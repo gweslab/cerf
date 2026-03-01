@@ -795,10 +795,27 @@ Win32Thunks::Win32Thunks(EmulatedMemory& mem)
        ARM code reads GetCurrentThreadId/GetCurrentProcessId directly from here
        (PUserKData[SH_CURTHREAD] at offset +4, PUserKData[SH_CURPROC] at offset +8).
        Without this, GetCurrentThreadId returns 0 → COMMCTRL g_CriticalSectionOwner
-       assert fires on every entry (0 != 0 is false). */
+       assert fires on every entry (0 != 0 is false).
+
+       KDataStruct layout (from nkarm.h):
+         offset 0x000: lpvTls     — pointer to current thread's TLS slot array
+         offset 0x004: ahSys[0]   — SH_CURTHREAD (current thread handle)
+         offset 0x008: ahSys[1]   — SH_CURPROC (current process handle)
+
+       TLS array layout: 7 pre-TLS DWORDs (negative indices) + 64 TLS slots.
+       We place this at 0xFFFFC000 (start of the allocated page).
+       lpvTls points to slot 0, which is at 0xFFFFC000 + 7*4 = 0xFFFFC01C. */
     mem.Alloc(0xFFFFC000, 0x1000);
+    /* Zero out TLS array area (pre-TLS + 64 slots = 71 DWORDs = 284 bytes) */
+    for (uint32_t i = 0; i < 71; i++)
+        mem.Write32(0xFFFFC000 + i * 4, 0);
+    /* lpvTls → slot 0 of the TLS array */
+    uint32_t emu_tls_slots = 0xFFFFC000 + 7 * 4;  /* 0xFFFFC01C */
+    mem.Write32(0xFFFFC800 + 0x000, emu_tls_slots);  /* lpvTls */
     mem.Write32(0xFFFFC800 + 0x004, GetCurrentThreadId());  /* SH_CURTHREAD */
     mem.Write32(0xFFFFC800 + 0x008, GetCurrentProcessId()); /* SH_CURPROC */
+    LOG(EMU, "[EMU] KData TLS array at 0x%08X, lpvTls at 0xFFFFC800 -> 0x%08X\n",
+        0xFFFFC000, emu_tls_slots);
 
     /* Register WinCE system window classes that don't exist on desktop Windows.
        On WinCE, these are provided by gwes.dll (the OS windowing kernel). */

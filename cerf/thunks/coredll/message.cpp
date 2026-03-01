@@ -130,6 +130,8 @@ void Win32Thunks::RegisterMessageHandlers() {
     Thunk("MessageBoxW", 858, [this](uint32_t* regs, EmulatedMemory& mem) -> bool {
         std::wstring text = ReadWStringFromEmu(mem, regs[1]);
         std::wstring title = ReadWStringFromEmu(mem, regs[2]);
+        LOG(THUNK, "[THUNK] MessageBoxW(hwnd=0x%08X, text='%ls', title='%ls', type=0x%X)\n",
+            regs[0], text.c_str(), title.c_str(), regs[3]);
         regs[0] = MessageBoxW((HWND)(intptr_t)(int32_t)regs[0], text.c_str(), title.c_str(), regs[3]);
         return true;
     });

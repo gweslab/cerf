@@ -24,7 +24,39 @@ void Win32Thunks::RegisterMiscHandlers() {
         LOG(DBG, "[DEBUG] %ls\n", ReadWStringFromEmu(mem, regs[0]).c_str()); return true;
     });
     Thunk("NKDbgPrintfW", 545, [this](uint32_t* regs, EmulatedMemory& mem) -> bool {
-        LOG(DBG, "[NKDbg] %ls\n", ReadWStringFromEmu(mem, regs[0]).c_str()); return true;
+        std::wstring fmt = ReadWStringFromEmu(mem, regs[0]);
+        /* Simple substitution for common format specifiers using R1-R3 */
+        std::wstring out;
+        uint32_t argRegs[] = { regs[1], regs[2], regs[3] };
+        int argIdx = 0;
+        for (size_t i = 0; i < fmt.size(); i++) {
+            if (fmt[i] == L'%' && i + 1 < fmt.size()) {
+                wchar_t spec = fmt[i + 1];
+                if (spec == L's' && argIdx < 3) {
+                    out += ReadWStringFromEmu(mem, argRegs[argIdx++]);
+                    i++; continue;
+                } else if (spec == L'S' && argIdx < 3) {
+                    /* %S = narrow string in wide printf */
+                    std::string narrow;
+                    uint32_t addr = argRegs[argIdx++];
+                    for (uint32_t c; addr && (c = mem.Read8(addr)); addr++) narrow += (char)c;
+                    out += std::wstring(narrow.begin(), narrow.end());
+                    i++; continue;
+                } else if ((spec == L'd' || spec == L'u') && argIdx < 3) {
+                    out += std::to_wstring(argRegs[argIdx++]);
+                    i++; continue;
+                } else if (spec == L'x' && argIdx < 3) {
+                    wchar_t hex[16]; swprintf(hex, 16, L"%x", argRegs[argIdx++]);
+                    out += hex; i++; continue;
+                } else if (spec == L'X' && argIdx < 3) {
+                    wchar_t hex[16]; swprintf(hex, 16, L"%X", argRegs[argIdx++]);
+                    out += hex; i++; continue;
+                }
+            }
+            out += fmt[i];
+        }
+        LOG(DBG, "[NKDbg] %ls\n", out.c_str());
+        return true;
     });
     Thunk("RegisterDbgZones", 546, [](uint32_t* regs, EmulatedMemory&) -> bool {
         LOG(THUNK, "[THUNK] RegisterDbgZones(hMod=0x%08X, lpdbgZones=0x%08X) -> TRUE (stub)\n", regs[0], regs[1]);
@@ -75,19 +107,13 @@ void Win32Thunks::RegisterMiscHandlers() {
     Thunk("GlobalAddAtomW", 1519, stub1("GlobalAddAtomW"));
     Thunk("GetAPIAddress", 32, stub0("GetAPIAddress"));
     Thunk("WaitForAPIReady", 2562, stub0("WaitForAPIReady"));
-    Thunk("__GetUserKData", 2528, [this](uint32_t* regs, EmulatedMemory& mem) -> bool {
-        /* WinCE UserKData page: system handle array at offset 0x004.
-           GetCurrentThreadId/GetCurrentProcessId read thread/process handles from here.
-           SH_CURTHREAD=0 (offset 0x004), SH_CURPROC=1 (offset 0x008) */
-        static uint32_t kdata_addr = 0x3FF00000;
-        static bool initialized = false;
-        if (!initialized) {
-            mem.Alloc(kdata_addr, 0x1000);
-            mem.Write32(kdata_addr + 0x004, GetCurrentThreadId());  /* SH_CURTHREAD */
-            mem.Write32(kdata_addr + 0x008, GetCurrentProcessId()); /* SH_CURPROC */
-            initialized = true;
-        }
-        regs[0] = kdata_addr;
+    Thunk("__GetUserKData", 2528, [](uint32_t* regs, EmulatedMemory&) -> bool {
+        /* Return the standard PUserKData address (0xFFFFC800).
+           The KData page is set up in the Win32Thunks constructor with:
+             offset 0x000: lpvTls (pointer to emulated TLS slot array)
+             offset 0x004: SH_CURTHREAD (current thread ID)
+             offset 0x008: SH_CURPROC (current process ID) */
+        regs[0] = 0xFFFFC800;
         return true;
     });
     /* Gesture stubs */

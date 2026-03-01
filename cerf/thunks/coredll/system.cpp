@@ -107,10 +107,51 @@ void Win32Thunks::RegisterSystemHandlers() {
     Thunk("ReleaseMutex", 556, [](uint32_t* regs, EmulatedMemory&) -> bool {
         regs[0] = ReleaseMutex((HANDLE)(intptr_t)(int32_t)regs[0]); return true;
     });
-    /* TLS */
-    Thunk("TlsGetValue", 15, [](uint32_t* regs, EmulatedMemory&) -> bool { regs[0] = 0; return true; });
-    Thunk("TlsSetValue", 16, [](uint32_t* regs, EmulatedMemory&) -> bool { regs[0] = 0; return true; });
-    Thunk("TlsCall", 520, [](uint32_t* regs, EmulatedMemory&) -> bool { regs[0] = 0; return true; });
+    /* TLS — emulated via the KData page at 0xFFFFC800.
+       WinCE ARM code can access TLS directly through memory:
+         lpvTls = *(DWORD*)0xFFFFC800   (pointer to TLS slot array)
+         value  = lpvTls[slot_index]     (read slot)
+       TLS slot array at 0xFFFFC01C, set up in Win32Thunks constructor.
+       Slots 0-3 reserved by WinCE; TlsCall allocates from 4 onward.
+       Next-free counter stored at 0xFFFFC880 (KData padding area). */
+    Thunk("TlsGetValue", 15, [this](uint32_t* regs, EmulatedMemory& mem) -> bool {
+        uint32_t idx = regs[0];
+        if (idx < 64) {
+            regs[0] = mem.Read32(0xFFFFC01C + idx * 4);
+        } else {
+            regs[0] = 0;
+        }
+        SetLastError(ERROR_SUCCESS);
+        LOG(THUNK, "[THUNK] TlsGetValue(%u) -> 0x%08X\n", idx, regs[0]);
+        return true;
+    });
+    Thunk("TlsSetValue", 16, [this](uint32_t* regs, EmulatedMemory& mem) -> bool {
+        uint32_t idx = regs[0];
+        if (idx < 64) {
+            mem.Write32(0xFFFFC01C + idx * 4, regs[1]);
+            LOG(THUNK, "[THUNK] TlsSetValue(%u, 0x%08X) -> 1\n", idx, regs[1]);
+            regs[0] = 1;
+        } else {
+            LOG(THUNK, "[THUNK] TlsSetValue(%u) -> 0 (out of range)\n", idx);
+            regs[0] = 0;
+        }
+        return true;
+    });
+    /* TlsCall: next-free counter stored at 0xFFFFC880 (KData padding area).
+       Initialize to 4 (slots 0-3 are reserved by WinCE). */
+    mem.Write32(0xFFFFC880, 4);
+    Thunk("TlsCall", 520, [this](uint32_t* regs, EmulatedMemory& mem) -> bool {
+        uint32_t next = mem.Read32(0xFFFFC880);
+        if (next < 64) {
+            mem.Write32(0xFFFFC880, next + 1);
+            LOG(THUNK, "[THUNK] TlsCall() -> slot %u\n", next);
+            regs[0] = next;
+        } else {
+            LOG(THUNK, "[THUNK] TlsCall() -> 0 (out of slots)\n");
+            regs[0] = 0;
+        }
+        return true;
+    });
     /* Locale */
     Thunk("GetLocaleInfoW", 200, [this](uint32_t* regs, EmulatedMemory& mem) -> bool {
         wchar_t buf[256] = {}; uint32_t maxlen = regs[3]; if (maxlen > 256) maxlen = 256;

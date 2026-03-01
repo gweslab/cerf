@@ -104,8 +104,8 @@ void Win32Thunks::RegisterModuleHandlers() {
         regs[0] = cmdline_addr;
         return true;
     });
-    Thunk("CacheSync", [](uint32_t* regs, EmulatedMemory&) -> bool { regs[0] = 1; return true; });
-    Thunk("CacheRangeFlush", [](uint32_t* regs, EmulatedMemory&) -> bool { regs[0] = 1; return true; });
+    Thunk("CacheSync", 577, [](uint32_t* regs, EmulatedMemory&) -> bool { regs[0] = 1; return true; });
+    Thunk("CacheRangeFlush", 1765, [](uint32_t* regs, EmulatedMemory&) -> bool { regs[0] = 1; return true; });
     Thunk("ExitProcess", [](uint32_t* regs, EmulatedMemory&) -> bool {
         printf("[THUNK] ExitProcess(%d)\n", regs[0]); ExitProcess(regs[0]); return true;
     });

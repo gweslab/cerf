@@ -227,8 +227,6 @@ void Win32Thunks::RegisterMiscHandlers() {
     Thunk("GetAPIAddress", 32, stub0);
     Thunk("WaitForAPIReady", 2562, stub0);
     Thunk("__GetUserKData", 2528, stub0);
-    Thunk("__PlatformSpecific2005", stub0);
-    Thunk("__PlatformSpecific2008", stub0);
     /* Gesture stubs */
     Thunk("RegisterDefaultGestureHandler", 2928, stub0);
     Thunk("GetGestureInfo", 2925, stub0);

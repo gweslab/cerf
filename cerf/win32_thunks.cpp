@@ -205,7 +205,9 @@ void Win32Thunks::InitOrdinalMap() {
     ordinal_map[455] = "RegCloseKey";
     ordinal_map[456] = "RegCreateKeyExW";
     ordinal_map[457] = "RegDeleteKeyW";
+    ordinal_map[458] = "RegDeleteValueW";
     ordinal_map[459] = "RegEnumValueW";
+    ordinal_map[460] = "RegEnumKeyExW";
     ordinal_map[461] = "RegOpenKeyExW";
     ordinal_map[462] = "RegQueryInfoKeyW";
     ordinal_map[463] = "RegQueryValueExW";
@@ -827,7 +829,45 @@ bool Win32Thunks::HandleThunk(uint32_t addr, uint32_t* regs, EmulatedMemory& mem
     if (it == thunks.end()) {
         /* Also check addr+1 for Thumb calls */
         it = thunks.find(addr & ~1u);
-        if (it == thunks.end()) return false;
+        if (it == thunks.end()) {
+            /* Handle WinCE trap-based API calls (0xF000xxxx range).
+               WinCE apps call some APIs via trap addresses descending from 0xF0010000.
+               API index = (0xF0010000 - addr) / 4, which maps to COREDLL ordinals. */
+            if (addr >= WINCE_TRAP_BASE && addr < WINCE_TRAP_TOP) {
+                uint32_t api_index = (WINCE_TRAP_TOP - addr) / 4;
+                auto name_it = ordinal_map.find((uint16_t)api_index);
+                std::string func_name = (name_it != ordinal_map.end()) ? name_it->second : "";
+                if (!func_name.empty()) {
+                    printf("[THUNK] WinCE trap 0x%08X -> API %u (%s)\n", addr, api_index, func_name.c_str());
+                } else {
+                    printf("[THUNK] WinCE trap 0x%08X -> API %u (unknown)\n", addr, api_index);
+                }
+                /* Create a temporary thunk entry and execute it */
+                ThunkEntry trap_entry;
+                trap_entry.dll_name = "COREDLL.dll";
+                trap_entry.func_name = func_name;
+                trap_entry.ordinal = (uint16_t)api_index;
+                trap_entry.by_ordinal = true;
+                trap_entry.thunk_addr = addr;
+                bool result = ExecuteThunk(trap_entry, regs, mem);
+                if (result) {
+                    uint32_t lr = regs[14];
+                    regs[15] = (lr & 1) ? (lr & ~1u) : (lr & ~3u);
+                }
+                return result;
+            }
+
+            /* Detect branches into thunk memory region at unregistered addresses */
+            if (addr >= THUNK_BASE && addr < THUNK_BASE + 0x100000) {
+                printf("[EMU] ERROR: Branch to unregistered thunk address 0x%08X (LR=0x%08X)\n",
+                       addr, regs[14]);
+                regs[0] = 0;
+                uint32_t lr = regs[14];
+                regs[15] = (lr & 1) ? (lr & ~1u) : (lr & ~3u);
+                return true;
+            }
+            return false;
+        }
     }
 
     bool result = ExecuteThunk(it->second, regs, mem);
@@ -879,6 +919,33 @@ bool Win32Thunks::ExecuteThunk(const ThunkEntry& entry, uint32_t* regs, Emulated
     if (ExecuteGdiThunk(func, regs, mem)) return true;
     if (ExecuteWindowThunk(func, regs, mem)) return true;
     if (ExecuteSystemThunk(func, regs, mem)) return true;
+
+    /* CEShell.DLL stubs - return proper error codes so apps don't
+       dereference NULL COM pointers when shell APIs are unavailable */
+    if (entry.dll_name == "CEShell.DLL" || entry.dll_name == "ceshell.dll") {
+        if (func == "SHGetSpecialFolderLocation" || func == "SHGetMalloc") {
+            /* HRESULT-returning functions: return E_NOTIMPL */
+            regs[0] = 0x80004001; /* E_NOTIMPL */
+            printf("[THUNK] %s -> E_NOTIMPL (stub)\n", func.c_str());
+            return true;
+        }
+        if (func == "SHGetPathFromIDList" || func == "SHGetShortcutTarget" ||
+            func == "SHLoadDIBitmap") {
+            /* BOOL/pointer-returning functions: return 0 (FALSE/NULL) */
+            regs[0] = 0;
+            printf("[THUNK] %s -> 0 (stub)\n", func.c_str());
+            return true;
+        }
+    }
+
+    /* commctrl.dll stubs */
+    if (entry.dll_name == "commctrl.dll" || entry.dll_name == "COMMCTRL.DLL") {
+        /* InitCommonControlsEx (ordinal 2), InitCommonControls (ordinal 3), etc. */
+        regs[0] = 1; /* TRUE - pretend success */
+        printf("[THUNK] commctrl.dll!%s (ordinal %d) -> 1 (stub)\n",
+               func.empty() ? "(unknown)" : func.c_str(), entry.ordinal);
+        return true;
+    }
 
     /* Platform-specific ordinals - silent no-ops */
     if (func == "__PlatformSpecific2005" || func == "__PlatformSpecific2008") {

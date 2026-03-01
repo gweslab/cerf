@@ -8,9 +8,16 @@
 #include "pe_loader.h"
 
 /* Magic address range for thunk entries.
-   When ARM code branches to an address in this range, we intercept it. */
-#define THUNK_BASE   0xF0000000
+   When ARM code branches to an address in this range, we intercept it.
+   NOTE: 0xF000xxxx is reserved for WinCE kernel trap-based API calls. */
+#define THUNK_BASE   0xFE000000
 #define THUNK_STRIDE 4
+
+/* WinCE trap-based API call range.
+   WinCE apps may call APIs via trap addresses descending from 0xF0010000.
+   API index = (0xF0010000 - addr) / 4 */
+#define WINCE_TRAP_BASE  0xF0000000
+#define WINCE_TRAP_TOP   0xF0010000
 
 struct ThunkEntry {
     std::string dll_name;

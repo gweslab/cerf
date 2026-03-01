@@ -162,16 +162,25 @@ bool Win32Thunks::ExecuteSystemThunk(const std::string& func, uint32_t* regs, Em
 
     /* Registry stubs */
     if (func == "RegOpenKeyExW" || func == "RegCreateKeyExW") {
-        printf("[THUNK] %s - stubbed (returning error)\n", func.c_str());
-        regs[0] = ERROR_FILE_NOT_FOUND;
+        uint32_t phkResult = (func == "RegOpenKeyExW") ?
+            ReadStackArg(regs, mem, 0) : ReadStackArg(regs, mem, 2);
+        std::wstring subkey;
+        if (regs[1]) subkey = ReadWStringFromEmu(mem, regs[1]);
+        static uint32_t next_fake_hkey = 0xAE000000;
+        uint32_t fake_hkey = next_fake_hkey++;
+        if (phkResult) mem.Write32(phkResult, fake_hkey);
+        printf("[THUNK] %s('%ls') -> fake HKEY 0x%08X\n", func.c_str(),
+               subkey.c_str(), fake_hkey);
+        regs[0] = ERROR_SUCCESS;
         return true;
     }
     if (func == "RegCloseKey") {
-        regs[0] = 0;
+        regs[0] = ERROR_SUCCESS;
         return true;
     }
     if (func == "RegQueryValueExW" || func == "RegSetValueExW" ||
-        func == "RegDeleteKeyW" || func == "RegEnumValueW" || func == "RegQueryInfoKeyW") {
+        func == "RegDeleteKeyW" || func == "RegDeleteValueW" ||
+        func == "RegEnumValueW" || func == "RegEnumKeyExW" || func == "RegQueryInfoKeyW") {
         regs[0] = ERROR_FILE_NOT_FOUND;
         return true;
     }
@@ -370,10 +379,18 @@ bool Win32Thunks::ExecuteSystemThunk(const std::string& func, uint32_t* regs, Em
                 (HINSTANCE)(intptr_t)(int32_t)hmod,
                 MAKEINTRESOURCEW(name_id), type, cx, cy, fuLoad);
         } else {
-            /* ARM module with non-bitmap type - stub */
-            printf("[THUNK] LoadImageW(0x%08X, %u, type=%u) -> unsupported type for ARM module\n",
-                   hmod, name_id, type);
-            regs[0] = 0;
+            /* ARM module with non-bitmap type (icon, cursor) - try native resource loading */
+            HMODULE native_mod = GetNativeModuleForResources(hmod);
+            if (native_mod) {
+                HANDLE h = LoadImageW(native_mod, MAKEINTRESOURCEW(name_id), type, cx, cy, fuLoad);
+                regs[0] = (uint32_t)(uintptr_t)h;
+                printf("[THUNK] LoadImageW(0x%08X, %u, type=%u) -> 0x%08X (native rsrc)\n",
+                       hmod, name_id, type, regs[0]);
+            } else {
+                printf("[THUNK] LoadImageW(0x%08X, %u, type=%u) -> no native module for resources\n",
+                       hmod, name_id, type);
+                regs[0] = 0;
+            }
         }
         return true;
     }
@@ -459,6 +476,20 @@ bool Win32Thunks::ExecuteSystemThunk(const std::string& func, uint32_t* regs, Em
         std::wstring path = ReadWStringFromEmu(mem, regs[0]);
         printf("[THUNK] CreateFileW('%ls') - stub\n", path.c_str());
         regs[0] = (uint32_t)INVALID_HANDLE_VALUE;
+        return true;
+    }
+    if (func == "FindFirstFileW") {
+        std::wstring pattern = ReadWStringFromEmu(mem, regs[0]);
+        printf("[THUNK] FindFirstFileW('%ls') -> INVALID_HANDLE_VALUE\n", pattern.c_str());
+        regs[0] = (uint32_t)INVALID_HANDLE_VALUE;
+        return true;
+    }
+    if (func == "FindNextFileW") {
+        regs[0] = 0; /* FALSE - no more files */
+        return true;
+    }
+    if (func == "FindClose") {
+        regs[0] = 1; /* TRUE */
         return true;
     }
 

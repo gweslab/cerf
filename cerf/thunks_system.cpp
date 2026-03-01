@@ -481,7 +481,23 @@ bool Win32Thunks::ExecuteSystemThunk(const std::string& func, uint32_t* regs, Em
     if (func == "DisableThreadLibraryCalls") { regs[0] = 1; return true; }
     if (func == "FlushInstructionCache") { regs[0] = 1; return true; }
     if (func == "GetProcessIndexFromID") { regs[0] = 1; return true; }
-    if (func == "GlobalMemoryStatus") { return true; }
+    if (func == "GlobalMemoryStatus") {
+        uint32_t ptr = regs[0];
+        if (ptr) {
+            MEMORYSTATUS ms = {};
+            ms.dwLength = sizeof(ms);
+            GlobalMemoryStatus(&ms);
+            mem.Write32(ptr + 0,  32);
+            mem.Write32(ptr + 4,  ms.dwMemoryLoad);
+            mem.Write32(ptr + 8,  (uint32_t)std::min(ms.dwTotalPhys,    (SIZE_T)UINT32_MAX));
+            mem.Write32(ptr + 12, (uint32_t)std::min(ms.dwAvailPhys,    (SIZE_T)UINT32_MAX));
+            mem.Write32(ptr + 16, (uint32_t)std::min(ms.dwTotalPageFile, (SIZE_T)UINT32_MAX));
+            mem.Write32(ptr + 20, (uint32_t)std::min(ms.dwAvailPageFile, (SIZE_T)UINT32_MAX));
+            mem.Write32(ptr + 24, (uint32_t)std::min(ms.dwTotalVirtual,  (SIZE_T)UINT32_MAX));
+            mem.Write32(ptr + 28, (uint32_t)std::min(ms.dwAvailVirtual,  (SIZE_T)UINT32_MAX));
+        }
+        return true;
+    }
     if (func == "GetVersionExW") {
         if (regs[0]) {
             mem.Write32(regs[0] + 4, 4);

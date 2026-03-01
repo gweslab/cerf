@@ -129,6 +129,16 @@ void Win32Thunks::RegisterGdiDrawHandlers() {
     Thunk("CreatePen", 926, [](uint32_t* regs, EmulatedMemory&) -> bool {
         regs[0] = (uint32_t)(uintptr_t)CreatePen(regs[0], regs[1], regs[2]); return true;
     });
+    Thunk("CreatePenIndirect", 930, [this](uint32_t* regs, EmulatedMemory& mem) -> bool {
+        /* LOGPEN: { UINT lopnStyle; POINT lopnWidth; COLORREF lopnColor; } = 16 bytes */
+        LOGPEN lp;
+        lp.lopnStyle = mem.Read32(regs[0]);
+        lp.lopnWidth.x = (LONG)mem.Read32(regs[0] + 4);
+        lp.lopnWidth.y = (LONG)mem.Read32(regs[0] + 8);
+        lp.lopnColor = mem.Read32(regs[0] + 12);
+        regs[0] = (uint32_t)(uintptr_t)CreatePenIndirect(&lp);
+        return true;
+    });
     Thunk("CreateSolidBrush", 931, [](uint32_t* regs, EmulatedMemory&) -> bool {
         regs[0] = (uint32_t)(uintptr_t)CreateSolidBrush(regs[0]); return true;
     });

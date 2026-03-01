@@ -70,6 +70,26 @@ void Win32Thunks::RegisterSystemHandlers() {
     Thunk("DeleteCriticalSection", 3, [](uint32_t*, EmulatedMemory&) -> bool { return true; });
     Thunk("EnterCriticalSection", 4, [](uint32_t*, EmulatedMemory&) -> bool { return true; });
     Thunk("LeaveCriticalSection", 5, [](uint32_t*, EmulatedMemory&) -> bool { return true; });
+    Thunk("InitLocale", 8, [](uint32_t* regs, EmulatedMemory&) -> bool { regs[0] = 1; return true; });
+    Thunk("InterlockedIncrement", 10, [this](uint32_t* regs, EmulatedMemory& mem) -> bool {
+        int32_t val = (int32_t)mem.Read32(regs[0]) + 1;
+        mem.Write32(regs[0], (uint32_t)val);
+        regs[0] = (uint32_t)val;
+        return true;
+    });
+    ThunkOrdinal("InterlockedDecrement", 11);
+    Thunk("InterlockedDecrement", [this](uint32_t* regs, EmulatedMemory& mem) -> bool {
+        int32_t val = (int32_t)mem.Read32(regs[0]) - 1;
+        mem.Write32(regs[0], (uint32_t)val);
+        regs[0] = (uint32_t)val;
+        return true;
+    });
+    Thunk("InterlockedExchange", 12, [this](uint32_t* regs, EmulatedMemory& mem) -> bool {
+        uint32_t old = mem.Read32(regs[0]);
+        mem.Write32(regs[0], regs[1]);
+        regs[0] = old;
+        return true;
+    });
     Thunk("CreateEventW", 495, [](uint32_t* regs, EmulatedMemory&) -> bool {
         regs[0] = (uint32_t)(uintptr_t)CreateEventW(NULL, regs[1], regs[2], NULL); return true;
     });

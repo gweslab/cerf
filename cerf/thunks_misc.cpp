@@ -540,7 +540,34 @@ void Win32Thunks::RegisterMiscHandlers() {
     Thunk("MapViewOfFile", 549, stub0("MapViewOfFile"));
     Thunk("UnmapViewOfFile", 550, stub0("UnmapViewOfFile"));
     /* Ordinal-only entries (no handler, for logging) */
-    ThunkOrdinal("Shell_NotifyIcon", 481);
+    Thunk("Shell_NotifyIcon", 481, [this](uint32_t* regs, EmulatedMemory& mem) -> bool {
+        /* Shell_NotifyIcon(dwMessage, pnid) */
+        DWORD dwMessage = regs[0];
+        uint32_t nid_addr = regs[1];
+        if (!nid_addr) { regs[0] = 0; return true; }
+        /* WinCE NOTIFYICONDATA (32-bit):
+           0x00 cbSize, 0x04 hWnd, 0x08 uID, 0x0C uFlags,
+           0x10 uCallbackMessage, 0x14 hIcon, 0x18 szTip[64] (128 bytes) */
+        NOTIFYICONDATAW nid = {};
+        nid.cbSize = sizeof(NOTIFYICONDATAW);
+        nid.hWnd = (HWND)(intptr_t)(int32_t)mem.Read32(nid_addr + 0x04);
+        nid.uID = mem.Read32(nid_addr + 0x08);
+        nid.uFlags = mem.Read32(nid_addr + 0x0C);
+        nid.uCallbackMessage = mem.Read32(nid_addr + 0x10);
+        nid.hIcon = (HICON)(intptr_t)(int32_t)mem.Read32(nid_addr + 0x14);
+        /* Read szTip (up to 64 wchars at offset 0x18) */
+        for (int i = 0; i < 63; i++) {
+            wchar_t c = (wchar_t)mem.Read16(nid_addr + 0x18 + i * 2);
+            nid.szTip[i] = c;
+            if (c == 0) break;
+        }
+        nid.szTip[63] = 0;
+        printf("[THUNK] Shell_NotifyIcon(msg=%d, uID=%d, tip='%ls')\n",
+               dwMessage, nid.uID, nid.szTip);
+        BOOL ret = Shell_NotifyIconW(dwMessage, &nid);
+        regs[0] = ret;
+        return true;
+    });
     ThunkOrdinal("SHCreateShortcut", 484);
     ThunkOrdinal("GetOwnerProcess", 606);
     ThunkOrdinal("Random", 80);

@@ -597,7 +597,8 @@ static bool IsThunkedDll(const std::string& dll_name) {
     std::transform(lower.begin(), lower.end(), lower.begin(), ::tolower);
     return lower.find("coredll") != std::string::npos ||
            lower.find("commctrl") != std::string::npos ||
-           lower.find("ceshell") != std::string::npos;
+           lower.find("ceshell") != std::string::npos ||
+           lower.find("ole32") != std::string::npos;
 }
 
 void Win32Thunks::InstallThunks(PEInfo& info) {
@@ -927,6 +928,13 @@ bool Win32Thunks::ExecuteThunk(const ThunkEntry& entry, uint32_t* regs, Emulated
         return true;
     }
 
+    /* ole32.dll stubs */
+    if (entry.dll_name == "ole32.dll" || entry.dll_name == "OLE32.DLL") {
+        regs[0] = 0; /* S_OK */
+        printf("[THUNK] ole32.dll!%s -> S_OK (stub)\n",
+               func.empty() ? "(unknown)" : func.c_str());
+        return true;
+    }
 
     /* Unhandled function */
     if (!func.empty()) {

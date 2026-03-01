@@ -5,6 +5,7 @@
 #include <commctrl.h>
 #include <commdlg.h>
 #include <shellapi.h>
+#include <objbase.h>
 #include <algorithm>
 #include <vector>
 
@@ -367,7 +368,31 @@ void Win32Thunks::RegisterMiscHandlers() {
     Thunk("GetSaveFileNameW", [this, getFileNameImpl](uint32_t* regs, EmulatedMemory& mem) -> bool {
         return getFileNameImpl(regs, mem, true);
     });
+    /* COM */
+    Thunk("CoInitializeEx", [](uint32_t* regs, EmulatedMemory&) -> bool {
+        HRESULT hr = CoInitializeEx(NULL, regs[1]);
+        printf("[THUNK] CoInitializeEx(0x%X) -> 0x%08X\n", regs[1], (uint32_t)hr);
+        regs[0] = (uint32_t)hr;
+        return true;
+    });
+    Thunk("CoUninitialize", [](uint32_t* regs, EmulatedMemory&) -> bool {
+        CoUninitialize(); regs[0] = 0; return true;
+    });
     /* Common controls */
+    Thunk("InitCommonControlsEx", [this](uint32_t* regs, EmulatedMemory& mem) -> bool {
+        /* Read INITCOMMONCONTROLSEX from emulated memory: { DWORD dwSize; DWORD dwICC; } */
+        uint32_t icc_addr = regs[0];
+        INITCOMMONCONTROLSEX icc = {};
+        icc.dwSize = sizeof(icc);
+        icc.dwICC = icc_addr ? mem.Read32(icc_addr + 4) : ICC_WIN95_CLASSES;
+        BOOL ret = InitCommonControlsEx(&icc);
+        printf("[THUNK] InitCommonControlsEx(dwICC=0x%X) -> %d\n", icc.dwICC, ret);
+        regs[0] = ret;
+        return true;
+    });
+    Thunk("InitCommonControls", [](uint32_t* regs, EmulatedMemory&) -> bool {
+        InitCommonControls(); regs[0] = 0; return true;
+    });
     Thunk("ImageList_Create", 742, [this](uint32_t* regs, EmulatedMemory& mem) -> bool {
         regs[0] = (uint32_t)(uintptr_t)ImageList_Create(regs[0], regs[1], regs[2], regs[3], ReadStackArg(regs, mem, 0));
         return true;

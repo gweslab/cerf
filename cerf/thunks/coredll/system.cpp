@@ -34,6 +34,26 @@ void Win32Thunks::RegisterSystemHandlers() {
     Thunk("GetTickCount", 535, [](uint32_t* regs, EmulatedMemory&) -> bool {
         regs[0] = GetTickCount(); return true;
     });
+    Thunk("QueryPerformanceCounter", 538, [this](uint32_t* regs, EmulatedMemory& mem) -> bool {
+        LARGE_INTEGER counter;
+        BOOL result = QueryPerformanceCounter(&counter);
+        if (regs[0]) {
+            mem.Write32(regs[0], (uint32_t)(counter.QuadPart & 0xFFFFFFFF));
+            mem.Write32(regs[0] + 4, (uint32_t)(counter.QuadPart >> 32));
+        }
+        regs[0] = result;
+        return true;
+    });
+    Thunk("QueryPerformanceFrequency", 539, [this](uint32_t* regs, EmulatedMemory& mem) -> bool {
+        LARGE_INTEGER freq;
+        BOOL result = QueryPerformanceFrequency(&freq);
+        if (regs[0]) {
+            mem.Write32(regs[0], (uint32_t)(freq.QuadPart & 0xFFFFFFFF));
+            mem.Write32(regs[0] + 4, (uint32_t)(freq.QuadPart >> 32));
+        }
+        regs[0] = result;
+        return true;
+    });
     Thunk("GetSystemInfo", 542, [this](uint32_t* regs, EmulatedMemory& mem) -> bool {
         if (regs[0]) {
             SYSTEM_INFO si; GetSystemInfo(&si);

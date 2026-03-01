@@ -218,7 +218,20 @@ void Win32Thunks::RegisterStringHandlers() {
         regs[0] = (uint32_t)result.size();
         return true;
     });
-    thunk_handlers["swprintf"] = thunk_handlers["_snwprintf"];
+    /* swprintf(dst, format, ...) — NO count param, unlike _snwprintf */
+    Thunk("swprintf", 1097, [this, wprintf_format](uint32_t* regs, EmulatedMemory& mem) -> bool {
+        uint32_t dst = regs[0];
+        std::wstring fmt = ReadWStringFromEmu(mem, regs[1]);
+        uint32_t args[10];
+        args[0] = regs[2];
+        args[1] = regs[3];
+        for (int i = 2; i < 10; i++) args[i] = ReadStackArg(regs, mem, i - 2);
+        std::wstring result = wprintf_format(mem, fmt, args, 10);
+        for (uint32_t i = 0; i < (uint32_t)result.size(); i++) mem.Write16(dst + i * 2, result[i]);
+        mem.Write16(dst + (uint32_t)result.size() * 2, 0);
+        regs[0] = (uint32_t)result.size();
+        return true;
+    });
     thunk_handlers["swscanf"] = thunk_handlers["_snwprintf"]; /* stub — swscanf is rare */
     thunk_handlers["wvsprintfW"] = thunk_handlers["_snwprintf"];
     Thunk("sprintf", 1058, [](uint32_t* regs, EmulatedMemory&) -> bool { regs[0] = 0; return true; });

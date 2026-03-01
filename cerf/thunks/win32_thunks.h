@@ -201,4 +201,5 @@ private:
     void RegisterMiscHandlers();
     void RegisterModuleHandlers();
     void RegisterAygshellHandlers();
+    void RegisterCeshellHandlers();
 };

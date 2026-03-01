@@ -572,6 +572,7 @@ Win32Thunks::Win32Thunks(EmulatedMemory& mem)
     RegisterMiscHandlers();
     RegisterModuleHandlers();
     RegisterAygshellHandlers();
+    RegisterCeshellHandlers();
 }
 
 uint32_t Win32Thunks::AllocThunk(const std::string& dll, const std::string& func,
@@ -911,20 +912,12 @@ bool Win32Thunks::ExecuteThunk(const ThunkEntry& entry, uint32_t* regs, Emulated
     auto it = thunk_handlers.find(func);
     if (it != thunk_handlers.end()) return it->second(regs, mem);
 
-    /* CEShell.DLL stubs - return proper error codes so apps don't
-       dereference NULL COM pointers when shell APIs are unavailable */
+    /* CEShell.DLL generic fallback */
     if (entry.dll_name == "CEShell.DLL" || entry.dll_name == "ceshell.dll") {
-        if (func == "SHGetSpecialFolderLocation" || func == "SHGetMalloc") {
-            regs[0] = 0x80004001; /* E_NOTIMPL */
-            printf("[THUNK] %s -> E_NOTIMPL (stub)\n", func.c_str());
-            return true;
-        }
-        if (func == "SHGetPathFromIDList" || func == "SHGetShortcutTarget" ||
-            func == "SHLoadDIBitmap") {
-            regs[0] = 0;
-            printf("[THUNK] %s -> 0 (stub)\n", func.c_str());
-            return true;
-        }
+        regs[0] = 0;
+        printf("[THUNK] ceshell.dll!%s (ordinal %d) -> 0 (stub)\n",
+               func.empty() ? "(unknown)" : func.c_str(), entry.ordinal);
+        return true;
     }
 
     /* commctrl.dll stubs */

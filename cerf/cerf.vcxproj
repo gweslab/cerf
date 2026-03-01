@@ -182,6 +182,7 @@
     <ClCompile Include="thunks\commdlg\commdlg.cpp" />
     <ClCompile Include="thunks\coredll\shell.cpp" />
     <ClCompile Include="thunks\aygshell\aygshell.cpp" />
+    <ClCompile Include="thunks\ceshell\ceshell.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

@@ -158,6 +158,14 @@
     <ClCompile Include="main.cpp" />
     <!-- Thunk infrastructure -->
     <ClCompile Include="thunks\win32_thunks.cpp" />
+    <ClCompile Include="thunks\registry_impl.cpp" />
+    <ClCompile Include="thunks\callbacks.cpp" />
+    <ClCompile Include="thunks\menubar.cpp" />
+    <ClCompile Include="thunks\dll_loader.cpp" />
+    <ClCompile Include="thunks\dispatch.cpp" />
+    <ClCompile Include="thunks\resource_helpers.cpp" />
+    <ClCompile Include="thunks\dlgproc.cpp" />
+    <ClCompile Include="thunks\registry_import.cpp" />
     <!-- COREDLL thunks -->
     <ClCompile Include="thunks\coredll\arm_runtime.cpp" />
     <ClCompile Include="thunks\coredll\memory.cpp" />

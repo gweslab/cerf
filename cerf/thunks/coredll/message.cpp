@@ -3,7 +3,6 @@
 #include "../../log.h"
 #include <cstdio>
 #include <vector>
-#include <commctrl.h>
 
 void Win32Thunks::RegisterMessageHandlers() {
     Thunk("GetMessageW", 861, [this](uint32_t* regs, EmulatedMemory& mem) -> bool {
@@ -71,19 +70,6 @@ void Win32Thunks::RegisterMessageHandlers() {
             wp = (WPARAM)(intptr_t)(int32_t)regs[2];
             LOG(THUNK, "[THUNK] SendMessage WM_SETFONT hwnd=%p hFont=0x%08X -> %p\n",
                 hw, regs[2], (HFONT)wp);
-        }
-        /* TB_ADDBITMAP: WinCE bitmap IDs 140 (close) and 142 (help) don't
-           exist on desktop comctl32.  Skip them to avoid errors — the button
-           renders blank but remains functional.  All other TB_ADDBITMAP
-           messages pass through to the ARM toolbar WndProc unchanged. */
-        if (umsg == TB_ADDBITMAP && lp != 0 && mem.IsValid((uint32_t)lp)) {
-            uint32_t arm_hInst = mem.Read32((uint32_t)lp);
-            uint32_t arm_nID = mem.Read32((uint32_t)lp + 4);
-            if (arm_hInst == 0xFFFFFFFF && (arm_nID == 140 || arm_nID == 142)) {
-                regs[0] = 0;
-                LOG(THUNK, "[THUNK] TB_ADDBITMAP WinCE bitmap %u -> skipped (no desktop equivalent)\n", arm_nID);
-                return true;
-            }
         }
         /* Marshal ARM pointers to native.
            Messages that pass strings in lParam need conversion from

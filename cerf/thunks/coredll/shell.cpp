@@ -90,8 +90,71 @@ void Win32Thunks::RegisterShellHandlers() {
         }
         return true;
     });
-    /* SHLoadDIBitmap(lpszFileName) — forward to ceshell.dll */
-    Thunk("SHLoadDIBitmap", 487, forwardToArm("ceshell.dll", "SHLoadDIBitmap", 1));
+    /* SHLoadDIBitmap(lpszFileName) — load a BMP file and return HBITMAP.
+       ceshell.dll's export is a PE forwarder back to COREDLL (circular),
+       so we implement it natively.  Handles standard .bmp and WinCE .2bp files. */
+    Thunk("SHLoadDIBitmap", 487, [this](uint32_t* regs, EmulatedMemory& mem) -> bool {
+        std::wstring wce_path = ReadWStringFromEmu(mem, regs[0]);
+        std::wstring host_path = MapWinCEPath(wce_path);
+        LOG(THUNK, "[THUNK] SHLoadDIBitmap('%ls' -> '%ls')\n", wce_path.c_str(), host_path.c_str());
+        HANDLE hFile = CreateFileW(host_path.c_str(), GENERIC_READ, FILE_SHARE_READ,
+                                   NULL, OPEN_EXISTING, 0, NULL);
+        if (hFile == INVALID_HANDLE_VALUE) {
+            LOG(THUNK, "[THUNK]   -> file not found\n");
+            regs[0] = 0;
+            return true;
+        }
+        DWORD fileSize = GetFileSize(hFile, NULL);
+        std::vector<uint8_t> buf(fileSize);
+        DWORD bytesRead = 0;
+        ReadFile(hFile, buf.data(), fileSize, &bytesRead, NULL);
+        CloseHandle(hFile);
+        if (bytesRead < sizeof(BITMAPFILEHEADER) + sizeof(BITMAPINFOHEADER)) {
+            LOG(THUNK, "[THUNK]   -> file too small (%u bytes)\n", bytesRead);
+            regs[0] = 0;
+            return true;
+        }
+        BITMAPFILEHEADER* bfh = (BITMAPFILEHEADER*)buf.data();
+        BITMAPINFO* bmi = (BITMAPINFO*)(buf.data() + sizeof(BITMAPFILEHEADER));
+        uint8_t* bits = buf.data() + bfh->bfOffBits;
+        HBITMAP hbm = NULL;
+        HDC hdc = GetDC(NULL);
+        if (bmi->bmiHeader.biBitCount == 2) {
+            /* WinCE 2bpp format — desktop Windows doesn't support it.
+               Convert to 4bpp: expand each 2-bit pixel to 4 bits. */
+            int w = bmi->bmiHeader.biWidth, h = abs(bmi->bmiHeader.biHeight);
+            int src_stride = ((w * 2 + 31) / 32) * 4;
+            int dst_stride = ((w * 4 + 31) / 32) * 4;
+            std::vector<uint8_t> dst_bits(dst_stride * h, 0);
+            for (int y = 0; y < h; y++) {
+                uint8_t* src_row = bits + y * src_stride;
+                uint8_t* dst_row = dst_bits.data() + y * dst_stride;
+                for (int x = 0; x < w; x++) {
+                    int src_byte = x / 4, src_shift = 6 - (x % 4) * 2;
+                    uint8_t val = (src_row[src_byte] >> src_shift) & 0x3;
+                    int dst_byte = x / 2, dst_shift = (x % 2 == 0) ? 4 : 0;
+                    dst_row[dst_byte] |= (val << dst_shift);
+                }
+            }
+            /* Build 4bpp BITMAPINFO with same color table */
+            int nColors = (bmi->bmiHeader.biClrUsed > 0) ? bmi->bmiHeader.biClrUsed : 4;
+            std::vector<uint8_t> bmi4_buf(sizeof(BITMAPINFOHEADER) + nColors * sizeof(RGBQUAD));
+            BITMAPINFO* bmi4 = (BITMAPINFO*)bmi4_buf.data();
+            bmi4->bmiHeader = bmi->bmiHeader;
+            bmi4->bmiHeader.biBitCount = 4;
+            bmi4->bmiHeader.biSizeImage = dst_stride * h;
+            bmi4->bmiHeader.biClrUsed = nColors;
+            memcpy(bmi4->bmiColors, bmi->bmiColors, nColors * sizeof(RGBQUAD));
+            hbm = CreateDIBitmap(hdc, &bmi4->bmiHeader, CBM_INIT, dst_bits.data(), bmi4, DIB_RGB_COLORS);
+        } else {
+            hbm = CreateDIBitmap(hdc, &bmi->bmiHeader, CBM_INIT, bits, bmi, DIB_RGB_COLORS);
+        }
+        ReleaseDC(NULL, hdc);
+        LOG(THUNK, "[THUNK]   -> hbm=%p (%dx%d %dbpp)\n", hbm,
+            bmi->bmiHeader.biWidth, bmi->bmiHeader.biHeight, bmi->bmiHeader.biBitCount);
+        regs[0] = (uint32_t)(uintptr_t)hbm;
+        return true;
+    });
     /* SHCreateShortcut(lpszShortcut, lpszTarget) — forward to ceshell.dll */
     Thunk("SHCreateShortcut", 484, forwardToArm("ceshell.dll", "SHCreateShortcut", 2));
     /* SHCreateShortcutEx(lpszShortcut, lpszTarget, lpszParams) — forward to ceshell.dll */

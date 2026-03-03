@@ -48,7 +48,7 @@ static std::vector<uint8_t> CopyDlgTemplate(EmulatedMemory& mem, uint32_t addr) 
    If DS_SETFONT is absent, adds it with the WinCE system font so child controls
    match the WinCE appearance instead of using the desktop "System" bitmap font.
    Returns true if the template had WS_EX_CAPTIONOKBTN in dwExtendedStyle. */
-static bool FixupDlgTemplate(std::vector<uint8_t>& tmpl, const std::wstring& sysfont_name, LONG sysfont_height) {
+static bool FixupDlgTemplate(std::vector<uint8_t>& tmpl, const std::wstring& sysfont_name) {
     if (tmpl.size() < 10) return false;
     /* DLGTEMPLATE: offset 0 = style (DWORD), offset 4 = dwExtendedStyle (DWORD) */
     uint32_t style   = *(uint32_t*)&tmpl[0];
@@ -75,12 +75,10 @@ static bool FixupDlgTemplate(std::vector<uint8_t>& tmpl, const std::wstring& sys
     p += 2; /* skip null terminator */
 
     if (style & DS_SETFONT) {
-        /* DS_SETFONT present: pointSize(WORD) then font name (wchar string) */
-        size_t font_offset = p;
-        /* Compute point size from lfHeight: abs(height) if negative */
-        int16_t point_size = (int16_t)(sysfont_height < 0 ? -sysfont_height : sysfont_height);
-        *(uint16_t*)&tmpl[font_offset] = (uint16_t)point_size;
-        p += 2; /* skip point size */
+        /* DS_SETFONT present: pointSize(WORD) then font name (wchar string).
+           Keep the original point size — it controls DLU sizing of all controls.
+           Only replace the font name so it uses the WinCE system font face. */
+        p += 2; /* skip point size (unchanged) */
         /* Replace font name with sysfont */
         size_t name_start = p;
         while (p + 2 <= tmpl.size() && *(uint16_t*)&tmpl[p]) p += 2;
@@ -97,10 +95,11 @@ static bool FixupDlgTemplate(std::vector<uint8_t>& tmpl, const std::wstring& sys
             *(uint16_t*)&tmpl[name_start + i * 2] = (uint16_t)sysfont_name[i];
         *(uint16_t*)&tmpl[name_start + sysfont_name.size() * 2] = 0;
     } else {
-        /* No DS_SETFONT: add it. Insert pointSize + font name at position p. */
+        /* No DS_SETFONT: add it. Insert pointSize + font name at position p.
+           Use 8pt — standard WinCE dialog font size. */
         style |= DS_SETFONT;
         *(uint32_t*)&tmpl[0] = style;
-        int16_t point_size = (int16_t)(sysfont_height < 0 ? -sysfont_height : sysfont_height);
+        int16_t point_size = 8;
         size_t insert_bytes = 2 + (sysfont_name.size() + 1) * 2;
         tmpl.insert(tmpl.begin() + p, insert_bytes, 0);
         *(uint16_t*)&tmpl[p] = (uint16_t)point_size;
@@ -116,7 +115,7 @@ void Win32Thunks::RegisterDialogHandlers() {
         uint32_t lpTemplate = regs[1], hwndParent = regs[2], arm_dlgProc = regs[3];
         LPARAM initParam = (LPARAM)ReadStackArg(regs, mem, 0);
         auto tmpl = CopyDlgTemplate(mem, lpTemplate);
-        bool has_captionok = FixupDlgTemplate(tmpl, wce_sysfont_name, wce_sysfont_height);
+        bool has_captionok = FixupDlgTemplate(tmpl, wce_sysfont_name);
         HWND dlg = CreateDialogIndirectParamW(GetModuleHandleW(NULL),
             (LPCDLGTEMPLATEW)tmpl.data(), (HWND)(intptr_t)(int32_t)hwndParent, EmuDlgProc, initParam);
         if (dlg && arm_dlgProc) hwnd_dlgproc_map[dlg] = arm_dlgProc;
@@ -133,7 +132,7 @@ void Win32Thunks::RegisterDialogHandlers() {
         LPARAM initParam = (LPARAM)ReadStackArg(regs, mem, 0);
         HWND parent = (HWND)(intptr_t)(int32_t)hwndParent;
         auto tmpl = CopyDlgTemplate(mem, lpTemplate);
-        bool has_captionok = FixupDlgTemplate(tmpl, wce_sysfont_name, wce_sysfont_height);
+        bool has_captionok = FixupDlgTemplate(tmpl, wce_sysfont_name);
         modal_dlg_ended = false;
         modal_dlg_result = 0;
         HWND dlg = CreateDialogIndirectParamW(GetModuleHandleW(NULL),

@@ -128,6 +128,10 @@ Reverse mapping (`MapHostToWinCE`): host drive paths (`C:\foo`) become `\c\foo`;
 
 **NEVER pile unrelated thunks into an existing file.** Create a new file proactively.
 
+## IMPORTANT: Logging is Encouraged
+
+**Feel free to add, extend, or enhance LOG() calls in any thunk or subsystem.** Verbose, detailed logging is valuable for debugging future issues. When investigating a problem, adding extra logging (parameter values, return values, intermediate state) is always appropriate — don't hold back. Detailed logs have proven invaluable for diagnosing issues across sessions.
+
 ## IMPORTANT: Stub Functions Must Log
 
 **Every stub function MUST print a console warning** so unimplemented calls are visible during testing. Use the format:

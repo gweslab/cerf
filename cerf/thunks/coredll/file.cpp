@@ -13,6 +13,13 @@ struct RootFindState {
 };
 static std::map<uint32_t, RootFindState> root_find_states; /* fake handle -> state */
 
+/* WinCE FindFirstFile/FindNextFile never return "." and ".." entries.
+   Skip them to match real WinCE behavior and prevent infinite recursion
+   in apps that recursively traverse directories. */
+static bool IsDotOrDotDot(const wchar_t* name) {
+    return (name[0] == L'.' && (name[1] == 0 || (name[1] == L'.' && name[2] == 0)));
+}
+
 /* Check if a WinCE search pattern targets the root directory (e.g. \* or \*.* ) */
 static bool IsRootPattern(const std::wstring& wce_pattern) {
     if (wce_pattern.size() < 2) return false;
@@ -123,6 +130,14 @@ void Win32Thunks::RegisterFileHandlers() {
         std::wstring host_pattern = MapWinCEPath(wce_pattern);
         WIN32_FIND_DATAW fd = {};
         HANDLE h = FindFirstFileW(host_pattern.c_str(), &fd);
+        /* Skip "." and ".." — WinCE never returns these */
+        while (h != INVALID_HANDLE_VALUE && IsDotOrDotDot(fd.cFileName)) {
+            if (!FindNextFileW(h, &fd)) {
+                FindClose(h);
+                h = INVALID_HANDLE_VALUE;
+                SetLastError(ERROR_NO_MORE_FILES);
+            }
+        }
         if (h != INVALID_HANDLE_VALUE) WriteFindDataToEmu(mem, find_data_addr, fd);
         uint32_t fake = WrapHandle(h);
         /* Track root-level enumerations so we can inject drive letters later */
@@ -142,6 +157,9 @@ void Win32Thunks::RegisterFileHandlers() {
         if (it == root_find_states.end()) {
             WIN32_FIND_DATAW fd = {};
             BOOL ret = FindNextFileW(h, &fd);
+            /* Skip "." and ".." — WinCE never returns these */
+            while (ret && IsDotOrDotDot(fd.cFileName))
+                ret = FindNextFileW(h, &fd);
             if (ret) WriteFindDataToEmu(mem, regs[1], fd);
             regs[0] = ret; return true;
         }
@@ -150,6 +168,9 @@ void Win32Thunks::RegisterFileHandlers() {
         if (!state.host_done) {
             WIN32_FIND_DATAW fd = {};
             BOOL ret = FindNextFileW(h, &fd);
+            /* Skip "." and ".." — WinCE never returns these */
+            while (ret && IsDotOrDotDot(fd.cFileName))
+                ret = FindNextFileW(h, &fd);
             if (ret) {
                 WriteFindDataToEmu(mem, regs[1], fd);
                 regs[0] = TRUE; return true;

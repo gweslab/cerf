@@ -40,7 +40,7 @@ k32 = ctypes.windll.kernel32
 # Default screenshot path (project root)
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 PROJECT_ROOT = os.path.dirname(SCRIPT_DIR)
-DEFAULT_SCREENSHOT = os.path.join(os.environ.get('TEMP', '/tmp'), "cerf_screenshot.png")
+DEFAULT_SCREENSHOT = os.path.join(PROJECT_ROOT, "tmp", "screenshot.png")
 
 # --- Virtual Key Codes ---
 VK_CODES = {

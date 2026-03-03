@@ -55,18 +55,24 @@ Tab headers now visible, gray background, proper layout. "Disk space" tab shows 
 
 ---
 
-## 5. Wrong fonts — OPEN
+## 5. Wrong fonts — RESOLVED
 
-**Description**: The app appears to use the system font (possibly MS Shell Dlg or System), but on real WinCE it uses a different font — likely Arial or the default WinCE theme font. Text in the file panels, toolbars, and dialogs looks different from the real device.
+**Description**: Text in file panels, toolbars, buttons, combo boxes, and dialogs used desktop Windows fonts (Segoe UI, System bitmap font) instead of the WinCE system font (Tahoma).
 
-**Expected**: Font rendering should match the real WinCE device (see `screenshots/cecmd_real.png`). Likely needs a default font override or WinCE-specific `SystemParametersInfo` / `GetStockObject(DEFAULT_GUI_FONT)` mapping.
+**Root cause (multi-part)**:
+1. `GetStockObject(DEFAULT_GUI_FONT)` returned the desktop "MS Shell Dlg" font. On real WinCE, the system font is configured via `HKLM\System\GDI\SYSFNT` registry (Nm=Tahoma, Ht=-12, Wt=400).
+2. `CreateFontIndirectW` with face name "System" created the desktop bitmap System font instead of the WinCE Tahoma.
+3. Native controls (ComboBox, Button, Edit) defaulted to Segoe UI because on desktop Windows that's the default, while on real WinCE the default is Tahoma — no explicit WM_SETFONT needed.
+4. Dialog templates with DS_SETFONT specified "System" font, which mapped to the desktop bitmap font.
+5. Dialog templates without DS_SETFONT got no font at all, falling back to the desktop System font.
 
-**Theoretical font priority** (for the solution):
-1. Device's `\Windows\Fonts\` directory (bundled WinCE fonts)
-2. Real desktop Windows fonts (host system fallback)
-3. Default behaviour (system font)
+**Fix**:
+- `gdi_text.cpp`: Read WinCE system font from `HKLM\System\GDI\SYSFNT` registry at startup. `GetStockObject(DEFAULT_GUI_FONT)` now returns a font created from those registry values. `CreateFontIndirectW` maps "System" face name to the configured WinCE system font.
+- `window.cpp`: After `CreateWindowExW`, automatically send `WM_SETFONT` with the WinCE system font to all child controls (ComboBox, Button, Edit, etc.).
+- `dialog.cpp`: `FixupDlgTemplate` replaces the font name in dialog templates with the WinCE system font (Tahoma). Preserves original point size for DS_SETFONT templates. Adds DS_SETFONT with 8pt default when absent.
+- `message.cpp`: Sign-extend HFONT handle in `WM_SETFONT` messages for 64-bit safety.
 
-**Font files location**: WinCE fonts are present in the `references/` directory (see `references/README.md`) but are **not bundled** with cerf. They need to be manually copied to `devices/wince5/fs/Windows/Fonts/` after each build (not checked into the repo or bundled via vcxproj).
+File list, path ComboBoxes, toolbar buttons, and Properties dialog all now use Tahoma with correct sizing.
 
 ---
 

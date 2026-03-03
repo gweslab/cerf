@@ -3,6 +3,7 @@
 #include "../../log.h"
 #include <cstdio>
 #include <vector>
+#include <commctrl.h>
 
 void Win32Thunks::RegisterMessageHandlers() {
     Thunk("GetMessageW", 861, [this](uint32_t* regs, EmulatedMemory& mem) -> bool {
@@ -70,6 +71,25 @@ void Win32Thunks::RegisterMessageHandlers() {
             wp = (WPARAM)(intptr_t)(int32_t)regs[2];
             LOG(THUNK, "[THUNK] SendMessage WM_SETFONT hwnd=%p hFont=0x%08X -> %p\n",
                 hw, regs[2], (HFONT)wp);
+        }
+        /* TB_ADDBITMAP: marshal TBADDBITMAP from ARM memory.
+           ARM struct: {HINSTANCE(4), UINT_PTR nID(4)} = 8 bytes
+           x64 struct: {HINSTANCE(8), UINT_PTR nID(8)} = 16 bytes */
+        if (umsg == TB_ADDBITMAP && lp != 0 && mem.IsValid((uint32_t)lp)) {
+            uint32_t arm_hInst = mem.Read32((uint32_t)lp);
+            uint32_t arm_nID = mem.Read32((uint32_t)lp + 4);
+            /* WinCE bitmap IDs 140 (close) and 142 (help) don't exist on desktop.
+               Skip them — the button will be blank but functional. */
+            if (arm_hInst == 0xFFFFFFFF && (arm_nID == 140 || arm_nID == 142)) {
+                regs[0] = 0;
+                LOG(THUNK, "[THUNK] TB_ADDBITMAP WinCE bitmap %u -> skipped (no desktop equivalent)\n", arm_nID);
+                return true;
+            }
+            TBADDBITMAP tbab;
+            tbab.hInst = (HINSTANCE)(intptr_t)(int32_t)arm_hInst;
+            tbab.nID = arm_nID;
+            regs[0] = (uint32_t)SendMessageW(hw, TB_ADDBITMAP, wp, (LPARAM)&tbab);
+            return true;
         }
         /* Marshal ARM pointers to native.
            Messages that pass strings in lParam need conversion from

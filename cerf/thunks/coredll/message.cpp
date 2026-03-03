@@ -65,6 +65,12 @@ void Win32Thunks::RegisterMessageHandlers() {
     });
     Thunk("SendMessageW", 868, [this](uint32_t* regs, EmulatedMemory& mem) -> bool {
         HWND hw = (HWND)(intptr_t)(int32_t)regs[0]; UINT umsg = regs[1]; WPARAM wp = regs[2]; LPARAM lp = regs[3];
+        /* WM_SETFONT: wParam is an HFONT handle — must sign-extend for 64-bit */
+        if (umsg == WM_SETFONT) {
+            wp = (WPARAM)(intptr_t)(int32_t)regs[2];
+            LOG(THUNK, "[THUNK] SendMessage WM_SETFONT hwnd=%p hFont=0x%08X -> %p\n",
+                hw, regs[2], (HFONT)wp);
+        }
         /* Marshal ARM pointers to native.
            Messages that pass strings in lParam need conversion from
            emulated ARM addresses to native pointers. */

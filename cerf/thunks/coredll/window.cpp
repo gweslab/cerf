@@ -118,6 +118,25 @@ void Win32Thunks::RegisterWindowHandlers() {
                 InstallCaptionOk(hwnd);
                 LOG(THUNK, "[THUNK]   WS_EX_CAPTIONOKBTN tracked for HWND=0x%p\n", hwnd);
             }
+            /* On real WinCE, the default system font is Tahoma (from SYSFNT registry).
+               On desktop Windows, native controls default to Segoe UI.
+               Send WM_SETFONT with the WinCE system font to child controls so they
+               match the real WinCE appearance without requiring explicit WM_SETFONT. */
+            if (!is_toplevel) {
+                static HFONT s_wce_default_font = NULL;
+                if (!s_wce_default_font) {
+                    LOGFONTW lf = {};
+                    lf.lfHeight = wce_sysfont_height;
+                    lf.lfWeight = wce_sysfont_weight;
+                    lf.lfCharSet = DEFAULT_CHARSET;
+                    lf.lfQuality = DEFAULT_QUALITY;
+                    lf.lfPitchAndFamily = VARIABLE_PITCH | FF_SWISS;
+                    wcscpy_s(lf.lfFaceName, wce_sysfont_name.c_str());
+                    s_wce_default_font = CreateFontIndirectW(&lf);
+                }
+                if (s_wce_default_font)
+                    ::SendMessageW(hwnd, WM_SETFONT, (WPARAM)s_wce_default_font, FALSE);
+            }
         }
         regs[0] = (uint32_t)(uintptr_t)hwnd; return true;
     });

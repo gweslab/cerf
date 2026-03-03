@@ -152,7 +152,22 @@ def get_cerf_window_bbox():
 def bring_cerf_to_foreground():
     """Find the main cerf window and bring it to the foreground.
     Called automatically before any mouse/keyboard interaction to prevent
-    accidentally clicking on other windows."""
+    accidentally clicking on other windows.
+    Skips if a cerf window is already the foreground window (preserves focus
+    on dialogs/child windows)."""
+    pids = find_cerf_pids()
+    if not pids:
+        print("WARNING: No cerf.exe process found")
+        return False
+
+    # Check if a cerf window is already in the foreground
+    foreground_hwnd = u32.GetForegroundWindow()
+    fore_pid = wt.DWORD()
+    u32.GetWindowThreadProcessId(foreground_hwnd, ctypes.byref(fore_pid))
+    if fore_pid.value in pids:
+        # A cerf window is already foreground - don't disrupt focus
+        return True
+
     windows = get_cerf_windows()
     visible = [w for w in windows if w['visible'] and w['size'][0] > 0 and w['size'][1] > 0]
     if not visible:
@@ -168,16 +183,14 @@ def bring_cerf_to_foreground():
     time.sleep(0.05)
 
     # AttachThreadInput trick for reliable SetForegroundWindow
-    foreground_hwnd = u32.GetForegroundWindow()
-    if foreground_hwnd != hwnd:
-        fore_tid = u32.GetWindowThreadProcessId(foreground_hwnd, None)
-        our_tid = k32.GetCurrentThreadId()
-        if fore_tid != our_tid:
-            u32.AttachThreadInput(our_tid, fore_tid, True)
-        u32.SetForegroundWindow(hwnd)
-        u32.BringWindowToTop(hwnd)
-        if fore_tid != our_tid:
-            u32.AttachThreadInput(our_tid, fore_tid, False)
+    fore_tid = u32.GetWindowThreadProcessId(foreground_hwnd, None)
+    our_tid = k32.GetCurrentThreadId()
+    if fore_tid != our_tid:
+        u32.AttachThreadInput(our_tid, fore_tid, True)
+    u32.SetForegroundWindow(hwnd)
+    u32.BringWindowToTop(hwnd)
+    if fore_tid != our_tid:
+        u32.AttachThreadInput(our_tid, fore_tid, False)
 
     time.sleep(0.15)  # Let the window fully activate
     print(f"Foregrounded: {main_win['class']} \"{main_win['title']}\" (0x{hwnd:X})")

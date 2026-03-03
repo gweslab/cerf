@@ -65,6 +65,13 @@ void Win32Thunks::RegisterGdiDcHandlers() {
             regs[0] = (index == HORZRES) ? (uint32_t)(wa.right - wa.left) : (uint32_t)(wa.bottom - wa.top);
             return true;
         }
+        // Return 2 for BITSPIXEL so ARM commctrl loads WinCE-style mono toolbar
+        // bitmaps (stdsm.2bp) instead of XP-style bitmaps (stdsmXP.bmp) which have
+        // wrong icons (e.g. "What's This?" cursor instead of simple "?" for STD_HELP)
+        if (index == BITSPIXEL) {
+            regs[0] = 2;
+            return true;
+        }
         regs[0] = GetDeviceCaps((HDC)(intptr_t)(int32_t)regs[0], index);
         return true;
     });

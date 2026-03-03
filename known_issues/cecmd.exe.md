@@ -76,6 +76,24 @@ File list, path ComboBoxes, toolbar buttons, and Properties dialog all now use T
 
 ---
 
+## 6. Command bar ? button showed wrong icon — RESOLVED
+
+**Description**: The ? (help) button in the command bar showed a "What's This?" cursor icon instead of a simple "?" question mark.
+
+**Root cause**: See `commctrl.dll.md` Issue 2. ARM commctrl loaded `stdsmXP.bmp` (which has a cursor+? icon at index 11) instead of `stdsm.2bp` (which has a simple "?" at index 11) because `GetDeviceCaps(BITSPIXEL)` returned 32 on desktop Windows.
+
+**Fix**: Return 2 for `BITSPIXEL` in `GetDeviceCaps` thunk so commctrl loads the WinCE mono bitmap set.
+
+---
+
+## 7. "Missing status bar" investigation — NOT A BUG
+
+**Description**: The dark bar at the bottom of the real WinCE screenshot (showing "Total Commander/CE" and clock) appeared to be a missing status bar in cerf.
+
+**Finding**: This is the **WinCE system taskbar**, not a cecmd status bar. cecmd.exe never creates an `msctls_statusbar32` window. The bar is part of the WinCE shell (`explorer.exe`), not the app. No fix needed.
+
+---
+
 ## Screenshots
 
 - Current: `screenshots/cecmd_current.png`

@@ -123,6 +123,10 @@ void Win32Thunks::RegisterImageListHandlers() {
         regs[0] = ImageList_SetBkColor((HIMAGELIST)UnwrapHandle(regs[0]), (COLORREF)regs[1]);
         return true;
     });
+    Thunk("ImageList_GetBkColor", 752, [this](uint32_t* regs, EmulatedMemory&) -> bool {
+        regs[0] = ImageList_GetBkColor((HIMAGELIST)UnwrapHandle(regs[0]));
+        return true;
+    });
     Thunk("ImageList_Remove", 760, [this](uint32_t* regs, EmulatedMemory&) -> bool {
         HIMAGELIST h = (HIMAGELIST)UnwrapHandle(regs[0]);
         LOG(THUNK, "[THUNK] ImageList_Remove(0x%08X -> %p, i=%d)\n", regs[0], h, (int)regs[1]);

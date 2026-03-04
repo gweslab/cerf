@@ -65,11 +65,13 @@ void Win32Thunks::RegisterGdiDcHandlers() {
             regs[0] = (index == HORZRES) ? (uint32_t)(wa.right - wa.left) : (uint32_t)(wa.bottom - wa.top);
             return true;
         }
-        // Return 2 for BITSPIXEL so ARM commctrl loads WinCE-style mono toolbar
-        // bitmaps (stdsm.2bp) instead of XP-style bitmaps (stdsmXP.bmp) which have
-        // wrong icons (e.g. "What's This?" cursor instead of simple "?" for STD_HELP)
+        // Return 16 for BITSPIXEL to match typical WinCE 5.0 devices (16bpp).
+        // Desktop returns 32 which is unrealistic; apps like cecmd check
+        // BITSPIXEL*PLANES >= 15 to choose high-color vs low-color bitmaps.
+        // Note: previously returned 2 to force commctrl mono bitmaps, but that
+        // broke all apps' bitmap selection (e.g. cecmd loaded bitmap 105 instead of 155).
         if (index == BITSPIXEL) {
-            regs[0] = 2;
+            regs[0] = 16;
             return true;
         }
         regs[0] = GetDeviceCaps((HDC)(intptr_t)(int32_t)regs[0], index);

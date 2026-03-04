@@ -76,13 +76,40 @@ File list, path ComboBoxes, toolbar buttons, and Properties dialog all now use T
 
 ---
 
-## 6. Command bar ? button showed wrong icon — RESOLVED
+## 6. Command bar ? button showed wrong icon — RESOLVED (fix revised)
 
 **Description**: The ? (help) button in the command bar showed a "What's This?" cursor icon instead of a simple "?" question mark.
 
 **Root cause**: See `commctrl.dll.md` Issue 2. ARM commctrl loaded `stdsmXP.bmp` (which has a cursor+? icon at index 11) instead of `stdsm.2bp` (which has a simple "?" at index 11) because `GetDeviceCaps(BITSPIXEL)` returned 32 on desktop Windows.
 
-**Fix**: Return 2 for `BITSPIXEL` in `GetDeviceCaps` thunk so commctrl loads the WinCE mono bitmap set.
+**Original fix**: Returned `BITSPIXEL=2` — forced commctrl to load mono bitmaps. **This caused Issue 8 below.**
+
+**Revised fix**: Return `BITSPIXEL=16` (realistic WinCE 5.0 value). The bundled WinCE `stdsmXP.bmp` is loaded correctly via `SHLoadDIBitmap`. The "What's This?" cursor at STD_HELP index 11 is actually correct for stdsmXP.bmp on real WinCE too.
+
+---
+
+## 8. Wrong toolbar icons (bitmap 105 instead of 155) — RESOLVED
+
+**Description**: cecmd's toolbar showed wrong icons — an alternative low-color bitmap set (resource 105) instead of the correct high-color set (resource 155). The icons were visually similar but noticeably different from the real device.
+
+**Root cause**: cecmd checks `GetDeviceCaps(BITSPIXEL) * GetDeviceCaps(PLANES) >= 15` to decide between high-color (bitmap 155) and low-color (bitmap 105) toolbar bitmaps. The `BITSPIXEL=2` hack from Issue 6's fix made the product 2, which is < 15, forcing the low-color path. This also made commctrl show mono X and ? command bar buttons globally.
+
+cecmd.exe ships two bitmap versions: 105 is a low-color alternative and 155 is the full-color version used on real WinCE devices (which have 16bpp screens).
+
+**Fix**: Changed `BITSPIXEL` return from 2 to 16 in `GetDeviceCaps` thunk. All apps now get the correct high-color bitmaps.
+
+---
+
+## 9. Show menu view modes (Brief/Full/Large Icons) don't work properly; no radio selection
+
+**Description**: In the "Show" menu, switching between "Brief", "Full", and "Large Icons" view modes does not affect the file list as expected. Additionally, no radio button circle is shown in the menu to indicate the currently active view mode.
+
+**Screenshots**: `screenshots/cecmd_chaning_views/`
+- `default full.png` — default Full view with Name/Ext, Size, Date/Time columns
+- `brief.png` — after selecting Brief mode
+- `big icons.png` — after selecting Large Icons mode
+
+**Status**: Open — needs investigation.
 
 ---
 

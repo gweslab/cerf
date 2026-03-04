@@ -104,9 +104,17 @@ Modal dialogs are separate top-level windows. The `windows` command shows them
 with their own control tree. The main app window will show as `[V DIS]` (disabled)
 while a modal dialog is open.
 
+**Important**: `click` and `key` commands auto-foreground the **main** cerf window,
+which steals focus from the dialog. To interact with a modal dialog, use `focus`
+first to target it by hwnd, then immediately run the click/key:
+```bash
+python3 tools/interact.py focus 0xHWND && python3 tools/interact.py click X Y
+python3 tools/interact.py focus 0xHWND && python3 tools/interact.py key enter
+```
+
 ### Escape closes most dialogs
 ```bash
-python3 tools/interact.py key escape
+python3 tools/interact.py focus 0xHWND && python3 tools/interact.py key escape
 ```
 
 ## Available Key Names

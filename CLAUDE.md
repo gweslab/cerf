@@ -78,6 +78,8 @@ bundled/                           - Files bundled with the build output
 msbuild cerf.sln /p:Configuration=Release /p:Platform=x64
 ```
 
+If the installed VS toolset differs from the project's (e.g. v145 vs v143), add `/p:PlatformToolset=v145`. In bash, use `//p:` to prevent path mangling.
+
 Output: `build/Release/x64/cerf.exe` with `build/Release/x64/devices/wince5/fs/Windows/` containing bundled ARM DLLs, `build/Release/x64/cerf.ini`, etc.
 
 ## Testing

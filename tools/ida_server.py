@@ -1,24 +1,33 @@
 """
-IDA HTTP API Server
--------------------
+IDA HTTP API Server (Unified)
+-----------------------------
 Exposes IDA Pro's analysis database over HTTP for use by remote clients
 (MCP servers, automation scripts, AI agents, etc).
 
 Targets IDA 9.0+ with IDAPython. Uses ida_typeinf for struct/enum
 access (ida_struct and ida_enum were removed in IDA 9.0).
 
-Start:
-    from ida_api_server import start_server, stop_server
-    start_server(host="0.0.0.0", port=6000)
+Auto-assigns a free port and registers the instance for discovery by
+the unified MCP client (claude_ida.py).
+
+Start (in IDA):
+    import ida_server
+    ida_server.start_server()          # auto-picks port
+    ida_server.start_server(port=5055) # or specify one
 
 Stop:
-    stop_server()
+    ida_server.stop_server()
 """
 
+import atexit
 import json
 import logging
 import binascii
+import os
+import re
+import tempfile
 import threading
+from datetime import datetime, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import urlparse, parse_qs
 
@@ -43,6 +52,8 @@ import ida_hexrays
 
 READONLY = True  # flip to False to enable write endpoints
 
+REGISTRY_DIR = os.path.join(os.path.expanduser("~"), ".ida-mcp", "instances")
+
 # ---------------------------------------------------------------------------
 # Logging
 # ---------------------------------------------------------------------------
@@ -64,6 +75,82 @@ if ida_hexrays.init_hexrays_plugin():
     log.info("Hex-Rays decompiler available")
 else:
     log.warning("Hex-Rays decompiler NOT available - /decompile will be limited")
+
+# ---------------------------------------------------------------------------
+# Instance registration (service discovery)
+# ---------------------------------------------------------------------------
+
+_INSTANCE_FILE = None  # path to our registry JSON, set on start
+
+
+def _sanitize_filename(name: str) -> str:
+    """Make a string safe for use in a filename on Windows."""
+    sanitized = re.sub(r'[<>:"/\\|?*\x00-\x1f]', '_', name)
+    sanitized = re.sub(r'_+', '_', sanitized)
+    sanitized = sanitized.strip('. ')
+    return sanitized[:200] if sanitized else 'unknown'
+
+
+def _get_instance_id():
+    """Derive a human-readable instance ID from the loaded binary."""
+    try:
+        path = idaapi.get_input_file_path()
+        if path:
+            return os.path.basename(path)
+    except Exception:
+        pass
+    return "unknown"
+
+
+def _register_instance(port):
+    """Write instance info to the registry directory for MCP client discovery."""
+    global _INSTANCE_FILE
+    os.makedirs(REGISTRY_DIR, exist_ok=True)
+
+    instance_id = _get_instance_id()
+    pid = os.getpid()
+    info = {
+        "instance_id": instance_id,
+        "file_path": idaapi.get_input_file_path() or "",
+        "port": port,
+        "pid": pid,
+        "host": "127.0.0.1",
+        "started_at": datetime.now(timezone.utc).isoformat(),
+        "ida_version": idaapi.get_kernel_version(),
+    }
+
+    filename = f"{_sanitize_filename(instance_id)}_{pid}.json"
+    target_path = os.path.join(REGISTRY_DIR, filename)
+
+    # Atomic write: write to temp file then rename
+    fd, tmp_path = tempfile.mkstemp(dir=REGISTRY_DIR, suffix=".tmp")
+    try:
+        with os.fdopen(fd, "w") as f:
+            json.dump(info, f, indent=2)
+        os.replace(tmp_path, target_path)
+    except Exception:
+        # Clean up temp file on failure
+        try:
+            os.unlink(tmp_path)
+        except OSError:
+            pass
+        raise
+
+    _INSTANCE_FILE = target_path
+    log.info("Registered instance: %s (port %d) -> %s", instance_id, port, target_path)
+
+
+def _unregister_instance():
+    """Remove our instance file from the registry."""
+    global _INSTANCE_FILE
+    if _INSTANCE_FILE and os.path.exists(_INSTANCE_FILE):
+        try:
+            os.unlink(_INSTANCE_FILE)
+            log.info("Unregistered instance: %s", _INSTANCE_FILE)
+        except OSError as exc:
+            log.warning("Failed to unregister instance: %s", exc)
+        _INSTANCE_FILE = None
+
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -981,8 +1068,14 @@ _SERVER = None
 _THREAD = None
 
 
-def start_server(host="0.0.0.0", port=6000):
-    """Start the HTTP API server in a background daemon thread."""
+def start_server(host="127.0.0.1", port=0):
+    """
+    Start the HTTP API server in a background daemon thread.
+
+    Args:
+        host: Interface to bind to (default 127.0.0.1, local only).
+        port: Port to listen on. 0 = auto-assign a free port (default).
+    """
     global _SERVER, _THREAD
 
     if _SERVER is not None:
@@ -990,17 +1083,22 @@ def start_server(host="0.0.0.0", port=6000):
         stop_server()
 
     _SERVER = ThreadingHTTPServer((host, port), IDARequestHandler)
+    actual_port = _SERVER.server_address[1]
     _THREAD = threading.Thread(target=_SERVER.serve_forever, daemon=True)
     _THREAD.start()
-    log.info("IDA API server listening on %s:%d (readonly=%s)", host, port, READONLY)
-    idaapi.msg(f"[ida_api] Server listening on {host}:{port} (readonly={READONLY})\n")
+
+    _register_instance(actual_port)
+
+    log.info("IDA API server listening on %s:%d (readonly=%s)", host, actual_port, READONLY)
+    idaapi.msg(f"[ida_api] Server listening on {host}:{actual_port} (readonly={READONLY})\n")
 
 
 def stop_server():
-    """Shutdown the HTTP API server."""
+    """Shutdown the HTTP API server and unregister from discovery."""
     global _SERVER, _THREAD
     if _SERVER is not None:
         log.info("Shutting down IDA API server...")
+        _unregister_instance()
         _SERVER.shutdown()
         _SERVER.server_close()
         _SERVER = None
@@ -1018,9 +1116,13 @@ def set_readonly(enabled):
     idaapi.msg(f"[ida_api] Read-only mode: {READONLY}\n")
 
 
+# Register cleanup on interpreter exit (best-effort for crashes)
+atexit.register(_unregister_instance)
+
+
 # ---------------------------------------------------------------------------
 # Auto-start when loaded as a script
 # ---------------------------------------------------------------------------
 
 if __name__ == "__main__":
-    start_server(host="0.0.0.0", port=6000)
+    start_server()

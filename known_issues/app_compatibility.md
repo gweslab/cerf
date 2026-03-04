@@ -28,6 +28,8 @@ Quick test results for WinCE apps from `references/Optional Programs/`.
 | PEInfo.exe | Shows empty window (needs a file to open, may work with interaction) |
 | BananaPC.exe | Creates tiny 51x16 taskbar widget (works but useless outside WinCE taskbar) |
 
+| spread_excel.exe (SpreadCE) | WinCE 7 app — window sizing and menu text work, but bottom menu bar clicks don't open menus (ARM modal message loop issue) |
+
 ## Not Working
 
 | App | Issue |
@@ -46,3 +48,7 @@ Quick test results for WinCE apps from `references/Optional Programs/`.
 4. **Dialog template DWORD alignment**: Fixed FixupDlgTemplate font name replacement corrupting DLGITEMTEMPLATE alignment when font name size changes (e.g. "MS Sans Serif" → "Tahoma"). This broke solitare.exe's game panel.
 5. **SystemParametersInfoW SPI_GETWORKAREA**: Marshal RECT output to emulated memory. Fixed ResInfo.exe off-screen positioning.
 6. **Window title text**: Fixed DefWindowProcW WM_SETTEXT to marshal ARM string pointers to native strings. Added WS_CAPTION to top-level windows.
+7. **WinCE 7 coredll ordinal 5403**: Mapped to SystemParametersInfoW — used by WinCE 7 aygshell.dll. Fixed SpreadExcel main window sizing.
+8. **SM_CXEDGE/SM_CYEDGE override**: Return 1 (WinCE value) instead of 2 (desktop). Fixed ARM commctrl.dll toolbar button text truncation.
+9. **WM_SETTINGCHANGE lParam translation**: Desktop sends lParam=0, WinCE convention is lParam=SPI constant. Translated in EmuWndProc callback.
+10. **SPI action 0xE1 (WinCE 7 SPI_GETSIPINFO)**: Implemented in SystemParametersInfoW thunk. Returns SIPINFO struct with work area. Only 0xE1 is handled (not 0x68 — handling 0x68 breaks WinCE 5 app layouts).

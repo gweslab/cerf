@@ -146,7 +146,8 @@ void Win32Thunks::RegisterWindowHandlers() {
     Thunk("ShowWindow", 266, [](uint32_t* regs, EmulatedMemory&) -> bool {
         HWND hw = (HWND)(intptr_t)(int32_t)regs[0];
         if (hw == NULL && regs[1] == 5) { regs[0] = 0; return true; }
-        regs[0] = ShowWindow(hw, regs[1]); return true;
+        regs[0] = ShowWindow(hw, regs[1]);
+        return true;
     });
     Thunk("UpdateWindow", 267, [](uint32_t* regs, EmulatedMemory&) -> bool { regs[0] = UpdateWindow((HWND)(intptr_t)(int32_t)regs[0]); return true; });
     Thunk("RedrawWindow", 1672, [this](uint32_t* regs, EmulatedMemory& mem) -> bool {
@@ -173,6 +174,8 @@ void Win32Thunks::RegisterWindowHandlers() {
         int swp_x = (int)regs[2], swp_y = (int)regs[3];
         int swp_cx = (int)ReadStackArg(regs,mem,0), swp_cy = (int)ReadStackArg(regs,mem,1);
         UINT swp_flags = ReadStackArg(regs,mem,2);
+        LOG(API, "[API] SetWindowPos(hwnd=0x%p, x=%d, y=%d, cx=%d, cy=%d, flags=0x%X)\n",
+            hw, swp_x, swp_y, swp_cx, swp_cy, swp_flags);
         regs[0] = SetWindowPos(hw, (HWND)(intptr_t)(int32_t)regs[1], swp_x, swp_y, swp_cx, swp_cy, swp_flags);
         return true;
     });
@@ -180,6 +183,7 @@ void Win32Thunks::RegisterWindowHandlers() {
         HWND hw = (HWND)(intptr_t)(int32_t)regs[0];
         int mw_x = (int)regs[1], mw_y = (int)regs[2], mw_w = (int)regs[3];
         int mw_h = (int)ReadStackArg(regs,mem,0); BOOL mw_rep = ReadStackArg(regs,mem,1);
+        LOG(API, "[API] MoveWindow(hwnd=0x%p, x=%d, y=%d, w=%d, h=%d)\n", hw, mw_x, mw_y, mw_w, mw_h);
         regs[0] = MoveWindow(hw, mw_x, mw_y, mw_w, mw_h, mw_rep);
         return true;
     });

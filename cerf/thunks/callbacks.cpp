@@ -251,6 +251,12 @@ LRESULT CALLBACK Win32Thunks::EmuWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPA
     }
     }
 
+    /* WinCE convention: WM_SETTINGCHANGE has lParam = SPI constant (e.g. 0xE0
+       for SPI_SETSIPINFO). Desktop Windows sends wParam=SPI, lParam=string.
+       Translate so ARM apps see the WinCE convention. */
+    if (msg == WM_SETTINGCHANGE && wParam == 0xE0 /* SPI_SETSIPINFO */ && lParam != 0xE0)
+        lParam = 0xE0; /* = 224 = SPI_SETSIPINFO */
+
     uint32_t arm_wndproc = it->second;
     /* Debug: log key messages to ARM windows */
     if (msg == WM_CHAR || msg == WM_KEYDOWN || msg == WM_SETTEXT ||

@@ -21,9 +21,14 @@ void Win32Thunks::RegisterSystemHandlers() {
             RECT wa; SystemParametersInfoW(SPI_GETWORKAREA, 0, &wa, 0);
             regs[0] = (idx == SM_CXSCREEN)
                 ? (uint32_t)(wa.right - wa.left) : (uint32_t)(wa.bottom - wa.top);
+            LOG(API, "[API] GetSystemMetrics(%d) -> %d (screen)\n", idx, regs[0]);
             return true;
         }
+        /* WinCE uses 1px edges vs 2px on desktop Windows. ARM commctrl.dll
+           toolbar code depends on this for correct button width calculation. */
+        if (idx == SM_CXEDGE || idx == SM_CYEDGE) { regs[0] = 1; return true; }
         regs[0] = GetSystemMetrics(idx);
+        LOG(API, "[API] GetSystemMetrics(%d) -> %d\n", idx, regs[0]);
         return true;
     });
     Thunk("GetSysColor", 889, [](uint32_t* regs, EmulatedMemory&) -> bool {
@@ -231,6 +236,7 @@ void Win32Thunks::RegisterSystemHandlers() {
         }
         regs[0] = 1; return true;
     });
+    ThunkOrdinal("SystemParametersInfoW", 5403); /* WinCE 7 aygshell uses this ordinal */
     Thunk("SystemParametersInfoW", 89, [](uint32_t* regs, EmulatedMemory& mem) -> bool {
         UINT uiAction = regs[0], uiParam = regs[1];
         uint32_t pvParam = regs[2];
@@ -244,6 +250,30 @@ void Win32Thunks::RegisterSystemHandlers() {
             mem.Write32(pvParam + 8,  (uint32_t)wa.right);
             mem.Write32(pvParam + 12, (uint32_t)wa.bottom);
             LOG(API, "[API] SystemParametersInfoW(SPI_GETWORKAREA) -> {%d,%d,%d,%d}\n",
+                wa.left, wa.top, wa.right, wa.bottom);
+            regs[0] = 1;
+        } else if (uiAction == 0xE1 /* WinCE 7 SPI_GETSIPINFO via aygshell */ && pvParam) {
+            /* WinCE Soft Input Panel info. Fill SIPINFO struct:
+               cbSize(4) fdwFlags(4) rcVisibleDesktop(16) rcSipRect(16)
+               dwImDataSize(4) pvImData(4) = 48 bytes.
+               Report SIP as hidden, visible desktop = full work area. */
+            RECT wa;
+            SystemParametersInfoW(SPI_GETWORKAREA, 0, &wa, 0);
+            mem.Write32(pvParam + 0,  48);    /* cbSize */
+            mem.Write32(pvParam + 4,  0x2);   /* fdwFlags = SIPF_DOCKED (not SIPF_ON) */
+            /* rcVisibleDesktop */
+            mem.Write32(pvParam + 8,  (uint32_t)wa.left);
+            mem.Write32(pvParam + 12, (uint32_t)wa.top);
+            mem.Write32(pvParam + 16, (uint32_t)wa.right);
+            mem.Write32(pvParam + 20, (uint32_t)wa.bottom);
+            /* rcSipRect = empty (SIP hidden) */
+            mem.Write32(pvParam + 24, 0);
+            mem.Write32(pvParam + 28, 0);
+            mem.Write32(pvParam + 32, 0);
+            mem.Write32(pvParam + 36, 0);
+            mem.Write32(pvParam + 40, 0);  /* dwImDataSize */
+            mem.Write32(pvParam + 44, 0);  /* pvImData */
+            LOG(API, "[API] SystemParametersInfoW(0x%X/SPI_GETSIPINFO) -> vis={%d,%d,%d,%d}\n", uiAction,
                 wa.left, wa.top, wa.right, wa.bottom);
             regs[0] = 1;
         } else {

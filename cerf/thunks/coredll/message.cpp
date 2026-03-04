@@ -114,6 +114,12 @@ void Win32Thunks::RegisterMessageHandlers() {
     });
     Thunk("SendMessageW", 868, [this](uint32_t* regs, EmulatedMemory& mem) -> bool {
         HWND hw = (HWND)(intptr_t)(int32_t)regs[0]; UINT umsg = regs[1]; WPARAM wp = regs[2]; LPARAM lp = regs[3];
+        if (umsg == WM_COMMAND || umsg == WM_NOTIFY) {
+            wchar_t cls[64] = {};
+            if (hw) GetClassNameW(hw, cls, 64);
+            LOG(API, "[API] SendMessageW(0x%p '%ls', msg=0x%X, wP=0x%X, lP=0x%X)\n",
+                hw, cls, umsg, (uint32_t)wp, (uint32_t)lp);
+        }
         /* WM_SETFONT: wParam is an HFONT handle — must sign-extend for 64-bit */
         if (umsg == WM_SETFONT) {
             wp = (WPARAM)(intptr_t)(int32_t)regs[2];
@@ -150,6 +156,10 @@ void Win32Thunks::RegisterMessageHandlers() {
             regs[0] = (uint32_t)len;
         } else {
             regs[0] = (uint32_t)SendMessageW(hw, umsg, wp, lp);
+            if (umsg == WM_NOTIFY) {
+                LOG(API, "[API] SendMessageW WM_NOTIFY hwnd=%p wP=%d lP=0x%X -> ret=0x%X\n",
+                    hw, (int)wp, (uint32_t)lp, regs[0]);
+            }
         }
         return true;
     });

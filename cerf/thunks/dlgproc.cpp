@@ -99,6 +99,12 @@ INT_PTR CALLBACK Win32Thunks::EmuDlgProc(HWND hwnd, UINT msg, WPARAM wParam, LPA
             arm_dlgproc, hwnd, (uint32_t)lParam);
     }
     uint32_t result = s_instance->callback_executor(arm_dlgproc, args, 4);
+    if (msg == WM_NOTIFY && lParam > 0 && (lParam >> 32) == 0) {
+        int32_t nmCode = (int32_t)emem.Read32((uint32_t)lParam + 8);
+        LONG_PTR msgResult = GetWindowLongPtrW(hwnd, DWLP_MSGRESULT);
+        LOG(API, "[API] EmuDlgProc WM_NOTIFY code=%d armResult=%u DWLP_MSGRESULT=0x%lX\n",
+            nmCode, result, (unsigned long)msgResult);
+    }
     if (msg == WM_INITDIALOG) {
         LOG(API, "[API] EmuDlgProc: WM_INITDIALOG returned %u\n", result);
     }

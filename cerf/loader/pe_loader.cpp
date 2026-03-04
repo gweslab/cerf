@@ -92,13 +92,18 @@ bool PELoader::LoadSections(const uint8_t* data, size_t size, EmulatedMemory& me
 
     /* Copy sections */
     for (auto& s : info.sections) {
-        if (s.SizeOfRawData == 0 || s.PointerToRawData == 0) continue;
-        if (s.PointerToRawData + s.SizeOfRawData > size) {
+        if (s.PointerToRawData == 0) continue;
+        /* WinCE PE convention: SizeOfRawData may be 0 even when data exists.
+           In that case, use VirtualSize as the on-disk data size. */
+        DWORD raw_size = s.SizeOfRawData;
+        if (raw_size == 0) raw_size = s.Misc.VirtualSize;
+        if (raw_size == 0) continue;
+        if (s.PointerToRawData + raw_size > size) {
             LOG_ERR("[PE] Section raw data exceeds file size\n");
             continue;
         }
-        DWORD vsize = s.Misc.VirtualSize ? s.Misc.VirtualSize : s.SizeOfRawData;
-        uint32_t copy_size = (s.SizeOfRawData < vsize) ? s.SizeOfRawData : vsize;
+        DWORD vsize = s.Misc.VirtualSize ? s.Misc.VirtualSize : raw_size;
+        uint32_t copy_size = (raw_size < vsize) ? raw_size : vsize;
         memcpy(image + s.VirtualAddress, data + s.PointerToRawData, copy_size);
     }
 

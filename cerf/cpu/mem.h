@@ -36,13 +36,33 @@ public:
        Identity-maps ARM addresses to host addresses so ARM pointers are valid
        native pointers — needed when ARM code passes struct pointers to native
        Win32 controls (e.g. tab control messages via SendMessageW). */
+    /* Pre-reserve a large address range for identity-mapped allocations.
+       Subsequent Alloc() calls within this range will MEM_COMMIT pages
+       without needing 64KB-aligned MEM_RESERVE (which fails for non-aligned pages). */
+    bool Reserve(uint32_t base, uint32_t size) {
+        size = AlignUp(size, PAGE_SIZE);
+        LPVOID rv = VirtualAlloc((LPVOID)(uintptr_t)base, size, MEM_RESERVE, PAGE_READWRITE);
+        if (!rv) {
+            fprintf(stderr, "[MEM] Reserve 0x%08X+0x%X failed (err=%lu)\n", base, size, GetLastError());
+            return false;
+        }
+        return true;
+    }
+
     uint8_t* Alloc(uint32_t base, uint32_t size, DWORD protect = PAGE_READWRITE, bool is_stack = false) {
         size = AlignUp(size, PAGE_SIZE);
         /* Try to allocate at the exact ARM address for identity mapping */
         uint8_t* ptr = nullptr;
         if (base >= 0x10000) { /* Addresses below 64KB can't be allocated on Windows */
+            /* First try MEM_COMMIT only (works if address is within a pre-reserved range) */
             ptr = (uint8_t*)VirtualAlloc((LPVOID)(uintptr_t)base, size,
-                                         MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
+                                         MEM_COMMIT, PAGE_READWRITE);
+            if (!ptr) {
+                /* Not within a reservation — try full MEM_COMMIT | MEM_RESERVE
+                   (only succeeds at 64KB-aligned addresses) */
+                ptr = (uint8_t*)VirtualAlloc((LPVOID)(uintptr_t)base, size,
+                                             MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
+            }
         }
         if (!ptr) {
             /* Fall back to arbitrary address if identity mapping fails */

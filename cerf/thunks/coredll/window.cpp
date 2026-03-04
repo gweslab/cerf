@@ -42,6 +42,26 @@ void Win32Thunks::RegisterWindowHandlers() {
         LOG(API, "[API] RegisterClassW: '%ls' (ARM WndProc=0x%08X, brush=0x%08X->0x%08X)\n",
             className.c_str(), arm_wndproc, emu_brush, (uint32_t)(uintptr_t)wc.hbrBackground);
         ATOM atom = RegisterClassW(&wc);
+        if (!atom && GetLastError() == ERROR_CLASS_ALREADY_EXISTS) {
+            /* The native comctl32.dll (or another system DLL) already registered
+               this class with a native WndProc.  We must replace it with our
+               EmuWndProc so that ARM code controls the window.  Try unregistering
+               the existing class from known system DLL hInstances, then re-register. */
+            LOG(API, "[API]   Class '%ls' already exists, replacing with ARM version\n", className.c_str());
+            HMODULE mods[] = {
+                GetModuleHandleW(L"comctl32.dll"),
+                GetModuleHandleW(L"comctl32"),
+                GetModuleHandleW(NULL),
+                NULL
+            };
+            for (HMODULE mod : mods) {
+                if (mod && UnregisterClassW(className.c_str(), mod)) {
+                    LOG(API, "[API]   Unregistered existing class from module %p\n", mod);
+                    break;
+                }
+            }
+            atom = RegisterClassW(&wc);
+        }
         if (!atom) LOG(API, "[API]   RegisterClassW FAILED (error=%d)\n", GetLastError());
         regs[0] = (uint32_t)atom; return true;
     });

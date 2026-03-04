@@ -29,7 +29,7 @@ Quick test results for WinCE apps from `references/Optional Programs/`.
 | BananaPC.exe | Creates tiny 51x16 taskbar widget (works but useless outside WinCE taskbar) |
 
 | spread_excel.exe (SpreadCE) | WinCE 7 app — window sizing and menu text work, but bottom menu bar clicks don't open menus (ARM modal message loop issue) |
-| DocOpen.exe (PHM Tools) | File open dialog works after memcpy/DllMain fixes. Toolbar buttons unclickable (ARM modal loop). ComboBox doesn't render until clicked. |
+| DocOpen.exe (PHM Tools) | File open dialog works after memcpy/DllMain fixes. Toolbar buttons now work (memory allocator fix). ComboBox doesn't render until clicked. |
 | Run.exe (PHM Tools) | Browse dialog works after DllMain fix. Wrong icon in dialog (warning icon instead of app icon). |
 
 ## Not Working
@@ -56,3 +56,4 @@ Quick test results for WinCE apps from `references/Optional Programs/`.
 10. **SPI action 0xE1 (WinCE 7 SPI_GETSIPINFO)**: Implemented in SystemParametersInfoW thunk. Returns SIPINFO struct with work area. Only 0xE1 is handled (not 0x68 — handling 0x68 breaks WinCE 5 app layouts).
 11. **memcpy/memmove/memset cross-region safety**: Check host pointer contiguity before native memcpy. Fallback regions (NOT identity-mapped) may have non-adjacent host addresses for adjacent emulated pages. Fall back to byte-by-byte copy. Fixed DocOpen.exe crash.
 12. **ARM DLL DllMain initialization**: Call DllMain(DLL_PROCESS_ATTACH) for on-demand loaded ARM DLLs before forwarding API calls. Fixed g_pShellMalloc NULL crash in ceshell.dll's SHGetOpenFileName (Run.exe Browse, DocOpen.exe).
+13. **Memory allocator address space collision + pre-reservation**: LocalAlloc (starting 0x00800000) grew past LocalReAlloc's range (0x00900000) after 240+ allocations, creating overlapping memory regions. Fixed by reorganizing with wider gaps (LocalAlloc→0x00800000, LocalReAlloc→0x00A00000, HeapAlloc→0x00C00000). Also fixed identity-mapping failures: Windows VirtualAlloc requires 64KB-aligned addresses for MEM_RESERVE, so page-by-page allocations at non-64KB-aligned addresses failed. Added pre-reservation of large contiguous blocks at each allocator base, with subsequent page commits within the reservation. Fixed HeapCreate to return handles instead of allocating overlapping memory. Made malloc/calloc/realloc share a single counter.

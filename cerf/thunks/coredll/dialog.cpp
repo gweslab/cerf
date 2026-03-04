@@ -142,14 +142,18 @@ static bool FixupDlgTemplate(std::vector<uint8_t>& tmpl, const std::wstring& sys
 
 void Win32Thunks::RegisterDialogHandlers() {
     Thunk("CreateDialogIndirectParamW", 688, [this](uint32_t* regs, EmulatedMemory& mem) -> bool {
-        uint32_t lpTemplate = regs[1], hwndParent = regs[2], arm_dlgProc = regs[3];
+        uint32_t hInst = regs[0], lpTemplate = regs[1], hwndParent = regs[2], arm_dlgProc = regs[3];
         LPARAM initParam = (LPARAM)ReadStackArg(regs, mem, 0);
         auto tmpl = CopyDlgTemplate(mem, lpTemplate);
         bool has_captionok = FixupDlgTemplate(tmpl, wce_sysfont_name);
+        /* Use the ARM module's native resource handle so SS_ICON/SS_BITMAP
+           controls in the dialog template find their resources correctly. */
+        HMODULE native_mod = GetNativeModuleForResources(hInst);
+        HINSTANCE dlg_inst = native_mod ? (HINSTANCE)native_mod : GetModuleHandleW(NULL);
         /* Pre-register the ARM dlgproc so EmuDlgProc can dispatch WM_INITDIALOG
            which is sent during CreateDialogIndirectParamW before it returns. */
         pending_arm_dlgproc = arm_dlgProc;
-        HWND dlg = CreateDialogIndirectParamW(GetModuleHandleW(NULL),
+        HWND dlg = CreateDialogIndirectParamW(dlg_inst,
             (LPCDLGTEMPLATEW)tmpl.data(), (HWND)(intptr_t)(int32_t)hwndParent, EmuDlgProc, initParam);
         pending_arm_dlgproc = 0;
         LOG(API, "[API] CreateDialogIndirectParamW(parent=0x%X, dlgproc=0x%08X) -> HWND=0x%p (err=%lu)\n",
@@ -164,14 +168,16 @@ void Win32Thunks::RegisterDialogHandlers() {
         return true;
     });
     Thunk("DialogBoxIndirectParamW", 690, [this](uint32_t* regs, EmulatedMemory& mem) -> bool {
-        uint32_t lpTemplate = regs[1], hwndParent = regs[2], arm_dlgProc = regs[3];
+        uint32_t hInst = regs[0], lpTemplate = regs[1], hwndParent = regs[2], arm_dlgProc = regs[3];
         LPARAM initParam = (LPARAM)ReadStackArg(regs, mem, 0);
         HWND parent = (HWND)(intptr_t)(int32_t)hwndParent;
         auto tmpl = CopyDlgTemplate(mem, lpTemplate);
         bool has_captionok = FixupDlgTemplate(tmpl, wce_sysfont_name);
+        HMODULE native_mod = GetNativeModuleForResources(hInst);
+        HINSTANCE dlg_inst = native_mod ? (HINSTANCE)native_mod : GetModuleHandleW(NULL);
         modal_dlg_ended = false;
         modal_dlg_result = 0;
-        HWND dlg = CreateDialogIndirectParamW(GetModuleHandleW(NULL),
+        HWND dlg = CreateDialogIndirectParamW(dlg_inst,
             (LPCDLGTEMPLATEW)tmpl.data(), parent, EmuDlgProc, initParam);
         if (dlg && arm_dlgProc) {
             hwnd_dlgproc_map[dlg] = arm_dlgProc;

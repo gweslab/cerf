@@ -4587,7 +4587,7 @@ REGEDIT4
 "Flags"=dword:00000010
 
 [HKEY_LOCAL_MACHINE\Explorer]
-"QVGA"=dword:00000001
+"QVGA"=dword:00000000
 "RecycleBinSize"=dword:0000000a
 "ShowExt"=dword:00000000
 "ShowSys"=dword:00000000

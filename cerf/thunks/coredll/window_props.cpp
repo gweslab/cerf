@@ -62,7 +62,27 @@ void Win32Thunks::RegisterWindowPropsHandlers() {
     });
     Thunk("SubtractRect", 105, [](uint32_t* regs, EmulatedMemory&) -> bool { regs[0]=0; return true; });
     Thunk("GetWindowRect", 248, [this](uint32_t* regs, EmulatedMemory& mem) -> bool {
-        RECT rc; BOOL ret=GetWindowRect((HWND)(intptr_t)(int32_t)regs[0],&rc);
+        HWND hw = (HWND)(intptr_t)(int32_t)regs[0];
+        RECT rc; BOOL ret=GetWindowRect(hw,&rc);
+        /* For top-level WS_CAPTION windows, return a WinCE-equivalent rect
+           (1px border + caption) instead of the desktop rect with thick frame.
+           This prevents apps from seeing inflated dimensions — e.g. calc.exe
+           checks GetWindowRect width<=480 and scales button positions if wider.
+           Applied universally (not just tracked HWNDs) because WM_CREATE fires
+           during CreateWindowExW before the HWND can be added to a tracking set. */
+        if (ret) {
+            HWND parent = GetParent(hw);
+            LONG style = GetWindowLongW(hw, GWL_STYLE);
+            if (parent == NULL && !(style & WS_CHILD) && (style & WS_CAPTION)) {
+                RECT client_rc; GetClientRect(hw, &client_rc);
+                POINT client_tl = {0, 0}; ClientToScreen(hw, &client_tl);
+                int cyCaption = GetSystemMetrics(SM_CYCAPTION);
+                rc.left   = client_tl.x - 1;
+                rc.top    = client_tl.y - cyCaption - 1;
+                rc.right  = client_tl.x + client_rc.right + 1;
+                rc.bottom = client_tl.y + client_rc.bottom + 1;
+            }
+        }
         mem.Write32(regs[1],rc.left); mem.Write32(regs[1]+4,rc.top);
         mem.Write32(regs[1]+8,rc.right); mem.Write32(regs[1]+12,rc.bottom);
         regs[0]=ret; return true;
@@ -189,11 +209,17 @@ void Win32Thunks::RegisterWindowPropsHandlers() {
         regs[0]=IsChild((HWND)(intptr_t)(int32_t)regs[0],(HWND)(intptr_t)(int32_t)regs[1]); return true;
     });
     Thunk("AdjustWindowRectEx", 887, [this](uint32_t* regs, EmulatedMemory& mem) -> bool {
-        RECT rc; rc.left=mem.Read32(regs[0]); rc.top=mem.Read32(regs[0]+4);
-        rc.right=mem.Read32(regs[0]+8); rc.bottom=mem.Read32(regs[0]+12);
-        BOOL ret=AdjustWindowRectEx(&rc,regs[1],regs[2],regs[3]);
-        mem.Write32(regs[0],rc.left); mem.Write32(regs[0]+4,rc.top);
-        mem.Write32(regs[0]+8,rc.right); mem.Write32(regs[0]+12,rc.bottom);
-        regs[0]=ret; return true;
+        int32_t l=mem.Read32(regs[0]), t=mem.Read32(regs[0]+4);
+        int32_t r=mem.Read32(regs[0]+8), b=mem.Read32(regs[0]+12);
+        DWORD style = regs[1];
+        /* Return WinCE-like frame dimensions (1px border for WS_CAPTION,
+           plus caption height) instead of thick desktop frame. */
+        int border = (style & WS_CAPTION) ? 1 : 0;
+        l -= border; t -= border; r += border; b += border;
+        if (style & WS_CAPTION)
+            t -= GetSystemMetrics(SM_CYCAPTION);
+        mem.Write32(regs[0],l); mem.Write32(regs[0]+4,t);
+        mem.Write32(regs[0]+8,r); mem.Write32(regs[0]+12,b);
+        regs[0]=1; return true;
     });
 }

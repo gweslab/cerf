@@ -93,20 +93,28 @@ void Win32Thunks::RegisterWindowHandlers() {
             /* WinCE top-level windows always have a title bar with text.
                Ensure WS_CAPTION is set so desktop Windows draws the title text. */
             style |= WS_CAPTION;
-            int bw = GetSystemMetrics(SM_CXBORDER), bh = GetSystemMetrics(SM_CYBORDER);
             if (x == (int)0x80000000 || y == (int)0x80000000 ||
                 w == (int)0x80000000 || h == (int)0x80000000 ||
                 (w == 0 && h == 0)) {
-                /* CW_USEDEFAULT or zero size — go fullscreen like WinCE */
-                x = -bw; y = -bh;
-                w = (int)screen_width+bw*2; h = (int)screen_height+bh*2;
+                /* CW_USEDEFAULT or zero size — go fullscreen like WinCE.
+                   Inflate so that client area = screen_width x screen_height. */
+                RECT fs = { 0, 0, (LONG)screen_width, (LONG)screen_height };
+                AdjustWindowRectEx(&fs, style, FALSE, exStyle);
+                x = fs.left; y = fs.top;
+                w = fs.right - fs.left; h = fs.bottom - fs.top;
             } else {
-                /* App specified explicit dimensions.  On WinCE the window frame
-                   is drawn inside the client area (no non-client region), so
-                   w/h effectively describe the client area.  Desktop Windows
-                   has a non-client frame that shrinks the client area, so
-                   inflate to ensure the client area matches what WinCE gave. */
-                RECT rc = { 0, 0, w, h };
+                /* App specified explicit WinCE window dimensions (e.g. calc: 480x240).
+                   On WinCE the w,h IS the total window size including thin frame
+                   (1px border each side + caption).  Client area = (w-2) x (h-2-cyCaption).
+                   We create a desktop window with matching client area, and thunk
+                   GetWindowRect to return the original WinCE dimensions so apps
+                   don't see inflated values (calc checks width<=480 for scaling). */
+                int cyCaption = GetSystemMetrics(SM_CYCAPTION);
+                int wince_client_w = w - 2;  /* WinCE: 1px border each side */
+                int wince_client_h = h - 2 - cyCaption;
+                if (wince_client_w < 1) wince_client_w = 1;
+                if (wince_client_h < 1) wince_client_h = 1;
+                RECT rc = { 0, 0, wince_client_w, wince_client_h };
                 AdjustWindowRectEx(&rc, style, FALSE, exStyle);
                 w = rc.right - rc.left;
                 h = rc.bottom - rc.top;
@@ -226,6 +234,22 @@ void Win32Thunks::RegisterWindowHandlers() {
         HWND hw = (HWND)(intptr_t)(int32_t)regs[0];
         int mw_x = (int)regs[1], mw_y = (int)regs[2], mw_w = (int)regs[3];
         int mw_h = (int)ReadStackArg(regs,mem,0); BOOL mw_rep = ReadStackArg(regs,mem,1);
+        /* For top-level WS_CAPTION windows, the app passes WinCE window
+           dimensions.  Inflate to desktop frame just like CreateWindowExW. */
+        HWND mw_parent = GetParent(hw);
+        LONG mw_style = GetWindowLongW(hw, GWL_STYLE);
+        if (mw_parent == NULL && !(mw_style & WS_CHILD) && (mw_style & WS_CAPTION) && mw_w > 0 && mw_h > 0) {
+            DWORD exStyle = (DWORD)GetWindowLongW(hw, GWL_EXSTYLE);
+            int cyCaption = GetSystemMetrics(SM_CYCAPTION);
+            int client_w = mw_w - 2;
+            int client_h = mw_h - 2 - cyCaption;
+            if (client_w < 1) client_w = 1;
+            if (client_h < 1) client_h = 1;
+            RECT rc = {0, 0, client_w, client_h};
+            AdjustWindowRectEx(&rc, mw_style, FALSE, exStyle);
+            mw_w = rc.right - rc.left;
+            mw_h = rc.bottom - rc.top;
+        }
         LOG(API, "[API] MoveWindow(hwnd=0x%p, x=%d, y=%d, w=%d, h=%d)\n", hw, mw_x, mw_y, mw_w, mw_h);
         regs[0] = MoveWindow(hw, mw_x, mw_y, mw_w, mw_h, mw_rep);
         return true;

@@ -8,9 +8,9 @@
 void Win32Thunks::RegisterCrtHandlers() {
     Thunk("memcpy", 1044, [this](uint32_t* regs, EmulatedMemory& mem) -> bool {
         uint32_t dst = regs[0], src = regs[1], len = regs[2];
-        if (len > 0x100000) {
-            LOG(API, "[API] memcpy(0x%08X, 0x%08X, 0x%X) -> HUGE len, capping\n", dst, src, len);
-            len = 0x100000;
+        if (len > 0x800000) {
+            LOG(API, "[API] memcpy(0x%08X, 0x%08X, 0x%X) -> bogus len, skipping\n", dst, src, len);
+            regs[0] = dst; return true;
         }
         uint8_t* dst_p = mem.Translate(dst);
         uint8_t* src_p = mem.Translate(src);

@@ -377,6 +377,16 @@ void Win32Thunks::RegisterSystemHandlers() {
             LOG(API, "[API] SystemParametersInfoW(0x%X/SPI_GETSIPINFO) -> vis={0,0,%d,%d}\n",
                 uiAction, screen_width, screen_height);
             regs[0] = 1;
+        } else if (uiAction == SPI_SETDESKWALLPAPER) {
+            /* WinCE apps set wallpaper via SPI and expect WM_SETTINGCHANGE broadcast.
+               The wallpaper path is a WinCE VFS path in ARM memory — don't forward to native. */
+            std::wstring wp_path;
+            if (pvParam) wp_path = ReadWStringFromEmu(mem, pvParam);
+            LOG(API, "[API] SystemParametersInfoW(SPI_SETDESKWALLPAPER, '%ls')\n", wp_path.c_str());
+            /* Broadcast WM_SETTINGCHANGE so the desktop reloads the wallpaper from registry */
+            if (fWinIni & SPIF_SENDCHANGE)
+                SendMessageW(HWND_BROADCAST, WM_SETTINGCHANGE, SPI_SETDESKWALLPAPER, 0);
+            regs[0] = 1;
         } else {
             regs[0] = SystemParametersInfoW(uiAction, uiParam, NULL, fWinIni);
         }

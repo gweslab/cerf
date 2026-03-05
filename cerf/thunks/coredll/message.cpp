@@ -113,8 +113,20 @@ void Win32Thunks::RegisterMessageHandlers() {
         }
         return true;
     });
-    Thunk("PostMessageW", 865, [](uint32_t* regs, EmulatedMemory&) -> bool {
-        regs[0] = PostMessageW((HWND)(intptr_t)(int32_t)regs[0], regs[1], regs[2], regs[3]);
+    Thunk("PostMessageW", 865, [this](uint32_t* regs, EmulatedMemory&) -> bool {
+        HWND hw = (HWND)(intptr_t)(int32_t)regs[0];
+        UINT msg = regs[1]; WPARAM wp = regs[2]; LPARAM lp = regs[3];
+        LOG(API, "[API] PostMessageW(hwnd=0x%p, msg=0x%04X, wP=0x%X, lP=0x%X)\n",
+            hw, msg, (uint32_t)wp, (uint32_t)lp);
+        /* HWND_BROADCAST + WM_SETTINGCHANGE: use SendMessage for synchronous delivery.
+           PostMessage during nested in-process execution may get lost because the
+           modal message loop ends before the message is dispatched. */
+        if (hw == HWND_BROADCAST && msg == WM_SETTINGCHANGE) {
+            SendMessageW(HWND_BROADCAST, msg, wp, lp);
+            regs[0] = 1;
+        } else {
+            regs[0] = PostMessageW(hw, msg, wp, lp);
+        }
         return true;
     });
     Thunk("SendMessageW", 868, [this](uint32_t* regs, EmulatedMemory& mem) -> bool {

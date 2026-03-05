@@ -242,32 +242,42 @@ void Win32Thunks::RegisterShellHandlers() {
                 mapped_file = win_mapped;
             }
         }
-        /* Check if the target is a WinCE ARM executable — spawn cerf.exe */
+        /* Check if the target is a WinCE ARM executable — run in-process.
+           WinCE shares address space across all processes, so we load the child PE
+           into the same emulated memory and call its WinMain via callback_executor.
+           This shares registry, windows, message broadcasts — just like real WinCE. */
         if (!mapped_file.empty() && IsArmPE(mapped_file)) {
-            wchar_t cerf_path[MAX_PATH];
-            GetModuleFileNameW(NULL, cerf_path, MAX_PATH);
-            std::wstring cmdline = L"\"";
-            cmdline += cerf_path;
-            cmdline += L"\" \"";
-            cmdline += mapped_file;
-            cmdline += L"\"";
-            if (!params.empty()) {
-                cmdline += L" ";
-                cmdline += params;
+            LOG(API, "[API]   -> ARM PE detected, running in-process\n");
+            std::string narrow_path;
+            for (auto c : mapped_file) narrow_path += (char)c;
+            PEInfo child_pe = {};
+            uint32_t child_entry = PELoader::Load(narrow_path.c_str(), mem, child_pe);
+            if (child_entry && callback_executor) {
+                InstallThunks(child_pe);
+                CallDllEntryPoints();
+                /* Build lpCmdLine wide string in emulated memory.
+                   Use a fixed address in unused space (main exe uses 0x60000000). */
+                uint32_t cmdline_addr = 0x60001000;
+                mem.Alloc(cmdline_addr, 0x1000);
+                if (!params.empty()) {
+                    for (size_t j = 0; j < params.size() && j < 0x7FE; j++)
+                        mem.Write16(cmdline_addr + (uint32_t)(j * 2), (uint16_t)params[j]);
+                    mem.Write16(cmdline_addr + (uint32_t)(params.size() * 2), 0);
+                } else {
+                    mem.Write16(cmdline_addr, 0);
+                }
+                /* Call WinMain(hInstance, 0, lpCmdLine, SW_SHOWNORMAL) */
+                uint32_t args[4] = { child_pe.image_base, 0, cmdline_addr, 1 };
+                LOG(API, "[API]   -> calling WinMain at 0x%08X (hInst=0x%X, cmdLine='%ls')\n",
+                    child_entry, child_pe.image_base, params.c_str());
+                uint32_t ret = callback_executor(child_entry, args, 4);
+                LOG(API, "[API]   -> WinMain returned %d\n", ret);
+                mem.Write32(sei_addr + 0x20, 42); /* hInstApp: >32 = success */
+            } else {
+                LOG(API, "[API]   -> failed to load PE or no callback_executor\n");
+                mem.Write32(sei_addr + 0x20, 0);
             }
-            LOG(API, "[API]   -> ARM PE detected, spawning cerf: %ls\n", cmdline.c_str());
-            STARTUPINFOW si = {}; si.cb = sizeof(si);
-            PROCESS_INFORMATION pi = {};
-            std::vector<wchar_t> cmd_buf(cmdline.begin(), cmdline.end());
-            cmd_buf.push_back(0);
-            BOOL ret = CreateProcessW(cerf_path, cmd_buf.data(),
-                NULL, NULL, FALSE, 0, NULL, NULL, &si, &pi);
-            mem.Write32(sei_addr + 0x20, ret ? 42 : 0); /* hInstApp: >32 = success */
-            if (ret && (fMask & SEE_MASK_NOCLOSEPROCESS))
-                mem.Write32(sei_addr + 0x38, WrapHandle(pi.hProcess));
-            if (ret) { CloseHandle(pi.hThread); }
-            LOG(API, "[API]   -> %s (pid=%d)\n", ret ? "OK" : "FAILED", ret ? pi.dwProcessId : 0);
-            regs[0] = ret;
+            regs[0] = 1;
         } else {
             /* Not an ARM PE — try native ShellExecuteExW */
             SHELLEXECUTEINFOW native_sei = {};

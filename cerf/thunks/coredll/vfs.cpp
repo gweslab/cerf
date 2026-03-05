@@ -34,13 +34,19 @@ void Win32Thunks::InitVFS(const std::string& device_override) {
                 while (!device_name.empty() && (device_name.back() == ' ' || device_name.back() == '\t'))
                     device_name.pop_back();
             }
-            if (line.substr(0, 13) == "screen_width=") {
-                int v = atoi(line.substr(13).c_str());
+            if (line.substr(0, 18) == "fake_screen_width=") {
+                int v = atoi(line.substr(18).c_str());
                 if (v > 0) screen_width = (uint32_t)v;
             }
-            if (line.substr(0, 14) == "screen_height=") {
-                int v = atoi(line.substr(14).c_str());
+            if (line.substr(0, 19) == "fake_screen_height=") {
+                int v = atoi(line.substr(19).c_str());
                 if (v > 0) screen_height = (uint32_t)v;
+            }
+            if (line.substr(0, 23) == "fake_screen_resolution=") {
+                std::string val = line.substr(23);
+                while (!val.empty() && (val.back() == ' ' || val.back() == '\t'))
+                    val.pop_back();
+                fake_screen_resolution = (val != "false" && val != "0" && val != "no");
             }
         }
     }

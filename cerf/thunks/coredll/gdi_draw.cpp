@@ -76,7 +76,24 @@ void Win32Thunks::RegisterGdiDrawHandlers() {
         return true;
     });
     Thunk("CreateBitmap", 901, [](uint32_t* regs, EmulatedMemory&) -> bool {
-        regs[0] = (uint32_t)(uintptr_t)CreateBitmap(regs[0], regs[1], regs[2], regs[3], NULL); return true;
+        int w = (int)regs[0], h = (int)regs[1];
+        UINT planes = regs[2], bpp = regs[3];
+        HBITMAP hbm;
+        /* WinCE apps call CreateBitmap(w,h,1,16,NULL) because GetDeviceCaps
+           returns BITSPIXEL=16.  On a 32bpp desktop this produces a 16bpp DDB
+           that can't be selected into a 32bpp-compatible DC (SelectObject fails).
+           Use CreateCompatibleBitmap instead so the format matches the screen. */
+        if (planes == 1 && bpp >= 8 && bpp != (UINT)GetDeviceCaps(GetDC(NULL), BITSPIXEL)) {
+            HDC screenDC = GetDC(NULL);
+            hbm = CreateCompatibleBitmap(screenDC, w, h);
+            ReleaseDC(NULL, screenDC);
+        } else {
+            hbm = CreateBitmap(w, h, planes, bpp, NULL);
+        }
+        LOG(API, "[API] CreateBitmap(%d, %d, planes=%d, bpp=%d) -> 0x%08X%s\n",
+            w, h, planes, bpp, (uint32_t)(uintptr_t)hbm, hbm ? "" : " (FAILED)");
+        regs[0] = (uint32_t)(uintptr_t)hbm;
+        return true;
     });
     Thunk("GetPixel", 936, [](uint32_t* regs, EmulatedMemory&) -> bool { regs[0] = GetPixel((HDC)(intptr_t)(int32_t)regs[0], regs[1], regs[2]); return true; });
     Thunk("SetPixel", 944, [](uint32_t* regs, EmulatedMemory&) -> bool { regs[0] = SetPixel((HDC)(intptr_t)(int32_t)regs[0], regs[1], regs[2], regs[3]); return true; });

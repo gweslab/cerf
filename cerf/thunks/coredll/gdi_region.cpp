@@ -65,4 +65,9 @@ void Win32Thunks::RegisterGdiRegionHandlers() {
         PAINTSTRUCT ps = {}; ps.hdc = (HDC)(intptr_t)(int32_t)mem.Read32(regs[1]);
         EndPaint((HWND)(intptr_t)(int32_t)regs[0], &ps); regs[0] = 1; return true;
     });
+    Thunk("ExcludeClipRect", 970, [this](uint32_t* regs, EmulatedMemory& mem) -> bool {
+        regs[0] = ExcludeClipRect((HDC)(intptr_t)(int32_t)regs[0],
+            (int)regs[1], (int)regs[2], (int)regs[3], (int)ReadStackArg(regs, mem, 0));
+        return true;
+    });
 }

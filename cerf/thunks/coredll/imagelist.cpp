@@ -176,6 +176,35 @@ void Win32Thunks::RegisterImageListHandlers() {
         regs[0] = ret;
         return true;
     });
+    Thunk("ImageList_DragMove", 746, [](uint32_t* regs, EmulatedMemory&) -> bool {
+        regs[0] = ImageList_DragMove((int)regs[0], (int)regs[1]);
+        return true;
+    });
+    Thunk("ImageList_DragShowNolock", 747, [](uint32_t* regs, EmulatedMemory&) -> bool {
+        regs[0] = ImageList_DragShowNolock(regs[0]);
+        return true;
+    });
+    Thunk("ImageList_DragEnter", 744, [](uint32_t* regs, EmulatedMemory&) -> bool {
+        regs[0] = ImageList_DragEnter((HWND)(intptr_t)(int32_t)regs[0], (int)regs[1], (int)regs[2]);
+        return true;
+    });
+    Thunk("ImageList_DragLeave", 745, [](uint32_t* regs, EmulatedMemory&) -> bool {
+        regs[0] = ImageList_DragLeave((HWND)(intptr_t)(int32_t)regs[0]);
+        return true;
+    });
+    Thunk("ImageList_GetDragImage", 753, [this](uint32_t* regs, EmulatedMemory& mem) -> bool {
+        POINT pt, ptHotspot;
+        HIMAGELIST h = ImageList_GetDragImage(&pt, &ptHotspot);
+        if (regs[0]) { mem.Write32(regs[0], pt.x); mem.Write32(regs[0]+4, pt.y); }
+        if (regs[1]) { mem.Write32(regs[1], ptHotspot.x); mem.Write32(regs[1]+4, ptHotspot.y); }
+        regs[0] = (uint32_t)(uintptr_t)h;
+        return true;
+    });
+    Thunk("ImageList_SetDragCursorImage", 764, [this](uint32_t* regs, EmulatedMemory&) -> bool {
+        regs[0] = ImageList_SetDragCursorImage(
+            (HIMAGELIST)UnwrapHandle(regs[0]), (int)regs[1], (int)regs[2], (int)regs[3]);
+        return true;
+    });
     Thunk("ImageList_SetOverlayImage", 766, [this](uint32_t* regs, EmulatedMemory&) -> bool {
         HIMAGELIST h = (HIMAGELIST)UnwrapHandle(regs[0]);
         LOG(API, "[API] ImageList_SetOverlayImage(0x%08X -> %p, iImage=%d, iOverlay=%d)\n",

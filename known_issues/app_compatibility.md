@@ -28,6 +28,7 @@ Quick test results for WinCE apps from `references/Optional Programs/`.
 | PEInfo.exe | Shows empty window (needs a file to open, may work with interaction) |
 | BananaPC.exe | Creates tiny 51x16 taskbar widget (works but useless outside WinCE taskbar) |
 
+| explorer.exe | WinCE 5 HPC shell — desktop icons, Start Menu (Programs/Favorites/Settings/Run/Suspend), taskbar with clock, launching apps from menu (.lnk shortcuts). Missing: folder navigation (needs COM/IShellFolder), desktop icon double-click CLSID handling, some icons wrong |
 | spread_excel.exe (SpreadCE) | WinCE 7 app — window sizing and menu text work, but bottom menu bar clicks don't open menus (ARM modal message loop issue) |
 | DocOpen.exe (PHM Tools) | File open dialog works after memcpy/DllMain fixes. Toolbar buttons now work (memory allocator fix). ComboBox doesn't render until clicked. |
 | Run.exe (PHM Tools) | Browse dialog works after DllMain fix. Wrong icon in dialog (warning icon instead of app icon). |
@@ -36,6 +37,7 @@ Quick test results for WinCE apps from `references/Optional Programs/`.
 
 | App | Issue |
 |-----|-------|
+| explorer.exe | WinCE 5 desktop shell — see "Partially Working" section |
 | Regedit.exe (TascalRegEdit) | Loops showing "Debug" error dialogs |
 | ITaskMgr.exe | "Application initialize failed" |
 | Crux_View.exe | Segfault on startup |
@@ -56,4 +58,11 @@ Quick test results for WinCE apps from `references/Optional Programs/`.
 10. **SPI action 0xE1 (WinCE 7 SPI_GETSIPINFO)**: Implemented in SystemParametersInfoW thunk. Returns SIPINFO struct with work area. Only 0xE1 is handled (not 0x68 — handling 0x68 breaks WinCE 5 app layouts).
 11. **memcpy/memmove/memset cross-region safety**: Check host pointer contiguity before native memcpy. Fallback regions (NOT identity-mapped) may have non-adjacent host addresses for adjacent emulated pages. Fall back to byte-by-byte copy. Fixed DocOpen.exe crash.
 12. **ARM DLL DllMain initialization**: Call DllMain(DLL_PROCESS_ATTACH) for on-demand loaded ARM DLLs before forwarding API calls. Fixed g_pShellMalloc NULL crash in ceshell.dll's SHGetOpenFileName (Run.exe Browse, DocOpen.exe).
-13. **Memory allocator address space collision + pre-reservation**: LocalAlloc (starting 0x00800000) grew past LocalReAlloc's range (0x00900000) after 240+ allocations, creating overlapping memory regions. Fixed by reorganizing with wider gaps (LocalAlloc→0x00800000, LocalReAlloc→0x00A00000, HeapAlloc→0x00C00000). Also fixed identity-mapping failures: Windows VirtualAlloc requires 64KB-aligned addresses for MEM_RESERVE, so page-by-page allocations at non-64KB-aligned addresses failed. Added pre-reservation of large contiguous blocks at each allocator base, with subsequent page commits within the reservation. Fixed HeapCreate to return handles instead of allocating overlapping memory. Made malloc/calloc/realloc share a single counter.
+13. **CreateThread inline execution**: Implemented pseudo-thread model — runs thread function synchronously via callback_executor with `in_pseudo_thread` flag. GetMessageW drains pending messages then returns WM_QUIT in pseudo-thread mode, allowing thread message loops to exit cleanly. Main WinMain message pump handles all windows.
+14. **EventModify**: Replaced stub with real implementation calling SetEvent/ResetEvent/PulseEvent based on func parameter (WinCE kernel API).
+15. **WinCE kernel API stubs**: Added RegisterDesktop (1507), RegisterTaskBar (892), RegisterTaskBarEx (1506), SignalStarted (639), OpenEventW (1496), CreateAPISet (559), RegisterAPISet (635), MapCallerPtr (1602), and many other explorer.exe dependencies.
+16. **WS_POPUP desktop window sizing**: Skip WS_CAPTION injection for WS_POPUP top-level windows (desktop, taskbar) — use dimensions as-is from WinCE GetSystemMetrics.
+17. **InsertMenuW MF_OWNERDRAW dwItemData**: MF_OWNERDRAW items pass lpNewItem as dwItemData (ARM pointer to menu data struct), not as a string. Fixed to pass `(LPCWSTR)(uintptr_t)lpNewItem` for owner-drawn items, matching AppendMenuW behavior. Fixed empty Programs submenu in explorer.
+18. **GetTimeFormatW / GetDateFormatW**: Implemented proper thunks (were stubbed as 0). Read SYSTEMTIME from ARM memory, call native API, write result back. Fixed clock displaying as 8px-wide window.
+19. **ShellExecuteEx .lnk resolution**: WinCE .lnk shortcuts use simple `#\path\to\target.exe` text format. ShellExecuteEx now reads .lnk files, extracts the target path, and launches via cerf.exe if target is ARM PE.
+20. **Memory allocator address space collision + pre-reservation**: LocalAlloc (starting 0x00800000) grew past LocalReAlloc's range (0x00900000) after 240+ allocations, creating overlapping memory regions. Fixed by reorganizing with wider gaps (LocalAlloc→0x00800000, LocalReAlloc→0x00A00000, HeapAlloc→0x00C00000). Also fixed identity-mapping failures: Windows VirtualAlloc requires 64KB-aligned addresses for MEM_RESERVE, so page-by-page allocations at non-64KB-aligned addresses failed. Added pre-reservation of large contiguous blocks at each allocator base, with subsequent page commits within the reservation. Fixed HeapCreate to return handles instead of allocating overlapping memory. Made malloc/calloc/realloc share a single counter.

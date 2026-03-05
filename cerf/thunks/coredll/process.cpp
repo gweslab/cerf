@@ -6,13 +6,48 @@
 #include <cstdio>
 #include <vector>
 
+
 void Win32Thunks::RegisterProcessHandlers() {
     auto stub0 = [](const char* name) -> ThunkHandler {
         return [name](uint32_t* regs, EmulatedMemory&) -> bool {
             LOG(API, "[API] [STUB] %s -> 0\n", name); regs[0] = 0; return true;
         };
     };
-    Thunk("CreateThread", 492, stub0("CreateThread"));
+    Thunk("CreateThread", 492, [this](uint32_t* regs, EmulatedMemory& mem) -> bool {
+        /* CreateThread(lpSA, stackSize, lpStartAddress, lpParameter, flags, lpThreadId)
+           ARM calling convention: R0=lpSA, R1=stackSize, R2=lpStartAddress, R3=lpParameter
+           Stack: [0]=flags, [1]=lpThreadId */
+        uint32_t lpStartAddress = regs[2];
+        uint32_t lpParameter = regs[3];
+        uint32_t flags = ReadStackArg(regs, mem, 0);
+        uint32_t lpThreadId = ReadStackArg(regs, mem, 1);
+        LOG(API, "[API] CreateThread(startAddr=0x%08X, param=0x%08X, flags=0x%X)\n",
+            lpStartAddress, lpParameter, flags);
+        /* Only run inline if the thread function is in the main EXE image
+           (roughly 0x10000-0x80000). DLL thread functions (like FileChangeManager
+           in ceshell.dll at 0x10xxxxxx) often block on WaitForMultipleObjects(INFINITE)
+           and can't work in our single-threaded inline model. */
+        bool is_exe_code = (lpStartAddress >= 0x10000 && lpStartAddress < 0x100000);
+        if (lpStartAddress && callback_executor && is_exe_code) {
+            /* Run thread function synchronously (inline pseudo-thread).
+               The thread function typically creates windows, signals an event,
+               then enters a message loop. The in_pseudo_thread flag makes
+               GetMessageW non-blocking so the loop exits cleanly. */
+            in_pseudo_thread = true;
+            uint32_t args[1] = { lpParameter };
+            uint32_t ret = callback_executor(lpStartAddress, args, 1);
+            in_pseudo_thread = false;
+            LOG(API, "[API]   CreateThread: thread function returned 0x%X\n", ret);
+        } else {
+            LOG(API, "[API]   CreateThread: skipping DLL thread at 0x%08X (not inline-safe)\n",
+                lpStartAddress);
+        }
+        /* Write fake thread ID if requested */
+        if (lpThreadId) mem.Write32(lpThreadId, 0x1001);
+        /* Return fake non-zero handle to indicate success */
+        regs[0] = 0xBEEF0001;
+        return true;
+    });
     Thunk("CreateProcessW", 493, [this](uint32_t* regs, EmulatedMemory& mem) -> bool {
         uint32_t image_ptr = regs[0], cmdline_ptr = regs[1];
         uint32_t fdwCreate = ReadStackArg(regs, mem, 1);
@@ -24,26 +59,54 @@ void Win32Thunks::RegisterProcessHandlers() {
         if (curdir_ptr) curdir = ReadWStringFromEmu(mem, curdir_ptr);
         LOG(API, "[API] CreateProcessW(image='%ls', cmdline='%ls', curdir='%ls', flags=0x%X)\n",
                image.c_str(), cmdline.c_str(), curdir.c_str(), fdwCreate);
-        STARTUPINFOW si = {}; si.cb = sizeof(si);
-        PROCESS_INFORMATION pi = {};
-        std::vector<wchar_t> cmdline_buf(cmdline.begin(), cmdline.end());
-        cmdline_buf.push_back(0);
         std::wstring mapped_image = image.empty() ? L"" : MapWinCEPath(image);
-        std::wstring mapped_curdir = curdir.empty() ? L"" : MapWinCEPath(curdir);
-        BOOL ret = CreateProcessW(
-            mapped_image.empty() ? NULL : mapped_image.c_str(),
-            cmdline_buf.data(),
-            NULL, NULL, FALSE, fdwCreate, NULL,
-            mapped_curdir.empty() ? NULL : mapped_curdir.c_str(),
-            &si, &pi);
-        if (ret && procinfo_ptr) {
-            mem.Write32(procinfo_ptr + 0x00, (uint32_t)(uintptr_t)pi.hProcess);
-            mem.Write32(procinfo_ptr + 0x04, (uint32_t)(uintptr_t)pi.hThread);
-            mem.Write32(procinfo_ptr + 0x08, pi.dwProcessId);
-            mem.Write32(procinfo_ptr + 0x0C, pi.dwThreadId);
+        /* If image is an ARM PE, spawn cerf.exe to run it */
+        if (!mapped_image.empty() && IsArmPE(mapped_image)) {
+            /* Build cerf.exe command line: cerf.exe <mapped_image_path> */
+            wchar_t cerf_path[MAX_PATH];
+            GetModuleFileNameW(NULL, cerf_path, MAX_PATH);
+            std::wstring cerf_cmdline = L"\"";
+            cerf_cmdline += cerf_path;
+            cerf_cmdline += L"\" \"";
+            cerf_cmdline += mapped_image;
+            cerf_cmdline += L"\"";
+            LOG(API, "[API]   -> ARM PE detected, spawning cerf: %ls\n", cerf_cmdline.c_str());
+            STARTUPINFOW si = {}; si.cb = sizeof(si);
+            PROCESS_INFORMATION pi = {};
+            std::vector<wchar_t> cmd_buf(cerf_cmdline.begin(), cerf_cmdline.end());
+            cmd_buf.push_back(0);
+            BOOL ret = CreateProcessW(cerf_path, cmd_buf.data(),
+                NULL, NULL, FALSE, 0, NULL, NULL, &si, &pi);
+            if (ret && procinfo_ptr) {
+                mem.Write32(procinfo_ptr + 0x00, WrapHandle(pi.hProcess));
+                mem.Write32(procinfo_ptr + 0x04, WrapHandle(pi.hThread));
+                mem.Write32(procinfo_ptr + 0x08, pi.dwProcessId);
+                mem.Write32(procinfo_ptr + 0x0C, pi.dwThreadId);
+            }
+            LOG(API, "[API]   -> %s (pid=%d)\n", ret ? "OK" : "FAILED", ret ? pi.dwProcessId : 0);
+            regs[0] = ret;
+        } else {
+            /* Not an ARM PE — try native CreateProcessW */
+            STARTUPINFOW si = {}; si.cb = sizeof(si);
+            PROCESS_INFORMATION pi = {};
+            std::vector<wchar_t> cmdline_buf(cmdline.begin(), cmdline.end());
+            cmdline_buf.push_back(0);
+            std::wstring mapped_curdir = curdir.empty() ? L"" : MapWinCEPath(curdir);
+            BOOL ret = CreateProcessW(
+                mapped_image.empty() ? NULL : mapped_image.c_str(),
+                cmdline_buf.data(),
+                NULL, NULL, FALSE, fdwCreate, NULL,
+                mapped_curdir.empty() ? NULL : mapped_curdir.c_str(),
+                &si, &pi);
+            if (ret && procinfo_ptr) {
+                mem.Write32(procinfo_ptr + 0x00, (uint32_t)(uintptr_t)pi.hProcess);
+                mem.Write32(procinfo_ptr + 0x04, (uint32_t)(uintptr_t)pi.hThread);
+                mem.Write32(procinfo_ptr + 0x08, pi.dwProcessId);
+                mem.Write32(procinfo_ptr + 0x0C, pi.dwThreadId);
+            }
+            LOG(API, "[API]   -> %s (pid=%d)\n", ret ? "OK" : "FAILED", ret ? pi.dwProcessId : 0);
+            regs[0] = ret;
         }
-        LOG(API, "[API]   -> %s (pid=%d)\n", ret ? "OK" : "FAILED", ret ? pi.dwProcessId : 0);
-        regs[0] = ret;
         return true;
     });
     Thunk("TerminateThread", 491, stub0("TerminateThread"));
@@ -51,7 +114,30 @@ void Win32Thunks::RegisterProcessHandlers() {
     Thunk("SetThreadPriority", 514, stub0("SetThreadPriority"));
     Thunk("GetExitCodeProcess", 519, stub0("GetExitCodeProcess"));
     Thunk("OpenProcess", 509, stub0("OpenProcess"));
-    Thunk("WaitForMultipleObjects", 498, stub0("WaitForMultipleObjects"));
+    Thunk("WaitForMultipleObjects", 498, [this](uint32_t* regs, EmulatedMemory& mem) -> bool {
+        /* WaitForMultipleObjects(nCount, lpHandles, bWaitAll, dwMilliseconds) */
+        uint32_t nCount = regs[0];
+        uint32_t lpHandles = regs[1];
+        BOOL bWaitAll = regs[2];
+        uint32_t dwMilliseconds = regs[3];
+        if (nCount == 0 || nCount > 64 || !lpHandles) {
+            LOG(API, "[API] WaitForMultipleObjects(n=%u) -> WAIT_FAILED (bad args)\n", nCount);
+            regs[0] = WAIT_FAILED;
+            return true;
+        }
+        HANDLE handles[64];
+        for (uint32_t i = 0; i < nCount; i++) {
+            uint32_t raw = mem.Read32(lpHandles + i * 4);
+            handles[i] = (HANDLE)(intptr_t)(int32_t)raw;
+        }
+        /* Cap timeout to avoid indefinite blocking (allow message pump to run) */
+        if (dwMilliseconds > 100) dwMilliseconds = 100;
+        DWORD result = WaitForMultipleObjects(nCount, handles, bWaitAll, dwMilliseconds);
+        LOG(API, "[API] WaitForMultipleObjects(n=%u, waitAll=%d, ms=%u) -> 0x%X\n",
+            nCount, bWaitAll, dwMilliseconds, result);
+        regs[0] = result;
+        return true;
+    });
 
     /* File mapping: read file contents into emulated memory */
     Thunk("CreateFileMappingW", 548, [this](uint32_t* regs, EmulatedMemory& mem) -> bool {

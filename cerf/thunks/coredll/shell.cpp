@@ -6,6 +6,7 @@
 #include "../win32_thunks.h"
 #include "../../log.h"
 #include <cstdio>
+#include <vector>
 #include <shellapi.h>
 #include <shlobj.h>
 
@@ -181,23 +182,97 @@ void Win32Thunks::RegisterShellHandlers() {
         if (dir_ptr) dir = ReadWStringFromEmu(mem, dir_ptr);
         LOG(API, "[API] ShellExecuteEx(verb='%ls', file='%ls', params='%ls', dir='%ls', nShow=%d)\n",
                verb.c_str(), file.c_str(), params.c_str(), dir.c_str(), nShow);
-        SHELLEXECUTEINFOW native_sei = {};
-        native_sei.cbSize = sizeof(SHELLEXECUTEINFOW);
-        native_sei.fMask = fMask;
-        native_sei.hwnd = (HWND)(intptr_t)(int32_t)hwnd_val;
+        /* Handle WinCE shell CLSID paths (::{guid}) — these are shell object
+           references that can't be passed to native Windows.  Silently succeed
+           for now (actual folder navigation requires multi-process support). */
+        if (file.size() > 3 && file[0] == L':' && file[1] == L':' && file[2] == L'{') {
+            LOG(API, "[API]   -> CLSID shell path '%ls'\n", file.c_str());
+            /* Map known CLSIDs to folder paths for explorer navigation.
+               {000214A0} = My Computer (root), {00021400} = Desktop */
+            std::wstring folder_path;
+            if (file.find(L"000214A0") != std::wstring::npos ||
+                file.find(L"000214a0") != std::wstring::npos)
+                folder_path = L"\\";
+            /* TODO: folder navigation requires full COM/IShellFolder support.
+               For now, just log and return success. */
+            (void)folder_path;
+            mem.Write32(sei_addr + 0x20, 42);
+            regs[0] = 1;
+            return true;
+        }
+        /* Resolve WinCE .lnk shortcut files.
+           Format: first line is "#\path\to\target.exe" optionally followed by params. */
+        if (file.size() > 4) {
+            std::wstring ext = file.substr(file.size() - 4);
+            for (auto& c : ext) c = towlower(c);
+            if (ext == L".lnk") {
+                std::wstring lnk_host = MapWinCEPath(file);
+                HANDLE hf = CreateFileW(lnk_host.c_str(), GENERIC_READ, FILE_SHARE_READ,
+                    NULL, OPEN_EXISTING, 0, NULL);
+                if (hf != INVALID_HANDLE_VALUE) {
+                    char buf[1024] = {};
+                    DWORD n = 0;
+                    ReadFile(hf, buf, sizeof(buf) - 1, &n, NULL);
+                    CloseHandle(hf);
+                    buf[n] = 0;
+                    if (n > 0 && buf[0] == '#') {
+                        /* Parse target path (skip #, trim CR/LF) */
+                        char* p = buf + 1;
+                        char* end = p;
+                        while (*end && *end != '\r' && *end != '\n') end++;
+                        *end = 0;
+                        /* Split on first space for params if no quotes */
+                        std::wstring target;
+                        for (char* c = p; *c; c++) target += (wchar_t)*c;
+                        LOG(API, "[API]   -> .lnk resolved to '%ls'\n", target.c_str());
+                        file = target;
+                        /* params from .lnk override if empty */
+                    }
+                }
+            }
+        }
         std::wstring mapped_file = file.empty() ? L"" : MapWinCEPath(file);
-        std::wstring mapped_dir = dir.empty() ? L"" : MapWinCEPath(dir);
-        native_sei.lpVerb = verb.empty() ? NULL : verb.c_str();
-        native_sei.lpFile = mapped_file.empty() ? NULL : mapped_file.c_str();
-        native_sei.lpParameters = params.empty() ? NULL : params.c_str();
-        native_sei.lpDirectory = mapped_dir.empty() ? NULL : mapped_dir.c_str();
-        native_sei.nShow = nShow;
-        BOOL ret = ShellExecuteExW(&native_sei);
-        mem.Write32(sei_addr + 0x20, (uint32_t)(uintptr_t)native_sei.hInstApp);
-        if (fMask & SEE_MASK_NOCLOSEPROCESS)
-            mem.Write32(sei_addr + 0x38, (uint32_t)(uintptr_t)native_sei.hProcess);
-        LOG(API, "[API]   -> %s\n", ret ? "OK" : "FAILED");
-        regs[0] = ret;
+        /* Check if the target is a WinCE ARM executable — spawn cerf.exe */
+        if (!mapped_file.empty() && IsArmPE(mapped_file)) {
+            wchar_t cerf_path[MAX_PATH];
+            GetModuleFileNameW(NULL, cerf_path, MAX_PATH);
+            std::wstring cmdline = L"\"";
+            cmdline += cerf_path;
+            cmdline += L"\" \"";
+            cmdline += mapped_file;
+            cmdline += L"\"";
+            LOG(API, "[API]   -> ARM PE detected, spawning cerf: %ls\n", cmdline.c_str());
+            STARTUPINFOW si = {}; si.cb = sizeof(si);
+            PROCESS_INFORMATION pi = {};
+            std::vector<wchar_t> cmd_buf(cmdline.begin(), cmdline.end());
+            cmd_buf.push_back(0);
+            BOOL ret = CreateProcessW(cerf_path, cmd_buf.data(),
+                NULL, NULL, FALSE, 0, NULL, NULL, &si, &pi);
+            mem.Write32(sei_addr + 0x20, ret ? 42 : 0); /* hInstApp: >32 = success */
+            if (ret && (fMask & SEE_MASK_NOCLOSEPROCESS))
+                mem.Write32(sei_addr + 0x38, WrapHandle(pi.hProcess));
+            if (ret) { CloseHandle(pi.hThread); }
+            LOG(API, "[API]   -> %s (pid=%d)\n", ret ? "OK" : "FAILED", ret ? pi.dwProcessId : 0);
+            regs[0] = ret;
+        } else {
+            /* Not an ARM PE — try native ShellExecuteExW */
+            SHELLEXECUTEINFOW native_sei = {};
+            native_sei.cbSize = sizeof(SHELLEXECUTEINFOW);
+            native_sei.fMask = fMask;
+            native_sei.hwnd = (HWND)(intptr_t)(int32_t)hwnd_val;
+            std::wstring mapped_dir = dir.empty() ? L"" : MapWinCEPath(dir);
+            native_sei.lpVerb = verb.empty() ? NULL : verb.c_str();
+            native_sei.lpFile = mapped_file.empty() ? NULL : mapped_file.c_str();
+            native_sei.lpParameters = params.empty() ? NULL : params.c_str();
+            native_sei.lpDirectory = mapped_dir.empty() ? NULL : mapped_dir.c_str();
+            native_sei.nShow = nShow;
+            BOOL ret = ShellExecuteExW(&native_sei);
+            mem.Write32(sei_addr + 0x20, (uint32_t)(uintptr_t)native_sei.hInstApp);
+            if (fMask & SEE_MASK_NOCLOSEPROCESS)
+                mem.Write32(sei_addr + 0x38, (uint32_t)(uintptr_t)native_sei.hProcess);
+            LOG(API, "[API]   -> %s\n", ret ? "OK" : "FAILED");
+            regs[0] = ret;
+        }
         return true;
     });
     Thunk("Shell_NotifyIcon", 481, [this](uint32_t* regs, EmulatedMemory& mem) -> bool {

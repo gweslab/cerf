@@ -72,6 +72,23 @@ std::wstring ReadWStringFromEmu(EmulatedMemory& mem, uint32_t addr);
 /* Helper to read a narrow string from emulated memory */
 std::string ReadStringFromEmu(EmulatedMemory& mem, uint32_t addr);
 
+/* Check if a file is an ARM PE (WinCE) executable by reading its PE header. */
+inline bool IsArmPE(const std::wstring& host_path) {
+    HANDLE f = CreateFileW(host_path.c_str(), GENERIC_READ, FILE_SHARE_READ, NULL,
+                           OPEN_EXISTING, 0, NULL);
+    if (f == INVALID_HANDLE_VALUE) return false;
+    uint8_t buf[512]; DWORD n = 0;
+    ReadFile(f, buf, sizeof(buf), &n, NULL);
+    CloseHandle(f);
+    if (n < 0x40) return false;
+    if (buf[0] != 'M' || buf[1] != 'Z') return false;
+    uint32_t pe_off = *(uint32_t*)(buf + 0x3C);
+    if (pe_off + 6 > n) return false;
+    if (buf[pe_off] != 'P' || buf[pe_off+1] != 'E') return false;
+    uint16_t machine = *(uint16_t*)(buf + pe_off + 4);
+    return (machine == 0x01C0 || machine == 0x01C2);
+}
+
 class Win32Thunks {
 public:
     Win32Thunks(EmulatedMemory& mem);
@@ -102,6 +119,11 @@ public:
        Args: (arm_addr, args_array, num_args) -> return value */
     typedef std::function<uint32_t(uint32_t addr, uint32_t* args, int nargs)> CallbackExecutor;
     CallbackExecutor callback_executor;
+
+    /* When true, we are inside a pseudo-thread (CreateThread inline execution).
+       GetMessageW uses this to drain pending messages then return WM_QUIT
+       instead of blocking, so the thread function's message loop exits cleanly. */
+    bool in_pseudo_thread = false;
 
     /* Store ARM WndProc addresses per class name */
     std::map<std::wstring, uint32_t> arm_wndprocs;
@@ -151,9 +173,15 @@ private:
     LONG wce_sysfont_weight = FW_NORMAL;
     void InitWceSysFont();
 
-    /* Emulated WinCE screen resolution (from cerf.ini, default 800x600) */
+public:
+    /* Emulated WinCE screen resolution (from cerf.ini, default 800x600).
+       When fake_screen_resolution is true (default), GetSystemMetrics/GetDeviceCaps
+       return these values instead of real desktop resolution. Set to false via
+       --fake-screen-resolution=false or fake_screen_resolution=false in cerf.ini. */
+    bool fake_screen_resolution = true;
     uint32_t screen_width  = WINCE_SCREEN_WIDTH_DEFAULT;
     uint32_t screen_height = WINCE_SCREEN_HEIGHT_DEFAULT;
+private:
 
     /* Virtual filesystem device paths */
     std::string cerf_dir;        /* Directory containing cerf.exe */

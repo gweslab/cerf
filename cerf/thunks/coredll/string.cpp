@@ -552,6 +552,99 @@ void Win32Thunks::RegisterStringHandlers() {
         return true;
     });
 
+    /* StringCbCopyW(dst, cbDest, src) — byte-count version of StringCchCopyW */
+    Thunk("StringCbCopyW", 1690, [this](uint32_t* regs, EmulatedMemory& mem) -> bool {
+        uint32_t dst = regs[0], cb = regs[1], src_ptr = regs[2];
+        uint32_t cch = cb / 2;
+        if (!dst || cch == 0) { regs[0] = 0x80070057; return true; }
+        std::wstring src = ReadWStringFromEmu(mem, src_ptr);
+        uint32_t copy_len = std::min((uint32_t)src.size(), cch - 1);
+        for (uint32_t i = 0; i < copy_len; i++) mem.Write16(dst + i * 2, src[i]);
+        mem.Write16(dst + copy_len * 2, 0);
+        regs[0] = (src.size() >= cch) ? 0x8007007A : 0;
+        return true;
+    });
+    /* StringCbCatW(dst, cbDest, src) — byte-count version of StringCchCatW */
+    Thunk("StringCbCatW", 1694, [this](uint32_t* regs, EmulatedMemory& mem) -> bool {
+        uint32_t dst = regs[0], cb = regs[1], src_ptr = regs[2];
+        uint32_t cch = cb / 2;
+        if (!dst || cch == 0) { regs[0] = 0x80070057; return true; }
+        std::wstring existing = ReadWStringFromEmu(mem, dst);
+        std::wstring src = ReadWStringFromEmu(mem, src_ptr);
+        uint32_t cur_len = (uint32_t)existing.size();
+        uint32_t avail = (cur_len < cch) ? cch - cur_len - 1 : 0;
+        uint32_t copy_len = std::min((uint32_t)src.size(), avail);
+        for (uint32_t i = 0; i < copy_len; i++) mem.Write16(dst + (cur_len + i) * 2, src[i]);
+        mem.Write16(dst + (cur_len + copy_len) * 2, 0);
+        regs[0] = (src.size() > avail) ? 0x8007007A : 0;
+        return true;
+    });
+    /* StringCchCatExW(dst, cchDest, src, ppszDestEnd, pcchRemaining, dwFlags) */
+    Thunk("StringCchCatExW", 1695, [this](uint32_t* regs, EmulatedMemory& mem) -> bool {
+        uint32_t dst = regs[0], cch = regs[1], src_ptr = regs[2], ppEnd = regs[3];
+        uint32_t pcchRemaining = ReadStackArg(regs, mem, 0);
+        if (!dst || cch == 0) { regs[0] = 0x80070057; return true; }
+        std::wstring existing = ReadWStringFromEmu(mem, dst);
+        std::wstring src = ReadWStringFromEmu(mem, src_ptr);
+        uint32_t cur_len = (uint32_t)existing.size();
+        uint32_t avail = (cur_len < cch) ? cch - cur_len - 1 : 0;
+        uint32_t copy_len = std::min((uint32_t)src.size(), avail);
+        for (uint32_t i = 0; i < copy_len; i++) mem.Write16(dst + (cur_len + i) * 2, src[i]);
+        mem.Write16(dst + (cur_len + copy_len) * 2, 0);
+        if (ppEnd) mem.Write32(ppEnd, dst + (cur_len + copy_len) * 2);
+        if (pcchRemaining) mem.Write32(pcchRemaining, cch - cur_len - copy_len);
+        regs[0] = (src.size() > avail) ? 0x8007007A : 0;
+        return true;
+    });
+    /* StringCbCatExW(dst, cbDest, src, ppszDestEnd, pcbRemaining, dwFlags) */
+    Thunk("StringCbCatExW", 1696, [this](uint32_t* regs, EmulatedMemory& mem) -> bool {
+        uint32_t dst = regs[0], cb = regs[1], src_ptr = regs[2], ppEnd = regs[3];
+        uint32_t pcbRemaining = ReadStackArg(regs, mem, 0);
+        uint32_t cch = cb / 2;
+        if (!dst || cch == 0) { regs[0] = 0x80070057; return true; }
+        std::wstring existing = ReadWStringFromEmu(mem, dst);
+        std::wstring src = ReadWStringFromEmu(mem, src_ptr);
+        uint32_t cur_len = (uint32_t)existing.size();
+        uint32_t avail = (cur_len < cch) ? cch - cur_len - 1 : 0;
+        uint32_t copy_len = std::min((uint32_t)src.size(), avail);
+        for (uint32_t i = 0; i < copy_len; i++) mem.Write16(dst + (cur_len + i) * 2, src[i]);
+        mem.Write16(dst + (cur_len + copy_len) * 2, 0);
+        if (ppEnd) mem.Write32(ppEnd, dst + (cur_len + copy_len) * 2);
+        if (pcbRemaining) mem.Write32(pcbRemaining, (cch - cur_len - copy_len) * 2);
+        regs[0] = (src.size() > avail) ? 0x8007007A : 0;
+        return true;
+    });
+    /* StringCchPrintfExW(dst, cchDest, ppszDestEnd, pcchRemaining, dwFlags, pszFormat, ...) */
+    Thunk("StringCchPrintfExW", 1701, [this, wprintf_format](uint32_t* regs, EmulatedMemory& mem) -> bool {
+        uint32_t dst = regs[0], cch = regs[1], ppEnd = regs[2], pcchRemaining = regs[3];
+        uint32_t dwFlags = ReadStackArg(regs, mem, 0);
+        uint32_t fmtPtr = ReadStackArg(regs, mem, 1);
+        if (!dst || cch == 0) { regs[0] = 0x80070057; return true; }
+        std::wstring fmt = ReadWStringFromEmu(mem, fmtPtr);
+        uint32_t args[10];
+        for (int i = 0; i < 10; i++) args[i] = ReadStackArg(regs, mem, 2 + i);
+        std::wstring result = wprintf_format(mem, fmt, args, 10);
+        uint32_t copy_len = std::min((uint32_t)result.size(), cch - 1);
+        for (uint32_t i = 0; i < copy_len; i++) mem.Write16(dst + i * 2, result[i]);
+        mem.Write16(dst + copy_len * 2, 0);
+        if (ppEnd) mem.Write32(ppEnd, dst + copy_len * 2);
+        if (pcchRemaining) mem.Write32(pcchRemaining, cch - copy_len);
+        regs[0] = (result.size() >= cch) ? 0x8007007A : 0;
+        (void)dwFlags;
+        return true;
+    });
+    /* StringCchCopyNW(dst, cchDest, src, cchToCopy) */
+    Thunk("StringCchCopyNW", 1742, [this](uint32_t* regs, EmulatedMemory& mem) -> bool {
+        uint32_t dst = regs[0], cch = regs[1], src_ptr = regs[2], cchToCopy = regs[3];
+        if (!dst || cch == 0) { regs[0] = 0x80070057; return true; }
+        std::wstring src = ReadWStringFromEmu(mem, src_ptr);
+        uint32_t src_len = std::min((uint32_t)src.size(), cchToCopy);
+        uint32_t copy_len = std::min(src_len, cch - 1);
+        for (uint32_t i = 0; i < copy_len; i++) mem.Write16(dst + i * 2, src[i]);
+        mem.Write16(dst + copy_len * 2, 0);
+        regs[0] = (src_len >= cch) ? 0x8007007A : 0;
+        return true;
+    });
     Thunk("StringCchLengthW", 1748, [this](uint32_t* regs, EmulatedMemory& mem) -> bool {
         uint32_t psz = regs[0], cchMax = regs[1], pcch_out = regs[2];
         if (!psz) { regs[0] = 0x80070057; return true; } /* STRSAFE_E_INVALID_PARAMETER */

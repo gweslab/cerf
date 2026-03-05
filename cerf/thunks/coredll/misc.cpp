@@ -155,7 +155,24 @@ void Win32Thunks::RegisterMiscHandlers() {
     /* Misc kernel stubs */
     Thunk("FlushInstructionCache", 508, stub1("FlushInstructionCache"));
     Thunk("GetProcessIndexFromID", stub1("GetProcessIndexFromID"));
-    Thunk("EventModify", 494, stub1("EventModify"));
+    Thunk("EventModify", 494, [](uint32_t* regs, EmulatedMemory&) -> bool {
+        /* WinCE EventModify(HANDLE hEvent, DWORD func)
+           func: 1=EVENT_PULSE, 2=EVENT_RESET, 3=EVENT_SET */
+        HANDLE hEvent = (HANDLE)(intptr_t)(int32_t)regs[0];
+        uint32_t func = regs[1];
+        BOOL result = FALSE;
+        switch (func) {
+            case 3: result = SetEvent(hEvent); break;    /* EVENT_SET */
+            case 2: result = ResetEvent(hEvent); break;  /* EVENT_RESET */
+            case 1: result = PulseEvent(hEvent); break;  /* EVENT_PULSE */
+            default:
+                LOG(API, "[API] EventModify(0x%p, func=%d) -> unknown func\n", hEvent, func);
+                break;
+        }
+        LOG(API, "[API] EventModify(0x%p, func=%d) -> %d\n", hEvent, func, result);
+        regs[0] = result;
+        return true;
+    });
     Thunk("GlobalAddAtomW", 1519, stub1("GlobalAddAtomW"));
     Thunk("GetAPIAddress", 32, stub0("GetAPIAddress"));
     Thunk("WaitForAPIReady", 2562, stub0("WaitForAPIReady"));
@@ -264,6 +281,103 @@ void Win32Thunks::RegisterMiscHandlers() {
     Thunk("MonitorFromPoint", 1522, [](uint32_t* regs, EmulatedMemory&) -> bool {
         regs[0] = 1; /* fake monitor handle */
         return true;
+    });
+    /* WinCE kernel stubs for explorer.exe */
+    Thunk("RegisterTaskBar", 892, [](uint32_t* regs, EmulatedMemory&) -> bool {
+        LOG(API, "[API] RegisterTaskBar(hwnd=0x%08X) -> 1\n", regs[0]);
+        regs[0] = 1; return true;
+    });
+    Thunk("RegisterDesktop", 1507, [](uint32_t* regs, EmulatedMemory&) -> bool {
+        LOG(API, "[API] RegisterDesktop(hwnd=0x%08X) -> 1\n", regs[0]);
+        regs[0] = 1; return true;
+    });
+    ThunkOrdinal("RegisterTaskBarEx", 1506);
+    thunk_handlers["RegisterTaskBarEx"] = thunk_handlers["RegisterTaskBar"];
+    Thunk("SignalStarted", 639, [](uint32_t* regs, EmulatedMemory&) -> bool {
+        LOG(API, "[API] SignalStarted(0x%08X) -> stub\n", regs[0]);
+        regs[0] = 0; return true;
+    });
+    Thunk("OpenEventW", 1496, [](uint32_t* regs, EmulatedMemory&) -> bool {
+        /* OpenEventW(dwDesiredAccess, bInheritHandle, lpName) — name is in R2 but
+           WinCE often passes NULL name (unnamed events). Return NULL to indicate
+           event doesn't exist yet (caller will CreateEventW). */
+        LOG(API, "[API] OpenEventW(access=0x%X, inherit=%d) -> 0 (stub)\n", regs[0], regs[1]);
+        regs[0] = 0; return true;
+    });
+    Thunk("CreateAPISet", 559, stub0("CreateAPISet"));
+    Thunk("RegisterAPISet", 635, stub0("RegisterAPISet"));
+    Thunk("SetProcPermissions", 611, stub1("SetProcPermissions"));
+    Thunk("GetCurrentPermissions", 612, [](uint32_t* regs, EmulatedMemory&) -> bool {
+        regs[0] = 0xFFFFFFFF; /* all permissions */
+        return true;
+    });
+    Thunk("CompactAllHeaps", 54, stub0("CompactAllHeaps"));
+    Thunk("MapCallerPtr", 1602, [](uint32_t* regs, EmulatedMemory&) -> bool {
+        /* MapCallerPtr just returns the pointer unchanged in our single-process model */
+        LOG(API, "[API] MapCallerPtr(ptr=0x%08X, size=%u) -> 0x%08X\n", regs[0], regs[1], regs[0]);
+        return true; /* regs[0] already contains the pointer */
+    });
+    Thunk("GetExitCodeThread", 518, [](uint32_t* regs, EmulatedMemory&) -> bool {
+        LOG(API, "[API] [STUB] GetExitCodeThread -> 0\n");
+        regs[0] = 0; return true;
+    });
+    Thunk("GetThreadPriority", 515, [](uint32_t* regs, EmulatedMemory&) -> bool {
+        regs[0] = 0; /* THREAD_PRIORITY_NORMAL */
+        return true;
+    });
+    Thunk("SendMessageTimeout", 1495, [](uint32_t* regs, EmulatedMemory&) -> bool {
+        HWND hw = (HWND)(intptr_t)(int32_t)regs[0];
+        regs[0] = (uint32_t)SendMessageW(hw, regs[1], regs[2], regs[3]);
+        return true;
+    });
+    Thunk("GetWindowTextWDirect", 1454, [this](uint32_t* regs, EmulatedMemory& mem) -> bool {
+        HWND hw = (HWND)(intptr_t)(int32_t)regs[0];
+        int maxlen = (int)regs[2];
+        wchar_t buf[256] = {};
+        if (maxlen > 256) maxlen = 256;
+        int len = GetWindowTextW(hw, buf, maxlen);
+        uint32_t dst = regs[1];
+        for (int i = 0; i <= len; i++) mem.Write16(dst + i * 2, buf[i]);
+        regs[0] = len;
+        return true;
+    });
+    /* WinCE kernel stubs for power/notification */
+    Thunk("CreateMsgQueue", 1529, stub0("CreateMsgQueue"));
+    Thunk("ReadMsgQueue", 1530, stub0("ReadMsgQueue"));
+    Thunk("RequestPowerNotifications", 1585, stub0("RequestPowerNotifications"));
+    Thunk("StopPowerNotifications", 1586, stub0("StopPowerNotifications"));
+    Thunk("FindFirstChangeNotificationW", 1682, stub0("FindFirstChangeNotificationW"));
+    Thunk("FindCloseChangeNotification", 1684, stub0("FindCloseChangeNotification"));
+    Thunk("CeRunAppAtEvent", 476, stub0("CeRunAppAtEvent"));
+    Thunk("CeOidGetInfo", 312, stub0("CeOidGetInfo"));
+    Thunk("GwesPowerOffSystem", 296, stub0("GwesPowerOffSystem"));
+    Thunk("RectangleAnimation", 294, stub0("RectangleAnimation"));
+    Thunk("TouchCalibrate", 877, stub0("TouchCalibrate"));
+    Thunk("TerminateProcess", 544, [](uint32_t* regs, EmulatedMemory&) -> bool {
+        LOG(API, "[API] TerminateProcess(hProcess=0x%08X, exitCode=%d)\n", regs[0], regs[1]);
+        regs[0] = 1; return true;
+    });
+    Thunk("GetKeyboardLayoutList", 1767, [this](uint32_t* regs, EmulatedMemory& mem) -> bool {
+        if (regs[0] > 0 && regs[1]) {
+            mem.Write32(regs[1], 0x04090409); /* US English */
+            regs[0] = 1;
+        } else {
+            regs[0] = 1; /* number of layouts */
+        }
+        return true;
+    });
+    Thunk("SHLoadIndirectString", 1977, stub0("SHLoadIndirectString"));
+    Thunk("CeOpenDatabaseEx2", 1469, stub0("CeOpenDatabaseEx2"));
+    Thunk("IsBadCodePtr", 521, [](uint32_t* regs, EmulatedMemory&) -> bool {
+        regs[0] = 0; /* Always return FALSE - pointer is valid */
+        return true;
+    });
+    Thunk("GetKeyState", 860, [](uint32_t* regs, EmulatedMemory&) -> bool {
+        regs[0] = (uint32_t)GetKeyState((int)regs[0]); return true;
+    });
+    Thunk("SetSysColors", 890, stub0("SetSysColors"));
+    Thunk("GetAsyncKeyState", 826, [](uint32_t* regs, EmulatedMemory&) -> bool {
+        regs[0] = (uint32_t)GetAsyncKeyState((int)regs[0]); return true;
     });
     /* Ordinal-only entries */
     ThunkOrdinal("GetOwnerProcess", 606);

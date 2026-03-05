@@ -8,7 +8,12 @@
 
 void Win32Thunks::RegisterGdiDcHandlers() {
     Thunk("CreateCompatibleDC", 910, [](uint32_t* regs, EmulatedMemory&) -> bool {
-        regs[0] = (uint32_t)(uintptr_t)CreateCompatibleDC((HDC)(intptr_t)(int32_t)regs[0]); return true;
+        HDC src = (HDC)(intptr_t)(int32_t)regs[0];
+        HDC result = CreateCompatibleDC(src);
+        LOG(API, "[API] CreateCompatibleDC(0x%08X) -> 0x%08X\n",
+            (uint32_t)(uintptr_t)src, (uint32_t)(uintptr_t)result);
+        regs[0] = (uint32_t)(uintptr_t)result;
+        return true;
     });
     Thunk("DeleteDC", 911, [](uint32_t* regs, EmulatedMemory&) -> bool {
         regs[0] = DeleteDC((HDC)(intptr_t)(int32_t)regs[0]); return true;
@@ -65,8 +70,8 @@ void Win32Thunks::RegisterGdiDcHandlers() {
     });
     Thunk("GetDeviceCaps", 916, [this](uint32_t* regs, EmulatedMemory&) -> bool {
         int index = (int)regs[1];
-        if (index == HORZRES) { regs[0] = screen_width; return true; }
-        if (index == VERTRES) { regs[0] = screen_height; return true; }
+        if (fake_screen_resolution && index == HORZRES) { regs[0] = screen_width; return true; }
+        if (fake_screen_resolution && index == VERTRES) { regs[0] = screen_height; return true; }
         // Return 16 for BITSPIXEL to match typical WinCE 5.0 devices (16bpp).
         // Desktop returns 32 which is unrealistic; apps like cecmd check
         // BITSPIXEL*PLANES >= 15 to choose high-color vs low-color bitmaps.

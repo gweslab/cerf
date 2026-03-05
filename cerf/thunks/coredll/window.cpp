@@ -89,9 +89,16 @@ void Win32Thunks::RegisterWindowHandlers() {
             style |= WS_POPUP;
         }
         bool is_toplevel = (parent == NULL && !(style & WS_CHILD));
-        if (is_toplevel) {
+        bool is_popup_no_caption = is_toplevel && (style & WS_POPUP) && !(style & WS_CAPTION);
+        /* Detect fullscreen-like windows: top-level with dimensions matching screen size.
+           These should use WS_POPUP style with exact screen dimensions, no frame inflation.
+           Examples: DesktopExplorerWindow (WS_CLIPCHILDREN|WS_CLIPSIBLINGS|WS_CAPTION, size=screen) */
+        bool is_fullscreen = is_toplevel && w > 0 && h > 0 &&
+            (uint32_t)w >= screen_width && (uint32_t)h >= screen_height;
+        if (is_toplevel && !is_popup_no_caption && !is_fullscreen) {
             /* WinCE top-level windows always have a title bar with text.
-               Ensure WS_CAPTION is set so desktop Windows draws the title text. */
+               Ensure WS_CAPTION is set so desktop Windows draws the title text.
+               (Skip for WS_POPUP windows without WS_CAPTION — e.g. desktop window) */
             style |= WS_CAPTION;
             if (x == (int)0x80000000 || y == (int)0x80000000 ||
                 w == (int)0x80000000 || h == (int)0x80000000 ||
@@ -120,6 +127,15 @@ void Win32Thunks::RegisterWindowHandlers() {
                 h = rc.bottom - rc.top;
             }
             exStyle |= WS_EX_APPWINDOW;
+        } else if (is_popup_no_caption || is_fullscreen) {
+            /* WS_POPUP without caption, or fullscreen window (e.g. desktop, taskbar).
+               Use WS_POPUP style with exact dimensions — no frame inflation. */
+            style &= ~(uint32_t)WS_CAPTION;  /* strip caption to avoid frame */
+            style |= WS_POPUP;
+            if (x == (int)0x80000000) x = 0;
+            if (y == (int)0x80000000) y = 0;
+            if (w == (int)0x80000000 || w == 0) w = (int)screen_width;
+            if (h == (int)0x80000000 || h == 0) h = (int)screen_height;
         } else {
             if (x==(int)0x80000000) x=0; if (y==(int)0x80000000) y=0;
             if (w==(int)0x80000000) w=320;
@@ -255,7 +271,25 @@ void Win32Thunks::RegisterWindowHandlers() {
         return true;
     });
     Thunk("BringWindowToTop", 275, [](uint32_t* regs, EmulatedMemory&) -> bool { regs[0] = BringWindowToTop((HWND)(intptr_t)(int32_t)regs[0]); return true; });
-    Thunk("GetWindow", 251, [](uint32_t* regs, EmulatedMemory&) -> bool { regs[0] = (uint32_t)(uintptr_t)GetWindow((HWND)(intptr_t)(int32_t)regs[0], regs[1]); return true; });
+    Thunk("GetWindow", 251, [this](uint32_t* regs, EmulatedMemory&) -> bool {
+        HWND hw = (HWND)(intptr_t)(int32_t)regs[0];
+        UINT cmd = regs[1];
+        HWND result = GetWindow(hw, cmd);
+        /* For sibling enumeration (GW_HWNDNEXT=2, GW_HWNDPREV=3, GW_HWNDFIRST=0,
+           GW_HWNDLAST=1), skip windows not owned by cerf.  This prevents the taskbar
+           from showing native host windows (IDA, etc.) as running apps. */
+        if (cmd <= 3) {
+            DWORD our_pid = GetCurrentProcessId();
+            while (result) {
+                DWORD pid = 0;
+                GetWindowThreadProcessId(result, &pid);
+                if (pid == our_pid) break;
+                result = GetWindow(result, (cmd == 0 || cmd == 2) ? GW_HWNDNEXT : GW_HWNDPREV);
+            }
+        }
+        regs[0] = (uint32_t)(uintptr_t)result;
+        return true;
+    });
     Thunk("SetParent", 268, [](uint32_t* regs, EmulatedMemory&) -> bool { regs[0] = (uint32_t)(uintptr_t)SetParent((HWND)(intptr_t)(int32_t)regs[0], (HWND)(intptr_t)(int32_t)regs[1]); return true; });
     Thunk("MapWindowPoints", 284, [this](uint32_t* regs, EmulatedMemory& mem) -> bool {
         HWND hwndFrom = (HWND)(intptr_t)(int32_t)regs[0];

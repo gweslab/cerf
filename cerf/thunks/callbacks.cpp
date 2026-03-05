@@ -271,7 +271,8 @@ LRESULT CALLBACK Win32Thunks::EmuWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPA
     /* Debug: log key messages to ARM windows */
     if (msg == WM_CHAR || msg == WM_KEYDOWN || msg == WM_SETTEXT ||
         msg == WM_LBUTTONDOWN || msg == WM_LBUTTONUP || msg == WM_CAPTURECHANGED ||
-        msg == WM_SETFOCUS || msg == WM_KILLFOCUS) {
+        msg == WM_SETFOCUS || msg == WM_KILLFOCUS ||
+        msg == WM_INITMENUPOPUP || msg == WM_MENUSELECT) {
         wchar_t cls[64] = {};
         GetClassNameW(hwnd, cls, 64);
         LOG(API, "[API] EmuWndProc: msg=0x%04X hwnd=0x%p class='%ls' wP=0x%X lP=0x%X\n",

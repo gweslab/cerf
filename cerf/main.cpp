@@ -32,6 +32,9 @@ static void PrintUsage(const char* prog) {
     printf("  --no-log=CATEGORIES  Disable specific categories\n");
     printf("  --log-file=PATH      Write logs to file (in addition to console)\n");
     printf("  --device=NAME        Device profile to use (default: from cerf.ini)\n");
+    printf("  --fake-screen-resolution=BOOL  Override fake screen resolution (true/false)\n");
+    printf("  --fake-screen-width=N          Fake screen width (default: 800)\n");
+    printf("  --fake-screen-height=N         Fake screen height (default: 600)\n");
     printf("  --flush-outputs      Flush after every log write (for complete captures)\n");
     printf("  --quiet              Disable all log output\n");
     printf("  --help               Show this help\n");
@@ -66,6 +69,9 @@ int main(int argc, char* argv[]) {
     const char* log_file = nullptr;
     bool flush_outputs = false;
     uint32_t no_log_mask = 0;
+    int cli_fake_screen_resolution = -1; /* -1=unset, 0=false, 1=true */
+    int cli_screen_width = 0;
+    int cli_screen_height = 0;
 
     Log::Init();
 
@@ -84,6 +90,13 @@ int main(int argc, char* argv[]) {
             flush_outputs = true;
         } else if (strncmp(argv[i], "--device=", 9) == 0) {
             device_override = argv[i] + 9;
+        } else if (strncmp(argv[i], "--fake-screen-resolution=", 25) == 0) {
+            const char* val = argv[i] + 25;
+            cli_fake_screen_resolution = (strcmp(val, "false") != 0 && strcmp(val, "0") != 0 && strcmp(val, "no") != 0) ? 1 : 0;
+        } else if (strncmp(argv[i], "--fake-screen-width=", 20) == 0) {
+            cli_screen_width = atoi(argv[i] + 20);
+        } else if (strncmp(argv[i], "--fake-screen-height=", 21) == 0) {
+            cli_screen_height = atoi(argv[i] + 21);
         } else if (strcmp(argv[i], "--quiet") == 0) {
             Log::SetEnabled(Log::NONE);
             explicit_log = true;
@@ -159,6 +172,14 @@ int main(int argc, char* argv[]) {
     /* Initialize virtual filesystem — reads cerf.ini, sets up device paths.
        This also sets wince_sys_dir for ARM DLL loading. */
     thunks.InitVFS(device_override ? device_override : "");
+
+    /* CLI overrides for screen resolution settings (take priority over cerf.ini) */
+    if (cli_fake_screen_resolution >= 0)
+        thunks.fake_screen_resolution = (cli_fake_screen_resolution != 0);
+    if (cli_screen_width > 0)
+        thunks.screen_width = (uint32_t)cli_screen_width;
+    if (cli_screen_height > 0)
+        thunks.screen_height = (uint32_t)cli_screen_height;
 
     /* Install import thunks */
     thunks.InstallThunks(pe_info);

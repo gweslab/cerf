@@ -34,9 +34,27 @@ void Win32Thunks::RegisterSystemHandlers() {
     Thunk("GetSystemMetrics", 885, [this](uint32_t* regs, EmulatedMemory&) -> bool {
         int idx = (int)regs[0];
         /* Return WinCE-compatible screen dimensions so ARM apps see a
-           reasonable screen size rather than the desktop's full resolution. */
-        if (idx == SM_CXSCREEN) { regs[0] = screen_width;  LOG(API, "[API] GetSystemMetrics(SM_CXSCREEN) -> %d\n", regs[0]); return true; }
-        if (idx == SM_CYSCREEN) { regs[0] = screen_height; LOG(API, "[API] GetSystemMetrics(SM_CYSCREEN) -> %d\n", regs[0]); return true; }
+           reasonable screen size rather than the desktop's full resolution.
+           Only override when fake_screen_resolution is enabled. */
+        if (fake_screen_resolution) {
+            if (idx == SM_CXSCREEN || idx == SM_CXFULLSCREEN || idx == SM_CXMAXIMIZED ||
+                idx == SM_CXVIRTUALSCREEN /* 78 */) {
+                regs[0] = screen_width;
+                LOG(API, "[API] GetSystemMetrics(%d) -> %d (screen_width)\n", idx, regs[0]);
+                return true;
+            }
+            if (idx == SM_CYSCREEN || idx == SM_CYFULLSCREEN || idx == SM_CYMAXIMIZED ||
+                idx == SM_CYVIRTUALSCREEN /* 79 */) {
+                regs[0] = screen_height;
+                LOG(API, "[API] GetSystemMetrics(%d) -> %d (screen_height)\n", idx, regs[0]);
+                return true;
+            }
+            /* Virtual screen origin — WinCE has a single monitor at (0,0) */
+            if (idx == SM_XVIRTUALSCREEN || idx == SM_YVIRTUALSCREEN) {
+                regs[0] = 0;
+                return true;
+            }
+        }
         /* WinCE uses 1px edges vs 2px on desktop Windows. ARM commctrl.dll
            toolbar code depends on this for correct button width calculation. */
         if (idx == SM_CXEDGE || idx == SM_CYEDGE) { regs[0] = 1; return true; }
@@ -239,8 +257,78 @@ void Win32Thunks::RegisterSystemHandlers() {
     Thunk("GetOEMCP", 187, [](uint32_t* regs, EmulatedMemory&) -> bool { regs[0] = GetOEMCP(); return true; });
     Thunk("GetCPInfo", 188, [](uint32_t* regs, EmulatedMemory&) -> bool { regs[0] = 0; return true; });
     Thunk("LCMapStringW", [](uint32_t* regs, EmulatedMemory&) -> bool { regs[0] = 0; return true; });
-    Thunk("GetTimeFormatW", 202, [](uint32_t* regs, EmulatedMemory&) -> bool { regs[0] = 0; return true; });
-    Thunk("GetDateFormatW", 203, [](uint32_t* regs, EmulatedMemory&) -> bool { regs[0] = 0; return true; });
+    /* GetTimeFormatW(Locale, dwFlags, lpTime, lpFormat, lpTimeStr, cchTime)
+       r0=Locale, r1=dwFlags, r2=lpTime(ARM ptr to SYSTEMTIME), r3=lpFormat(ARM ptr),
+       stack[0]=lpTimeStr(ARM ptr), stack[1]=cchTime */
+    Thunk("GetTimeFormatW", 202, [this](uint32_t* regs, EmulatedMemory& mem) -> bool {
+        LCID locale = regs[0];
+        DWORD flags = regs[1];
+        uint32_t lpTime_addr = regs[2];
+        uint32_t lpFormat_addr = regs[3];
+        uint32_t lpOut_addr = ReadStackArg(regs, mem, 0);
+        int cch = (int)ReadStackArg(regs, mem, 1);
+        SYSTEMTIME st = {}, *pst = NULL;
+        if (lpTime_addr) {
+            st.wYear = mem.Read16(lpTime_addr);
+            st.wMonth = mem.Read16(lpTime_addr + 2);
+            st.wDayOfWeek = mem.Read16(lpTime_addr + 4);
+            st.wDay = mem.Read16(lpTime_addr + 6);
+            st.wHour = mem.Read16(lpTime_addr + 8);
+            st.wMinute = mem.Read16(lpTime_addr + 10);
+            st.wSecond = mem.Read16(lpTime_addr + 12);
+            st.wMilliseconds = mem.Read16(lpTime_addr + 14);
+            pst = &st;
+        }
+        std::wstring fmt;
+        LPCWSTR pFmt = NULL;
+        if (lpFormat_addr) { fmt = ReadWStringFromEmu(mem, lpFormat_addr); pFmt = fmt.c_str(); }
+        wchar_t buf[256] = {};
+        int ret = GetTimeFormatW(locale, flags, pst, pFmt, buf, 256);
+        if (ret > 0 && lpOut_addr && cch > 0) {
+            int copy = (ret < cch) ? ret : cch;
+            for (int i = 0; i < copy; i++) mem.Write16(lpOut_addr + i * 2, buf[i]);
+        } else if (cch == 0) {
+            /* Query mode: return required size */
+        }
+        LOG(API, "[API] GetTimeFormatW(locale=0x%X, flags=0x%X, fmt=%ls) -> %d '%ls'\n",
+            locale, flags, pFmt ? pFmt : L"(null)", ret, buf);
+        regs[0] = ret;
+        return true;
+    });
+    /* GetDateFormatW — same signature as GetTimeFormatW */
+    Thunk("GetDateFormatW", 203, [this](uint32_t* regs, EmulatedMemory& mem) -> bool {
+        LCID locale = regs[0];
+        DWORD flags = regs[1];
+        uint32_t lpDate_addr = regs[2];
+        uint32_t lpFormat_addr = regs[3];
+        uint32_t lpOut_addr = ReadStackArg(regs, mem, 0);
+        int cch = (int)ReadStackArg(regs, mem, 1);
+        SYSTEMTIME st = {}, *pst = NULL;
+        if (lpDate_addr) {
+            st.wYear = mem.Read16(lpDate_addr);
+            st.wMonth = mem.Read16(lpDate_addr + 2);
+            st.wDayOfWeek = mem.Read16(lpDate_addr + 4);
+            st.wDay = mem.Read16(lpDate_addr + 6);
+            st.wHour = mem.Read16(lpDate_addr + 8);
+            st.wMinute = mem.Read16(lpDate_addr + 10);
+            st.wSecond = mem.Read16(lpDate_addr + 12);
+            st.wMilliseconds = mem.Read16(lpDate_addr + 14);
+            pst = &st;
+        }
+        std::wstring fmt;
+        LPCWSTR pFmt = NULL;
+        if (lpFormat_addr) { fmt = ReadWStringFromEmu(mem, lpFormat_addr); pFmt = fmt.c_str(); }
+        wchar_t buf[256] = {};
+        int ret = GetDateFormatW(locale, flags, pst, pFmt, buf, 256);
+        if (ret > 0 && lpOut_addr && cch > 0) {
+            int copy = (ret < cch) ? ret : cch;
+            for (int i = 0; i < copy; i++) mem.Write16(lpOut_addr + i * 2, buf[i]);
+        }
+        LOG(API, "[API] GetDateFormatW(locale=0x%X, flags=0x%X) -> %d '%ls'\n",
+            locale, flags, ret, buf);
+        regs[0] = ret;
+        return true;
+    });
     Thunk("GetNumberFormatW", 204, [](uint32_t* regs, EmulatedMemory&) -> bool { regs[0] = 0; return true; });
     Thunk("GetCurrencyFormatW", 205, [](uint32_t* regs, EmulatedMemory&) -> bool { regs[0] = 0; return true; });
     /* Version/info */
@@ -257,13 +345,13 @@ void Win32Thunks::RegisterSystemHandlers() {
         uint32_t pvParam = regs[2];
         UINT fWinIni = regs[3];
         if (uiAction == SPI_GETWORKAREA && pvParam) {
-            /* Return WinCE-compatible work area */
+            uint32_t w = fake_screen_resolution ? screen_width : (uint32_t)GetSystemMetrics(SM_CXSCREEN);
+            uint32_t h = fake_screen_resolution ? screen_height : (uint32_t)GetSystemMetrics(SM_CYSCREEN);
             mem.Write32(pvParam + 0,  0);    /* left */
             mem.Write32(pvParam + 4,  0);    /* top */
-            mem.Write32(pvParam + 8,  screen_width);   /* right */
-            mem.Write32(pvParam + 12, screen_height);  /* bottom */
-            LOG(API, "[API] SystemParametersInfoW(SPI_GETWORKAREA) -> {0,0,%d,%d}\n",
-                screen_width, screen_height);
+            mem.Write32(pvParam + 8,  w);    /* right */
+            mem.Write32(pvParam + 12, h);    /* bottom */
+            LOG(API, "[API] SystemParametersInfoW(SPI_GETWORKAREA) -> {0,0,%d,%d}\n", w, h);
             regs[0] = 1;
         } else if (uiAction == 0xE1 /* WinCE 7 SPI_GETSIPINFO via aygshell */ && pvParam) {
             /* WinCE Soft Input Panel info. Fill SIPINFO struct:
@@ -273,10 +361,12 @@ void Win32Thunks::RegisterSystemHandlers() {
             mem.Write32(pvParam + 0,  48);    /* cbSize */
             mem.Write32(pvParam + 4,  0x2);   /* fdwFlags = SIPF_DOCKED (not SIPF_ON) */
             /* rcVisibleDesktop */
+            uint32_t sw = fake_screen_resolution ? screen_width : (uint32_t)GetSystemMetrics(SM_CXSCREEN);
+            uint32_t sh = fake_screen_resolution ? screen_height : (uint32_t)GetSystemMetrics(SM_CYSCREEN);
             mem.Write32(pvParam + 8,  0);     /* left */
             mem.Write32(pvParam + 12, 0);     /* top */
-            mem.Write32(pvParam + 16, screen_width);   /* right */
-            mem.Write32(pvParam + 20, screen_height);  /* bottom */
+            mem.Write32(pvParam + 16, sw);    /* right */
+            mem.Write32(pvParam + 20, sh);    /* bottom */
             /* rcSipRect = empty (SIP hidden) */
             mem.Write32(pvParam + 24, 0);
             mem.Write32(pvParam + 28, 0);

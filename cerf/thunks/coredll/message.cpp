@@ -8,6 +8,11 @@ void Win32Thunks::RegisterMessageHandlers() {
     Thunk("GetMessageW", 861, [this](uint32_t* regs, EmulatedMemory& mem) -> bool {
         MSG msg;
         BOOL ret;
+        /* No pseudo-thread special case: let the thread's message loop run
+           normally as the app's real message loop. If CreateThread ran us inline,
+           the thread's GetMessageW blocks here and processes messages, preventing
+           the thread function from exiting and destroying its objects (e.g.
+           CTaskBar in explorer.exe). */
         while (true) {
             ret = GetMessageW(&msg, (HWND)(intptr_t)(int32_t)regs[1], regs[2], regs[3]);
             if (ret <= 0) break; /* WM_QUIT or error */

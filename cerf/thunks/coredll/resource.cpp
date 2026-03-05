@@ -12,19 +12,21 @@ void Win32Thunks::RegisterResourceHandlers() {
         if (maxlen > 4096) maxlen = 4096;
         uint32_t bundle_id = (str_id / 16) + 1, string_idx = str_id % 16;
         uint32_t rsrc_rva = 0, rsrc_sz = 0; bool is_arm = false;
+        uint32_t arm_base = 0;
         if (hmod == emu_hinstance || hmod == 0) {
-            is_arm = true; uint32_t base = emu_hinstance;
-            uint32_t dos_lfanew = mem.Read32(base + 0x3C), nt_addr = base + dos_lfanew;
+            is_arm = true; arm_base = emu_hinstance;
+            uint32_t dos_lfanew = mem.Read32(arm_base + 0x3C), nt_addr = arm_base + dos_lfanew;
             uint32_t num_rva_sizes = mem.Read32(nt_addr + 0x74);
             if (num_rva_sizes > IMAGE_DIRECTORY_ENTRY_RESOURCE) {
                 rsrc_rva = mem.Read32(nt_addr + 0x78 + IMAGE_DIRECTORY_ENTRY_RESOURCE * 8);
                 rsrc_sz = mem.Read32(nt_addr + 0x78 + IMAGE_DIRECTORY_ENTRY_RESOURCE * 8 + 4);
             }
-            hmod = base;
+            hmod = arm_base;
         }
         for (auto& pair : loaded_dlls) {
             if (pair.second.base_addr == hmod) {
-                is_arm = true; rsrc_rva = pair.second.pe_info.rsrc_rva;
+                is_arm = true; arm_base = pair.second.base_addr;
+                rsrc_rva = pair.second.pe_info.rsrc_rva;
                 rsrc_sz = pair.second.pe_info.rsrc_size; break;
             }
         }
@@ -39,6 +41,15 @@ void Win32Thunks::RegisterResourceHandlers() {
                     }
                     if ((uint8_t*)p < data + data_size) {
                         uint16_t len = *p++;
+                        if (maxlen == 0 && dst == 0) {
+                            /* Special case: nBufferMax=0, lpBuffer=NULL.
+                               Return a direct pointer to the string in the resource section.
+                               WinCE/Win32 LoadStringW returns a read-only pointer (not null-terminated)
+                               and the character count. CStringRes relies on this. */
+                            uint32_t str_arm_addr = hmod + data_rva + (uint32_t)((uint8_t*)p - data);
+                            regs[0] = str_arm_addr;
+                            return true;
+                        }
                         uint32_t copy_len = (len < maxlen - 1) ? len : maxlen - 1;
                         for (uint32_t i = 0; i < copy_len; i++) mem.Write16(dst + i * 2, p[i]);
                         mem.Write16(dst + copy_len * 2, 0);

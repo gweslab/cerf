@@ -132,6 +132,10 @@ void Win32Thunks::RegisterFileHandlers() {
         std::wstring host_pattern = MapWinCEPath(wce_pattern);
         WIN32_FIND_DATAW fd = {};
         HANDLE h = FindFirstFileW(host_pattern.c_str(), &fd);
+        LOG(API, "[API] FindFirstFileW('%ls' -> '%ls') -> %s%ls\n",
+            wce_pattern.c_str(), host_pattern.c_str(),
+            (h != INVALID_HANDLE_VALUE) ? "found: " : "NONE",
+            (h != INVALID_HANDLE_VALUE) ? fd.cFileName : L"");
         /* Skip "." and ".." — WinCE never returns these */
         while (h != INVALID_HANDLE_VALUE && IsDotOrDotDot(fd.cFileName)) {
             if (!FindNextFileW(h, &fd)) {
@@ -237,8 +241,19 @@ void Win32Thunks::RegisterFileHandlers() {
         }
         regs[0] = ret; return true;
     });
+    Thunk("CopyFileW", 164, [this](uint32_t* regs, EmulatedMemory& mem) -> bool {
+        std::wstring src = ReadWStringFromEmu(mem, regs[0]);
+        std::wstring dst = ReadWStringFromEmu(mem, regs[1]);
+        BOOL failIfExists = regs[2];
+        std::wstring host_src = MapWinCEPath(src);
+        std::wstring host_dst = MapWinCEPath(dst);
+        BOOL ret = CopyFileW(host_src.c_str(), host_dst.c_str(), failIfExists);
+        LOG(API, "[API] CopyFileW('%ls' -> '%ls', failIfExists=%d) -> %d\n",
+            src.c_str(), dst.c_str(), failIfExists, ret);
+        regs[0] = ret;
+        return true;
+    });
     /* Ordinal-only entries */
-    ThunkOrdinal("CopyFileW", 164);
     ThunkOrdinal("GetTempPathW", 162);
     ThunkOrdinal("FlushFileBuffers", 175);
     ThunkOrdinal("SetFileTime", 177);

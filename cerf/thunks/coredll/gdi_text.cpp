@@ -241,4 +241,8 @@ void Win32Thunks::RegisterGdiTextHandlers() {
         regs[0] = (uint32_t)ret;
         return true;
     });
+    Thunk("AddFontResourceW", 893, [](uint32_t* regs, EmulatedMemory&) -> bool {
+        LOG(API, "[API] [STUB] AddFontResourceW -> 1\n");
+        regs[0] = 1; return true;
+    });
 }

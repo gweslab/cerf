@@ -17,9 +17,15 @@ void Win32Thunks::RegisterMenuHandlers() {
         regs[0] = (uint32_t)(uintptr_t)GetSubMenu((HMENU)(intptr_t)(int32_t)regs[0], regs[1]); return true;
     });
     Thunk("AppendMenuW", 842, [this](uint32_t* regs, EmulatedMemory& mem) -> bool {
-        std::wstring text = ReadWStringFromEmu(mem, regs[3]);
+        /* MF_STRING is 0x0, so can't test with bitwise AND.
+           A menu item has a string if none of MF_OWNERDRAW/MF_BITMAP/MF_SEPARATOR are set. */
+        bool is_string = regs[3] != 0 && !(regs[1] & (MF_OWNERDRAW | MF_BITMAP | MF_SEPARATOR));
+        std::wstring text;
+        if (is_string) text = ReadWStringFromEmu(mem, regs[3]);
+        LOG(API, "[API] AppendMenuW(hMenu=0x%08X, flags=0x%X, id=0x%X, str=%ls)\n",
+            regs[0], regs[1], regs[2], is_string ? text.c_str() : L"(non-string)");
         regs[0] = AppendMenuW((HMENU)(intptr_t)(int32_t)regs[0], regs[1], regs[2],
-            (regs[1] & MF_STRING) ? text.c_str() : (LPCWSTR)(uintptr_t)regs[3]);
+            is_string ? text.c_str() : (LPCWSTR)(uintptr_t)regs[3]);
         return true;
     });
     Thunk("EnableMenuItem", 847, [](uint32_t* regs, EmulatedMemory&) -> bool {
@@ -86,11 +92,16 @@ void Win32Thunks::RegisterMenuHandlers() {
         uint32_t lpNewItem = ReadStackArg(regs, mem, 0);
         LPCWSTR str = NULL;
         std::wstring text;
-        if ((uFlags & MF_STRING) && lpNewItem) {
+        /* MF_STRING is 0x0 — check for absence of special type flags instead */
+        bool is_string = lpNewItem != 0 && !(uFlags & (MF_OWNERDRAW | MF_BITMAP | MF_SEPARATOR));
+        if (is_string) {
             text = ReadWStringFromEmu(mem, lpNewItem);
             str = text.c_str();
         }
-        regs[0] = InsertMenuW(hMenu, uPosition, uFlags, uIDNewItem, str);
+        LOG(API, "[API] InsertMenuW(hMenu=0x%p, pos=%d, flags=0x%X, id=0x%X, str=%ls)\n",
+            hMenu, uPosition, uFlags, uIDNewItem, is_string ? str : L"(non-string)");
+        regs[0] = InsertMenuW(hMenu, uPosition, uFlags, uIDNewItem,
+            is_string ? str : (LPCWSTR)(uintptr_t)lpNewItem);
         return true;
     });
     Thunk("DeleteMenu", 850, [](uint32_t* regs, EmulatedMemory&) -> bool {

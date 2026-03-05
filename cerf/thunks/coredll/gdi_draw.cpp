@@ -14,7 +14,13 @@ void Win32Thunks::RegisterGdiDrawHandlers() {
         int x = (int)regs[1], y = (int)regs[2], w = (int)regs[3];
         int h = (int)ReadStackArg(regs, mem, 0);
         HDC src_dc = (HDC)(intptr_t)(int32_t)ReadStackArg(regs, mem, 1);
-        regs[0] = BitBlt(dst, x, y, w, h, src_dc, (int)ReadStackArg(regs,mem,2), (int)ReadStackArg(regs,mem,3), ReadStackArg(regs,mem,4));
+        int sx = (int)ReadStackArg(regs,mem,2), sy = (int)ReadStackArg(regs,mem,3);
+        DWORD rop = ReadStackArg(regs,mem,4);
+        GdiFlush();  /* Ensure ARM pvBits writes are visible to native GDI */
+        BOOL ret = BitBlt(dst, x, y, w, h, src_dc, sx, sy, rop);
+        LOG(API, "[API] BitBlt(dst=0x%p, %d,%d,%dx%d, src=0x%p, %d,%d, rop=0x%08X) -> %d\n",
+            dst, x, y, w, h, src_dc, sx, sy, rop, ret);
+        regs[0] = ret;
         return true;
     });
     Thunk("PatBlt", 938, [this](uint32_t* regs, EmulatedMemory& mem) -> bool {
@@ -24,6 +30,7 @@ void Win32Thunks::RegisterGdiDrawHandlers() {
     Thunk("SetBkColor", 922, [](uint32_t* regs, EmulatedMemory&) -> bool { regs[0] = SetBkColor((HDC)(intptr_t)(int32_t)regs[0], regs[1]); return true; });
     Thunk("GetBkColor", 913, [](uint32_t* regs, EmulatedMemory&) -> bool { regs[0] = GetBkColor((HDC)(intptr_t)(int32_t)regs[0]); return true; });
     Thunk("SetBkMode", 923, [](uint32_t* regs, EmulatedMemory&) -> bool {
+        LOG(API, "[API] SetBkMode(hdc=0x%08X, mode=%d [%s])\n", regs[0], regs[1], regs[1]==1?"TRANSPARENT":"OPAQUE");
         regs[0] = SetBkMode((HDC)(intptr_t)(int32_t)regs[0], regs[1]); return true;
     });
     Thunk("SetTextColor", 924, [](uint32_t* regs, EmulatedMemory&) -> bool { regs[0] = SetTextColor((HDC)(intptr_t)(int32_t)regs[0], regs[1]); return true; });
@@ -34,8 +41,39 @@ void Win32Thunks::RegisterGdiDrawHandlers() {
         if (regs[3] && ret) { mem.Write32(regs[3], pt.x); mem.Write32(regs[3] + 4, pt.y); }
         regs[0] = ret; return true;
     });
-    Thunk("CreateCompatibleBitmap", 902, [](uint32_t* regs, EmulatedMemory&) -> bool {
-        regs[0] = (uint32_t)(uintptr_t)CreateCompatibleBitmap((HDC)(intptr_t)(int32_t)regs[0], regs[1], regs[2]); return true;
+    Thunk("CreateCompatibleBitmap", 902, [this](uint32_t* regs, EmulatedMemory& mem) -> bool {
+        /* Create as DIB section instead of DDB so ARM code can directly access pixel data.
+           ARM apps may memcpy pixels between DIB sections and "compatible" bitmaps,
+           which only works if all bitmaps have pvBits in emulated memory. */
+        HDC hdc = (HDC)(intptr_t)(int32_t)regs[0];
+        int w = (int)regs[1], h = (int)regs[2];
+        if (w <= 0 || h <= 0) { regs[0] = 0; return true; }
+        /* Use WinCE device bpp (16), not native desktop bpp (32).
+           ARM code calculates strides based on 16bpp. */
+        int bpp = 16;
+        BITMAPINFOHEADER bih = {};
+        bih.biSize = sizeof(bih);
+        bih.biWidth = w;
+        bih.biHeight = -h; /* top-down for direct memory access */
+        bih.biPlanes = 1;
+        bih.biBitCount = (WORD)bpp;
+        bih.biCompression = BI_RGB;
+        void* pvBits = nullptr;
+        HBITMAP hbm = CreateDIBSection(hdc, (BITMAPINFO*)&bih, DIB_RGB_COLORS, &pvBits, NULL, 0);
+        if (hbm && pvBits) {
+            uint32_t stride = ((w * bpp + 31) / 32) * 4;
+            uint32_t data_size = stride * h;
+            uint32_t emu_addr = next_dib_addr;
+            next_dib_addr += (data_size + 0xFFF) & ~0xFFF;
+            mem.AddExternalRegion(emu_addr, data_size, (uint8_t*)pvBits);
+            hbitmap_to_emu_pvbits[(uint32_t)(uintptr_t)hbm] = emu_addr;
+            LOG(API, "[API] CreateCompatibleBitmap(%dx%d, %dbpp) -> hbm=0x%08X pvBits=emu:0x%08X (%u bytes)\n",
+                w, h, bpp, (uint32_t)(uintptr_t)hbm, emu_addr, data_size);
+        } else {
+            LOG(API, "[API] CreateCompatibleBitmap(%dx%d) -> 0x%08X (FAILED)\n", w, h, (uint32_t)(uintptr_t)hbm);
+        }
+        regs[0] = (uint32_t)(uintptr_t)hbm;
+        return true;
     });
     Thunk("CreateBitmap", 901, [](uint32_t* regs, EmulatedMemory&) -> bool {
         regs[0] = (uint32_t)(uintptr_t)CreateBitmap(regs[0], regs[1], regs[2], regs[3], NULL); return true;
@@ -60,10 +98,34 @@ void Win32Thunks::RegisterGdiDrawHandlers() {
     Thunk("MoveToEx", 1651, [](uint32_t* regs, EmulatedMemory&) -> bool { regs[0] = MoveToEx((HDC)(intptr_t)(int32_t)regs[0], regs[1], regs[2], NULL); return true; });
     Thunk("SetViewportOrgEx", 983, [](uint32_t* regs, EmulatedMemory&) -> bool { regs[0] = SetViewportOrgEx((HDC)(intptr_t)(int32_t)regs[0], regs[1], regs[2], NULL); return true; });
     Thunk("StretchBlt", 905, [this](uint32_t* regs, EmulatedMemory& mem) -> bool {
-        regs[0] = StretchBlt((HDC)(intptr_t)(int32_t)regs[0], (int)regs[1], (int)regs[2], (int)regs[3],
-            (int)ReadStackArg(regs,mem,0), (HDC)(intptr_t)(int32_t)ReadStackArg(regs,mem,1),
-            (int)ReadStackArg(regs,mem,2), (int)ReadStackArg(regs,mem,3),
-            (int)ReadStackArg(regs,mem,4), (int)ReadStackArg(regs,mem,5), ReadStackArg(regs,mem,6));
+        HDC dst = (HDC)(intptr_t)(int32_t)regs[0];
+        int xD=(int)regs[1], yD=(int)regs[2], wD=(int)regs[3];
+        int hD=(int)ReadStackArg(regs,mem,0);
+        HDC src = (HDC)(intptr_t)(int32_t)ReadStackArg(regs,mem,1);
+        int xS=(int)ReadStackArg(regs,mem,2), yS=(int)ReadStackArg(regs,mem,3);
+        int wS=(int)ReadStackArg(regs,mem,4), hS=(int)ReadStackArg(regs,mem,5);
+        DWORD rop = ReadStackArg(regs,mem,6);
+        GdiFlush();
+        BOOL ret = StretchBlt(dst, xD, yD, wD, hD, src, xS, yS, wS, hS, rop);
+        LOG(API, "[API] StretchBlt(dst=0x%p, %d,%d,%dx%d, src=0x%p, %d,%d,%dx%d, rop=0x%08X) -> %d\n",
+            dst, xD, yD, wD, hD, src, xS, yS, wS, hS, rop, ret);
+        regs[0] = ret;
+        return true;
+    });
+    /* MaskBlt(hdcDest, xDest, yDest, width, height, hdcSrc, xSrc, ySrc, hbmMask, xMask, yMask, rop) */
+    Thunk("MaskBlt", 904, [this](uint32_t* regs, EmulatedMemory& mem) -> bool {
+        HDC hdcDest = (HDC)(intptr_t)(int32_t)regs[0];
+        int xDest = (int)regs[1], yDest = (int)regs[2], w = (int)regs[3];
+        int h = (int)ReadStackArg(regs, mem, 0);
+        HDC hdcSrc = (HDC)(intptr_t)(int32_t)ReadStackArg(regs, mem, 1);
+        int xSrc = (int)ReadStackArg(regs, mem, 2), ySrc = (int)ReadStackArg(regs, mem, 3);
+        HBITMAP hbmMask = (HBITMAP)(intptr_t)(int32_t)ReadStackArg(regs, mem, 4);
+        int xMask = (int)ReadStackArg(regs, mem, 5), yMask = (int)ReadStackArg(regs, mem, 6);
+        DWORD rop = ReadStackArg(regs, mem, 7);
+        BOOL ret = MaskBlt(hdcDest, xDest, yDest, w, h, hdcSrc, xSrc, ySrc, hbmMask, xMask, yMask, rop);
+        LOG(API, "[API] MaskBlt(dst=0x%p %d,%d %dx%d src=0x%p %d,%d mask=0x%p rop=0x%08X) -> %d\n",
+            hdcDest, xDest, yDest, w, h, hdcSrc, xSrc, ySrc, hbmMask, rop, ret);
+        regs[0] = ret;
         return true;
     });
     Thunk("CreateDIBSection", 90, [this](uint32_t* regs, EmulatedMemory& mem) -> bool {
@@ -75,14 +137,32 @@ void Win32Thunks::RegisterGdiDrawHandlers() {
         bih.biXPelsPerMeter = (LONG)mem.Read32(bmi_addr+24); bih.biYPelsPerMeter = (LONG)mem.Read32(bmi_addr+28);
         bih.biClrUsed = mem.Read32(bmi_addr+32); bih.biClrImportant = mem.Read32(bmi_addr+36);
         int nColors = (bih.biBitCount <= 8) ? ((bih.biClrUsed > 0) ? bih.biClrUsed : (1 << bih.biBitCount)) : 0;
+        /* BI_BITFIELDS (3): 3 DWORD color masks follow the header (e.g. RGB565 for 16bpp) */
+        if (bih.biCompression == BI_BITFIELDS && nColors < 3) nColors = 3;
         std::vector<uint8_t> bmi_buf(sizeof(BITMAPINFOHEADER) + nColors * sizeof(RGBQUAD), 0);
         memcpy(bmi_buf.data(), &bih, sizeof(bih));
         for (int i = 0; i < nColors; i++) { uint32_t clr = mem.Read32(bmi_addr+40+i*4); memcpy(bmi_buf.data()+sizeof(BITMAPINFOHEADER)+i*4, &clr, 4); }
         void* pvBits = nullptr;
         HBITMAP hbm = CreateDIBSection(hdc, (BITMAPINFO*)bmi_buf.data(), regs[2], &pvBits, NULL, 0);
-        if (regs[3]) mem.Write32(regs[3], 0);
+        uint32_t ppvBits_addr = regs[3];
+        if (ppvBits_addr && pvBits && hbm) {
+            /* Map native pvBits into emulated address space so ARM code can write pixels */
+            int absH = bih.biHeight < 0 ? -bih.biHeight : bih.biHeight;
+            uint32_t stride = ((bih.biWidth * bih.biBitCount + 31) / 32) * 4;
+            uint32_t data_size = stride * absH;
+            uint32_t emu_addr = next_dib_addr;
+            next_dib_addr += (data_size + 0xFFF) & ~0xFFF; /* page-align */
+            mem.AddExternalRegion(emu_addr, data_size, (uint8_t*)pvBits);
+            mem.Write32(ppvBits_addr, emu_addr);
+            hbitmap_to_emu_pvbits[(uint32_t)(uintptr_t)hbm] = emu_addr;
+            LOG(API, "[API] CreateDIBSection(%dx%d, %dbpp, biH=%d) -> hbm=0x%08X pvBits=emu:0x%08X (%u bytes)\n",
+                bih.biWidth, absH, bih.biBitCount, bih.biHeight, (uint32_t)(uintptr_t)hbm, emu_addr, data_size);
+        } else {
+            if (ppvBits_addr) mem.Write32(ppvBits_addr, 0);
+            LOG(API, "[API] CreateDIBSection(%dx%d, %dbpp) -> 0x%08X (pvBits=NULL)\n",
+                bih.biWidth, bih.biHeight, bih.biBitCount, (uint32_t)(uintptr_t)hbm);
+        }
         regs[0] = (uint32_t)(uintptr_t)hbm;
-        LOG(API, "[API] CreateDIBSection(%dx%d, %dbpp) -> 0x%08X\n", bih.biWidth, bih.biHeight, bih.biBitCount, regs[0]);
         return true;
     });
     Thunk("StretchDIBits", 1667, [this](uint32_t* regs, EmulatedMemory& mem) -> bool {
@@ -98,6 +178,7 @@ void Win32Thunks::RegisterGdiDrawHandlers() {
         bih.biYPelsPerMeter=(LONG)mem.Read32(bmi_addr+28); bih.biClrUsed=mem.Read32(bmi_addr+32);
         bih.biClrImportant=mem.Read32(bmi_addr+36);
         int nC=(bih.biBitCount<=8)?((bih.biClrUsed>0)?bih.biClrUsed:(1<<bih.biBitCount)):0;
+        if (bih.biCompression == BI_BITFIELDS && nC < 3) nC = 3;
         std::vector<uint8_t> bmi_buf(sizeof(BITMAPINFOHEADER)+nC*sizeof(RGBQUAD),0);
         memcpy(bmi_buf.data(),&bih,sizeof(bih));
         for(int i=0;i<nC;i++){uint32_t c=mem.Read32(bmi_addr+40+i*4);memcpy(bmi_buf.data()+sizeof(BITMAPINFOHEADER)+i*4,&c,4);}
@@ -115,6 +196,7 @@ void Win32Thunks::RegisterGdiDrawHandlers() {
         bih.biCompression=mem.Read32(bmi_addr+16); bih.biSizeImage=mem.Read32(bmi_addr+20);
         bih.biClrUsed=mem.Read32(bmi_addr+32);
         int nC=bih.biClrUsed; if(nC==0&&bih.biBitCount<=8) nC=1<<bih.biBitCount;
+        if (bih.biCompression == BI_BITFIELDS && nC < 3) nC = 3;
         std::vector<uint8_t> bmi_buf(sizeof(BITMAPINFOHEADER)+nC*4);
         memcpy(bmi_buf.data(),&bih,sizeof(bih));
         for(int i=0;i<nC;i++){uint32_t c=mem.Read32(bmi_addr+40+i*4);memcpy(bmi_buf.data()+sizeof(BITMAPINFOHEADER)+i*4,&c,4);}
@@ -129,10 +211,40 @@ void Win32Thunks::RegisterGdiDrawHandlers() {
         return true;
     });
     Thunk("TransparentBlt", 906, [this](uint32_t* regs, EmulatedMemory& mem) -> bool {
-        regs[0]=TransparentBlt((HDC)(intptr_t)(int32_t)regs[0],(int)regs[1],(int)regs[2],(int)regs[3],
-            (int)ReadStackArg(regs,mem,0),(HDC)(intptr_t)(int32_t)ReadStackArg(regs,mem,1),
-            (int)ReadStackArg(regs,mem,2),(int)ReadStackArg(regs,mem,3),
-            (int)ReadStackArg(regs,mem,4),(int)ReadStackArg(regs,mem,5),ReadStackArg(regs,mem,6));
+        HDC hdcDest = (HDC)(intptr_t)(int32_t)regs[0];
+        int xD = (int)regs[1], yD = (int)regs[2], wD = (int)regs[3];
+        int hD = (int)ReadStackArg(regs,mem,0);
+        HDC hdcSrc = (HDC)(intptr_t)(int32_t)ReadStackArg(regs,mem,1);
+        int xS = (int)ReadStackArg(regs,mem,2), yS = (int)ReadStackArg(regs,mem,3);
+        int wS = (int)ReadStackArg(regs,mem,4), hS = (int)ReadStackArg(regs,mem,5);
+        UINT crTrans = ReadStackArg(regs,mem,6);
+        GdiFlush();
+        /* Diagnostic: dump source bitmap pixel data */
+        static int tblt_diag_count = 0;
+        HBITMAP srcBm = (HBITMAP)GetCurrentObject(hdcSrc, OBJ_BITMAP);
+        if (srcBm && tblt_diag_count < 3) {
+            tblt_diag_count++;
+            BITMAP bm = {}; GetObjectW(srcBm, sizeof(bm), &bm);
+            if (bm.bmBits) {
+                uint8_t* px = (uint8_t*)bm.bmBits;
+                /* Dump first 3 pixels of rows 0, 13, 26 (top, middle, bottom) */
+                int stride = bm.bmWidthBytes;
+                int rows[] = {0, bm.bmHeight/2, bm.bmHeight-1};
+                for (int ri = 0; ri < 3; ri++) {
+                    int row = rows[ri];
+                    if (row < 0 || row >= bm.bmHeight) continue;
+                    uint8_t* rp = px + row * stride;
+                    LOG(API, "[API]   src row %d: [%02X %02X %02X] [%02X %02X %02X] [%02X %02X %02X]\n",
+                        row, rp[0], rp[1], rp[2], rp[3], rp[4], rp[5], rp[6], rp[7], rp[8]);
+                }
+            }
+        }
+        BOOL ret = TransparentBlt(hdcDest, xD, yD, wD, hD, hdcSrc, xS, yS, wS, hS, crTrans);
+        COLORREF dstPx = GetPixel(hdcDest, xD + wD/2, yD + hD/2);
+        COLORREF srcPx = GetPixel(hdcSrc, xS + wS/2, yS + hS/2);
+        LOG(API, "[API] TransparentBlt(dst=0x%p %d,%d %dx%d src=0x%p %d,%d %dx%d crTrans=0x%06X) -> %d srcPx=0x%06X dstPx=0x%06X\n",
+            hdcDest, xD, yD, wD, hD, hdcSrc, xS, yS, wS, hS, crTrans, ret, srcPx, dstPx);
+        regs[0] = ret;
         return true;
     });
     Thunk("InvertRect", 1770, [this](uint32_t* regs, EmulatedMemory& mem) -> bool {

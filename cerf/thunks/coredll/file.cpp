@@ -63,6 +63,8 @@ void Win32Thunks::RegisterFileHandlers() {
             for (DWORD i = 0; i < bytes_read; i++) mem.Write8(buf_addr + i, buf[i]);
         }
         if (bytes_read_addr) mem.Write32(bytes_read_addr, bytes_read);
+        LOG(API, "[API] ReadFile(h=0x%08X, %u bytes) -> %d (read=%u)\n",
+            regs[0], bytes_to_read, ret, bytes_read);
         regs[0] = ret; return true;
     });
     Thunk("WriteFile", 171, [this](uint32_t* regs, EmulatedMemory& mem) -> bool {

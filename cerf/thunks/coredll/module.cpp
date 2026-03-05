@@ -25,15 +25,12 @@ void Win32Thunks::RegisterModuleHandlers() {
     });
     Thunk("GetModuleFileNameW", 537, [this](uint32_t* regs, EmulatedMemory& mem) -> bool {
         uint32_t buf_addr = regs[1], buf_size = regs[2];
-        /* Return WinCE-style path instead of host path */
-        std::wstring wce_path = MapHostToWinCE(exe_path);
-        /* If MapHostToWinCE returned the path unchanged (exe is outside VFS),
-           synthesize a WinCE path: \Windows\<filename> */
-        if (wce_path == exe_path) {
-            size_t sep = wce_path.find_last_of(L"\\/");
-            std::wstring filename = (sep != std::wstring::npos) ? wce_path.substr(sep + 1) : wce_path;
-            wce_path = L"\\Windows\\" + filename;
-        }
+        /* Resolve the exe host path to absolute, then reverse-map to WinCE path.
+           This gives the app its real installation directory. */
+        wchar_t abs_buf[MAX_PATH] = {};
+        if (GetFullPathNameW(exe_path.c_str(), MAX_PATH, abs_buf, NULL))
+            { /* got absolute path */ }
+        std::wstring wce_path = MapHostToWinCE(abs_buf[0] ? abs_buf : exe_path);
         LOG(API, "[API] GetModuleFileNameW() -> '%ls'\n", wce_path.c_str());
         for (uint32_t i = 0; i < wce_path.size() && i < buf_size; i++)
             mem.Write16(buf_addr + i * 2, wce_path[i]);

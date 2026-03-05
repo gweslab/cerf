@@ -27,7 +27,12 @@ void Win32Thunks::RegisterGdiDcHandlers() {
         regs[0] = (uint32_t)(uintptr_t)CreateDCW(driver.c_str(), NULL, NULL, NULL); return true;
     });
     Thunk("SelectObject", 921, [](uint32_t* regs, EmulatedMemory&) -> bool {
-        regs[0] = (uint32_t)(uintptr_t)SelectObject((HDC)(intptr_t)(int32_t)regs[0], (HGDIOBJ)(intptr_t)(int32_t)regs[1]); return true;
+        HDC hdc = (HDC)(intptr_t)(int32_t)regs[0];
+        HGDIOBJ hobj = (HGDIOBJ)(intptr_t)(int32_t)regs[1];
+        HGDIOBJ prev = SelectObject(hdc, hobj);
+        LOG(API, "[API] SelectObject(hdc=0x%08X, obj=0x%08X) -> prev=0x%08X\n",
+            (uint32_t)(uintptr_t)hdc, (uint32_t)(uintptr_t)hobj, (uint32_t)(uintptr_t)prev);
+        regs[0] = (uint32_t)(uintptr_t)prev; return true;
     });
     Thunk("DeleteObject", 912, [](uint32_t* regs, EmulatedMemory&) -> bool {
         regs[0] = DeleteObject((HGDIOBJ)(intptr_t)(int32_t)regs[0]); return true;
@@ -60,11 +65,8 @@ void Win32Thunks::RegisterGdiDcHandlers() {
     });
     Thunk("GetDeviceCaps", 916, [](uint32_t* regs, EmulatedMemory&) -> bool {
         int index = (int)regs[1];
-        if (index == HORZRES || index == VERTRES) {
-            RECT wa; SystemParametersInfoW(SPI_GETWORKAREA, 0, &wa, 0);
-            regs[0] = (index == HORZRES) ? (uint32_t)(wa.right - wa.left) : (uint32_t)(wa.bottom - wa.top);
-            return true;
-        }
+        if (index == HORZRES) { regs[0] = WINCE_SCREEN_WIDTH; return true; }
+        if (index == VERTRES) { regs[0] = WINCE_SCREEN_HEIGHT; return true; }
         // Return 16 for BITSPIXEL to match typical WinCE 5.0 devices (16bpp).
         // Desktop returns 32 which is unrealistic; apps like cecmd check
         // BITSPIXEL*PLANES >= 15 to choose high-color vs low-color bitmaps.
@@ -88,12 +90,19 @@ void Win32Thunks::RegisterGdiDcHandlers() {
         int cb = (int)regs[1]; uint32_t buf_addr = regs[2];
         if (buf_addr && cb > 0) {
             if (cb == 24) {
+                /* 32-bit BITMAP: {bmType, bmWidth, bmHeight, bmWidthBytes, bmPlanes(16), bmBitsPixel(16), bmBits} = 24 bytes */
                 BITMAP bm = {}; int ret = GetObjectW(hobj, sizeof(BITMAP), &bm);
                 if (ret > 0) {
+                    /* Look up emulated pvBits for this HBITMAP */
+                    uint32_t emu_bits = 0;
+                    auto it = hbitmap_to_emu_pvbits.find((uint32_t)(uintptr_t)hobj);
+                    if (it != hbitmap_to_emu_pvbits.end()) emu_bits = it->second;
                     mem.Write32(buf_addr+0, bm.bmType); mem.Write32(buf_addr+4, bm.bmWidth);
                     mem.Write32(buf_addr+8, bm.bmHeight); mem.Write32(buf_addr+12, bm.bmWidthBytes);
                     mem.Write16(buf_addr+16, bm.bmPlanes); mem.Write16(buf_addr+18, bm.bmBitsPixel);
-                    mem.Write32(buf_addr+20, 0); regs[0] = 24;
+                    mem.Write32(buf_addr+20, emu_bits); regs[0] = 24;
+                    LOG(API, "[API] GetObjectW(hbm=0x%08X, BITMAP) -> %dx%d %dbpp bmBits=0x%08X\n",
+                        (uint32_t)(uintptr_t)hobj, bm.bmWidth, bm.bmHeight, bm.bmBitsPixel, emu_bits);
                 } else regs[0] = 0;
             } else {
                 std::vector<uint8_t> buf(std::max(cb, 64), 0);

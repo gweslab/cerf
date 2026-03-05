@@ -158,7 +158,10 @@ void Win32Thunks::RegisterDialogHandlers() {
         pending_arm_dlgproc = 0;
         LOG(API, "[API] CreateDialogIndirectParamW(parent=0x%X, dlgproc=0x%08X) -> HWND=0x%p (err=%lu)\n",
             hwndParent, arm_dlgProc, dlg, dlg ? 0UL : GetLastError());
-        if (dlg && arm_dlgProc) hwnd_dlgproc_map[dlg] = arm_dlgProc;
+        /* Only set the DlgProc if it wasn't already updated during WM_INITDIALOG
+           (MFC's DialogFunc sets DWL_DLGPROC to the real handler during init) */
+        if (dlg && arm_dlgProc && hwnd_dlgproc_map.find(dlg) == hwnd_dlgproc_map.end())
+            hwnd_dlgproc_map[dlg] = arm_dlgProc;
         if (dlg && has_captionok) {
             captionok_hwnds.insert(dlg);
             InstallCaptionOk(dlg);

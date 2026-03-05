@@ -48,6 +48,12 @@ inline const ThunkedDllInfo* FindThunkedDllW(const std::wstring& dll_name) {
 #define THUNK_BASE   0xFE000000
 #define THUNK_STRIDE 4
 
+/* Emulated WinCE screen resolution.
+   ARM apps see this as the device screen size via GetSystemMetrics
+   and SystemParametersInfoW(SPI_GETWORKAREA). */
+#define WINCE_SCREEN_WIDTH   800
+#define WINCE_SCREEN_HEIGHT  600
+
 /* WinCE trap-based API call range.
    WinCE apps may call APIs via trap addresses descending from 0xF0010000.
    API index = (0xF0010000 - addr) / 4 */
@@ -118,6 +124,8 @@ public:
     static INT_PTR modal_dlg_result;
     static bool modal_dlg_ended;
     static Win32Thunks* s_instance;  /* For static WndProc callback */
+    /* setjmp buffer stack for RaiseException recovery (poor man's SEH) */
+    std::vector<uint32_t> setjmp_stack;
 
     static LRESULT CALLBACK EmuWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam);
     static INT_PTR CALLBACK EmuDlgProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam);
@@ -212,6 +220,12 @@ private:
         uint32_t size;
     };
     std::map<uint32_t, FileMappingInfo> file_mappings; /* fake handle -> mapping info */
+
+    /* DIB section tracking: maps emulated pvBits address -> native pvBits + size.
+       Used by CreateDIBSection to let ARM code directly write bitmap pixel data. */
+    uint32_t next_dib_addr = 0x04000000;  /* DIB bits allocation range */
+    /* Map HBITMAP -> emulated pvBits address for GetObjectW(bmBits) */
+    std::map<uint32_t, uint32_t> hbitmap_to_emu_pvbits; /* (uint32_t)HBITMAP -> emu_addr */
     uint32_t WrapHandle(HANDLE h);
     HANDLE UnwrapHandle(uint32_t fake);
     void RemoveHandle(uint32_t fake);

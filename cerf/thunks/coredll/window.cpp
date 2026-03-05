@@ -168,11 +168,17 @@ void Win32Thunks::RegisterWindowHandlers() {
     });
     Thunk("ShowWindow", 266, [](uint32_t* regs, EmulatedMemory&) -> bool {
         HWND hw = (HWND)(intptr_t)(int32_t)regs[0];
+        LOG(API, "[API] ShowWindow(0x%p, %d)\n", hw, regs[1]);
         if (hw == NULL && regs[1] == 5) { regs[0] = 0; return true; }
         regs[0] = ShowWindow(hw, regs[1]);
         return true;
     });
-    Thunk("UpdateWindow", 267, [](uint32_t* regs, EmulatedMemory&) -> bool { regs[0] = UpdateWindow((HWND)(intptr_t)(int32_t)regs[0]); return true; });
+    Thunk("UpdateWindow", 267, [](uint32_t* regs, EmulatedMemory&) -> bool {
+        HWND hw = (HWND)(intptr_t)(int32_t)regs[0];
+        LOG(API, "[API] UpdateWindow(0x%p)\n", hw);
+        regs[0] = UpdateWindow(hw);
+        return true;
+    });
     Thunk("RedrawWindow", 1672, [this](uint32_t* regs, EmulatedMemory& mem) -> bool {
         HWND hw = (HWND)(intptr_t)(int32_t)regs[0];
         /* lprcUpdate (regs[1]) — WinCE RECT ptr in emulated memory */
@@ -403,5 +409,22 @@ void Win32Thunks::RegisterWindowHandlers() {
     });
     Thunk("IsWindowVisible", 886, [](uint32_t* regs, EmulatedMemory&) -> bool {
         regs[0] = IsWindowVisible((HWND)(intptr_t)(int32_t)regs[0]); return true;
+    });
+    /* DeferWindowPos — pass through to native */
+    Thunk("BeginDeferWindowPos", 1157, [](uint32_t* regs, EmulatedMemory&) -> bool {
+        regs[0] = (uint32_t)(uintptr_t)BeginDeferWindowPos(regs[0]); return true;
+    });
+    Thunk("DeferWindowPos", 1158, [this](uint32_t* regs, EmulatedMemory& mem) -> bool {
+        HDWP hdwp = (HDWP)(intptr_t)(int32_t)regs[0];
+        HWND hwnd = (HWND)(intptr_t)(int32_t)regs[1];
+        HWND after = (HWND)(intptr_t)(int32_t)regs[2];
+        int x = (int)regs[3], y = (int)ReadStackArg(regs,mem,0);
+        int cx = (int)ReadStackArg(regs,mem,1), cy = (int)ReadStackArg(regs,mem,2);
+        UINT flags = ReadStackArg(regs,mem,3);
+        regs[0] = (uint32_t)(uintptr_t)DeferWindowPos(hdwp, hwnd, after, x, y, cx, cy, flags);
+        return true;
+    });
+    Thunk("EndDeferWindowPos", 1159, [](uint32_t* regs, EmulatedMemory&) -> bool {
+        regs[0] = EndDeferWindowPos((HDWP)(intptr_t)(int32_t)regs[0]); return true;
     });
 }

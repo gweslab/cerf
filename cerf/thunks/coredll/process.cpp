@@ -47,6 +47,7 @@ void Win32Thunks::RegisterProcessHandlers() {
         return true;
     });
     Thunk("TerminateThread", 491, stub0("TerminateThread"));
+    Thunk("ResumeThread", 500, stub0("ResumeThread"));
     Thunk("SetThreadPriority", 514, stub0("SetThreadPriority"));
     Thunk("GetExitCodeProcess", 519, stub0("GetExitCodeProcess"));
     Thunk("OpenProcess", 509, stub0("OpenProcess"));

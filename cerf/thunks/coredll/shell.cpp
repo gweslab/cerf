@@ -282,7 +282,7 @@ void Win32Thunks::RegisterShellHandlers() {
     ThunkOrdinal("SHInitDialog", 1791);
     ThunkOrdinal("SHFullScreen", 1790);
     Thunk("SHCreateMenuBar", stub0("SHCreateMenuBar"));
-    ThunkOrdinal("SHSipPreference", 1786);
+    Thunk("SHSipPreference", 1786, stub0("SHSipPreference"));
     Thunk("SHRecognizeGesture", stub0("SHRecognizeGesture"));
     Thunk("SHSendBackToFocusWindow", stub0("SHSendBackToFocusWindow"));
     ThunkOrdinal("SHSetAppKeyWndAssoc", 1784);

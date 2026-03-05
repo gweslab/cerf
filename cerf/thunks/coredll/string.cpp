@@ -165,7 +165,8 @@ void Win32Thunks::RegisterStringHandlers() {
         regs[0] = dst; return true;
     });
     Thunk("wcsncmp", 65, [this](uint32_t* regs, EmulatedMemory& mem) -> bool {
-        regs[0] = (uint32_t)wcsncmp(ReadWStringFromEmu(mem,regs[0]).c_str(), ReadWStringFromEmu(mem,regs[1]).c_str(), regs[2]);
+        std::wstring s1 = ReadWStringFromEmu(mem,regs[0]), s2 = ReadWStringFromEmu(mem,regs[1]);
+        regs[0] = (uint32_t)wcsncmp(s1.c_str(), s2.c_str(), regs[2]);
         return true;
     });
     Thunk("_wcsicmp", 230, [this](uint32_t* regs, EmulatedMemory& mem) -> bool {
@@ -187,7 +188,8 @@ void Win32Thunks::RegisterStringHandlers() {
         regs[0] = (pos != std::wstring::npos) ? regs[0] + (uint32_t)(pos * 2) : 0; return true;
     });
     Thunk("_wtol", 78, [this](uint32_t* regs, EmulatedMemory& mem) -> bool {
-        regs[0] = (uint32_t)_wtol(ReadWStringFromEmu(mem, regs[0]).c_str()); return true;
+        std::wstring s = ReadWStringFromEmu(mem, regs[0]);
+        regs[0] = (uint32_t)_wtol(s.c_str()); return true;
     });
     Thunk("wcstol", 1082, [this](uint32_t* regs, EmulatedMemory& mem) -> bool {
         regs[0] = (uint32_t)wcstol(ReadWStringFromEmu(mem, regs[0]).c_str(), NULL, regs[2]); return true;
@@ -255,19 +257,69 @@ void Win32Thunks::RegisterStringHandlers() {
     Thunk("wcstombs", 75, [this](uint32_t* regs, EmulatedMemory& mem) -> bool {
         std::wstring src = ReadWStringFromEmu(mem, regs[1]);
         uint32_t dst = regs[0], count = regs[2];
-        for (uint32_t i = 0; i < count && i < (uint32_t)src.size(); i++) mem.Write8(dst+i, (uint8_t)src[i]);
-        if (count > 0) mem.Write8(dst + std::min(count-1, (uint32_t)src.size()), 0);
-        regs[0] = (uint32_t)src.size(); return true;
+        uint32_t slen = (uint32_t)src.size();
+        for (uint32_t i = 0; i < count && i < slen; i++) mem.Write8(dst + i, (uint8_t)src[i]);
+        /* Null-terminate only if buffer has room beyond the string content */
+        if (slen < count) mem.Write8(dst + slen, 0);
+        regs[0] = slen; return true;
     });
     Thunk("mbstowcs", 76, [this](uint32_t* regs, EmulatedMemory& mem) -> bool {
         std::string src = ReadStringFromEmu(mem, regs[1]);
         uint32_t dst = regs[0], count = regs[2];
-        for (uint32_t i = 0; i < count && i < (uint32_t)src.size(); i++) mem.Write16(dst+i*2, (uint16_t)(uint8_t)src[i]);
-        if (count > 0) mem.Write16(dst + std::min(count-1, (uint32_t)src.size())*2, 0);
-        regs[0] = (uint32_t)src.size(); return true;
+        if (dst == 0) { regs[0] = (uint32_t)src.size(); return true; } /* just count */
+        uint32_t n = std::min(count, (uint32_t)src.size());
+        for (uint32_t i = 0; i < n; i++) mem.Write16(dst+i*2, (uint16_t)(uint8_t)src[i]);
+        if (n < count) mem.Write16(dst + n*2, 0); /* null-terminate if room */
+        regs[0] = n; return true;
     });
-    Thunk("wcstok", 77, [](uint32_t* regs, EmulatedMemory&) -> bool { regs[0] = 0; return true; });
-    thunk_handlers["wcspbrk"] = thunk_handlers["wcstok"];
+    Thunk("wcstok", 77, [this](uint32_t* regs, EmulatedMemory& mem) -> bool {
+        /* WinCE wcstok(str, delimiters) - 2-arg like POSIX strtok.
+           str=NULL means continue from saved position. */
+        static uint32_t saved_pos = 0;
+        uint32_t str_addr = regs[0];
+        uint32_t delim_addr = regs[1];
+        std::wstring delim = ReadWStringFromEmu(mem, delim_addr);
+        if (str_addr != 0) saved_pos = str_addr;
+        if (saved_pos == 0) { regs[0] = 0; return true; }
+        /* Skip leading delimiters */
+        uint32_t pos = saved_pos;
+        while (true) {
+            uint16_t ch = mem.Read16(pos);
+            if (ch == 0) { saved_pos = 0; regs[0] = 0; return true; }
+            bool is_delim = false;
+            for (wchar_t d : delim) if ((uint16_t)d == ch) { is_delim = true; break; }
+            if (!is_delim) break;
+            pos += 2;
+        }
+        /* pos now points to start of token */
+        uint32_t token_start = pos;
+        /* Find end of token */
+        while (true) {
+            uint16_t ch = mem.Read16(pos);
+            if (ch == 0) { saved_pos = 0; break; }
+            bool is_delim = false;
+            for (wchar_t d : delim) if ((uint16_t)d == ch) { is_delim = true; break; }
+            if (is_delim) { mem.Write16(pos, 0); saved_pos = pos + 2; break; }
+            pos += 2;
+        }
+        std::wstring tok = ReadWStringFromEmu(mem, token_start);
+        static int wcstok_log_count = 0;
+        if (wcstok_log_count < 30) { wcstok_log_count++; LOG(API, "[API] wcstok('%ls') -> 0x%08X '%ls'\n", delim.c_str(), token_start, tok.substr(0,40).c_str()); }
+        regs[0] = token_start;
+        return true;
+    });
+    Thunk("wcspbrk", [this](uint32_t* regs, EmulatedMemory& mem) -> bool {
+        /* wcspbrk(str, charset) - find first char in str that's in charset */
+        uint32_t str_addr = regs[0], cs_addr = regs[1];
+        std::wstring charset = ReadWStringFromEmu(mem, cs_addr);
+        uint32_t pos = str_addr;
+        while (true) {
+            uint16_t ch = mem.Read16(pos);
+            if (ch == 0) { regs[0] = 0; return true; }
+            for (wchar_t d : charset) if ((uint16_t)d == ch) { regs[0] = pos; return true; }
+            pos += 2;
+        }
+    });
     Thunk("_snwprintf", 1096, [this, wprintf_format](uint32_t* regs, EmulatedMemory& mem) -> bool {
         uint32_t dst = regs[0], count = regs[1];
         std::wstring fmt = ReadWStringFromEmu(mem, regs[2]);
@@ -295,9 +347,157 @@ void Win32Thunks::RegisterStringHandlers() {
         regs[0] = (uint32_t)result.size();
         return true;
     });
-    thunk_handlers["swscanf"] = thunk_handlers["_snwprintf"]; /* stub — swscanf is rare */
+    /* swscanf(wchar_t* input, wchar_t* format, ...) — scanf from wide string */
+    Thunk("swscanf", 1098, [this](uint32_t* regs, EmulatedMemory& mem) -> bool {
+        std::wstring input = ReadWStringFromEmu(mem, regs[0]);
+        std::wstring fmt = ReadWStringFromEmu(mem, regs[1]);
+        /* Collect output pointer args: r2, r3, then stack */
+        uint32_t out_ptrs[10];
+        out_ptrs[0] = regs[2]; out_ptrs[1] = regs[3];
+        for (int i = 2; i < 10; i++) out_ptrs[i] = ReadStackArg(regs, mem, i - 2);
+        /* Simple scanf parser: supports %d, %u, %x, %s, %c, %f, %ld, %lu, %lx */
+        int matched = 0;
+        size_t ipos = 0; /* position in input */
+        size_t fpos = 0; /* position in format */
+        int outi = 0;    /* output pointer index */
+        while (fpos < fmt.size() && ipos < input.size()) {
+            wchar_t fc = fmt[fpos];
+            if (fc == L'%') {
+                fpos++;
+                /* Skip width specifiers and 'l' modifier */
+                while (fpos < fmt.size() && (fmt[fpos] == L'l' || fmt[fpos] == L'h' ||
+                       (fmt[fpos] >= L'0' && fmt[fpos] <= L'9'))) fpos++;
+                if (fpos >= fmt.size()) break;
+                wchar_t spec = fmt[fpos++];
+                /* Skip whitespace in input */
+                while (ipos < input.size() && (input[ipos] == L' ' || input[ipos] == L'\t')) ipos++;
+                if (spec == L'd' || spec == L'i') {
+                    /* Parse signed integer */
+                    bool neg = false;
+                    if (ipos < input.size() && input[ipos] == L'-') { neg = true; ipos++; }
+                    else if (ipos < input.size() && input[ipos] == L'+') ipos++;
+                    if (ipos >= input.size() || input[ipos] < L'0' || input[ipos] > L'9') break;
+                    int32_t val = 0;
+                    while (ipos < input.size() && input[ipos] >= L'0' && input[ipos] <= L'9')
+                        val = val * 10 + (input[ipos++] - L'0');
+                    if (neg) val = -val;
+                    if (outi < 10) mem.Write32(out_ptrs[outi++], (uint32_t)val);
+                    matched++;
+                } else if (spec == L'u') {
+                    if (ipos >= input.size() || input[ipos] < L'0' || input[ipos] > L'9') break;
+                    uint32_t val = 0;
+                    while (ipos < input.size() && input[ipos] >= L'0' && input[ipos] <= L'9')
+                        val = val * 10 + (input[ipos++] - L'0');
+                    if (outi < 10) mem.Write32(out_ptrs[outi++], val);
+                    matched++;
+                } else if (spec == L'x' || spec == L'X') {
+                    /* Skip optional 0x prefix */
+                    if (ipos + 1 < input.size() && input[ipos] == L'0' && (input[ipos+1] == L'x' || input[ipos+1] == L'X'))
+                        ipos += 2;
+                    if (ipos >= input.size()) break;
+                    uint32_t val = 0;
+                    bool got = false;
+                    while (ipos < input.size()) {
+                        wchar_t c = input[ipos];
+                        if (c >= L'0' && c <= L'9') { val = val * 16 + (c - L'0'); got = true; ipos++; }
+                        else if (c >= L'a' && c <= L'f') { val = val * 16 + (c - L'a' + 10); got = true; ipos++; }
+                        else if (c >= L'A' && c <= L'F') { val = val * 16 + (c - L'A' + 10); got = true; ipos++; }
+                        else break;
+                    }
+                    if (!got) break;
+                    if (outi < 10) mem.Write32(out_ptrs[outi++], val);
+                    matched++;
+                } else if (spec == L's') {
+                    /* Read non-whitespace characters into wide string pointer */
+                    uint32_t dst = out_ptrs[outi++];
+                    uint32_t off = 0;
+                    while (ipos < input.size() && input[ipos] != L' ' && input[ipos] != L'\t' && input[ipos] != L'\n')
+                        mem.Write16(dst + off++ * 2, input[ipos++]);
+                    mem.Write16(dst + off * 2, 0);
+                    matched++;
+                } else if (spec == L'c') {
+                    if (outi < 10) mem.Write16(out_ptrs[outi++], input[ipos++]);
+                    matched++;
+                } else {
+                    /* Unknown specifier, skip */
+                    break;
+                }
+            } else if (fc == L' ' || fc == L'\t') {
+                /* Whitespace in format matches zero or more whitespace in input */
+                fpos++;
+                while (ipos < input.size() && (input[ipos] == L' ' || input[ipos] == L'\t')) ipos++;
+            } else {
+                /* Literal character match */
+                if (input[ipos] != fc) break;
+                fpos++; ipos++;
+            }
+        }
+        LOG(API, "[API] swscanf('%ls', '%ls') -> %d\n", input.c_str(), fmt.c_str(), matched);
+        regs[0] = (uint32_t)matched;
+        return true;
+    });
     thunk_handlers["wvsprintfW"] = thunk_handlers["_snwprintf"];
-    Thunk("sprintf", 1058, [](uint32_t* regs, EmulatedMemory&) -> bool { regs[0] = 0; return true; });
+    ThunkOrdinal("sin", 1058);  /* sin @1058 is implemented in crt.cpp */
+    /* sprintf(char* buf, const char* fmt, ...) — narrow printf */
+    Thunk("sprintf", 719, [this](uint32_t* regs, EmulatedMemory& mem) -> bool {
+        uint32_t dst_addr = regs[0];
+        std::string fmt = ReadStringFromEmu(mem, regs[1]);
+        uint32_t args[10];
+        args[0] = regs[2]; args[1] = regs[3];
+        for (int i = 2; i < 10; i++) args[i] = ReadStackArg(regs, mem, i - 2);
+        /* Process format string, assembling output */
+        std::string result;
+        int arg_idx = 0;
+        for (size_t i = 0; i < fmt.size(); i++) {
+            if (fmt[i] == '%' && i + 1 < fmt.size()) {
+                i++;
+                if (fmt[i] == '%') { result += '%'; continue; }
+                /* Collect the full format specifier */
+                std::string spec_str = "%";
+                while (i < fmt.size() && !isalpha(fmt[i]) && fmt[i] != '%') { spec_str += fmt[i]; i++; }
+                if (i >= fmt.size()) break;
+                char spec = fmt[i]; spec_str += spec;
+                if (arg_idx >= 10) { result += '?'; continue; }
+                char buf[128];
+                if (spec == 'd' || spec == 'i') {
+                    snprintf(buf, sizeof(buf), spec_str.c_str(), (int)args[arg_idx++]);
+                    result += buf;
+                } else if (spec == 'u') {
+                    snprintf(buf, sizeof(buf), spec_str.c_str(), args[arg_idx++]);
+                    result += buf;
+                } else if (spec == 'x' || spec == 'X' || spec == 'o') {
+                    snprintf(buf, sizeof(buf), spec_str.c_str(), args[arg_idx++]);
+                    result += buf;
+                } else if (spec == 's') {
+                    std::string s = ReadStringFromEmu(mem, args[arg_idx++]);
+                    snprintf(buf, sizeof(buf), spec_str.c_str(), s.c_str());
+                    result += buf;
+                } else if (spec == 'S') {
+                    /* %S = wide string in WinCE narrow printf */
+                    std::wstring ws = ReadWStringFromEmu(mem, args[arg_idx++]);
+                    std::string ns(ws.begin(), ws.end());
+                    result += ns;
+                } else if (spec == 'c') {
+                    snprintf(buf, sizeof(buf), spec_str.c_str(), (char)args[arg_idx++]);
+                    result += buf;
+                } else if (spec == 'f' || spec == 'e' || spec == 'E' || spec == 'g' || spec == 'G') {
+                    if (arg_idx + 1 < 10) {
+                        uint64_t bits = ((uint64_t)args[arg_idx + 1] << 32) | args[arg_idx];
+                        double val; memcpy(&val, &bits, 8); arg_idx += 2;
+                        snprintf(buf, sizeof(buf), spec_str.c_str(), val);
+                        result += buf;
+                    } else { result += '?'; arg_idx = 10; }
+                } else if (spec == 'p') {
+                    snprintf(buf, sizeof(buf), "%08X", args[arg_idx++]);
+                    result += buf;
+                } else { result += '?'; arg_idx++; }
+            } else result += fmt[i];
+        }
+        uint8_t* dst = mem.Translate(dst_addr);
+        if (dst) { memcpy(dst, result.c_str(), result.size() + 1); }
+        regs[0] = (uint32_t)result.size();
+        return true;
+    });
     /* StringCchPrintfW(pszDest, cchDest, pszFormat, ...) — safe wide printf */
     Thunk("StringCchPrintfW", 1699, [this, wprintf_format](uint32_t* regs, EmulatedMemory& mem) -> bool {
         uint32_t dst = regs[0], cch = regs[1];
@@ -468,4 +668,19 @@ void Win32Thunks::RegisterStringHandlers() {
     ThunkOrdinal("wcspbrk", 68);
     ThunkOrdinal("swprintf", 1097);
     ThunkOrdinal("swscanf", 1098);
+
+    /* vswprintf(dst, format, va_list) — va_list on ARM is a pointer to args in memory */
+    Thunk("vswprintf", 1099, [this, wprintf_format](uint32_t* regs, EmulatedMemory& mem) -> bool {
+        uint32_t dst = regs[0];
+        std::wstring fmt = ReadWStringFromEmu(mem, regs[1]);
+        uint32_t va_ptr = regs[2]; /* ARM va_list = pointer to arg array */
+        uint32_t args[10];
+        for (int i = 0; i < 10; i++) args[i] = mem.Read32(va_ptr + i * 4);
+        std::wstring result = wprintf_format(mem, fmt, args, 10);
+        for (uint32_t i = 0; i < (uint32_t)result.size(); i++) mem.Write16(dst + i * 2, result[i]);
+        mem.Write16(dst + (uint32_t)result.size() * 2, 0);
+        LOG(API, "[API] vswprintf('%ls') -> '%ls'\n", fmt.c_str(), result.c_str());
+        regs[0] = (uint32_t)result.size();
+        return true;
+    });
 }

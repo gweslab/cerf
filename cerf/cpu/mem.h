@@ -15,6 +15,7 @@ struct MemRegion {
     uint8_t* host_ptr;   /* Host-side allocation */
     DWORD    protect;
     bool     is_stack;
+    bool     is_external = false; /* True for externally-owned buffers (don't free) */
 };
 
 class EmulatedMemory {
@@ -27,7 +28,7 @@ public:
 
     ~EmulatedMemory() {
         for (auto& r : regions) {
-            if (r.host_ptr)
+            if (r.host_ptr && !r.is_external)
                 VirtualFree(r.host_ptr, 0, MEM_RELEASE);
         }
     }
@@ -157,6 +158,23 @@ public:
         uint8_t* p = Translate(addr);
         if (!p) { fprintf(stderr, "[MEM] WriteBytes fault at 0x%08X len=0x%X\n", addr, len); return; }
         memcpy(p, src, len);
+    }
+
+    /* Register an externally-owned buffer as an emulated region.
+       The caller retains ownership; the buffer must outlive the mapping.
+       Used for CreateDIBSection pvBits: maps native bitmap data into ARM space. */
+    void AddExternalRegion(uint32_t base, uint32_t size, uint8_t* host_ptr) {
+        MemRegion r = {};
+        r.base = base; r.size = size; r.host_ptr = host_ptr;
+        r.protect = PAGE_READWRITE; r.is_external = true;
+        regions.push_back(r);
+    }
+
+    /* Remove a previously-added external region by its base address. */
+    void RemoveExternalRegion(uint32_t base) {
+        for (auto it = regions.begin(); it != regions.end(); ++it) {
+            if (it->base == base) { regions.erase(it); return; }
+        }
     }
 
     /* Allocate the stack region */

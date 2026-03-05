@@ -137,6 +137,11 @@ void Win32Thunks::RegisterWindowPropsHandlers() {
             regs[0] = (it != hwnd_wndproc_map.end()) ? it->second : 0;
             if (nv) {
                 hwnd_wndproc_map[hw] = (uint32_t)nv;
+                /* If this HWND was a dialog (native WNDPROC = DefDlgProc), switch its
+                   native WNDPROC to EmuWndProc so messages route through the ARM WndProc
+                   chain instead of the dialog proc chain.  MFC does this to subclass
+                   dialog-based main windows. */
+                SetWindowLongPtrW(hw, GWLP_WNDPROC, (LONG_PTR)EmuWndProc);
                 LOG(API, "[API] SetWindowLongW(0x%p, GWL_WNDPROC, 0x%08X) -> old=0x%08X\n",
                     hw, (uint32_t)nv, regs[0]);
             }
@@ -158,7 +163,11 @@ void Win32Thunks::RegisterWindowPropsHandlers() {
                 /* DWL_DLGPROC: ARM code setting a new dialog proc — update our map
                    instead of corrupting the native DLGPROC pointer */
                 regs[0] = (uint32_t)hwnd_dlgproc_map[hw];
-                if (nv) hwnd_dlgproc_map[hw] = (uint32_t)nv;
+                if (nv) {
+                    hwnd_dlgproc_map[hw] = (uint32_t)nv;
+                    LOG(API, "[API] SetWindowLongW(0x%p, DWL_DLGPROC, 0x%08X) -> old=0x%08X\n",
+                        hw, (uint32_t)nv, regs[0]);
+                }
             } else {
                 regs[0] = (uint32_t)SetWindowLongPtrW(hw, DWLP_MSGRESULT, (LONG_PTR)(int32_t)nv);
             }

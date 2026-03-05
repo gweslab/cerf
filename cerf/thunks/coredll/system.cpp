@@ -12,18 +12,31 @@ void Win32Thunks::RegisterSystemHandlers() {
     Thunk("SetLastError", 517, [](uint32_t* regs, EmulatedMemory&) -> bool {
         SetLastError(regs[0]); return true;
     });
-    Thunk("RaiseException", 543, [](uint32_t* regs, EmulatedMemory&) -> bool {
-        LOG(API, "[API] RaiseException(0x%08X) - ignoring\n", regs[0]); return true;
+    Thunk("RaiseException", 543, [this](uint32_t* regs, EmulatedMemory& mem) -> bool {
+        uint32_t code = regs[0], flags = regs[1];
+        LOG(API, "[API] RaiseException(0x%08X, flags=0x%X, nArgs=%u) from LR=0x%08X\n",
+            code, flags, regs[2], regs[14]);
+        /* For non-continuable exceptions, try longjmp to the most recent setjmp buffer.
+           This emulates SEH __except recovery for code that uses setjmp/longjmp (like MFC). */
+        if ((flags & 1) && !setjmp_stack.empty()) { /* EXCEPTION_NONCONTINUABLE */
+            uint32_t buf = setjmp_stack.back();
+            setjmp_stack.pop_back();
+            for (int i = 4; i <= 11; i++) regs[i] = mem.Read32(buf + (i - 4) * 4);
+            regs[13] = mem.Read32(buf + 8 * 4); /* SP */
+            regs[14] = mem.Read32(buf + 9 * 4); /* LR */
+            regs[0] = 1; /* setjmp returns non-zero on longjmp */
+            LOG(API, "[API]   -> longjmp to buf=0x%08X, LR=0x%08X (recovery)\n", buf, regs[14]);
+        } else {
+            LOG(API, "[API]   -> ignoring (continuable or no setjmp buffer)\n");
+        }
+        return true;
     });
     Thunk("GetSystemMetrics", 885, [](uint32_t* regs, EmulatedMemory&) -> bool {
         int idx = (int)regs[0];
-        if (idx == SM_CXSCREEN || idx == SM_CYSCREEN) {
-            RECT wa; SystemParametersInfoW(SPI_GETWORKAREA, 0, &wa, 0);
-            regs[0] = (idx == SM_CXSCREEN)
-                ? (uint32_t)(wa.right - wa.left) : (uint32_t)(wa.bottom - wa.top);
-            LOG(API, "[API] GetSystemMetrics(%d) -> %d (screen)\n", idx, regs[0]);
-            return true;
-        }
+        /* Return WinCE-compatible screen dimensions so ARM apps see a
+           reasonable screen size rather than the desktop's full resolution. */
+        if (idx == SM_CXSCREEN) { regs[0] = WINCE_SCREEN_WIDTH;  LOG(API, "[API] GetSystemMetrics(SM_CXSCREEN) -> %d\n", regs[0]); return true; }
+        if (idx == SM_CYSCREEN) { regs[0] = WINCE_SCREEN_HEIGHT; LOG(API, "[API] GetSystemMetrics(SM_CYSCREEN) -> %d\n", regs[0]); return true; }
         /* WinCE uses 1px edges vs 2px on desktop Windows. ARM commctrl.dll
            toolbar code depends on this for correct button width calculation. */
         if (idx == SM_CXEDGE || idx == SM_CYEDGE) { regs[0] = 1; return true; }
@@ -228,6 +241,8 @@ void Win32Thunks::RegisterSystemHandlers() {
     Thunk("LCMapStringW", [](uint32_t* regs, EmulatedMemory&) -> bool { regs[0] = 0; return true; });
     Thunk("GetTimeFormatW", 202, [](uint32_t* regs, EmulatedMemory&) -> bool { regs[0] = 0; return true; });
     Thunk("GetDateFormatW", 203, [](uint32_t* regs, EmulatedMemory&) -> bool { regs[0] = 0; return true; });
+    Thunk("GetNumberFormatW", 204, [](uint32_t* regs, EmulatedMemory&) -> bool { regs[0] = 0; return true; });
+    Thunk("GetCurrencyFormatW", 205, [](uint32_t* regs, EmulatedMemory&) -> bool { regs[0] = 0; return true; });
     /* Version/info */
     Thunk("GetVersionExW", 717, [this](uint32_t* regs, EmulatedMemory& mem) -> bool {
         if (regs[0]) {
@@ -242,30 +257,26 @@ void Win32Thunks::RegisterSystemHandlers() {
         uint32_t pvParam = regs[2];
         UINT fWinIni = regs[3];
         if (uiAction == SPI_GETWORKAREA && pvParam) {
-            /* Marshal RECT from native → emulated memory */
-            RECT wa;
-            SystemParametersInfoW(SPI_GETWORKAREA, 0, &wa, 0);
-            mem.Write32(pvParam + 0,  (uint32_t)wa.left);
-            mem.Write32(pvParam + 4,  (uint32_t)wa.top);
-            mem.Write32(pvParam + 8,  (uint32_t)wa.right);
-            mem.Write32(pvParam + 12, (uint32_t)wa.bottom);
-            LOG(API, "[API] SystemParametersInfoW(SPI_GETWORKAREA) -> {%d,%d,%d,%d}\n",
-                wa.left, wa.top, wa.right, wa.bottom);
+            /* Return WinCE-compatible work area */
+            mem.Write32(pvParam + 0,  0);    /* left */
+            mem.Write32(pvParam + 4,  0);    /* top */
+            mem.Write32(pvParam + 8,  WINCE_SCREEN_WIDTH);   /* right */
+            mem.Write32(pvParam + 12, WINCE_SCREEN_HEIGHT);  /* bottom */
+            LOG(API, "[API] SystemParametersInfoW(SPI_GETWORKAREA) -> {0,0,%d,%d}\n",
+                WINCE_SCREEN_WIDTH, WINCE_SCREEN_HEIGHT);
             regs[0] = 1;
         } else if (uiAction == 0xE1 /* WinCE 7 SPI_GETSIPINFO via aygshell */ && pvParam) {
             /* WinCE Soft Input Panel info. Fill SIPINFO struct:
                cbSize(4) fdwFlags(4) rcVisibleDesktop(16) rcSipRect(16)
                dwImDataSize(4) pvImData(4) = 48 bytes.
                Report SIP as hidden, visible desktop = full work area. */
-            RECT wa;
-            SystemParametersInfoW(SPI_GETWORKAREA, 0, &wa, 0);
             mem.Write32(pvParam + 0,  48);    /* cbSize */
             mem.Write32(pvParam + 4,  0x2);   /* fdwFlags = SIPF_DOCKED (not SIPF_ON) */
             /* rcVisibleDesktop */
-            mem.Write32(pvParam + 8,  (uint32_t)wa.left);
-            mem.Write32(pvParam + 12, (uint32_t)wa.top);
-            mem.Write32(pvParam + 16, (uint32_t)wa.right);
-            mem.Write32(pvParam + 20, (uint32_t)wa.bottom);
+            mem.Write32(pvParam + 8,  0);     /* left */
+            mem.Write32(pvParam + 12, 0);     /* top */
+            mem.Write32(pvParam + 16, WINCE_SCREEN_WIDTH);   /* right */
+            mem.Write32(pvParam + 20, WINCE_SCREEN_HEIGHT);  /* bottom */
             /* rcSipRect = empty (SIP hidden) */
             mem.Write32(pvParam + 24, 0);
             mem.Write32(pvParam + 28, 0);
@@ -273,8 +284,8 @@ void Win32Thunks::RegisterSystemHandlers() {
             mem.Write32(pvParam + 36, 0);
             mem.Write32(pvParam + 40, 0);  /* dwImDataSize */
             mem.Write32(pvParam + 44, 0);  /* pvImData */
-            LOG(API, "[API] SystemParametersInfoW(0x%X/SPI_GETSIPINFO) -> vis={%d,%d,%d,%d}\n", uiAction,
-                wa.left, wa.top, wa.right, wa.bottom);
+            LOG(API, "[API] SystemParametersInfoW(0x%X/SPI_GETSIPINFO) -> vis={0,0,%d,%d}\n",
+                uiAction, WINCE_SCREEN_WIDTH, WINCE_SCREEN_HEIGHT);
             regs[0] = 1;
         } else {
             regs[0] = SystemParametersInfoW(uiAction, uiParam, NULL, fWinIni);

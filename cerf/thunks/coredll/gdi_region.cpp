@@ -26,6 +26,8 @@ void Win32Thunks::RegisterGdiRegionHandlers() {
         RECT rc; int ret = GetClipBox((HDC)(intptr_t)(int32_t)regs[0], &rc);
         mem.Write32(regs[1], rc.left); mem.Write32(regs[1]+4, rc.top);
         mem.Write32(regs[1]+8, rc.right); mem.Write32(regs[1]+12, rc.bottom);
+        LOG(API, "[API] GetClipBox(hdc=0x%08X) -> %d, rc={%d,%d,%d,%d}\n",
+            regs[0], ret, rc.left, rc.top, rc.right, rc.bottom);
         regs[0] = ret; return true;
     });
     Thunk("GetClipRgn", 972, [](uint32_t* regs, EmulatedMemory&) -> bool {
@@ -54,6 +56,9 @@ void Win32Thunks::RegisterGdiRegionHandlers() {
         mem.Write32(ps_addr+0, (uint32_t)(uintptr_t)hdc); mem.Write32(ps_addr+4, ps.fErase);
         mem.Write32(ps_addr+8, ps.rcPaint.left); mem.Write32(ps_addr+12, ps.rcPaint.top);
         mem.Write32(ps_addr+16, ps.rcPaint.right); mem.Write32(ps_addr+20, ps.rcPaint.bottom);
+        LOG(API, "[API] BeginPaint(0x%p) -> hdc=0x%08X, fErase=%d, rcPaint={%d,%d,%d,%d}\n",
+            hw, (uint32_t)(uintptr_t)hdc, ps.fErase,
+            ps.rcPaint.left, ps.rcPaint.top, ps.rcPaint.right, ps.rcPaint.bottom);
         regs[0] = (uint32_t)(uintptr_t)hdc; return true;
     });
     Thunk("EndPaint", 261, [this](uint32_t* regs, EmulatedMemory& mem) -> bool {

@@ -48,6 +48,11 @@ INT_PTR CALLBACK Win32Thunks::EmuDlgProc(HWND hwnd, UINT msg, WPARAM wParam, LPA
     }
 
     uint32_t arm_dlgproc = it->second;
+    /* Log non-INITDIALOG dispatches to detect stale DlgProc entries */
+    if (msg != WM_INITDIALOG && arm_dlgproc == 0x00104044) {
+        LOG(API, "[API] EmuDlgProc: WARNING stale dlgproc=0x104044 for HWND=%p msg=0x%04X (map key=%p)\n",
+            hwnd, msg, (void*)it->first);
+    }
 
     /* Marshal owner-draw structs from native 64-bit layout to 32-bit ARM layout */
     static uint32_t odi_emu_addr = 0x3F001000;

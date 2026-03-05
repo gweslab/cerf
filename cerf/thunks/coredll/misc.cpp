@@ -91,6 +91,7 @@ void Win32Thunks::RegisterMiscHandlers() {
     });
     /* Sound */
     Thunk("sndPlaySoundW", 377, stub1("sndPlaySoundW"));
+    Thunk("PlaySoundW", 378, stub1("PlaySoundW"));
     Thunk("waveOutSetVolume", 382, stub0("waveOutSetVolume"));
     /* RAS */
     Thunk("RasDial", 342, stub0("RasDial"));
@@ -113,22 +114,27 @@ void Win32Thunks::RegisterMiscHandlers() {
         regs[0] = MulDiv((int)regs[0], (int)regs[1], (int)regs[2]); return true;
     });
     Thunk("_except_handler4_common", 87, [](uint32_t* regs, EmulatedMemory&) -> bool { regs[0] = 0; return true; });
+    /* setjmp/longjmp + RaiseException integration:
+       Track setjmp buffers so RaiseException(NONCONTINUABLE) can longjmp to recovery point.
+       MFC uses setjmp/longjmp for C++ exception handling on WinCE. */
     /* setjmp: save callee-saved registers (r4-r11), SP, LR into jmp_buf at r0.
        ARM WinCE jmp_buf layout: r4, r5, r6, r7, r8, r9, r10, r11, r13(SP), r14(LR) = 10 words */
-    Thunk("setjmp", 2054, [](uint32_t* regs, EmulatedMemory& mem) -> bool {
+    Thunk("setjmp", 2054, [this](uint32_t* regs, EmulatedMemory& mem) -> bool {
         uint32_t buf = regs[0];
         if (buf) {
             for (int i = 4; i <= 11; i++) mem.Write32(buf + (i - 4) * 4, regs[i]);
             mem.Write32(buf + 8 * 4, regs[13]); /* SP */
             mem.Write32(buf + 9 * 4, regs[14]); /* LR (return address) */
+            setjmp_stack.push_back(buf);
         }
-        LOG(API, "[API] setjmp(buf=0x%08X, LR=0x%08X) -> 0\n", buf, regs[14]);
+        LOG(API, "[API] setjmp(buf=0x%08X, LR=0x%08X) -> 0 (stack depth=%zu)\n",
+            buf, regs[14], setjmp_stack.size());
         regs[0] = 0;
         return true;
     });
     Thunk("_setjmp3", thunk_handlers["setjmp"]);
     /* longjmp: restore registers from jmp_buf, return val (or 1 if val==0) */
-    Thunk("longjmp", 1036, [](uint32_t* regs, EmulatedMemory& mem) -> bool {
+    Thunk("longjmp", 1036, [this](uint32_t* regs, EmulatedMemory& mem) -> bool {
         uint32_t buf = regs[0];
         uint32_t val = regs[1];
         if (val == 0) val = 1;
@@ -136,8 +142,13 @@ void Win32Thunks::RegisterMiscHandlers() {
             for (int i = 4; i <= 11; i++) regs[i] = mem.Read32(buf + (i - 4) * 4);
             regs[13] = mem.Read32(buf + 8 * 4); /* SP */
             regs[14] = mem.Read32(buf + 9 * 4); /* LR */
+            /* Pop setjmp stack back to this buffer (or further) */
+            while (!setjmp_stack.empty() && setjmp_stack.back() != buf)
+                setjmp_stack.pop_back();
+            if (!setjmp_stack.empty()) setjmp_stack.pop_back();
         }
-        LOG(API, "[API] longjmp(buf=0x%08X, val=%u) -> LR=0x%08X\n", buf, val, regs[14]);
+        LOG(API, "[API] longjmp(buf=0x%08X, val=%u) -> LR=0x%08X (stack depth=%zu)\n",
+            buf, val, regs[14], setjmp_stack.size());
         regs[0] = val;
         return true;
     });

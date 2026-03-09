@@ -48,9 +48,9 @@ inline const ThunkedDllInfo* FindThunkedDllW(const std::wstring& dll_name) {
 #define THUNK_BASE   0xFE000000
 #define THUNK_STRIDE 4
 
-/* Default emulated WinCE screen resolution (overridable via cerf.ini). */
+/* Default emulated WinCE screen resolution (overridable via cerf.ini / CLI). */
 #define WINCE_SCREEN_WIDTH_DEFAULT   800
-#define WINCE_SCREEN_HEIGHT_DEFAULT  600
+#define WINCE_SCREEN_HEIGHT_DEFAULT  480
 
 /* WinCE trap-based API call range.
    WinCE apps may call APIs via trap addresses descending from 0xF0010000.
@@ -194,7 +194,19 @@ public:
     uint32_t screen_width  = WINCE_SCREEN_WIDTH_DEFAULT;
     uint32_t screen_height = WINCE_SCREEN_HEIGHT_DEFAULT;
 
-    /* WinCE theming (from cerf.ini).
+    /* Emulated WinCE OS version (from cerf.ini / CLI).
+       Returned by GetVersionExW.  Default: CE 5.0, build 1, Jan 1 2008. */
+    uint32_t os_major = 5;
+    uint32_t os_minor = 0;
+    uint32_t os_build = 1;
+    std::string os_build_date = "Jan  1 2008";
+
+    /* Fake memory (from cerf.ini / CLI).
+       When > 0, GlobalMemoryStatus returns these instead of real host memory.
+       Default: 0 (use real host memory). */
+    uint32_t fake_total_phys = 0;   /* bytes, 0 = use real */
+
+    /* WinCE theming (from cerf.ini / CLI).
        enable_theming: load system colors from WinCE registry, apply via IAT hooks.
        disable_uxtheme: strip UxTheme visual styles from emulated windows. */
     bool enable_theming = false;

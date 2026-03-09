@@ -26,18 +26,23 @@ static void PrintUsage(const char* prog) {
     printf("Emulates Windows CE ARM executables on x86 desktop Windows.\n\n");
     printf("Usage: %s [options] <arm-wince-exe>\n\n", prog);
     printf("Options:\n");
-    printf("  --trace              Enable instruction tracing\n");
-    printf("  --log=CATEGORIES     Enable only listed categories (comma-separated)\n");
-    printf("                       Categories: THUNK,PE,EMU,TRACE,CPU,REG,DBG,ALL,NONE\n");
-    printf("  --no-log=CATEGORIES  Disable specific categories\n");
-    printf("  --log-file=PATH      Write logs to file (in addition to console)\n");
-    printf("  --device=NAME        Device profile to use (default: from cerf.ini)\n");
+    printf("  --trace                  Enable instruction tracing\n");
+    printf("  --log=CATEGORIES         Enable only listed categories (comma-separated)\n");
+    printf("                           Categories: THUNK,PE,EMU,TRACE,CPU,REG,DBG,ALL,NONE\n");
+    printf("  --no-log=CATEGORIES      Disable specific categories\n");
+    printf("  --log-file=PATH          Write logs to file (in addition to console)\n");
+    printf("  --device=NAME            Device profile to use (default: from cerf.ini)\n");
+    printf("  --screen-width=N         Screen width in pixels (default: 800)\n");
+    printf("  --screen-height=N        Screen height in pixels (default: 480)\n");
     printf("  --fake-screen-resolution=BOOL  Override fake screen resolution (true/false)\n");
-    printf("  --fake-screen-width=N          Fake screen width (default: 800)\n");
-    printf("  --fake-screen-height=N         Fake screen height (default: 600)\n");
-    printf("  --flush-outputs      Flush after every log write (for complete captures)\n");
-    printf("  --quiet              Disable all log output\n");
-    printf("  --help               Show this help\n");
+    printf("  --os-major=N             WinCE major version (default: 5)\n");
+    printf("  --os-minor=N             WinCE minor version (default: 0)\n");
+    printf("  --os-build=N             WinCE build number (default: 1)\n");
+    printf("  --os-build-date=STR      WinCE build date (default: \"Jan  1 2008\")\n");
+    printf("  --fake-total-phys=N      Fake total physical RAM in bytes (0 = real)\n");
+    printf("  --flush-outputs          Flush after every log write (for complete captures)\n");
+    printf("  --quiet                  Disable all log output\n");
+    printf("  --help                   Show this help\n");
 }
 
 static void DumpRegisters(ArmCpu& cpu) {
@@ -72,6 +77,9 @@ int main(int argc, char* argv[]) {
     int cli_fake_screen_resolution = -1; /* -1=unset, 0=false, 1=true */
     int cli_screen_width = 0;
     int cli_screen_height = 0;
+    int cli_os_major = -1, cli_os_minor = -1, cli_os_build = -1;
+    const char* cli_os_build_date = nullptr;
+    int cli_fake_total_phys = 0;
 
     Log::Init();
 
@@ -93,10 +101,20 @@ int main(int argc, char* argv[]) {
         } else if (strncmp(argv[i], "--fake-screen-resolution=", 25) == 0) {
             const char* val = argv[i] + 25;
             cli_fake_screen_resolution = (strcmp(val, "false") != 0 && strcmp(val, "0") != 0 && strcmp(val, "no") != 0) ? 1 : 0;
-        } else if (strncmp(argv[i], "--fake-screen-width=", 20) == 0) {
-            cli_screen_width = atoi(argv[i] + 20);
-        } else if (strncmp(argv[i], "--fake-screen-height=", 21) == 0) {
-            cli_screen_height = atoi(argv[i] + 21);
+        } else if (strncmp(argv[i], "--screen-width=", 15) == 0) {
+            cli_screen_width = atoi(argv[i] + 15);
+        } else if (strncmp(argv[i], "--screen-height=", 16) == 0) {
+            cli_screen_height = atoi(argv[i] + 16);
+        } else if (strncmp(argv[i], "--os-major=", 11) == 0) {
+            cli_os_major = atoi(argv[i] + 11);
+        } else if (strncmp(argv[i], "--os-minor=", 11) == 0) {
+            cli_os_minor = atoi(argv[i] + 11);
+        } else if (strncmp(argv[i], "--os-build=", 11) == 0) {
+            cli_os_build = atoi(argv[i] + 11);
+        } else if (strncmp(argv[i], "--os-build-date=", 16) == 0) {
+            cli_os_build_date = argv[i] + 16;
+        } else if (strncmp(argv[i], "--fake-total-phys=", 18) == 0) {
+            cli_fake_total_phys = atoi(argv[i] + 18);
         } else if (strcmp(argv[i], "--quiet") == 0) {
             Log::SetEnabled(Log::NONE);
             explicit_log = true;
@@ -174,13 +192,18 @@ int main(int argc, char* argv[]) {
        This also sets wince_sys_dir for ARM DLL loading. */
     thunks.InitVFS(device_override ? device_override : "");
 
-    /* CLI overrides for screen resolution settings (take priority over cerf.ini) */
+    /* CLI overrides take priority over cerf.ini */
     if (cli_fake_screen_resolution >= 0)
         thunks.fake_screen_resolution = (cli_fake_screen_resolution != 0);
     if (cli_screen_width > 0)
         thunks.screen_width = (uint32_t)cli_screen_width;
     if (cli_screen_height > 0)
         thunks.screen_height = (uint32_t)cli_screen_height;
+    if (cli_os_major >= 0) thunks.os_major = (uint32_t)cli_os_major;
+    if (cli_os_minor >= 0) thunks.os_minor = (uint32_t)cli_os_minor;
+    if (cli_os_build >= 0) thunks.os_build = (uint32_t)cli_os_build;
+    if (cli_os_build_date) thunks.os_build_date = cli_os_build_date;
+    if (cli_fake_total_phys > 0) thunks.fake_total_phys = (uint32_t)cli_fake_total_phys;
 
     /* Install import thunks */
     thunks.InstallThunks(pe_info);

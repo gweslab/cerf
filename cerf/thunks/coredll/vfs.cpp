@@ -21,7 +21,7 @@ void Win32Thunks::InitVFS(const std::string& device_override) {
     else
         cerf_dir = "";
 
-    /* Read cerf.ini to get device name */
+    /* Read cerf.ini */
     std::string ini_path = cerf_dir + "cerf.ini";
     std::ifstream ini(ini_path);
     if (ini.is_open()) {
@@ -29,38 +29,49 @@ void Win32Thunks::InitVFS(const std::string& device_override) {
         while (std::getline(ini, line)) {
             if (!line.empty() && line.back() == '\r') line.pop_back();
             if (line.empty() || line[0] == ';' || line[0] == '#') continue;
-            if (line.substr(0, 7) == "device=") {
-                device_name = line.substr(7);
-                /* Trim whitespace */
-                while (!device_name.empty() && (device_name.back() == ' ' || device_name.back() == '\t'))
-                    device_name.pop_back();
+
+            /* Helper: extract value after "key=" and trim trailing whitespace */
+            auto getval = [&](const char* key) -> std::string {
+                size_t klen = strlen(key);
+                if (line.size() > klen && line.substr(0, klen) == key) {
+                    std::string val = line.substr(klen);
+                    while (!val.empty() && (val.back() == ' ' || val.back() == '\t'))
+                        val.pop_back();
+                    return val;
+                }
+                return "";
+            };
+            auto is_true = [](const std::string& v) { return v == "true" || v == "1" || v == "yes"; };
+
+            std::string v;
+            if (!(v = getval("device=")).empty())
+                device_name = v;
+            if (!(v = getval("screen_width=")).empty()) {
+                int n = atoi(v.c_str());
+                if (n > 0) screen_width = (uint32_t)n;
             }
-            if (line.substr(0, 18) == "fake_screen_width=") {
-                int v = atoi(line.substr(18).c_str());
-                if (v > 0) screen_width = (uint32_t)v;
+            if (!(v = getval("screen_height=")).empty()) {
+                int n = atoi(v.c_str());
+                if (n > 0) screen_height = (uint32_t)n;
             }
-            if (line.substr(0, 19) == "fake_screen_height=") {
-                int v = atoi(line.substr(19).c_str());
-                if (v > 0) screen_height = (uint32_t)v;
-            }
-            if (line.substr(0, 23) == "fake_screen_resolution=") {
-                std::string val = line.substr(23);
-                while (!val.empty() && (val.back() == ' ' || val.back() == '\t'))
-                    val.pop_back();
-                fake_screen_resolution = (val != "false" && val != "0" && val != "no");
-            }
-            if (line.substr(0, 15) == "enable_theming=") {
-                std::string val = line.substr(15);
-                while (!val.empty() && (val.back() == ' ' || val.back() == '\t'))
-                    val.pop_back();
-                enable_theming = (val == "true" || val == "1" || val == "yes");
+            if (!(v = getval("fake_screen_resolution=")).empty())
+                fake_screen_resolution = (v != "false" && v != "0" && v != "no");
+            if (!(v = getval("enable_theming=")).empty()) {
+                enable_theming = is_true(v);
                 LOG(VFS, "[VFS] enable_theming=%d\n", enable_theming);
             }
-            if (line.substr(0, 16) == "disable_uxtheme=") {
-                std::string val = line.substr(16);
-                while (!val.empty() && (val.back() == ' ' || val.back() == '\t'))
-                    val.pop_back();
-                disable_uxtheme = (val == "true" || val == "1" || val == "yes");
+            if (!(v = getval("disable_uxtheme=")).empty())
+                disable_uxtheme = is_true(v);
+            /* OS version */
+            if (!(v = getval("os_major=")).empty()) { int n = atoi(v.c_str()); if (n >= 0) os_major = (uint32_t)n; }
+            if (!(v = getval("os_minor=")).empty()) { int n = atoi(v.c_str()); if (n >= 0) os_minor = (uint32_t)n; }
+            if (!(v = getval("os_build=")).empty()) { int n = atoi(v.c_str()); if (n >= 0) os_build = (uint32_t)n; }
+            if (!(v = getval("os_build_date=")).empty())
+                os_build_date = v;
+            /* Fake memory */
+            if (!(v = getval("fake_total_phys=")).empty()) {
+                int n = atoi(v.c_str());
+                if (n > 0) fake_total_phys = (uint32_t)n;
             }
         }
     }
@@ -76,6 +87,14 @@ void Win32Thunks::InitVFS(const std::string& device_override) {
 
     device_fs_root = cerf_dir + "devices\\" + device_name + "\\fs\\";
     device_dir = cerf_dir + "devices\\" + device_name + "\\";
+
+    /* Validate device directory exists */
+    DWORD attrs = GetFileAttributesA(device_dir.c_str());
+    if (attrs == INVALID_FILE_ATTRIBUTES || !(attrs & FILE_ATTRIBUTE_DIRECTORY)) {
+        LOG_ERR("[VFS] FATAL: Device directory does not exist: %s\n", device_dir.c_str());
+        LOG_ERR("[VFS] Check the device= setting in cerf.ini or use --device=NAME.\n");
+        ExitProcess(1);
+    }
 
     LOG(VFS, "[VFS] Device: %s\n", device_name.c_str());
     LOG(VFS, "[VFS] Device FS root: %s\n", device_fs_root.c_str());

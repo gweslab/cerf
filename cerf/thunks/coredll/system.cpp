@@ -349,12 +349,21 @@ void Win32Thunks::RegisterSystemHandlers() {
     });
     Thunk("GetNumberFormatW", 204, [](uint32_t* regs, EmulatedMemory&) -> bool { regs[0] = 0; return true; });
     Thunk("GetCurrencyFormatW", 205, [](uint32_t* regs, EmulatedMemory&) -> bool { regs[0] = 0; return true; });
-    /* Version/info */
+    /* Version/info — configurable via cerf.ini / CLI */
     Thunk("GetVersionExW", 717, [this](uint32_t* regs, EmulatedMemory& mem) -> bool {
         if (regs[0]) {
-            mem.Write32(regs[0]+4, 4); mem.Write32(regs[0]+8, 21);
-            mem.Write32(regs[0]+12, 0); mem.Write32(regs[0]+16, 0);
+            mem.Write32(regs[0]+4,  os_major);   /* dwMajorVersion */
+            mem.Write32(regs[0]+8,  os_minor);   /* dwMinorVersion */
+            mem.Write32(regs[0]+12, os_build);   /* dwBuildNumber */
+            mem.Write32(regs[0]+16, 0);          /* dwPlatformId (VER_PLATFORM_WIN32_CE=3, but WinCE apps expect 0) */
+            /* szCSDVersion at offset 20 (128 wchars) — write build date string */
+            std::string date_str = "Built " + os_build_date;
+            for (size_t j = 0; j < date_str.size() && j < 127; j++)
+                mem.Write16(regs[0] + 20 + (uint32_t)(j * 2), (uint16_t)date_str[j]);
+            mem.Write16(regs[0] + 20 + (uint32_t)(date_str.size() * 2), 0);
         }
+        LOG(API, "[API] GetVersionExW -> %u.%u build %u (%s)\n",
+            os_major, os_minor, os_build, os_build_date.c_str());
         regs[0] = 1; return true;
     });
     ThunkOrdinal("SystemParametersInfoW", 5403); /* WinCE 7 aygshell uses this ordinal */
@@ -414,13 +423,26 @@ void Win32Thunks::RegisterSystemHandlers() {
         uint32_t ptr = regs[0];
         if (ptr) {
             MEMORYSTATUS ms = {}; ms.dwLength = sizeof(ms); GlobalMemoryStatus(&ms);
-            mem.Write32(ptr+0, 32); mem.Write32(ptr+4, ms.dwMemoryLoad);
-            mem.Write32(ptr+8, (uint32_t)std::min(ms.dwTotalPhys, (SIZE_T)UINT32_MAX));
-            mem.Write32(ptr+12, (uint32_t)std::min(ms.dwAvailPhys, (SIZE_T)UINT32_MAX));
-            mem.Write32(ptr+16, (uint32_t)std::min(ms.dwTotalPageFile, (SIZE_T)UINT32_MAX));
-            mem.Write32(ptr+20, (uint32_t)std::min(ms.dwAvailPageFile, (SIZE_T)UINT32_MAX));
-            mem.Write32(ptr+24, (uint32_t)std::min(ms.dwTotalVirtual, (SIZE_T)UINT32_MAX));
-            mem.Write32(ptr+28, (uint32_t)std::min(ms.dwAvailVirtual, (SIZE_T)UINT32_MAX));
+            uint32_t total_phys = (uint32_t)std::min(ms.dwTotalPhys, (SIZE_T)UINT32_MAX);
+            uint32_t avail_phys = (uint32_t)std::min(ms.dwAvailPhys, (SIZE_T)UINT32_MAX);
+            if (fake_total_phys > 0) {
+                /* Scale available proportionally to fake total */
+                double ratio = (double)fake_total_phys / (double)total_phys;
+                total_phys = fake_total_phys;
+                avail_phys = (uint32_t)(avail_phys * ratio);
+                if (avail_phys > total_phys) avail_phys = total_phys;
+            }
+            mem.Write32(ptr+0,  32);
+            mem.Write32(ptr+4,  ms.dwMemoryLoad);
+            mem.Write32(ptr+8,  total_phys);
+            mem.Write32(ptr+12, avail_phys);
+            mem.Write32(ptr+16, total_phys);  /* page file = same as phys on WinCE */
+            mem.Write32(ptr+20, avail_phys);
+            mem.Write32(ptr+24, total_phys);  /* virtual = same as phys on WinCE */
+            mem.Write32(ptr+28, avail_phys);
+            LOG(API, "[API] GlobalMemoryStatus -> total=%u MB, avail=%u MB%s\n",
+                total_phys / (1024*1024), avail_phys / (1024*1024),
+                fake_total_phys > 0 ? " (fake)" : "");
         }
         return true;
     });

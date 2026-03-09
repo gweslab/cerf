@@ -182,23 +182,49 @@ void Win32Thunks::RegisterShellHandlers() {
         if (dir_ptr) dir = ReadWStringFromEmu(mem, dir_ptr);
         LOG(API, "[API] ShellExecuteEx(verb='%ls', file='%ls', params='%ls', dir='%ls', nShow=%d)\n",
                verb.c_str(), file.c_str(), params.c_str(), dir.c_str(), nShow);
-        /* Handle WinCE shell CLSID paths (::{guid}) — these are shell object
-           references that can't be passed to native Windows.  Silently succeed
-           for now (actual folder navigation requires multi-process support). */
+        /* Handle WinCE shell CLSID paths (::{guid}) and directory paths.
+           Real WinCE coredll's ShellExecuteEx calls trap 0xF000ABDC
+           (SH_SHELL API set method 9 = SHCreateExplorerInstance) which
+           tells the running explorer.exe to open a folder browser window.
+           We replicate this by calling SHCreateExplorerInstance directly
+           in the ARM explorer code via callback_executor. */
+        auto callSHCreateExplorerInstance = [&](const std::wstring& path) -> bool {
+            /* SHCreateExplorerInstance is at RVA 0xA120 in explorer.exe,
+               loaded at preferred base 0x00010000 → runtime 0x0001A120.
+               Signature: BOOL SHCreateExplorerInstance(LPCWSTR pszPath, UINT uFlags) */
+            const uint32_t shCreateExplorerInstance = 0x0001A120;
+            /* Write path string to emulated memory */
+            uint32_t path_addr = 0x60002000;
+            mem.Alloc(path_addr, 0x1000);
+            for (size_t j = 0; j < path.size() && j < 0x7FE; j++)
+                mem.Write16(path_addr + (uint32_t)(j * 2), (uint16_t)path[j]);
+            mem.Write16(path_addr + (uint32_t)(path.size() * 2), 0);
+            uint32_t args[2] = { path_addr, 0 };
+            LOG(API, "[API]   -> calling SHCreateExplorerInstance('%ls') at 0x%08X\n",
+                path.c_str(), shCreateExplorerInstance);
+            uint32_t ret = callback_executor(shCreateExplorerInstance, args, 2);
+            LOG(API, "[API]   -> SHCreateExplorerInstance returned %d\n", ret);
+            mem.Write32(sei_addr + 0x20, 42); /* hInstApp > 32 = success */
+            regs[0] = 1;
+            return true;
+        };
         if (file.size() > 3 && file[0] == L':' && file[1] == L':' && file[2] == L'{') {
             LOG(API, "[API]   -> CLSID shell path '%ls'\n", file.c_str());
-            /* Map known CLSIDs to folder paths for explorer navigation.
-               {000214A0} = My Computer (root), {00021400} = Desktop */
             std::wstring folder_path;
             if (file.find(L"000214A0") != std::wstring::npos ||
                 file.find(L"000214a0") != std::wstring::npos)
-                folder_path = L"\\";
-            /* TODO: folder navigation requires full COM/IShellFolder support.
-               For now, just log and return success. */
-            (void)folder_path;
-            mem.Write32(sei_addr + 0x20, 42);
-            regs[0] = 1;
-            return true;
+                folder_path = L"\\";           /* My Computer / My Device → root */
+            else if (file.find(L"00021400") != std::wstring::npos ||
+                     file.find(L"00021400") != std::wstring::npos)
+                folder_path = L"\\";           /* ShellDesktop → root */
+            if (!folder_path.empty() && callback_executor) {
+                return callSHCreateExplorerInstance(folder_path);
+            } else {
+                LOG(API, "[API]   -> unknown CLSID, returning success (stub)\n");
+                mem.Write32(sei_addr + 0x20, 42);
+                regs[0] = 1;
+                return true;
+            }
         }
         /* Resolve WinCE .lnk shortcut files.
            Format: first line is "#\path\to\target.exe" optionally followed by params. */
@@ -240,6 +266,19 @@ void Win32Thunks::RegisterShellHandlers() {
             if (GetFileAttributesW(win_mapped.c_str()) != INVALID_FILE_ATTRIBUTES) {
                 LOG(API, "[API]   -> resolved '%ls' via \\Windows\\ search path\n", file.c_str());
                 mapped_file = win_mapped;
+            }
+        }
+        /* Real WinCE coredll checks if the target is a directory and calls
+           SHCreateExplorerInstance to open a folder browser window. */
+        if (!mapped_file.empty() && callback_executor) {
+            DWORD attr = GetFileAttributesW(mapped_file.c_str());
+            if (attr != INVALID_FILE_ATTRIBUTES && (attr & FILE_ATTRIBUTE_DIRECTORY)) {
+                LOG(API, "[API]   -> target is DIRECTORY, opening folder browser\n");
+                /* Ensure path starts with backslash (WinCE convention) */
+                std::wstring wce_path = file;
+                if (!wce_path.empty() && wce_path[0] != L'\\')
+                    wce_path = L"\\" + wce_path;
+                return callSHCreateExplorerInstance(wce_path);
             }
         }
         /* Check if the target is a WinCE ARM executable — run in-process.

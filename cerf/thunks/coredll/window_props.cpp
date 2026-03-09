@@ -147,6 +147,7 @@ void Win32Thunks::RegisterWindowPropsHandlers() {
         if (idx == -4 /* GWL_WNDPROC */) {
             auto it = hwnd_wndproc_map.find(hw);
             regs[0] = (it != hwnd_wndproc_map.end()) ? it->second : 0;
+            LOG(API, "[API] GetWindowLongW(%p, GWL_WNDPROC) -> 0x%08X\n", hw, regs[0]);
             return true;
         }
         /* Translate WinCE 32-bit dialog extra data offsets to 64-bit.
@@ -157,12 +158,14 @@ void Win32Thunks::RegisterWindowPropsHandlers() {
             if (idx == 8)       regs[0] = (uint32_t)GetWindowLongPtrW(hw, DWLP_USER);
             else if (idx == 4)  regs[0] = hwnd_dlgproc_map[hw]; /* Return ARM dlgproc address */
             else                regs[0] = (uint32_t)GetWindowLongPtrW(hw, DWLP_MSGRESULT);
+            LOG(API, "[API] GetWindowLongW(%p, %d) -> 0x%08X (dialog extra)\n", hw, idx, regs[0]);
         } else {
             LONG val = GetWindowLongW(hw, idx);
             /* Restore WS_EX_CAPTIONOKBTN bit for tracked windows */
             if (idx == GWL_EXSTYLE && captionok_hwnds.count(hw))
                 val |= (LONG)0x80000000;
             regs[0] = (uint32_t)val;
+            LOG(API, "[API] GetWindowLongW(%p, %d) -> 0x%08X\n", hw, idx, regs[0]);
         }
         return true;
     });
@@ -200,6 +203,8 @@ void Win32Thunks::RegisterWindowPropsHandlers() {
         if (idx >= 0 && idx <= 8 && hwnd_dlgproc_map.count(hw)) {
             if (idx == 8) {
                 regs[0] = (uint32_t)SetWindowLongPtrW(hw, DWLP_USER, (LONG_PTR)(int32_t)nv);
+                LOG(API, "[API] SetWindowLongW(%p, DWL_USER=8, 0x%08X) -> old=0x%08X (dialog extra)\n",
+                    hw, (uint32_t)nv, regs[0]);
             } else if (idx == 4) {
                 /* DWL_DLGPROC: ARM code setting a new dialog proc — update our map
                    instead of corrupting the native DLGPROC pointer */
@@ -211,9 +216,12 @@ void Win32Thunks::RegisterWindowPropsHandlers() {
                 }
             } else {
                 regs[0] = (uint32_t)SetWindowLongPtrW(hw, DWLP_MSGRESULT, (LONG_PTR)(int32_t)nv);
+                LOG(API, "[API] SetWindowLongW(%p, DWL_MSGRESULT=%d, 0x%08X) -> old=0x%08X (dialog extra)\n",
+                    hw, idx, (uint32_t)nv, regs[0]);
             }
         } else {
             regs[0] = SetWindowLongW(hw, idx, nv);
+            LOG(API, "[API] SetWindowLongW(%p, %d, 0x%08X) -> old=0x%08X\n", hw, idx, (uint32_t)nv, regs[0]);
         }
         return true;
     });

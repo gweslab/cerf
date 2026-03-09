@@ -333,6 +333,14 @@ int main(int argc, char* argv[]) {
             if (pc == cb_sentinel || pc == (cb_sentinel & ~1u)) {
                 break;
             }
+            /* Detect null function pointer call — PC at 0 means the ARM code
+               called through a NULL pointer.  Don't execute zeroed memory. */
+            if (pc < 0x1000 && cb_depth > 1) {
+                LOG(API, "[API] callback_executor: NULL function pointer (PC=0x%08X) at depth=%d, aborting\n",
+                    pc, cb_depth);
+                cpu.r[0] = 0;
+                break;
+            }
             cpu.Step();
         }
 

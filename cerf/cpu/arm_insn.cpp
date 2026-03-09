@@ -93,6 +93,16 @@ void ArmCpu::ExecuteArm(uint32_t insn) {
         return;
     }
 
+    /* Undefined instruction / SWBKPT (WinCE __debugbreak):
+       bits [27:25] = 011 with bit [4] = 1 is architecturally undefined.
+       WinCE uses 0xE6000010 (and similar) as a software breakpoint.
+       Log a warning and treat as NOP — do NOT fall through to LDR/STR. */
+    if ((insn & 0x0E000010) == 0x06000010) {
+        LOG(CPU, "[ARM] Undefined instruction (SWBKPT) 0x%08X at PC=0x%08X — treating as NOP\n",
+            insn, r[REG_PC] - 4);
+        return;
+    }
+
     /* Single data transfer (LDR/STR) */
     if ((insn & 0x0C000000) == 0x04000000) {
         ArmSingleDataTransfer(insn);

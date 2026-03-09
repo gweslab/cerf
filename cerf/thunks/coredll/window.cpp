@@ -177,13 +177,15 @@ void Win32Thunks::RegisterWindowHandlers() {
                 SendMessageW(hwnd, WM_SETICON, ICON_BIG, (LPARAM)hIcon);
                 SendMessageW(hwnd, WM_SETICON, ICON_SMALL, (LPARAM)hIcon);
             }
+            /* Apply WinCE theme (strip UxTheme, set title bar color).
+               Must be installed BEFORE CaptionOk so the OK button subclass
+               processes WM_NCPAINT first (LIFO) and paints on top of caption. */
+            ApplyWindowTheme(hwnd, is_toplevel);
             if (has_captionok) {
                 captionok_hwnds.insert(hwnd);
                 InstallCaptionOk(hwnd);
                 LOG(API, "[API]   WS_EX_CAPTIONOKBTN tracked for HWND=0x%p\n", hwnd);
             }
-            /* Apply WinCE theme (strip UxTheme, set title bar color) */
-            ApplyWindowTheme(hwnd, is_toplevel);
             /* On real WinCE, the default system font is Tahoma (from SYSFNT registry).
                On desktop Windows, native controls default to Segoe UI.
                Send WM_SETFONT with the WinCE system font to child controls so they
@@ -232,10 +234,14 @@ void Win32Thunks::RegisterWindowHandlers() {
     });
     Thunk("DestroyWindow", 265, [](uint32_t* regs, EmulatedMemory&) -> bool {
         HWND hw = (HWND)(intptr_t)(int32_t)regs[0];
+        LOG(API, "[API] DestroyWindow(0x%p) IsWindow=%d\n", hw, IsWindow(hw));
         if (captionok_hwnds.erase(hw)) RemoveCaptionOk(hw);
-        hwnd_wndproc_map.erase(hw);
+        /* Erase wndproc map AFTER DestroyWindow so WM_DESTROY reaches ARM code */
         hwnd_dlgproc_map.erase(hw);
-        regs[0] = DestroyWindow(hw);
+        BOOL ret = DestroyWindow(hw);
+        LOG(API, "[API] DestroyWindow result=%d, error=%d\n", ret, GetLastError());
+        hwnd_wndproc_map.erase(hw);
+        regs[0] = ret;
         return true;
     });
     Thunk("SetWindowPos", 247, [this](uint32_t* regs, EmulatedMemory& mem) -> bool {

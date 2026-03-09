@@ -162,18 +162,18 @@ void Win32Thunks::RegisterDialogHandlers() {
            (MFC's DialogFunc sets DWL_DLGPROC to the real handler during init) */
         if (dlg && arm_dlgProc && hwnd_dlgproc_map.find(dlg) == hwnd_dlgproc_map.end())
             hwnd_dlgproc_map[dlg] = arm_dlgProc;
-        if (dlg && has_captionok) {
-            captionok_hwnds.insert(dlg);
-            InstallCaptionOk(dlg);
-            LOG(API, "[API]   Dialog HWND=0x%p has WS_EX_CAPTIONOKBTN\n", dlg);
-        }
         if (dlg) {
-            /* Apply WinCE theme to dialog and all its child controls */
+            /* Apply theme BEFORE CaptionOk so OK button paints on top (LIFO) */
             ApplyWindowTheme(dlg, true);
             EnumChildWindows(dlg, [](HWND child, LPARAM lp) -> BOOL {
                 ((Win32Thunks*)lp)->ApplyWindowTheme(child, false);
                 return TRUE;
             }, (LPARAM)this);
+            if (has_captionok) {
+                captionok_hwnds.insert(dlg);
+                InstallCaptionOk(dlg);
+                LOG(API, "[API]   Dialog HWND=0x%p has WS_EX_CAPTIONOKBTN\n", dlg);
+            }
         }
         regs[0] = (uint32_t)(uintptr_t)dlg;
         return true;
@@ -192,17 +192,17 @@ void Win32Thunks::RegisterDialogHandlers() {
             (LPCDLGTEMPLATEW)tmpl.data(), parent, EmuDlgProc, initParam);
         if (dlg && arm_dlgProc) {
             hwnd_dlgproc_map[dlg] = arm_dlgProc;
-            if (has_captionok) {
-                captionok_hwnds.insert(dlg);
-                InstallCaptionOk(dlg);
-                LOG(API, "[API]   Modal dialog HWND=0x%p has WS_EX_CAPTIONOKBTN\n", dlg);
-            }
-            /* Apply WinCE theme to modal dialog and all its child controls */
+            /* Apply theme BEFORE CaptionOk so OK button paints on top (LIFO) */
             ApplyWindowTheme(dlg, true);
             EnumChildWindows(dlg, [](HWND child, LPARAM lp) -> BOOL {
                 ((Win32Thunks*)lp)->ApplyWindowTheme(child, false);
                 return TRUE;
             }, (LPARAM)this);
+            if (has_captionok) {
+                captionok_hwnds.insert(dlg);
+                InstallCaptionOk(dlg);
+                LOG(API, "[API]   Modal dialog HWND=0x%p has WS_EX_CAPTIONOKBTN\n", dlg);
+            }
             uint32_t args[4] = { (uint32_t)(uintptr_t)dlg, WM_INITDIALOG, 0, (uint32_t)initParam };
             callback_executor(arm_dlgProc, args, 4);
         }

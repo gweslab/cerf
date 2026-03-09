@@ -99,6 +99,13 @@ INT_PTR CALLBACK Win32Thunks::EmuDlgProc(HWND hwnd, UINT msg, WPARAM wParam, LPA
         emu_lParam
     };
 
+    if (msg == WM_COMMAND) {
+        LOG(API, "[API] EmuDlgProc: WM_COMMAND hwnd=%p id=%d code=%d lParam=0x%X\n",
+            hwnd, LOWORD(wParam), HIWORD(wParam), (uint32_t)lParam);
+    }
+    if (msg == WM_CLOSE) {
+        LOG(API, "[API] EmuDlgProc: WM_CLOSE hwnd=%p\n", hwnd);
+    }
     if (msg == WM_INITDIALOG) {
         LOG(API, "[API] EmuDlgProc: dispatching WM_INITDIALOG to ARM dlgproc=0x%08X hwnd=%p lParam=0x%X\n",
             arm_dlgproc, hwnd, (uint32_t)lParam);

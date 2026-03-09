@@ -261,14 +261,26 @@ LRESULT CALLBACK Win32Thunks::EmuWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPA
     }
     }
 
-    /* WinCE convention: WM_SETTINGCHANGE has lParam = SPI constant (e.g. 0xE0
-       for SPI_SETSIPINFO). Desktop Windows sends wParam=SPI, lParam=string.
-       Translate so ARM apps see the WinCE convention. */
-    if (msg == WM_SETTINGCHANGE && wParam == 0xE0 /* SPI_SETSIPINFO */ && lParam != 0xE0)
-        lParam = 0xE0; /* = 224 = SPI_SETSIPINFO */
+    /* WM_SETTINGCHANGE: Desktop Windows sends wParam=SPI, lParam=native string ptr.
+       WinCE convention: lParam = SPI constant (for SPI_SETSIPINFO=0xE0).
+       For other SPI values, lParam is a native 64-bit string pointer that would
+       crash if truncated to 32-bit. Zero it out so ARM code gets the notification
+       without dereferencing a bad pointer. */
+    if (msg == WM_SETTINGCHANGE) {
+        if (wParam == 0xE0 /* SPI_SETSIPINFO */)
+            lParam = 0xE0;
+        else
+            lParam = 0;
+    }
 
     uint32_t arm_wndproc = it->second;
     /* Debug: log key messages to ARM windows */
+    if (msg == WM_CLOSE || msg == WM_SYSCOMMAND || msg == WM_DESTROY) {
+        wchar_t cls[64] = {};
+        GetClassNameW(hwnd, cls, 64);
+        LOG(API, "[API] EmuWndProc CLOSE-PATH: msg=0x%04X hwnd=0x%p class='%ls' wP=0x%X lP=0x%X\n",
+            msg, hwnd, cls, (uint32_t)wParam, (uint32_t)lParam);
+    }
     if (msg == WM_CHAR || msg == WM_KEYDOWN || msg == WM_SETTEXT ||
         msg == WM_LBUTTONDOWN || msg == WM_LBUTTONUP || msg == WM_CAPTURECHANGED ||
         msg == WM_SETFOCUS || msg == WM_KILLFOCUS ||
@@ -326,38 +338,35 @@ LRESULT CALLBACK Win32Thunks::EmuWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPA
    native title bar buttons (?, X).  Cached during InstallCaptionOk by probing
    WM_NCHITTEST, since SM_CXSIZE doesn't match the actual classic-mode button
    widths on Windows 10/11 with DWM disabled. */
-static std::map<HWND, int> captionok_btns_from_right;
-
 /* Calculate the OK button rect in window (not screen) coordinates.
-   Placed to the left of the native title bar buttons (?, X). */
+   Uses the same button-position formula as PaintThemedCaption so the
+   OK button sits exactly to the left of the themed caption buttons. */
 static RECT GetCaptionOkBtnRect(HWND hwnd) {
     int captH = GetSystemMetrics(SM_CYCAPTION);
     int padBorder = GetSystemMetrics(SM_CXPADDEDBORDER);
+    int frame = GetSystemMetrics(SM_CXFRAME) + padBorder;
+    int btnW = GetSystemMetrics(SM_CXSIZE) - 2;
     RECT wr;
     GetWindowRect(hwnd, &wr);
     int winW = wr.right - wr.left;
-    /* Use cached probe result if available; otherwise estimate from metrics */
-    int btnsFromRight;
-    auto it = captionok_btns_from_right.find(hwnd);
-    if (it != captionok_btns_from_right.end()) {
-        btnsFromRight = it->second;
-    } else {
-        /* Fallback: estimate from system metrics */
-        LONG style = GetWindowLongW(hwnd, GWL_STYLE);
-        LONG exStyle = GetWindowLongW(hwnd, GWL_EXSTYLE);
-        int nativeBtns = 0;
-        if (style & WS_SYSMENU) nativeBtns++;
-        if (exStyle & 0x00000400L) nativeBtns++;
-        if (style & WS_MAXIMIZEBOX) nativeBtns++;
-        if (style & WS_MINIMIZEBOX) nativeBtns++;
-        int frame = GetSystemMetrics(SM_CXFRAME) + padBorder;
-        btnsFromRight = frame + nativeBtns * GetSystemMetrics(SM_CXSIZE);
-    }
-    int okW = captH;  /* Button width ≈ caption height (square-ish) */
+    int captRight = winW - frame;
+    int border_top = GetSystemMetrics(SM_CYFRAME) + padBorder;
+
+    /* Count native buttons — same logic as PaintThemedCaption */
+    LONG style = GetWindowLongW(hwnd, GWL_STYLE);
+    LONG exStyle = GetWindowLongW(hwnd, GWL_EXSTYLE);
+    int btnX = captRight - 2;
+    if (style & WS_SYSMENU) btnX -= btnW;
+    if (exStyle & WS_EX_CONTEXTHELP) btnX -= btnW;
+    if (style & WS_MAXIMIZEBOX) btnX -= btnW;
+    if (style & WS_MINIMIZEBOX) btnX -= btnW;
+
+    /* OK button goes immediately to the left of the leftmost native button */
+    int okW = captH;
     RECT r;
-    r.right = winW - btnsFromRight;
+    r.right = btnX;
     r.left  = r.right - okW;
-    r.top   = padBorder;
+    r.top   = border_top;
     r.bottom = r.top + captH;
     return r;
 }
@@ -436,28 +445,9 @@ void Win32Thunks::InstallCaptionOk(HWND hwnd) {
        Without this, DWM on Windows 10/11 paints over our custom NC area. */
     DWMNCRENDERINGPOLICY policy = DWMNCRP_DISABLED;
     DwmSetWindowAttribute(hwnd, DWMWA_NCRENDERING_POLICY, &policy, sizeof(policy));
-    /* Force frame recalculation BEFORE probing or installing subclass */
+    /* Force frame recalculation */
     SetWindowPos(hwnd, NULL, 0, 0, 0, 0,
         SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_FRAMECHANGED);
-
-    /* Probe the title bar to find where native buttons (?, X) start.
-       Classic NC rendering on Windows 10/11 uses button widths that don't match
-       SM_CXSIZE, so we probe WM_NCHITTEST to find the actual boundary. */
-    RECT wr;
-    GetWindowRect(hwnd, &wr);
-    int padBorder = GetSystemMetrics(SM_CXPADDEDBORDER);
-    int captH = GetSystemMetrics(SM_CYCAPTION);
-    int probe_y = wr.top + padBorder + captH / 2;
-    int btnsFromRight = 0;
-    for (int x = wr.right - 1; x > wr.left + (wr.right - wr.left) / 2; x--) {
-        LRESULT ht = SendMessageW(hwnd, WM_NCHITTEST, 0, MAKELPARAM(x, probe_y));
-        if (ht == HTCAPTION || ht == HTSYSMENU || ht == HTNOWHERE) {
-            btnsFromRight = wr.right - x - 1;
-            break;
-        }
-    }
-    if (btnsFromRight > 0)
-        captionok_btns_from_right[hwnd] = btnsFromRight;
 
     SetWindowSubclass(hwnd, CaptionOkSubclassProc, CAPTIONOK_SUBCLASS_ID, 0);
     PaintCaptionOkBtn(hwnd);
@@ -465,7 +455,6 @@ void Win32Thunks::InstallCaptionOk(HWND hwnd) {
 
 void Win32Thunks::RemoveCaptionOk(HWND hwnd) {
     RemoveWindowSubclass(hwnd, CaptionOkSubclassProc, CAPTIONOK_SUBCLASS_ID);
-    captionok_btns_from_right.erase(hwnd);
     /* Re-enable DWM non-client rendering */
     DWMNCRENDERINGPOLICY policy = DWMNCRP_ENABLED;
     DwmSetWindowAttribute(hwnd, DWMWA_NCRENDERING_POLICY, &policy, sizeof(policy));

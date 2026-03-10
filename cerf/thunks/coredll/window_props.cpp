@@ -64,51 +64,8 @@ void Win32Thunks::RegisterWindowPropsHandlers() {
     Thunk("GetWindowRect", 248, [this](uint32_t* regs, EmulatedMemory& mem) -> bool {
         HWND hw = (HWND)(intptr_t)(int32_t)regs[0];
         RECT rc; BOOL ret=GetWindowRect(hw,&rc);
-        { wchar_t _c[64]={}; GetClassNameW(hw,_c,64);
-          if (wcsstr(_c, L"SysListView32"))
-              LOG(API, "[API] GetWindowRect(SysListView32 %p) -> (%ld,%ld,%ld,%ld) %dx%d\n",
-                  hw, rc.left, rc.top, rc.right, rc.bottom, rc.right-rc.left, rc.bottom-rc.top);
-        }
-        /* For top-level WS_CAPTION windows, return a WinCE-equivalent rect
-           (1px border + caption) instead of the desktop rect with thick frame.
-           This prevents apps from seeing inflated dimensions — e.g. calc.exe
-           checks GetWindowRect width<=480 and scales button positions if wider.
-           Applied universally (not just tracked HWNDs) because WM_CREATE fires
-           during CreateWindowExW before the HWND can be added to a tracking set. */
-        if (ret) {
-            LONG style = GetWindowLongW(hw, GWL_STYLE);
-            /* WinCE-equivalent rect for any non-child WS_CAPTION window, including
-               owned popup dialogs (property sheets, etc.) where GetParent()!=NULL.
-               Without this, ARM code sees native desktop frame sizes (thick borders)
-               and computes oversized window dimensions. */
-            if (!(style & WS_CHILD) && (style & WS_CAPTION)) {
-                RECT native_rc = rc;
-                RECT client_rc; GetClientRect(hw, &client_rc);
-                POINT client_tl = {0, 0}; ClientToScreen(hw, &client_tl);
-                int cyCaption = GetSystemMetrics(SM_CYCAPTION);
-                /* If this HWND has a DLU-based client override (desktop minimum
-                   width is larger than the DLU-specified size), use the override
-                   so ARM sizing code computes growth from the correct small size. */
-                int cw = client_rc.right, ch = client_rc.bottom;
-                if (hw == dlu_override_hwnd && dlu_override_client_w > 0) {
-                    cw = dlu_override_client_w;
-                    ch = dlu_override_client_h;
-                    /* Clear after first use — the override is only needed for the
-                       initial GetWindowRect that ARM sizing code uses to compute
-                       growth.  Subsequent calls should see the real dimensions. */
-                    dlu_override_hwnd = nullptr;
-                    LOG(API, "[API] GetWindowRect DLU override hwnd=%p: actual_client(%ldx%ld)->override_client(%dx%d)\n",
-                        hw, client_rc.right, client_rc.bottom, cw, ch);
-                }
-                rc.left   = client_tl.x - 1;
-                rc.top    = client_tl.y - cyCaption - 1;
-                rc.right  = client_tl.x + cw + 1;
-                rc.bottom = client_tl.y + ch + 1;
-                LOG(API, "[API] GetWindowRect WinCE hwnd=%p: native(%ld,%ld,%ld,%ld)->wince(%ld,%ld,%ld,%ld) client=%dx%d\n",
-                    hw, native_rc.left, native_rc.top, native_rc.right, native_rc.bottom,
-                    rc.left, rc.top, rc.right, rc.bottom, cw, ch);
-            }
-        }
+        /* No deflation needed — windows are WS_POPUP with WinCE NC area handled by
+           our WM_NCCALCSIZE, so native rect IS the WinCE rect. Pass through as-is. */
         mem.Write32(regs[1],rc.left); mem.Write32(regs[1]+4,rc.top);
         mem.Write32(regs[1]+8,rc.right); mem.Write32(regs[1]+12,rc.bottom);
         regs[0]=ret; return true;
@@ -147,30 +104,44 @@ void Win32Thunks::RegisterWindowPropsHandlers() {
     Thunk("GetWindowLongW", 259, [](uint32_t* regs, EmulatedMemory&) -> bool {
         HWND hw = (HWND)(intptr_t)(int32_t)regs[0];
         int idx = (int)regs[1];
-        /* GWL_WNDPROC: return the ARM WndProc from our map, not the native EmuWndProc.
-           On x64, GetWindowLongW(GWL_WNDPROC) doesn't work (need SetWindowLongPtrW),
-           and the ARM code expects an ARM function address, not EmuWndProc. */
         if (idx == -4 /* GWL_WNDPROC */) {
             auto it = hwnd_wndproc_map.find(hw);
             regs[0] = (it != hwnd_wndproc_map.end()) ? it->second : 0;
             LOG(API, "[API] GetWindowLongW(%p, GWL_WNDPROC) -> 0x%08X\n", hw, regs[0]);
             return true;
         }
-        /* Translate WinCE 32-bit dialog extra data offsets to 64-bit.
-           On WinCE: DWL_MSGRESULT=0, DWL_DLGPROC=4, DWL_USER=8.
-           On x64:   DWLP_MSGRESULT=0, DWLP_DLGPROC=8, DWLP_USER=16.
-           Non-negative indices ≤8 for dialog windows need translation. */
+        /* GWL_STYLE: return original WinCE style (not the WS_POPUP we converted to) */
+        if (idx == GWL_STYLE) {
+            auto sit = hwnd_wce_style_map.find(hw);
+            if (sit != hwnd_wce_style_map.end()) {
+                regs[0] = sit->second;
+                LOG(API, "[API] GetWindowLongW(%p, GWL_STYLE) -> 0x%08X (WinCE map)\n", hw, regs[0]);
+                return true;
+            }
+        }
+        /* GWL_EXSTYLE: return original WinCE extended style */
+        if (idx == GWL_EXSTYLE) {
+            auto eit = hwnd_wce_exstyle_map.find(hw);
+            if (eit != hwnd_wce_exstyle_map.end()) {
+                regs[0] = eit->second;
+                LOG(API, "[API] GetWindowLongW(%p, GWL_EXSTYLE) -> 0x%08X (WinCE map)\n", hw, regs[0]);
+                return true;
+            }
+            LONG val = GetWindowLongW(hw, idx);
+            if (captionok_hwnds.count(hw))
+                val |= (LONG)0x80000000;
+            regs[0] = (uint32_t)val;
+            LOG(API, "[API] GetWindowLongW(%p, GWL_EXSTYLE) -> 0x%08X\n", hw, regs[0]);
+            return true;
+        }
+        /* WinCE dialog extra data: translate 32-bit offsets to 64-bit */
         if (idx >= 0 && idx <= 8 && hwnd_dlgproc_map.count(hw)) {
             if (idx == 8)       regs[0] = (uint32_t)GetWindowLongPtrW(hw, DWLP_USER);
-            else if (idx == 4)  regs[0] = hwnd_dlgproc_map[hw]; /* Return ARM dlgproc address */
+            else if (idx == 4)  regs[0] = hwnd_dlgproc_map[hw];
             else                regs[0] = (uint32_t)GetWindowLongPtrW(hw, DWLP_MSGRESULT);
             LOG(API, "[API] GetWindowLongW(%p, %d) -> 0x%08X (dialog extra)\n", hw, idx, regs[0]);
         } else {
-            LONG val = GetWindowLongW(hw, idx);
-            /* Restore WS_EX_CAPTIONOKBTN bit for tracked windows */
-            if (idx == GWL_EXSTYLE && captionok_hwnds.count(hw))
-                val |= (LONG)0x80000000;
-            regs[0] = (uint32_t)val;
+            regs[0] = (uint32_t)GetWindowLongW(hw, idx);
             LOG(API, "[API] GetWindowLongW(%p, %d) -> 0x%08X\n", hw, idx, regs[0]);
         }
         return true;
@@ -197,7 +168,29 @@ void Win32Thunks::RegisterWindowPropsHandlers() {
             }
             return true;
         }
+        if (idx == GWL_STYLE) {
+            /* ARM code is changing the window style — update our WinCE style map
+               and return the old WinCE style.  Don't pass to native SetWindowLongW
+               because our window is WS_POPUP and the ARM style has WS_CAPTION etc. */
+            auto sit = hwnd_wce_style_map.find(hw);
+            if (sit != hwnd_wce_style_map.end()) {
+                regs[0] = sit->second;
+                sit->second = (uint32_t)nv;
+                LOG(API, "[API] SetWindowLongW(%p, GWL_STYLE, 0x%08X) -> old=0x%08X (WinCE map)\n",
+                    hw, (uint32_t)nv, regs[0]);
+                /* Trigger NC recalculation if caption state changed */
+                SetWindowPos(hw, NULL, 0, 0, 0, 0,
+                    SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_FRAMECHANGED);
+                return true;
+            }
+        }
         if (idx == GWL_EXSTYLE) {
+            /* Update WinCE exstyle map */
+            auto eit = hwnd_wce_exstyle_map.find(hw);
+            if (eit != hwnd_wce_exstyle_map.end()) {
+                regs[0] = eit->second;
+                eit->second = (uint32_t)nv;
+            }
             if (nv & (LONG)0x80000000) {
                 if (captionok_hwnds.insert(hw).second) InstallCaptionOk(hw);
             } else {

@@ -107,37 +107,10 @@ INT_PTR CALLBACK Win32Thunks::EmuDlgProc(HWND hwnd, UINT msg, WPARAM wParam, LPA
         LOG(API, "[API] EmuDlgProc: WM_CLOSE hwnd=%p\n", hwnd);
     }
     if (msg == WM_INITDIALOG) {
-        /* Desktop Windows enforces a minimum window width for captioned windows
-           that doesn't exist on WinCE.  We can't actually resize below the minimum
-           (SetWindowPos silently ignores it), so instead we override GetWindowRect
-           to return DLU-based client dimensions during WM_INITDIALOG processing.
-           This lets ARM sizing code (e.g. InitPropSheetDlg) compute correct growth
-           from the small WinCE-equivalent size, not the inflated desktop minimum. */
-        uint16_t tcx = s_instance->pending_template_cx;
-        uint16_t tcy = s_instance->pending_template_cy;
-        if (tcx > 0 && tcy > 0) {
-            LONG style = GetWindowLongW(hwnd, GWL_STYLE);
-            if (!(style & WS_CHILD) && (style & WS_CAPTION)) {
-                RECT dlu_rc = {0, 0, (LONG)tcx, (LONG)tcy};
-                MapDialogRect(hwnd, &dlu_rc);
-                RECT cur_rc; GetClientRect(hwnd, &cur_rc);
-                if (dlu_rc.right < cur_rc.right || dlu_rc.bottom < cur_rc.bottom) {
-                    dlu_override_hwnd = hwnd;
-                    dlu_override_client_w = dlu_rc.right;
-                    dlu_override_client_h = dlu_rc.bottom;
-                    LOG(API, "[API] EmuDlgProc: DLU override for HWND=%p: DLU(%ux%u)->client(%dx%d) actual_client(%ldx%ld)\n",
-                        hwnd, tcx, tcy, dlu_rc.right, dlu_rc.bottom, cur_rc.right, cur_rc.bottom);
-                }
-            }
-        }
         LOG(API, "[API] EmuDlgProc: dispatching WM_INITDIALOG to ARM dlgproc=0x%08X hwnd=%p lParam=0x%X\n",
             arm_dlgproc, hwnd, (uint32_t)lParam);
     }
     uint32_t result = s_instance->callback_executor(arm_dlgproc, args, 4);
-    /* Clear override after WM_INITDIALOG dispatch completes */
-    if (msg == WM_INITDIALOG && dlu_override_hwnd == hwnd) {
-        dlu_override_hwnd = nullptr;
-    }
     if (msg == WM_NOTIFY && lParam > 0 && (lParam >> 32) == 0) {
         int32_t nmCode = (int32_t)emem.Read32((uint32_t)lParam + 8);
         LONG_PTR msgResult = GetWindowLongPtrW(hwnd, DWLP_MSGRESULT);

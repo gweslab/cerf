@@ -67,8 +67,6 @@ void Win32Thunks::RegisterWindowHandlers() {
     });
     Thunk("CreateWindowExW", 246, [this](uint32_t* regs, EmulatedMemory& mem) -> bool {
         uint32_t exStyle = regs[0];
-        /* Class name can be a string pointer or an ATOM (MAKEINTATOM: high word=0, low word=atom).
-           In WinCE 32-bit, ATOM is passed as a uint32_t where high 16 bits are 0. */
         uint32_t class_raw = regs[1];
         bool class_is_atom = (class_raw != 0 && class_raw <= 0xFFFF);
         std::wstring className;
@@ -89,104 +87,111 @@ void Win32Thunks::RegisterWindowHandlers() {
         HWND parent = (HWND)(intptr_t)(int32_t)ReadStackArg(regs,mem,4);
         HMENU menu_h = (HMENU)(intptr_t)(int32_t)ReadStackArg(regs,mem,5);
         uint32_t arm_lpParam = ReadStackArg(regs,mem,7);
+
+        /* Save original WinCE styles before any modification */
+        uint32_t wce_style = style;
+        uint32_t wce_exstyle = exStyle;
         bool has_captionok = (exStyle & 0x80000000) != 0;
-        exStyle &= 0x0FFFFFFF;       /* strip WinCE-only high bits (including WS_EX_CAPTIONOKBTN) */
-        /* WinCE COMBOBOX defaults to CBS_DROPDOWN when no CBS type bits are set.
-           Desktop Windows treats type=0 as CBS_SIMPLE (list always visible).
-           Force CBS_DROPDOWN so combo boxes collapse to edit-only height. */
+        exStyle &= 0x0FFFFFFF; /* strip WinCE-only high bits */
+
+        /* WinCE COMBOBOX defaults to CBS_DROPDOWN when no CBS type bits are set */
         if (_wcsicmp(className.c_str(), L"COMBOBOX") == 0 && (style & 0x3) == 0)
             style |= CBS_DROPDOWN;
-        /* WinCE allows WS_CHILD windows with NULL parent (e.g. "Menu" class).
-           Desktop Windows doesn't — strip WS_CHILD when parent is NULL. */
+        /* WinCE allows WS_CHILD with NULL parent — desktop doesn't */
         if (parent == NULL && (style & WS_CHILD)) {
             style &= ~(uint32_t)WS_CHILD;
             style |= WS_POPUP;
         }
-        bool is_toplevel = (parent == NULL && !(style & WS_CHILD));
-        bool is_popup_no_caption = is_toplevel && (style & WS_POPUP) && !(style & WS_CAPTION);
-        /* Detect fullscreen-like windows: top-level with dimensions matching screen size.
-           These should use WS_POPUP style with exact screen dimensions, no frame inflation.
-           Examples: DesktopExplorerWindow (WS_CLIPCHILDREN|WS_CLIPSIBLINGS|WS_CAPTION, size=screen) */
-        /* Fullscreen = exact screen size match.  Windows slightly larger (e.g.
-           control.exe 816x519 on 800x480) are normal captioned windows whose
-           WinCE dimensions include the frame — NOT fullscreen. */
-        bool is_fullscreen = is_toplevel && w > 0 && h > 0 &&
-            (uint32_t)w == screen_width && (uint32_t)h == screen_height;
-        if (is_toplevel && !is_popup_no_caption && !is_fullscreen) {
-            /* WinCE top-level windows always have a title bar with text.
-               Ensure WS_CAPTION is set so desktop Windows draws the title text.
-               (Skip for WS_POPUP windows without WS_CAPTION — e.g. desktop window) */
-            style |= WS_CAPTION;
-            if (x == (int)0x80000000 || y == (int)0x80000000 ||
-                w == (int)0x80000000 || h == (int)0x80000000 ||
-                (w == 0 && h == 0)) {
-                /* CW_USEDEFAULT or zero size — go fullscreen like WinCE.
-                   Inflate so that client area = screen_width x screen_height. */
-                RECT fs = { 0, 0, (LONG)screen_width, (LONG)screen_height };
-                AdjustWindowRectEx(&fs, style, FALSE, exStyle);
-                x = fs.left; y = fs.top;
-                w = fs.right - fs.left; h = fs.bottom - fs.top;
-            } else {
-                /* App specified explicit WinCE window dimensions (e.g. calc: 480x240).
-                   On WinCE the w,h IS the total window size including thin frame
-                   (1px border each side + caption).  Client area = (w-2) x (h-2-cyCaption).
-                   We create a desktop window with matching client area, and thunk
-                   GetWindowRect to return the original WinCE dimensions so apps
-                   don't see inflated values (calc checks width<=480 for scaling). */
-                int cyCaption = GetSystemMetrics(SM_CYCAPTION);
-                int wince_client_w = w - 2;  /* WinCE: 1px border each side */
-                int wince_client_h = h - 2 - cyCaption;
-                if (wince_client_w < 1) wince_client_w = 1;
-                if (wince_client_h < 1) wince_client_h = 1;
-                RECT rc = { 0, 0, wince_client_w, wince_client_h };
-                AdjustWindowRectEx(&rc, style, FALSE, exStyle);
-                w = rc.right - rc.left;
-                h = rc.bottom - rc.top;
-            }
+
+        bool is_child = (style & WS_CHILD) != 0;
+        bool is_toplevel = (parent == NULL && !is_child);
+
+        LOG(API, "[API] CWEx: class='%ls' wce_style=0x%08X exStyle=0x%08X toplevel=%d w=%d h=%d\n",
+            className.c_str(), wce_style, wce_exstyle, is_toplevel, w, h);
+
+        if (is_toplevel) {
+            bool has_caption = (wce_style & WS_CAPTION) == WS_CAPTION;
+
+            /* Convert all top-level WinCE windows to WS_POPUP on desktop.
+               This eliminates the native thick frame entirely — no inflate/deflate.
+               Our WM_NCCALCSIZE handler in EmuWndProc provides WinCE NC area. */
+            style &= ~(uint32_t)(WS_OVERLAPPED | WS_THICKFRAME |
+                                  WS_MINIMIZEBOX | WS_MAXIMIZEBOX | WS_CAPTION);
+            style |= WS_POPUP;
             exStyle |= WS_EX_APPWINDOW;
-        } else if (is_popup_no_caption || is_fullscreen) {
-            /* WS_POPUP without caption, or fullscreen window (e.g. desktop, taskbar).
-               Use WS_POPUP style with exact dimensions — no frame inflation. */
-            style &= ~(uint32_t)WS_CAPTION;  /* strip caption to avoid frame */
+
+            /* CW_USEDEFAULT (0x80000000) → WinCE defaults to fullscreen at (0,0) */
+            if (x == (int)0x80000000) x = 0;
+            if (y == (int)0x80000000) y = 0;
+
+            if (w == (int)0x80000000 || w == 0) {
+                /* CW_USEDEFAULT or zero size → fullscreen */
+                if (has_caption) {
+                    int cyCaption = GetSystemMetrics(SM_CYCAPTION);
+                    w = (int)screen_width + 2;              /* 1px border each side */
+                    h = (int)screen_height + 2 + cyCaption; /* + caption bar */
+                } else {
+                    w = (int)screen_width;
+                    h = (int)screen_height;
+                }
+            } else if (h == (int)0x80000000 || h == 0) {
+                h = has_caption ? (int)screen_height + 2 + GetSystemMetrics(SM_CYCAPTION)
+                                : (int)screen_height;
+            }
+            /* Dimensions pass through as-is — ARM code already computed them
+               using our WinCE-compatible GetSystemMetrics/AdjustWindowRectEx. */
+        } else if (!is_child) {
+            /* Owned popup (has parent but not WS_CHILD) — convert to WS_POPUP
+               just like top-level windows for consistent WinCE NC area handling. */
+            style &= ~(uint32_t)(WS_OVERLAPPED | WS_THICKFRAME |
+                                  WS_MINIMIZEBOX | WS_MAXIMIZEBOX | WS_CAPTION);
             style |= WS_POPUP;
             if (x == (int)0x80000000) x = 0;
             if (y == (int)0x80000000) y = 0;
-            if (w == (int)0x80000000 || w == 0) w = (int)screen_width;
-            if (h == (int)0x80000000 || h == 0) h = (int)screen_height;
+            if (w == (int)0x80000000) w = (int)screen_width;
+            if (h == (int)0x80000000) h = (int)screen_height;
         } else {
-            if (x==(int)0x80000000) x=0; if (y==(int)0x80000000) y=0;
-            if (w==(int)0x80000000) w=320;
-            if (h==(int)0x80000000) h=240;
-            /* WinCE allows w=0/h=0 for child controls (sized later by parent).
-               Desktop Windows doesn't always auto-size, so use defaults — except
-               for classes that explicitly need w=0 (e.g. Menu class in CommandBar). */
+            /* Child window — pass through, minimal fixups */
+            if (x == (int)0x80000000) x = 0;
+            if (y == (int)0x80000000) y = 0;
             bool allow_zero_size = (className == L"Menu");
             if (!allow_zero_size) {
-                if (w == 0) w = 320;
-                if (h == 0) h = 240;
+                if (w == (int)0x80000000 || w == 0) w = (int)screen_width;
+                if (h == (int)0x80000000 || h == 0) h = (int)screen_height;
+            } else {
+                if (w == (int)0x80000000) w = 0;
+                if (h == (int)0x80000000) h = 0;
             }
         }
-        /* WinCE shell creates SysListView32 without LVS_AUTOARRANGE. The ARM commctrl
-           code auto-arranges icons on WM_WINDOWPOSCHANGED only if this flag is set. */
-        if (className == L"SysListView32") {
-            style |= 0x0100; /* LVS_AUTOARRANGE */
-        }
-        /* shdocvw creates Shell Embedding & DefShellView without WS_VISIBLE; the
-           browser's view activation code should call ShowWindow later but doesn't
-           complete in emulation (vtable corruption). Force them visible. */
+
+        /* Per-class fixups */
+        if (className == L"SysListView32")
+            style |= 0x0100 | 0x0800; /* LVS_AUTOARRANGE | LVS_ALIGNLEFT */
         if (className == L"Shell Embedding" || className == L"DefShellView")
             style |= WS_VISIBLE;
-        LOG(API, "[API] CreateWindowExW: class='%ls' title='%ls' style=0x%08X exStyle=0x%08X parent=0x%p size=(%dx%d) lpParam=0x%08X\n", className.c_str(), windowName.c_str(), style, exStyle, parent, w, h, arm_lpParam);
-        HWND hwnd = CreateWindowExW(exStyle, lpClassName, windowName.c_str(), style, x, y, w, h, parent, menu_h, GetModuleHandleW(NULL), (LPVOID)(uintptr_t)arm_lpParam);
+
+        LOG(API, "[API] CreateWindowExW: class='%ls' title='%ls' style=0x%08X exStyle=0x%08X parent=0x%p pos=(%d,%d) size=(%dx%d)\n",
+            className.c_str(), windowName.c_str(), style, exStyle, parent, x, y, w, h);
+
+        /* Stash original WinCE styles for EmuWndProc to pick up during WM_NCCREATE.
+           Covers both true top-level and owned popup windows. */
+        if (!is_child) {
+            tls_pending_wce_style = wce_style;
+            tls_pending_wce_exstyle = wce_exstyle;
+        }
+
+        HWND hwnd = CreateWindowExW(exStyle, lpClassName, windowName.c_str(),
+            style, x, y, w, h, parent, menu_h,
+            GetModuleHandleW(NULL), (LPVOID)(uintptr_t)arm_lpParam);
+
+        tls_pending_wce_style = 0;
+        tls_pending_wce_exstyle = 0;
+
         if (!hwnd) {
             DWORD err = GetLastError();
-            WNDCLASSEXW probe = {}; probe.cbSize = sizeof(probe);
-            BOOL found = GetClassInfoExW(GetModuleHandleW(NULL), lpClassName, &probe);
-            BOOL foundGlobal = found ? TRUE : GetClassInfoExW(NULL, lpClassName, &probe);
-            LOG(API, "[API]   CreateWindowExW FAILED (error=%d, classFound=%d/%d)\n", err, found, foundGlobal);
+            LOG(API, "[API]   CreateWindowExW FAILED (error=%d)\n", err);
         }
         if (hwnd) {
-            /* Case-insensitive lookup: window classes are case-insensitive */
             uint32_t arm_wndproc = 0;
             for (auto& [cls, proc] : arm_wndprocs) {
                 if (_wcsicmp(cls.c_str(), className.c_str()) == 0) {
@@ -194,8 +199,6 @@ void Win32Thunks::RegisterWindowHandlers() {
                     break;
                 }
             }
-            /* Only set if not already updated (e.g., by SetWindowLongW(GWL_WNDPROC)
-               during WM_CREATE — as done by aygshell's TempWndProc pattern) */
             if (arm_wndproc && hwnd_wndproc_map.find(hwnd) == hwnd_wndproc_map.end())
                 hwnd_wndproc_map[hwnd] = arm_wndproc;
 
@@ -205,19 +208,12 @@ void Win32Thunks::RegisterWindowHandlers() {
                 SendMessageW(hwnd, WM_SETICON, ICON_BIG, (LPARAM)hIcon);
                 SendMessageW(hwnd, WM_SETICON, ICON_SMALL, (LPARAM)hIcon);
             }
-            /* Apply WinCE theme (strip UxTheme, set title bar color).
-               Must be installed BEFORE CaptionOk so the OK button subclass
-               processes WM_NCPAINT first (LIFO) and paints on top of caption. */
-            ApplyWindowTheme(hwnd, is_toplevel);
+            ApplyWindowTheme(hwnd, !is_child);
             if (has_captionok) {
                 captionok_hwnds.insert(hwnd);
                 InstallCaptionOk(hwnd);
                 LOG(API, "[API]   WS_EX_CAPTIONOKBTN tracked for HWND=0x%p\n", hwnd);
             }
-            /* On real WinCE, the default system font is Tahoma (from SYSFNT registry).
-               On desktop Windows, native controls default to Segoe UI.
-               Send WM_SETFONT with the WinCE system font to child controls so they
-               match the real WinCE appearance without requiring explicit WM_SETFONT. */
             if (!is_toplevel) {
                 static HFONT s_wce_default_font = NULL;
                 if (!s_wce_default_font) {
@@ -265,11 +261,12 @@ void Win32Thunks::RegisterWindowHandlers() {
         HWND hw = (HWND)(intptr_t)(int32_t)regs[0];
         LOG(API, "[API] DestroyWindow(0x%p) IsWindow=%d\n", hw, IsWindow(hw));
         if (captionok_hwnds.erase(hw)) RemoveCaptionOk(hw);
-        /* Erase wndproc map AFTER DestroyWindow so WM_DESTROY reaches ARM code */
         hwnd_dlgproc_map.erase(hw);
         BOOL ret = DestroyWindow(hw);
         LOG(API, "[API] DestroyWindow result=%d, error=%d\n", ret, GetLastError());
         hwnd_wndproc_map.erase(hw);
+        hwnd_wce_style_map.erase(hw);
+        hwnd_wce_exstyle_map.erase(hw);
         regs[0] = ret;
         return true;
     });

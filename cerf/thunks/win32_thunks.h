@@ -68,13 +68,14 @@ public:
     static std::map<UINT_PTR, uint32_t> arm_timer_callbacks;   /* timer ID -> ARM TIMERPROC */
     static std::map<HWND, uint32_t> hwnd_dlgproc_map;          /* HWND -> ARM DlgProc */
     static uint32_t pending_arm_dlgproc;   /* stashed for CreateDialogIndirectParamW */
-    /* DLU dimensions for pre-INITDIALOG resize (desktop min-width workaround) */
-    static uint16_t pending_template_cx;
-    static uint16_t pending_template_cy;
-    /* GetWindowRect override during WM_INITDIALOG for correct ARM sizing */
-    static HWND dlu_override_hwnd;
-    static int dlu_override_client_w;
-    static int dlu_override_client_h;
+    /* Original WinCE window styles — stored per-HWND because we convert top-level
+       windows to WS_POPUP on desktop, but ARM code needs to see original styles. */
+    static std::map<HWND, uint32_t> hwnd_wce_style_map;
+    static std::map<HWND, uint32_t> hwnd_wce_exstyle_map;
+    /* Thread-local pending WinCE styles for CreateWindowExW → EmuWndProc handoff.
+       Set before ::CreateWindowExW, consumed during WM_NCCREATE in EmuWndProc. */
+    static thread_local uint32_t tls_pending_wce_style;
+    static thread_local uint32_t tls_pending_wce_exstyle;
     static std::set<HWND> captionok_hwnds; /* WS_EX_CAPTIONOKBTN tracking */
     static INT_PTR modal_dlg_result;
     static bool modal_dlg_ended;

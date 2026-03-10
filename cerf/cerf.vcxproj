@@ -148,6 +148,8 @@
     <ClInclude Include="thunks\thread_context.h" />
     <ClInclude Include="log.h" />
     <ClInclude Include="cli_helpers.h" />
+    <ClInclude Include="thunks\theme_internal.h" />
+    <ClInclude Include="thunks\coredll\dialog_template.h" />
   </ItemGroup>
   <ItemGroup>
     <!-- CPU emulation -->
@@ -215,6 +217,8 @@
     <ClCompile Include="thunks\coredll\shell_exec_launch.cpp" />
     <ClCompile Include="thunks\coredll\vfs.cpp" />
     <ClCompile Include="thunks\theme.cpp" />
+    <ClCompile Include="thunks\theme_subclass.cpp" />
+    <ClCompile Include="thunks\coredll\dialog_template.cpp" />
     <ClCompile Include="thunks\thread_context.cpp" />
   </ItemGroup>
   <!-- Bundled device files — copied to devices/ next to cerf.exe -->

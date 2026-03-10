@@ -10,31 +10,12 @@ void Win32Thunks::RegisterWindowLayoutHandlers() {
         int swp_x = (int)regs[2], swp_y = (int)regs[3];
         int swp_cx = (int)ReadStackArg(regs,mem,0), swp_cy = (int)ReadStackArg(regs,mem,1);
         UINT swp_flags = ReadStackArg(regs,mem,2);
-        /* For top-level WS_CAPTION windows, the ARM code passes WinCE window
-           dimensions (1px border + thin caption). Inflate to desktop frame
-           just like CreateWindowExW and MoveWindow do. */
-        if (!(swp_flags & SWP_NOSIZE) && swp_cx > 0 && swp_cy > 0) {
-            LONG swp_style = GetWindowLongW(hw, GWL_STYLE);
-            /* Inflate for any non-child WS_CAPTION window, including owned popup
-               dialogs (property sheets, etc.) where GetParent()!=NULL. */
-            if (!(swp_style & WS_CHILD) && (swp_style & WS_CAPTION)) {
-                DWORD exStyle = (DWORD)GetWindowLongW(hw, GWL_EXSTYLE);
-                int cyCaption = GetSystemMetrics(SM_CYCAPTION);
-                int orig_cx = swp_cx, orig_cy = swp_cy;
-                int client_w = swp_cx - 2;
-                int client_h = swp_cy - 2 - cyCaption;
-                if (client_w < 1) client_w = 1;
-                if (client_h < 1) client_h = 1;
-                RECT rc = {0, 0, client_w, client_h};
-                AdjustWindowRectEx(&rc, swp_style, FALSE, exStyle);
-                swp_cx = rc.right - rc.left;
-                swp_cy = rc.bottom - rc.top;
-                LOG(API, "[API] SetWindowPos INFLATE hwnd=%p: WinCE(%dx%d)->client(%dx%d)->native(%dx%d) style=0x%lX exStyle=0x%lX\n",
-                    hw, orig_cx, orig_cy, client_w, client_h, swp_cx, swp_cy, (unsigned long)swp_style, (unsigned long)exStyle);
-            }
-        }
-        LOG(API, "[API] SetWindowPos(hwnd=0x%p, x=%d, y=%d, cx=%d, cy=%d, flags=0x%X)\n",
-            hw, swp_x, swp_y, swp_cx, swp_cy, swp_flags);
+        /* No inflation — ARM code computes WinCE-compatible dimensions using our
+           overridden GetSystemMetrics/AdjustWindowRectEx.  Windows are WS_POPUP
+           with WinCE NC area handled by EmuWndProc's WM_NCCALCSIZE. */
+        HWND after = (HWND)(intptr_t)(int32_t)regs[1];
+        LOG(API, "[API] SetWindowPos(hwnd=0x%p, after=0x%p, x=%d, y=%d, cx=%d, cy=%d, flags=0x%X)\n",
+            hw, after, swp_x, swp_y, swp_cx, swp_cy, swp_flags);
         regs[0] = SetWindowPos(hw, (HWND)(intptr_t)(int32_t)regs[1], swp_x, swp_y, swp_cx, swp_cy, swp_flags);
         return true;
     });
@@ -42,22 +23,6 @@ void Win32Thunks::RegisterWindowLayoutHandlers() {
         HWND hw = (HWND)(intptr_t)(int32_t)regs[0];
         int mw_x = (int)regs[1], mw_y = (int)regs[2], mw_w = (int)regs[3];
         int mw_h = (int)ReadStackArg(regs,mem,0); BOOL mw_rep = ReadStackArg(regs,mem,1);
-        /* For top-level WS_CAPTION windows, the app passes WinCE window
-           dimensions.  Inflate to desktop frame just like CreateWindowExW. */
-        LONG mw_style = GetWindowLongW(hw, GWL_STYLE);
-        /* Inflate for any non-child WS_CAPTION window, including owned popups. */
-        if (!(mw_style & WS_CHILD) && (mw_style & WS_CAPTION) && mw_w > 0 && mw_h > 0) {
-            DWORD exStyle = (DWORD)GetWindowLongW(hw, GWL_EXSTYLE);
-            int cyCaption = GetSystemMetrics(SM_CYCAPTION);
-            int client_w = mw_w - 2;
-            int client_h = mw_h - 2 - cyCaption;
-            if (client_w < 1) client_w = 1;
-            if (client_h < 1) client_h = 1;
-            RECT rc = {0, 0, client_w, client_h};
-            AdjustWindowRectEx(&rc, mw_style, FALSE, exStyle);
-            mw_w = rc.right - rc.left;
-            mw_h = rc.bottom - rc.top;
-        }
         LOG(API, "[API] MoveWindow(hwnd=0x%p, x=%d, y=%d, w=%d, h=%d)\n", hw, mw_x, mw_y, mw_w, mw_h);
         regs[0] = MoveWindow(hw, mw_x, mw_y, mw_w, mw_h, mw_rep);
         return true;
@@ -96,6 +61,8 @@ void Win32Thunks::RegisterWindowLayoutHandlers() {
             pts[i].y = (LONG)mem.Read32(lpPts + i * 8 + 4);
         }
         int ret = MapWindowPoints(hwndFrom, hwndTo, pts.data(), cPoints);
+        /* No frame correction needed — windows are WS_POPUP with WinCE NC area
+           handled by our WM_NCCALCSIZE, so native coordinates are correct. */
         for (UINT i = 0; i < cPoints; i++) {
             mem.Write32(lpPts + i * 8,     (uint32_t)pts[i].x);
             mem.Write32(lpPts + i * 8 + 4, (uint32_t)pts[i].y);
@@ -242,14 +209,16 @@ void Win32Thunks::RegisterWindowLayoutHandlers() {
         regs[0] = (uint32_t)(uintptr_t)WindowFromPoint(pt); return true;
     });
     Thunk("ClientToScreen", 254, [this](uint32_t* regs, EmulatedMemory& mem) -> bool {
+        HWND hw = (HWND)(intptr_t)(int32_t)regs[0];
         POINT pt; pt.x = mem.Read32(regs[1]); pt.y = mem.Read32(regs[1]+4);
-        BOOL ret = ClientToScreen((HWND)(intptr_t)(int32_t)regs[0], &pt);
+        BOOL ret = ClientToScreen(hw, &pt);
         mem.Write32(regs[1], pt.x); mem.Write32(regs[1]+4, pt.y);
         regs[0] = ret; return true;
     });
     Thunk("ScreenToClient", 255, [this](uint32_t* regs, EmulatedMemory& mem) -> bool {
+        HWND hw = (HWND)(intptr_t)(int32_t)regs[0];
         POINT pt; pt.x = mem.Read32(regs[1]); pt.y = mem.Read32(regs[1]+4);
-        BOOL ret = ScreenToClient((HWND)(intptr_t)(int32_t)regs[0], &pt);
+        BOOL ret = ScreenToClient(hw, &pt);
         mem.Write32(regs[1], pt.x); mem.Write32(regs[1]+4, pt.y);
         regs[0] = ret; return true;
     });

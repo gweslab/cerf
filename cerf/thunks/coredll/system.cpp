@@ -55,13 +55,11 @@ void Win32Thunks::RegisterSystemHandlers() {
                 return true;
             }
         }
-        /* WinCE uses 1px borders/edges everywhere — override all frame-related
-           metrics so ARM code computes WinCE-compatible window sizes.
-           Our CreateWindowExW/MoveWindow/SetWindowPos inflation thunks assume
-           ARM code uses 1px borders (subtracting 2 total).  If ARM code sees
-           native SM_CXDLGFRAME=3 or SM_CXFRAME=4, it computes oversized window
-           dimensions, causing extra space in the client area after inflation. */
-        if (idx == SM_CXEDGE || idx == SM_CYEDGE) { regs[0] = 1; return true; }
+        /* WinCE frame metrics — return WinCE-compatible values so ARM code
+           computes correct window sizes.  We create top-level WinCE windows as
+           WS_POPUP (no native frame) and handle the NC area ourselves, so these
+           values must match our WM_NCCALCSIZE and AdjustWindowRectEx thunks. */
+        if (idx == SM_CXEDGE || idx == SM_CYEDGE) { regs[0] = 2; return true; }
         /* SM_CXBORDER(5)/SM_CYBORDER(6) are already 1 on desktop — no override needed */
         if (idx == SM_CXDLGFRAME || idx == SM_CYDLGFRAME) { regs[0] = 1; return true; }
         if (idx == SM_CXFRAME || idx == SM_CYFRAME) { regs[0] = 1; return true; }

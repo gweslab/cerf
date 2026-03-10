@@ -1,186 +1,69 @@
 /* Dialog thunks: CreateDialog, DialogBox, EndDialog, DlgItem functions */
 #define NOMINMAX
 #include "../win32_thunks.h"
+#include "dialog_template.h"
 #include "../../log.h"
 #include <cstdio>
 #include <vector>
-
-/* Helper: compute size of a DLGTEMPLATE (with all items) in emulated memory. */
-static uint32_t ComputeDlgTemplateSize(EmulatedMemory& mem, uint32_t addr) {
-    uint32_t p = addr;
-    uint16_t cdit = mem.Read16(p + 8);
-    p += 18;
-    uint16_t w = mem.Read16(p);
-    if (w == 0x0000) { p += 2; }
-    else if (w == 0xFFFF) { p += 4; }
-    else { while (mem.Read16(p)) p += 2; p += 2; }
-    w = mem.Read16(p);
-    if (w == 0x0000) { p += 2; }
-    else if (w == 0xFFFF) { p += 4; }
-    else { while (mem.Read16(p)) p += 2; p += 2; }
-    while (mem.Read16(p)) p += 2; p += 2;
-    uint32_t style = mem.Read32(addr);
-    if (style & DS_SETFONT) { p += 2; while (mem.Read16(p)) p += 2; p += 2; }
-    for (int i = 0; i < cdit; i++) {
-        p = (p + 3) & ~3u;
-        p += 18;
-        w = mem.Read16(p);
-        if (w == 0xFFFF) { p += 4; }
-        else { while (mem.Read16(p)) p += 2; p += 2; }
-        w = mem.Read16(p);
-        if (w == 0xFFFF) { p += 4; }
-        else { while (mem.Read16(p)) p += 2; p += 2; }
-        uint16_t extra = mem.Read16(p);
-        p += 2 + extra;
-    }
-    return p - addr;
-}
-
-static std::vector<uint8_t> CopyDlgTemplate(EmulatedMemory& mem, uint32_t addr) {
-    uint32_t size = ComputeDlgTemplateSize(mem, addr);
-    std::vector<uint8_t> buf(size);
-    for (uint32_t i = 0; i < size; i++) buf[i] = mem.Read8(addr + i);
-    return buf;
-}
-
-/* Strip WinCE-only styles from a copied DLGTEMPLATE buffer.
-   Also patches the dialog font: WinCE "System" → configured sysfont (e.g. Tahoma).
-   If DS_SETFONT is absent, adds it with the WinCE system font so child controls
-   match the WinCE appearance instead of using the desktop "System" bitmap font.
-   Returns true if the template had WS_EX_CAPTIONOKBTN in dwExtendedStyle. */
-static bool FixupDlgTemplate(std::vector<uint8_t>& tmpl, const std::wstring& sysfont_name) {
-    if (tmpl.size() < 10) return false;
-    /* DLGTEMPLATE: offset 0 = style (DWORD), offset 4 = dwExtendedStyle (DWORD) */
-    uint32_t style   = *(uint32_t*)&tmpl[0];
-    uint32_t exStyle = *(uint32_t*)&tmpl[4];
-    bool had_captionok = (exStyle & 0x80000000u) != 0;
-    exStyle &= ~0x80000000u;   /* strip WS_EX_CAPTIONOKBTN — we render it ourselves */
-    *(uint32_t*)&tmpl[4] = exStyle;
-
-    /* Detect DLGTEMPLATEEX vs DLGTEMPLATE.
-       DLGTEMPLATEEX has signature 0xFFFF at offset 2, dlgVer=1 at offset 0.
-       DLGTEMPLATE:   style(4) exStyle(4) cdit(2) x(2@10) y(2@12) cx(2) cy(2)
-       DLGTEMPLATEEX: dlgVer(2) sig(2) helpID(4) exStyle(4) style(4) cdit(2) x(2@18) y(2@20) cx(2) cy(2) */
-    bool is_ex = (tmpl.size() >= 4 && *(uint16_t*)&tmpl[2] == 0xFFFF);
-    size_t xy_off = is_ex ? 18 : 10;
-
-    /* Clamp dialog position: WinCE uses 16-bit screen coords (max 240x320).
-       Values like 0x7FFF (32767) mean "default" on WinCE but produce
-       off-screen positioning on desktop Windows. Clamp to 0. */
-    if (tmpl.size() >= xy_off + 4) {
-        int16_t dlg_x = *(int16_t*)&tmpl[xy_off];
-        int16_t dlg_y = *(int16_t*)&tmpl[xy_off + 2];
-        if (dlg_x > 500 || dlg_x < 0) *(int16_t*)&tmpl[xy_off] = 0;
-        if (dlg_y > 500 || dlg_y < 0) *(int16_t*)&tmpl[xy_off + 2] = 0;
-    }
-
-    /* Locate the font field in the template.
-       DLGTEMPLATE header: style(4) + exStyle(4) + cdit(2) + x(2) + y(2) + cx(2) + cy(2) = 18 bytes
-       Then: menu (sz_Or_Ord), class (sz_Or_Ord), title (sz string), [font if DS_SETFONT] */
-    size_t p = 18;
-    auto skip_sz_or_ord = [&]() {
-        if (p + 2 > tmpl.size()) return;
-        uint16_t w = *(uint16_t*)&tmpl[p];
-        if (w == 0x0000) { p += 2; }
-        else if (w == 0xFFFF) { p += 4; }
-        else { while (p + 2 <= tmpl.size() && *(uint16_t*)&tmpl[p]) p += 2; p += 2; }
-    };
-    skip_sz_or_ord(); /* menu */
-    skip_sz_or_ord(); /* class */
-    /* title: always a null-terminated wchar string */
-    while (p + 2 <= tmpl.size() && *(uint16_t*)&tmpl[p]) p += 2;
-    p += 2; /* skip null terminator */
-
-    if (style & DS_SETFONT) {
-        /* DS_SETFONT present: pointSize(WORD) then font name (wchar string).
-           Keep the original point size — it controls DLU sizing of all controls.
-           Only replace the font name so it uses the WinCE system font face.
-           IMPORTANT: Each DLGITEMTEMPLATE must be DWORD-aligned, so when the font
-           name changes size we must recompute the alignment padding between the
-           font name's null terminator and the first item. */
-        p += 2; /* skip point size (unchanged) */
-        size_t name_start = p;
-        while (p + 2 <= tmpl.size() && *(uint16_t*)&tmpl[p]) p += 2;
-        p += 2; /* past null */
-        /* p = byte after font name null terminator */
-        size_t old_items = (p + 3) & ~(size_t)3; /* DWORD-aligned start of items */
-
-        size_t new_name_bytes = (sysfont_name.size() + 1) * 2;
-        size_t new_name_end = name_start + new_name_bytes;
-        size_t new_items = (new_name_end + 3) & ~(size_t)3;
-        size_t new_pad = new_items - new_name_end;
-
-        /* Erase old font name + old alignment padding, insert new name + new padding */
-        tmpl.erase(tmpl.begin() + name_start, tmpl.begin() + old_items);
-        tmpl.insert(tmpl.begin() + name_start, new_name_bytes + new_pad, 0);
-        for (size_t i = 0; i < sysfont_name.size(); i++)
-            *(uint16_t*)&tmpl[name_start + i * 2] = (uint16_t)sysfont_name[i];
-        *(uint16_t*)&tmpl[name_start + sysfont_name.size() * 2] = 0;
-    } else {
-        /* No DS_SETFONT: add it with 8pt WinCE system font.
-           Must also fix DWORD alignment for items that follow. */
-        style |= DS_SETFONT;
-        *(uint32_t*)&tmpl[0] = style;
-        size_t old_items = (p + 3) & ~(size_t)3; /* current DWORD-aligned item start */
-
-        size_t new_name_bytes = (sysfont_name.size() + 1) * 2;
-        size_t font_data_size = 2 + new_name_bytes; /* pointSize + name + null */
-        size_t new_font_end = p + font_data_size;
-        size_t new_items = (new_font_end + 3) & ~(size_t)3;
-        size_t new_pad = new_items - new_font_end;
-
-        /* Erase old alignment padding, insert font data + new padding */
-        tmpl.erase(tmpl.begin() + p, tmpl.begin() + old_items);
-        tmpl.insert(tmpl.begin() + p, font_data_size + new_pad, 0);
-        *(uint16_t*)&tmpl[p] = 8; /* point size */
-        for (size_t i = 0; i < sysfont_name.size(); i++)
-            *(uint16_t*)&tmpl[p + 2 + i * 2] = (uint16_t)sysfont_name[i];
-        *(uint16_t*)&tmpl[p + 2 + sysfont_name.size() * 2] = 0;
-    }
-    return had_captionok;
-}
 
 void Win32Thunks::RegisterDialogHandlers() {
     Thunk("CreateDialogIndirectParamW", 688, [this](uint32_t* regs, EmulatedMemory& mem) -> bool {
         uint32_t hInst = regs[0], lpTemplate = regs[1], hwndParent = regs[2], arm_dlgProc = regs[3];
         LPARAM initParam = (LPARAM)ReadStackArg(regs, mem, 0);
         auto tmpl = CopyDlgTemplate(mem, lpTemplate);
-        bool has_captionok = FixupDlgTemplate(tmpl, wce_sysfont_name);
-        /* Extract template dimensions for post-creation fixup */
-        uint16_t t_cx = *(uint16_t*)&tmpl[14], t_cy = *(uint16_t*)&tmpl[16];
-        LOG(API, "[API] CreateDialogIndirectParamW: template cx=%u cy=%u\n", t_cx, t_cy);
-        /* Use the ARM module's native resource handle so SS_ICON/SS_BITMAP
-           controls in the dialog template find their resources correctly. */
+        auto fixup = FixupDlgTemplate(tmpl, wce_sysfont_name);
+        LOG(API, "[API] CreateDialogIndirectParamW: template wce_style=0x%08X\n", fixup.wce_style);
         HMODULE native_mod = GetNativeModuleForResources(hInst);
         HINSTANCE dlg_inst = native_mod ? (HINSTANCE)native_mod : GetModuleHandleW(NULL);
-        /* Pre-register the ARM dlgproc so EmuDlgProc can dispatch WM_INITDIALOG
-           which is sent during CreateDialogIndirectParamW before it returns. */
         pending_arm_dlgproc = arm_dlgProc;
-        pending_template_cx = t_cx;
-        pending_template_cy = t_cy;
         HWND dlg = CreateDialogIndirectParamW(dlg_inst,
             (LPCDLGTEMPLATEW)tmpl.data(), (HWND)(intptr_t)(int32_t)hwndParent, EmuDlgProc, initParam);
         pending_arm_dlgproc = 0;
-        pending_template_cx = 0;
-        pending_template_cy = 0;
         LOG(API, "[API] CreateDialogIndirectParamW(parent=0x%X, dlgproc=0x%08X) -> HWND=0x%p (err=%lu)\n",
             hwndParent, arm_dlgProc, dlg, dlg ? 0UL : GetLastError());
-        /* Only set the DlgProc if it wasn't already updated during WM_INITDIALOG
-           (MFC's DialogFunc sets DWL_DLGPROC to the real handler during init) */
         if (dlg && arm_dlgProc && hwnd_dlgproc_map.find(dlg) == hwnd_dlgproc_map.end())
             hwnd_dlgproc_map[dlg] = arm_dlgProc;
         if (dlg) {
-            /* Apply theme BEFORE CaptionOk so OK button paints on top (LIFO) */
-            ApplyWindowTheme(dlg, true);
+            if (!fixup.is_child) {
+                /* Non-child dialog: add to WinCE style maps so WM_NCCALCSIZE and
+                   PaintWinCENCArea draw the WinCE NC area (border + caption + OK). */
+                hwnd_wce_style_map[dlg] = fixup.wce_style;
+                hwnd_wce_exstyle_map[dlg] = fixup.wce_exstyle;
+                ApplyWindowTheme(dlg, true);
+                if (fixup.had_captionok) {
+                    captionok_hwnds.insert(dlg);
+                    LOG(API, "[API]   Dialog HWND=0x%p has WS_EX_CAPTIONOKBTN\n", dlg);
+                }
+                /* Expand window to account for WinCE NC area.  The native dialog
+                   manager sized the window for WS_POPUP (no frame), but our
+                   WM_NCCALCSIZE handler carves out border + caption.  Without
+                   expansion the client area shrinks and controls get clipped.
+                   SWP_FRAMECHANGED also triggers WM_NCCALCSIZE + WM_NCPAINT so
+                   the caption bar and buttons appear immediately. */
+                bool dlg_cap = (fixup.wce_style & WS_CAPTION) == WS_CAPTION;
+                bool dlg_brd = (fixup.wce_style & WS_BORDER) != 0;
+                if (dlg_cap || dlg_brd) {
+                    RECT wr;
+                    GetWindowRect(dlg, &wr);
+                    int brd = 1;
+                    int cap = dlg_cap ? GetSystemMetrics(SM_CYCAPTION) : 0;
+                    SetWindowPos(dlg, NULL, 0, 0,
+                        (wr.right - wr.left) + 2 * brd,
+                        (wr.bottom - wr.top) + 2 * brd + cap,
+                        SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE | SWP_FRAMECHANGED);
+                }
+            } else {
+                /* Child dialog (e.g. property page): theme background only,
+                   no NC area or style map — it lives inside its parent. */
+                ApplyWindowTheme(dlg, false);
+            }
             EnumChildWindows(dlg, [](HWND child, LPARAM lp) -> BOOL {
+                wchar_t cls[64] = {};
+                GetClassNameW(child, cls, 64);
+                LOG(API, "[API]   EnumChild: %p class='%ls'\n", child, cls);
                 ((Win32Thunks*)lp)->ApplyWindowTheme(child, false);
                 return TRUE;
             }, (LPARAM)this);
-            if (has_captionok) {
-                captionok_hwnds.insert(dlg);
-                InstallCaptionOk(dlg);
-                LOG(API, "[API]   Dialog HWND=0x%p has WS_EX_CAPTIONOKBTN\n", dlg);
-            }
         }
         regs[0] = (uint32_t)(uintptr_t)dlg;
         return true;
@@ -190,7 +73,7 @@ void Win32Thunks::RegisterDialogHandlers() {
         LPARAM initParam = (LPARAM)ReadStackArg(regs, mem, 0);
         HWND parent = (HWND)(intptr_t)(int32_t)hwndParent;
         auto tmpl = CopyDlgTemplate(mem, lpTemplate);
-        bool has_captionok = FixupDlgTemplate(tmpl, wce_sysfont_name);
+        auto fixup = FixupDlgTemplate(tmpl, wce_sysfont_name);
         HMODULE native_mod = GetNativeModuleForResources(hInst);
         HINSTANCE dlg_inst = native_mod ? (HINSTANCE)native_mod : GetModuleHandleW(NULL);
         modal_dlg_ended = false;
@@ -199,17 +82,34 @@ void Win32Thunks::RegisterDialogHandlers() {
             (LPCDLGTEMPLATEW)tmpl.data(), parent, EmuDlgProc, initParam);
         if (dlg && arm_dlgProc) {
             hwnd_dlgproc_map[dlg] = arm_dlgProc;
-            /* Apply theme BEFORE CaptionOk so OK button paints on top (LIFO) */
-            ApplyWindowTheme(dlg, true);
+            if (!fixup.is_child) {
+                hwnd_wce_style_map[dlg] = fixup.wce_style;
+                hwnd_wce_exstyle_map[dlg] = fixup.wce_exstyle;
+                ApplyWindowTheme(dlg, true);
+                if (fixup.had_captionok) {
+                    captionok_hwnds.insert(dlg);
+                    LOG(API, "[API]   Modal dialog HWND=0x%p has WS_EX_CAPTIONOKBTN\n", dlg);
+                }
+                /* Expand window for WinCE NC area (same as modeless path above) */
+                bool dlg_cap = (fixup.wce_style & WS_CAPTION) == WS_CAPTION;
+                bool dlg_brd = (fixup.wce_style & WS_BORDER) != 0;
+                if (dlg_cap || dlg_brd) {
+                    RECT wr;
+                    GetWindowRect(dlg, &wr);
+                    int brd = 1;
+                    int cap = dlg_cap ? GetSystemMetrics(SM_CYCAPTION) : 0;
+                    SetWindowPos(dlg, NULL, 0, 0,
+                        (wr.right - wr.left) + 2 * brd,
+                        (wr.bottom - wr.top) + 2 * brd + cap,
+                        SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE | SWP_FRAMECHANGED);
+                }
+            } else {
+                ApplyWindowTheme(dlg, false);
+            }
             EnumChildWindows(dlg, [](HWND child, LPARAM lp) -> BOOL {
                 ((Win32Thunks*)lp)->ApplyWindowTheme(child, false);
                 return TRUE;
             }, (LPARAM)this);
-            if (has_captionok) {
-                captionok_hwnds.insert(dlg);
-                InstallCaptionOk(dlg);
-                LOG(API, "[API]   Modal dialog HWND=0x%p has WS_EX_CAPTIONOKBTN\n", dlg);
-            }
             uint32_t args[4] = { (uint32_t)(uintptr_t)dlg, WM_INITDIALOG, 0, (uint32_t)initParam };
             callback_executor(arm_dlgProc, args, 4);
         }

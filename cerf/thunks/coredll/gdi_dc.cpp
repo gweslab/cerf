@@ -72,15 +72,10 @@ void Win32Thunks::RegisterGdiDcHandlers() {
         int index = (int)regs[1];
         if (fake_screen_resolution && index == HORZRES) { regs[0] = screen_width; return true; }
         if (fake_screen_resolution && index == VERTRES) { regs[0] = screen_height; return true; }
-        // Return 16 for BITSPIXEL to match typical WinCE 5.0 devices (16bpp).
-        // Desktop returns 32 which is unrealistic; apps like cecmd check
-        // BITSPIXEL*PLANES >= 15 to choose high-color vs low-color bitmaps.
-        // Note: previously returned 2 to force commctrl mono bitmaps, but that
-        // broke all apps' bitmap selection (e.g. cecmd loaded bitmap 105 instead of 155).
-        if (index == BITSPIXEL) {
-            regs[0] = 16;
-            return true;
-        }
+        /* Pass through native BITSPIXEL (32 on desktop). Apps check
+           BITSPIXEL*PLANES >= 15 for high-color — 32 satisfies that.
+           Using native bpp avoids 16bpp→32bpp mismatch in SelectObject
+           and gives full-quality icons/bitmaps. */
         regs[0] = GetDeviceCaps((HDC)(intptr_t)(int32_t)regs[0], index);
         return true;
     });

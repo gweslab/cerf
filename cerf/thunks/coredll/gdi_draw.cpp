@@ -48,9 +48,9 @@ void Win32Thunks::RegisterGdiDrawHandlers() {
         HDC hdc = (HDC)(intptr_t)(int32_t)regs[0];
         int w = (int)regs[1], h = (int)regs[2];
         if (w <= 0 || h <= 0) { regs[0] = 0; return true; }
-        /* Use WinCE device bpp (16), not native desktop bpp (32).
-           ARM code calculates strides based on 16bpp. */
-        int bpp = 16;
+        /* Use native desktop bpp so bitmaps match the screen DC format.
+           ARM code gets the same bpp from GetDeviceCaps(BITSPIXEL). */
+        int bpp = GetDeviceCaps(hdc ? hdc : GetDC(NULL), BITSPIXEL);
         BITMAPINFOHEADER bih = {};
         bih.biSize = sizeof(bih);
         bih.biWidth = w;
@@ -79,10 +79,9 @@ void Win32Thunks::RegisterGdiDrawHandlers() {
         int w = (int)regs[0], h = (int)regs[1];
         UINT planes = regs[2], bpp = regs[3];
         HBITMAP hbm;
-        /* WinCE apps call CreateBitmap(w,h,1,16,NULL) because GetDeviceCaps
-           returns BITSPIXEL=16.  On a 32bpp desktop this produces a 16bpp DDB
-           that can't be selected into a 32bpp-compatible DC (SelectObject fails).
-           Use CreateCompatibleBitmap instead so the format matches the screen. */
+        /* Safety net: if ARM code requests a bpp that doesn't match the screen
+           (e.g. from a hardcoded value), use CreateCompatibleBitmap to avoid
+           SelectObject failures when selecting into a screen-compatible DC. */
         if (planes == 1 && bpp >= 8 && bpp != (UINT)GetDeviceCaps(GetDC(NULL), BITSPIXEL)) {
             HDC screenDC = GetDC(NULL);
             hbm = CreateCompatibleBitmap(screenDC, w, h);
@@ -101,13 +100,11 @@ void Win32Thunks::RegisterGdiDrawHandlers() {
         regs[0] = Rectangle((HDC)(intptr_t)(int32_t)regs[0], regs[1], regs[2], regs[3], ReadStackArg(regs,mem,0)); return true;
     });
     Thunk("FillRect", 935, [this](uint32_t* regs, EmulatedMemory& mem) -> bool {
-        RECT rc; rc.left = mem.Read32(regs[1]); rc.top = mem.Read32(regs[1]+4);
-        rc.right = mem.Read32(regs[1]+8); rc.bottom = mem.Read32(regs[1]+12);
+        RECT rc={mem.Read32(regs[1]),mem.Read32(regs[1]+4),mem.Read32(regs[1]+8),mem.Read32(regs[1]+12)};
         regs[0] = FillRect((HDC)(intptr_t)(int32_t)regs[0], &rc, (HBRUSH)(intptr_t)(int32_t)regs[2]); return true;
     });
     Thunk("DrawFocusRect", 933, [this](uint32_t* regs, EmulatedMemory& mem) -> bool {
-        RECT rc; rc.left = mem.Read32(regs[1]); rc.top = mem.Read32(regs[1]+4);
-        rc.right = mem.Read32(regs[1]+8); rc.bottom = mem.Read32(regs[1]+12);
+        RECT rc={mem.Read32(regs[1]),mem.Read32(regs[1]+4),mem.Read32(regs[1]+8),mem.Read32(regs[1]+12)};
         regs[0] = DrawFocusRect((HDC)(intptr_t)(int32_t)regs[0], &rc); return true;
     });
     Thunk("GetNearestColor", 952, [](uint32_t* regs, EmulatedMemory&) -> bool { regs[0] = GetNearestColor((HDC)(intptr_t)(int32_t)regs[0], regs[1]); return true; });
@@ -229,39 +226,13 @@ void Win32Thunks::RegisterGdiDrawHandlers() {
     });
     Thunk("TransparentBlt", 906, [this](uint32_t* regs, EmulatedMemory& mem) -> bool {
         HDC hdcDest = (HDC)(intptr_t)(int32_t)regs[0];
-        int xD = (int)regs[1], yD = (int)regs[2], wD = (int)regs[3];
-        int hD = (int)ReadStackArg(regs,mem,0);
+        int xD=(int)regs[1], yD=(int)regs[2], wD=(int)regs[3], hD=(int)ReadStackArg(regs,mem,0);
         HDC hdcSrc = (HDC)(intptr_t)(int32_t)ReadStackArg(regs,mem,1);
-        int xS = (int)ReadStackArg(regs,mem,2), yS = (int)ReadStackArg(regs,mem,3);
-        int wS = (int)ReadStackArg(regs,mem,4), hS = (int)ReadStackArg(regs,mem,5);
+        int xS=(int)ReadStackArg(regs,mem,2), yS=(int)ReadStackArg(regs,mem,3);
+        int wS=(int)ReadStackArg(regs,mem,4), hS=(int)ReadStackArg(regs,mem,5);
         UINT crTrans = ReadStackArg(regs,mem,6);
         GdiFlush();
-        /* Diagnostic: dump source bitmap pixel data */
-        static int tblt_diag_count = 0;
-        HBITMAP srcBm = (HBITMAP)GetCurrentObject(hdcSrc, OBJ_BITMAP);
-        if (srcBm && tblt_diag_count < 3) {
-            tblt_diag_count++;
-            BITMAP bm = {}; GetObjectW(srcBm, sizeof(bm), &bm);
-            if (bm.bmBits) {
-                uint8_t* px = (uint8_t*)bm.bmBits;
-                /* Dump first 3 pixels of rows 0, 13, 26 (top, middle, bottom) */
-                int stride = bm.bmWidthBytes;
-                int rows[] = {0, bm.bmHeight/2, bm.bmHeight-1};
-                for (int ri = 0; ri < 3; ri++) {
-                    int row = rows[ri];
-                    if (row < 0 || row >= bm.bmHeight) continue;
-                    uint8_t* rp = px + row * stride;
-                    LOG(API, "[API]   src row %d: [%02X %02X %02X] [%02X %02X %02X] [%02X %02X %02X]\n",
-                        row, rp[0], rp[1], rp[2], rp[3], rp[4], rp[5], rp[6], rp[7], rp[8]);
-                }
-            }
-        }
-        BOOL ret = TransparentBlt(hdcDest, xD, yD, wD, hD, hdcSrc, xS, yS, wS, hS, crTrans);
-        COLORREF dstPx = GetPixel(hdcDest, xD + wD/2, yD + hD/2);
-        COLORREF srcPx = GetPixel(hdcSrc, xS + wS/2, yS + hS/2);
-        LOG(API, "[API] TransparentBlt(dst=0x%p %d,%d %dx%d src=0x%p %d,%d %dx%d crTrans=0x%06X) -> %d srcPx=0x%06X dstPx=0x%06X\n",
-            hdcDest, xD, yD, wD, hD, hdcSrc, xS, yS, wS, hS, crTrans, ret, srcPx, dstPx);
-        regs[0] = ret;
+        regs[0] = TransparentBlt(hdcDest, xD, yD, wD, hD, hdcSrc, xS, yS, wS, hS, crTrans);
         return true;
     });
     Thunk("InvertRect", 1770, [this](uint32_t* regs, EmulatedMemory& mem) -> bool {
@@ -276,10 +247,7 @@ void Win32Thunks::RegisterGdiDrawHandlers() {
         uint32_t mesh_addr = regs[3];
         ULONG nMesh = ReadStackArg(regs, mem, 0);
         ULONG ulMode = ReadStackArg(regs, mem, 1);
-        /* TRIVERTEX = {LONG x, LONG y, COLOR16 R,G,B,A} = 16 bytes, no pointers.
-           GRADIENT_RECT = {ULONG Upper, Lower} = 8 bytes.
-           GRADIENT_TRIANGLE = {ULONG V1,V2,V3} = 12 bytes.
-           All same layout on 32/64-bit — pass ARM memory directly. */
+        /* TRIVERTEX/GRADIENT_RECT/GRADIENT_TRIANGLE are POD, same layout 32/64-bit */
         uint8_t* pVertex = mem.Translate(vertex_addr);
         uint8_t* pMesh = mem.Translate(mesh_addr);
         if (!pVertex || !pMesh) { regs[0] = 0; return true; }
@@ -317,21 +285,14 @@ void Win32Thunks::RegisterGdiDrawHandlers() {
         return true;
     });
     Thunk("DrawEdge", 932, [](uint32_t* regs, EmulatedMemory& mem) -> bool {
-        RECT rc;
-        rc.left = mem.Read32(regs[1]); rc.top = mem.Read32(regs[1]+4);
-        rc.right = mem.Read32(regs[1]+8); rc.bottom = mem.Read32(regs[1]+12);
+        RECT rc={mem.Read32(regs[1]),mem.Read32(regs[1]+4),mem.Read32(regs[1]+8),mem.Read32(regs[1]+12)};
         regs[0] = DrawEdge((HDC)(intptr_t)(int32_t)regs[0], &rc, regs[2], regs[3]);
-        /* Write back modified rect — DrawEdge adjusts it when BF_ADJUST (0x2000) is set */
-        if (regs[3] & 0x2000) {
-            mem.Write32(regs[1], rc.left); mem.Write32(regs[1]+4, rc.top);
-            mem.Write32(regs[1]+8, rc.right); mem.Write32(regs[1]+12, rc.bottom);
-        }
+        /* Write back modified rect when BF_ADJUST (0x2000) is set */
+        if (regs[3]&0x2000) { mem.Write32(regs[1],rc.left); mem.Write32(regs[1]+4,rc.top); mem.Write32(regs[1]+8,rc.right); mem.Write32(regs[1]+12,rc.bottom); }
         return true;
     });
     Thunk("DrawFrameControl", 987, [](uint32_t* regs, EmulatedMemory& mem) -> bool {
-        RECT rc;
-        rc.left = mem.Read32(regs[1]); rc.top = mem.Read32(regs[1]+4);
-        rc.right = mem.Read32(regs[1]+8); rc.bottom = mem.Read32(regs[1]+12);
+        RECT rc={(LONG)mem.Read32(regs[1]),(LONG)mem.Read32(regs[1]+4),(LONG)mem.Read32(regs[1]+8),(LONG)mem.Read32(regs[1]+12)};
         regs[0] = DrawFrameControl((HDC)(intptr_t)(int32_t)regs[0], &rc, regs[2], regs[3]);
         return true;
     });

@@ -50,7 +50,12 @@ void Win32Thunks::RegisterImageListHandlers() {
         InitCommonControls(); regs[0] = 0; return true;
     });
     Thunk("ImageList_Create", 742, [this](uint32_t* regs, EmulatedMemory& mem) -> bool {
-        HIMAGELIST h = ImageList_Create(regs[0], regs[1], regs[2], regs[3], ReadStackArg(regs, mem, 0));
+        /* WinCE default: ILC_MASK (0x1) with no ILC_COLORxx → screen depth (16bpp).
+           Desktop default: ILC_COLOR (0) → 4bpp (16 colors), making icons look terrible.
+           Upgrade to ILC_COLOR32 when no color depth is specified. */
+        UINT flags = regs[2];
+        if ((flags & 0xFE) == 0) flags |= ILC_COLOR32;
+        HIMAGELIST h = ImageList_Create(regs[0], regs[1], flags, regs[3], ReadStackArg(regs, mem, 0));
         uint32_t wrapped = h ? WrapHandle((HANDLE)h) : 0;
         LOG(API, "[API] ImageList_Create(cx=%d, cy=%d, flags=0x%X, init=%d, grow=%d) -> 0x%08X\n",
             regs[0], regs[1], regs[2], regs[3], ReadStackArg(regs, mem, 0), wrapped);

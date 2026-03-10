@@ -2,7 +2,7 @@
 
 class EmulatedMemory;
 
-/* Apply runtime patches to loaded ARM DLLs (OLE32, RPCRT4, Explorer).
-   These patch corrupted linked lists, stub out unimplemented COM/RPC
-   functions, and skip known-bad code paths in the ARM binaries. */
+/* Legacy entry point — intentionally does nothing.
+   Runtime binary patching is PERMANENTLY FORBIDDEN.
+   Fix API thunks instead. See patches.cpp for details. */
 void ApplyRuntimePatches(EmulatedMemory& mem);

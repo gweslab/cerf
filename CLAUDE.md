@@ -162,6 +162,17 @@ Never create a silent stub that just returns a value without logging. This is cr
 
 **Never silently choose the fake/stub path** when a real implementation is possible. The user must explicitly opt into shortcuts. Lessons learned: pseudo-threading caused OLE apartment corruption, infinite loops, and days of wasted debugging. Real solutions scale; fake ones don't.
 
+## CRITICAL: Never Modify Loaded ARM Binaries
+
+**NEVER patch, stub, NOP, or modify ANY loaded ARM executable or DLL in emulated memory.** Every external binary MUST remain in its original, unmodified form. The CERF philosophy: **we provide a perfect API — we do not modify what we run.**
+
+If an ARM app crashes, hangs, or misbehaves, the ONLY correct fix is to improve the API thunks in `cerf/thunks/`. Reasons:
+1. Multiple DLLs share the same base address (e.g. commctrl.dll and OLE32 both load at 0x10000000). Address-based patches corrupt whichever DLL occupies that address first.
+2. Patching hides API bugs instead of fixing them — the thunk stays broken for every other app.
+3. Patches are fragile across different DLL versions/builds.
+
+`cerf/patches.cpp` exists as a legacy no-op. It must stay empty.
+
 ## IMPORTANT: No Hardcoded Magic Values
 
 **Never use bare numeric literals (magic numbers) in code.** Every constant must have a named `#define`, `constexpr`, or `static const` with a descriptive name. This applies to addresses, sizes, offsets, flags, limits, and any value whose meaning isn't immediately obvious from context. Small universally-understood values (0, 1, nullptr, true/false) are exempt.

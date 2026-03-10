@@ -5,6 +5,7 @@
 #include <vector>
 #include <cstring>
 #include <cstdio>
+#include <mutex>
 
 /* Emulated memory manager for ARM address space.
    Uses VirtualAlloc on the host to back emulated memory regions. */
@@ -24,7 +25,13 @@ public:
     static const uint32_t STACK_SIZE = 1024 * 1024; /* 1 MB stack */
     static const uint32_t STACK_BASE = 0x01000000;  /* Stack grows down from here (above 64KB boundary) */
 
+    /* Per-thread KData page redirect. When set, reads/writes to 0xFFFFC000-0xFFFFCFFF
+       go to this buffer instead of shared memory. Each ARM thread sets this to its
+       own ThreadContext::kdata[] before entering ARM execution. */
+    static thread_local uint8_t* kdata_override;
+
     std::vector<MemRegion> regions;
+    std::mutex alloc_mutex;  /* Protects regions vector during Alloc/Reserve */
 
     ~EmulatedMemory() {
         for (auto& r : regions) {
@@ -41,6 +48,7 @@ public:
        Subsequent Alloc() calls within this range will MEM_COMMIT pages
        without needing 64KB-aligned MEM_RESERVE (which fails for non-aligned pages). */
     bool Reserve(uint32_t base, uint32_t size) {
+        std::lock_guard<std::mutex> lock(alloc_mutex);
         size = AlignUp(size, PAGE_SIZE);
         LPVOID rv = VirtualAlloc((LPVOID)(uintptr_t)base, size, MEM_RESERVE, PAGE_READWRITE);
         if (!rv) {
@@ -51,6 +59,7 @@ public:
     }
 
     uint8_t* Alloc(uint32_t base, uint32_t size, DWORD protect = PAGE_READWRITE, bool is_stack = false) {
+        std::lock_guard<std::mutex> lock(alloc_mutex);
         size = AlignUp(size, PAGE_SIZE);
         /* Try to allocate at the exact ARM address for identity mapping */
         uint8_t* ptr = nullptr;
@@ -82,6 +91,10 @@ public:
 
     /* Find the host pointer for an emulated address */
     uint8_t* Translate(uint32_t addr) const {
+        /* Per-thread KData page: each thread has its own TLS slots and thread ID.
+           Single branch, almost always not-taken (well-predicted). */
+        if (kdata_override && (addr >> 12) == 0xFFFFC)
+            return kdata_override + (addr & 0xFFF);
         for (auto& r : regions) {
             if (addr >= r.base && addr < r.base + r.size) {
                 return r.host_ptr + (addr - r.base);

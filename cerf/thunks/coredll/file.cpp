@@ -3,7 +3,6 @@
 #include "../../log.h"
 #include <cstdio>
 #include <vector>
-
 /* State for root directory enumeration: after real host entries are exhausted,
    we inject synthetic entries for available drive letters (a-z). */
 struct RootFindState {
@@ -37,7 +36,6 @@ static WIN32_FIND_DATAW MakeDriveEntry(char drive_letter) {
     fd.cFileName[1] = 0;
     return fd;
 }
-
 void Win32Thunks::RegisterFileHandlers() {
     Thunk("CreateFileW", 168, [this](uint32_t* regs, EmulatedMemory& mem) -> bool {
         std::wstring wce_path = ReadWStringFromEmu(mem, regs[0]);
@@ -253,8 +251,7 @@ void Win32Thunks::RegisterFileHandlers() {
         regs[0] = ret;
         return true;
     });
-    /* Ordinal-only entries */
-    ThunkOrdinal("GetTempPathW", 162);
+    ThunkOrdinal("GetTempPathW", 162); /* Ordinal-only entries */
     ThunkOrdinal("FlushFileBuffers", 175);
     ThunkOrdinal("SetFileTime", 177);
     ThunkOrdinal("DeleteAndRenameFile", 183);
@@ -272,8 +269,7 @@ void Win32Thunks::RegisterFileHandlers() {
             if (regs[3]) { mem.Write32(regs[3], totalFree.LowPart); mem.Write32(regs[3]+4, totalFree.HighPart); }
         }
         LOG(API, "[API] GetDiskFreeSpaceExW('%ls') -> %d\n", path.c_str(), ret);
-        regs[0] = ret;
-        return true;
+        regs[0] = ret; return true;
     });
     Thunk("SetFileAttributesW", 169, [this](uint32_t* regs, EmulatedMemory& mem) -> bool {
         std::wstring path = ReadWStringFromEmu(mem, regs[0]);
@@ -288,7 +284,17 @@ void Win32Thunks::RegisterFileHandlers() {
         LOG(API, "[API] FindFirstChangeNotificationW('%ls', subtree=%d, filter=0x%X)\n",
             path.c_str(), regs[1], regs[2]);
         HANDLE h = FindFirstChangeNotificationW(mapped.c_str(), regs[1], regs[2]);
-        regs[0] = WrapHandle(h);
+        LOG(API, "[API]   -> handle=%p\n", h);
+        /* Store raw handle (not wrapped) — same convention as CreateEventW.
+           WaitForMultipleObjects uses sign-extension to recover native handles. */
+        regs[0] = (uint32_t)(uintptr_t)h;
+        return true;
+    });
+    Thunk("FindNextChangeNotification", 1683, [](uint32_t* regs, EmulatedMemory&) -> bool {
+        HANDLE h = (HANDLE)(intptr_t)(int32_t)regs[0];
+        BOOL ok = FindNextChangeNotification(h);
+        LOG(API, "[API] FindNextChangeNotification(0x%08X) -> %d\n", regs[0], ok);
+        regs[0] = ok;
         return true;
     });
 }

@@ -4,7 +4,7 @@
 #include "../log.h"
 
 INT_PTR CALLBACK Win32Thunks::EmuDlgProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
-    if (!s_instance || !s_instance->callback_executor) {
+    if (!s_instance || !t_ctx || !t_ctx->callback_executor) {
         return FALSE;
     }
 

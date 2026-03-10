@@ -96,6 +96,10 @@ Test apps in `tmp/arm_test_apps/`: solitare.exe, chearts.exe, Zuma-arm.exe
 
 The `references/` directory (gitignored) holds local WinCE SDK materials including `coredll.def` (ordinal map) and ARM DLL builds. See `references/README.md` for setup.
 
+## Pre-commit Hook
+
+A pre-commit hook at `.githooks/pre-commit` rejects source files (`.cpp`, `.h`, `.py`) over 300 lines. Contributors must run `git config core.hooksPath .githooks` once to activate it.
+
 ## Conventions
 
 - C++17, MSVC (Visual Studio 2022, v143 toolset)
@@ -145,6 +149,31 @@ Never create a silent stub that just returns a value without logging. This is cr
 ## IMPORTANT: No Faking Real Functionality
 
 **NEVER replace real WinCE functionality with native/fake implementations** (e.g. intercepting ShellExecuteEx to show a Win11 dialog instead of running the actual ARM binary). If an ARM binary exists for the task, run it. Only implement native workarounds when explicitly permitted by the user. When in doubt, ASK first — don't mock, stub, or substitute real app behavior with host-native shortcuts.
+
+## CRITICAL: Real Solutions Over Fake Stubs
+
+**ALWAYS prioritize proper, real implementations over hacky stubs and workarounds.** Pseudo-threading, fake COM apartments, and similar shortcuts create cascading corruption and debugging nightmares that cost far more time than doing it right. If a proper solution is large (e.g. real OS threading, real COM forwarding), STOP and ask the user:
+
+> "This requires a real implementation of X. Do you want me to do the proper version, or a temporary stub?"
+
+**Never silently choose the fake/stub path** when a real implementation is possible. The user must explicitly opt into shortcuts. Lessons learned: pseudo-threading caused OLE apartment corruption, infinite loops, and days of wasted debugging. Real solutions scale; fake ones don't.
+
+## IMPORTANT: No Hardcoded Magic Values
+
+**Never use bare numeric literals (magic numbers) in code.** Every constant must have a named `#define`, `constexpr`, or `static const` with a descriptive name. This applies to addresses, sizes, offsets, flags, limits, and any value whose meaning isn't immediately obvious from context. Small universally-understood values (0, 1, nullptr, true/false) are exempt.
+
+```cpp
+// BAD:
+mem.Alloc(0x3F000000, 0x00100000);
+if (slot < 64) { ... }
+
+// GOOD:
+constexpr uint32_t MARSHAL_BUFFER_BASE = 0x3F000000;
+constexpr uint32_t MARSHAL_BUFFER_SIZE = 0x00100000;
+constexpr uint32_t MAX_TLS_SLOTS = 64;
+mem.Alloc(MARSHAL_BUFFER_BASE, MARSHAL_BUFFER_SIZE);
+if (slot < MAX_TLS_SLOTS) { ... }
+```
 
 ## IMPORTANT: Known Issues Tracking
 

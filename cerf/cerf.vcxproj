@@ -143,7 +143,9 @@
     <ClInclude Include="cpu\mem.h" />
     <ClInclude Include="loader\pe_loader.h" />
     <ClInclude Include="thunks\win32_thunks.h" />
+    <ClInclude Include="thunks\thread_context.h" />
     <ClInclude Include="log.h" />
+    <ClInclude Include="cli_helpers.h" />
   </ItemGroup>
   <ItemGroup>
     <!-- CPU emulation -->
@@ -156,10 +158,14 @@
     <ClCompile Include="log.cpp" />
     <!-- Entry point -->
     <ClCompile Include="main.cpp" />
+    <ClCompile Include="cli_helpers.cpp" />
     <!-- Thunk infrastructure -->
     <ClCompile Include="thunks\win32_thunks.cpp" />
+    <ClCompile Include="thunks\win32_thunks_util.cpp" />
     <ClCompile Include="thunks\registry_impl.cpp" />
     <ClCompile Include="thunks\callbacks.cpp" />
+    <ClCompile Include="thunks\callbacks_marshal.cpp" />
+    <ClCompile Include="thunks\captionok.cpp" />
     <ClCompile Include="thunks\menubar.cpp" />
     <ClCompile Include="thunks\dll_loader.cpp" />
     <ClCompile Include="thunks\dispatch.cpp" />
@@ -177,6 +183,7 @@
     <ClCompile Include="thunks\coredll\gdi_text.cpp" />
     <ClCompile Include="thunks\coredll\gdi_region.cpp" />
     <ClCompile Include="thunks\coredll\window.cpp" />
+    <ClCompile Include="thunks\coredll\window_layout.cpp" />
     <ClCompile Include="thunks\coredll\window_props.cpp" />
     <ClCompile Include="thunks\coredll\dialog.cpp" />
     <ClCompile Include="thunks\coredll\message.cpp" />
@@ -185,9 +192,13 @@
     <ClCompile Include="thunks\coredll\registry.cpp" />
     <ClCompile Include="thunks\coredll\file.cpp" />
     <ClCompile Include="thunks\coredll\system.cpp" />
+    <ClCompile Include="thunks\coredll\sysinfo.cpp" />
+    <ClCompile Include="thunks\coredll\locale.cpp" />
+    <ClCompile Include="thunks\coredll\sync.cpp" />
     <ClCompile Include="thunks\coredll\resource.cpp" />
     <ClCompile Include="thunks\coredll\process.cpp" />
     <ClCompile Include="thunks\coredll\misc.cpp" />
+    <ClCompile Include="thunks\coredll\com.cpp" />
     <ClCompile Include="thunks\coredll\imagelist.cpp" />
     <ClCompile Include="thunks\coredll\dpa.cpp" />
     <ClCompile Include="thunks\coredll\dsa.cpp" />
@@ -195,6 +206,7 @@
     <ClCompile Include="thunks\coredll\shell.cpp" />
     <ClCompile Include="thunks\coredll\vfs.cpp" />
     <ClCompile Include="thunks\theme.cpp" />
+    <ClCompile Include="thunks\thread_context.cpp" />
   </ItemGroup>
   <!-- Bundled device files — copied to devices/ next to cerf.exe -->
   <Target Name="CopyBundledFiles" AfterTargets="Build">

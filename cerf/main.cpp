@@ -20,51 +20,7 @@
 #include "cpu/arm_cpu.h"
 #include "loader/pe_loader.h"
 #include "thunks/win32_thunks.h"
-
-static void PrintUsage(const char* prog) {
-    printf("CERF - Windows CE Runtime Foundation\n");
-    printf("Emulates Windows CE ARM executables on x86 desktop Windows.\n\n");
-    printf("Usage: %s [options] <arm-wince-exe>\n\n", prog);
-    printf("Options:\n");
-    printf("  --trace                  Enable instruction tracing\n");
-    printf("  --log=CATEGORIES         Enable only listed categories (comma-separated)\n");
-    printf("                           Categories: THUNK,PE,EMU,TRACE,CPU,REG,DBG,ALL,NONE\n");
-    printf("  --no-log=CATEGORIES      Disable specific categories\n");
-    printf("  --log-file=PATH          Write logs to file (in addition to console)\n");
-    printf("  --device=NAME            Device profile to use (default: from cerf.ini)\n");
-    printf("  --screen-width=N         Screen width in pixels (default: 800)\n");
-    printf("  --screen-height=N        Screen height in pixels (default: 480)\n");
-    printf("  --fake-screen-resolution=BOOL  Override fake screen resolution (true/false)\n");
-    printf("  --os-major=N             WinCE major version (default: 5)\n");
-    printf("  --os-minor=N             WinCE minor version (default: 0)\n");
-    printf("  --os-build=N             WinCE build number (default: 1)\n");
-    printf("  --os-build-date=STR      WinCE build date (default: \"Jan  1 2008\")\n");
-    printf("  --fake-total-phys=N      Fake total physical RAM in bytes (0 = real)\n");
-    printf("  --flush-outputs          Flush after every log write (for complete captures)\n");
-    printf("  --quiet                  Disable all log output\n");
-    printf("  --help                   Show this help\n");
-}
-
-static void DumpRegisters(ArmCpu& cpu) {
-    LOG_RAW("\n--- CPU State ---\n");
-    for (int i = 0; i < 16; i++) {
-        const char* names[] = {
-            "R0", "R1", "R2", "R3", "R4", "R5", "R6", "R7",
-            "R8", "R9", "R10", "R11", "R12", "SP", "LR", "PC"
-        };
-        LOG_RAW("  %-3s = 0x%08X", names[i], cpu.r[i]);
-        if ((i & 3) == 3) LOG_RAW("\n");
-    }
-    LOG_RAW("  CPSR = 0x%08X [%c%c%c%c %s]\n",
-           cpu.cpsr,
-           cpu.GetN() ? 'N' : '-',
-           cpu.GetZ() ? 'Z' : '-',
-           cpu.GetC() ? 'C' : '-',
-           cpu.GetV() ? 'V' : '-',
-           cpu.IsThumb() ? "Thumb" : "ARM");
-    LOG_RAW("  Instructions executed: %llu\n", cpu.insn_count);
-    LOG_RAW("-----------------\n\n");
-}
+#include "cli_helpers.h"
 
 int main(int argc, char* argv[]) {
     const char* exe_path = nullptr;
@@ -221,8 +177,10 @@ int main(int argc, char* argv[]) {
     /* Allocate stack */
     uint32_t stack_top = mem.AllocStack();
 
-    /* Initialize CPU */
-    ArmCpu cpu;
+    /* Initialize main thread context */
+    ThreadContext main_ctx;
+    main_ctx.marshal_base = 0x3F000000;
+    ArmCpu& cpu = main_ctx.cpu;
     cpu.mem = &mem;
     cpu.trace = trace;
 
@@ -295,276 +253,27 @@ int main(int argc, char* argv[]) {
     /* Write a BX LR instruction at the sentinel address as a safety net */
     mem.Write32(cb_sentinel, 0xE12FFF1E); /* BX LR */
 
-    thunks.callback_executor = [&cpu, &mem, &thunks, cb_sentinel](
-            uint32_t arm_addr, uint32_t* args, int nargs) -> uint32_t {
-        static int cb_depth = 0;
-        cb_depth++;
-        if (cb_depth > 1) {
-            LOG(API, "[API] callback_executor NESTED depth=%d addr=0x%08X args=[0x%X,0x%X,0x%X,0x%X]\n",
-                cb_depth, arm_addr,
-                nargs > 0 ? args[0] : 0, nargs > 1 ? args[1] : 0,
-                nargs > 2 ? args[2] : 0, nargs > 3 ? args[3] : 0);
-        }
-        /* Save CPU state */
-        uint32_t saved_regs[16];
-        memcpy(saved_regs, cpu.r, sizeof(saved_regs));
-        uint32_t saved_cpsr = cpu.cpsr;
-        bool saved_halted = cpu.halted;
-        cpu.halted = false;
+    /* Reserve marshal buffer space for up to 16 threads */
+    mem.Reserve(0x3F000000, 0x00100000);
 
-        /* Set up callback arguments (R0-R3) */
-        for (int i = 0; i < nargs && i < 4; i++) {
-            cpu.r[i] = args[i];
-        }
+    /* Initialize main thread context with its own callback_executor and KData */
+    MakeCallbackExecutor(&main_ctx, mem, thunks, cb_sentinel);
 
-        /* Set LR to sentinel so we know when the callback returns */
-        cpu.r[REG_LR] = cb_sentinel;
+    /* Copy shared KData page (written during Win32Thunks construction) into
+       the main thread's per-thread buffer, then activate the redirect. */
+    {
+        uint8_t* shared_kdata = mem.Translate(0xFFFFC000);
+        if (shared_kdata)
+            memcpy(main_ctx.kdata, shared_kdata, 0x1000);
+    }
+    t_ctx = &main_ctx;
+    EmulatedMemory::kdata_override = main_ctx.kdata;
 
-        /* Set PC to ARM function address */
-        if (arm_addr & 1) {
-            cpu.cpsr |= PSR_T;
-            cpu.r[REG_PC] = arm_addr & ~1u;
-        } else {
-            cpu.cpsr &= ~PSR_T;
-            cpu.r[REG_PC] = arm_addr;
-        }
-
-        /* Allocate a small stack frame for the callback and push extra args.
-           ARM calling convention: args[0-3] in r0-r3, args[4+] on the stack.
-           Stack grows downward; 5th arg at [SP+0], 6th at [SP+4], etc. */
-        cpu.r[REG_SP] -= 0x100;
-        for (int i = 4; i < nargs; i++) {
-            mem.Write32(cpu.r[REG_SP] + (uint32_t)(i - 4) * 4, args[i]);
-        }
-
-        /* Run until callback returns (hits sentinel) */
-        uint32_t step_count = 0;
-        while (!cpu.halted) {
-            uint32_t pc = cpu.r[REG_PC];
-            if (pc == cb_sentinel || pc == (cb_sentinel & ~1u)) {
-                break;
-            }
-            /* Detect null function pointer call — PC at 0 means the ARM code
-               called through a NULL pointer.  Don't execute zeroed memory. */
-            if (pc < 0x1000 && cb_depth > 1) {
-                LOG(API, "[API] callback_executor: NULL function pointer (PC=0x%08X) at depth=%d, aborting\n",
-                    pc, cb_depth);
-                cpu.r[0] = 0;
-                break;
-            }
-            /* Periodic message pump — DISABLED: dispatching messages inside the
-               ARM execution loop causes re-entrancy that breaks shdocvw COM
-               initialization (Navigate2 fails because _pbs becomes NULL when
-               messages arrive during SetOwner/OnCreate). The ARM code's own
-               message loops (GetMessageW/PeekMessageW thunks) handle message
-               pumping at the appropriate times. */
-            #if 0
-            if (++step_count % 50000 == 0) {
-                MSG pump_msg;
-                while (PeekMessageW(&pump_msg, NULL, 0, 0, PM_REMOVE)) {
-                    if (pump_msg.message == WM_QUIT) {
-                        PostQuitMessage((int)pump_msg.wParam);
-                        break;
-                    }
-                    TranslateMessage(&pump_msg);
-                    DispatchMessageW(&pump_msg);
-                }
-            }
-            #endif
-            /* Temporary trace for explorer.exe OLE browsing debug */
-            if (pc == 0x257F8) {
-                LOG(API, "[TRACE] CBrowseObj::Activate -> HRESULT=0x%08X\n", cpu.r[0]);
-            } else if (pc == 0x1E600) {
-                LOG(API, "[TRACE] CMainWnd::CreateBrowser: byte[108]&1 = %d\n", cpu.r[3]);
-            } else if (pc == 0x1E614) {
-                LOG(API, "[TRACE] CMainWnd::CreateBrowser: _pBrowser = 0x%08X\n", cpu.r[3]);
-            } else if (pc == 0x1E630) {
-                LOG(API, "[TRACE] CMainWnd: _pidl=0x%08X\n", cpu.r[3]);
-            } else if (pc == 0x1E680) {
-                /* R3 = _lpszUrl pointer */
-                { std::wstring url; uint32_t p = cpu.r[3];
-                  if (p) { for (int i=0; i<200; i++) { wchar_t c = (wchar_t)mem.Read16(p+i*2); if (!c) break; url += c; } }
-                  LOG(API, "[TRACE] CMainWnd: _lpszUrl=0x%08X '%ls'\n", cpu.r[3], url.c_str()); }
-            } else if (pc == 0x1E648) {
-                LOG(API, "[TRACE] CMainWnd: -> InitVariantFromIDList (Navigate2 with PIDL)\n");
-            } else if (pc == 0x1E730) {
-                LOG(API, "[TRACE] CMainWnd: -> GoHome (no pidl, no url)\n");
-            } else if (pc == 0x1E728) {
-                LOG(API, "[TRACE] CMainWnd: -> Navigate2 at 0x%08X, this=0x%08X, varURL=0x%08X\n",
-                    cpu.r[4], cpu.r[0], cpu.r[1]);
-            }
-            /* Trace shdocvw OLE initialization chain */
-            else if (pc == (0x10740000 + 0x548F4)) {
-                /* CShellEmbedding::SetClientSite entry */
-                LOG(API, "[TRACE] shdocvw SetClientSite(pClientSite=0x%08X) this=0x%08X\n",
-                    cpu.r[1], cpu.r[0]);
-            }
-            else if (pc == (0x10740000 + 0x58C7C)) {
-                /* CWebBrowserOC::_OnSetClientSite entry */
-                LOG(API, "[TRACE] shdocvw _OnSetClientSite this=0x%08X\n", cpu.r[0]);
-            }
-            else if (pc == (0x10740000 + 0x59290)) {
-                /* CWebBrowserOC::_OnCreate entry — check _psb at this+0x170 */
-                uint32_t this_ptr = mem.Read32(cpu.r[13] + 4); /* pushed R0 */
-                uint32_t psb = this_ptr ? mem.Read32(this_ptr + 0x170) : 0;
-                LOG(API, "[TRACE] shdocvw _OnCreate this=0x%08X _psb=0x%08X\n",
-                    this_ptr, psb);
-            }
-            else if (pc == (0x10740000 + 0x66D3C)) {
-                /* CBaseBrowser2::OnCreate entry */
-                LOG(API, "[TRACE] shdocvw CBaseBrowser2::OnCreate this=0x%08X\n", cpu.r[0]);
-            }
-            else if (pc == (0x10740000 + 0x66E74)) {
-                /* CBaseBrowser2::OnCreate about to call SetOwner */
-                LOG(API, "[TRACE] shdocvw OnCreate: calling IShellService::SetOwner R0=0x%08X R1=0x%08X\n",
-                    cpu.r[0], cpu.r[1]);
-            }
-            else if (pc == (0x10740000 + 0x45160)) {
-                /* CIEFrameAuto::SetOwner entry */
-                LOG(API, "[TRACE] shdocvw CIEFrameAuto::SetOwner(punkOwner=0x%08X) this=0x%08X\n",
-                    cpu.r[1], cpu.r[0]);
-            }
-            else if (pc == (0x10740000 + 0x45224)) {
-                /* Right after QI(IID_IBrowserService) call in SetOwner — R0 = HRESULT */
-                /* The IShellService 'this' is at [SP+0x34], CIEFrameAuto base = this-0x24 */
-                uint32_t ss_this = mem.Read32(cpu.r[13] + 0x34);
-                uint32_t base = ss_this - 0x24;
-                uint32_t pbs = mem.Read32(base + 0xA4);
-                LOG(API, "[TRACE] SetOwner QI(IBrowserService) result: hr=0x%08X _pbs=0x%08X base=0x%08X\n",
-                    cpu.r[0], pbs, base);
-            }
-            else if (pc == (0x10740000 + 0x4524C)) {
-                /* Right after QI(IID_IShellBrowser) call in SetOwner */
-                uint32_t ss_this = mem.Read32(cpu.r[13] + 0x34);
-                uint32_t base = ss_this - 0x24;
-                uint32_t psb = mem.Read32(base + 0xD4);
-                LOG(API, "[TRACE] SetOwner QI(IShellBrowser) result: hr=0x%08X _psb=0x%08X\n",
-                    cpu.r[0], psb);
-            }
-            else if (pc == (0x10740000 + 0x45298)) {
-                /* Right after QI(IID_IServiceProvider) call in SetOwner */
-                uint32_t ss_this = mem.Read32(cpu.r[13] + 0x34);
-                uint32_t base = ss_this - 0x24;
-                uint32_t psp = mem.Read32(base + 0xC0);
-                LOG(API, "[TRACE] SetOwner QI(IServiceProvider) result: hr=0x%08X _psp=0x%08X\n",
-                    cpu.r[0], psp);
-            }
-            /* Trace shdocvw Navigate2 internals */
-            else if (pc == (0x10740000 + 0x5E87C)) {
-                /* The code does: this - 0x128 + 0x140 = this + 0x18 for inner check
-                   and this - 0x128 + 0x154 = this + 0x2C for vtable dispatch */
-                uint32_t this_ptr = mem.Read32(cpu.r[13] + 0x2C);
-                uint32_t inner18 = mem.Read32(this_ptr + 0x18);
-                uint32_t inner2C = mem.Read32(this_ptr + 0x2C);
-                LOG(API, "[TRACE] shdocvw Navigate2: this=0x%08X, m_pInner[+0x18]=0x%08X, m_pDispatch[+0x2C]=0x%08X\n",
-                    this_ptr, inner18, inner2C);
-            }
-            else if (pc == (0x10740000 + 0x5E894)) {
-                /* URL VARIANT check: read vt and bstrVal */
-                uint32_t pvarURL = mem.Read32(cpu.r[13] + 0x30);
-                uint16_t vt = mem.Read16(pvarURL);
-                uint32_t bstrVal = mem.Read32(pvarURL + 8);
-                LOG(API, "[TRACE] shdocvw Navigate2: pvarURL=0x%08X, vt=%d, bstrVal=0x%08X\n",
-                    pvarURL, vt, bstrVal);
-            }
-            else if (pc == (0x10740000 + 0x5E96C)) {
-                /* DIRECT path: will call inner[+0x2C]->vtable[0xD0] */
-                uint32_t this_ptr = mem.Read32(cpu.r[13] + 0x2C);
-                uint32_t dispatch = mem.Read32(this_ptr + 0x2C);
-                uint32_t vtable = dispatch ? mem.Read32(dispatch) : 0;
-                uint32_t nav2_fn = vtable ? mem.Read32(vtable + 0xD0) : 0;
-                LOG(API, "[TRACE] shdocvw Navigate2: DIRECT path, dispatch=0x%08X, vtable=0x%08X, Nav2=0x%08X\n",
-                    dispatch, vtable, nav2_fn);
-            }
-            else if (pc == (0x10740000 + 0x5E908)) {
-                LOG(API, "[TRACE] shdocvw Navigate2: security check passed, dispatching to inner\n");
-            }
-            else if (pc == (0x10740000 + 0x5E968)) {
-                LOG(API, "[TRACE] shdocvw Navigate2: epilogue, hr=0x%08X\n",
-                    mem.Read32(cpu.r[13] + 0x8));
-            }
-            /* Trace CIEFrameAuto::Navigate2 at IDA 0x10042A84 */
-            else if (pc == (0x10740000 + 0x42A84)) {
-                LOG(API, "[TRACE] CIEFrameAuto::Navigate2 entry this=0x%08X pvURL=0x%08X\n",
-                    cpu.r[0], cpu.r[1]);
-            }
-            /* Trace the BX R4 instruction at IDA 0x1005E9BC that calls Navigate2 */
-            else if (pc == (0x10740000 + 0x5E9B8)) {
-                LOG(API, "[TRACE] shdocvw Navigate2 about to BX: R4=0x%08X LR=0x%08X PC=0x%08X\n",
-                    cpu.r[4], cpu.r[REG_LR], cpu.r[REG_PC]);
-            }
-            else if (pc == (0x10740000 + 0x5E9BC)) {
-                LOG(API, "[TRACE] shdocvw Navigate2 BX R4: R4=0x%08X R0=0x%08X\n",
-                    cpu.r[4], cpu.r[0]);
-            }
-            else if (pc == (0x10740000 + 0x5E9C0)) {
-                LOG(API, "[TRACE] shdocvw Navigate2 returned: R0=0x%08X\n", cpu.r[0]);
-            }
-            /* Trace CIEFrameAuto::_NavigateHelper at IDA 0x100419B8 */
-            else if (pc == (0x10740000 + 0x419B8)) {
-                LOG(API, "[TRACE] CIEFrameAuto::_NavigateHelper entry this=0x%08X URL=0x%08X\n",
-                    cpu.r[0], cpu.r[1]);
-                /* _pbs is at CIEFrameAuto_base + 0xA4 (from SetOwner disasm: base+0xA4) */
-                uint32_t pbs = cpu.r[0] ? mem.Read32(cpu.r[0] + 0xA4) : 0;
-                LOG(API, "[TRACE]   _pbs=0x%08X\n", pbs);
-            }
-            /* Trace _PidlFromUrlEtc at IDA 0x10080E24 */
-            else if (pc == (0x10740000 + 0x80E24)) {
-                LOG(API, "[TRACE] CIEFrameAuto::_PidlFromUrlEtc entry this=0x%08X pszUrl=0x%08X\n",
-                    cpu.r[0], cpu.r[2]);
-                if (cpu.r[2]) {
-                    std::wstring url; uint32_t p = cpu.r[2];
-                    for (int i=0; i<200; i++) { wchar_t c = (wchar_t)mem.Read16(p+i*2); if (!c) break; url += c; }
-                    LOG(API, "[TRACE]   url='%ls'\n", url.c_str());
-                }
-            }
-            /* Trace IECreateFromPathCPWithBCW at IDA 0x10051880 */
-            else if (pc == (0x10740000 + 0x51880)) {
-                LOG(API, "[TRACE] IECreateFromPathCPWithBCW entry path=0x%08X\n", cpu.r[1]);
-                if (cpu.r[1]) {
-                    std::wstring p; uint32_t a = cpu.r[1];
-                    for (int i=0; i<200; i++) { wchar_t c = (wchar_t)mem.Read16(a+i*2); if (!c) break; p += c; }
-                    LOG(API, "[TRACE]   path='%ls'\n", p.c_str());
-                }
-            }
-            /* Trace SHILCreateFromPath at IDA 0x10078628 */
-            else if (pc == (0x10740000 + 0x78628)) {
-                LOG(API, "[TRACE] SHILCreateFromPath entry path=0x%08X\n", cpu.r[0]);
-                if (cpu.r[0]) {
-                    std::wstring p; uint32_t a = cpu.r[0];
-                    for (int i=0; i<200; i++) { wchar_t c = (wchar_t)mem.Read16(a+i*2); if (!c) break; p += c; }
-                    LOG(API, "[TRACE]   path='%ls'\n", p.c_str());
-                }
-            }
-            /* Trace SHGetDesktopFolder at IDA 0x10078978 */
-            else if (pc == (0x10740000 + 0x78978)) {
-                LOG(API, "[TRACE] SHGetDesktopFolder entry\n");
-            }
-            /* Trace _BrowseObject at shdocvw */
-            else if (pc == (0x10740000 + 0x42828)) {
-                LOG(API, "[TRACE] CIEFrameAuto::_BrowseObject entry this=0x%08X pidl=0x%08X flags=0x%X\n",
-                    cpu.r[0], cpu.r[1], cpu.r[2]);
-            }
-            cpu.Step();
-        }
-
-        if (cpu.halted && cb_depth > 1) {
-            LOG(API, "[API] callback_executor HALTED at depth=%d PC=0x%08X R0=0x%X LR=0x%X\n",
-                cb_depth, cpu.r[REG_PC], cpu.r[0], cpu.r[REG_LR]);
-        }
-
-        uint32_t result = cpu.r[0];
-
-        /* Restore CPU state */
-        memcpy(cpu.r, saved_regs, sizeof(saved_regs));
-        cpu.cpsr = saved_cpsr;
-        cpu.halted = saved_halted;
-
-        if (cb_depth > 1) {
-            LOG(API, "[API] callback_executor RETURN depth=%d result=0x%X\n", cb_depth, result);
-        }
-        cb_depth--;
-        return result;
+    /* Set up the trampoline: thunk handlers use this->callback_executor which
+       delegates to the current thread's real callback_executor via t_ctx. */
+    thunks.callback_executor = [](uint32_t addr, uint32_t* args, int nargs) -> uint32_t {
+        if (!t_ctx || !t_ctx->callback_executor) return 0;
+        return t_ctx->callback_executor(addr, args, nargs);
     };
 
     /* Call DllMain for any loaded ARM DLLs (must happen after callback_executor is set up) */

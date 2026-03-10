@@ -6,55 +6,27 @@
 #include <map>
 #include <set>
 #include <functional>
-#include <algorithm>
-#include <cstring>
+#include <atomic>
 #include "../cpu/mem.h"
 #include "../loader/pe_loader.h"
+#include "thread_context.h"
 
-/* Thunked DLL registry — single source of truth for all system DLLs we emulate.
-   To add a new thunked DLL: add one entry here, then create Register*Handlers(). */
+/* Thunked DLL registry — add one entry here, then create Register*Handlers(). */
 struct ThunkedDllInfo {
     const char* name;          /* lowercase key (e.g. "coredll") */
     uint32_t    fake_handle;   /* returned by GetModuleHandle/LoadLibrary */
 };
+extern const ThunkedDllInfo thunked_dlls[];
+extern const size_t thunked_dlls_count;
+const ThunkedDllInfo* FindThunkedDll(const std::string& dll_name);   /* case-insensitive substring */
+const ThunkedDllInfo* FindThunkedDllW(const std::wstring& dll_name); /* wide version */
 
-inline const ThunkedDllInfo thunked_dlls[] = {
-    { "coredll",   0xCE000000 },
-};
-
-/* Look up a thunked DLL by name (narrow, case-insensitive, substring match) */
-inline const ThunkedDllInfo* FindThunkedDll(const std::string& dll_name) {
-    std::string lower = dll_name;
-    std::transform(lower.begin(), lower.end(), lower.begin(), ::tolower);
-    for (const auto& dll : thunked_dlls)
-        if (lower.find(dll.name) != std::string::npos) return &dll;
-    return nullptr;
-}
-
-/* Wide string version for LoadLibraryW / GetModuleHandleW */
-inline const ThunkedDllInfo* FindThunkedDllW(const std::wstring& dll_name) {
-    std::wstring lower = dll_name;
-    std::transform(lower.begin(), lower.end(), lower.begin(), ::towlower);
-    for (const auto& dll : thunked_dlls) {
-        std::wstring wide_name(dll.name, dll.name + strlen(dll.name));
-        if (lower.find(wide_name) != std::wstring::npos) return &dll;
-    }
-    return nullptr;
-}
-
-/* Magic address range for thunk entries.
-   When ARM code branches to an address in this range, we intercept it.
-   NOTE: 0xF000xxxx is reserved for WinCE kernel trap-based API calls. */
+/* Thunk address range (0xF000xxxx reserved for WinCE kernel trap API calls) */
 #define THUNK_BASE   0xFE000000
 #define THUNK_STRIDE 4
-
-/* Default emulated WinCE screen resolution (overridable via cerf.ini / CLI). */
 #define WINCE_SCREEN_WIDTH_DEFAULT   800
 #define WINCE_SCREEN_HEIGHT_DEFAULT  480
-
-/* WinCE trap-based API call range.
-   WinCE apps may call APIs via trap addresses descending from 0xF0010000.
-   API index = (0xF0010000 - addr) / 4 */
+/* WinCE trap-based API range: index = (0xF0010000 - addr) / 4 */
 #define WINCE_TRAP_BASE  0xF0000000
 #define WINCE_TRAP_TOP   0xF0010000
 
@@ -63,152 +35,86 @@ struct ThunkEntry {
     std::string func_name;
     uint16_t    ordinal;
     bool        by_ordinal;
-    uint32_t    thunk_addr;    /* Address in thunk region */
+    uint32_t    thunk_addr;
 };
 
-/* Helper to read a wide string from emulated memory */
 std::wstring ReadWStringFromEmu(EmulatedMemory& mem, uint32_t addr);
-
-/* Helper to read a narrow string from emulated memory */
 std::string ReadStringFromEmu(EmulatedMemory& mem, uint32_t addr);
-
-/* Check if a file is an ARM PE (WinCE) executable by reading its PE header. */
-inline bool IsArmPE(const std::wstring& host_path) {
-    HANDLE f = CreateFileW(host_path.c_str(), GENERIC_READ, FILE_SHARE_READ, NULL,
-                           OPEN_EXISTING, 0, NULL);
-    if (f == INVALID_HANDLE_VALUE) return false;
-    uint8_t buf[512]; DWORD n = 0;
-    ReadFile(f, buf, sizeof(buf), &n, NULL);
-    CloseHandle(f);
-    if (n < 0x40) return false;
-    if (buf[0] != 'M' || buf[1] != 'Z') return false;
-    uint32_t pe_off = *(uint32_t*)(buf + 0x3C);
-    if (pe_off + 6 > n) return false;
-    if (buf[pe_off] != 'P' || buf[pe_off+1] != 'E') return false;
-    uint16_t machine = *(uint16_t*)(buf + pe_off + 4);
-    return (machine == 0x01C0 || machine == 0x01C2);
-}
+bool IsArmPE(const std::wstring& host_path); /* Check if file is ARM PE (WinCE) */
 
 class Win32Thunks {
 public:
     Win32Thunks(EmulatedMemory& mem);
-
-    /* Install thunks for all imports in a loaded PE.
-       Replaces IAT entries with thunk addresses. */
-    void InstallThunks(PEInfo& info);
-
-    /* Call DllMain for all loaded ARM DLLs. Must be called after callback_executor is set up. */
-    void CallDllEntryPoints();
-
-    /* Handle a thunk call. Called when ARM CPU branches to a thunk address.
-       Returns true if the address was a thunk and was handled.
-       regs[0..15] = R0-R15 */
+    void InstallThunks(PEInfo& info);      /* Replace IAT entries with thunk addresses */
+    void CallDllEntryPoints();             /* Call DllMain for loaded ARM DLLs */
     bool HandleThunk(uint32_t addr, uint32_t* regs, EmulatedMemory& mem);
 
-    /* Set the emulated HINSTANCE for the WinCE app */
     void SetHInstance(uint32_t hinst) { emu_hinstance = hinst; }
     void SetExePath(const std::wstring& path) { exe_path = path; }
     void SetExeDir(const std::string& dir) { exe_dir = dir; }
     void SetWinceSysDir(const std::string& dir) { wince_sys_dir = dir; }
-
-    /* Virtual filesystem initialization — reads cerf.ini, sets device paths.
-       If device_override is non-empty, it overrides the cerf.ini setting. */
     void InitVFS(const std::string& device_override = "");
 
-    /* Execute a callback from native code back into ARM emulator.
-       Args: (arm_addr, args_array, num_args) -> return value */
+    /* Callback executor: trampoline to t_ctx->callback_executor (per-thread) */
     typedef std::function<uint32_t(uint32_t addr, uint32_t* args, int nargs)> CallbackExecutor;
     CallbackExecutor callback_executor;
 
-    /* Pseudo-thread depth counter: 0=normal, 1=first pseudo-thread (blocking
-       GetMessageW as main loop), 2+=nested pseudo-threads (non-blocking GetMessageW
-       so they exit their message loops and let the parent continue). */
-    int pseudo_thread_depth = 0;
+    std::atomic<uint32_t> next_tls_slot{4};  /* TLS slot allocator (0-3 reserved) */
+    std::map<uint32_t, CRITICAL_SECTION*> cs_map; /* ARM CS addr -> native CS* */
+    std::mutex cs_map_mutex;
 
-    /* Store ARM WndProc addresses per class name */
-    std::map<std::wstring, uint32_t> arm_wndprocs;
-    /* Map HWND -> ARM WndProc */
-    static std::map<HWND, uint32_t> hwnd_wndproc_map;
-    /* Map timer ID -> ARM TIMERPROC callback address */
-    static std::map<UINT_PTR, uint32_t> arm_timer_callbacks;
-    /* Map HWND -> ARM DlgProc callback address */
-    static std::map<HWND, uint32_t> hwnd_dlgproc_map;
-    /* Stashed ARM DlgProc for CreateDialogIndirectParamW: WM_INITDIALOG is sent
-       during the API call before it returns, so hwnd_dlgproc_map isn't populated yet. */
-    static uint32_t pending_arm_dlgproc;
-    /* Stashed template DLU dimensions for pre-INITDIALOG resize: desktop Windows
-       enforces a minimum width for captioned windows that WinCE doesn't have.
-       We resize to DLU-based dimensions BEFORE WM_INITDIALOG so ARM code
-       (e.g. InitPropSheetDlg) sees the correct small size. */
+    std::map<std::wstring, uint32_t> arm_wndprocs;             /* class name -> ARM WndProc */
+    static std::map<HWND, uint32_t> hwnd_wndproc_map;          /* HWND -> ARM WndProc */
+    static std::map<UINT_PTR, uint32_t> arm_timer_callbacks;   /* timer ID -> ARM TIMERPROC */
+    static std::map<HWND, uint32_t> hwnd_dlgproc_map;          /* HWND -> ARM DlgProc */
+    static uint32_t pending_arm_dlgproc;   /* stashed for CreateDialogIndirectParamW */
+    /* DLU dimensions for pre-INITDIALOG resize (desktop min-width workaround) */
     static uint16_t pending_template_cx;
     static uint16_t pending_template_cy;
-    /* During WM_INITDIALOG dispatch, override GetWindowRect to return DLU-based
-       client dimensions instead of the inflated desktop minimum.  This lets ARM
-       sizing code (e.g. InitPropSheetDlg) compute correct growth. */
+    /* GetWindowRect override during WM_INITDIALOG for correct ARM sizing */
     static HWND dlu_override_hwnd;
     static int dlu_override_client_w;
     static int dlu_override_client_h;
-    /* HWNDs created with WS_EX_CAPTIONOKBTN (0x80000000).  Style is stripped
-       before native CreateWindowEx, but tracked here so WM_CLOSE is converted
-       to WM_COMMAND(IDOK) and GetWindowLongW reports the original style. */
-    static std::set<HWND> captionok_hwnds;
-    /* Modal dialog result for EndDialog */
+    static std::set<HWND> captionok_hwnds; /* WS_EX_CAPTIONOKBTN tracking */
     static INT_PTR modal_dlg_result;
     static bool modal_dlg_ended;
-    static Win32Thunks* s_instance;  /* For static WndProc callback */
-    /* setjmp buffer stack for RaiseException recovery (poor man's SEH) */
-    std::vector<uint32_t> setjmp_stack;
+    static Win32Thunks* s_instance;
+    std::vector<uint32_t> setjmp_stack;    /* RaiseException recovery */
 
     static LRESULT CALLBACK EmuWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam);
     static INT_PTR CALLBACK EmuDlgProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam);
     static LRESULT CALLBACK MenuBarWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam);
-    /* Install/remove the WS_EX_CAPTIONOKBTN title bar button subclass on a window */
     static void InstallCaptionOk(HWND hwnd);
     static void RemoveCaptionOk(HWND hwnd);
 private:
     static LRESULT CALLBACK CaptionOkSubclassProc(HWND, UINT, WPARAM, LPARAM, UINT_PTR, DWORD_PTR);
 
-private:
     EmulatedMemory& mem;
     std::map<uint32_t, ThunkEntry> thunks;   /* thunk_addr -> entry */
     uint32_t next_thunk_addr;
-
     uint32_t emu_hinstance;
     std::wstring exe_path;
-    std::string exe_dir;  /* Directory containing the exe */
-    std::string wince_sys_dir;  /* WinCE system DLL directory (for ARM DLLs like commctrl.dll) */
+    std::string exe_dir;
+    std::string wince_sys_dir;
 
-    /* WinCE system font (from HKLM\System\GDI\SYSFNT registry key).
-       Used to remap "System" font requests to the device's actual font. */
-    std::wstring wce_sysfont_name = L"Tahoma";  /* default fallback */
+    /* WinCE system font (from HKLM\System\GDI\SYSFNT) */
+    std::wstring wce_sysfont_name = L"Tahoma";
     LONG wce_sysfont_height = -12;
     LONG wce_sysfont_weight = FW_NORMAL;
     void InitWceSysFont();
 
 public:
-    /* Emulated WinCE screen resolution (from cerf.ini, default 800x600).
-       When fake_screen_resolution is true (default), GetSystemMetrics/GetDeviceCaps
-       return these values instead of real desktop resolution. Set to false via
-       --fake-screen-resolution=false or fake_screen_resolution=false in cerf.ini. */
+    /* Emulated screen resolution (from cerf.ini) */
     bool fake_screen_resolution = true;
     uint32_t screen_width  = WINCE_SCREEN_WIDTH_DEFAULT;
     uint32_t screen_height = WINCE_SCREEN_HEIGHT_DEFAULT;
-
-    /* Emulated WinCE OS version (from cerf.ini / CLI).
-       Returned by GetVersionExW.  Default: CE 5.0, build 1, Jan 1 2008. */
+    /* Emulated WinCE OS version */
     uint32_t os_major = 5;
     uint32_t os_minor = 0;
     uint32_t os_build = 1;
     std::string os_build_date = "Jan  1 2008";
-
-    /* Fake memory (from cerf.ini / CLI).
-       When > 0, GlobalMemoryStatus returns these instead of real host memory.
-       Default: 0 (use real host memory). */
-    uint32_t fake_total_phys = 0;   /* bytes, 0 = use real */
-
-    /* WinCE theming (from cerf.ini / CLI).
-       enable_theming: load system colors from WinCE registry, apply via IAT hooks.
-       disable_uxtheme: strip UxTheme visual styles from emulated windows. */
+    uint32_t fake_total_phys = 0;  /* fake memory; 0 = use real host memory */
+    /* WinCE theming */
     bool enable_theming = false;
     bool disable_uxtheme = false;
     void InitWceTheme();
@@ -216,120 +122,80 @@ public:
     void UpdateWceThemeColor(int index, COLORREF color);
     COLORREF GetWceThemeColor(int index);
     HBRUSH GetWceThemeBrush(int index);
+
 private:
-
     /* Virtual filesystem device paths */
-    std::string cerf_dir;        /* Directory containing cerf.exe */
-    std::string device_name;     /* Active device name (e.g. "wince5") */
-    std::string device_fs_root;  /* <cerf_dir>/devices/<device>/fs/ */
-    std::string device_dir;      /* <cerf_dir>/devices/<device>/ */
+    std::string cerf_dir;
+    std::string device_name;
+    std::string device_fs_root;
+    std::string device_dir;
 
-    /* Loaded ARM DLLs */
     struct LoadedDll {
         std::string path;
         uint32_t base_addr;
         PEInfo pe_info;
-        HMODULE native_rsrc_handle; /* Native load for resource access */
+        HMODULE native_rsrc_handle;
     };
-    std::map<std::wstring, LoadedDll> loaded_dlls; /* lowercase name -> info */
-    LoadedDll* LoadArmDll(const std::string& dll_name); /* Find/load ARM DLL */
+    std::map<std::wstring, LoadedDll> loaded_dlls;
+    LoadedDll* LoadArmDll(const std::string& dll_name);
 
-    /* Resource handle mapping (fake emu handle -> resource data location) */
-    struct EmuRsrc {
-        uint32_t data_rva;  /* RVA of resource data in the PE image */
-        uint32_t data_size; /* Size of resource data */
-        uint32_t module_base; /* Base address of the module */
-    };
+    struct EmuRsrc { uint32_t data_rva; uint32_t data_size; uint32_t module_base; };
     std::map<uint32_t, EmuRsrc> rsrc_map;
     uint32_t next_rsrc_handle = 0xE0000000;
-
-    /* Find a resource in an ARM PE loaded in emulated memory */
     uint32_t FindResourceInPE(uint32_t module_base, uint32_t rsrc_rva, uint32_t rsrc_size,
                               uint32_t type_id, uint32_t name_id,
                               uint32_t& out_data_rva, uint32_t& out_data_size);
 
-    /* Pending DLL entry points to call after callback_executor is set up */
-    struct PendingDllInit {
-        uint32_t entry_point;
-        uint32_t base_addr;
-    };
+    struct PendingDllInit { uint32_t entry_point; uint32_t base_addr; };
     std::vector<PendingDllInit> pending_dll_inits;
 
-    /* Ordinal to function name mapping (coredll default + per-DLL overrides).
-       Thunk() routes ordinals to the correct map based on current_dll_context. */
+    /* Ordinal to function name mapping */
     static std::map<uint16_t, std::string> ordinal_map;
     static std::map<std::string, std::map<uint16_t, std::string>> dll_ordinal_map;
-    std::string current_dll_context;  /* set before Register*Handlers() calls */
+    std::string current_dll_context;
     std::string ResolveOrdinal(uint16_t ordinal, const std::string& dll_name = "coredll.dll");
 
-    /* Allocate a thunk address for a function */
     uint32_t AllocThunk(const std::string& dll, const std::string& func, uint16_t ordinal, bool by_ordinal);
-
-    /* Execute a specific thunked Win32 API call */
     bool ExecuteThunk(const ThunkEntry& entry, uint32_t* regs, EmulatedMemory& mem);
-
-    /* Read stack arguments (beyond R0-R3) */
     uint32_t ReadStackArg(uint32_t* regs, EmulatedMemory& mem, int index);
-
-    /* Get a native HMODULE for resource access from an emulated module handle */
     HMODULE GetNativeModuleForResources(uint32_t emu_handle);
 
-    /* Handle mapping for 64-bit HANDLE values that can't safely round-trip
-       through 32-bit ARM registers (sign-extension corrupts bit-31-set handles) */
-    std::map<uint32_t, HANDLE> handle_map;   /* fake 32-bit handle -> real 64-bit HANDLE */
+    /* Handle mapping (64-bit HANDLE <-> 32-bit fake handle for ARM round-trip) */
+    std::map<uint32_t, HANDLE> handle_map;
     uint32_t next_fake_handle = 0x00100000;
+    struct FileMappingInfo { uint32_t emu_addr; uint32_t size; };
+    std::map<uint32_t, FileMappingInfo> file_mappings;
 
-    /* File mapping tracking */
-    struct FileMappingInfo {
-        uint32_t emu_addr;
-        uint32_t size;
-    };
-    std::map<uint32_t, FileMappingInfo> file_mappings; /* fake handle -> mapping info */
-
-    /* DIB section tracking: maps emulated pvBits address -> native pvBits + size.
-       Used by CreateDIBSection to let ARM code directly write bitmap pixel data. */
-    uint32_t next_dib_addr = 0x04000000;  /* DIB bits allocation range */
-    /* Map HBITMAP -> emulated pvBits address for GetObjectW(bmBits) */
-    std::map<uint32_t, uint32_t> hbitmap_to_emu_pvbits; /* (uint32_t)HBITMAP -> emu_addr */
+    /* DIB section tracking */
+    uint32_t next_dib_addr = 0x04000000;
+    std::map<uint32_t, uint32_t> hbitmap_to_emu_pvbits; /* HBITMAP -> emu pvBits addr */
     uint32_t WrapHandle(HANDLE h);
     HANDLE UnwrapHandle(uint32_t fake);
     void RemoveHandle(uint32_t fake);
 
-    /* WinCE path mapping: converts WinCE paths to host filesystem paths */
     std::wstring MapWinCEPath(const std::wstring& wce_path);
-    /* Reverse mapping: converts host filesystem paths back to WinCE paths */
     std::wstring MapHostToWinCE(const std::wstring& host_path);
 
 public:
     /* Emulated registry (file-backed, text format) */
-    struct RegValue {
-        uint32_t type = 0;          /* REG_DWORD, REG_SZ, REG_BINARY, etc. */
-        std::vector<uint8_t> data;
-    };
-    struct RegKey {
-        std::map<std::wstring, RegValue> values;
-        std::set<std::wstring> subkeys;
-    };
+    struct RegValue { uint32_t type = 0; std::vector<uint8_t> data; };
+    struct RegKey { std::map<std::wstring, RegValue> values; std::set<std::wstring> subkeys; };
 private:
-    std::map<std::wstring, RegKey> registry;       /* full key path -> key */
-    std::map<uint32_t, std::wstring> hkey_map;     /* fake HKEY -> full key path */
+    std::map<std::wstring, RegKey> registry;
+    std::map<uint32_t, std::wstring> hkey_map;
     uint32_t next_fake_hkey = 0xAE000000;
     bool registry_loaded = false;
-    std::string registry_path;                     /* cerf_registry.txt path */
+    std::string registry_path;
     void LoadRegistry();
     void SaveRegistry();
     void ImportRegFile(const std::string& path);
     std::wstring ResolveHKey(uint32_t hkey, const std::wstring& subkey);
     void EnsureParentKeys(const std::wstring& path);
-
-    /* Write WIN32_FIND_DATAW to emulated memory (WinCE layout) */
     void WriteFindDataToEmu(EmulatedMemory& mem, uint32_t addr, const WIN32_FIND_DATAW& fd);
 
     /* Map-based thunk dispatch */
     typedef std::function<bool(uint32_t* regs, EmulatedMemory& mem)> ThunkHandler;
     std::map<std::string, ThunkHandler> thunk_handlers;
-
-    /* Register a handler with ordinal, without ordinal, or ordinal-only (name mapping) */
     void Thunk(const std::string& name, uint16_t ordinal, ThunkHandler handler);
     void Thunk(const std::string& name, ThunkHandler handler);
     void ThunkOrdinal(const std::string& name, uint16_t ordinal);
@@ -344,6 +210,7 @@ private:
     void RegisterGdiTextHandlers();
     void RegisterGdiRegionHandlers();
     void RegisterWindowHandlers();
+    void RegisterWindowLayoutHandlers();
     void RegisterWindowPropsHandlers();
     void RegisterDialogHandlers();
     void RegisterMessageHandlers();
@@ -352,10 +219,14 @@ private:
     void RegisterRegistryHandlers();
     void RegisterFileHandlers();
     void RegisterSystemHandlers();
+    void RegisterSysInfoHandlers();
+    void RegisterLocaleHandlers();
+    void RegisterSyncHandlers();
     void RegisterResourceHandlers();
     void RegisterShellHandlers();
     void RegisterProcessHandlers();
     void RegisterMiscHandlers();
+    void RegisterComHandlers();
     void RegisterImageListHandlers();
     void RegisterModuleHandlers();
     void RegisterDpaHandlers();

@@ -35,6 +35,7 @@ uint32_t Win32Thunks::ReadStackArg(uint32_t* regs, EmulatedMemory& mem, int inde
 }
 
 bool Win32Thunks::HandleThunk(uint32_t addr, uint32_t* regs, EmulatedMemory& mem) {
+    if (t_ctx) ++t_ctx->thunk_call_count;
     /* Check if address is in thunk range */
     auto it = thunks.find(addr);
     if (it == thunks.end()) {
@@ -109,16 +110,24 @@ bool Win32Thunks::ExecuteThunk(const ThunkEntry& entry, uint32_t* regs, Emulated
     auto it = thunk_handlers.find(func);
     if (it != thunk_handlers.end()) return it->second(regs, mem);
 
-    /* Unhandled function */
+    /* Unhandled function.
+       For completely unknown ordinals (no name mapping), fail fast — returning
+       fake data causes silent memory corruption that's very hard to debug.
+       For known-named functions that just lack an implementation, log prominently
+       and return 0. These should be stubbed explicitly as they're discovered. */
+    if (func.empty() && entry.by_ordinal) {
+        LOG(API, "\n[FATAL] UNKNOWN ORDINAL: %s!@%d (no name mapping) LR=0x%08X\n",
+               entry.dll_name.c_str(), entry.ordinal, regs[14]);
+        LOG(API, "[FATAL] Exiting to prevent silent corruption.\n\n");
+        Log::Close();
+        ExitProcess(1);
+    }
     if (!func.empty()) {
-        LOG(API, "[API] UNHANDLED: %s!%s (ordinal=%d) - returning 0\n",
-               entry.dll_name.c_str(), func.c_str(), entry.ordinal);
-    } else if (entry.by_ordinal) {
-        LOG(API, "[API] UNHANDLED: %s!@%d (no name mapping) - returning 0\n",
-               entry.dll_name.c_str(), entry.ordinal);
+        LOG(API, "[API] *** UNIMPLEMENTED: %s!%s (ordinal=%d) LR=0x%08X - returning 0 ***\n",
+               entry.dll_name.c_str(), func.c_str(), entry.ordinal, regs[14]);
     } else {
-        LOG(API, "[API] UNHANDLED: %s!%s - returning 0\n",
-               entry.dll_name.c_str(), entry.func_name.c_str());
+        LOG(API, "[API] *** UNIMPLEMENTED: %s!%s LR=0x%08X - returning 0 ***\n",
+               entry.dll_name.c_str(), entry.func_name.c_str(), regs[14]);
     }
     regs[0] = 0;
     return true;

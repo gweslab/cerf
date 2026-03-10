@@ -11,10 +11,16 @@ void Win32Thunks::RegisterMenuHandlers() {
         regs[0] = (uint32_t)(uintptr_t)CreatePopupMenu(); return true;
     });
     Thunk("DestroyMenu", 844, [](uint32_t* regs, EmulatedMemory&) -> bool {
-        regs[0] = DestroyMenu((HMENU)(intptr_t)(int32_t)regs[0]); return true;
+        HMENU h = (HMENU)(intptr_t)(int32_t)regs[0];
+        BOOL ok = DestroyMenu(h);
+        LOG(API, "[API] DestroyMenu(0x%p) -> %d err=%lu\n", h, ok, ok ? 0 : GetLastError());
+        regs[0] = ok; return true;
     });
     Thunk("GetSubMenu", 855, [](uint32_t* regs, EmulatedMemory&) -> bool {
-        regs[0] = (uint32_t)(uintptr_t)GetSubMenu((HMENU)(intptr_t)(int32_t)regs[0], regs[1]); return true;
+        HMENU h = (HMENU)(intptr_t)(int32_t)regs[0];
+        HMENU sub = GetSubMenu(h, regs[1]);
+        LOG(API, "[API] GetSubMenu(0x%p, %d) -> 0x%p (trunc=0x%08X)\n", h, regs[1], sub, (uint32_t)(uintptr_t)sub);
+        regs[0] = (uint32_t)(uintptr_t)sub; return true;
     });
     Thunk("AppendMenuW", 842, [this](uint32_t* regs, EmulatedMemory& mem) -> bool {
         /* MF_STRING is 0x0, so can't test with bitwise AND.

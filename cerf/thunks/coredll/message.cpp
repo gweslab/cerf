@@ -8,55 +8,21 @@ void Win32Thunks::RegisterMessageHandlers() {
     Thunk("GetMessageW", 861, [this](uint32_t* regs, EmulatedMemory& mem) -> bool {
         MSG msg;
         BOOL ret;
-        if (pseudo_thread_depth >= 2) {
-            /* Nested pseudo-thread (depth 2+): use MsgWaitForMultipleObjectsEx
-               with a timeout so the thread can process async messages (e.g. COM/OLE
-               initialization, WebBrowser navigation) before exiting.
-               After max_empty_waits consecutive timeouts with no messages, inject WM_QUIT. */
-            LOG(API, "[API] GetMessageW depth=%d hwndFilter=0x%08X msgMin=0x%X msgMax=0x%X\n",
-                pseudo_thread_depth, regs[1], regs[2], regs[3]);
-            int empty_waits = 0;
-            const int max_empty_waits = 50; /* 50 * 100ms = 5 seconds max idle */
-            while (true) {
-                ret = PeekMessageW(&msg, (HWND)(intptr_t)(int32_t)regs[1], regs[2], regs[3], PM_REMOVE);
-                if (!ret) {
-                    if (++empty_waits >= max_empty_waits) {
-                        msg = {};
-                        msg.message = WM_QUIT;
-                        ret = 0;
-                        break;
-                    }
-                    /* Wait up to 100ms for new messages before trying again */
-                    MsgWaitForMultipleObjectsEx(0, NULL, 100, QS_ALLINPUT, MWMO_INPUTAVAILABLE);
+        /* Real threading: each thread has its own message queue.
+           Use blocking GetMessageW — no pseudo-thread hacks needed. */
+        while (true) {
+            ret = GetMessageW(&msg, (HWND)(intptr_t)(int32_t)regs[1], regs[2], regs[3]);
+            if (ret <= 0) break; /* WM_QUIT or error */
+            /* Filter native timer callbacks: if the timer ID isn't registered
+               as an ARM callback, dispatch it natively and get next message. */
+            if (msg.message == WM_TIMER && msg.hwnd == NULL && msg.lParam != 0) {
+                UINT_PTR timerID = msg.wParam;
+                if (arm_timer_callbacks.find(timerID) == arm_timer_callbacks.end()) {
+                    DispatchMessageW(&msg);
                     continue;
                 }
-                empty_waits = 0; /* Reset on any message received */
-                /* Filter native timer callbacks same as blocking path */
-                if (msg.message == WM_TIMER && msg.hwnd == NULL && msg.lParam != 0) {
-                    UINT_PTR timerID = msg.wParam;
-                    if (arm_timer_callbacks.find(timerID) == arm_timer_callbacks.end()) {
-                        DispatchMessageW(&msg);
-                        continue;
-                    }
-                }
-                break;
             }
-        } else {
-            /* Normal or first pseudo-thread (depth 0 or 1): use blocking GetMessageW.
-               Depth 1 is the first inline thread whose message loop acts as the app's
-               main message pump (e.g. CTaskBar in explorer). */
-            while (true) {
-                ret = GetMessageW(&msg, (HWND)(intptr_t)(int32_t)regs[1], regs[2], regs[3]);
-                if (ret <= 0) break; /* WM_QUIT or error */
-                if (msg.message == WM_TIMER && msg.hwnd == NULL && msg.lParam != 0) {
-                    UINT_PTR timerID = msg.wParam;
-                    if (arm_timer_callbacks.find(timerID) == arm_timer_callbacks.end()) {
-                        DispatchMessageW(&msg);
-                        continue;
-                    }
-                }
-                break;
-            }
+            break;
         }
         LOG(API, "[API] GetMessageW -> msg=0x%04X hwnd=0x%p wP=0x%X lP=0x%X ret=%d\n",
             msg.message, msg.hwnd, (uint32_t)msg.wParam, (uint32_t)msg.lParam, ret);

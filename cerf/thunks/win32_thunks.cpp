@@ -132,6 +132,7 @@ Win32Thunks::Win32Thunks(EmulatedMemory& mem)
        It's called from InitVFS() instead. */
     RegisterGdiRegionHandlers();
     RegisterWindowHandlers();
+    RegisterWindowLayoutHandlers();
     RegisterWindowPropsHandlers();
     RegisterDialogHandlers();
     RegisterMessageHandlers();
@@ -140,9 +141,13 @@ Win32Thunks::Win32Thunks(EmulatedMemory& mem)
     RegisterRegistryHandlers();
     RegisterFileHandlers();
     RegisterSystemHandlers();
+    RegisterSysInfoHandlers();
+    RegisterLocaleHandlers();
+    RegisterSyncHandlers();
     RegisterResourceHandlers();
     RegisterProcessHandlers();
     RegisterMiscHandlers();
+    RegisterComHandlers();
     RegisterImageListHandlers();
     RegisterModuleHandlers();
     RegisterDpaHandlers();

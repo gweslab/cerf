@@ -114,9 +114,9 @@ void Win32Thunks::RegisterModuleHandlers() {
         /* Resolve hmod to the correct DLL name via the thunked DLL table */
         std::string dll_name = "coredll.dll";
         bool is_thunked_dll = false;
-        for (const auto& dll : thunked_dlls) {
-            if (hmod == dll.fake_handle) {
-                dll_name = std::string(dll.name) + ".dll";
+        for (size_t i = 0; i < thunked_dlls_count; ++i) {
+            if (hmod == thunked_dlls[i].fake_handle) {
+                dll_name = std::string(thunked_dlls[i].name) + ".dll";
                 is_thunked_dll = true;
                 break;
             }

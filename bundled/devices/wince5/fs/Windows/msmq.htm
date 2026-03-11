@@ -1,0 +1,47 @@
+<!--
+Copyright (c) Microsoft Corporation.  All rights reserved.
+-->
+<!--
+Use of this source code is subject to the terms of the Microsoft end-user
+license agreement (EULA) under which you licensed this SOFTWARE PRODUCT.
+If you did not accept the terms of the EULA, you are not authorized to use
+this source code. For a copy of the EULA, please see the LICENSE.RTF on your
+install media.
+-->
+<HTML>
+<HEAD>
+<TITLE>MSMQ Administration Page</TITLE>
+</HEAD>
+<B>MSMQ Administration Page</B>
+      
+
+<P>Command Shortcut Table
+<TABLE BORDER =0 WIDTH=40%>
+<TR>
+<TD><FORM ACTION = "/MsmqAdmin" METHOD = "post"><INPUT TYPE = submit NAME = "register install netreg" VALUE = "Install"></FORM></TD>
+<TD><FORM ACTION = "/MsmqAdmin" METHOD = "post"><INPUT TYPE = submit NAME = "register" VALUE = "Register" ></FORM></TD>
+<TD><FORM ACTION = "/MsmqAdmin" METHOD = "post"><INPUT TYPE = submit NAME = "status" VALUE = "Status" ></FORM></TD>
+<TD><FORM ACTION = "/MsmqAdmin" METHOD = "post"><INPUT TYPE = submit NAME = "net connect" VALUE = "Net Connect" ></FORM></TD>
+<TD><FORM ACTION = "/MsmqAdmin" METHOD = "post"><INPUT TYPE = submit NAME = "start" VALUE = "Start" ></FORM></TD>
+</TR>
+<TR>
+<TD><FORM ACTION = "/MsmqAdmin" METHOD = "post"><INPUT TYPE = submit NAME = "register uninstall" VALUE = "Uninstall" ></FORM></TD>
+<TD><FORM ACTION = "/MsmqAdmin" METHOD = "post"><INPUT TYPE = submit NAME = "verify" VALUE = "Verify"></FORM></TD>
+<TD><FORM ACTION = "/MsmqAdmin" METHOD = "post"><INPUT TYPE = submit NAME = "log" VALUE = "Log" ></FORM></TD>
+<TD><FORM ACTION = "/MsmqAdmin" METHOD = "post"><INPUT TYPE = submit NAME = "enum queues" VALUE = "List Queues" ></FORM></TD>
+<TD><FORM ACTION = "/MsmqAdmin" METHOD = "post"><INPUT TYPE = submit NAME = "stop" VALUE = "Stop" ></FORM></TD>
+</TR>
+</TABLE>
+
+
+<FORM METHOD="post">
+Enter a custom command:  <INPUT NAME = "run" width=50>
+<INPUT TYPE = SUBMIT VALUE = "Submit">
+</FORM>
+<HR>
+
+
+<B>Output</B>
+<P>
+<!--  The script appends the output to this page, so don't terminated with </HTML> tags in this file -->
+

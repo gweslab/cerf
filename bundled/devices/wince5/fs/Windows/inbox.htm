@@ -1,0 +1,785 @@
+<!--
+Copyright (c) Microsoft Corporation.  All rights reserved.
+-->
+<!--
+Use of this source code is subject to the terms of the Microsoft end-user
+license agreement (EULA) under which you licensed this SOFTWARE PRODUCT.
+If you did not accept the terms of the EULA, you are not authorized to use
+this source code. For a copy of the EULA, please see the LICENSE.RTF on your
+install media.
+-->
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 3.2 Final//EN">
+<HTML>
+<HEAD>
+<META HTTP-EQUIV="Htm-Help" CONTENT="inbox.htm#Main_Contents">
+<TITLE>Inbox Help</TITLE>
+</HEAD>
+<BODY BGCOLOR="#FFFFFF" TEXT="#000000">
+<!-- PegHelp -->
+
+<P><A NAME="Main_Contents"></A><B>Inbox Help</B></P><UL></UL>
+
+<A HREF="inbox.htm#overview">About Inbox</A><BR>
+<A HREF="inbox.htm#remote">Connecting to a Mail Server</A><BR>
+<A HREF="inbox.htm#reading_and_responding_to_messages">Reading and Responding to Messages</A><BR>
+<A HREF="inbox.htm#composing_and_editing_messages">Composing and Editing Messages</A><BR>
+<A HREF="inbox.htm#working_with_folders">Working with Folders</A><BR>
+<A HREF="inbox.htm#moving_copying_and_deleting_messages">Organizing Messages</A><BR>
+<A HREF="inbox.htm#working_with_message_attachments">Working with Message Attachments</A><BR>
+<A HREF="inbox.htm#index">Index</A><BR>
+
+<BR><!-- PegHelp --><HR>
+
+
+<!-- ************************Topic Break************************* -->
+
+<A NAME="overview"></A><B>About Inbox</B><BR><UL></UL>
+
+<P>You can send and receive e-mail by connecting to a POP3 or IMAP4 server. Inbox contains an e-mail service for each method you use. For example, if you receive e-mail through a connection to a POP3 server and through a connection to an IMAP4 server, Inbox will contain two services: POP3 Mail and IMAP4 Mail. Each e-mail service has its own folder hierarchy with four default folders: Inbox, Outbox, Deleted (local), and Sent. The messages you receive and send through the mail service are stored in these folders. You can also create additional folders within each hierarchy. For more information on folders, see <A HREF="inbox.htm#howfolders">About folders</A>.<UL></UL>
+
+<P>When connecting to a POP3 or IMAP4 server, you use a modem to connect to your Internet service provider (ISP), or use a modem or Ethernet card to connect to the local area network that your mail server is connected to. In addition to creating a connection to your ISP or network, you must create an e-mail service in Inbox. For more information, see <A HREF="inbox.htm#remote">Connecting to a Mail Server</A>.<UL></UL>
+
+
+<BR><!-- PegHelp --><HR>
+<!-- ************************Topic Break************************* -->
+
+
+<P><A NAME="remote"></A><B>Connecting to a Mail Server</B></P><UL></UL>
+
+<A HREF="inbox.htm#set_up_an_e-mail_service">Set up a mail service</A><BR>
+<A HREF="inbox.htm#set_up_internet_mail_service">Set service definitions</A><BR>
+<A HREF="inbox.htm#set_general_preferences_for_internet_mail">Set general preferences</A><BR>
+<A HREF="inbox.htm#set_inbox_preferences_for_internet_mail">Set Inbox preferences</A><BR>
+<A HREF="inbox.htm#downloadserver">Download messages from the server</A><BR>
+<BR><!-- PegHelp --><HR>
+
+
+<!-- ************************Topic Break************************* -->
+
+
+<P><A NAME="set_up_an_e-mail_service"></A><B>Set up a mail service</B></P><UL></UL>
+
+<P>To connect to your POP3 or IMAP4 mail server, you need to set up an Inbox mail service and a remote connection to the Internet or network the mail server is connected to. For more information on setting up a remote connection, see <A HREF="rnetw.htm#Main_Contents">Remote Connections Help</A>.
+
+<OL>
+<LI>Get the following information from your ISP or network administrator: POP3 or IMAP4 server name, SMTP host name, user name, password, and domain name (for network connections only).
+<LI>Open Inbox, and select <B>Services</B> > <B>Options</B> > <B>Services</B> tab.
+<LI>Select <B>Add</B>.
+<LI>From the <B>Service type</B> list, select POP3 Mail or IMAP4 Mail. (POP3 is the most common mail protocol for ISPs.)
+<LI>Enter a unique name for the service. This name cannot be changed later.
+<LI>Select <B>OK</B>.
+<LI>Follow the steps in the Setup wizard. For more information, see the following topics:
+<UL>
+<LI><A HREF="inbox.htm#set_up_internet_mail_service">Set service definitions</A>
+<LI><A HREF="inbox.htm#set_general_preferences_for_internet_mail">Set general preferences</A>
+<LI><A HREF="inbox.htm#set_inbox_preferences_for_internet_mail">Set Inbox preferences</A>
+</UL>
+</OL>
+
+<P><B>Notes</B>
+<UL>
+<LI>Other mail protocols, such as the protocol used by AOL, are not supported. In addition, services that use special authentication, such as MSN, are not supported. However, you can gain access to the Internet through these services. There may be third-party programs available that would enable you to send and receive mail through proprietary protocols. Try searching the Web on the keyword &quot;Windows CE&quot; to find third-party programs for your device.
+<LI>If you use the same service to connect to different mailboxes, set up and name a different service for each connection.
+</UL>
+<BR><!-- PegHelp --><HR>
+<!-- ************************Topic Break************************* -->
+
+<A NAME="set_up_internet_mail_service"></A><A NAME="screen_one_IMAP4"></A><B>Set service definitions</B></P><UL></UL>
+
+<P>The Mail Service Setup wizard appears after you add a service. If you are adjusting the settings of an existing service, select <B>Services</B> > <B>Options</B>, select the service you are using, and then <B>Properties</B>. In the <B>Service Definition</B> dialog box, complete the following entries as needed:</P>
+
+<UL>
+<LI><B>Connection</B>: Select the name of the connection you created to connect to the mail server. If you are receiving e-mail through a network (Ethernet) connection, Select <B>Network Connection</B>. If you want Inbox to use your current connection, select <B>(none)</B>. If you have not created a connection, select <B>Create new connection</B>, double-tap or double-click the Make New Connection icon, and follow the instructions in the wizard. When finished, select Inbox in the Taskbar and continue setting up Inbox. For more information, see <A HREF="rnetw.htm#Main_Contents">Remote Connections Help</A>.
+<LI><B>POP3 Host</B> (POP3 only): Enter the name of the mail server you use to receive and send messages.
+<LI><B>Server</B> (IMAP4 only): Enter the name of the mail server you use to receive and send messages.
+<LI><B>User ID</B>: Enter the user name or mailbox ID assigned to you.
+<LI><B>Password</B>: Enter the password you use to access this mail account. If you do not want to be prompted to enter the password each time you connect, select <B>Save password</B>.
+<LI><B>Domain (Windows NT)</B>: Enter your Windows NT domain name. This name is  required only when connecting to networks, such as a corporate network, that use Windows NT domain security. This is not required for most ISP accounts. If you have trouble connecting, try clearing this box.
+<LI><B>SMTP Host</B>: If your mail service uses a separate server for SMTP, enter the name in the box. If you're setting up a POP3 Mail service with an ISP, the ISP must use an SMTP mail gateway.
+<LI><B>Return Address</B>: By default, the return address is set to <B><I>username@POP3host</I></B> or <B><I>username@Servername</I></B>, depending on the service you are using. If this is not your e-mail address, enter the correct address in the box.
+</UL>
+
+<B>See Also</B><BR>
+<A HREF="inbox.htm#set_general_preferences_for_internet_mail">Set general preferences</A> <BR>
+<A HREF="inbox.htm#set_inbox_preferences_for_internet_mail">Set Inbox preferences</A><BR>
+
+<BR CLEAR=ALL><!-- PegHelp --><HR>
+
+<!-- ************************Topic Break************************* -->
+
+<P><A NAME="set_general_preferences_for_internet_mail"></A><A NAME="set_general_preferences_for_IMAP4"></A><B>Set general preferences</B></P><UL></UL>
+
+<P>If you are adjusting the settings of an existing service, select <B>Services</B> > <B>Options</B>, select the service you are using, select <B>Properties</B>, and then select <B>Next</B>. In the <B>General Preferences</B> dialog box, choose any of the following settings, all of which are optional:</P>
+
+<UL>
+<LI><B>Disconnect service after actions are performed</B>: Select to automatically disconnect from the server upon completion of all pending actions. This option minimizes connect time and cost.
+<LI><B>Check for new messages every</B>: Select the time interval (in minutes) at which you want the device to check for new mail. If this option is turned off, you must check for new mail manually by selecting <B>Services</B> > <B>Send/Receive Mail</B>.
+<LI><B>Display a message box when new mail arrives</B> (POP3 only): Select to be informed that new mail has arrived.
+<LI><B>Play a sound</B> (IMAP4 only): Select to be informed that new mail has arrived.
+<LI><B>Send using MIME format</B> (POP3 only): Select to send messages with extended characters.
+<LI><B>Only display messages from the last 3 days</B>: Select how many day's messages you want downloaded.
+</UL>
+
+<B>See Also</B><BR>
+<A HREF="inbox.htm#set_inbox_preferences_for_internet_mail">Set Inbox preferences</A><BR>
+
+<BR CLEAR=ALL><!-- PegHelp --><HR>
+
+<!-- ************************Topic Break************************* -->
+
+<P><A NAME="set_inbox_preferences_for_internet_mail"></A><A NAME="set_inbox_preferences_for_IMAP4"></A><B>Set Inbox preferences</B></P><UL></UL>
+
+<P>If you are adjusting the settings of an existing service, select <B>Services</B> > <B>Options</B>, select the service you are using, select <B>Properties</B>, and then select <B>Next</B> twice. In the <B>Inbox Preferences</B> dialog box, choose any of the following options:</P>
+
+<UL>
+<LI><B>Get message headers only</B>: Select to save storage space and time by downloading only headers. You can download a full copy of the message later by selecting the message and then <B>Services</B> > <B>Get Full Copy</B>.
+<LI><B>Include &lt;number&gt; lines</B>: Select to set the message length (approximate number of lines) that you want to download.
+<LI><B>Get full copy of messages</B>: Select to receive a full copy of all messages. In addition to the message body, any options you select in <B>When getting full copy</B> will be downloaded. Selecting this option increases the amount of time needed to download messages.
+<LI><B>Only synchronize folder hierarchy under Inbox</B> (IMAP4 only): Select to speed download time by preventing the complete download of the folder list every time you connect.
+<LI><B>Get meeting requests</B> (POP3 only): Select to download and store copies of meeting requests when getting full copies of messages. This setting applies whether you have chosen to download full copies of messages by default, or if you selectively download full copies of messages by opening the message and selecting <B>Services</B> > <B>Get Full Copy</B>. Limitations apply. 
+<LI><B>Get file attachments</B> (POP3 only): Select to download and save message attachments when getting full copies of messages. This option may use significant RAM and slow download time. This setting applies whether you have chosen to download full copies of messages by default, or if you selectively download full copies of messages by opening the message and selecting <B>Services</B> > <B>Get Full Copy</B>.
+<LI><B>Get file attachments and meeting requests</B> (IMAP4 only): Select to download and store meeting requests and message attachments when getting full copies of messages. This setting applies whether you have chosen to download full copies of messages by default, or if you selectively download full copies of messages by opening the message and selecting <B>Services</B> > <B>Get Full Copy</B>. Limitations apply. 
+<LI><B>Only if smaller than</B> (IMAP4 only) Select to restrict the size of the attachments you download. Set to 10K if you want to receive meeting requests only.
+</UL>
+
+<BR CLEAR=ALL><!-- PegHelp --><HR>
+
+<!-- ************************Topic Break************************* -->
+
+<A NAME="downloadserver"><B>Download messages from the server</B></A><UL></UL>
+
+<P>When you download messages, you need to create two connections: a remote connection and a mail server connection. The remote connection connects you to your ISP or network. The mail server connection downloads messages from your mail server to Inbox on your device. When you select <B>Services </B> > <B>Connect</B> in Inbox, Inbox starts a remote connection using the connection you specified when setting up the current mail service. If you are already connected through a remote connection other than the one you specified in the mail service, you will be asked if you want to use the current connection. If you choose not to, you will need to disconnect from the current connection before you can check for new messages. For more information, see <A HREF="rnetw.htm#Main_Contents">Remote Connections Help</A>. 
+<OL>
+<LI>Select the <B>Services</B> menu and make sure that the service you want to use is selected (the selected service has a bullet next to it.)
+<LI>Select <B>Services</B> > <B>Connect</B>.
+The messages on your device and mail server are synchronized: new messages are downloaded to the device Inbox folder, messages in the device Outbox folder are sent, and messages that have been deleted on the server are removed from the device Inbox.  Double-tap or double-click a message in the message list to open it.
+<LI>If you read a message and decide that you need the full copy, select <B>File</B> > <B>Get Full Copy</B> while in the message window or <B>Services</B> > <B>Get Full Copy</B> while in list view. This will also download message attachments and meeting requests if you have those options selected in the <B>Inbox Preferences</B> dialog box. You can also choose to download full copies of messages by default.
+<LI>When finished, select <B>Services</B> > <B>Connect</B> to disconnect. You also need to disconnect your dial-up connection by double-tapping or double-clicking the icon in the status bar and selecting <B>Disconnect</B>.
+</OL>  
+
+<P><B>Notes</B>
+<UL>
+<LI>Receiving entire messages consumes storage memory.
+<LI>The size column in the Inbox list view displays the local size and server size of a message. Even when a message has been downloaded fully, these numbers may differ because the size of a message can vary between the server and the device.
+<LI>When using IMAP4 to get Outlook or Schedule+ data, you will see the contents of your Journal folder. File editing transactions and documents (such as Task items, e-mail messages, and Word documents) attached using drag and drop will appear as shortcuts on the device. A copy of the document will not be moved to your device, and the shortcut on the device cannot be used to access the document. To move documents associated with a journal entry to the device, attach the document to the entry rather than dragging and dropping it. Also, be sure to set your IMAP4 service to receive full copies of messages, attachments, and meeting requests. For more information on using Journal, see the Help for the desktop version of Outlook.
+</UL>
+
+<P><B>See Also</B><BR>
+<A HREF="inbox.htm#howfolders">About folders</A><BR>
+<A HREF="inbox.htm#set_inbox_preferences_for_internet_mail">Set Inbox preferences</A><BR>
+<BR CLEAR=ALL><!-- PegHelp --><HR>
+
+<!-- ************************Topic Break************************* -->
+
+
+<P><A NAME="reading_and_responding_to_messages"></A><B>Reading and Responding to Messages</B></P><UL></UL>
+
+<A HREF="inbox.htm#copy_a_message_to_your_h_pc_inbox">Download messages</A><BR>
+<A HREF="inbox.htm#replay_to_a_message">Reply to or forward a message</A><BR>
+<A HREF="inbox.htm#add_to_contacts">Add the sender to Address Book</A><BR>
+<A HREF="inbox.htm#addressbook">Change the Address Book entries</A><BR>
+<A HREF="inbox.htm#check_inbox_status">Check Inbox status</A><BR>
+<A HREF="inbox.htm#include_the_original_message_in_a_reply">Include the original message in a reply</A><BR>
+<A HREF="inbox.htm#enlarge_the_message_font">Enlarge the message font</A><BR>
+
+<BR><!-- PegHelp --><HR>
+
+
+<!-- ************************Topic Break************************* -->
+
+
+<A NAME="copy_a_message_to_your_h_pc_inbox"></A><B>Download messages</B><UL></UL>
+<P>The way you download copies of messages depends on how you are receiving messages:
+<UL>
+<LI>If you receive messages through a remote mail server, see <A HREF="inbox.htm#downloadserver">Download messages from the server</A>.<BR>
+</UL>
+
+<BR><!-- PegHelp --><HR>
+
+
+<!-- ************************Topic Break************************* -->
+
+<A NAME="replay_to_a_message"></A><B>Reply to or forward a message</B>
+
+<OL>
+<LI>Open the message, and then select <B>Compose</B> > <B>Reply to Sender</B>, <B>Reply to All</B>, or <B>Forward</B>.
+<LI>Enter your response.
+<LI>Select <B>File</B> > <B>Send</B>.
+</OL>
+
+<P><B>Tips</B>
+<UL>
+<LI>Selections in the <B>Options</B> dialog box determine whether the original text is included.
+<LI>To see more header information, select the inverted triangle in the lower-right corner of the header area. Select the triangle again to collapse the header area.
+</UL>
+
+<B>See Also</B><BR>
+<A HREF="inbox.htm#include_the_original_message_in_a_reply">Include the original message in a reply</A><BR>
+
+<BR><!-- PegHelp --><HR>
+
+
+<!-- ************************Topic Break************************* -->
+<A NAME="add_to_contacts"></A><B>Add the sender to Address Book</B>
+
+<OL>
+<LI>Open the message, and then select <B>Compose</B> > <B>Add Sender to Address Book</B>.<BR>
+A new contact card will open with the sender's name and e-mail address already entered.
+<LI>Enter other desired information.
+</OL>
+
+<B>See Also</B><BR>
+<A HREF="inbox.htm#addressbook">Change the Address Book entries</A>
+
+<BR><!-- PegHelp --><HR>
+
+
+<!-- ************************Topic Break************************* -->
+<A NAME="addressbook"></A><B>Change the Address Book entries</B>
+
+<uL>
+<LI>Select <B>Go</B> > <B>Address Book</B>.
+<ul>
+<LI>To add a new entry, select <B>New</B>. Enter the name you want to type in the <b>To</b> and <b>CC</b> fields of messages in the <b>Name</b> field.  For more information, see 
+<A HREF="inbox.htm#compose_a_new_message">Compose and send a message</A>.
+<LI>To delete an entry, select it, and then select <B>Delete</B>.
+<LI>To edit an entry, select it, and then select <B>Edit</B>.
+</uL>
+</uL>
+
+<B>See Also</B><BR>
+<A HREF="inbox.htm#add_to_contacts">Add the sender to Address Book</A>
+
+<BR><!-- PegHelp --><HR>
+
+
+<!-- ************************Topic Break************************* -->
+
+<A NAME="check_inbox_status"></A><B>Check Inbox status</B>
+
+<UL>
+<LI>In list view, select <B>Compose</B> > <B>Status</B>.<BR>
+You can view details such as the number of messages to be sent, deleted, and copied, and the number of attachments to be downloaded.
+</UL>
+
+<BR><!-- PegHelp --><HR>
+
+<!-- ************************Topic Break************************* -->
+
+<A NAME="include_the_original_message_in_a_reply"></A><B>Include the original message in a reply</B>
+
+<OL>
+<LI>Select <B>Services</B> > <B>Options </B> > <B>Compose</B> tab.
+<LI>Under <B>Reply</B>, select <B>Include Body</B>.<BR>This setting will place a copy of the original message beneath your response text.
+<LI>To indent the original message, select <B>Indent</B>.
+<LI>To add leading characters (such as &gt;) to the original message lines, select <B>Add leading character</B>, and enter the character you want.</LI>
+</OL>
+
+<B>See Also</B><BR>
+<A HREF="inbox.htm#save_copies_of_your_sent_messages">Save copies of sent messages</A>
+
+<BR><!-- PegHelp --><HR>
+
+
+<!-- ************************Topic Break************************* -->
+
+<A NAME="enlarge_the_message_font"></A><B>Enlarge the message font</B>
+
+<OL>
+<LI>Open the message you want to read.
+<LI>Select <B>File</B> > <B>Large Font</B>.
+<LI>To return the font to its original size, select <B>File</B> > <B>Large Font</B> again.
+</OL>
+
+
+<BR><!-- PegHelp --><HR>
+
+
+<!-- ************************Topic Break************************* -->
+<P><A NAME="composing_and_editing_messages"></A><B>Composing and Editing Messages</B></P><UL></UL>
+
+<A HREF="inbox.htm#compose_a_new_message">Compose and send a message</A><BR>
+<A HREF="inbox.htm#save_a_message">Save a message</A><BR>
+<A HREF="inbox.htm#save_copies_of_your_sent_messages">Save copies of sent messages</A><BR>
+
+<BR><!-- PegHelp --><HR>
+
+
+<!-- ************************Topic Break************************* -->
+
+
+<A NAME="compose_a_new_message"></A><B>Compose and send a message</B>
+
+
+<OL>
+<LI>In list view, select <B>Compose</B> > <B>New Message</B>.
+<LI>Enter the address of one or more recipients, separating them with a semicolon. If the recipient is listed in the Address Book, enter a few letters of the recipient's name and select <B>Compose</B> > <B>Check Names</B>. If there is only one match, the e-mail address is inserted. If there is more than one match, select the correct address from the <B>Choose E-mail Recipients</B> dialog box.  If there is no match then add a new e-mail address through <B>Choose E-mail Recipients</B>.
+<LI>To attach a file, select <B>File</B> > <B>Attachments</B> > <B>Add Attachment</B>.
+<LI>Select <B>File</B> > <B>Send</B>.
+If you are working offline, the message is moved to the Outbox folder and will be sent the next time you connect.
+</OL>
+
+<P><B>Tip</B> To see more header information, select the triangle in the lower-right corner of the header area. Select the triangle again to collapse the header area.
+<UL></UL>
+<P><B>See Also</B><BR>
+<A HREF="inbox.htm#attach_a_file_to_a_message">Attach a file to a message</A>
+
+
+<BR><!-- PegHelp --><HR>
+
+
+<!-- ************************Topic Break************************* -->
+
+<A NAME="save_a_message"></A><B>Save a message</B>
+
+<UL>
+<LI>Select <B>File</B> > <B>Save</B> to save the message you are composing or editing.<BR>
+The message is not sent and is saved in the Inbox folder of the active service.
+</UL>
+
+<B>See Also</B><BR>
+<A HREF="inbox.htm#compose_a_new_message">Compose and send a message</A><BR>
+
+<BR><!-- PegHelp --><HR>
+
+
+<!-- ************************Topic Break************************* -->
+
+
+<A NAME="save_copies_of_your_sent_messages"></A><B>Save copies of sent messages</B><UL></UL>
+
+<P>By default, sent messages are not saved on your device.</P>
+
+<OL>
+<LI>Select <B>Services</B> > <B>Options</B> > <B>Compose</B> tab.
+<LI>Select <B>Keep copy of sent mail in Sent folder</B>.<BR>
+</OL>
+
+<BR><!-- PegHelp --><HR>
+
+
+<!-- ************************Topic Break************************* -->
+
+<P><A NAME="working_with_folders"></A><B>Working with Folders</B></P><UL></UL>
+
+<A HREF="inbox.htm#howfolders">About folders</A><BR>
+<A HREF="inbox.htm#create_a_folder">Create a folder</A><BR>
+<A HREF="inbox.htm#rename_a_folder">Rename a folder</A><BR>
+<A HREF="inbox.htm#delete_a_folder">Delete a folder</A><BR>
+<A HREF="inbox.htm#designate">Designate a folder as offline</A><BR>
+<A HREF="inbox.htm#syncfolders">Synchronize folders while connected</A><BR>
+
+
+<BR CLEAR=ALL><!-- PegHelp --><HR>
+
+<!-- ************************Topic Break************************* -->
+
+<P><A NAME="howfolders"></A><B>About folders</B><UL></UL>
+
+<P>Inbox contains folders from mail services you have set up. You can set up services to connect directly to a remote mail server. When you set up a service, it appears in the Inbox list view. Each service contains four default folders: Inbox, Deleted (local), Outbox, and Sent. The Deleted (local) folder contains messages that have been deleted on the device. If you are using IMAP4, you may see a Deleted Items folder. This folder is for messages deleted on the server. The behavior of the Deleted (local) and Sent folders depends on the Inbox options you have chosen.<UL></UL>
+
+<P>You can also create your own folders. The behavior of the folders you create depends on whether you are using POP3 or IMAP4. <UL></UL>
+
+<P>If you are using POP3 and you drag messages to a folder you created, the link is broken between the messages and their copies on the mail server. The next time you connect, the mail server will see that the messages are missing from the device Inbox and delete them from the server. This prevents you from having duplicate copies of a message, but it also means that you will no longer have access to messages you move to folders you create from anywhere except the device.<UL></UL>
+
+<P>If you are using IMAP4, the folders you create and the messages you move are mirrored on the server. For example, if you move two messages from the Inbox folder to a folder called Family, the server will create a copy of the Family folder and copy the messages into that folder. Therefore, messages are available to you anytime you connect to your mail server, whether it is from your device or PC. This synchronization of folders occurs when you create a new folder, move messages into a folder, exit the Inbox program, or select <B>Services</B> > <B>Synchronize Folders</B>. If you want to view the messages in a folder while disconnected from your mail server, select the folder and then <B>Services</B> > <B>Offline Folder</B>.<UL></UL>
+
+<P><B>See Also</B><BR>
+<A HREF="inbox.htm#create_a_folder">Create a folder</A><BR>
+<A HREF="inbox.htm#designate">Designate a folder as offline</A><BR>
+<A HREF="inbox.htm#syncfolders">Synchronize folders while connected</A><BR>
+
+<BR CLEAR=ALL><!-- PegHelp --><HR>
+
+<!-- ************************Topic Break************************* -->
+
+<A NAME="create_a_folder"></A><B>Create a folder</B>
+
+<OL>
+<LI>Select <B>File</B> > <B>Folder</B> > <B>New Folder</B>.
+<LI>Type a name for the folder.
+</OL>
+
+<B>See Also</B><BR>
+<A HREF="inbox.htm#rename_a_folder">Rename a folder</A><BR>
+<A HREF="inbox.htm#delete_a_folder">Delete a folder</A><BR>
+
+<BR CLEAR=ALL><!-- PegHelp --><HR>
+
+<!-- ************************Topic Break************************* -->
+
+<A NAME="rename_a_folder"></A><B>Rename a folder</B>
+
+<OL>
+<LI>Select the folder you want to rename.
+<LI>Select <B>File</B> > <B>Folder</B> > <B>Rename Folder</B>.
+<LI>Type the new name for the folder.
+</OL>
+
+<B>Notes</B>
+<UL>
+<LI>Default folders, such as Inbox, can't be renamed.
+<LI>Folders you create for IMAP4 mail servers can't be renamed.
+</UL>
+
+<B>See Also</B><BR>
+<A HREF="inbox.htm#create_a_folder">Create a folder</A><BR>
+<A HREF="inbox.htm#delete_a_folder">Delete a folder</A><BR>
+
+<BR CLEAR=ALL><!-- PegHelp --><HR>
+
+<!-- ************************Topic Break************************* -->
+
+<A NAME="delete_a_folder"></A><B>Delete a folder</B>
+
+
+<OL>
+<LI>Select the folder you want to delete.
+<LI>Select <B>File</B> > <B>Delete</B>.
+</OL>
+
+<P><B>Note</B>  Default folders, such as Inbox, can't be deleted.</P><UL></UL>
+
+<B>See Also</B><BR>
+<A HREF="inbox.htm#create_a_folder">Create a folder</A><BR>
+<A HREF="inbox.htm#empty_deleted_items">Empty deleted items</A><BR>
+
+<BR CLEAR=ALL><!-- PegHelp --><HR>
+
+<!-- ************************Topic Break************************* -->
+
+<A NAME="designate"></A><B>Designate a folder as offline</B><UL></UL>
+
+<P>Only IMAP4 folders can be designated as offline. All IMAP4 default folders, such as Inbox, are automatically designated as offline. Messages in offline folders can be viewed when you are disconnected from your mail server. If a folder is not designated as offline, you will  be able to read and respond to messages in that folder only when connected to the server. 
+<P>
+<UL>
+<LI>To designate a folder as offline, select the folder, and then select <B>Services</B> > <B>Offline Folder</B>.
+</UL><BR>
+Offline folders are designated with the following icon:
+<IMG HEIGHT=16 WIDTH=16 SRC="iremotI.2bp"><BR>
+Folders that are not offline are designated with the following icon:
+<IMG HEIGHT=16 WIDTH=16 SRC="ilocI.2bp"><BR>
+
+
+<BR CLEAR=ALL><!-- PegHelp --><HR>
+
+<!-- ************************Topic Break************************* -->
+
+
+<A NAME="syncfolders"></A><B>Synchronize folders while connected</B><BR><UL></UL>
+
+<P>When you synchronize folders, the contents of your device folders and mail server folders are compared and updated. New mail messages are downloaded, and messages in your device Outbox folder are sent. The synchronization behavior depends on how you connect to your mail server.
+<P>
+<UL>
+<LI>When you connect to a POP3 server, the Inbox and Outbox folders on your device are synchronized with the corresponding folders on the mail server. To synchronize after the initial connection, select <B>Services</B> >  <B>Send/Receive Mail</B>.
+<LI>When you connect to an IMAP4 server, Inbox, Outbox, and all folders marked as offline are synchronized. To synchronize all folders after the initial connection, select <B>Services</B> > <B>Synchronize Folders</B>. To synchronize just the selected folder and the Outbox folder, select <B>Services</B> > <B>Send/Receive Mail</B>.
+
+</UL>
+
+
+<BR CLEAR=ALL><!-- PegHelp --><HR>
+
+<!-- ************************Topic Break************************* -->
+
+
+<P><A NAME="moving_copying_and_deleting_messages"></A><B>Organizing Messages</B></P><UL></UL>
+
+
+<A HREF="inbox.htm#move_a_message">Move or copy a message</A><BR>
+<A HREF="inbox.htm#DELETE_A_MESSAGE">Delete a message</A><BR>
+<A HREF="inbox.htm#empty_deleted_items">Empty the Deleted (local) folder</A><BR>
+<A HREF="inbox.htm#clear_message_headers">Clear messages and folders</A><BR>
+<A HREF="inbox.htm#unmark_a_message">Unmark a message</A><BR>
+<A HREF="inbox.htm#set_the_action_to_follow_moving_or_deleting_a_message">Set the action to follow deleting, moving, or responding to a message</A><BR>
+
+
+<BR><!-- PegHelp --><HR>
+
+
+<!-- ************************Topic Break************************* -->
+
+
+
+<P><A NAME="move_a_message"></A><B>Move or copy a message</B></P><UL></UL>
+
+<P><B>Caution</B>  When you move a message that you have received through POP3 or synchronization to a folder you created on your device, the copy of the message on the server is deleted. This prevents duplicate copies of messages. Although the complete message is moved, message attachments will be deleted if you have not selected the option to download attachments. Once the message is moved, you will  be able to access the message only from your device.</P>
+
+<OL>
+<LI>Select the message.
+<LI>Select <B>File</B> > <B>Move To</B> or <B>File</B> > <B>Copy To</B>.
+<LI>Select the destination folder.<BR>If you are working offline, the message will be moved or copied from the server the next time you connect.
+</OL>
+
+
+<BR><!-- PegHelp --><HR>
+
+
+<!-- ************************Topic Break************************* -->
+
+<A NAME="DELETE_A_MESSAGE"></A><B>Delete a message</B><BR>
+
+<UL>
+<LI>Select the message and select <B>File</B> > <B>Delete</B>. Messages are moved to the Deleted (local) folder and deleted according to the option you have selected in <B>Services</B> > <B>Options</B> > <B>Delete</B> tab:
+<UL>
+<LI><B>On connect/disconnect</B>: Deletes messages when you connect or disconnect from your mail service or exit Inbox. 
+<LI><B>Immediately</B>: Deletes messages as soon as you select <B>File</B> > <B>Delete</B>.
+<LI><B>Manual</B>: Deletes messages when you select <B>File</B> > <B>Empty Deleted (local)</B>.
+</UL>
+</UL>
+
+<P><B>Note</B>  If you are working offline, messages that have been deleted from the server will be deleted from the device the next time you connect.</P><UL></UL>
+
+<B>See Also</B><BR>
+<A HREF="inbox.htm#empty_deleted_items">Empty the Deleted (local) folder</A><BR>
+<A HREF="inbox.htm#clear_message_headers">Clear messages and folders</A><BR>
+
+
+<BR><!-- PegHelp --><HR>
+
+
+<!-- ************************Topic Break************************* -->
+
+
+<A NAME="empty_deleted_items"></A><B>Empty the Deleted (local) folder</B>
+
+<UL>
+<LI>Select <B>File</B> > <B>Empty Deleted (local)</B>.<BR>This permanently deletes messages in the Deleted (local) folder.
+<LI>To check or adjust the current settings for deleting messages, select  <B>Services</B> > <B>Options</B> > <B>Delete</B> tab.
+</UL>
+
+
+<B>See Also</B><BR>
+<A HREF="inbox.htm#DELETE_A_MESSAGE">Delete a message</A><BR><BR>
+
+<BR><!-- PegHelp --><HR>
+
+
+<!-- ************************Topic Break************************* -->
+
+<A NAME="clear_message_headers"></A><B>Clear messages and folders</B>
+
+
+<UL>
+<LI>When receiving mail from a POP3 or IMAP4 server, select the service that contains the folders and messages you want to clear, and then select <B>Service</B> > <B>Clear All</B>. All messages and folders that are linked to the selected service are cleared and memory space is expanded on the device without deleting messages on the server. The next time you connect, the messages and folders are downloaded again.
+</UL>
+
+<BR><!-- PegHelp --><HR>
+
+
+<!-- ************************Topic Break************************* -->
+
+
+<A NAME="unmark_a_message"></A><B>Unmark a message</B>
+
+<UL>
+<LI>To unmark a message that is marked for download, double-tap or double-click the marked message.
+</UL>
+
+<BR><!-- PegHelp --><HR>
+
+<!-- ************************Topic Break************************* -->
+
+<A NAME="set_the_action_to_follow_moving_or_deleting_a_message"></A><B>Set the action to follow deleting, moving, or responding to a message</B>
+
+<OL>
+<LI>Select <B>Services</B> > <B>Options </B> > <B>Read</B> tab.
+<LI>Select desired options.
+</OL>
+
+<BR><!-- PegHelp --><HR>
+
+
+<!-- ************************Topic Break************************* -->
+
+
+<P><A NAME="working_with_message_attachments"></A><B>Working with Message Attachments</B><P><UL></UL>
+
+<A HREF="inbox.htm#receive_attachments">Receive attachments</A><BR>
+<A HREF="inbox.htm#check_attachment_status">Check attachment status</A><BR>
+<A HREF="inbox.htm#open_an_attachment">Open an attachment</A><BR>
+<A HREF="inbox.htm#storage">Store an attachment</A><BR>
+<A HREF="inbox.htm#remove_an_attachment_from_a_message">Delete an attachment</A><BR>
+<A HREF="inbox.htm#attach_a_file_to_a_message">Attach a file to a message</A> <BR>
+
+
+<BR><!-- PegHelp --><HR>
+
+
+<!-- ************************Topic Break************************* -->
+
+<P><A NAME="receive_attachments"></A><B>Receive attachments</B></P>
+
+
+<UL>
+<LI>If you receive messages through a remote mail server, in Inbox on the device, select the <B>Get file attachments and meeting requests</B> (IMAP4) or <B>Get meeting requests</B> (POP3) setting in the <B>Inbox Preferences</B> dialog box. For more information, see <A HREF="inbox.htm#set_inbox_preferences_for_IMAP4">Set Inbox preferences</A>.
+</UL>
+
+<P><B>Notes</B>
+<UL>
+<LI>Embedded images and OLE objects cannot be received as attachments.
+<LI>Embedded messages can be viewed as an attachment when using IMAP4 to receive e-mail. However, this features does not work if TNEF is enabled so that you can receive meeting requests.
+</UL></P>
+
+
+<BR><!-- PegHelp --><HR>
+
+
+<!-- ************************Topic Break************************* -->
+
+<A NAME="check_attachment_status"></A><B>Check attachment status</B>
+
+
+<UL>
+<LI>An attachment sent with an e-mail message, whether it has been downloaded or not, will appear as an icon at the bottom of the message in its own window pane. If you don't see this pane, select <B>File</B> > <B>Attachments</B> > <B>Show Attachments</B>. If TNEF is turned on so you can receive meeting requests, you will not see attachments until they are fully downloaded.
+<LI>To mark an attachment for downloading in a POP3 or IMAP4 service, double-tap or double-click it. The attachment will be downloaded the next time you connect.
+You can also set Inbox to download attachments automatically when you get a full copy of a message. For more information, see <A HREF="inbox.htm#receive_attachments">Receive attachments</A>.
+
+</UL>
+
+<B>See Also</B><BR>
+<A HREF="inbox.htm#open_an_attachment">Open an attachment</A><BR>
+
+
+<BR><!-- PegHelp --><HR>
+
+
+
+<!-- ************************Topic Break************************* -->
+
+
+<A NAME="open_an_attachment"></A><B>Open an attachment</B>
+
+<UL>
+<LI>With the message open, double-tap or double-click the attachment's icon at the bottom of the message. If you don't see this pane, select <B>File</B> > <B>Attachments</B> > <B>Show Attachments</B>.<BR>
+</UL>
+
+
+<BR><!-- PegHelp --><HR>
+
+
+<!-- ************************Topic Break************************* -->
+
+<A NAME="storage"></A><B>Store an attachment</B>
+
+<OL>
+<LI>Select <B>Services</B> > <B>Options</B> > <B>Storage</B> tab.
+<LI>Select to store attachments on internal RAM or a storage card.
+<LI>If you use more than one storage card, select it from the list.
+</OL>
+
+<P><B>Note</B>  Once you make the above selection, all attachments will be moved to the selected card.</P>
+
+<BR><!-- PegHelp --><HR>
+
+
+<!-- ************************Topic Break************************* -->
+
+<A NAME="remove_an_attachment_from_a_message"></A><B>Delete an attachment</B>
+
+<UL>
+<LI>To delete an attachment from a message you are sending, select the attachment, and then select <B>Edit</B> > <B>Clear</B> or press the DEL key on the keyboard.
+<LI>To delete an attachment you have received, delete the message.
+</UL>
+<BR><!-- PegHelp --><HR>
+
+
+<!-- ************************Topic Break************************* -->
+
+
+<A NAME="attach_a_file_to_a_message"></A><B>Attach a file to a message</B>
+
+<OL>
+<LI>With the message open, select <B>File</B> > <B>Attachments</B> > <B>Add Attachment</B>.
+<LI>Select the file you want to attach.
+</OL>
+
+<P><B>Note</B>  OLE objects cannot be attached to Inbox messages.</P><UL></UL>
+
+<B>See Also</B><BR>
+<A HREF="inbox.htm#compose_a_new_message">Compose a new message</A><BR>
+<A HREF="inbox.htm#remove_an_attachment_from_a_message">Delete an attachment</A><BR>
+
+
+<BR><!-- PegHelp --><HR>
+<!-- ************************Topic Break************************* -->
+
+<A NAME="servicestab"></A><B>Adding, removing, and viewing mail services</B><BR>
+
+<!-- This topic is context sensitive help for the Services tab. It's invisible to the rest of the help system. -->
+
+<UL>
+<LI>All installed mail services are listed in the <B>Installed services</B> box.
+<LI>To add a mail service, select <B>Add</B>.
+<LI>To remove a mail service, select the service from the <B>Installed services</B> box and then select <B>Remove</B>.
+<LI>To view a mail service's properties, select the service from the <B>Installed services</B> box and then select <B>Properties</B>.
+</UL>
+
+<P><B>See Also</B><BR>
+<A HREF="inbox.htm#set_up_an_e-mail_service">Set up a mail service</A><BR>
+
+
+<BR><!-- PegHelp --><HR>
+<!-- ************************Topic Break************************* -->
+
+<A NAME="index"></A><B>Index</B><UL></UL>
+
+<A HREF="inbox.htm#addressbook">Address Book, changing the entries</A><BR>
+
+<A HREF="inbox.htm#check_attachment_status">attachments, checking status</A><BR>
+<A HREF="inbox.htm#attach_a_file_to_a_message">attachments, creating</A><BR>
+<A HREF="inbox.htm#remove_an_attachment_from_a_message">attachments, deleting</A><BR>
+<A HREF="inbox.htm#open_an_attachment">attachments, opening</A><BR>
+<A HREF="inbox.htm#receive_attachments">attachments, receiving</A><BR>
+<A HREF="inbox.htm#storage">attachments, storing</A><BR>
+
+<A HREF="inbox.htm#empty_deleted_items">Deleted (local) folder, emptying</A><BR>
+<A HREF="inbox.htm#DELETE_A_MESSAGE">Deleted (local) folder, options</A><BR>
+
+<A HREF="inbox.htm#create_a_folder">folders, creating</A><BR>
+<A HREF="inbox.htm#delete_a_folder">folders, deleting</A><BR>
+<A HREF="inbox.htm#designate">folders, designating as offline</A><BR>
+<A HREF="inbox.htm#rename_a_folder">folders, renaming</A><BR>
+<A HREF="inbox.htm#syncfolders">folders, synchronizing while connected</A><BR>
+<A HREF="inbox.htm#replay_to_a_message">Forward command</A><BR>
+
+<A HREF="inbox.htm#overview">IMAP4, about</A><BR>
+<A HREF="inbox.htm#howfolders">IMAP4 folders, see folders</A><BR>
+
+<A HREF="inbox.htm#set_the_action_to_follow_moving_or_deleting_a_message">messages, action after deleting or moving</A><BR>
+<A HREF="inbox.htm#set_the_action_to_follow_moving_or_deleting_a_message">messages, action after responding</A><BR>
+<A HREF="inbox.htm#copy_a_message_to_your_h_pc_inbox">messages, checking for new</A><BR>
+<A HREF="inbox.htm#clear_message_headers">messages, clearing</A><BR>
+<A HREF="inbox.htm#compose_a_new_message">messages, composing</A><BR>
+<A HREF="inbox.htm#move_a_message">messages, copying to another folder</A><BR>
+<A HREF="inbox.htm#DELETE_A_MESSAGE">messages, deleting</A><BR>
+<A HREF="inbox.htm#copy_a_message_to_your_h_pc_inbox">messages, downloading complete</A><BR>
+<A HREF="inbox.htm#replay_to_a_message">messages, forwarding</A><BR>
+<A HREF="inbox.htm#include_the_original_message_in_a_reply">messages, including original in reply</A><BR>
+<A HREF="inbox.htm#set_inbox_preferences_for_internet_mail">messages, length limit</A><BR>
+<A HREF="inbox.htm#move_a_message">messages, moving</A><BR>
+<A HREF="inbox.htm#replay_to_a_message">messages, replying</A><BR>
+<A HREF="inbox.htm#save_a_message">messages, saving</A><BR>
+<A HREF="inbox.htm#save_copies_of_your_sent_messages">messages, saving sent messages</A><BR>
+<A HREF="inbox.htm#compose_a_new_message">messages, sending</A><BR>
+<A HREF="inbox.htm#unmark_a_message">messages, unmarking</A><BR>
+
+<A HREF="inbox.htm#designate">Offline Folder command</A><BR>
+
+<A HREF="inbox.htm#overview">POP3, about</A><BR>
+<A HREF="inbox.htm#howfolders">POP3 folders, see folders</A><BR>
+
+<A HREF="inbox.htm#overview">remote e-mail, about</A><BR>
+<A HREF="inbox.htm#set_up_internet_mail_service">remote e-mail, viewing properties</A><BR>
+<A HREF="inbox.htm#replay_to_a_message">Reply command</A><BR>
+
+<A HREF="inbox.htm#compose_a_new_message">Send command</A><BR>
+<A HREF="inbox.htm#save_copies_of_your_sent_messages">sent messages, saving</A><BR>
+<A HREF="inbox.htm#check_inbox_status">status, checking</A><BR>
+<A HREF="inbox.htm#syncfolders">Synchronize folders command</A><BR>
+
+
+<BR><!-- PegHelp --><HR>
+
+
+</BODY>
+</HTML>

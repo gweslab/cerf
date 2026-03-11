@@ -272,7 +272,6 @@ __pycache__/
 *.pyc
 
 # Bundled device files — track DLLs and PDBs that are part of the distribution
-!bundled/**/*.dll
-!bundled/**/*.pdb
+bundled/
 
 run_claude.md

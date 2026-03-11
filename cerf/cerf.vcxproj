@@ -200,6 +200,7 @@
     <ClCompile Include="thunks\coredll\input.cpp" />
     <ClCompile Include="thunks\coredll\registry.cpp" />
     <ClCompile Include="thunks\coredll\file.cpp" />
+    <ClCompile Include="thunks\coredll\file_notify.cpp" />
     <ClCompile Include="thunks\coredll\system.cpp" />
     <ClCompile Include="thunks\coredll\sysinfo.cpp" />
     <ClCompile Include="thunks\coredll\locale.cpp" />

@@ -125,6 +125,7 @@ Win32Thunks::Win32Thunks(EmulatedMemory& mem)
     RegisterInputHandlers();
     RegisterRegistryHandlers();
     RegisterFileHandlers();
+    RegisterFileNotifyHandlers();
     RegisterSystemHandlers();
     RegisterSysInfoHandlers();
     RegisterLocaleHandlers();

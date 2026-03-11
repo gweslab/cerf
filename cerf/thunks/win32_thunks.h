@@ -240,6 +240,7 @@ private:
     void RegisterInputHandlers();
     void RegisterRegistryHandlers();
     void RegisterFileHandlers();
+    void RegisterFileNotifyHandlers();
     void RegisterSystemHandlers();
     void RegisterSysInfoHandlers();
     void RegisterLocaleHandlers();

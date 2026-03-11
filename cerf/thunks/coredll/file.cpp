@@ -99,6 +99,11 @@ void Win32Thunks::RegisterFileHandlers() {
         std::wstring wce_path = ReadWStringFromEmu(mem, regs[0]);
         std::wstring host_path = MapWinCEPath(wce_path);
         regs[0] = GetFileAttributesW(host_path.c_str());
+        /* Strip NTFS-only attribute bits that collide with WinCE meanings:
+           0x0200 SPARSE, 0x0400 REPARSE, 0x1000 OFFLINE→ROMSTATICREF,
+           0x2000 NOT_CONTENT_INDEXED→ROMMODULE, 0x4000 ENCRYPTED */
+        if (regs[0] != INVALID_FILE_ATTRIBUTES)
+            regs[0] &= ~0x7600u;
         LOG(API, "[API] GetFileAttributesW('%ls' -> '%ls') -> 0x%08X\n", wce_path.c_str(), host_path.c_str(), regs[0]);
         return true;
     });
@@ -276,25 +281,6 @@ void Win32Thunks::RegisterFileHandlers() {
         std::wstring mapped = MapWinCEPath(path);
         LOG(API, "[API] SetFileAttributesW('%ls', 0x%X)\n", path.c_str(), regs[1]);
         regs[0] = SetFileAttributesW(mapped.c_str(), regs[1]);
-        return true;
-    });
-    Thunk("FindFirstChangeNotificationW", 1682, [this](uint32_t* regs, EmulatedMemory& mem) -> bool {
-        std::wstring path = ReadWStringFromEmu(mem, regs[0]);
-        std::wstring mapped = MapWinCEPath(path);
-        LOG(API, "[API] FindFirstChangeNotificationW('%ls', subtree=%d, filter=0x%X)\n",
-            path.c_str(), regs[1], regs[2]);
-        HANDLE h = FindFirstChangeNotificationW(mapped.c_str(), regs[1], regs[2]);
-        LOG(API, "[API]   -> handle=%p\n", h);
-        /* Store raw handle (not wrapped) — same convention as CreateEventW.
-           WaitForMultipleObjects uses sign-extension to recover native handles. */
-        regs[0] = (uint32_t)(uintptr_t)h;
-        return true;
-    });
-    Thunk("FindNextChangeNotification", 1683, [](uint32_t* regs, EmulatedMemory&) -> bool {
-        HANDLE h = (HANDLE)(intptr_t)(int32_t)regs[0];
-        BOOL ok = FindNextChangeNotification(h);
-        LOG(API, "[API] FindNextChangeNotification(0x%08X) -> %d\n", regs[0], ok);
-        regs[0] = ok;
         return true;
     });
 }

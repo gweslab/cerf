@@ -1,7 +1,11 @@
 #define NOMINMAX
 #define _CRT_SECURE_NO_WARNINGS
 /* Misc small stubs: debug, clipboard, caret, sound, RAS, IMM, gestures,
-   C runtime */
+   C runtime.
+   AI NOTE: Do NOT dump random thunks here. If a function belongs to a
+   specific subsystem (file I/O, GDI, shell, etc.), put it in the
+   appropriate dedicated file. This file is ONLY for genuinely
+   miscellaneous stubs that don't fit anywhere else. */
 #include "../win32_thunks.h"
 #include "../../log.h"
 #include "../../loader/pe_loader.h"

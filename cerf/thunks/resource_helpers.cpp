@@ -16,7 +16,14 @@
      +40  WCHAR  cFileName[MAX_PATH]  (260 wchars = 520 bytes)
    Total: 560 bytes */
 void Win32Thunks::WriteFindDataToEmu(EmulatedMemory& mem, uint32_t addr, const WIN32_FIND_DATAW& fd) {
-    mem.Write32(addr + 0, fd.dwFileAttributes);
+    /* Strip NTFS attribute bits that collide with WinCE CE_FIND_DATA meanings:
+       0x0200 SPARSE_FILE      — not in WinCE
+       0x0400 REPARSE_POINT    — not in WinCE
+       0x1000 OFFLINE          — WinCE: FILE_ATTRIBUTE_ROMSTATICREF
+       0x2000 NOT_CONTENT_INDEXED — WinCE: FILE_ATTRIBUTE_ROMMODULE (hides files!)
+       0x4000 ENCRYPTED        — not standard in WinCE */
+    uint32_t attrs = fd.dwFileAttributes & ~0x7600u;
+    mem.Write32(addr + 0, attrs);
     mem.Write32(addr + 4, fd.ftCreationTime.dwLowDateTime);
     mem.Write32(addr + 8, fd.ftCreationTime.dwHighDateTime);
     mem.Write32(addr + 12, fd.ftLastAccessTime.dwLowDateTime);

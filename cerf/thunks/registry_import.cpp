@@ -13,12 +13,6 @@ static std::wstring NarrowToWide(const std::string& s) {
     return w;
 }
 
-static std::wstring ToLowerW(const std::wstring& s) {
-    std::wstring r = s;
-    for (auto& c : r) if (c >= L'A' && c <= L'Z') c += 32;
-    return r;
-}
-
 /* Map REGEDIT4 root names to our abbreviated forms */
 static std::wstring MapRegRoot(const std::wstring& key) {
     if (key.substr(0, 18) == L"HKEY_CLASSES_ROOT\\") return L"HKCR\\" + key.substr(18);
@@ -32,73 +26,76 @@ static std::wstring MapRegRoot(const std::wstring& key) {
     return key;
 }
 
-/* WinCE build system LOC_* macro definitions (US English / LCID 0x0409).
-   These are resolved at import time for .reg files from the platform SDK. */
-struct LocMacro { const char* name; const char* str_val; uint32_t dw_val; };
-static const LocMacro loc_macros[] = {
-    {"LOC_LCID",              nullptr, 0x0409},
-    {"LOC_ACP",               nullptr, 0x04e4},
-    {"LOC_CONSOLEFONTNAME",   "Tahoma", 0},
-    {"LOC_CONSOLEFONTSIZE",   nullptr, 9},
-    {"LOC_CONSOLEPAINTFIX",   nullptr, 0},
-    {"LOC_MENUBARFONTWEIGHT", nullptr, 700},
-    {"LOC_BUTTONFONTWEIGHT",  nullptr, 700},
-    {"LOC_HKL_DEFAULT",       "00000409", 0},
-    {"LOC_KEYBOARD",          "Standard Keyboard", 0},
-    {"LOC_DEFAULT_TIMEZONE",  "Eastern Standard Time", 0},
-    {"LOC_PATH_APPDATA",      "\\Application Data", 0},
-    {"LOC_PATH_DESKTOP",      "\\Windows\\Desktop", 0},
-    {"LOC_PATH_FAVORITES",    "\\Windows\\Favorites", 0},
-    {"LOC_PATH_FONTS",        "\\Windows\\Fonts", 0},
-    {"LOC_PATH_MYDOCUMENTS",  "\\My Documents", 0},
-    {"LOC_PATH_PROGRAMFILES", "\\Program Files", 0},
-    {"LOC_PATH_PROGRAMS",     "\\Windows\\Programs", 0},
-    {"LOC_PATH_RECENT",       "\\Windows\\Recent", 0},
-    {"LOC_PATH_STARTUP",      "\\Windows\\StartUp", 0},
-    {"LOC_PATH_WINDOWS",      "\\Windows", 0},
-    {"LOC_STORE_DEFAULT_FOLDER", "Storage Card", 0},
-    {"LOC_STORE_PCMCIA_FOLDER",  "Storage Card", 0},
-    {"LOC_STORE_HD_FOLDER",      "Hard Disk", 0},
-    {"LOC_STORE_CD_FOLDER",      "CD-ROM", 0},
-    {"LOC_STORE_FLOPPY_FOLDER",  "Floppy Disk", 0},
-    {"LOC_HOMEAREACODE",      "425", 0},
-    {"LOC_HOMECOUNTRYCODE",   "1", 0},
-    {"LOC_HOMECWCODE",        "1", 0},
-    {"LOC_HOMELOCATIONNAME",  "Home", 0},
-    {"LOC_HOMELOCALFMT",      "0,,", 0},
-    {"LOC_HOMELDFMT",         "0,,", 0},
-    {"LOC_HOMEINTNTLFMT",     "011,", 0},
-    {"LOC_HOMEOPTIONS",       "0", 0},
-    {"LOC_WORKAREACODE",      "425", 0},
-    {"LOC_WORKCOUNTRYCODE",   "1", 0},
-    {"LOC_WORKCWCODE",        "1", 0},
-    {"LOC_WORKLOCATIONNAME",  "Work", 0},
-    {"LOC_WORKLOCALFMT",      "0,,", 0},
-    {"LOC_WORKLDFMT",         "0,,", 0},
-    {"LOC_WORKINTNTLFMT",     "011,", 0},
-    {"LOC_WORKOPTIONS",       "0", 0},
-    {"LOC_STARTPAGE",         "http://www.msn.com", 0},
-    {"LOC_SEARCHPAGE",        "http://www.msn.com", 0},
-};
+#include "loc_macros.h"
+
+/* Resolve a single LOC_XXX token to its string value (or nullptr if not found) */
+static const LocMacro* FindLocMacro(const char* name, size_t len) {
+    for (auto& m : loc_macros) {
+        if (strlen(m.name) == len && memcmp(m.name, name, len) == 0)
+            return &m;
+    }
+    return nullptr;
+}
 
 /* Resolve LOC_* macros in a value string.
-   dword:LOC_XXX → dword:XXXX, bare LOC_XXX → "resolved_string" */
+   dword:LOC_XXX → dword:XXXX, bare LOC_XXX → "resolved_string",
+   also replaces LOC_XXX tokens embedded inside quoted strings. */
 static std::string ResolveLocMacros(const std::string& val_str) {
-    for (auto& m : loc_macros) {
-        size_t pos = val_str.find(m.name);
-        if (pos == std::string::npos) continue;
-        if (val_str.substr(0, 6) == "dword:" && pos == 6) {
-            /* dword:LOC_XXX → dword:XXXXXXXX */
+    /* dword:LOC_XXX */
+    if (val_str.substr(0, 6) == "dword:" && val_str.size() > 10 &&
+        val_str.substr(6, 4) == "LOC_") {
+        auto* m = FindLocMacro(val_str.c_str() + 6, val_str.size() - 6);
+        if (m) {
             char buf[20];
-            sprintf(buf, "dword:%08x", m.dw_val);
+            sprintf(buf, "dword:%08x", m->dw_val);
             return buf;
         }
-        if (pos == 0 && val_str.size() == strlen(m.name) && m.str_val) {
-            /* Bare LOC_XXX → "string_value" */
-            return std::string("\"") + m.str_val + "\"";
+    }
+    /* Bare LOC_XXX (no quotes) */
+    if (val_str.size() > 4 && val_str.substr(0, 4) == "LOC_" && val_str[0] != '"') {
+        auto* m = FindLocMacro(val_str.c_str(), val_str.size());
+        if (m && m->str_val)
+            return std::string("\"") + m->str_val + "\"";
+    }
+    /* LOC_XXX tokens inside a quoted string: "...LOC_XXX..." */
+    if (val_str.size() > 2 && val_str[0] == '"') {
+        std::string result = val_str;
+        size_t pos = 0;
+        bool changed = false;
+        while ((pos = result.find("LOC_", pos)) != std::string::npos) {
+            /* Find end of token (alphanumeric + underscore) */
+            size_t end = pos + 4;
+            while (end < result.size() && (isalnum((unsigned char)result[end]) || result[end] == '_')) end++;
+            auto* m = FindLocMacro(result.c_str() + pos, end - pos);
+            if (m && m->str_val) {
+                result.replace(pos, end - pos, m->str_val);
+                pos += strlen(m->str_val);
+                changed = true;
+            } else {
+                pos = end;
+            }
         }
+        if (changed) return result;
     }
     return val_str;
+}
+
+/* Resolve LOC_* macros in a key path string */
+static std::string ResolveLocMacrosInKey(const std::string& key_str) {
+    std::string result = key_str;
+    size_t pos = 0;
+    while ((pos = result.find("LOC_", pos)) != std::string::npos) {
+        size_t end = pos + 4;
+        while (end < result.size() && (isalnum((unsigned char)result[end]) || result[end] == '_')) end++;
+        auto* m = FindLocMacro(result.c_str() + pos, end - pos);
+        if (m && m->str_val) {
+            result.replace(pos, end - pos, m->str_val);
+            pos += strlen(m->str_val);
+        } else {
+            pos = end;
+        }
+    }
+    return result;
 }
 
 /* Parse a value from a .reg file value string (after the '=').
@@ -173,7 +170,8 @@ void Win32Thunks::ImportRegFile(const std::string& path) {
 
         /* Key: [HKEY_...] */
         if (line[0] == '[' && line.back() == ']') {
-            current_key = MapRegRoot(NarrowToWide(line.substr(1, line.size() - 2)));
+            std::string key_str = ResolveLocMacrosInKey(line.substr(1, line.size() - 2));
+            current_key = MapRegRoot(NarrowToWide(key_str));
             registry[current_key];
             EnsureParentKeys(current_key);
             key_count++;

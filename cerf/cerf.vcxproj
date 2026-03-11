@@ -185,6 +185,8 @@
     <ClCompile Include="thunks\coredll\crt.cpp" />
     <ClCompile Include="thunks\coredll\stdio.cpp" />
     <ClCompile Include="thunks\coredll\string.cpp" />
+    <ClCompile Include="thunks\coredll\string_format.cpp" />
+    <ClCompile Include="thunks\coredll\string_safe.cpp" />
     <ClCompile Include="thunks\coredll\gdi_dc.cpp" />
     <ClCompile Include="thunks\coredll\gdi_draw.cpp" />
     <ClCompile Include="thunks\coredll\gdi_text.cpp" />

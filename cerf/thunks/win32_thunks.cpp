@@ -107,6 +107,8 @@ Win32Thunks::Win32Thunks(EmulatedMemory& mem)
     RegisterMemoryHandlers();
     RegisterCrtHandlers();
     RegisterStringHandlers();
+    RegisterStringFormatHandlers();
+    RegisterStringSafeHandlers();
     RegisterGdiDcHandlers();
     RegisterGdiDrawHandlers();
     RegisterGdiTextHandlers();

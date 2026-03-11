@@ -217,6 +217,9 @@ private:
     void RegisterMemoryHandlers();
     void RegisterCrtHandlers();
     void RegisterStringHandlers();
+    void RegisterStringFormatHandlers();
+    void RegisterStringSafeHandlers();
+    std::wstring WprintfFormat(EmulatedMemory& mem, const std::wstring& fmt, uint32_t* args, int nargs);
     void RegisterGdiDcHandlers();
     void RegisterGdiDrawHandlers();
     void RegisterGdiTextHandlers();

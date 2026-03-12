@@ -1,0 +1,88 @@
+;
+; Copyright (c) Microsoft Corporation.  All rights reserved.
+;
+;
+; Use of this sample source code is subject to the terms of the Microsoft
+; license agreement under which you licensed this sample source code. If
+; you did not accept the terms of the license agreement, you are not
+; authorized to use this sample source code. For the terms of the license,
+; please see the license agreement between you and Microsoft or, if applicable,
+; see the LICENSE.RTF on your install media or the root of your tools installation.
+; THE SAMPLE SOURCE CODE IS PROVIDED "AS IS", WITH NO WARRANTIES OR INDEMNITIES.
+;
+[HKEY_LOCAL_MACHINE\Ident]
+    "Name"=LOC_DEFAULTDEVICENAME
+    "Desc"=LOC_DEFAULTDEVICEDESC
+
+
+; Redirector settings
+[HKEY_LOCAL_MACHINE\Comm\Redir]
+   ; Expose \NETWORK dir for mapped resources
+   "RegisterFSRoot"=dword:1
+
+
+; Set memory thresholds for Hibernate
+[HKEY_LOCAL_MACHINE\SYSTEM\Hibernate]
+	"Bytes"=dword:20000
+	"Pages"=dword:28
+
+; Let Start/Settings/Control Panel Auto Expand
+[HKEY_LOCAL_MACHINE\Explorer]
+    "ExpandControlPanel"=dword:0
+
+
+; Settings for Multiple IME and Input Language Switching support
+
+; IME switching should not affect for each thread by default on CE
+IF IMGCONCURRENTIMESWITCHING !
+[HKEY_LOCAL_MACHINE\System\IME]
+    "ConcurrentIMESwitching"=dword:0
+ENDIF IMGCONCURRENTIMESWITCHING !
+IF IMGCONCURRENTIMESWITCHING
+[HKEY_LOCAL_MACHINE\System\IME]
+    "ConcurrentIMESwitching"=dword:1
+ENDIF IMGCONCURRENTIMESWITCHING
+
+; Create an image with multiple IMEs for testing purpose
+; (Platform specific part may be in project.reg for each platform and this is platform independent part)
+IF _IMG_TEST_MULTIIME_CE_PHONEIME_MSPY
+
+; Override IME layout settings to avoid conflict with each other
+[HKEY_LOCAL_MACHINE\System\CurrentControlSet\Control\Layouts\e0020409]
+    "Layout Text"="PHONE IME"
+    "Ime File"="\\Windows\\phoneime.dll"
+    "Keyboard Layout"="00000409"
+[HKEY_LOCAL_MACHINE\System\CurrentControlSet\Control\Layouts\e0010804]
+    "Layout Display Name"="@\\Windows\\intll.cpl,-20485"
+    "Layout Text"="Intelligent IME 2003"
+    "Ime File"="\\Windows\\chsime03.dll"
+    "Keyboard Layout"="00000409"
+
+; Override preload settings to switch between IMEs in decided order
+[HKEY_CURRENT_USER\Keyboard Layout\Preload]
+    @="e0020409"
+[HKEY_CURRENT_USER\Keyboard Layout\Preload\1]
+    @="e0020409"
+[HKEY_CURRENT_USER\Keyboard Layout\Preload\2]
+    @="e0010804"
+
+; Current Input Language when device is cold booted
+[HKEY_CURRENT_USER\System\Input]
+    "CurLang"="0409"
+
+; Default HKL for each Lang
+[HKEY_LOCAL_MACHINE\System\Input\lang_0409]
+    @="e0020409"
+[HKEY_LOCAL_MACHINE\System\Input\lang_0804]
+    @="e0010804"
+
+ENDIF ; _IMG_TEST_MULTIIME_CE_PHONEIME_MSPY
+
+
+; @CESYSGEN IF CE_MODULES_LVMOD_FULL
+;
+; Unsigned Applications Policy
+;
+[HKEY_LOCAL_MACHINE\Security\Policies\Policies]
+    "00001006"=dword:1
+; @CESYSGEN ENDIF

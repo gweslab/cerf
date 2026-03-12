@@ -1,0 +1,251 @@
+<!--
+Copyright (c) Microsoft Corporation.  All rights reserved.
+-->
+<!--
+Use of this sample source code is subject to the terms of the Microsoft
+license agreement under which you licensed this sample source code. If
+you did not accept the terms of the license agreement, you are not
+authorized to use this sample source code. For the terms of the license,
+please see the license agreement between you and Microsoft or, if applicable,
+see the LICENSE.RTF on your install media or the root of your tools installation.
+THE SAMPLE SOURCE CODE IS PROVIDED "AS IS", WITH NO WARRANTIES.
+-->
+<HTML>
+<!--
+THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
+ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED TO
+THE IMPLIED WARRANTIES OF MERCHANTABILITY AND/OR FITNESS FOR A
+PARTICULAR PURPOSE.
+-->
+<HEAD>
+<TITLE>Windows CE HTML Shell</TITLE>
+</HEAD>
+
+<BODY BGCOLOR=#C0C0C0 onLoad="Dir('')">
+
+<INPUT TYPE=BUTTON VALUE="Copy" onClick="Copy()">
+<INPUT TYPE=BUTTON VALUE="Move" onClick="Move()">
+<INPUT TYPE=BUTTON VALUE="Delete" onClick="Delete()">
+<INPUT TYPE=BUTTON VALUE="New Folder" onClick="MkDir()">
+
+<p><OBJECT ID=FileSystem
+ CLASSID="CLSID:3F0C2794-5C3A-11D1-A717-00AA0044064C"
+ STYLE="VISIBILITY:VISIBLE;WIDTH=20;HEIGHT=20"
+ WIDTH=20
+ HEIGHT=20>
+</OBJECT>
+
+<SCRIPT LANGUAGE="JAVASCRIPT">
+
+sCurSel = "";
+sCurrentDir = "\\";
+
+function Dir(sNewPath)
+{
+	if (sNewPath != "")
+	{
+		if (sNewPath == "..")
+		{
+			sCurrentDir = sCurrentDir.substr(0, sCurrentDir.length-1);
+			nLast = sCurrentDir.lastIndexOf("\\");
+			if (nLast > 0)
+				sCurrentDir = sCurrentDir.substr(0, nLast+1);
+			else
+				sCurrentDir = "\\"
+		}	
+		else
+		{
+			sCurrentDir = sCurrentDir + sNewPath + "\\";
+		}
+	}
+
+	fs = window.parent.frames.item("cmdbar").FileSystem;
+	doc = window.parent.frames.item("filesystem").document;
+
+	sCurSel = "";
+	doc.close();
+	doc.write("<HTML>\n");
+	doc.write("<BODY BGCOLOR=#C0C0C0>\n");
+	
+	doc.write("<SCRIPT LANGUAGE=\"JAVASCRIPT\">\n");
+	doc.write("function CallDir(sPath)\n");
+	doc.write("{\n");
+	doc.write("\tcmd = window.parent.frames.item(\"cmdbar\");\n");
+	doc.write("\tcmd.Dir(sPath);\n");
+	doc.write("}\n");
+
+	doc.write("function SelChange(sFile)\n");
+	doc.write("{\n");
+	doc.write("\tcmd = window.parent.frames.item(\"cmdbar\");\n");
+	doc.write("\tcmd.sCurSel = sFile;\n");
+	doc.write("}\n");
+
+	doc.write("function CallExec(sPath)\n");
+	doc.write("{\n");
+	doc.write("\tfs = window.parent.frames.item(\"cmdbar\").FileSystem;\n");
+	doc.write("\tfs.Execute(sPath);\n");
+	doc.write("}\n");
+
+	doc.write("<\/SCRIPT>\n");
+
+	doc.write("<FONT FACE=\"Courier New\">");
+	doc.write("<H4>Contents Of " + sCurrentDir + "*.*</H4>\n");
+	doc.write("<A HREF=\"javascript:CallDir('..')\">Parent Directory</A><br>\n");
+	sFile = fs.Dir(sCurrentDir + "*.*");
+
+	doc.write("<TABLE>\n");
+
+	while(sFile != "")
+	{
+		if ((sFile == ".") || (sFile == ".."))
+		{
+			sFile = fs.Dir();
+			continue;
+		}
+		sPath = sCurrentDir + sFile;
+		date = fs.FileDateTime(sPath);
+		attrib = fs.GetAttr(sPath);
+		if (attrib & 16)
+		{
+			doc.write("<TR>\n");
+			doc.write("<TD><INPUT TYPE=RADIO NAME=\"radSel\" VALUE=\"" + sFile + "\" onClick=\"SelChange('" + sFile + "')\"></TD>");
+			doc.write("<TD><IMG SRC=dir.jpg></TD>");
+			doc.write("<TD>" + date + "</TD>");
+			sFunc = "\"javascript:CallDir('" + sFile + "')\"";
+			doc.write("<TD ALIGN=RIGHT></TD>");
+			doc.write("<TD><A HREF=" + sFunc + ">" + sFile + " </A></TD>\n");
+			doc.write("</TR>\n");
+		}
+		else
+		{
+			doc.write("<TR>\n");
+			doc.write("<TD><INPUT TYPE=RADIO NAME=\"radSel\" VALUE=\"" + sFile + "\" onClick=\"SelChange('" + sFile + "')\"></TD>");
+			doc.write("<TD><IMG SRC=file.jpg></TD>");
+			doc.write("<TD>" + date + "</TD>");
+			doc.write("<TD ALIGN=RIGHT>" + fs.FileLen(sPath) + "</TD>");
+			if (sFile.toLowerCase().lastIndexOf(".exe") == sFile.length - 4 )
+			{
+				nStart = 0;nRet = -1;
+				while( (nRet = sPath.indexOf("\\", nStart)) >= 0)
+				{
+					sPath = sPath.substr(0, nRet+1) + "\\" + sPath.substr(nRet+1);
+					nStart = nRet+2;
+				}
+				sFunc = "\"javascript:CallExec('" + sPath + "')\"";
+				doc.write("<TD><A HREF=" + sFunc + ">" + sFile + " </A></TD>\n");
+			}
+			else
+			{
+				doc.write("<TD><A HREF=\"file://" + sPath + "\">" + sFile + " </A></TD>\n");
+			}
+			doc.write("</TR>\n");
+		}
+		sFile = fs.Dir();
+	}
+	doc.write("</TABLE>");
+	doc.write("</FONT>");
+	doc.write("</BODY>\n");
+	doc.write("</HTML>\n");
+}
+
+function MkDir()
+{
+	sDir = window.prompt("Create directory in " + sCurrentDir, "<Enter name of directory>");
+	if (sDir != null)
+	{
+		window.parent.frames.item("cmdbar").FileSystem.MkDir(sCurrentDir + sDir);
+		Dir("");
+	}
+}
+
+function Copy()
+{
+	if (sCurSel == "")
+		return;
+	sPath = sCurrentDir + sCurSel;
+	attrib = FileSystem.GetAttr(sPath);
+	if (attrib & 64)
+	{
+		alert("'" + sPath +"' is a ROM file. It cannot be copied.");
+		return;
+	}
+	sDir = window.prompt("Copy '" + sPath + "' to: ", "<Enter full path of target directory>");
+	if (sDir != null)
+	{
+		if (sDir.lastIndexOf("\\") != sDir.length-1)
+		{
+			sDir = sDir + "\\";
+		}
+		FileSystem.FileCopy(sPath, sDir + sCurSel);
+		if (nRet != 0)
+		{
+			window.alert("Unable to copy '" + sPath + "'. Error Code : " + nRet);	
+		}
+	}
+}
+
+function Move()
+{
+	if (sCurSel == "")
+		return;
+	sPath = sCurrentDir + sCurSel;
+	attrib = FileSystem.GetAttr(sPath);
+	if (attrib & 64)
+	{
+		alert("'" + sPath +"' is a ROM file. It cannot be moved.");
+		return;
+	}
+	sDir = window.prompt("Move '"+ sPath + "' to: ", "<Enter full path of target directory>");
+	if (sDir != null)
+	{
+		if (sDir.lastIndexOf("\\") != sDir.length-1)
+		{
+			sDir = sDir + "\\";
+		}
+		nRet = FileSystem.MoveFile(sPath, sDir + sCurSel);
+		if (nRet != 0)
+		{
+			window.alert("Unable to move '" + sPath + "'. Error Code : " + nRet);	
+		}
+	}
+}
+
+
+function Delete()
+{
+	if (sCurSel == "")
+		return;
+	sPath = sCurrentDir + sCurSel;
+	attrib = FileSystem.GetAttr(sPath);
+	if (attrib & 64)
+	{
+		alert("'" + sPath +"' is a ROM file. It cannot be deleted.");
+		return;
+	}
+	bRet = window.confirm("Are you sure you want to delete '" + sPath + "'?");
+	if (bRet == 0)
+	{
+		return;
+	}
+
+	attrib = FileSystem.GetAttr(sPath);
+	if (attrib & 16)
+	{
+		nRet = FileSystem.RmDir(sPath);
+	}
+	else
+	{
+		nRet = FileSystem.Kill(sPath);
+	}
+	if (nRet != 0)
+	{
+		window.alert("Unable to delete '" + sPath + "'. Error Code : " + nRet);	
+	}
+	Dir("");
+}
+
+</SCRIPT>
+
+</BODY>
+
+</HTML>	

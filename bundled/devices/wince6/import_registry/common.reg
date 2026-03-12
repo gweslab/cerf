@@ -1,0 +1,4545 @@
+REGEDIT4
+;
+; Copyright (c) Microsoft Corporation.  All rights reserved.
+;
+;
+; Use of this sample source code is subject to the terms of the Microsoft
+; license agreement under which you licensed this sample source code. If
+; you did not accept the terms of the license agreement, you are not
+; authorized to use this sample source code. For the terms of the license,
+; please see the license agreement between you and Microsoft or, if applicable,
+; see the LICENSE.RTF on your install media or the root of your tools installation.
+; THE SAMPLE SOURCE CODE IS PROVIDED "AS IS", WITH NO WARRANTIES OR INDEMNITIES.
+;
+
+; @CESYSGEN IF FILESYS_FSREGHIVE
+; This tag MUST come before all registry settings and HIVE BOOT SECTION tags.
+; OUTPUTHIVE
+; @CESYSGEN ENDIF
+
+; @XIPREGION IF COMMON_REGISTRY_NLS_MUI_INIT
+; HIVE BOOT SECTION
+; Place data here which would be required for a hive-based boot.  That includes
+; data necessary for starting drivers to reach a hive located outside ROM or
+; RAM.  This data will be put into boot.hiv as well as into your default system
+; hive.  Any configuration which does not use the hive-based registry will
+; include this data in its registry, in the same manner as the data outside the
+; hive boot section.
+
+; set LCID in common.str, *not* directly in common.reg
+[HKEY_LOCAL_MACHINE\nls]
+        "DefaultLCID" = dword:LOC_LCID
+
+; END HIVE BOOT SECTION
+
+; @XIPREGION ENDIF COMMON_REGISTRY_NLS_MUI_INIT
+
+
+; MUI Register setttins :
+;   HKLM\MUI\Enable - enable MUI or not
+;   HKLM\MUI\SysLang - system default langid
+;   HKCU\MUI\CurLang - langid for current user
+
+   ; Update the enable field to enable MUI
+; @CESYSGEN IF COREDLL_MULTIUI
+[HKEY_LOCAL_MACHINE\MUI]
+        "Enable"=dword:1
+; @CESYSGEN ENDIF
+
+; @XIPREGION IF COMMON_REGISTRY_NLS_MUI_INIT
+   ; Update the SysLang field to set system default langid
+[HKEY_LOCAL_MACHINE\MUI]
+   "SysLang"=dword:LOC_LCID
+
+
+[HKEY_CURRENT_USER\MUI]
+   ; Update the CurLang field to set user default langid
+   "CurLang"=dword:LOC_LCID
+; @XIPREGION ENDIF COMMON_REGISTRY_NLS_MUI_INIT
+
+; CE_MODULES_NK keeps the settings with the logging files (see common.bib)
+; @CESYSGEN IF CE_MODULES_NK
+IF IMGCELOGENABLE
+; At most one CeLog flush app (CeLogFlush, OSCapture) can be used
+IF IMGAUTOFLUSH
+[HKEY_LOCAL_MACHINE\init]
+        "Launch05"="CeLogFlush.exe"
+ENDIF
+IF IMGOSCAPTURE
+[HKEY_LOCAL_MACHINE\init]
+        "Launch05"="OSCapture.exe"
+ENDIF
+ENDIF
+; @CESYSGEN ENDIF CE_MODULES_NK
+
+; @CESYSGEN IF CE_MODULES_SHELL
+IF IMGNOKITL !
+[HKEY_LOCAL_MACHINE\init]
+        "Launch10"="shell.exe"
+ENDIF IMGNOKITL !
+; @CESYSGEN ENDIF
+; @CESYSGEN IF CE_MODULES_DEVICE
+[HKEY_LOCAL_MACHINE\init]
+        "Launch20"="device.dll"
+
+; @CESYSGEN IF CE_MODULES_SHELL
+IF IMGNOKITL !
+[HKEY_LOCAL_MACHINE\init]
+        "Depend20"=hex:0a,00
+ENDIF IMGNOKITL !
+; @CESYSGEN ENDIF
+; @CESYSGEN ENDIF
+
+; @CESYSGEN IF CE_MODULES_GWES
+[HKEY_LOCAL_MACHINE\init]
+        "Launch30"="gwes.dll"
+        "Depend30"=hex:14,00
+; @CESYSGEN ENDIF
+; @CESYSGEN IF CE_MODULES_BTGW
+; @CESYSGEN ENDIF
+; @CESYSGEN IF CE_MODULES_SERVICES
+[HKEY_LOCAL_MACHINE\init]
+        "Launch60"="servicesStart.exe"
+        "Depend60"=hex:14,00
+; @CESYSGEN ENDIF CE_MODULES_SERVICES
+
+; HIVE BOOT SECTION
+; Set Device RootKey and registry enumerator
+; @CESYSGEN IF CE_MODULES_DEVICE
+[HKEY_LOCAL_MACHINE\Drivers]
+    "RootKey"="Drivers\\BuiltIn"
+    "ProcName"="udevice.exe"
+    "ProcVolPrefix"="$udevice"
+
+[HKEY_LOCAL_MACHINE\Drivers\ProcGroup_0002]
+    "ProcName"="servicesd.exe"
+    "ProcVolPrefix"="$services"
+    "ProcTimeout"=dword:20000
+
+[HKEY_LOCAL_MACHINE\Drivers\ProcGroup_0003]
+    "ProcName"="udevice.exe"
+    "ProcVolPrefix"="$udevice"
+
+[HKEY_LOCAL_MACHINE\Drivers\BuiltIn]
+    "Dll"="BusEnum.dll"
+    "BusName"="BuiltIn"
+    "Flags"=dword:8
+    "BusIoctl"=dword:2a0048
+    "InterfaceType"=dword:0
+    "IClass"=multi_sz:"{B3CC6EBA-5507-4196-8E41-2BF42E4A47C9}=%b","{6F40791D-300E-44E4-BC38-E0E63CA8375C}=%b"
+; @CESYSGEN ENDIF
+; END HIVE BOOT SECTION
+
+; @CESYSGEN IF CE_MODULES_DEVICE
+
+; HIVE BOOT SECTION
+
+[HKEY_LOCAL_MACHINE\System\Events]
+    "SYSTEM/DevMgrApiSetReady"="Device Manager APIs ready"
+
+; END HIVE BOOT SECTION
+
+; @CESYSGEN IF DEVICE_PMIF
+
+;
+; Power Manager
+;
+; HIVE BOOT SECTION
+
+[HKEY_LOCAL_MACHINE\System\Events]
+    "SYSTEM/PowerManagerReady"="Power Manager APIs ready"
+
+; END HIVE BOOT SECTION
+
+; @CESYSGEN ENDIF ; DEVICE_PMIF
+
+; @CESYSGEN IF DEVICE_PMIF && !PM_PMSTUBS
+
+; HIVE BOOT SECTION
+
+;
+; Power Manager interfaces.  These list the interface classes that the Power
+; Manager will monitor for new devices.
+;
+[HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Power\Interfaces]
+    "{A32942B7-920C-486b-B0E6-92A702A99B35}"="Generic power-manageable devices"
+    "{8DD679CE-8AB4-43c8-A14A-EA4963FAA715}"="Power-manageable block devices"
+; @CESYSGEN IF CE_MODULES_NDIS
+    "{98C5250D-C29A-4985-AE5F-AFE5367E5006}"="Power-manageable NDIS miniports"
+; @CESYSGEN ENDIF CE_MODULES_NDIS
+; @CESYSGEN IF CE_MODULES_GWES
+    "{EB91C7C9-8BF6-4a2d-9AB8-69724EED97D1}"="Power-manageable display"
+; @CESYSGEN ENDIF CE_MODULES_GWES
+
+;
+; Default System Power States
+;
+; OEMs may choose to customize this set of system power states to
+; reflect the capabilities of their platform.  For example, they
+; may wish to create power states reflecting critical battery
+; levels, in or out of cradle, on or off of AC power.  If the Power
+; Manager module is actively determining when to switch system power
+; states, OEMs may need to update the PM source code when they
+; add new power states.
+;
+; To remove these state definitions from the configuration for a platform,
+; include the line:
+;   [-HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Power\State]
+; in the device's platform.reg file.  Uncomment the line in the
+; platform.reg file.
+;
+
+;
+; In this system power state, the user is interacting actively with
+; the system.
+;
+[HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Power\State\On]
+    "Default"=dword:0           ; D0
+    "Flags"=dword:12010000      ; POWER_STATE_ON | POWER_STATE_PASSWORD | POWER_STATE_BACKLIGHTON
+
+; @CESYSGEN IF PM_PM_DEFAULT_PDD
+
+;
+; In this system power state, the user may be interacting with the
+; system, but not actively.  For instance, they might be looking at
+; the screen or they might not.  In this power state the system is
+; "idle" but still in use by the user, so all devices still be
+; operational (but possibly with some latency).
+;
+[HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Power\State\UserIdle]
+    "Default"=dword:1           ; D1
+    "Flags"=dword:11000000      ; POWER_STATE_USERIDLE | POWER_STATE_PASSWORD
+
+;
+; In this system power state, the user is not considered to be using
+; the system, even passively.  However, the system is not suspended
+; and system programs may be doing work on the user's behalf.  In this
+; power state the system is "idle" but might still be used by system
+; programs.  Devices that aren't actively doing work might be powered
+; down.
+;
+[HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Power\State\SystemIdle]
+    "Default"=dword:2           ; D2
+    "Flags"=dword:0             ;
+
+; @CESYSGEN IF CE_MODULES_GWES
+;
+; Turn the display off during SystemIdle.
+;
+[HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Power\State\SystemIdle\{EB91C7C9-8BF6-4a2d-9AB8-69724EED97D1}]
+    "Default"=dword:4           ; D4
+; @CESYSGEN ENDIF CE_MODULES_GWES
+
+; @CESYSGEN ENDIF ; PM_PM_DEFAULT_PDD
+
+;
+; In this system power state, the system is suspended.  Devices are turned
+; off, interrupts are not being serviced, and the CPU is stopped.
+;
+[HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Power\State\Suspend]
+    "Default"=dword:3           ; D3
+    "Flags"=dword:200000        ; POWER_STATE_SUSPEND
+
+;
+; Entering this system power state reboots the system with a clean object
+; store.  If an OEM includes this state in their platform, they must
+; support KernelIoControl() with IOCTL_HAL_REBOOT.
+;
+[HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Power\State\ColdReboot]
+    "Default"=dword:4           ; D4
+    "Flags"=dword:800000        ; POWER_STATE_RESET
+
+;
+; Entering this system power state reboots the system.  If an OEM includes this state in
+; their platform, they must support KernelIoControl() with IOCTL_HAL_REBOOT.
+;
+[HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Power\State\Reboot]
+    "Default"=dword:4           ; D4
+    "Flags"=dword:800000        ; POWER_STATE_RESET
+
+;;;;
+;;;; Entering this system power state shuts down the system.  All devices are powered off,
+;;;; resuming may require user intervention.  The system will cold boot on resume.
+;;;; Supporting this power state requires that the OEM customize the Power Manager
+;;;; to recognize POWER_STATE_OFF and take platform-specific action to remove
+;;;; power.
+;;;;
+;;;[HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Power\State\ShutDown]
+;;;    "Default"=dword:4           ; D4
+;;;    "Flags"=dword:20000         ; POWER_STATE_OFF
+
+; @CESYSGEN IF CE_MODULES_NDIS
+
+;
+; Since we generally don't want arbitrary network adapters to be wake
+; sources, override the default suspend setting to turn adapters completely
+; off.  Add adapters to this section that we DO want to be wake sources, or
+; have the application using the adapter use the SetPowerRequirement() API
+; to make it a wake source.
+;
+; NDIS maps power manager device power states to NDIS device power states
+; as follows:
+;   PM State                        NDIS State
+;
+;       D0                      NdisDeviceStateD0
+;       D1                      NdisDeviceStateD0
+;       D2                      NdisDeviceStateD0
+;
+;       D4                      NdisDeviceStateD3
+;       D3                      See below.
+;
+; Note on D3:  If an adapter supports wake sources, NDIS will map
+; the PM device power state D3 to the highest-power-consuming state
+; reported by the miniport driver in response to an OID_PNP_CAPABILITIES
+; query. For example, suppose the miniport reports:
+;       MinLinkChangeWakeUp     NdisDeviceStateD2
+;       MinMagicPacketWakeUp    NdisDeviceStateD1
+;       MinPatternWakeUp        NdisDeviceStateD2
+; For this miniport, NDIS translates D3 from Power Manager to
+; NdisDeviceStateD1.
+;
+[HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Power\State\Suspend\{98C5250D-C29A-4985-AE5F-AFE5367E5006}]
+    "Default"=dword:4           ; D4
+
+; @CESYSGEN ENDIF CE_MODULES_NDIS
+
+; @CESYSGEN IF PM_PM_PDA_PDD
+; @CESYSGEN IF CE_MODULES_WAVEAPI
+; @CESYSGEN ENDIF ; CE_MODULES_WAVEAPI
+; @CESYSGEN ENDIF ; PM_PM_PDA_PDD
+
+;
+; Default Activity Timers
+;
+
+;
+; These registry values set up activity timers inside the Power Manager.
+; GWES and/or other system components need to reset them periodically
+; to keep the associated inactivity event from being set.
+;
+; OEMs can define other timers instead of or in addition to the ones in this
+; file.  Generally this will be done in conjunction with modifications to
+; the Power Manager platform sources.
+;
+; Defining timers causes the PM to create a set of named events for resetting
+; the timer and for obtaining its activity status.  See the PM documentation
+; for more information.
+;
+; To remove these timer definitions from the configuration for a platform,
+; include the line:
+;   [-HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Power\ActivityTimers]
+; in the device's platform.reg file.  Uncomment the line in the
+; platform.reg file.
+;
+;
+[HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Power\ActivityTimers\UserActivity]
+    "TimeoutMs"=dword:64                        ; in milli seconds
+
+; @CESYSGEN IF PM_PM_DEFAULT_PDD
+[HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Power\ActivityTimers\SystemActivity]
+    "TimeoutMs"=dword:64                        ; in milli seconds
+; @CESYSGEN ENDIF ; PM_PM_DEFAULT_PDD
+
+;
+; Default System Power State Transition Timeouts
+;
+
+; These registry values configure the interval of time the Power Manager allows
+; to pass during periods of inactivity before updating the system power state.
+; The sample implementation of the power manager uses them as follows:
+;   On AC power, the system will be in the "On" system power state as ;
+;       long as the UserActivity activity timer has not expired.
+;   Once the UserActivity timer expires, the PM will transition to the
+;       "UserIdle" system power state after ACUserIdle seconds of user
+;       inactivity.
+;   After ACSystemIdle seconds of continued user inactivity, the PM will
+;       transition to the "SystemIdle" system power state.
+;   The PM will keep the system in the SystemIdle power state for as long
+;       as the SystemActivity activity timer has not expired.  Once it expires,
+;       the PM will wait ACSuspend seconds before transitioning to the "Suspend"
+;       system power state.
+; Resetting the UserActivity activity timer at any time prior to entering
+; the Suspend system power state will cause the system to go back to the "On"
+; system power state.  The PM implements a similar algorithm on battery power
+; using the BattUserIdle, BattSystemIdle, and BattSuspend timeouts.
+;
+; OEMs can change this state machine by customizing the PM for their platform.
+;
+; To remove these timeout definitions from the configuration for a platform,
+; include the line:
+;   [-HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Power\Timeouts]
+; in the device's platform.reg file.  Uncomment the line in the
+; platform.reg file.
+
+[HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Power\Timeouts]
+; @CESYSGEN IF PM_PM_DEFAULT_PDD
+    "ACUserIdle"=dword:3c               ; in seconds
+    "ACSystemIdle"=dword:12c    ; in seconds
+    "ACSuspend"=dword:0                 ; in seconds
+    "BattUserIdle"=dword:3c             ; in seconds
+    "BattSystemIdle"=dword:b4   ; in seconds
+    "BattSuspend"=dword:12c             ; in seconds
+; @CESYSGEN ENDIF ; PM_PM_DEFAULT_PDD
+; @CESYSGEN IF PM_PM_PDA_PDD
+; @CESYSGEN ENDIF ; PM_PM_PDA_PDD
+;;;     "BatteryPoll"=dword:1f4         ; battery polling interval, in milliseonds
+
+; END HIVE BOOT SECTION
+
+; @CESYSGEN IF CE_MODULES_PCCARD
+; @CESYSGEN IF PM_PM_DEFAULT_PDD
+
+[HKEY_LOCAL_MACHINE\Drivers\PCMCIA]
+    "StatusChangeActivityEvent"="PowerManager/ActivityTimer/SystemActivity"
+
+; @CESYSGEN ENDIF ; PM_PM_DEFAULT_PDD
+; @CESYSGEN ENDIF CE_MODULES_PCCARD
+
+; @CESYSGEN IF CE_MODULES_GWES
+
+; This registry setting tells GWES to signal the Power Manager
+; when user input devices are active.  GWES will reset this activity timer
+; whenever it dequeues any type of input event (keyboard, mouse, or
+; touch) from its internal queue.
+[HKEY_LOCAL_MACHINE\SYSTEM\GWE]
+    "ActivityEvent"="PowerManager/ActivityTimer/UserActivity"
+
+; Set GWES registry keys so that it's not fighting with the PM about
+; when to suspend the system.  Setting DisableGwesPowerOff to a non-
+; zero value tells GWES to ignore the settings of the BattPowerOff,
+; ExtPowerOff, and WakeupPowerOff values.
+[HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Power]
+    "DisableGwesPowerOff"=dword:1
+
+; @CESYSGEN IF PM_PM_PDA_PDD
+; @CESYSGEN ENDIF ; PM_PM_PDA_PDD
+
+; @CESYSGEN ENDIF CE_MODULES_GWES
+
+; @CESYSGEN IF CE_MODULES_CXPORT
+
+; These registry settings tells the networking protocol stack to periodically
+; signal the Power Manager when any sockets are in the connected state.  They
+; also tell the stack NOT to automatically reset the GWES idle timer (this
+; enables the screen saver).
+[HKEY_LOCAL_MACHINE\Comm\CXPort]
+; @CESYSGEN IF PM_PM_DEFAULT_PDD
+    "NoIdleTimerEvent"="PowerManager/ActivityTimer/SystemActivity"
+; @CESYSGEN ENDIF ; PM_PM_DEFAULT_PDD
+    "NoIdleTimerReset"=dword:1
+IF PRJ_CXPORT_PHYSHEAP
+    "PhysHeap"=dword:1
+ENDIF
+
+; @CESYSGEN ENDIF CE_MODULES_CXPORT
+
+; @CESYSGEN ENDIF DEVICE_PMIF && !PM_PMSTUBS
+
+; @CESYSGEN IF CE_MODULES_SERVICES
+; Services.exe configuration key
+[HKEY_LOCAL_MACHINE\Services]
+    "Dll"="ServicesEnum.dll"
+    "BusName"="services"
+    "Flags"=dword:8
+    "BusIoctl"=dword:2a0048
+    "InterfaceType"=dword:0
+    "IClass"=multi_sz:"{B3CC6EBA-5507-4196-8E41-2BF42E4A47C9}=%b","{6F40791D-300E-44E4-BC38-E0E63CA8375C}=%b"
+; @CESYSGEN ENDIF CE_MODULES_SERVICES
+
+; @CESYSGEN ENDIF CE_MODULES_DEVICE
+
+; @CESYSGEN IF CE_MODULES_GWES
+; Event based API-set ready detection
+; HIVE BOOT SECTION
+[HKEY_LOCAL_MACHINE\SYSTEM\Events]
+    "SYSTEM/GweApiSetReady"="Event triggered after GWES registers its API sets"
+; END HIVE BOOT SECTION
+; @CESYSGEN ENDIF
+
+; @CESYSGEN IF CE_MODULES_SNMP && CE_MODULES_WINSOCK
+; @CESYSGEN IF CE_MODULES_SNMP_MIBII
+; @CESYSGEN ENDIF
+; @CESYSGEN IF CE_MODULES_SNMP_HOSTMIB
+; @CESYSGEN ENDIF
+; @CESYSGEN IF CE_MODULES_SNMP_SNMPTESTMIB
+; @CESYSGEN ENDIF
+; @CESYSGEN IF CE_MODULES_SNMP_MIBII
+; @CESYSGEN ENDIF
+; @CESYSGEN IF CE_MODULES_SNMP_HOSTMIB
+; @CESYSGEN ENDIF
+; @CESYSGEN IF CE_MODULES_SNMP_SNMPTESTMIB
+; @CESYSGEN ENDIF
+; @CESYSGEN ENDIF
+
+
+; @CESYSGEN IF FILESYS_FSREGHIVE
+; HIVE BOOT SECTION
+
+; Valid Bits for Flags registry value
+; If no flags are set, the hive will be stored in the object store.
+;
+; 0x00000001    Start storage manager in boot phase 1 for hive-based registry
+; 0x00000002    Start device manager in boot phase 1 for hive-based registry
+; 0x00000004    Start storage manager in boot phase 1 for registry in
+;               external ROM (such as BINFS)
+; 0x00000008    Start device manager in boot phase 1 for registry in
+;               external ROM (such as BINFS)
+
+[HKEY_LOCAL_MACHINE\init\BootVars]
+   "SystemHive"="Documents and Settings\\system.hv"
+   "ProfileDir"="Documents and Settings"
+   "Flags"=dword:1
+; END HIVE BOOT SECTION
+; @CESYSGEN ENDIF FILESYS_FSREGHIVE
+
+; @CESYSGEN IF FILESYS_FSDBASE
+; HIVE BOOT SECTION
+
+; When a bootable persistent storage device is mounted, redirect ObjectStore
+; database operations to a volume file on the device. This will be the same
+; storage device where the registry hives are stored on FSREGHIVE builds.
+[HKEY_LOCAL_MACHINE\System\ObjectStore]
+    "DefaultDBVol"="Documents and Settings\\default.vol"
+
+; END HIVE BOOT SECTION
+; @CESYSGEN ENDIF
+
+; HIVE BOOT SECTION
+; This key allows untrusted processes (when using 2 tier trust model) to access system files for read.
+[HKEY_LOCAL_MACHINE\System\ObjectStore]
+    "AllowSystemAccess"=dword:1
+; END HIVE BOOT SECTION
+
+
+; Replication Filter Registry Map
+;
+; ReplStoreHostVolume  : Host volume of replication database volume; "" for root, "\\<mount point>" for non-root, e.g., "\\Hard Disk"
+; ReplStorePath        : Path of replication database volume on host volume
+; ReplStoreName        : Name of replication database in replication database volume
+; ReplStoreDoImmaculate: [Optional] Whether to synchronize the replication database to the replicated volume on initialization
+; ReplStoreCacheSize   : [Optional] Number of replication records (paths) to cache
+; NumDirsToExclude     : [Optional; Required if DirsToExclude present] Number of entries in DirsToExclude
+; DirsToExclude        : [Optional; Required if NumDirsToExclude present] Set of fully qualified paths to exclude from replication
+;                        e.g., "\\foo\\","\\bar\\" Note that, it is important to include the trailing slash
+;
+; ReplStoreHostVolume, ReplStorePath, and ReplStoreName must all be defined in order to override the
+; default of ("", "\\ReplStorVol", "ReplStor").
+;
+; HIVE BOOT SECTION
+; @CESYSGEN IF CE_MODULES_FSREPLXFILT
+; @CESYSGEN ENDIF CE_MODULES_FSREPLXFILT
+; END HIVE BOOT SECTION
+
+; Valid Bits for Flags registry value under [HKEY_LOCAL_MACHINE\init\BootVars]
+; 0x00000001    Start storage manager in boot phase 1 for hive-based registry
+; 0x00000002    Start device manager in boot phase 1 for hive-based registry
+
+IF PRJ_ENABLE_FSMOUNTASROOT
+; HIVE BOOT SECTION
+IF PRJ_BOOTDEVICE_ATAPI
+[HKEY_LOCAL_MACHINE\init\BootVars]
+   "Flags"=dword:3
+[HKEY_LOCAL_MACHINE\System\StorageManager\Profiles\HDProfile]
+    "MountAsRoot"=dword:1
+IF PRJ_ENABLE_FSEXTREPL
+; @CESYSGEN IF CE_MODULES_FSREPLXFILT
+; @CESYSGEN ELSE
+#error PRJ_ENABLE_FSEXTREPL defined without including replication filter component.  Add SYSGEN_FSREPLXFILT to your configuration.
+; @CESYSGEN ENDIF CE_MODULES_FSREPLXFILT
+ENDIF
+ENDIF
+
+IF PRJ_BOOTDEVICE_MSFLASH
+[HKEY_LOCAL_MACHINE\init\BootVars]
+   "Flags"=dword:1
+[HKEY_LOCAL_MACHINE\System\StorageManager\Profiles\MSFlash\FATFS]
+    "MountAsRoot"=dword:1
+IF PRJ_ENABLE_FSEXTREPL
+; @CESYSGEN IF CE_MODULES_FSREPLXFILT
+; @CESYSGEN ELSE
+#error PRJ_ENABLE_FSEXTREPL defined without including replication filter component.  Add SYSGEN_FSREPLXFILT to your configuration.
+; @CESYSGEN ENDIF CE_MODULES_FSREPLXFILT
+ENDIF
+ENDIF
+; END HIVE BOOT SECTION
+ENDIF
+
+
+IF PRJ_ENABLE_FSREGHIVE
+; @CESYSGEN IF  FILESYS_FSREGHIVE
+; HIVE BOOT SECTION
+IF PRJ_BOOTDEVICE_MSFLASH
+[HKEY_LOCAL_MACHINE\init\BootVars]
+   "Flags"=dword:1
+[HKEY_LOCAL_MACHINE\System\StorageManager\Profiles\MSFlash]
+    "MountAsBootable"=dword:1
+ELSE
+[HKEY_LOCAL_MACHINE\init\BootVars]
+   "Flags"=dword:3
+[HKEY_LOCAL_MACHINE\System\StorageManager\Profiles\HDProfile]
+    "MountAsBootable"=dword:1
+ENDIF
+; END HIVE BOOT SECTION
+; @CESYSGEN ELSE
+; @CESYSGEN ENDIF FILESYS_FSREGHIVE
+ENDIF
+
+
+; @CESYSGEN IF CE_MODULES_FSDMGR
+
+; HIVE BOOT SECTION
+
+IF PRJ_ENABLE_REGFLUSH_THREAD
+[HKEY_LOCAL_MACHINE\System\ObjectStore\RegFlush]
+; To monitor the flushing from an external process add "ActivityName" registry value.
+; The activity name is a global named event that filesystem will signal on Registry Activity.
+;   "ActivityName"=""
+; Create an thread in filesys to perform flushing
+    "SpawnThread"=dword:1
+; Make the thread IDLE priority
+    "FlushPriority256"=dword:FF
+; ActivityThreshold specifies the # of reg activity before we force a flush
+    "ActivityThreshold"=dword:100
+; Timeout period in ms for a flush (flush occurs if there have been some changes during this period).
+    "FlushPeriod"=dword:1D4C0
+ENDIF
+
+
+IF PRJ_ENABLE_DBFLUSH_THREAD
+[HKEY_LOCAL_MACHINE\System\ObjectStore\DBFlush]
+; To monitor the flushing from an external process add "ActivityName" registry value.
+; The activity name is a global named event that filesystem will signal on database Activity.
+;   "ActivityName"=""
+; Create an thread in filesys to perform flushing
+    "SpawnThread"=dword:1
+; Make the thread IDLE priority
+    "FlushPriority256"=dword:FF
+; ActivityThreshold specifies the # of db activity before we force a flush
+    "ActivityThreshold"=dword:100
+; Timeout period in ms for a flush (flush occurs if there have been some changes during this period).
+    "FlushPeriod"=dword:1D4C0
+ENDIF
+
+
+; Registry value that can be queried to determine the type of registry subsystem that is in use
+; 0 - RAM/ObjectStore based registry
+; 1 - Hive based registry
+; @CESYSGEN IF FILESYS_FSREGHIVE
+[HKEY_LOCAL_MACHINE\System\ObjectStore]
+    "RegistryType"=dword:1
+; @CESYSGEN ELSE
+; @CESYSGEN ENDIF
+
+; Sample persistent registry dll
+; @CESYSGEN IF CE_MODULES_OEMFS
+; @CESYSGEN ENDIF
+
+; This tells Filesys to load FSDMGR
+[HKEY_LOCAL_MACHINE\System\StorageManager]
+    "Dll"="fsdmgr.dll"
+    "PNPUnloadDelay"=dword:1000
+; END HIVE BOOT SECTION
+
+; @CESYSGEN IF CE_MODULES_RELFSD
+; HIVE BOOT SECTION
+IF IMGNOKITL !
+
+[HKEY_LOCAL_MACHINE\System\Events]
+    "ReleaseFSD"="ReleaseFSD"
+
+; @CESYSGEN IF CE_MODULES_SHELL
+[HKEY_LOCAL_MACHINE\Loader]
+    "SystemPath"=multi_sz:"\\Release\\"
+; @CESYSGEN ENDIF CE_MODULES_SHELL
+
+; AutoLoad Filesystems
+; LoadFlags - DWORD - Controls how the filesystem is loaded
+; BootPhase - DWORD - Controls what phase of the boot this filesystem is loaded can be 0, 1, 2
+; Currently LoadFLags can be one of the following
+; LOAD_FLAG_SYNC     00000001    LOAD_FLAG_SYNC  - Load the filesystem synchronously
+; LOAD_FLAG_ASYNC    00000002    LOAD_FLAG_ASYNC - Load the filesystem async on another thread (Default)
+; mount  - string -  dir where relfsd mounts the _FLATRELEASEDIR. When
+;                    shell is included in the image, kernel loader
+;                    automatically loads modules from '\release' if they
+;                    are not found on the device. Because of this,
+;                    production images in which relfsd is included in the
+;                    image (and shell is not), relfsd should be set to
+;                    mount to some other dir than '\release'.
+; secure - DWORD -   1 - relfsd will allow only opening and reading
+;                        of existing files on the desktop. Disallows
+;                        writing to files and registry access functions.
+;                        "Opening file ... from desktop" is a RETAILMSG.
+;                    0 - unrestricted relfsd access
+;                        "Opening file ... from desktop" is a NKDbgPrintfW message.
+[HKEY_LOCAL_MACHINE\System\StorageManager\AutoLoad\Relfsd]
+    "Dll"="relfsd.dll"
+    "Paging"=dword:0
+    "LoadFlags"=dword:1
+    "PowerNotify"=dword:0
+; @CESYSGEN IF CE_MODULES_SHELL
+    "mount"="Release"
+    "secure"=dword:0
+; @CESYSGEN ELSE
+; @CESYSGEN ENDIF CE_MODULES_SHELL
+
+ENDIF IMGNOKITL !
+; END HIVE BOOT SECTION
+; @CESYSGEN ENDIF CE_MODULES_RELFSD
+
+; @CESYSGEN IF FILESYS_FSYSRAM
+; HIVE BOOT SECTION
+[HKEY_LOCAL_MACHINE\System\StorageManager\AutoLoad\ObjectStore]
+    "Dll"="filesys.dll"
+    "Paging"=dword:1
+    "LoadFlags"=dword:1
+    "BootPhase"=dword:0
+    "MountPermanent"=dword:1
+IF PRJ_ENABLE_FSREGHIVE !
+    ; Only mount ObjectStore FS as bootable if PRJ_ENABLE_FSREGHIVE is NOT set
+    ; in order to preserve backwards compatibility (hive files go on
+    ; ObjectStore FS by default).
+    "MountAsBootable"=dword:1
+ENDIF
+IF PRJ_ENABLE_FSMOUNTASROOT !
+    ; Only mount ObjectStore FS as root if PRJ_ENABLE_FSMOUNTASROOT is NOT set
+    ; in order to preserve backwards compatibility (ObjectStore is root of
+    ; virtual file system by default).
+    "MountAsRoot"=dword:1
+ENDIF
+IF PRJ_DISABLE_RAMFS_COMPRESSION
+    "DisableFileCompression"=dword:1
+ENDIF
+; END HIVE BOOT SECTION
+; @CESYSGEN ENDIF FILESYS_FSYSRAM
+
+
+; @CESYSGEN IF CE_MODULES_EXFAT
+; HIVE BOOT SECTION
+;
+; Default values for FATFS.  These can be overridden per profile
+;
+; Dll            String    Dll name of file system, e.g fatfsd.dll
+; Util           String    Dll name of utility to do format and scan, e.g fatutil.dll
+; BufferSize     DWORD     Number of sector-sized buffers to use for streams (default = 64)
+; CodePage       DWORD     Overrides using CP_OEMCP in all character conversion.
+; MountLabel     DWORD     1 to use disk name as mount point
+;
+; TFAT specific settings
+;
+; SectorsPerSyncAtInit     DWORD     Number of sectors to sync at a time during init (default = 32).
+; ReservedClusters         DWORD     Number of clusters to reserve for cloning (default = 4).
+;
+; Disk cache settings
+;
+; CacheDll                 String    DLL name of disk cache library
+; EnableCache              DWORD     0 to disable disk caching, 1 to enable
+; EnableWriteBack          DWORD     1 to enable a write-back cache. 0 to use a write-through cache.
+; EnableFatCacheWarm       DWORD     1 to enable pre-warming the FAT cache.
+; EnableDataCacheWarm      DWORD     1 to enable pre-warming the data cache.
+; EnableBitmapCacheWarm    DWORD     1 to enable pre-warming the bitmap cache.
+; FatCacheSize             DWORD     Size of the FAT cache, in number of sectors.
+;                                    If 0, FATFS uses size of the FAT up to 512 sectors.
+; DataCacheSize            DWORD     Size of the data cache, in number of sectors.
+;                                    If 0, FATFS uses twice the FAT cache.
+; BitmapCacheSize          DWORD     Size of the bitmap cache, in number of sectors.
+;                                    If 0, FATFS uses size of the bitmap up to 512 sectors.
+; LazyWriterThreadPrio256  DWORD     The priority of the lazy write-back thread.
+;
+; Formatting settings
+;
+; FormatTfat           DWORD     1 to format volume as TFAT on auto-format or through IOCTL_DISK_FORMAT_VOLUME
+; FormatExfat          DWORD     1 to format volume as EXFAT on auto-format or through IOCTL_DISK_FORMAT_VOLUME
+; FormatClusterSize    DWORD     Cluster size in bytes.  Limit of 32 KB for regular FAT.  No limit for exFAT.
+; FormatFatVersion     DWORD     Regular FAT only.  Values of 12, 16, or 32.
+; FormatNumberOfFats   DWORD     Regular FAT only.  Values of 1 or 2.
+; FullFormat           DWORD     Full format on auto-format.
+; SecureWipe           DWORD     Secure wipe on auto-format.
+;
+; FATFS flags (formerly under Flags registry value)
+;
+; UpdateAccess         DWORD     Update access times if set (formerly Flags = 0x1)
+; DisableAutoScan      DWORD     Disable automatic ScanVolume() (formerly Flags = 0x4)
+; ForceWritethrough    DWORD     Force file writes to be always writethrough (formerly Flags = 0x20)
+; DisableAutoFormat    DWORD     Disable automatic formatting of unformatted volumes (formerly Flags = 0x40)
+; DisableFormat        DWORD     Disable format IOCTL (formerly Flags = 0x20000)
+; TransactData         DWORD     Transact data on a write (i.e. clone cluster on every write)
+;                                (formerly Flags = 0x40000)
+; NonatomicSector      DWORD     Use cluster 1 entry in FAT table for TFAT transaction,
+;                                since sector writes are non-atomic. (formerly Flags = 0x80000)
+; TfatMarkAlways       DWORD     Always mark transaction status, even only one sector in FAT is changed.
+;                                (formerly Flags = 0x200000)
+; LFNExtendedAlways    DWORD     Generate LFN entries for extended characters always
+; SecuritySupport      DWORD     exFAT only.  Indicates to add a security descriptor directory entry
+;                                for every file/directory created.
+; ForceNoFileBuffering DWORD     Force reads and writes to file data to be unbuffered
+;
+;
+[HKEY_LOCAL_MACHINE\System\StorageManager\FATFS]
+    "FriendlyName"="FAT FileSystem"
+    "Dll"="exfat.dll"
+    "DisableAutoFormat"=dword:1
+    "DisableAutoScan"=dword:1
+    "Paging"=dword:1
+    "EnableCache"=dword:1
+    "CacheSize"=dword:0
+    "Util"="fatutil.dll"
+    "CacheDll"="diskcache.dll"
+
+; @CESYSGEN IF CE_MODULES_CACHEFILT
+[HKEY_LOCAL_MACHINE\System\StorageManager\FATFS\Filters\CacheFilt]
+    "Dll"="cachefilt.dll"
+    "LockIOBuffers"=dword:1
+; @CESYSGEN ENDIF CE_MODULES_CACHEFILT
+
+[HKEY_LOCAL_MACHINE\System\StorageManager\EXFAT]
+    "FriendlyName"="exFAT FileSystem"
+    "Dll"="exfat.dll"
+    "DisableAutoFormat"=dword:1
+    "DisableAutoScan"=dword:1
+    "Paging"=dword:1
+    "EnableCache"=dword:1
+    "CacheSize"=dword:0
+    "Util"="fatutil.dll"
+    "CacheDll"="diskcache.dll"
+    "FormatExfat"=dword:1
+
+; @CESYSGEN IF CE_MODULES_CACHEFILT
+[HKEY_LOCAL_MACHINE\System\StorageManager\EXFAT\Filters\CacheFilt]
+    "Dll"="cachefilt.dll"
+    "LockIOBuffers"=dword:1
+; @CESYSGEN ENDIF CE_MODULES_CACHEFILT
+; END HIVE BOOT SECTION
+; @CESYSGEN ENDIF CE_MODULES_EXFAT
+
+; @CESYSGEN IF CE_MODULES_ENCFILT
+; @CESYSGEN ENDIF
+
+IF PRJ_FSCOMPRESS_BOOTDEVICE
+; @CESYSGEN IF CE_MODULES_CEFILT
+; @CESYSGEN ELSE
+#error PRJ_PRJ_FSCOMPRESS_BOOTDEVICE defined without including compression filter component. Add SYSGEN_CEFILT to your configuration.
+; @CESYSGEN ENDIF CE_MODULES_CEFILT
+ENDIF
+
+IF PRJ_FSENCRYPT_BOOTDEVICE
+; @CESYSGEN IF CE_MODULES_CEFILT
+; @CESYSGEN ELSE
+#error PRJ_FSENCRYPT_BOOTDEVICE defined without including encryption filter component. Add SYSGEN_CEFILT to your configuration.
+; @CESYSGEN ENDIF CE_MODULES_CEFILT
+ENDIF
+
+IF PRJ_FSCOMPRESS_BOOTDEVICE || PRJ_FSENCRYPT_BOOTDEVICE
+; @CESYSGEN IF CE_MODULES_CEFILT
+; @CESYSGEN ENDIF CE_MODULES_CEFILT
+ENDIF
+
+; @CESYSGEN IF CE_MODULES_UDFS
+; Default values for udfs.  These can be overridden per profile
+[HKEY_LOCAL_MACHINE\System\StorageManager\UDFS]
+    "FriendlyName"="UDF Read-only FileSystem"
+    "Dll"="udfs.dll"
+    "Paging"=dword:1
+    "LockIOBuffers"=dword:0
+;   "HeapMaxSize"=dword:0 ; maximum size of heap in KB, 0=unbounded
+;   "DestroyHeapOnUnmount"=dword:0 ; 0=disable, 1=enable destruction, recreation of heap on media change
+
+; The detectors for the CDProfile will be listed here.
+[HKEY_LOCAL_MACHINE\System\StorageManager\MSIFS_CD\Detectors\UDFS]
+    "Order"=dword:1
+    "LoadFlags"=dword:0
+    "Dll"="UDFS.DLL"
+    "Export"="UDF_RecognizeVolume"
+    "Guid"="{1DFE4CC8-525B-4613-BA79-8FB510950BDD}"
+; @CESYSGEN ENDIF CE_MODULES_UDFS
+
+; @CESYSGEN IF CE_MODULES_CDFS
+; Default values for cdfs.  These can be overridden per profile
+[HKEY_LOCAL_MACHINE\System\StorageManager\CDFS]
+    "FriendlyName"="ISO 9660/Joliet/CDDA FileSystem"
+    "Dll"="cdfs.dll"
+    "Paging"=dword:1
+    "LockIOBuffers"=dword:0
+;   "HeapMaxSize"=dword:0 ; maximum size of heap in KB, 0=unbounded
+;   "DestroyHeapOnUnmount"=dword:0 ; 0=disable, 1=enable destruction, recreation of heap on media change
+
+; The detectors for the CDProfile will be listed here.
+[HKEY_LOCAL_MACHINE\System\StorageManager\MSIFS_CD\Detectors\CDFS]
+    "Order"=dword:2
+    "LoadFlags"=dword:0
+    "Dll"="CDFS.DLL"
+    "Export"="CDFS_RecognizeVolume"
+    "Guid"="{0B1005CD-3940-4563-829C-61D68521D448}"
+; @CESYSGEN ENDIF CE_MODULES_UDFS
+
+; @CESYSGEN IF CE_MODULES_BINFS
+; @CESYSGEN ENDIF CE_MODULES_BINFS
+
+; @CESYSGEN IF CE_MODULES_IMGFS
+; @CESYSGEN IF IMGFS_IMGFS_NOWRITE
+; @CESYSGEN ENDIF
+; @CESYSGEN ENDIF
+
+; @CESYSGEN IF CE_MODULES_RAWFS
+; @CESYSGEN ENDIF
+
+; @CESYSGEN IF CE_MODULES_UPDATEAPP || CE_MODULES_IMGUPD
+; @CESYSGEN ENDIF
+
+; @CESYSGEN IF CE_MODULES_UPDATEAPP
+; @CESYSGEN ENDIF
+
+; @CESYSGEN IF CE_MODULES_MSPART
+; HIVE BOOT SECTION
+; Partition driver key.
+[HKEY_LOCAL_MACHINE\System\StorageManager\MSPART]
+    "Dll"="mspart.dll"
+; END HIVE BOOT SECTION
+; @CESYSGEN ENDIF
+
+; Default values for all profiles
+; These can overridden in the particular named profile
+; Various Flags
+;   AutoFormat - Formats the store automatically
+;   AutoPart   - Automatically partitions the store with largest creatable partition
+;   AutoMount  - Automatically Mounts each detected partition (if FSD driver is available)
+;   MountFlags (deprecated)- Flags on how the partition is mounted
+;       1  - Hidden file system
+;       2  - May contain system registry
+;       4  - Mount as root of file system, "\"
+;      10  - Mount filesystem as an external ROM filesystem
+;      20  - Treat all files and subdirectories as system files
+;   The following registry values override the MountFlags:
+;      MountHidden - Hidden file system (same as MountFlags=1)
+;      MountAsBootable - May contain system registry (same as MountFlags=2)
+;      MountAsRoot - Mount as root of file system, "\" (same as MountFlags=4)
+;      MountAsROM - Mount as an external ROM filesystem (same as MountFlags=10)
+;      MountSystem - Treat all files and subdirectories as system files (same as MountFlags=20)
+;      MountPermanent - This volume can never be dismounted (same as MountFlags=40)
+;      MountAsNetwork - This volume will receive all UNC paths (same as MountFlags=80)
+
+; HIVE BOOT SECTION
+[HKEY_LOCAL_MACHINE\System\StorageManager\Profiles]
+    "AutoMount"=dword:1
+    "AutoPart"=dword:0
+    "AutoFormat"=dword:0
+    "MountFlags"=dword:0
+    "DefaultFileSystem"=""
+    "PartitionDriverName"="MSPART"
+    "Folder"=LOC_STORE_DEFAULT_FOLDER
+; @CESYSGEN IF PM_PM_DEFAULT_PDD
+    "ActivityEvent"="PowerManager/ActivityTimer/SystemActivity"
+; @CESYSGEN ENDIF ; PM_PM_DEFAULT_PDD
+
+
+; The partition table contain entries where the volume name is the partition type (in %02X format)
+; The value is the name of the filesystem.  This is used to look up the module to load etc.
+; Explicitly call out 07 partition type as MSIFS, which means an Microsoft Installable File SYstem,
+; such as NTFS or EXFAT.  The actual filesystem name is determined by running the detectors.
+
+[HKEY_LOCAL_MACHINE\System\StorageManager\PartitionTable]
+    "01"="FATFS"
+    "04"="FATFS"
+    "06"="FATFS"
+    "07"="MSIFS"
+    "0B"="FATFS"
+    "0C"="FATFS"
+    "0E"="FATFS"
+    "0F"="FATFS"
+    "20"="BOOT"
+    "21"="BINFS"
+    "22"="RAWFS"
+    "23"="RAWFS"
+    "25"="IMGFS"
+    "26"="BINARY"
+
+[HKEY_LOCAL_MACHINE\System\StorageManager\MSIFS\Detectors\EXFAT]
+    "Guid"="{A4AB2ABF-726A-4aa8-B882-6EB6EB5780E9}"
+    "Dll"="exfat.dll"
+    "Export"="FSD_DetectVolume"
+
+[HKEY_LOCAL_MACHINE\System\StorageManager\MSIFS]
+    "DefaultFileSystem"="EXFAT"
+
+; @CESYSGEN IF CE_MODULES_FSDACL
+; @CESYSGEN ENDIF
+; END HIVE BOOT SECTION
+
+; @CESYSGEN IF CE_MODULES_PCCARD
+[HKEY_LOCAL_MACHINE\System\StorageManager\Profiles\PCMCIA]
+    "Name"="PCMCIA/Compact Flash Device"
+    "Folder"=LOC_STORE_PCMCIA_FOLDER
+; @CESYSGEN ENDIF CE_MODULES_PCCARD
+
+; HIVE BOOT SECTION
+; @CESYSGEN IF CE_MODULES_SDNPCID
+; @CESYSGEN ENDIF CE_MODULES_SDNPCID
+; END HIVE BOOT SECTION
+
+; HIVE BOOT SECTION
+; @CESYSGEN IF CE_MODULES_ATAPI
+[HKEY_LOCAL_MACHINE\System\StorageManager\Profiles\HDProfile]
+    "Name"="IDE Hard Disk Drive"
+    "Folder"=LOC_STORE_HD_FOLDER
+
+[HKEY_LOCAL_MACHINE\System\StorageManager\Profiles\HDProfile\FATFS]
+    "EnableCacheWarm"=dword:0
+
+; @CESYSGEN ENDIF CE_MODULES_ATAPI
+; END HIVE BOOT SECTION
+
+
+[HKEY_LOCAL_MACHINE\System\StorageManager\Profiles\CDProfile]
+; The DefaultFileSystem is actually used to indicate the possible file system detectors to use.
+; We've added the CDRom partition driver to handle the CDROM IOCTLs to be bus agnostic
+;       (using SCSI pass through).
+    "Name"="IDE CDROM/DVD Drive"
+    "Folder"=LOC_STORE_CD_FOLDER
+    "DefaultFileSystem"="MSIFS_CD"
+    "PartitionDriver"="CDRom.DLL"
+
+; ATAPI CD/DVD devices should use the legacy read IOCTL instead of translating read requests
+; into SCSI commands. Set to 0 to use SCSI command instead.
+[HKEY_LOCAL_MACHINE\System\StorageManager\Profiles\CDProfile\CDRom]
+    "UseLegacyReadIOCTL"=dword:1
+
+[HKEY_LOCAL_MACHINE\System\StorageManager\Profiles\CDProfile\PartitionTable]
+
+; @CESYSGEN IF CE_MODULES_USBDISK6
+[HKEY_LOCAL_MACHINE\System\StorageManager\Profiles\USBHDProfile]
+    "Name"="USB Hard Disk Drive"
+    "Folder"=LOC_STORE_HD_FOLDER
+
+[HKEY_LOCAL_MACHINE\System\StorageManager\Profiles\USBHDProfile\FATFS]
+    "EnableCacheWarm"=dword:0
+
+
+[HKEY_LOCAL_MACHINE\System\StorageManager\Profiles\USBFDProfile]
+    "Name"="USB Floppy Disk Drive"
+    "Folder"=LOC_STORE_FLOPPY_FOLDER
+    "DefaultFileSystem"="FATFS"
+    "PartitionDriver"=""
+
+[HKEY_LOCAL_MACHINE\System\StorageManager\Profiles\USBCDProfile]
+    "Name"="USB CDROM/DVD Drive"
+    "Folder"=LOC_STORE_CD_FOLDER
+    "DefaultFileSystem"="MSIFS_CD"
+    "PartitionDriver"="CDRom.DLL"
+
+[HKEY_LOCAL_MACHINE\System\StorageManager\Profiles\USBCDProfile\PartitionTable]
+
+; @CESYSGEN ENDIF CE_MODULES_USBDISK6
+
+; @CESYSGEN IF CE_MODULES_RAMDISK
+; @CESYSGEN ENDIF
+
+; @CESYSGEN IF CE_MODULES_RAMFMD
+; @CESYSGEN ENDIF CE_MODULES_RAMFMD
+
+; @CESYSGEN IF CE_MODULES_FLASHPDD_RAM
+; @CESYSGEN ENDIF CE_MODULES_FLASHPDD_RAM
+
+; @CESYSGEN IF CE_MODULES_FLASHPDD_SDNPCI
+; @CESYSGEN ENDIF CE_MODULES_FLASHPDD_SDNPCI
+
+
+; @CESYSGEN ENDIF CE_MODULES_FSDMGR
+
+
+
+; @CESYSGEN IF GWES_MGTT
+; @CESYSGEN IF CE_MODULES_MGTT_O || CE_MODULES_DECOMPDLL
+; @CESYSGEN IF CE_MODULES_MGTT_O
+; @CESYSGEN ENDIF
+; @CESYSGEN IF CE_MODULES_DECOMPDLL
+; @CESYSGEN ENDIF
+; @CESYSGEN ENDIF
+; @CESYSGEN IF CE_MODULES_MGTT_O
+; @CESYSGEN ENDIF
+; @CESYSGEN IF CE_MODULES_DECOMPDLL
+; @CESYSGEN ENDIF
+; @CESYSGEN ENDIF GWES_MGTT
+
+
+; Set some HPC-compatible default system fonts
+; @CESYSGEN IF CE_MODULES_GWES
+[HKEY_LOCAL_MACHINE\SYSTEM\GDI\SYSFNT]
+        "Nm"="Tahoma"
+        "Ht"=dword:fffffff4
+        "It"=dword:0
+        "Wt"=dword:190
+        "CS"=dword:0
+[HKEY_LOCAL_MACHINE\SYSTEM\GWE\Menu\BarFnt]
+        "Nm"="Tahoma"
+        "Ht"=dword:fffffff4
+        "It"=dword:0
+        "Wt"=dword:LOC_MENUBARFONTWEIGHT
+        "CS"=dword:0
+[HKEY_LOCAL_MACHINE\SYSTEM\GWE\Menu\PopFnt]
+        "Nm"="Tahoma"
+        "Ht"=dword:fffffff4
+        "It"=dword:0
+        "Wt"=dword:190
+        "CS"=dword:0
+[HKEY_LOCAL_MACHINE\SYSTEM\GWE\OOMFnt]
+        "Nm"="Tahoma"
+        "Ht"=dword:fffffff4
+        "It"=dword:0
+        "Wt"=dword:190
+        "CS"=dword:0
+; @CESYSGEN ENDIF
+
+; @CESYSGEN IF GWES_MOVERLAP
+[HKEY_LOCAL_MACHINE\SYSTEM\GWE\Menu]
+                "Overlap"=dword:60
+; @CESYSGEN ENDIF
+
+
+; @CESYSGEN IF CE_MODULES_GWES
+[HKEY_LOCAL_MACHINE\SYSTEM\GWE\Button]
+        "FontWeight"=dword:LOC_BUTTONFONTWEIGHT
+
+;[HKEY_LOCAL_MACHINE\system\gwe]
+; Use this to center dialogs in the specified rectangle - (0,0,160,100) in this example
+;       "dlgctr" = hex:00,00,00,00, 00,00,00,00, 60,01,00,00, 00,01,00,00
+
+; @CESYSGEN IF GWES_NCLIENTVIEWXP
+; @CESYSGEN ENDIF
+
+; @CESYSGEN ENDIF
+
+
+; @CESYSGEN IF CE_MODULES_COMMCTRL
+; Configurable Drag settings
+[HKEY_LOCAL_MACHINE\SYSTEM\GWE\Commctrl\DragMetrics]
+   "CXDrag"=dword:5
+   "CYDrag"=dword:5
+
+; @CESYSGEN IF CE_MODULES_GWES
+
+; @CESYSGEN IF GWES_TOUCHCURSORONLY
+; @CESYSGEN ENDIF
+
+; @CESYSGEN ENDIF CE_MODULES_GWES
+
+; @CESYSGEN ENDIF CE_MODULES_COMMCTRL
+
+
+; @CESYSGEN IF COREDLL_TIMEZONES
+;
+
+;----------------------------Time Zones --------------------------------------
+
+[HKEY_LOCAL_MACHINE\Time Zones]
+        "Default"=LOC_DEFAULT_TIMEZONE
+
+; (GMT -12:00)
+[HKEY_LOCAL_MACHINE\Time Zones\Dateline Standard Time]
+"Display"=mui_sz:"coredll.dll,#32768"
+"Dlt"=mui_sz:"coredll.dll,#33024"
+"Std"=mui_sz:"coredll.dll,#33280"
+"TZI"=hex:d0,02,00,00,00,00,00,00,c4,ff,ff,ff,\
+  00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,\
+  00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00
+
+; (GMT -11:00)
+[HKEY_LOCAL_MACHINE\Time Zones\Samoa Standard Time]
+"Display"=mui_sz:"coredll.dll,#32769"
+"Dlt"=mui_sz:"coredll.dll,#33025"
+"Std"=mui_sz:"coredll.dll,#33281"
+"TZI"=hex:94,02,00,00,00,00,00,00,c4,ff,ff,ff,\
+  00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,\
+  00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00
+
+; (GMT -10:00)
+[HKEY_LOCAL_MACHINE\Time Zones\Hawaiian Standard Time]
+"Display"=mui_sz:"coredll.dll,#32770"
+"Dlt"=mui_sz:"coredll.dll,#33026"
+"Std"=mui_sz:"coredll.dll,#33282"
+"TZI"=hex:58,02,00,00,00,00,00,00,c4,ff,ff,ff,\
+  00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,\
+  00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00
+
+; (GMT -09:00)
+[HKEY_LOCAL_MACHINE\Time Zones\Alaskan Standard Time]
+"Display"=mui_sz:"coredll.dll,#32771"
+"Dlt"=mui_sz:"coredll.dll,#33027"
+"Std"=mui_sz:"coredll.dll,#33283"
+"TZI"=hex:1c,02,00,00,00,00,00,00,c4,ff,ff,ff,\
+  00,00,0b,00,00,00,01,00,02,00,00,00,00,00,00,00,\
+  00,00,03,00,00,00,02,00,02,00,00,00,00,00,00,00
+
+; (GMT -08:00)
+[HKEY_LOCAL_MACHINE\Time Zones\Pacific Standard Time]
+"Display"=mui_sz:"coredll.dll,#32772"
+"Dlt"=mui_sz:"coredll.dll,#33028"
+"Std"=mui_sz:"coredll.dll,#33284"
+"TZI"=hex:e0,01,00,00,00,00,00,00,c4,ff,ff,ff,\
+  00,00,0b,00,00,00,01,00,02,00,00,00,00,00,00,00,\
+  00,00,03,00,00,00,02,00,02,00,00,00,00,00,00,00
+
+[HKEY_LOCAL_MACHINE\Time Zones\Pacific Standard Time (Mexico)]
+"Display"=mui_sz:"coredll.dll,#32773"
+"Dlt"=mui_sz:"coredll.dll,#33029"
+"Std"=mui_sz:"coredll.dll,#33285"
+"TZI"=hex:e0,01,00,00,00,00,00,00,c4,ff,ff,ff,\
+  00,00,0a,00,00,00,05,00,02,00,00,00,00,00,00,00,\
+  00,00,04,00,00,00,01,00,02,00,00,00,00,00,00,00
+
+; (GMT -07:00)
+[HKEY_LOCAL_MACHINE\Time Zones\Mountain Standard Time]
+"Display"=mui_sz:"coredll.dll,#32774"
+"Dlt"=mui_sz:"coredll.dll,#33030"
+"Std"=mui_sz:"coredll.dll,#33286"
+"TZI"=hex:a4,01,00,00,00,00,00,00,c4,ff,ff,ff,\
+  00,00,0b,00,00,00,01,00,02,00,00,00,00,00,00,00,\
+  00,00,03,00,00,00,02,00,02,00,00,00,00,00,00,00
+
+[HKEY_LOCAL_MACHINE\Time Zones\US Mountain Standard Time]
+"Display"=mui_sz:"coredll.dll,#32775"
+"Dlt"=mui_sz:"coredll.dll,#33031"
+"Std"=mui_sz:"coredll.dll,#33287"
+"TZI"=hex:a4,01,00,00,00,00,00,00,c4,ff,ff,ff,\
+  00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,\
+  00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00
+
+[HKEY_LOCAL_MACHINE\Time Zones\Mountain Standard Time (Mexico)]
+"Display"=mui_sz:"coredll.dll,#32776"
+"Dlt"=mui_sz:"coredll.dll,#33032"
+"Std"=mui_sz:"coredll.dll,#33288"
+"TZI"=hex:a4,01,00,00,00,00,00,00,c4,ff,ff,ff,\
+  00,00,0a,00,00,00,05,00,02,00,00,00,00,00,00,00,\
+  00,00,04,00,00,00,01,00,02,00,00,00,00,00,00,00
+
+; (GMT -06:00)
+[HKEY_LOCAL_MACHINE\Time Zones\Central Standard Time]
+"Display"=mui_sz:"coredll.dll,#32777"
+"Dlt"=mui_sz:"coredll.dll,#33033"
+"Std"=mui_sz:"coredll.dll,#33289"
+"TZI"=hex:68,01,00,00,00,00,00,00,c4,ff,ff,ff,\
+  00,00,0b,00,00,00,01,00,02,00,00,00,00,00,00,00,\
+  00,00,03,00,00,00,02,00,02,00,00,00,00,00,00,00
+
+[HKEY_LOCAL_MACHINE\Time Zones\Canada Central Standard Time]
+"Display"=mui_sz:"coredll.dll,#32778"
+"Dlt"=mui_sz:"coredll.dll,#33034"
+"Std"=mui_sz:"coredll.dll,#33290"
+"TZI"=hex:68,01,00,00,00,00,00,00,c4,ff,ff,ff,\
+  00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,\
+  00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00
+
+[HKEY_LOCAL_MACHINE\Time Zones\Central America Standard Time]
+"Display"=mui_sz:"coredll.dll,#32779"
+"Dlt"=mui_sz:"coredll.dll,#33035"
+"Std"=mui_sz:"coredll.dll,#33291"
+"TZI"=hex:68,01,00,00,00,00,00,00,c4,ff,ff,ff,\
+  00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,\
+  00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00
+
+[HKEY_LOCAL_MACHINE\Time Zones\Central Standard Time (Mexico)]
+"Display"=mui_sz:"coredll.dll,#32780"
+"Dlt"=mui_sz:"coredll.dll,#33036"
+"Std"=mui_sz:"coredll.dll,#33292"
+"TZI"=hex:68,01,00,00,00,00,00,00,c4,ff,ff,ff,\
+  00,00,0a,00,00,00,05,00,02,00,00,00,00,00,00,00,\
+  00,00,04,00,00,00,01,00,02,00,00,00,00,00,00,00
+
+; (GMT -05:00)
+[HKEY_LOCAL_MACHINE\Time Zones\Eastern Standard Time]
+"Display"=mui_sz:"coredll.dll,#32781"
+"Dlt"=mui_sz:"coredll.dll,#33037"
+"Std"=mui_sz:"coredll.dll,#33293"
+"TZI"=hex:2c,01,00,00,00,00,00,00,c4,ff,ff,ff,\
+  00,00,0b,00,00,00,01,00,02,00,00,00,00,00,00,00,\
+  00,00,03,00,00,00,02,00,02,00,00,00,00,00,00,00
+
+[HKEY_LOCAL_MACHINE\Time Zones\US Eastern Standard Time]
+"Display"=mui_sz:"coredll.dll,#32782"
+"Dlt"=mui_sz:"coredll.dll,#33038"
+"Std"=mui_sz:"coredll.dll,#33294"
+"TZI"=hex:2c,01,00,00,00,00,00,00,c4,ff,ff,ff,\
+  00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,\
+  00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00
+
+[HKEY_LOCAL_MACHINE\Time Zones\SA Pacific Standard Time]
+"Display"=mui_sz:"coredll.dll,#32783"
+"Dlt"=mui_sz:"coredll.dll,#33039"
+"Std"=mui_sz:"coredll.dll,#33295"
+"TZI"=hex:2c,01,00,00,00,00,00,00,c4,ff,ff,ff,\
+  00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,\
+  00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00
+
+; (GMT -04:30)
+[HKEY_LOCAL_MACHINE\Time Zones\Venezuela Standard Time]
+"Display"=mui_sz:"coredll.dll,#32850"
+"Dlt"=mui_sz:"coredll.dll,#33106"
+"Std"=mui_sz:"coredll.dll,#33362"
+"TZI"=hex:0e,01,00,00,00,00,00,00,c4,ff,ff,ff,\
+  00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,\
+  00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00
+
+; (GMT -04:00)
+[HKEY_LOCAL_MACHINE\Time Zones\Atlantic Standard Time]
+"Display"=mui_sz:"coredll.dll,#32784"
+"Dlt"=mui_sz:"coredll.dll,#33040"
+"Std"=mui_sz:"coredll.dll,#33296"
+"TZI"=hex:f0,00,00,00,00,00,00,00,c4,ff,ff,ff,\
+  00,00,0b,00,00,00,01,00,02,00,00,00,00,00,00,00,\
+  00,00,03,00,00,00,02,00,02,00,00,00,00,00,00,00
+
+[HKEY_LOCAL_MACHINE\Time Zones\SA Western Standard Time]
+"Display"=mui_sz:"coredll.dll,#32785"
+"Dlt"=mui_sz:"coredll.dll,#33041"
+"Std"=mui_sz:"coredll.dll,#33297"
+"TZI"=hex:f0,00,00,00,00,00,00,00,c4,ff,ff,ff,\
+  00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,\
+  00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00
+
+[HKEY_LOCAL_MACHINE\Time Zones\Pacific SA Standard Time]
+"Display"=mui_sz:"coredll.dll,#32786"
+"Dlt"=mui_sz:"coredll.dll,#33042"
+"Std"=mui_sz:"coredll.dll,#33298"
+"TZI"=hex:f0,00,00,00,00,00,00,00,c4,ff,ff,ff,\
+  00,00,03,00,06,00,02,00,17,00,3b,00,3b,00,e7,03,\
+  00,00,0a,00,06,00,02,00,17,00,3b,00,3b,00,e7,03
+
+[HKEY_LOCAL_MACHINE\Time Zones\Central Brazilian Standard Time]
+"Display"=mui_sz:"coredll.dll,#32787"
+"Dlt"=mui_sz:"coredll.dll,#33043"
+"Std"=mui_sz:"coredll.dll,#33299"
+"TZI"=hex:f0,00,00,00,00,00,00,00,c4,ff,ff,ff,\
+  00,00,02,00,06,00,02,00,17,00,3b,00,3b,00,e7,03,\
+  00,00,0a,00,06,00,02,00,17,00,3b,00,3b,00,e7,03
+
+[HKEY_LOCAL_MACHINE\Time Zones\Paraguay Standard Time]
+"Display"=mui_sz:"coredll.dll,#32856"
+"Dlt"=mui_sz:"coredll.dll,#33112"
+"Std"=mui_sz:"coredll.dll,#33368"
+"TZI"=hex:f0,00,00,00,00,00,00,00,c4,ff,ff,ff,\
+  00,00,03,00,00,00,02,00,00,00,00,00,00,00,00,00,\
+  00,00,0a,00,00,00,03,00,00,00,00,00,00,00,00,00
+
+; (GMT -03:30)
+[HKEY_LOCAL_MACHINE\Time Zones\Newfoundland Standard Time]
+"Display"=mui_sz:"coredll.dll,#32788"
+"Dlt"=mui_sz:"coredll.dll,#33044"
+"Std"=mui_sz:"coredll.dll,#33300"
+"TZI"=hex:d2,00,00,00,00,00,00,00,c4,ff,ff,ff,\
+  00,00,0b,00,00,00,01,00,00,00,01,00,00,00,00,00,\
+  00,00,03,00,00,00,02,00,00,00,01,00,00,00,00,00
+
+; (GMT -03:00)
+[HKEY_LOCAL_MACHINE\Time Zones\E. South America Standard Time]
+"Display"=mui_sz:"coredll.dll,#32789"
+"Dlt"=mui_sz:"coredll.dll,#33045"
+"Std"=mui_sz:"coredll.dll,#33301"
+"TZI"=hex:b4,00,00,00,00,00,00,00,c4,ff,ff,ff,\
+  00,00,02,00,06,00,02,00,17,00,3b,00,3b,00,e7,03,\
+  00,00,0a,00,06,00,02,00,17,00,3b,00,3b,00,e7,03
+
+[HKEY_LOCAL_MACHINE\Time Zones\SA Eastern Standard Time]
+"Display"=mui_sz:"coredll.dll,#32790"
+"Dlt"=mui_sz:"coredll.dll,#33046"
+"Std"=mui_sz:"coredll.dll,#33302"
+"TZI"=hex:b4,00,00,00,00,00,00,00,c4,ff,ff,ff,\
+  00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,\
+  00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00
+
+[HKEY_LOCAL_MACHINE\Time Zones\Greenland Standard Time]
+"Display"=mui_sz:"coredll.dll,#32791"
+"Dlt"=mui_sz:"coredll.dll,#33047"
+"Std"=mui_sz:"coredll.dll,#33303"
+"TZI"=hex:b4,00,00,00,00,00,00,00,c4,ff,ff,ff,\
+  00,00,0a,00,06,00,04,00,17,00,00,00,00,00,00,00,\
+  00,00,03,00,06,00,05,00,16,00,00,00,00,00,00,00
+
+[HKEY_LOCAL_MACHINE\Time Zones\Argentina Standard Time]
+"Display"=mui_sz:"coredll.dll,#32851"
+"Dlt"=mui_sz:"coredll.dll,#33107"
+"Std"=mui_sz:"coredll.dll,#33363"
+"TZI"=hex:b4,00,00,00,00,00,00,00,c4,ff,ff,ff,\
+  00,00,03,00,06,00,02,00,17,00,3b,00,3b,00,e7,03,\
+  00,00,0a,00,06,00,03,00,17,00,3b,00,3b,00,e7,03
+
+[HKEY_LOCAL_MACHINE\Time Zones\Montevideo Standard Time]
+"Display"=mui_sz:"coredll.dll,#32852"
+"Dlt"=mui_sz:"coredll.dll,#33108"
+"Std"=mui_sz:"coredll.dll,#33364"
+"TZI"=hex:b4,00,00,00,00,00,00,00,c4,ff,ff,ff,\
+  00,00,03,00,00,00,02,00,02,00,00,00,00,00,00,00,\
+  00,00,0a,00,00,00,01,00,02,00,00,00,00,00,00,00
+
+; (GMT -02:00)
+[HKEY_LOCAL_MACHINE\Time Zones\Mid-Atlantic Standard Time]
+"Display"=mui_sz:"coredll.dll,#32792"
+"Dlt"=mui_sz:"coredll.dll,#33048"
+"Std"=mui_sz:"coredll.dll,#33304"
+"TZI"=hex:78,00,00,00,00,00,00,00,c4,ff,ff,ff,\
+  00,00,09,00,00,00,05,00,02,00,00,00,00,00,00,00,\
+  00,00,03,00,00,00,05,00,02,00,00,00,00,00,00,00
+
+; (GMT -01:00)
+[HKEY_LOCAL_MACHINE\Time Zones\Azores Standard Time]
+"Display"=mui_sz:"coredll.dll,#32793"
+"Dlt"=mui_sz:"coredll.dll,#33049"
+"Std"=mui_sz:"coredll.dll,#33305"
+"TZI"=hex:3c,00,00,00,00,00,00,00,c4,ff,ff,ff,\
+  00,00,0a,00,00,00,05,00,03,00,00,00,00,00,00,00,\
+  00,00,03,00,00,00,05,00,02,00,00,00,00,00,00,00
+
+[HKEY_LOCAL_MACHINE\Time Zones\Cape Verde Standard Time]
+"Display"=mui_sz:"coredll.dll,#32794"
+"Dlt"=mui_sz:"coredll.dll,#33050"
+"Std"=mui_sz:"coredll.dll,#33306"
+"TZI"=hex:3c,00,00,00,00,00,00,00,c4,ff,ff,ff,\
+  00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,\
+  00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00
+
+; (GMT +00:00)
+[HKEY_LOCAL_MACHINE\Time Zones\GMT Standard Time]
+"Display"=mui_sz:"coredll.dll,#32795"
+"Dlt"=mui_sz:"coredll.dll,#33051"
+"Std"=mui_sz:"coredll.dll,#33307"
+"TZI"=hex:00,00,00,00,00,00,00,00,c4,ff,ff,ff,\
+  00,00,0a,00,00,00,05,00,02,00,00,00,00,00,00,00,\
+  00,00,03,00,00,00,05,00,01,00,00,00,00,00,00,00
+
+[HKEY_LOCAL_MACHINE\Time Zones\Greenwich Standard Time]
+"Display"=mui_sz:"coredll.dll,#32796"
+"Dlt"=mui_sz:"coredll.dll,#33052"
+"Std"=mui_sz:"coredll.dll,#33308"
+"TZI"=hex:00,00,00,00,00,00,00,00,c4,ff,ff,ff,\
+  00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,\
+  00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00
+
+[HKEY_LOCAL_MACHINE\Time Zones\Morocco Standard Time]
+"Display"=mui_sz:"coredll.dll,#32853"
+"Dlt"=mui_sz:"coredll.dll,#33109"
+"Std"=mui_sz:"coredll.dll,#33365"
+"TZI"=hex:00,00,00,00,00,00,00,00,c4,ff,ff,ff,\
+  00,00,08,00,04,00,03,00,17,00,3b,00,3b,00,e7,03,\
+  00,00,05,00,00,00,05,00,17,00,3b,00,3b,00,e7,03
+
+[HKEY_LOCAL_MACHINE\Time Zones\UTC]
+"Display"=mui_sz:"coredll.dll,#32857"
+"Dlt"=mui_sz:"coredll.dll,#33113"
+"Std"=mui_sz:"coredll.dll,#33369"
+"TZI"=hex:00,00,00,00,00,00,00,00,00,00,00,00,\
+  00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,\
+  00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00
+
+; (GMT +01:00)
+[HKEY_LOCAL_MACHINE\Time Zones\Central Europe Standard Time]
+"Display"=mui_sz:"coredll.dll,#32797"
+"Dlt"=mui_sz:"coredll.dll,#33053"
+"Std"=mui_sz:"coredll.dll,#33309"
+"TZI"=hex:c4,ff,ff,ff,00,00,00,00,c4,ff,ff,ff,\
+  00,00,0a,00,00,00,05,00,03,00,00,00,00,00,00,00,\
+  00,00,03,00,00,00,05,00,02,00,00,00,00,00,00,00
+
+[HKEY_LOCAL_MACHINE\Time Zones\Central European Standard Time]
+"Display"=mui_sz:"coredll.dll,#32798"
+"Dlt"=mui_sz:"coredll.dll,#33054"
+"Std"=mui_sz:"coredll.dll,#33310"
+"TZI"=hex:c4,ff,ff,ff,00,00,00,00,c4,ff,ff,ff,\
+  00,00,0a,00,00,00,05,00,03,00,00,00,00,00,00,00,\
+  00,00,03,00,00,00,05,00,02,00,00,00,00,00,00,00
+
+[HKEY_LOCAL_MACHINE\Time Zones\Romance Standard Time]
+"Display"=mui_sz:"coredll.dll,#32799"
+"Dlt"=mui_sz:"coredll.dll,#33055"
+"Std"=mui_sz:"coredll.dll,#33311"
+"TZI"=hex:c4,ff,ff,ff,00,00,00,00,c4,ff,ff,ff,\
+  00,00,0a,00,00,00,05,00,03,00,00,00,00,00,00,00,\
+  00,00,03,00,00,00,05,00,02,00,00,00,00,00,00,00
+
+[HKEY_LOCAL_MACHINE\Time Zones\W. Europe Standard Time]
+"Display"=mui_sz:"coredll.dll,#32800"
+"Dlt"=mui_sz:"coredll.dll,#33056"
+"Std"=mui_sz:"coredll.dll,#33312"
+"TZI"=hex:c4,ff,ff,ff,00,00,00,00,c4,ff,ff,ff,\
+  00,00,0a,00,00,00,05,00,03,00,00,00,00,00,00,00,\
+  00,00,03,00,00,00,05,00,02,00,00,00,00,00,00,00
+
+[HKEY_LOCAL_MACHINE\Time Zones\W. Central Africa Standard Time]
+"Display"=mui_sz:"coredll.dll,#32801"
+"Dlt"=mui_sz:"coredll.dll,#33057"
+"Std"=mui_sz:"coredll.dll,#33313"
+"TZI"=hex:c4,ff,ff,ff,00,00,00,00,c4,ff,ff,ff,\
+  00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,\
+  00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00
+
+; (GMT +02:00)
+[HKEY_LOCAL_MACHINE\Time Zones\E. Europe Standard Time]
+"Display"=mui_sz:"coredll.dll,#32802"
+"Dlt"=mui_sz:"coredll.dll,#33058"
+"Std"=mui_sz:"coredll.dll,#33314"
+"TZI"=hex:88,ff,ff,ff,00,00,00,00,c4,ff,ff,ff,\
+  00,00,0a,00,00,00,05,00,03,00,00,00,00,00,00,00,\
+  00,00,03,00,00,00,05,00,02,00,00,00,00,00,00,00
+
+[HKEY_LOCAL_MACHINE\Time Zones\Egypt Standard Time]
+"Display"=mui_sz:"coredll.dll,#32803"
+"Dlt"=mui_sz:"coredll.dll,#33059"
+"Std"=mui_sz:"coredll.dll,#33315"
+"TZI"=hex:88,ff,ff,ff,00,00,00,00,c4,ff,ff,ff,\
+  00,00,09,00,04,00,05,00,17,00,3b,00,3b,00,e7,03,\
+  00,00,04,00,04,00,04,00,17,00,3b,00,3b,00,e7,03
+
+[HKEY_LOCAL_MACHINE\Time Zones\FLE Standard Time]
+"Display"=mui_sz:"coredll.dll,#32804"
+"Dlt"=mui_sz:"coredll.dll,#33060"
+"Std"=mui_sz:"coredll.dll,#33316"
+"TZI"=hex:88,ff,ff,ff,00,00,00,00,c4,ff,ff,ff,\
+  00,00,0a,00,00,00,05,00,04,00,00,00,00,00,00,00,\
+  00,00,03,00,00,00,05,00,03,00,00,00,00,00,00,00
+
+[HKEY_LOCAL_MACHINE\Time Zones\GTB Standard Time]
+"Display"=mui_sz:"coredll.dll,#32805"
+"Dlt"=mui_sz:"coredll.dll,#33061"
+"Std"=mui_sz:"coredll.dll,#33317"
+"TZI"=hex:88,ff,ff,ff,00,00,00,00,c4,ff,ff,ff,\
+  00,00,0a,00,00,00,05,00,04,00,00,00,00,00,00,00,\
+  00,00,03,00,00,00,05,00,03,00,00,00,00,00,00,00
+
+[HKEY_LOCAL_MACHINE\Time Zones\South Africa Standard Time]
+"Display"=mui_sz:"coredll.dll,#32806"
+"Dlt"=mui_sz:"coredll.dll,#33062"
+"Std"=mui_sz:"coredll.dll,#33318"
+"TZI"=hex:88,ff,ff,ff,00,00,00,00,c4,ff,ff,ff,\
+  00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,\
+  00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00
+
+[HKEY_LOCAL_MACHINE\Time Zones\Israel Standard Time]
+"Display"=mui_sz:"coredll.dll,#32807"
+"Dlt"=mui_sz:"coredll.dll,#33063"
+"Std"=mui_sz:"coredll.dll,#33319"
+"TZI"=hex:88,ff,ff,ff,00,00,00,00,c4,ff,ff,ff,\
+  00,00,09,00,00,00,05,00,02,00,00,00,00,00,00,00,\
+  00,00,03,00,05,00,05,00,02,00,00,00,00,00,00,00
+
+[HKEY_LOCAL_MACHINE\Time Zones\Namibia Standard Time]
+"Display"=mui_sz:"coredll.dll,#32808"
+"Dlt"=mui_sz:"coredll.dll,#33064"
+"Std"=mui_sz:"coredll.dll,#33320"
+"TZI"=hex:88,ff,ff,ff,00,00,00,00,3c,00,00,00,\
+  00,00,09,00,00,00,01,00,02,00,00,00,00,00,00,00,\
+  00,00,04,00,00,00,01,00,02,00,00,00,00,00,00,00
+
+[HKEY_LOCAL_MACHINE\Time Zones\Jordan Standard Time]
+"Display"=mui_sz:"coredll.dll,#32809"
+"Dlt"=mui_sz:"coredll.dll,#33065"
+"Std"=mui_sz:"coredll.dll,#33321"
+"TZI"=hex:88,ff,ff,ff,00,00,00,00,c4,ff,ff,ff,\
+  00,00,0a,00,05,00,05,00,01,00,00,00,00,00,00,00,\
+  00,00,03,00,04,00,05,00,17,00,3b,00,3b,00,e7,03
+
+[HKEY_LOCAL_MACHINE\Time Zones\Middle East Standard Time]
+"Display"=mui_sz:"coredll.dll,#32810"
+"Dlt"=mui_sz:"coredll.dll,#33066"
+"Std"=mui_sz:"coredll.dll,#33322"
+"TZI"=hex:88,ff,ff,ff,00,00,00,00,c4,ff,ff,ff,\
+  00,00,0a,00,00,00,05,00,00,00,00,00,00,00,00,00,\
+  00,00,03,00,00,00,05,00,00,00,00,00,00,00,00,00
+
+; (GMT +03:00)
+[HKEY_LOCAL_MACHINE\Time Zones\Russian Standard Time]
+"Display"=mui_sz:"coredll.dll,#32811"
+"Dlt"=mui_sz:"coredll.dll,#33067"
+"Std"=mui_sz:"coredll.dll,#33323"
+"TZI"=hex:4c,ff,ff,ff,00,00,00,00,c4,ff,ff,ff,\
+  00,00,0a,00,00,00,05,00,03,00,00,00,00,00,00,00,\
+  00,00,03,00,00,00,05,00,02,00,00,00,00,00,00,00
+
+[HKEY_LOCAL_MACHINE\Time Zones\Arab Standard Time]
+"Display"=mui_sz:"coredll.dll,#32812"
+"Dlt"=mui_sz:"coredll.dll,#33068"
+"Std"=mui_sz:"coredll.dll,#33324"
+"TZI"=hex:4c,ff,ff,ff,00,00,00,00,c4,ff,ff,ff,\
+  00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,\
+  00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00
+
+[HKEY_LOCAL_MACHINE\Time Zones\E. Africa Standard Time]
+"Display"=mui_sz:"coredll.dll,#32813"
+"Dlt"=mui_sz:"coredll.dll,#33069"
+"Std"=mui_sz:"coredll.dll,#33325"
+"TZI"=hex:4c,ff,ff,ff,00,00,00,00,c4,ff,ff,ff,\
+  00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,\
+  00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00
+
+[HKEY_LOCAL_MACHINE\Time Zones\Arabic Standard Time]
+"Display"=mui_sz:"coredll.dll,#32814"
+"Dlt"=mui_sz:"coredll.dll,#33070"
+"Std"=mui_sz:"coredll.dll,#33326"
+"TZI"=hex:4c,ff,ff,ff,00,00,00,00,c4,ff,ff,ff,\
+  00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,\
+  00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00
+
+[HKEY_LOCAL_MACHINE\Time Zones\Georgian Standard Time]
+"Display"=mui_sz:"coredll.dll,#32815"
+"Dlt"=mui_sz:"coredll.dll,#33071"
+"Std"=mui_sz:"coredll.dll,#33327"
+"TZI"=hex:4c,ff,ff,ff,00,00,00,00,c4,ff,ff,ff,\
+  00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,\
+  00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00
+
+; (GMT +03:30)
+[HKEY_LOCAL_MACHINE\Time Zones\Iran Standard Time]
+"Display"=mui_sz:"coredll.dll,#32816"
+"Dlt"=mui_sz:"coredll.dll,#33072"
+"Std"=mui_sz:"coredll.dll,#33328"
+"TZI"=hex:2e,ff,ff,ff,00,00,00,00,c4,ff,ff,ff,\
+  00,00,09,00,01,00,03,00,17,00,3b,00,3b,00,e7,03,\
+  00,00,03,00,06,00,03,00,17,00,3b,00,3b,00,e7,03
+
+; (GMT +04:00)
+[HKEY_LOCAL_MACHINE\Time Zones\Arabian Standard Time]
+"Display"=mui_sz:"coredll.dll,#32817"
+"Dlt"=mui_sz:"coredll.dll,#33073"
+"Std"=mui_sz:"coredll.dll,#33329"
+"TZI"=hex:10,ff,ff,ff,00,00,00,00,c4,ff,ff,ff,\
+  00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,\
+  00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00
+
+[HKEY_LOCAL_MACHINE\Time Zones\Caucasus Standard Time]
+"Display"=mui_sz:"coredll.dll,#32818"
+"Dlt"=mui_sz:"coredll.dll,#33074"
+"Std"=mui_sz:"coredll.dll,#33330"
+"TZI"=hex:10,ff,ff,ff,00,00,00,00,c4,ff,ff,ff,\
+  00,00,0a,00,00,00,05,00,03,00,00,00,00,00,00,00,\
+  00,00,03,00,00,00,05,00,02,00,00,00,00,00,00,00
+
+[HKEY_LOCAL_MACHINE\Time Zones\Azerbaijan Standard Time]
+"Display"=mui_sz:"coredll.dll,#32819"
+"Dlt"=mui_sz:"coredll.dll,#33075"
+"Std"=mui_sz:"coredll.dll,#33331"
+"TZI"=hex:10,ff,ff,ff,00,00,00,00,c4,ff,ff,ff,\
+  00,00,0a,00,00,00,05,00,05,00,00,00,00,00,00,00,\
+  00,00,03,00,00,00,05,00,04,00,00,00,00,00,00,00
+
+[HKEY_LOCAL_MACHINE\Time Zones\Mauritius Standard Time]
+"Display"=mui_sz:"coredll.dll,#32855"
+"Dlt"=mui_sz:"coredll.dll,#33111"
+"Std"=mui_sz:"coredll.dll,#33367"
+"TZI"=hex:10,ff,ff,ff,00,00,00,00,c4,ff,ff,ff,\
+  00,00,03,00,00,00,05,00,02,00,00,00,00,00,00,00,\
+  00,00,0a,00,00,00,05,00,02,00,00,00,00,00,00,00
+
+; (GMT +04:30)
+[HKEY_LOCAL_MACHINE\Time Zones\Afghanistan Standard Time]
+"Display"=mui_sz:"coredll.dll,#32820"
+"Dlt"=mui_sz:"coredll.dll,#33076"
+"Std"=mui_sz:"coredll.dll,#33332"
+"TZI"=hex:f2,fe,ff,ff,00,00,00,00,c4,ff,ff,ff,\
+  00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,\
+  00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00
+
+; (GMT +05:00)
+[HKEY_LOCAL_MACHINE\Time Zones\Ekaterinburg Standard Time]
+"Display"=mui_sz:"coredll.dll,#32821"
+"Dlt"=mui_sz:"coredll.dll,#33077"
+"Std"=mui_sz:"coredll.dll,#33333"
+"TZI"=hex:d4,fe,ff,ff,00,00,00,00,c4,ff,ff,ff,\
+  00,00,0a,00,00,00,05,00,03,00,00,00,00,00,00,00,\
+  00,00,03,00,00,00,05,00,02,00,00,00,00,00,00,00
+
+[HKEY_LOCAL_MACHINE\Time Zones\West Asia Standard Time]
+"Display"=mui_sz:"coredll.dll,#32822"
+"Dlt"=mui_sz:"coredll.dll,#33078"
+"Std"=mui_sz:"coredll.dll,#33334"
+"TZI"=hex:d4,fe,ff,ff,00,00,00,00,c4,ff,ff,ff,\
+  00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,\
+  00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00
+
+[HKEY_LOCAL_MACHINE\Time Zones\Pakistan Standard Time]
+"Display"=mui_sz:"coredll.dll,#32854"
+"Dlt"=mui_sz:"coredll.dll,#33110"
+"Std"=mui_sz:"coredll.dll,#33366"
+"TZI"=hex:d4,fe,ff,ff,00,00,00,00,c4,ff,ff,ff,\
+  00,00,0a,00,06,00,05,00,17,00,3b,00,3b,00,e7,03,\
+  00,00,04,00,02,00,02,00,17,00,3b,00,3b,00,e7,03
+
+; (GMT +05:30)
+[HKEY_LOCAL_MACHINE\Time Zones\India Standard Time]
+"Display"=mui_sz:"coredll.dll,#32823"
+"Dlt"=mui_sz:"coredll.dll,#33079"
+"Std"=mui_sz:"coredll.dll,#33335"
+"TZI"=hex:b6,fe,ff,ff,00,00,00,00,c4,ff,ff,ff,\
+  00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,\
+  00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00
+
+[HKEY_LOCAL_MACHINE\Time Zones\Sri Lanka Standard Time]
+"Display"=mui_sz:"coredll.dll,#32824"
+"Dlt"=mui_sz:"coredll.dll,#33080"
+"Std"=mui_sz:"coredll.dll,#33336"
+"TZI"=hex:b6,fe,ff,ff,00,00,00,00,c4,ff,ff,ff,\
+  00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,\
+  00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00
+
+; (GMT +05:45)
+[HKEY_LOCAL_MACHINE\Time Zones\Nepal Standard Time]
+"Display"=mui_sz:"coredll.dll,#32825"
+"Dlt"=mui_sz:"coredll.dll,#33081"
+"Std"=mui_sz:"coredll.dll,#33337"
+"TZI"=hex:a7,fe,ff,ff,00,00,00,00,c4,ff,ff,ff,\
+  00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,\
+  00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00
+
+; (GMT +06:00)
+[HKEY_LOCAL_MACHINE\Time Zones\Central Asia Standard Time]
+"Display"=mui_sz:"coredll.dll,#32826"
+"Dlt"=mui_sz:"coredll.dll,#33082"
+"Std"=mui_sz:"coredll.dll,#33338"
+"TZI"=hex:98,fe,ff,ff,00,00,00,00,c4,ff,ff,ff,\
+  00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,\
+  00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00
+
+[HKEY_LOCAL_MACHINE\Time Zones\N. Central Asia Standard Time]
+"Display"=mui_sz:"coredll.dll,#32827"
+"Dlt"=mui_sz:"coredll.dll,#33083"
+"Std"=mui_sz:"coredll.dll,#33339"
+"TZI"=hex:98,fe,ff,ff,00,00,00,00,c4,ff,ff,ff,\
+  00,00,0a,00,00,00,05,00,03,00,00,00,00,00,00,00,\
+  00,00,03,00,00,00,05,00,02,00,00,00,00,00,00,00
+
+; (GMT +06:30)
+[HKEY_LOCAL_MACHINE\Time Zones\Myanmar Standard Time]
+"Display"=mui_sz:"coredll.dll,#32828"
+"Dlt"=mui_sz:"coredll.dll,#33084"
+"Std"=mui_sz:"coredll.dll,#33340"
+"TZI"=hex:7a,fe,ff,ff,00,00,00,00,c4,ff,ff,ff,\
+  00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,\
+  00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00
+
+; (GMT +07:00)
+[HKEY_LOCAL_MACHINE\Time Zones\SE Asia Standard Time]
+"Display"=mui_sz:"coredll.dll,#32829"
+"Dlt"=mui_sz:"coredll.dll,#33085"
+"Std"=mui_sz:"coredll.dll,#33341"
+"TZI"=hex:5c,fe,ff,ff,00,00,00,00,c4,ff,ff,ff,\
+  00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,\
+  00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00
+
+[HKEY_LOCAL_MACHINE\Time Zones\North Asia Standard Time]
+"Display"=mui_sz:"coredll.dll,#32830"
+"Dlt"=mui_sz:"coredll.dll,#33086"
+"Std"=mui_sz:"coredll.dll,#33342"
+"TZI"=hex:5c,fe,ff,ff,00,00,00,00,c4,ff,ff,ff,\
+  00,00,0a,00,00,00,05,00,03,00,00,00,00,00,00,00,\
+  00,00,03,00,00,00,05,00,02,00,00,00,00,00,00,00
+
+; (GMT +08:00)
+[HKEY_LOCAL_MACHINE\Time Zones\China Standard Time]
+"Display"=mui_sz:"coredll.dll,#32831"
+"Dlt"=mui_sz:"coredll.dll,#33087"
+"Std"=mui_sz:"coredll.dll,#33343"
+"TZI"=hex:20,fe,ff,ff,00,00,00,00,c4,ff,ff,ff,\
+  00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,\
+  00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00
+
+[HKEY_LOCAL_MACHINE\Time Zones\Taipei Standard Time]
+"Display"=mui_sz:"coredll.dll,#32832"
+"Dlt"=mui_sz:"coredll.dll,#33088"
+"Std"=mui_sz:"coredll.dll,#33344"
+"TZI"=hex:20,fe,ff,ff,00,00,00,00,c4,ff,ff,ff,\
+  00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,\
+  00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00
+
+[HKEY_LOCAL_MACHINE\Time Zones\W. Australia Standard Time]
+"Display"=mui_sz:"coredll.dll,#32833"
+"Dlt"=mui_sz:"coredll.dll,#33089"
+"Std"=mui_sz:"coredll.dll,#33345"
+"TZI"=hex:20,fe,ff,ff,00,00,00,00,c4,ff,ff,ff,\
+ 00,00,03,00,00,00,05,00,03,00,00,00,00,00,00,00,\
+ 00,00,0a,00,00,00,05,00,02,00,00,00,00,00,00,00
+
+[HKEY_LOCAL_MACHINE\Time Zones\North Asia East Standard Time]
+"Display"=mui_sz:"coredll.dll,#32834"
+"Dlt"=mui_sz:"coredll.dll,#33090"
+"Std"=mui_sz:"coredll.dll,#33346"
+"TZI"=hex:20,fe,ff,ff,00,00,00,00,c4,ff,ff,ff,\
+  00,00,0a,00,00,00,05,00,03,00,00,00,00,00,00,00,\
+  00,00,03,00,00,00,05,00,02,00,00,00,00,00,00,00
+
+[HKEY_LOCAL_MACHINE\Time Zones\Singapore Standard Time]
+"Display"=mui_sz:"coredll.dll,#32835"
+"Dlt"=mui_sz:"coredll.dll,#33091"
+"Std"=mui_sz:"coredll.dll,#33347"
+"TZI"=hex:20,fe,ff,ff,00,00,00,00,c4,ff,ff,ff,\
+  00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,\
+  00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00
+
+; (GMT +09:00)
+[HKEY_LOCAL_MACHINE\Time Zones\Korea Standard Time]
+"Display"=mui_sz:"coredll.dll,#32836"
+"Dlt"=mui_sz:"coredll.dll,#33092"
+"Std"=mui_sz:"coredll.dll,#33348"
+"TZI"=hex:e4,fd,ff,ff,00,00,00,00,c4,ff,ff,ff,\
+  00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,\
+  00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00
+
+[HKEY_LOCAL_MACHINE\Time Zones\Tokyo Standard Time]
+"Display"=mui_sz:"coredll.dll,#32837"
+"Dlt"=mui_sz:"coredll.dll,#33093"
+"Std"=mui_sz:"coredll.dll,#33349"
+"TZI"=hex:e4,fd,ff,ff,00,00,00,00,c4,ff,ff,ff,\
+  00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,\
+  00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00
+
+[HKEY_LOCAL_MACHINE\Time Zones\Yakutsk Standard Time]
+"Display"=mui_sz:"coredll.dll,#32838"
+"Dlt"=mui_sz:"coredll.dll,#33094"
+"Std"=mui_sz:"coredll.dll,#33350"
+"TZI"=hex:e4,fd,ff,ff,00,00,00,00,c4,ff,ff,ff,\
+  00,00,0a,00,00,00,05,00,03,00,00,00,00,00,00,00,\
+  00,00,03,00,00,00,05,00,02,00,00,00,00,00,00,00
+
+; (GMT +09:30)
+[HKEY_LOCAL_MACHINE\Time Zones\AUS Central Standard Time]
+"Display"=mui_sz:"coredll.dll,#32839"
+"Dlt"=mui_sz:"coredll.dll,#33095"
+"Std"=mui_sz:"coredll.dll,#33351"
+"TZI"=hex:c6,fd,ff,ff,00,00,00,00,c4,ff,ff,ff,\
+  00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,\
+  00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00
+
+[HKEY_LOCAL_MACHINE\Time Zones\Cen. Australia Standard Time]
+"Display"=mui_sz:"coredll.dll,#32840"
+"Dlt"=mui_sz:"coredll.dll,#33096"
+"Std"=mui_sz:"coredll.dll,#33352"
+"TZI"=hex:c6,fd,ff,ff,00,00,00,00,c4,ff,ff,ff,\
+  00,00,04,00,00,00,01,00,03,00,00,00,00,00,00,00,\
+  00,00,0a,00,00,00,01,00,02,00,00,00,00,00,00,00
+
+; (GMT +10:00)
+[HKEY_LOCAL_MACHINE\Time Zones\AUS Eastern Standard Time]
+"Display"=mui_sz:"coredll.dll,#32841"
+"Dlt"=mui_sz:"coredll.dll,#33097"
+"Std"=mui_sz:"coredll.dll,#33353"
+"TZI"=hex:a8,fd,ff,ff,00,00,00,00,c4,ff,ff,ff,\
+  00,00,04,00,00,00,01,00,03,00,00,00,00,00,00,00,\
+  00,00,0a,00,00,00,01,00,02,00,00,00,00,00,00,00
+
+[HKEY_LOCAL_MACHINE\Time Zones\E. Australia Standard Time]
+"Display"=mui_sz:"coredll.dll,#32842"
+"Dlt"=mui_sz:"coredll.dll,#33098"
+"Std"=mui_sz:"coredll.dll,#33354"
+"TZI"=hex:a8,fd,ff,ff,00,00,00,00,c4,ff,ff,ff,\
+  00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,\
+  00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00
+
+[HKEY_LOCAL_MACHINE\Time Zones\Tasmania Standard Time]
+"Display"=mui_sz:"coredll.dll,#32843"
+"Dlt"=mui_sz:"coredll.dll,#33099"
+"Std"=mui_sz:"coredll.dll,#33355"
+"TZI"=hex:a8,fd,ff,ff,00,00,00,00,c4,ff,ff,ff,\
+  00,00,04,00,00,00,01,00,03,00,00,00,00,00,00,00,\
+  00,00,0a,00,00,00,01,00,02,00,00,00,00,00,00,00
+
+[HKEY_LOCAL_MACHINE\Time Zones\Vladivostok Standard Time]
+"Display"=mui_sz:"coredll.dll,#32844"
+"Dlt"=mui_sz:"coredll.dll,#33100"
+"Std"=mui_sz:"coredll.dll,#33356"
+"TZI"=hex:a8,fd,ff,ff,00,00,00,00,c4,ff,ff,ff,\
+  00,00,0a,00,00,00,05,00,03,00,00,00,00,00,00,00,\
+  00,00,03,00,00,00,05,00,02,00,00,00,00,00,00,00
+
+[HKEY_LOCAL_MACHINE\Time Zones\West Pacific Standard Time]
+"Display"=mui_sz:"coredll.dll,#32845"
+"Dlt"=mui_sz:"coredll.dll,#33101"
+"Std"=mui_sz:"coredll.dll,#33357"
+"TZI"=hex:a8,fd,ff,ff,00,00,00,00,c4,ff,ff,ff,\
+  00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,\
+  00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00
+
+; (GMT +11:00)
+[HKEY_LOCAL_MACHINE\Time Zones\Central Pacific Standard Time]
+"Display"=mui_sz:"coredll.dll,#32846"
+"Dlt"=mui_sz:"coredll.dll,#33102"
+"Std"=mui_sz:"coredll.dll,#33358"
+"TZI"=hex:6c,fd,ff,ff,00,00,00,00,c4,ff,ff,ff,\
+  00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,\
+  00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00
+
+[HKEY_LOCAL_MACHINE\Time Zones\Magadan Standard Time]
+"Display"=mui_sz:"coredll.dll,#32858"
+"Dlt"=mui_sz:"coredll.dll,#33114"
+"Std"=mui_sz:"coredll.dll,#33370"
+"TZI"=hex:6c,fd,ff,ff,00,00,00,00,c4,ff,ff,ff,\
+  00,00,0a,00,00,00,05,00,03,00,00,00,00,00,00,00,\
+  00,00,03,00,00,00,05,00,02,00,00,00,00,00,00,00
+
+; (GMT +12:00)
+[HKEY_LOCAL_MACHINE\Time Zones\Fiji Standard Time]
+"Display"=mui_sz:"coredll.dll,#32847"
+"Dlt"=mui_sz:"coredll.dll,#33103"
+"Std"=mui_sz:"coredll.dll,#33359"
+"TZI"=hex:30,fd,ff,ff,00,00,00,00,c4,ff,ff,ff,\
+  00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,\
+  00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00
+
+[HKEY_LOCAL_MACHINE\Time Zones\New Zealand Standard Time]
+"Display"=mui_sz:"coredll.dll,#32848"
+"Dlt"=mui_sz:"coredll.dll,#33104"
+"Std"=mui_sz:"coredll.dll,#33360"
+"TZI"=hex:30,fd,ff,ff,00,00,00,00,c4,ff,ff,ff,\
+ 00,00,04,00,00,00,01,00,03,00,00,00,00,00,00,00,\
+ 00,00,09,00,00,00,05,00,02,00,00,00,00,00,00,00
+
+[HKEY_LOCAL_MACHINE\Time Zones\Kamchatka Standard Time]
+"Display"=mui_sz:"coredll.dll,#32859"
+"Dlt"=mui_sz:"coredll.dll,#33115"
+"Std"=mui_sz:"coredll.dll,#33371"
+"TZI"=hex:30,fd,ff,ff,00,00,00,00,c4,ff,ff,ff,\
+  00,00,0a,00,00,00,05,00,03,00,00,00,00,00,00,00,\
+  00,00,03,00,00,00,05,00,02,00,00,00,00,00,00,00
+
+; (GMT +13:00)
+[HKEY_LOCAL_MACHINE\Time Zones\Tonga Standard Time]
+"Display"=mui_sz:"coredll.dll,#32849"
+"Dlt"=mui_sz:"coredll.dll,#33105"
+"Std"=mui_sz:"coredll.dll,#33361"
+"TZI"=hex:f4,fc,ff,ff,00,00,00,00,c4,ff,ff,ff,\
+  00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,\
+  00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00
+
+
+;---------------------------- End Timezones -------------------------------------
+
+;
+; @CESYSGEN ENDIF COREDLL_TIMEZONES
+
+
+; Font Linking information
+
+; @CESYSGEN IF FONTS_MSGOTHIC || FONTS_MSGOTHIC30 || FONTS_MSGOTHIC30_1_19 || FONTS_MSGOTHIC_1_50 || FONTS_MSGOTHIC_1_60 || FONTS_MSGOTHIC_1_70 || FONTS_MSGOTHIC_1_80 || FONTS_MSGOTHIC_1_90 || FONTS_MSGOTHIC_1_48
+; @CESYSGEN IF !FONTS_AC3_VERSIONS
+; @CESYSGEN ENDIF !FONTS_AC3_VERSIONS
+; @CESYSGEN IF FONTS_AC3_VERSIONS
+; @CESYSGEN ENDIF FONTS_AC3_VERSIONS
+; @CESYSGEN ENDIF FONTS_MSGOTHIC
+
+
+
+; @CESYSGEN IF FONTS_GULIM_1_30 || FONTS_GULIM_1_40 || FONTS_GULIM_1_50 || FONTS_GULIM_1_60
+; @CESYSGEN IF !FONTS_AC3_VERSIONS
+; @CESYSGEN ENDIF !FONTS_AC3_VERSIONS
+; @CESYSGEN IF FONTS_AC3_VERSIONS
+; @CESYSGEN ENDIF FONTS_AC3_VERSIONS
+; @CESYSGEN ENDIF FONTS_GULIM
+
+; @CESYSGEN IF FONTS_SIMSUN || FONTS_SIMSUN_2_50 || FONTS_SIMSUN_2_60 || FONTS_SIMSUN_2_70 || FONTS_SIMSUN_2_80 || FONTS_SIMSUN_2_90
+; @CESYSGEN IF !FONTS_AC3_VERSIONS
+; @CESYSGEN ENDIF !FONTS_AC3_VERSIONS
+; @CESYSGEN IF FONTS_AC3_VERSIONS
+; @CESYSGEN ENDIF FONTS_AC3_VERSIONS
+; @CESYSGEN ENDIF FONTS_SIMSUN
+
+
+; @CESYSGEN IF FONTS_MINGLIU || FONTS_MINGLIU_2_70 || FONTS_MINGLIU_2_80 || FONTS_MINGLIU_2_90
+; @CESYSGEN IF !FONTS_AC3_VERSIONS
+; @CESYSGEN ENDIF !FONTS_AC3_VERSIONS
+; @CESYSGEN IF FONTS_AC3_VERSIONS
+; @CESYSGEN ENDIF FONTS_AC3_VERSIONS
+; @CESYSGEN ENDIF FONTS_MINGLIU
+
+; @CESYSGEN IF CE_MODULES_USPCE
+; @CESYSGEN IF FONTS_LATHA || FONTS_MANGAL || FONTS_GAUTAMI || FONTS_RAAVI || FONTS_SHRUTI || FONTS_TUNGA
+; @CESYSGEN ENDIF FONTS_LATHA || FONTS_MANGAL || FONTS_GAUTAMI || FONTS_RAAVI || FONTS_SHRUTI || FONTS_TUNGA
+; @CESYSGEN ENDIF CE_MODULES_USPCE
+
+; @CESYSGEN IF CE_MODULES_GSM610
+; @CESYSGEN ENDIF
+
+; @CESYSGEN IF CE_MODULES_MSFILTER
+; @CESYSGEN ENDIF
+
+
+; @CESYSGEN IF CE_MODULES_LPCD
+[HKEY_LOCAL_MACHINE\Services\LPCD]
+   "Dll"="lpcd.dll"
+   "Order"=dword:1
+   "Keep"=dword:1
+   "Prefix"="LPC"
+   "Index"=dword:1
+; @CESYSGEN ENDIF
+
+; @CESYSGEN IF CE_MODULES_NDIS
+[HKEY_LOCAL_MACHINE\Drivers\BuiltIn\NDIS]
+   "Dll"="NDIS.Dll"
+   "Prefix"="NDS"
+   "Index"=dword:0
+   "Order"=dword:18
+   ; Indicate NDS is a power manageable interface
+   "IClass"="{A32942B7-920C-486b-B0E6-92A702A99B35}"
+   ; Flags==2 is DEVFLAGS_LOADLIBRARY
+   "Flags"=dword:2
+; @CESYSGEN ENDIF
+
+; @CESYSGEN IF CE_MODULES_PPP
+[HKEY_LOCAL_MACHINE\Drivers\BuiltIn\PPP]
+   "Dll"="PPP.Dll"
+   ; Must load after NDIS
+   "Order"=dword:26
+   ; Flags==2 is DEVFLAGS_LOADLIBRARY
+   "Flags"=dword:2
+; @CESYSGEN ENDIF
+
+; @CESYSGEN IF CE_MODULES_AUTORAS
+[HKEY_LOCAL_MACHINE\Drivers\BuiltIn\autoras]
+   "Prefix"="ARS"
+   "Dll"="autoras.dll"
+   "Index"=dword:1
+   "Order"=dword:28
+   ; Flags==2 is DEVFLAGS_LOADLIBRARY
+   "Flags"=dword:2
+
+[HKEY_LOCAL_MACHINE\Comm\Autoras]
+   "Dialer"="rnaapp.exe"
+   "NoPromptOpt"="-p"
+   "RasEntryOpt"="-e"
+; @CESYSGEN ENDIF
+
+
+; @CESYSGEN IF CE_MODULES_NDISUIO
+[HKEY_LOCAL_MACHINE\Drivers\BuiltIn\NDISUIO]
+   "Prefix"="UIO"
+   "Dll"="ndisuio.dll"
+   "Index"=dword:1
+   "Order"=dword:26
+   ; Flags==2 is DEVFLAGS_LOADLIBRARY
+   "Flags"=dword:2
+; @CESYSGEN ENDIF
+
+
+; @CESYSGEN IF CE_MODULES_NDISPWR
+[HKEY_LOCAL_MACHINE\Drivers\BuiltIn\NdisPower]
+   "Prefix"="NPW"
+   "Dll"="NDISPWR.dll"
+   "Index"=dword:1
+   ; NDISUIO must load before us..
+   "Order"=dword:2A
+   ; Flags==2 is DEVFLAGS_LOADLIBRARY
+   "Flags"=dword:2
+; @CESYSGEN ENDIF
+
+; @CESYSGEN IF CE_MODULES_WZCSVC
+[HKEY_LOCAL_MACHINE\Drivers\BuiltIn\ZeroConfig]
+   "Prefix"="ZCF"
+   "Dll"="WZCSVC.dll"
+   "Index"=dword:1
+   ; NDISUIO must be started before WZCSVC
+   "Order"=dword:28
+   ; Flags==2 is DEVFLAGS_LOADLIBRARY
+   "Flags"=dword:2
+; @CESYSGEN ENDIF
+
+; @CESYSGEN IF CE_MODULES_ETHMAN
+[HKEY_LOCAL_MACHINE\Drivers\BuiltIn\Ethman]
+   "Prefix"="ETM"
+   "Dll"="ethman.dll"
+   "Index"=dword:1
+   ; WZCSVC must be started before ethman
+   "Order"=dword:2A
+   ; Flags==12 is DEVFLAGS_LOADLIBRARY and DEVFLAGS_LOAD_AS_USERPROC
+   "Flags"=dword:12
+   "UserProcGroup"=dword:3 ; // default to group 3
+; @CESYSGEN ENDIF
+
+; @CESYSGEN IF CE_MODULES_EAPCHAP
+[HKEY_LOCAL_MACHINE\Comm\EAP\Extension\4]
+   "FriendlyName"="MD5-Challenge"
+   "InvokePasswordDialog"=dword:1
+   "InvokeUserNameDialog"=dword:1
+   "Path"="eapchap.dll"
+
+[HKEY_LOCAL_MACHINE\Comm\EAP\Extension\26]
+   "FriendlyName"="MSV2-Challenge"
+   "InvokePasswordDialog"=dword:1
+   "InvokeUserNameDialog"=dword:1
+   "Path"="eapchap.dll"
+   "InteractiveUIPath"="eapchap.dll"
+; @CESYSGEN ENDIF
+
+; @CESYSGEN IF CE_MODULES_EAPTLS
+[HKEY_LOCAL_MACHINE\Comm\EAP\Extension\13]
+   "FriendlyName"="TLS"
+   "InvokeUserNameDialog"=dword:1
+   "ConfigUIPath"="netui.dll"
+   "InteractiveUIPath"="netui.dll"
+   "Path"="eaptls.dll"
+
+[HKEY_LOCAL_MACHINE\Comm\EAP\Extension\25]
+   "FriendlyName"="PEAP"
+   "InvokeUserNameDialog"=dword:1
+   "InvokePasswordDialog"=dword:1
+   "ConfigUIPath"="netui.dll"
+   "Path"="eaptls.dll"
+   "InteractiveUIPath"="eaptls.dll"
+   "EAPMSCHAPv2Only"=dword:1
+; @CESYSGEN ENDIF
+
+; @CESYSGEN IF CE_MODULES_SSLLSP
+[HKEY_LOCAL_MACHINE\Comm\WS2\LSP\SSL]
+    "Dll"="ssllsp.dll"
+    ; Flags: 0x1 => LSP  doesn't require PROTOCOL_TLS to be specified
+    "Flags"=dword:1
+
+; @CESYSGEN ENDIF
+
+; @CESYSGEN IF CE_MODULES_WS2INSTL
+[HKEY_LOCAL_MACHINE\Comm\WS2\LSP\NSPM]
+    "Dll"="ws2instl.dll"
+    "Entry"="InstallNSPM"
+    "Order"=dword:200
+
+; @CESYSGEN ENDIF
+
+
+; @CESYSGEN IF CE_MODULES_IPV6HLP
+[HKEY_LOCAL_MACHINE\Drivers\BuiltIn\ipv6hlp]
+   "Prefix"="V6H"
+   "Dll"="ipv6hlp.dll"
+   "Index"=dword:1
+   "Order"=dword:28
+   ; Flags==2 is DEVFLAGS_LOADLIBRARY
+   "Flags"=dword:2
+; @CESYSGEN ENDIF
+
+; @CESYSGEN IF CE_MODULES_AFD
+[HKEY_LOCAL_MACHINE\Drivers\BuiltIn\AFD]
+   "Dll"="AFD.Dll"
+   "Order"=dword:24
+   ; Flags==2 is DEVFLAGS_LOADLIBRARY
+   "Flags"=dword:2
+; @CESYSGEN ENDIF CE_MODULES_AFD
+
+; @CESYSGEN IF CE_MODULES_SNMP
+; @CESYSGEN ENDIF
+
+; @CESYSGEN IF CE_MODULES_WS2SERV
+[HKEY_LOCAL_MACHINE\Drivers\BuiltIn\Ws2Serv]
+    "Prefix"="WSS"
+    "Dll"="ws2serv.dll"
+    "Index"=dword:1
+    "Order"=dword:25
+    ; Flags==2 is DEVFLAGS_LOADLIBRARY
+    ; Flags==10 is user mode
+    "Flags"=dword:12
+; @CESYSGEN ENDIF
+
+; @CESYSGEN IF CE_MODULES_SDBUS
+; @CESYSGEN ENDIF CE_MODULES_SDBUS
+
+; @CESYSGEN IF CE_MODULES_GPSSDIO
+; @CESYSGEN ENDIF IF CE_MODULES_GPSSDIO
+
+; @CESYSGEN IF CE_MODULES_SDMEMORY
+; @CESYSGEN ENDIF CE_MODULES_SDMEMORY
+
+; @CESYSGEN IF CE_MODULES_SDHC
+; @CESYSGEN ENDIF CE_MODULES_SDHC
+
+
+IF BSP_NOUSB !
+; @CESYSGEN IF CE_MODULES_USBD
+; @CESYSGEN IF CE_MODULES_USBHID
+; USB - Human Interface Device (HID) class Driver
+[HKEY_LOCAL_MACHINE\Drivers\USB\LoadClients\Default\Default\3\Hid_Class]
+   "DLL"="USBHID.DLL"
+
+[HKEY_LOCAL_MACHINE\Drivers\USB\ClientDrivers\Hid\Instance]
+   "DLL"="USBHID.DLL"
+
+[HKEY_LOCAL_MACHINE\Drivers\USB\ClientDrivers\Hid\Hid_Class]
+   "DLL"="USBHID.DLL"
+   "Prefix"="HID"
+   "QueuedTransferCount"=dword:2
+; @CESYSGEN ENDIF
+
+; @CESYSGEN IF CE_MODULES_USBPRN
+; @CESYSGEN ENDIF
+
+; @CESYSGEN IF CE_MODULES_USBMSC
+; USB - Mass Storage Class Driver
+[HKEY_LOCAL_MACHINE\Drivers\USB\LoadClients\Default\Default\8\Mass_Storage_Class]
+   "DLL"="USBMSC.DLL"
+   "Prefix"="DSK"
+
+[HKEY_LOCAL_MACHINE\Drivers\USB\ClientDrivers\Mass_Storage_Class]
+   "DLL"="USBMSC.DLL"
+   "Prefix"="DSK"
+
+[HKEY_LOCAL_MACHINE\Drivers\USB\ClientDrivers\Mass_Storage_Class\2]
+   "DLL"="USBDISK6.DLL"
+   "Prefix"="DSK"
+   "Folder"="USB Disk"
+   "MediaPollInterval"=dword:432   ; Media poll interval (1250 ms)
+   "ReadSectorTimeout"=dword:2710  ; Read sector timeout (10 s)
+   "WriteSectorTimeout"=dword:2710 ; Read sector timeout (10 s)
+   "ScsiCommandTimeout"=dword:1388 ; Command timeout (5 s)
+   "UnitAttnRepeat"=dword:A        ; TEST UNIT READY repeat (reduce to 1 for large USB disk keys)
+   "IOCTL"=dword:4
+   "IClass"="{A4E7EDDA-E575-4252-9D6B-4195D48BB865}"
+
+[HKEY_LOCAL_MACHINE\Drivers\USB\ClientDrivers\Mass_Storage_Class\6]
+   "DLL"="USBDISK6.DLL"
+   "Prefix"="DSK"
+   "Folder"="USB Disk"
+   "MediaPollInterval"=dword:432   ; Media poll interval (1250 ms)
+   "ReadSectorTimeout"=dword:2710  ; Read sector timeout (10 s)
+   "WriteSectorTimeout"=dword:2710 ; Read sector timeout (10 s)
+   "ScsiCommandTimeout"=dword:1388 ; Command timeout (5 s)
+   "UnitAttnRepeat"=dword:A        ; TEST UNIT READY repeat (reduce to 1 for large USB disk keys)
+   "IOCTL"=dword:4
+   "IClass"="{A4E7EDDA-E575-4252-9D6B-4195D48BB865}"
+; @CESYSGEN ENDIF
+
+; @CESYSGEN IF CE_MODULES_USBCCID
+; @CESYSGEN ENDIF
+
+; @CESYSGEN IF CE_MODULES_STCUSB
+; @CESYSGEN ENDIF
+
+; @CESYSGEN IF CE_MODULES_USB8023 && CE_MODULES_RNDISMP
+; @CESYSGEN ENDIF CE_MODULES_USB8023 && CE_MODULES_RNDISMP
+
+; @CESYSGEN IF CE_MODULES_USBSER
+; @CESYSGEN ENDIF CE_MODULES_USBSER
+
+; @CESYSGEN ENDIF CE_MODULES_USBD
+ENDIF BSP_NOUSB !
+
+; @CESYSGEN IF CE_MODULES_NET2280
+; @CESYSGEN ENDIF CE_MODULES_NET2280
+
+
+; @CESYSGEN IF CE_MODULES_USBMSFN
+; @CESYSGEN ENDIF CE_MODULES_USBMSFN
+
+; @CESYSGEN IF CE_MODULES_UFNPRN
+; @CESYSGEN ENDIF CE_MODULES_UFNPRN
+
+; @CESYSGEN IF CE_MODULES_RNDISFN
+; @CESYSGEN ENDIF CE_MODULES_RNDISFN
+
+; @CESYSGEN IF CE_MODULES_SERIALUSBFN
+; @CESYSGEN ENDIF CE_MODULES_SERIALUSBFN
+
+; @CESYSGEN IF CE_MODULES_COMPOSITEFN
+; @CESYSGEN ENDIF CE_MODULES_COMPOSITEFN
+
+; @CESYSGEN IF CE_MODULES_KBDHID
+[HKEY_LOCAL_MACHINE\Drivers\HID\LoadClients\Default\Default\1_6\Keyboard]
+   "DLL"="KBDHID.DLL"
+
+[HKEY_LOCAL_MACHINE\Drivers\HID\ClientDrivers\Keyboard]
+   "DLL"="KBDHID.DLL"
+   "Prefix"="KBD"
+   "IClass"="{CBE6DDF2-F5D4-4e16-9F61-4CCC0B6695F3}"
+   "RemoteWakeup"=dword:1
+   "Flags"=dword:00010000
+; @CESYSGEN ENDIF CE_MODULES_KBDHID
+
+; @CESYSGEN IF CE_MODULES_CONSHID
+[HKEY_LOCAL_MACHINE\Drivers\HID\LoadClients\Default\Default\12_1\Consumer]
+   "DLL"="CONSHID.DLL"
+   "RemoteWakeup"=dword:1
+; @CESYSGEN ENDIF CE_MODULES_CONSHID
+
+; @CESYSGEN IF CE_MODULES_MOUHID
+[HKEY_LOCAL_MACHINE\Drivers\HID\LoadClients\Default\Default\1_2\Mouse]
+   "DLL"="MOUHID.DLL"
+   "RemoteWakeup"=dword:1
+; @CESYSGEN ENDIF CE_MODULES_MOUHID
+
+
+; @CESYSGEN IF CE_MODULES_TAPI
+[HKEY_LOCAL_MACHINE\Drivers\BuiltIn\TAPI]
+   "Dll"="TAPI.dll"
+   "Order"=dword:1
+   ; Flags==2 is DEVFLAGS_LOADLIBRARY
+   "Flags"=dword:2
+
+; @CESYSGEN IF CE_MODULES_UNIMODEM
+[HKEY_LOCAL_MACHINE\ExtModems\HayesCompat]
+   "Port"="COM1:"
+   "DeviceType"=dword:1
+;LOC_FRIENDLYHAYESCOMPAT
+   "FriendlyName"=mui_sz:"unimodem.dll,#9001"
+
+;[HKEY_LOCAL_MACHINE\ExtModems\HayesCompat\Init]
+
+;[HKEY_LOCAL_MACHINE\ExtModems\HayesCompat\Settings]
+
+; ---------------------------------------------------------------------------
+; Default Unimodem values.  Unimodem looks here if it doesn't find an
+; overriding value in the device specific registry entry.
+; ---------------------------------------------------------------------------
+[HKEY_LOCAL_MACHINE\Drivers\Unimodem]
+   "DevConfig"=hex: 10,00, 00,00, 78,00,00,00, 10,01,00,00, 00,4B,00,00, 00,00, 08, 00, 00, 00,00,00,00
+
+[HKEY_LOCAL_MACHINE\Drivers\Unimodem\Init]
+   "1"="AT<cr>"
+   "2"="ATE0V1&C1&D2<cr>"
+
+[HKEY_LOCAL_MACHINE\Drivers\Unimodem\Settings]
+   "Prefix"="AT"
+   "Terminator"="<cr>"
+   "DialPrefix"="D"
+   "DialSuffix"=";"
+   "Pulse"="P"
+   "Tone"="T"
+   "Blind_Off"="X4"
+   "Blind_On"="X3"
+   "CallSetupFailTimeout"="ATS7=<#><cr>"
+   "Reset"="ATZ<cr>"
+; @CESYSGEN ENDIF CE_MODULES_UNIMODEM
+; @CESYSGEN ENDIF CE_MODULES_TAPI
+
+; @CESYSGEN IF CE_MODULES_PCCARD
+#if ! defined BSP_NOPCMCIA  || ! defined BSP_NOPCCARD
+; ---------------------------------------------------------------------------
+; Registry values for the various PCMCIA cards that we support.  Note that
+; any Unimodem settings not specified here will be searched for in the
+; drivers\unimodem keys
+;
+; NOTE : Be careful about placing &F in the "3" value for Init.  This will
+; wipe out the work that was done in the default "2" case.  You can use it,
+; but be sure to restore whatever might be needed from step 2.  Needed since
+; the default case has to work for the lowest common denominator.  We could
+; move the &F into "1" or "2" but not all modems support it.
+; ---------------------------------------------------------------------------
+;; Registry values for generic PCMCIA modem and serial cards
+[HKEY_LOCAL_MACHINE\Drivers\PCMCIA\Modem]
+   "DeviceArrayIndex"=dword:1
+   "Prefix"="COM"
+   "Dll"="Serial.Dll"
+   "ResetDelay"=dword:300
+   "IClass"="{CC5195AC-BA49-48a0-BE17-DF6D1B0173DD}"
+
+; @CESYSGEN IF CE_MODULES_UNIMODEM
+[HKEY_LOCAL_MACHINE\Drivers\PCMCIA\Modem\Unimodem]
+   "Tsp"="Unimodem.dll"
+   "DeviceType"=dword:3
+; @CESYSGEN ENDIF CE_MODULES_UNIMODEM
+
+[HKEY_LOCAL_MACHINE\Drivers\PCMCIA\Serial]
+   "DeviceArrayIndex"=dword:1
+   "Prefix"="COM"
+   "Dll"="Serial.Dll"
+   "ResetDelay"=dword:300
+   "IClass"="{CC5195AC-BA49-48a0-BE17-DF6D1B0173DD}"
+
+; @CESYSGEN IF CE_MODULES_UNIMODEM
+[HKEY_LOCAL_MACHINE\Drivers\PCMCIA\Serial\Unimodem]
+   "Tsp"="Unimodem.dll"
+   "DeviceType"=dword:0
+; @CESYSGEN ENDIF CE_MODULES_UNIMODEM
+
+; ********  Registry values for the NTT DoCoMo PCMCIA Card ************************
+[HKEY_LOCAL_MACHINE\Drivers\PCMCIA\NTT_DoCoMo-MFCard96F1-A093]
+   "DeviceArrayIndex"=dword:1
+   "Prefix"="COM"
+   "Dll"="Serial.Dll"
+   "ResetDelay"=dword:300
+   "NoIntrPend"=dword:1
+   "IClass"="{CC5195AC-BA49-48a0-BE17-DF6D1B0173DD}"
+
+; @CESYSGEN IF CE_MODULES_UNIMODEM
+[HKEY_LOCAL_MACHINE\Drivers\PCMCIA\NTT_DoCoMo-MFCard96F1-A093\Unimodem]
+   "Tsp"="Unimodem.dll"
+   "DeviceType"=dword:3
+; @CESYSGEN ENDIF CE_MODULES_UNIMODEM
+
+; ********  Registry values for the Hayes PCMCIA Card ************************
+[HKEY_LOCAL_MACHINE\Drivers\PCMCIA\Hayes-OPTIMA_288_+_FAX_for_PCMCIA_with_EZ-4FA5]
+   "DeviceArrayIndex"=dword:1
+   "Prefix"="COM"
+   "Dll"="Serial.dll"
+   "IClass"="{CC5195AC-BA49-48a0-BE17-DF6D1B0173DD}"
+
+; @CESYSGEN IF CE_MODULES_UNIMODEM
+[HKEY_LOCAL_MACHINE\Drivers\PCMCIA\Hayes-OPTIMA_288_+_FAX_for_PCMCIA_with_EZ-4FA5\Unimodem]
+   "Tsp"="Unimodem.dll"
+;LOC_FRIENDLYHAYESFAX
+   "FriendlyName"=mui_sz:"unimodem.dll,#9002"
+   "DeviceType"=dword:3
+
+[HKEY_LOCAL_MACHINE\Drivers\PCMCIA\Hayes-OPTIMA_288_+_FAX_for_PCMCIA_with_EZ-4FA5\Unimodem\Init]
+   "3"="AT&F E0 V1 &C1 &D2<cr>"
+   "4"="ATW0 S95=0<cr>"
+
+[HKEY_LOCAL_MACHINE\Drivers\PCMCIA\Hayes-OPTIMA_288_+_FAX_for_PCMCIA_with_EZ-4FA5\Unimodem\Settings]
+   "FlowHard"="AT&K3<cr>"
+   "FlowSoft"="AT&K4<cr>"
+   "FlowOff"="AT&K0<cr>"
+; @CESYSGEN ENDIF CE_MODULES_UNIMODEM
+
+; ********  Registry values for the MEGAHERTZ 28.8 Card **********************
+[HKEY_LOCAL_MACHINE\Drivers\PCMCIA\MEGAHERTZ-XJ2288-9E81]
+   "DeviceArrayIndex"=dword:1
+   "Prefix"="COM"
+   "Dll"="Serial.dll"
+   "IClass"="{CC5195AC-BA49-48a0-BE17-DF6D1B0173DD}"
+
+; @CESYSGEN IF CE_MODULES_UNIMODEM
+[HKEY_LOCAL_MACHINE\Drivers\PCMCIA\MEGAHERTZ-XJ2288-9E81\Unimodem]
+   "Tsp"="Unimodem.dll"
+;LOC_FRIENDLYMEGAHERTZ
+   "FriendlyName"=mui_sz:"unimodem.dll,#9003"
+   "DeviceType"=dword:3
+
+[HKEY_LOCAL_MACHINE\Drivers\PCMCIA\MEGAHERTZ-XJ2288-9E81\Unimodem\Init]
+   "3"="ATW2B1\\V<cr>"
+
+[HKEY_LOCAL_MACHINE\Drivers\PCMCIA\MEGAHERTZ-XJ2288-9E81\Unimodem\Settings]
+   "FlowHard"="AT&K3<cr>"
+   "FlowSoft"="AT&K4<cr>"
+   "FlowOff"="AT&K0<cr>"
+; @CESYSGEN ENDIF CE_MODULES_UNIMODEM
+
+; ********  Registry values for the MEGAHERTZ Cellular Card *******************
+[HKEY_LOCAL_MACHINE\Drivers\PCMCIA\MEGAHERTZ-XJ3288-26C7]
+   "DeviceArrayIndex"=dword:1
+   "Prefix"="COM"
+   "Dll"="Serial.dll"
+   "IClass"="{CC5195AC-BA49-48a0-BE17-DF6D1B0173DD}"
+
+; @CESYSGEN IF CE_MODULES_UNIMODEM
+[HKEY_LOCAL_MACHINE\Drivers\PCMCIA\MEGAHERTZ-XJ3288-26C7\Unimodem]
+   "Tsp"="Unimodem.dll"
+;LOC_FRIENDLYMEGAHERTZCELL
+   "FriendlyName"=mui_sz:"unimodem.dll,#9004"
+   "DeviceType"=dword:3
+
+[HKEY_LOCAL_MACHINE\Drivers\PCMCIA\MEGAHERTZ-XJ3288-26C7\Unimodem\Init]
+   "3"="ATW2B1\\V1<cr>"
+
+[HKEY_LOCAL_MACHINE\Drivers\PCMCIA\MEGAHERTZ-XJ3288-26C7\Unimodem\Settings]
+   "FlowHard"="AT&K3<cr>"
+   "FlowSoft"="AT&K4<cr>"
+   "FlowOff"="AT&K0<cr>"
+; @CESYSGEN ENDIF CE_MODULES_UNIMODEM
+
+; ********  Registry values for the MEGAHERTZ  Card *******************
+[HKEY_LOCAL_MACHINE\Drivers\PCMCIA\MEGAHERTZ-Megahertz_28.8-73E3]
+   "DeviceArrayIndex"=dword:1
+   "Prefix"="COM"
+   "Dll"="Serial.dll"
+   "IClass"="{CC5195AC-BA49-48a0-BE17-DF6D1B0173DD}"
+
+; @CESYSGEN IF CE_MODULES_UNIMODEM
+[HKEY_LOCAL_MACHINE\Drivers\PCMCIA\MEGAHERTZ-Megahertz_28.8-73E3\Unimodem]
+   "Tsp"="Unimodem.dll"
+;LOC_FRIENDLYMEGAHERTZCRUISE
+   "FriendlyName"=mui_sz:"unimodem.dll,#9005"
+   "DeviceType"=dword:3
+
+[HKEY_LOCAL_MACHINE\Drivers\PCMCIA\MEGAHERTZ-Megahertz_28.8-73E3\Unimodem\Init]
+   "3"="ATW2B1\\V1<cr>"
+
+[HKEY_LOCAL_MACHINE\Drivers\PCMCIA\MEGAHERTZ-Megahertz_28.8-73E3\Unimodem\Settings]
+   "FlowHard"="AT&K3<cr>"
+   "FlowSoft"="AT&K4<cr>"
+   "FlowOff"="AT&K0<cr>"
+; @CESYSGEN ENDIF CE_MODULES_UNIMODEM
+
+; ********  Registry values for the MEGAHERTZ 14.4 Card **********************
+[HKEY_LOCAL_MACHINE\Drivers\PCMCIA\MEGAHERTZ-XJ1144-5C3E]
+   "DeviceArrayIndex"=dword:1
+   "Prefix"="COM"
+   "Dll"="Serial.Dll"
+   "IClass"="{CC5195AC-BA49-48a0-BE17-DF6D1B0173DD}"
+
+; @CESYSGEN IF CE_MODULES_UNIMODEM
+[HKEY_LOCAL_MACHINE\Drivers\PCMCIA\MEGAHERTZ-XJ1144-5C3E\Unimodem]
+   "Tsp"="Unimodem.dll"
+;LOC_FRIENDLYMEGAHERTZ144
+   "FriendlyName"=mui_sz:"unimodem.dll,#9006"
+   "DeviceType"=dword:3
+; @CESYSGEN ENDIF CE_MODULES_UNIMODEM
+
+; ********  Registry values for the USRobotics 28.8 Sportster *****************
+[HKEY_LOCAL_MACHINE\Drivers\PCMCIA\USRobotics-PCMCIA_28800_Data/Fax-92A2]
+   "DeviceArrayIndex"=dword:1
+   "Prefix"="COM"
+   "Dll"="Serial.dll"
+   "ResetDelay"=dword:800
+   "IClass"="{CC5195AC-BA49-48a0-BE17-DF6D1B0173DD}"
+
+; @CESYSGEN IF CE_MODULES_UNIMODEM
+[HKEY_LOCAL_MACHINE\Drivers\PCMCIA\USRobotics-PCMCIA_28800_Data/Fax-92A2\Unimodem]
+   "Tsp"="Unimodem.dll"
+;LOC_FRIENDLYSPORTSTER288
+   "FriendlyName"=mui_sz:"unimodem.dll,#9007"
+   "DeviceType"=dword:3
+
+[HKEY_LOCAL_MACHINE\Drivers\PCMCIA\USRobotics-PCMCIA_28800_Data/Fax-92A2\Unimodem\Init]
+    "3"="AT &F1 E0 V1 &C1 &D2 &B1 &A3 S0=0<cr>"
+
+[HKEY_LOCAL_MACHINE\Drivers\PCMCIA\USRobotics-PCMCIA_28800_Data/Fax-92A2\Unimodem\Settings]
+   "FlowHard"="AT&K3<cr>"
+   "FlowSoft"="AT&K4<cr>"
+   "FlowOff"="AT&K0<cr>"
+; @CESYSGEN ENDIF CE_MODULES_UNIMODEM
+
+; ********  Registry values for the Practical Peripherals ProClass 28.8 *******
+[HKEY_LOCAL_MACHINE\Drivers\PCMCIA\Practical_Peripherals_Inc-PPI_PC288T2EZ_PCMCIA-F382]
+   "DeviceArrayIndex"=dword:1
+   "Prefix"="COM"
+   "Dll"="Serial.dll"
+   "IClass"="{CC5195AC-BA49-48a0-BE17-DF6D1B0173DD}"
+
+; @CESYSGEN IF CE_MODULES_UNIMODEM
+[HKEY_LOCAL_MACHINE\Drivers\PCMCIA\Practical_Peripherals_Inc-PPI_PC288T2EZ_PCMCIA-F382\Unimodem]
+   "Tsp"="Unimodem.dll"
+;LOC_FRIENDLYPROCLASS288
+   "FriendlyName"=mui_sz:"unimodem.dll,#9008"
+   "DeviceType"=dword:3
+; @CESYSGEN ENDIF CE_MODULES_UNIMODEM
+
+; ********  Registry values for the Practical Peripherals ProClass 28.8 *******
+; (the newer revision gives a different Pnp ID)
+[HKEY_LOCAL_MACHINE\Drivers\PCMCIA\Practical_Peripherals_Inc-PPI_PC288T2EZ_PCMCIA-DAE6]
+   "DeviceArrayIndex"=dword:1
+   "Prefix"="COM"
+   "Dll"="Serial.dll"
+   "IClass"="{CC5195AC-BA49-48a0-BE17-DF6D1B0173DD}"
+
+; @CESYSGEN IF CE_MODULES_UNIMODEM
+[HKEY_LOCAL_MACHINE\Drivers\PCMCIA\Practical_Peripherals_Inc-PPI_PC288T2EZ_PCMCIA-DAE6\Unimodem]
+   "Tsp"="Unimodem.dll"
+   "FriendlyName"=LOC_FRIENDLYPROCLASS288
+   "DeviceType"=dword:3
+; @CESYSGEN ENDIF CE_MODULES_UNIMODEM
+
+; ********  Registry values for the Xircom 33.6 Credit Card Modem  *******
+[HKEY_LOCAL_MACHINE\Drivers\PCMCIA\Xircom-CreditCard_Modem_33.6-5347]
+   "DeviceArrayIndex"=dword:1
+   "Prefix"="COM"
+   "Dll"="Serial.dll"
+   "IClass"="{CC5195AC-BA49-48a0-BE17-DF6D1B0173DD}"
+
+; @CESYSGEN IF CE_MODULES_UNIMODEM
+[HKEY_LOCAL_MACHINE\Drivers\PCMCIA\Xircom-CreditCard_Modem_33.6-5347\Unimodem]
+   "Tsp"="Unimodem.dll"
+;LOC_FRIENDLYXIRCOM336
+   "FriendlyName"=mui_sz:"unimodem.dll,#9009"
+   "DeviceType"=dword:3
+; @CESYSGEN ENDIF CE_MODULES_UNIMODEM
+
+
+; ********  Registry values for the Socket Communications 16550 UART Card *****
+[HKEY_LOCAL_MACHINE\Drivers\PCMCIA\Socket_Communications_Inc-Serial_Port_Adapter_Revision_B-5E3E]
+   "DeviceArrayIndex"=dword:1
+   "Prefix"="COM"
+   "Dll"="Serial.dll"
+   "IClass"="{CC5195AC-BA49-48a0-BE17-DF6D1B0173DD}"
+
+; @CESYSGEN IF CE_MODULES_UNIMODEM
+[HKEY_LOCAL_MACHINE\Drivers\PCMCIA\Socket_Communications_Inc-Serial_Port_Adapter_Revision_B-5E3E\Unimodem]
+   "Tsp"="Unimodem.dll"
+   "FriendlyName"="Socket I/O Serial"
+   "DeviceType"=dword:0
+; @CESYSGEN ENDIF CE_MODULES_UNIMODEM
+
+; ********  Registry values for the Xircom 33.6 Credit Card Modem + Ether *******
+[HKEY_LOCAL_MACHINE\Drivers\PCMCIA\Xircom-CreditCard_Ethernet+Modem_33.6-05DD]
+   "Dll"="regenum.dll"
+
+[HKEY_LOCAL_MACHINE\Drivers\PCMCIA\Xircom-CreditCard_Ethernet+Modem_33.6-05DD\1]
+   "DeviceArrayIndex"=dword:1
+   "Prefix"="COM"
+   "Dll"="Serial.dll"
+   "IClass"="{CC5195AC-BA49-48a0-BE17-DF6D1B0173DD}"
+
+; @CESYSGEN IF CE_MODULES_UNIMODEM
+[HKEY_LOCAL_MACHINE\Drivers\PCMCIA\Xircom-CreditCard_Ethernet+Modem_33.6-05DD\1\Unimodem]
+   "Tsp"="Unimodem.dll"
+;LOC_FRIENDLYXIRCOMETHER336
+   "FriendlyName"=mui_sz:"unimodem.dll,#9010"
+   "DeviceType"=dword:3
+; @CESYSGEN ENDIF CE_MODULES_UNIMODEM
+
+
+; ********  Registry values for the Motorola Montana *********************
+[HKEY_LOCAL_MACHINE\Drivers\PCMCIA\Motorola-MONTANA_V.34_FAX/MODEM-9E9C]
+   "DeviceArrayIndex"=dword:1
+   "Prefix"="COM"
+   "Dll"="Serial.dll"
+   "IClass"="{CC5195AC-BA49-48a0-BE17-DF6D1B0173DD}"
+
+; @CESYSGEN IF CE_MODULES_UNIMODEM
+[HKEY_LOCAL_MACHINE\Drivers\PCMCIA\Motorola-MONTANA_V.34_FAX/MODEM-9E9C\Unimodem]
+   "Tsp"="Unimodem.dll"
+;LOC_FRIENDLYMOTOMONTANA288
+   "FriendlyName"=mui_sz:"unimodem.dll,#9011"
+   "DeviceType"=dword:3
+
+[HKEY_LOCAL_MACHINE\Drivers\PCMCIA\Motorola-MONTANA_V.34_FAX/MODEM-9E9C\Unimodem\Init]
+   "3"="ATS7=60M1<cr>"
+
+[HKEY_LOCAL_MACHINE\Drivers\PCMCIA\Motorola-MONTANA_V.34_FAX/MODEM-9E9C\Unimodem\Settings]
+   "FlowHard"="AT\\Q3<cr>"
+   "FlowSoft"="AT\\Q1<cr>"
+   "FlowOff"="AT\\Q<cr>"
+; @CESYSGEN ENDIF CE_MODULES_UNIMODEM
+
+; ********  Registry values for the Motorola Power 14.4 *********************
+[HKEY_LOCAL_MACHINE\Drivers\PCMCIA\MOTOROLA-POWER_14.4-8980]
+   "DeviceArrayIndex"=dword:1
+   "Prefix"="COM"
+   "Dll"="Serial.dll"
+   "IClass"="{CC5195AC-BA49-48a0-BE17-DF6D1B0173DD}"
+
+; @CESYSGEN IF CE_MODULES_UNIMODEM
+[HKEY_LOCAL_MACHINE\Drivers\PCMCIA\MOTOROLA-POWER_14.4-8980\Unimodem]
+   "Tsp"="Unimodem.dll"
+;LOC_FRIENDLYMOTOPOWER144
+   "FriendlyName"=mui_sz:"unimodem.dll,#9012"
+   "DeviceType"=dword:3
+
+[HKEY_LOCAL_MACHINE\Drivers\PCMCIA\MOTOROLA-POWER_14.4-8980\Unimodem\Init]
+   "3"="ATS7=60S19=0M1<cr>"
+
+[HKEY_LOCAL_MACHINE\Drivers\PCMCIA\MOTOROLA-POWER_14.4-8980\Unimodem\Settings]
+   "FlowHard"="AT\\Q3<cr>"
+   "FlowSoft"="AT\\Q1<cr>"
+   "FlowOff"="AT\\Q<cr>"
+; @CESYSGEN ENDIF CE_MODULES_UNIMODEM
+
+
+#endif BSP_NOPCMCIA ! || BSP_NOPCCARD !
+; @CESYSGEN ENDIF CE_MODULES_PCCARD
+
+
+; @CESYSGEN IF CE_MODULES_PCCARD
+IF BSP_NOPCCARD !
+; @CESYSGEN IF ATAPI_ATAPI_PCMCIA
+
+; TransferMode Key
+;   PIO default mode                0x00
+;   PIO default mode, disable IORDY 0x01
+;   PIO flow control transfer mode  0x08 (mode 0), 0x09 (mode 1), 0x0A (mode 2), 0x0B (mode 3), 0x0C (mode 4)
+;   Multiword DMA mode              0x20 (mode 0), 0x21 (mode 1), 0x22 (mode 2)
+;   Ultra DMA mode                  0x40 (mode 0), 0x41 (mode 1), 0x42 (mode 2), 0x43 (mode 3), 0x44 (mode 4), ...
+;   Default                         0xFF
+
+[HKEY_LOCAL_MACHINE\Drivers\PCCARD\PCMCIA\TEMPLATE\ATADISKA]
+    "FUNCTION_ID"=dword:4
+    "IoBase"=multi_sz:"1f0","3f6"
+    "IoLen"=multi_sz:"8","2"
+    "IOADDR_HIGHESTBIT_SET"=dword:1 ; Alter the address to highest locate to avoiding conflict with IDE Controller
+    "Prefix"="IDE"
+    "Dll"="atapi.dll"
+    "Order"=dword:6
+    "Legacy"=dword:00               ; not legacy
+;   "Irq"=dword:00                  ; provided by PC Card bus driver
+;   "SysIntr"=dword:00              ; provided by PC Card bus driver
+;   "DMAAlignment"=dword:00         ; default DMA alignment; DMA not supported
+    "SoftResetTimeout"=dword:03     ; ATA/ATAPI spec defines 31s ceiling; this is too long
+    "StatusPollCycles"=dword:100    ; Status register DRQ/BSY polling; 256 poll cycles
+    "StatusPollsPerCycle"=dword:20  ; Status register DRQ/BSY polling; 32 polls per cycle
+    "StatusPollCyclePause"=dword:05 ; Status register DRQ/BSY polling; 5 milliseconds between poll cycles
+    "SpawnFunction"="CreatePCMCIA"  ; controller-specific instantiation function
+    "IsrDll"="giisr.dll"            ; bus-agnostic; installable ISR
+    "IsrHandler"="ISRHandler"       ; bus-agnostic; installable ISR
+    "DeviceControlOffset"=dword:0   ; AT task file offset of device control I/O port
+    "AlternateStatusOffset"=dword:0 ; AT task file offset of alternate status I/O port
+    "RegisterStride"=dword:01       ; AT task file register stride; register block is contiguous
+[HKEY_LOCAL_MACHINE\Drivers\PCCARD\PCMCIA\TEMPLATE\ATADISKA\Device0]
+    "IClass"=multi_sz:"{A4E7EDDA-E575-4252-9D6B-4195D48BB865}"
+    "Prefix"="DSK"
+    "Dll"="atapi.dll"
+    "InterruptDriven"=dword:00      ; interrupt driven I/O {0=disable, 1=enable}
+    "DMA"=dword:00                  ; DMA {0=disable, 1=enable}
+    "DoubleBufferSize"=dword:10000  ; double buffer size (bytes); should be larger than DRQ data block {0=disabled, ..., 131072}
+    "DrqDataBlockSize"=dword:200    ; sector-aligned DRQ data block size (bytes), i.e., R/W Multiple sectors/interrupt {0=device default, 512, ..., 130560}
+    "WriteCache"=dword:01           ; write cache {0=disable, 1=enable}
+    "LookAhead"=dword:01            ; lookahead {0=disable, 1=enable}
+    "DeviceId"=dword:00             ; device 0, i.e., primary master
+    "TransferMode"=dword:FF         ; transfer mode (Ultra DMA 3, 4 require 80-conductor cable); see TransferMode Key
+[HKEY_LOCAL_MACHINE\Drivers\PCCARD\PCMCIA\TEMPLATE\ATADISKB]
+    "FUNCTION_ID"=dword:4
+    "IoBase"=multi_sz:"170","376"
+    "IoLen"=multi_sz:"8","2"
+    "IOADDR_HIGHESTBIT_SET"=dword:1
+    "Prefix"="IDE"
+    "Dll"="atapi.dll"
+    "Order"=dword:6
+    "Legacy"=dword:00
+;   "Irq"=dword:00
+;   "SysIntr"=dword:00
+;   "DMAAlignment"=dword:00
+    "SoftResetTimeout"=dword:03
+    "StatusPollCycles"=dword:100
+    "StatusPollsPerCycle"=dword:20
+    "StatusPollCyclePause"=dword:05
+    "SpawnFunction"="CreatePCMCIA"
+    "IsrDll"="giisr.dll"
+    "IsrHandler"="ISRHandler"
+    "DeviceControlOffset"=dword:0
+    "AlternateStatusOffset"=dword:0
+    "RegisterStride"=dword:01
+[HKEY_LOCAL_MACHINE\Drivers\PCCARD\PCMCIA\TEMPLATE\ATADISKB\Device0]
+    "IClass"=multi_sz:"{A4E7EDDA-E575-4252-9D6B-4195D48BB865}"
+    "Prefix"="DSK"
+    "Dll"="atapi.dll"
+    "InterruptDriven"=dword:00
+    "DMA"=dword:00
+    "DoubleBufferSize"=dword:10000
+    "DrqDataBlockSize"=dword:200
+    "WriteCache"=dword:01
+    "LookAhead"=dword:01
+    "DeviceId"=dword:00
+    "TransferMode"=dword:FF
+; @CESYSGEN ENDIF ATAPI_ATAPI_PCMCIA
+; @CESYSGEN IF CE_MODULES_SERIAL
+
+[HKEY_LOCAL_MACHINE\Drivers\PCCARD\PCMCIA\TEMPLATE\COM_CARDA]
+    "FUNCTION_ID"=dword:2
+    "IoBase"=dword:3f8
+    "IoLen"=dword:8
+    "INTERRUPT_MASK"=dword:ffff
+    "DeviceArrayIndex"=dword:0
+    "Prefix"="COM"
+    "Dll"="com16550.dll"
+   "IClass"="{CC5195AC-BA49-48a0-BE17-DF6D1B0173DD}"
+; Turn on follows for Installable ISR (isr16550 supporting SOFTWARE FIFO
+   "IsrDll"="isr16550.dll"
+   "IsrHandler"="ISRHandler"
+
+; @CESYSGEN IF CE_MODULES_UNIMODEM
+[HKEY_LOCAL_MACHINE\Drivers\PCCARD\PCMCIA\TEMPLATE\COM_CARDA\Unimodem]
+   "Tsp"="Unimodem.dll"
+   "FriendlyName"="PCCard Serial 1"
+   "DeviceType"=dword:0
+[HKEY_LOCAL_MACHINE\Drivers\PCCARD\PCMCIA\TEMPLATE\COM_CARDA\Unimodem2]
+   "Tsp"="Unimodem.dll"
+   "FriendlyName"="PCCard Modem 1"
+   "DeviceType"=dword:3
+; @CESYSGEN ENDIF CE_MODULES_UNIMODEM
+
+[HKEY_LOCAL_MACHINE\Drivers\PCCARD\PCMCIA\TEMPLATE\COM_CARDB]
+    "FUNCTION_ID"=dword:2
+    "IoBase"=dword:2f8
+    "IoLen"=dword:8
+    "INTERRUPT_MASK"=dword:ffff
+    "DeviceArrayIndex"=dword:0
+    "Prefix"="COM"
+    "Dll"="com16550.dll"
+   "IClass"="{CC5195AC-BA49-48a0-BE17-DF6D1B0173DD}"
+; Turn on follows for Installable ISR (isr16550 supporting SOFTWARE FIFO
+   "IsrDll"="isr16550.dll"
+   "IsrHandler"="ISRHandler"
+
+; @CESYSGEN IF CE_MODULES_UNIMODEM
+[HKEY_LOCAL_MACHINE\Drivers\PCCARD\PCMCIA\TEMPLATE\COM_CARDB\Unimodem]
+   "Tsp"="Unimodem.dll"
+   "FriendlyName"="PCCard Serial 2"
+   "DeviceType"=dword:0
+[HKEY_LOCAL_MACHINE\Drivers\PCCARD\PCMCIA\TEMPLATE\COM_CARDB\Unimodem2]
+   "Tsp"="Unimodem.dll"
+   "FriendlyName"="PCCard Modem 2"
+   "DeviceType"=dword:3
+; @CESYSGEN ENDIF CE_MODULES_UNIMODEM
+
+[HKEY_LOCAL_MACHINE\Drivers\PCCARD\PCMCIA\TEMPLATE\COM_CARDC]
+    "FUNCTION_ID"=dword:2
+    "IoBase"=dword:3e8
+    "IoLen"=dword:8
+    "INTERRUPT_MASK"=dword:ffff
+    "DeviceArrayIndex"=dword:0
+    "Prefix"="COM"
+    "Dll"="com16550.dll"
+   "IClass"="{CC5195AC-BA49-48a0-BE17-DF6D1B0173DD}"
+; Turn on follows for Installable ISR (isr16550 supporting SOFTWARE FIFO
+   "IsrDll"="isr16550.dll"
+   "IsrHandler"="ISRHandler"
+
+; @CESYSGEN IF CE_MODULES_UNIMODEM
+[HKEY_LOCAL_MACHINE\Drivers\PCCARD\PCMCIA\TEMPLATE\COM_CARDC\Unimodem]
+   "Tsp"="Unimodem.dll"
+   "FriendlyName"="PCCard Serial 3"
+   "DeviceType"=dword:0
+[HKEY_LOCAL_MACHINE\Drivers\PCCARD\PCMCIA\TEMPLATE\COM_CARDC\Unimodem2]
+   "Tsp"="Unimodem.dll"
+   "FriendlyName"="PCCard Modem 3"
+   "DeviceType"=dword:3
+; @CESYSGEN ENDIF CE_MODULES_UNIMODEM
+
+
+[HKEY_LOCAL_MACHINE\Drivers\PCCARD\PCMCIA\TEMPLATE\COM_CARDD]
+    "FUNCTION_ID"=dword:2
+    "IoBase"=dword:2e8
+    "IoLen"=dword:8
+    "INTERRUPT_MASK"=dword:ffff
+    "DeviceArrayIndex"=dword:0
+    "Prefix"="COM"
+    "Dll"="com16550.dll"
+   "IClass"="{CC5195AC-BA49-48a0-BE17-DF6D1B0173DD}"
+; Turn on follows for Installable ISR (isr16550 supporting SOFTWARE FIFO
+   "IsrDll"="isr16550.dll"
+   "IsrHandler"="ISRHandler"
+
+; @CESYSGEN IF CE_MODULES_UNIMODEM
+[HKEY_LOCAL_MACHINE\Drivers\PCCARD\PCMCIA\TEMPLATE\COM_CARDD\Unimodem]
+   "Tsp"="Unimodem.dll"
+   "FriendlyName"="PCCard Serial 4"
+   "DeviceType"=dword:0
+[HKEY_LOCAL_MACHINE\Drivers\PCCARD\PCMCIA\TEMPLATE\COM_CARDD\Unimodem2]
+   "Tsp"="Unimodem.dll"
+   "FriendlyName"="PCCard Modem 4"
+   "DeviceType"=dword:3
+; @CESYSGEN ENDIF CE_MODULES_UNIMODEM
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+; ********  Registry values for the NTT DoCoMo PCMCIA Card ************************
+[HKEY_LOCAL_MACHINE\Drivers\PCCARD\PCMCIA\PNP\NTT_DoCoMo-MFCard96F1-A093\Option1]
+   "DeviceArrayIndex"=dword:0
+   "Prefix"="COM"
+   "Dll"="com16550.dll"
+   "IsrDll"="isr16550.dll"
+   "IsrHandler"="ISRHandler"
+   "ResetDelay"=dword:300
+   "NoIntrPend"=dword:1
+   "IClass"="{CC5195AC-BA49-48a0-BE17-DF6D1B0173DD}"
+
+; ********  Registry values for the Hayes PCMCIA Card ************************
+[HKEY_LOCAL_MACHINE\Drivers\PCCARD\PCMCIA\PNP\Hayes-OPTIMA_288_+_FAX_for_PCMCIA_with_EZ-4FA5\Option1]
+   "DeviceArrayIndex"=dword:0
+   "Prefix"="COM"
+   "Dll"="com16550.dll"
+   "IsrDll"="isr16550.dll"
+   "IsrHandler"="ISRHandler"
+   "IClass"="{CC5195AC-BA49-48a0-BE17-DF6D1B0173DD}"
+
+; @CESYSGEN IF CE_MODULES_UNIMODEM
+[HKEY_LOCAL_MACHINE\Drivers\PCCARD\PCMCIA\PNP\Hayes-OPTIMA_288_+_FAX_for_PCMCIA_with_EZ-4FA5\Option1\Unimodem]
+   "Tsp"="Unimodem.dll"
+;LOC_FRIENDLYHAYESFAX
+   "FriendlyName"=mui_sz:"unimodem.dll,#9002"
+   "DeviceType"=dword:3
+
+[HKEY_LOCAL_MACHINE\Drivers\PCCARD\PCMCIA\PNP\Hayes-OPTIMA_288_+_FAX_for_PCMCIA_with_EZ-4FA5\Option1\Unimodem\Init]
+   "3"="AT&F E0 V1 &C1 &D2<cr>"
+   "4"="ATW0 S95=0<cr>"
+
+[HKEY_LOCAL_MACHINE\Drivers\PCCARD\PCMCIA\PNP\Hayes-OPTIMA_288_+_FAX_for_PCMCIA_with_EZ-4FA5\Option1\Unimodem\Settings]
+   "FlowHard"="AT&K3<cr>"
+   "FlowSoft"="AT&K4<cr>"
+   "FlowOff"="AT&K0<cr>"
+; @CESYSGEN ENDIF CE_MODULES_UNIMODEM
+
+; ********  Registry values for the MEGAHERTZ 28.8 Card **********************
+[HKEY_LOCAL_MACHINE\Drivers\PCCARD\PCMCIA\PNP\MEGAHERTZ-XJ2288-9E81\Option1]
+   "DeviceArrayIndex"=dword:0
+   "Prefix"="COM"
+   "Dll"="com16550.dll"
+   "IsrDll"="isr16550.dll"
+   "IsrHandler"="ISRHandler"
+   "IClass"="{CC5195AC-BA49-48a0-BE17-DF6D1B0173DD}"
+
+; @CESYSGEN IF CE_MODULES_UNIMODEM
+[HKEY_LOCAL_MACHINE\Drivers\PCCARD\PCMCIA\PNP\MEGAHERTZ-XJ2288-9E81\Option1\Unimodem]
+   "Tsp"="Unimodem.dll"
+;LOC_FRIENDLYMEGAHERTZ
+   "FriendlyName"=mui_sz:"unimodem.dll,#9003"
+   "DeviceType"=dword:3
+
+[HKEY_LOCAL_MACHINE\Drivers\PCCARD\PCMCIA\PNP\MEGAHERTZ-XJ2288-9E81\Option1\Unimodem\Init]
+   "3"="ATW2B1\\V<cr>"
+
+[HKEY_LOCAL_MACHINE\Drivers\PCCARD\PCMCIA\PNP\MEGAHERTZ-XJ2288-9E81\Option1\Unimodem\Settings]
+   "FlowHard"="AT&K3<cr>"
+   "FlowSoft"="AT&K4<cr>"
+   "FlowOff"="AT&K0<cr>"
+; @CESYSGEN ENDIF CE_MODULES_UNIMODEM
+
+; ********  Registry values for the MEGAHERTZ Cellular Card *******************
+[HKEY_LOCAL_MACHINE\Drivers\PCCARD\PCMCIA\PNP\MEGAHERTZ-XJ3288-26C7\Option1]
+   "DeviceArrayIndex"=dword:0
+   "Prefix"="COM"
+   "Dll"="com16550.dll"
+   "IsrDll"="isr16550.dll"
+   "IsrHandler"="ISRHandler"
+   "IClass"="{CC5195AC-BA49-48a0-BE17-DF6D1B0173DD}"
+
+; @CESYSGEN IF CE_MODULES_UNIMODEM
+[HKEY_LOCAL_MACHINE\Drivers\PCCARD\PCMCIA\PNP\MEGAHERTZ-XJ3288-26C7\Option1\Unimodem]
+   "Tsp"="Unimodem.dll"
+;LOC_FRIENDLYMEGAHERTZCELL
+   "FriendlyName"=mui_sz:"unimodem.dll,#9004"
+   "DeviceType"=dword:3
+
+[HKEY_LOCAL_MACHINE\Drivers\PCCARD\PCMCIA\PNP\MEGAHERTZ-XJ3288-26C7\Option1\Unimodem\Init]
+   "3"="ATW2B1\\V1<cr>"
+
+[HKEY_LOCAL_MACHINE\Drivers\PCCARD\PCMCIA\PNP\MEGAHERTZ-XJ3288-26C7\Option1\Unimodem\Settings]
+   "FlowHard"="AT&K3<cr>"
+   "FlowSoft"="AT&K4<cr>"
+   "FlowOff"="AT&K0<cr>"
+; @CESYSGEN ENDIF CE_MODULES_UNIMODEM
+
+; ********  Registry values for the MEGAHERTZ  Card *******************
+[HKEY_LOCAL_MACHINE\Drivers\PCCARD\PCMCIA\PNP\MEGAHERTZ-Megahertz_28.8-73E3\Option1]
+   "DeviceArrayIndex"=dword:0
+   "Prefix"="COM"
+   "Dll"="com16550.dll"
+   "IsrDll"="isr16550.dll"
+   "IsrHandler"="ISRHandler"
+   "IClass"="{CC5195AC-BA49-48a0-BE17-DF6D1B0173DD}"
+
+; @CESYSGEN IF CE_MODULES_UNIMODEM
+[HKEY_LOCAL_MACHINE\Drivers\PCCARD\PCMCIA\PNP\MEGAHERTZ-Megahertz_28.8-73E3\Option1\Unimodem]
+   "Tsp"="Unimodem.dll"
+;LOC_FRIENDLYMEGAHERTZCRUISE
+   "FriendlyName"=mui_sz:"unimodem.dll,#9005"
+   "DeviceType"=dword:3
+
+[HKEY_LOCAL_MACHINE\Drivers\PCCARD\PCMCIA\PNP\MEGAHERTZ-Megahertz_28.8-73E3\Option1\Unimodem\Init]
+   "3"="ATW2B1\\V1<cr>"
+
+[HKEY_LOCAL_MACHINE\Drivers\PCCARD\PCMCIA\PNP\MEGAHERTZ-Megahertz_28.8-73E3\Option1\Unimodem\Settings]
+   "FlowHard"="AT&K3<cr>"
+   "FlowSoft"="AT&K4<cr>"
+   "FlowOff"="AT&K0<cr>"
+; @CESYSGEN ENDIF CE_MODULES_UNIMODEM
+
+; ********  Registry values for the MEGAHERTZ 14.4 Card **********************
+[HKEY_LOCAL_MACHINE\Drivers\PCCARD\PCMCIA\PNP\MEGAHERTZ-XJ1144-5C3E\Option1]
+   "DeviceArrayIndex"=dword:0
+   "Prefix"="COM"
+   "Dll"="com16550.dll"
+   "IsrDll"="isr16550.dll"
+   "IsrHandler"="ISRHandler"
+   "IClass"="{CC5195AC-BA49-48a0-BE17-DF6D1B0173DD}"
+
+; @CESYSGEN IF CE_MODULES_UNIMODEM
+[HKEY_LOCAL_MACHINE\Drivers\PCCARD\PCMCIA\PNP\MEGAHERTZ-XJ1144-5C3E\Option1\Unimodem]
+   "Tsp"="Unimodem.dll"
+;LOC_FRIENDLYMEGAHERTZ144
+   "FriendlyName"=mui_sz:"unimodem.dll,#9006"
+   "DeviceType"=dword:3
+; @CESYSGEN ENDIF CE_MODULES_UNIMODEM
+
+; ********  Registry values for the USRobotics 28.8 Sportster *****************
+[HKEY_LOCAL_MACHINE\Drivers\PCCARD\PCMCIA\PNP\USRobotics-PCMCIA_28800_Data/Fax-92A2\Option1]
+   "DeviceArrayIndex"=dword:0
+   "Prefix"="COM"
+   "Dll"="com16550.dll"
+   "IsrDll"="isr16550.dll"
+   "IsrHandler"="ISRHandler"
+   "ResetDelay"=dword:800
+   "IClass"="{CC5195AC-BA49-48a0-BE17-DF6D1B0173DD}"
+
+; @CESYSGEN IF CE_MODULES_UNIMODEM
+[HKEY_LOCAL_MACHINE\Drivers\PCCARD\PCMCIA\PNP\USRobotics-PCMCIA_28800_Data/Fax-92A2\Option1\Unimodem]
+   "Tsp"="Unimodem.dll"
+;LOC_FRIENDLYSPORTSTER288
+   "FriendlyName"=mui_sz:"unimodem.dll,#9007"
+   "DeviceType"=dword:3
+
+[HKEY_LOCAL_MACHINE\Drivers\PCCARD\PCMCIA\PNP\USRobotics-PCMCIA_28800_Data/Fax-92A2\Option1\Unimodem\Init]
+    "3"="AT &F1 E0 V1 &C1 &D2 &B1 &A3 S0=0<cr>"
+
+[HKEY_LOCAL_MACHINE\Drivers\PCCARD\PCMCIA\PNP\USRobotics-PCMCIA_28800_Data/Fax-92A2\Option1\Unimodem\Settings]
+   "FlowHard"="AT&K3<cr>"
+   "FlowSoft"="AT&K4<cr>"
+   "FlowOff"="AT&K0<cr>"
+; @CESYSGEN ENDIF CE_MODULES_UNIMODEM
+
+; ********  Registry values for the Practical Peripherals ProClass 28.8 *******
+[HKEY_LOCAL_MACHINE\Drivers\PCCARD\PCMCIA\PNP\Practical_Peripherals_Inc-PPI_PC288T2EZ_PCMCIA-F382\Option1]
+   "DeviceArrayIndex"=dword:0
+   "Prefix"="COM"
+   "Dll"="com16550.dll"
+   "IsrDll"="isr16550.dll"
+   "IsrHandler"="ISRHandler"
+   "IClass"="{CC5195AC-BA49-48a0-BE17-DF6D1B0173DD}"
+
+; @CESYSGEN IF CE_MODULES_UNIMODEM
+[HKEY_LOCAL_MACHINE\Drivers\PCCARD\PCMCIA\PNP\Practical_Peripherals_Inc-PPI_PC288T2EZ_PCMCIA-F382\Option1\Unimodem]
+   "Tsp"="Unimodem.dll"
+;LOC_FRIENDLYPROCLASS288
+   "FriendlyName"=mui_sz:"unimodem.dll,#9008"
+   "DeviceType"=dword:3
+; @CESYSGEN ENDIF CE_MODULES_UNIMODEM
+
+; ********  Registry values for the Practical Peripherals ProClass 28.8 *******
+; (the newer revision gives a different Pnp ID)
+[HKEY_LOCAL_MACHINE\Drivers\PCCARD\PCMCIA\PNP\Practical_Peripherals_Inc-PPI_PC288T2EZ_PCMCIA-DAE6\Option1]
+   "DeviceArrayIndex"=dword:0
+   "Prefix"="COM"
+   "Dll"="com16550.dll"
+   "IsrDll"="isr16550.dll"
+   "IsrHandler"="ISRHandler"
+   "IClass"="{CC5195AC-BA49-48a0-BE17-DF6D1B0173DD}"
+
+; @CESYSGEN IF CE_MODULES_UNIMODEM
+[HKEY_LOCAL_MACHINE\Drivers\PCCARD\PCMCIA\PNP\Practical_Peripherals_Inc-PPI_PC288T2EZ_PCMCIA-DAE6\Option1\Unimodem]
+   "Tsp"="Unimodem.dll"
+   "FriendlyName"=LOC_FRIENDLYPROCLASS288
+   "DeviceType"=dword:3
+; @CESYSGEN ENDIF CE_MODULES_UNIMODEM
+
+; ********  Registry values for the Xircom 33.6 Credit Card Modem  *******
+[HKEY_LOCAL_MACHINE\Drivers\PCCARD\PCMCIA\PNP\Xircom-CreditCard_Modem_33.6-5347]
+   "DeviceArrayIndex"=dword:0
+   "Prefix"="COM"
+   "Dll"="com16550.dll"
+   "IsrDll"="isr16550.dll"
+   "IsrHandler"="ISRHandler"
+   "IClass"="{CC5195AC-BA49-48a0-BE17-DF6D1B0173DD}"
+
+; @CESYSGEN IF CE_MODULES_UNIMODEM
+[HKEY_LOCAL_MACHINE\Drivers\PCCARD\PCMCIA\PNP\Xircom-CreditCard_Modem_33.6-5347\Unimodem]
+   "Tsp"="Unimodem.dll"
+;LOC_FRIENDLYXIRCOM336
+   "FriendlyName"=mui_sz:"unimodem.dll,#9009"
+   "DeviceType"=dword:3
+; @CESYSGEN ENDIF CE_MODULES_UNIMODEM
+
+; ********  Registry values for the Socket Communications 16550 UART Card *****
+[HKEY_LOCAL_MACHINE\Drivers\PCCARD\PCMCIA\PNP\Socket_Communications_Inc-Serial_Port_Adapter_Revision_B-5E3E\Option1]
+   "DeviceArrayIndex"=dword:0
+   "Prefix"="COM"
+   "Dll"="com16550.dll"
+   "IsrDll"="isr16550.dll"
+   "IsrHandler"="ISRHandler"
+   "IClass"="{CC5195AC-BA49-48a0-BE17-DF6D1B0173DD}"
+
+; @CESYSGEN IF CE_MODULES_UNIMODEM
+[HKEY_LOCAL_MACHINE\Drivers\PCCARD\PCMCIA\PNP\Socket_Communications_Inc-Serial_Port_Adapter_Revision_B-5E3E\Option1\Unimodem]
+   "Tsp"="Unimodem.dll"
+   "FriendlyName"="Socket I/O Serial"
+   "DeviceType"=dword:0
+; @CESYSGEN ENDIF CE_MODULES_UNIMODEM
+
+; ********  Registry values for the Xircom 33.6 Credit Card Modem + Ether *******
+[HKEY_LOCAL_MACHINE\Drivers\PCCARD\PCMCIA\PNP\Xircom-CreditCard_Ethernet+Modem_33.6-05DD\Option1]
+   "Dll"="regenum.dll"
+
+[HKEY_LOCAL_MACHINE\Drivers\PCCARD\PCMCIA\PNP\Xircom-CreditCard_Ethernet+Modem_33.6-05DD\1\Option1]
+   "DeviceArrayIndex"=dword:0
+   "Prefix"="COM"
+   "Dll"="com16550.dll"
+   "IsrDll"="isr16550.dll"
+   "IsrHandler"="ISRHandler"
+   "IClass"="{CC5195AC-BA49-48a0-BE17-DF6D1B0173DD}"
+
+; @CESYSGEN IF CE_MODULES_UNIMODEM
+[HKEY_LOCAL_MACHINE\Drivers\PCMCIA\Xircom-CreditCard_Ethernet+Modem_33.6-05DD\1\Option1\Unimodem]
+   "Tsp"="Unimodem.dll"
+;LOC_FRIENDLYXIRCOMETHER336
+   "FriendlyName"=mui_sz:"unimodem.dll,#9010"
+   "DeviceType"=dword:3
+; @CESYSGEN ENDIF CE_MODULES_UNIMODEM
+
+
+; ********  Registry values for the Motorola Montana *********************
+[HKEY_LOCAL_MACHINE\Drivers\PCCARD\PCMCIA\PNP\Motorola-MONTANA_V.34_FAX/MODEM-9E9C\Option1]
+   "DeviceArrayIndex"=dword:0
+   "Prefix"="COM"
+   "Dll"="com16550.dll"
+   "IsrDll"="isr16550.dll"
+   "IsrHandler"="ISRHandler"
+   "IClass"="{CC5195AC-BA49-48a0-BE17-DF6D1B0173DD}"
+
+; @CESYSGEN IF CE_MODULES_UNIMODEM
+[HKEY_LOCAL_MACHINE\Drivers\PCCARD\PCMCIA\PNP\Motorola-MONTANA_V.34_FAX/MODEM-9E9C\Option1\Unimodem]
+   "Tsp"="Unimodem.dll"
+;LOC_FRIENDLYMOTOMONTANA288
+   "FriendlyName"=mui_sz:"unimodem.dll,#9011"
+   "DeviceType"=dword:3
+
+[HKEY_LOCAL_MACHINE\Drivers\PCCARD\PCMCIA\PNP\Motorola-MONTANA_V.34_FAX/MODEM-9E9C\Option1\Unimodem\Init]
+   "3"="ATS7=60M1<cr>"
+
+[HKEY_LOCAL_MACHINE\Drivers\PCCARD\PCMCIA\PNP\Motorola-MONTANA_V.34_FAX/MODEM-9E9C\Option1\Unimodem\Settings]
+   "FlowHard"="AT\\Q3<cr>"
+   "FlowSoft"="AT\\Q1<cr>"
+   "FlowOff"="AT\\Q<cr>"
+; @CESYSGEN ENDIF CE_MODULES_UNIMODEM
+
+; ********  Registry values for the Motorola Power 14.4 *********************
+[HKEY_LOCAL_MACHINE\Drivers\PCCARD\PCMCIA\PNP\MOTOROLA-POWER_14.4-8980\Option1]
+   "DeviceArrayIndex"=dword:0
+   "Prefix"="COM"
+   "Dll"="com16550.dll"
+   "IsrDll"="isr16550.dll"
+   "IsrHandler"="ISRHandler"
+   "IClass"="{CC5195AC-BA49-48a0-BE17-DF6D1B0173DD}"
+
+; @CESYSGEN IF CE_MODULES_UNIMODEM
+[HKEY_LOCAL_MACHINE\Drivers\PCCARD\PCMCIA\PNP\MOTOROLA-POWER_14.4-8980\Option1\Unimodem]
+   "Tsp"="Unimodem.dll"
+;LOC_FRIENDLYMOTOPOWER144
+   "FriendlyName"=mui_sz:"unimodem.dll,#9012"
+   "DeviceType"=dword:3
+
+[HKEY_LOCAL_MACHINE\Drivers\PCCARD\PCMCIA\PNP\MOTOROLA-POWER_14.4-8980\Option1\Unimodem\Init]
+   "3"="ATS7=60S19=0M1<cr>"
+
+[HKEY_LOCAL_MACHINE\Drivers\PCCARD\PCMCIA\PNP\MOTOROLA-POWER_14.4-8980\Option1\Unimodem\Settings]
+   "FlowHard"="AT\\Q3<cr>"
+   "FlowSoft"="AT\\Q1<cr>"
+   "FlowOff"="AT\\Q<cr>"
+; @CESYSGEN ENDIF CE_MODULES_UNIMODEM
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+; @CESYSGEN ENDIF CE_MODULES_SERIAL
+
+; @CESYSGEN IF CE_MODULES_NE2000
+#if defined BSP_NIC_NE2000_PCI && ! defined BSP_NOPCCARD
+;
+; From the NE2000 driver point of view, it looks like PCI device.
+;
+[HKEY_LOCAL_MACHINE\Drivers\PCCARD\PCMCIA\TEMPLATE\NE2000A]
+   "Dll"="ndis.dll"
+   "Prefix"="NDS"
+   "Miniport"="NE2000"
+   "Instance"="NE2000"
+    "FUNCTION_ID"=dword:6
+    "INTERRUPT_MASK"=dword:ffff
+    "IoBase"=dword:300
+    "IoLen"=dword:20
+    ; Flags==2 is DEVFLAGS_LOADLIBRARY
+    "Flags"=dword:2
+
+[HKEY_LOCAL_MACHINE\Drivers\PCCARD\PCMCIA\TEMPLATE\NE2000B]
+   "Dll"="ndis.dll"
+   "Prefix"="NDS"
+   "Miniport"="NE2000"
+   "Instance"="NE2000"
+    "FUNCTION_ID"=dword:6
+    "INTERRUPT_MASK"=dword:ffff
+    "IoBase"=dword:320
+    "IoLen"=dword:20
+    ; Flags==2 is DEVFLAGS_LOADLIBRARY
+    "Flags"=dword:2
+
+[HKEY_LOCAL_MACHINE\Drivers\PCCARD\PCMCIA\TEMPLATE\NE2000C]
+   "Dll"="ndis.dll"
+   "Prefix"="NDS"
+   "Miniport"="NE2000"
+   "Instance"="NE2000"
+    "FUNCTION_ID"=dword:6
+    "INTERRUPT_MASK"=dword:ffff
+    "IoBase"=dword:340
+    "IoLen"=dword:20
+    ; Flags==2 is DEVFLAGS_LOADLIBRARY
+    "Flags"=dword:2
+#endif
+
+
+; @CESYSGEN ENDIF CE_MODULES_NE2000
+ENDIF BSP_NOPCCARD
+; @CESYSGEN ENDIF CE_MODULES_PCCARD
+
+; @CESYSGEN IF CE_MODULES_PCCARD
+#if ! defined BSP_NOPCMCIA  || ! defined BSP_NOPCCARD
+
+; @CESYSGEN IF CE_MODULES_ATADISK
+[HKEY_LOCAL_MACHINE\Drivers\PCMCIA\ATADisk]
+    "Dll"="ATADISK.DLL"
+    "Prefix"="DSK"
+    "Ioctl"=dword:4
+    "Profile"="PCMCIA"
+    ; Indicate we are a power manageable interface and a storage driver
+    "IClass"=multi_sz:"{8DD679CE-8AB4-43c8-A14A-EA4963FAA715}","{A4E7EDDA-E575-4252-9D6B-4195D48BB865}"
+; @CESYSGEN ENDIF
+
+; @CESYSGEN IF CE_MODULES_SERIAL
+[HKEY_LOCAL_MACHINE\Drivers\PCMCIA\Detect\10]
+   "Dll"="SERIAL.DLL"
+   "Entry"="DetectModem"
+; @CESYSGEN ENDIF CE_MODULES_SERIAL
+
+; @CESYSGEN IF CE_MODULES_ATADISK
+[HKEY_LOCAL_MACHINE\Drivers\PCMCIA\Detect\50]
+   "Dll"="ATADISK.DLL"
+   "Entry"="DetectATADisk"
+; @CESYSGEN ENDIF CE_MODULES_ATADISK
+
+; @CESYSGEN IF CE_MODULES_NE2000
+[HKEY_LOCAL_MACHINE\Drivers\PCMCIA\Detect\60]
+   "Dll"="NE2000.DLL"
+   "Entry"="DetectNE2000"
+[HKEY_LOCAL_MACHINE\Drivers\PCMCIA\NE2000]
+   "Dll"="ndis.dll"
+   "Prefix"="NDS"
+   "Miniport"="NE2000"
+   ; Flags==2 is DEVFLAGS_LOADLIBRARY
+   "Flags"=dword:2
+; @CESYSGEN ENDIF CE_MODULES_NE2000
+
+#endif  BSP_NOPCMCIA ! || BSP_NOPCCARD !
+; @CESYSGEN ENDIF CE_MODULES_PCCARD
+
+; @CESYSGEN IF CE_MODULES_NE2000
+[HKEY_LOCAL_MACHINE\Comm\NE2000]
+;LOC_FRIENDLYNE2000COMPAT
+   "DisplayName"=mui_sz:"netmui.dll,#9001"
+   "Group"="NDIS"
+   "ImagePath"="ne2000.dll"
+
+[HKEY_LOCAL_MACHINE\Comm\NE2000\Linkage]
+   "Route"=multi_sz:"NE20001"
+
+[HKEY_LOCAL_MACHINE\Comm\NE20001]
+;LOC_FRIENDLYNE2000COMPAT
+   "DisplayName"=mui_sz:"netmui.dll,#9001"
+   "Group"="NDIS"
+   "ImagePath"="ne2000.dll"
+
+[HKEY_LOCAL_MACHINE\Comm\NE20001\Parms]
+   "BusNumber"=dword:0
+   "BusType"=dword:8
+   "InterruptNumber"=dword:03
+   "IoBaseAddress"=dword:0300
+   "Transceiver"=dword:3
+   "CardType"=dword:1
+; @CESYSGEN ENDIF CE_MODULES_NE2000
+
+
+; @CESYSGEN IF CE_MODULES_ISLP2NDS
+#if ! defined BSP_NOPCMCIA  || ! defined BSP_NOPCCARD
+IF BSP_NIC_ISLP2NDS_PCMCIA
+[HKEY_LOCAL_MACHINE\Drivers\PCMCIA\Microsoft-Wireless_Notebook_Adapter_MN-520-2E27]
+    "Dll"="ndis.dll"
+    "Prefix"="NDS"
+    "Miniport"="ISLP2"
+    ; Flags==2 is DEVFLAGS_LOADLIBRARY
+    "Flags"=dword:2
+
+[HKEY_LOCAL_MACHINE\Drivers\PCMCIA\The_Linksys_Group,_Inc.-Instant_Wireless_Network_PC_Card-0C0B]
+    "Dll"="ndis.dll"
+    "Prefix"="NDS"
+    "Miniport"="ISLP2"
+    ; Flags==2 is DEVFLAGS_LOADLIBRARY
+    "Flags"=dword:2
+
+[HKEY_LOCAL_MACHINE\Drivers\PCMCIA\NETGEAR-MA701_Wireless_CF_Card-691A]
+    "Dll"="ndis.dll"
+    "Prefix"="NDS"
+    "Miniport"="ISLP2"
+    ; Flags==2 is DEVFLAGS_LOADLIBRARY
+    "Flags"=dword:2
+
+[HKEY_LOCAL_MACHINE\Comm\ISLP2]
+   "DisplayName"="Intersil 802.11 Wireless LAN PC Card"
+   "Group"="NDIS"
+   "ImagePath"="ISLP2NDS.dll"
+
+[HKEY_LOCAL_MACHINE\Comm\ISLP2\Linkage]
+   "Route"=multi_sz:"ISLP21"
+
+[HKEY_LOCAL_MACHINE\Comm\ISLP21]
+   "DisplayName"="Intersil 802.11 Wireless LAN PC Card"
+   "Group"="NDIS"
+   "ImagePath"="ISLP2NDS.DLL"
+   "ISLP21OC"="ISL1:"
+
+[HKEY_LOCAL_MACHINE\Comm\ISLP21\Parms]
+   "BusNumber"=dword:1
+   "BusType"=dword:8
+   "InterruptNumber"=dword:03
+   "IoBaseAddress"=dword:0300
+   "LoadFirmware"=dword:01
+   "PlatformID"=dword:801d
+ENDIF BSP_NIC_ISLP2NDS_PCMCIA
+#endif BSP_NOPCMCIA ! || BSP_NOPCCARD !
+; @CESYSGEN ENDIF CE_MODULES_ISLP2NDS
+
+; @CESYSGEN IF CE_MODULES_AR6K_NDIS_CF
+#if ! defined BSP_NOPCMCIA  || ! defined BSP_NOPCCARD
+IF BSP_NIC_AR6K_PCMCIA
+
+[HKEY_LOCAL_MACHINE\DRIVERS\PCCARD\PCMCIA\PNP\UNKNOWN_MANUFACTURER-2A62]
+    "Dll"="ndis.dll"
+    "Prefix"="NDS"
+    "Miniport"="AR6K_CF"
+
+[HKEY_LOCAL_MACHINE\DRIVERS\PCCARD\PCMCIA\PNP\UNKNOWN_MANUFACTURER-6E2C]
+    "Dll"="ndis.dll"
+    "Prefix"="NDS"
+    "Miniport"="AR6K_CF"
+
+[HKEY_LOCAL_MACHINE\DRIVERS\PCCARD\PCMCIA\PNP\ATHR-AR6K-A417]
+    "Dll"="ndis.dll"
+    "Prefix"="NDS"
+    "Miniport"="AR6K_CF"
+
+[HKEY_LOCAL_MACHINE\Comm\PCCARD\ATHR-AR6K-A4171\Parms]
+    "bkScanEnable"=dword:1
+
+[HKEY_LOCAL_MACHINE\DRIVERS\PCCARD\PCMCIA\PNP\ATHR-AR6K-4C0A]
+    "Dll"="ndis.dll"
+    "Prefix"="NDS"
+    "Miniport"="AR6K_CF"
+
+[HKEY_LOCAL_MACHINE\Comm\PCCARD\ATHR-AR6K-4C0A1\Parms]
+    "bkScanEnable"=dword:1
+
+[HKEY_LOCAL_MACHINE\DRIVERS\PCCARD\PCMCIA\PNP\ATHR-AR6K-0C3F]
+    "Dll"="ndis.dll"
+    "Prefix"="NDS"
+    "Miniport"="AR6K_CF"
+
+[HKEY_LOCAL_MACHINE\Comm\PCCARD\ATHR-AR6K-0C3F1\Parms]
+    "bkScanEnable"=dword:1
+
+[HKEY_LOCAL_MACHINE\Comm\AR6K_CF]
+    "DisplayName"="AR6000 WLAN Adapter"
+    "Group"="NDIS"
+    "ImagePath"="ar6k_ndis_cf.dll"
+
+[HKEY_LOCAL_MACHINE\Comm\AR6K_CF\Linkage]
+    "Route"=multi_sz:"AR6K_CF1"
+
+[HKEY_LOCAL_MACHINE\Comm\AR6K_CF1]
+    "DisplayName"="AR6000 WLAN Adapter"
+    "Group"="NDIS"
+    "ImagePath"="ar6k_ndis_cf.dll"
+
+[HKEY_LOCAL_MACHINE\Comm\AR6K_CF1\Parms]
+    "bkScanEnable"=dword:1
+
+ENDIF BSP_NIC_AR6K_PCMCIA
+#endif BSP_NOPCMCIA ! || BSP_NOPCCARD !
+; @CESYSGEN ENDIF CE_MODULES_AR6K_NDIS_CF
+
+; @CESYSGEN IF CE_MODULES_AR6K_NDIS_SDIO
+; @CESYSGEN ENDIF CE_MODULES_AR6K_NDIS_SDIO
+
+; @CESYSGEN IF CE_MODULES_VMINI
+IF IMGNOKITL !
+IF BSP_NOSHAREETH !
+[HKEY_LOCAL_MACHINE\Comm\VMini]
+;LOC_FRIENDLYVMINI
+    "DisplayName"=mui_sz:"netmui.dll,#9006"
+    "Group"="NDIS"
+    "ImagePath"="VMini.dll"
+    "Priority256"=dword:83
+
+[HKEY_LOCAL_MACHINE\Comm\VMini\Linkage]
+    "Route"=multi_sz:"VMINI1"
+
+[HKEY_LOCAL_MACHINE\Comm\VMINI1]
+;LOC_FRIENDLYVMINI
+    "DisplayName"=mui_sz:"netmui.dll,#9006"
+    "Group"="NDIS"
+    "ImagePath"="VMini.dll"
+
+[HKEY_LOCAL_MACHINE\Comm\VMINI1\Parms]
+    "BusNumber"=dword:0
+    "BusType"=dword:0
+ENDIF BSP_NOSHAREETH !
+ENDIF IMGNOKITL !
+; @CESYSGEN ENDIF CE_MODULES_VMINI
+
+
+; @CESYSGEN IF CE_MODULES_PEGASSDN
+; @CESYSGEN ENDIF CE_MODULES_PEGASSDN
+
+
+; @CESYSGEN IF CE_MODULES_RTL8139
+IF BSP_NOPCIBUS !
+IF BSP_NOETHER !
+IF BSP_NIC_RTL8139
+
+[HKEY_LOCAL_MACHINE\Comm\RTL8139]
+;LOC_FRIENDLYRTL8139
+   "DisplayName"=mui_sz:"netmui.dll,#9011"
+   "Group"="NDIS"
+   "ImagePath"="RTL8139.dll"
+
+;
+; Template the PCI bus driver uses to match DLINK RTL cards and built in RTL on Geode.
+;
+
+[HKEY_LOCAL_MACHINE\Drivers\BuiltIn\PCI\Template\RTL8139]
+   "Dll"="NDIS.dll"
+   "Class"=dword:02
+   "SubClass"=dword:00
+   "ProgIF"=dword:0
+   "VendorID"=multi_sz:"1186","1113","10ec","10ec","13D1"
+   "DeviceID"=multi_sz:"1300","1211","8139","8138","AB06"
+;
+;  This is replaced by Prefix key to support CardBus adapter.
+;  Adapter will now be instantiated via NDS_INIT.
+;
+;  "Entry"="NdisPCIBusDeviceInit"
+;
+   "Prefix"="NDS"
+   "Transceiver"=dword:3
+   "DuplexMode"=dword:1
+   "EarlyTxThreshold"=dword:10000
+   ; Flags==2 is DEVFLAGS_LOADLIBRARY
+   "Flags"=dword:2
+
+;
+; Use shared ISR handler for the RTL8139
+;
+   "IsrDll"="giisr.dll"
+   "IsrHandler"="ISRHandler"
+   "PortIsIO"=dword:1
+   "PortOffset"=dword:3E
+   "PortSize"=dword:2
+   "PortMask"=dword:C07F
+   "UseMaskReg"=dword:1
+   "MaskOffset"=dword:3c
+
+ENDIF BSP_NIC_RTL8139
+ENDIF BSP_NOETHER !
+ENDIF BSP_NOPCIBUS !
+; @CESYSGEN ENDIF CE_MODULES_RTL8139
+
+; @CESYSGEN IF CE_MODULES_E100BEX
+IF BSP_NOPCIBUS !
+IF BSP_NOETHER !
+IF BSP_NIC_E100BEX
+
+[HKEY_LOCAL_MACHINE\Comm\e100bex]
+;LOC_FRIENDLYE100BEX
+   "DisplayName"="Intel 82559"
+   "Group"="NDIS"
+   "ImagePath"="E100BEX.dll"
+
+[HKEY_LOCAL_MACHINE\Drivers\BuiltIn\PCI\Template\E100BEX]
+   "Dll"="NDIS.dll"
+   "Class"=dword:02
+   "SubClass"=dword:00
+   "ProgIF"=dword:0
+   "VendorID"=multi_sz:"8086"
+   "DeviceID"=multi_sz:"1229"
+   "Prefix"="NDS"
+   ; Flags==2 is DEVFLAGS_LOADLIBRARY
+   "Flags"=dword:2
+
+;
+; Use standard GIISR for Interrupt Service Routine.
+;
+   "IsrDll"="giisr.dll"
+   "IsrHandler"="ISRHandler"
+
+   "PortIsIO"=dword:1
+   "PortOffset"=dword:0
+   "PortSize"=dword:2
+   "PortMask"=dword:F300
+
+ENDIF BSP_NIC_E100BEX
+ENDIF BSP_NOETHER !
+ENDIF BSP_NOPCIBUS !
+; @CESYSGEN ENDIF CE_MODULES_E100BEX
+
+; @CESYSGEN IF CE_MODULES_NE2000
+IF BSP_NOPCIBUS !
+IF BSP_NOETHER !
+IF BSP_NIC_NE2000_PCI
+; These are the registry settings for using the Kingston PCI NE2000 ethernet
+; adapter on a CEPC.
+
+;
+; NE2000 Miniport driver information
+;
+[HKEY_LOCAL_MACHINE\Comm\NE2000]
+;LOC_FRIENDLYNE2000COMPAT
+   "DisplayName"=mui_sz:"netmui.dll,#9001"
+   "Group"="NDIS"
+   "ImagePath"="ne2000.dll"
+
+;
+; Template the PCI bus driver uses to match a Kingston NE2000 card
+;
+[HKEY_LOCAL_MACHINE\Drivers\BuiltIn\PCI\Template\NE2000]
+   "Dll"="NDIS.dll"
+   "Class"=dword:02
+   "SubClass"=dword:00
+   "ProgIF"=dword:0
+   "VendorID"=multi_sz:"10ec","1050"
+   "DeviceID"=multi_sz:"8029","0940"
+;  "Entry"="NdisPCIBusDeviceInit"
+   "Prefix"="NDS"
+   ; Flags==2 is DEVFLAGS_LOADLIBRARY
+   "Flags"=dword:2
+   "Transceiver"=dword:3
+;
+; Installable shared ISR handler for the NE2000.
+; Uses the generic ISR handler, configured to read
+; IO port 7 (the ISR status register) and look at
+; bitmask 0x1B (RCV, XMIT, XMIT_ERR, OVERRUN)
+; to determine if the NE2000
+; is indicating an interrupt.
+;
+; NOTE: The interrupt mask register of the NE2000
+; is write-only.  Proper detection of whether an
+; NE2000 adapter is generating an interrupt would
+; require reading that mask. Since that is impossible,
+; this shared ISR handler can incorrectly report
+; that the device generated an interrupt when it did
+; not.  Thus, it is not recommended that NE2000 adapters
+; share interrupts with other devices.
+;
+
+;   "IsrDll"="giisr.dll"
+;   "IsrHandler"="ISRHandler"
+;   "PortIsIO"=dword:1
+;   "PortOffset"=dword:7
+;   "PortSize"=dword:1
+;   "PortMask"=dword:1B
+
+;;;
+;;;  NE2000 miniport driver now has its own ISR (ne2000isr.dll)
+;;;  The parameters needed for GIISR.DLL (common ISR handler) are not
+;;;  needed anymore.
+;;;  The ISR is loaded by NE2000.DLL miniport driver.
+;;;
+
+
+ENDIF BSP_NIC_NE2000_PCI
+ENDIF BSP_NOETHER !
+ENDIF BSP_NOPCIBUS !
+; @CESYSGEN ENDIF CE_MODULES_NE2000
+
+; @CESYSGEN IF CE_MODULES_IRCOMM
+; @CESYSGEN IF CE_MODULES_UNIMODEM
+; @CESYSGEN ENDIF
+; @CESYSGEN ENDIF
+
+; @CESYSGEN IF CE_MODULES_PSCR
+; @CESYSGEN ENDIF
+
+; @CESYSGEN IF CE_MODULES_BULLTLP3
+; @CESYSGEN ENDIF
+
+; @CESYSGEN IF CE_MODULES_CXPORT
+[HKEY_LOCAL_MACHINE\Comm\Devices\cxport]
+   "Dll"="cxport.dll"
+   "Index"=dword:0
+   "Prefix"="CTE"
+    ; Flags==2 is DEVFLAGS_LOADLIBRARY
+    "Flags"=dword:2
+; @CESYSGEN ENDIF
+
+; @CESYSGEN IF CE_MODULES_NDIS
+; Netlog can be added to any system that supports
+; NDIS.
+[HKEY_LOCAL_MACHINE\Comm\Devices\netlog]
+   "Dll"="netlog.dll"
+   "Index"=dword:0
+   "Prefix"="NLG"
+    ; Flags==2 is DEVFLAGS_LOADLIBRARY
+    "Flags"=dword:2
+
+; @CESYSGEN ENDIF
+
+; @CESYSGEN IF CE_MODULES_REDIR
+; Device driver to expose IOCTL interface
+[HKEY_LOCAL_MACHINE\Comm\Devices\Redir]
+    "Dll"="redir.dll"
+    "Prefix"="RDR"
+    "Index"=dword:0
+    ; Flags==2 is DEVFLAGS_LOADLIBRARY
+    "Flags"=dword:2
+; @CESYSGEN ENDIF CE_MODULES_REDIR
+
+; @CESYSGEN IF CE_MODULES_TCPSTK
+; Device driver to expose IOCTL interface
+[HKEY_LOCAL_MACHINE\Comm\Devices\TCPIP\IPDevice]
+    "Dll"="tcpstk.dll"
+    "Prefix"="IPD"
+    "Index"=dword:0
+    ; Flags==2 is DEVFLAGS_LOADLIBRARY
+    "Flags"=dword:2
+
+[HKEY_LOCAL_MACHINE\Comm\Devices\TCPIP\TCPDevice]
+    "Dll"="tcpstk.dll"
+    "Prefix"="TCP"
+    "Index"=dword:0
+    ; Flags==2 is DEVFLAGS_LOADLIBRARY
+    "Flags"=dword:2
+
+; Registry values for the TCP/IP stack
+[HKEY_LOCAL_MACHINE\Comm\Tcpip\Parms]
+   "IpEnableRouter"=dword:0
+   "TcpWindowSize"=dword:8000
+   "EnableDHCP"=dword:1
+; @CESYSGEN ENDIF CE_MODULES_TCPSTK
+
+; @CESYSGEN IF CE_MODULES_TCPIP6
+; Device driver to expose IOCTL interface
+[HKEY_LOCAL_MACHINE\Comm\Devices\TCPIP6\IPDevice]
+    "Dll"="tcpip6.dll"
+    "Prefix"="IP6"
+    "Index"=dword:0
+    ; Flags==2 is DEVFLAGS_LOADLIBRARY
+    "Flags"=dword:2
+; @CESYSGEN ENDIF CE_MODULES_TCPIP6
+
+
+; @CESYSGEN IF CE_MODULES_DHCPV6L
+; Device driver to expose IOCTL interface
+[HKEY_LOCAL_MACHINE\Comm\Devices\TCPIP6\DHCPV6L]
+    "Dll"="dhcpv6l.dll"
+    "Prefix"="DP6"
+    "Index"=dword:0
+    ; Flags==2 is DEVFLAGS_LOADLIBRARY
+    "Flags"=dword:2
+; @CESYSGEN ENDIF CE_MODULES_DHCPV6L
+
+; @CESYSGEN IF CE_MODULES_IPNAT
+; @CESYSGEN IF !CE_MODULES_FW6
+; @CESYSGEN ENDIF
+; @CESYSGEN IF CE_MODULES_FW6
+; @CESYSGEN ENDIF
+; @CESYSGEN ENDIF
+
+; @CESYSGEN IF CE_MODULES_FW6
+; @CESYSGEN IF CE_MODULES_IPNAT
+; @CESYSGEN ENDIF
+; @CESYSGEN IF CE_MODULES_IPV6HLP
+; @CESYSGEN ENDIF
+; @CESYSGEN IF CE_MODULES_TCPIP6
+; @CESYSGEN ENDIF
+; @CESYSGEN ENDIF
+
+
+; @CESYSGEN IF CE_MODULES_BTGW
+; @CESYSGEN ENDIF
+
+; @CESYSGEN IF CE_MODULES_MBRIDGE
+; @CESYSGEN ENDIF
+
+; @CESYSGEN IF CE_MODULES_PPP
+;
+; If the CE RAS server is to be used with authentication,
+; then this flag should be set.
+;
+; [HKEY_LOCAL_MACHINE\Comm\Security\UserAccounts]
+;    "Password":dword=1
+;
+; @CESYSGEN ENDIF
+
+
+; @CESYSGEN IF CE_MODULES_ASYNCMAC
+[HKEY_LOCAL_MACHINE\Comm\AsyncMac]
+;LOC_FRIENDLYASYNCMAC
+   "DisplayName"=mui_sz:"netmui.dll,#9008"
+   "Group"="NDIS"
+   "ImagePath"="AsyncMac.dll"
+
+[HKEY_LOCAL_MACHINE\Comm\AsyncMac\Linkage]
+   "Route"=multi_sz:"AsyncMac1"
+
+[HKEY_LOCAL_MACHINE\Comm\AsyncMac1]
+;LOC_FRIENDLYASYNCMAC
+   "DisplayName"=mui_sz:"netmui.dll,#9008"
+   "Group"="NDIS"
+
+[HKEY_LOCAL_MACHINE\Comm\AsyncMac1\Parms]
+   "BusNumber"=dword:0
+   "BusType"=dword:0
+   "DisablePowerManagement"=dword:1
+; @CESYSGEN ENDIF
+
+; @CESYSGEN IF CE_MODULES_PPTP
+[HKEY_LOCAL_MACHINE\Comm\PPTP]
+;LOC_FRIENDLYPPTP
+   "DisplayName"=mui_sz:"netmui.dll,#9009"
+   "Group"="NDIS"
+   "ImagePath"="pptp.dll"
+
+[HKEY_LOCAL_MACHINE\Comm\PPTP\Linkage]
+   "Route"=multi_sz:"PPTP1"
+
+[HKEY_LOCAL_MACHINE\Comm\PPTP1]
+;LOC_FRIENDLYPPTP
+   "DisplayName"=mui_sz:"netmui.dll,#9009"
+   "Group"="NDIS"
+
+[HKEY_LOCAL_MACHINE\Comm\PPTP1\Parms]
+   "BusNumber"=dword:0
+   "BusType"=dword:0
+   "DisablePowerManagement"=dword:1
+; @CESYSGEN ENDIF
+
+; @CESYSGEN IF CE_MODULES_L2TP
+; @CESYSGEN ENDIF
+
+
+; @CESYSGEN IF CE_MODULES_PPPOE
+; @CESYSGEN ENDIF
+
+
+; @CESYSGEN IF CE_MODULES_WAVEAPI
+IF BSP_NOAUDIO !
+[HKEY_LOCAL_MACHINE\Drivers\BuiltIn\WAPIMAN]
+   "Prefix"="WAM"
+   "Dll"="waveapi.dll"
+   "Index"=dword:1
+   "Order"=dword:1
+   ; Flags==2 is DEVFLAGS_LOADLIBRARY
+   "Flags"=dword:2
+
+; Internal WaveAPI PCM converter registers as an ACM driver ACM9:
+[HKEY_LOCAL_MACHINE\Drivers\BuiltIn\WAPIMAN_ACM]
+   "Prefix"="ACM"
+   "Dll"="waveapi.dll"
+   "Index"=dword:9
+   "Order"=dword:1
+   "Flags"=dword:2
+
+ENDIF
+; @CESYSGEN ENDIF
+
+
+; @CESYSGEN IF CE_MODULES_SCARD
+[HKEY_LOCAL_MACHINE\Drivers\BuiltIn\SmartCard]
+   "Prefix"="SCA"
+   "Dll"="scard.dll"
+   "Index"=dword:1
+   "Order"=dword:1
+; @CESYSGEN ENDIF
+
+; @CESYSGEN IF CE_MODULES_PRNPORT
+; Printer Port settings
+[HKEY_LOCAL_MACHINE\Printers\Ports]
+    "Port1"="COM1: 9600"
+    "Port2"="COM1: 57600"
+    "Port3"="IRDA"
+    "Port4"="NET0:"
+; @CESYSGEN ENDIF
+
+; @CESYSGEN IF CE_MODULES_PCL
+; @CESYSGEN ENDIF
+
+
+
+;  Add the SSPI provider list (all providers may not be present)
+; @CESYSGEN IF CE_MODULES_SECUR32
+[HKEY_LOCAL_MACHINE\Comm\SecurityProviders]
+    "Providers"="schannel.dll, ntlmssp.dll, kerberos.dll, spnego.dll, credssp.dll"
+; @CESYSGEN ENDIF CE_MODULES_SECUR32
+
+; @CESYSGEN IF CE_MODULES_SCHANNEL
+[HKEY_LOCAL_MACHINE\Comm\SecurityProviders\SCHANNEL]
+; session cache duration in milliseconds (5b8d80 == 100 mins). Default is 10 mins.
+    "ClientCacheTime"=dword:05b8d80
+; @CESYSGEN ENDIF CE_MODULES_SCHANNEL
+
+; @CESYSGEN IF CE_MODULES_RSAENH
+[HKEY_LOCAL_MACHINE\Comm\Security\Crypto\Defaults]
+
+[HKEY_LOCAL_MACHINE\Comm\Security\Crypto\Defaults\Provider]
+
+[HKEY_LOCAL_MACHINE\Comm\Security\Crypto\Defaults\Provider\Microsoft Base Cryptographic Provider v1.0]
+    "Image Path"="\\Windows\\rsaenh.dll"
+    "Type"=dword:00000001
+
+[HKEY_LOCAL_MACHINE\Comm\Security\Crypto\Defaults\Provider\Microsoft Enhanced Cryptographic Provider v1.0]
+    "Image Path"="\\Windows\\rsaenh.dll"
+    "Type"=dword:00000001
+
+[HKEY_LOCAL_MACHINE\Comm\Security\Crypto\Defaults\Provider\Microsoft Enhanced RSA and AES Cryptographic Provider]
+    "Image Path"="\\Windows\\rsaenh.dll"
+    "Type"=dword:00000018
+
+; set the Enhanced provider to be the default RSA provider
+[HKEY_LOCAL_MACHINE\Comm\Security\Crypto\Defaults\Provider Types\Type 001]
+        "Name"="Microsoft Enhanced Cryptographic Provider v1.0"
+; use the following to make the base provider the default
+;"Name"="Microsoft Base Cryptographic Provider v1.0"
+
+; set the Enhanced provider to be the default AES Provider
+;#define PROV_RSA_AES            24
+[HKEY_LOCAL_MACHINE\Comm\Security\Crypto\Defaults\Provider Types\Type 024]
+        "Name"="Microsoft Enhanced RSA and AES Cryptographic Provider"
+
+; @CESYSGEN ENDIF
+
+; @CESYSGEN IF CE_MODULES_DSSDH
+; @CESYSGEN ENDIF
+
+; @CESYSGEN IF CE_MODULES_SCWCSP
+; @CESYSGEN ENDIF
+
+; @CESYSGEN IF CE_MODULES_CRYPT32
+[HKEY_LOCAL_MACHINE\Comm\Security\SystemCertificates\Root]
+        "InitFile"="\\windows\\sysroots.p7b"
+; @CESYSGEN ENDIF
+
+; @CESYSGEN IF CE_MODULES_OLEAUT32
+; @CESYSGEN ENDIF
+
+; @CESYSGEN IF CE_MODULES_MIDIAPI
+; @CESYSGEN ENDIF
+
+; @CESYSGEN IF CE_MODULES_TAPI || CE_MODULES_NETUI
+; Communications dialing default locations
+[HKEY_CURRENT_USER\ControlPanel\Dial]
+; What is Location ID (value name) for the current location
+"CurrentLoc"=dword:0
+
+; @CESYSGEN IF CE_MODULES_AUTODIAL
+; @CESYSGEN ENDIF
+
+; What is the next permanent location ID to be used when creating a new entry
+"HighLocID"=dword:2
+
+;Default Location settings -- need to be localized
+[HKEY_CURRENT_USER\ControlPanel\Dial\Locations]
+; Each MultiSz location (value name = PermLocationID" has :
+;   LocationName, LocalFmt, LdFmt, IntntlFmt, AreaCode, CwCode, CountryCode, & Options
+"0"=multi_sz: LOC_WORKLOCATIONNAME,
+              LOC_WORKLOCALFMT,
+              LOC_WORKLDFMT,
+              LOC_WORKINTNTLFMT,
+              LOC_WORKAREACODE,
+              LOC_WORKCWCODE,
+              LOC_WORKCOUNTRYCODE,
+              LOC_WORKOPTIONS
+"1"=multi_sz: LOC_HOMELOCATIONNAME,
+              LOC_HOMELOCALFMT,
+              LOC_HOMELDFMT,
+              LOC_HOMEINTNTLFMT,
+              LOC_HOMEAREACODE,
+              LOC_HOMECWCODE,
+              LOC_HOMECOUNTRYCODE,
+              LOC_HOMEOPTIONS
+; end TAPI/comm CPL location settings
+; @CESYSGEN ENDIF
+
+
+; @CESYSGEN IF !CE_MODULES_CONSOLE
+; @CESYSGEN ENDIF
+
+; @CESYSGEN IF CE_MODULES_CONSOLE
+; Set Default Font Name/Size for Console
+[HKEY_LOCAL_MACHINE\Drivers\Console]
+   "Font"=LOC_CONSOLEFONTNAME
+   "Size"=dword:LOC_CONSOLEFONTSIZE
+   "PaintRow"=dword:LOC_CONSOLEPAINTFIX
+    "Dll"="console.dll"
+    "Prefix"="CON"
+    "Flags"=dword:10
+    "UserProcGroup"=dword:3
+; @CESYSGEN ENDIF
+
+; @CESYSGEN IF CE_MODULES_CMD && SHELL_MODULES_EXPLORER
+[HKEY_CLASSES_ROOT\.bat]
+    @="cmdfile"
+
+[HKEY_CLASSES_ROOT\.cmd]
+    @="cmdfile"
+
+[HKEY_CLASSES_ROOT\cmdfile]
+    @="Batch File"
+
+[HKEY_CLASSES_ROOT\cmdfile\DefaultIcon]
+    @="\\Windows\\cmd.exe,0"
+
+[HKEY_CLASSES_ROOT\cmdfile\Shell\Open\Command]
+    @="\\Windows\\cmd.exe /c \"%1\""
+
+; @CESYSGEN ENDIF
+
+; @CESYSGEN IF COREDLL_SHORTCUT || WCESHELL_MODULES_WEBVIEW
+[HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\International]
+        "LCID"=dword:LOC_LCID
+        "ACP"=dword:LOC_ACP
+; @CESYSGEN ENDIF
+
+; @CESYSGEN IF COREDLL_COREIMM
+;
+; @CESYSGEN IF CE_MODULES_IMEJPP || CE_MODULES_IMJP31K || CE_MODULES_TESTIME
+; @CESYSGEN ENDIF CE_MODULES_IMEJPP || CE_MODULES_IMJP31K || CE_MODULES_TESTIME
+
+; @CESYSGEN IF CE_MODULES_IMEJPP
+; @CESYSGEN IF WCESHELLFE_MODULES_INTLL
+; @CESYSGEN ENDIF
+; @CESYSGEN IF WCESHELLFE_MODULES_INTLP
+; @CESYSGEN ENDIF
+; @CESYSGEN IF CE_MODULES_IMEJPP_DIC_S && CE_MODULES_IMEJPP_DIC_N
+; @CESYSGEN ENDIF
+; @CESYSGEN IF CE_MODULES_IMEJPP_DIC_S && !CE_MODULES_IMEJPP_DIC_N
+; @CESYSGEN ENDIF
+; @CESYSGEN IF !CE_MODULES_IMEJPP_DIC_S && CE_MODULES_IMEJPP_DIC_N
+; @CESYSGEN ENDIF
+; @CESYSGEN ENDIF
+
+; @CESYSGEN IF CE_MODULES_IMJP31K
+; @CESYSGEN IF WCESHELLFE_MODULES_INTLL
+; @CESYSGEN ENDIF
+; @CESYSGEN IF WCESHELLFE_MODULES_INTLP
+; @CESYSGEN ENDIF
+; @CESYSGEN ENDIF
+
+; @CESYSGEN IF CE_MODULES_IMJP31M
+; @CESYSGEN ENDIF
+; @CESYSGEN IF CE_MODULES_IMJP31U
+; @CESYSGEN ENDIF
+; @CESYSGEN IF CE_MODULES_IMJP31U_Q
+; @CESYSGEN ENDIF
+; @CESYSGEN IF CE_MODULES_IMJP31DX
+; @CESYSGEN ENDIF
+; @CESYSGEN IF CE_MODULES_IMJP31DX_Q
+; @CESYSGEN ENDIF
+; @CESYSGEN IF CE_MODULES_IMJP31C
+; @CESYSGEN ENDIF
+
+; TESTIME
+; @CESYSGEN IF CE_MODULES_TESTIME
+; @CESYSGEN ENDIF
+
+
+; @CESYSGEN IF CE_MODULES_GB18030
+; @CESYSGEN ENDIF
+
+
+
+;
+; @CESYSGEN ENDIF
+
+; @CESYSGEN IF CE_MODULES_SOFTKB
+; SIP
+[HKEY_LOCAL_MACHINE\Drivers\BuiltIn\SIP]
+"Prefix"="SIP"
+"Dll"="softkb.DLL"
+"Order"=dword:1
+"Index"=dword:0
+;Flags==10 is DEVFLAGS_LOAD_AS_USERPROC
+"Flags"=dword:10
+"UserProcGroup"=dword:3 ; // default to group 3
+
+
+[HKEY_CURRENT_USER\ControlPanel\Sip]
+"AllowChange"=dword:1
+"DragStyle"=dword:1
+; @CESYSGEN IF CE_MODULES_MULTIBOX
+; @CESYSGEN ENDIF CE_MODULES_MULTIBOX
+
+; @CESYSGEN IF CE_MODULES_MSSTRKLIST
+; @CESYSGEN ENDIF CE_MODULES_MSSTRKLIST
+
+; @CESYSGEN IF CE_MODULES_MSRADLIST
+; @CESYSGEN ENDIF CE_MODULES_MSRADLIST
+
+; @CESYSGEN IF CE_MODULES_MSKANA
+; @CESYSGEN ENDIF CE_MODULES_MSKANA
+
+; @CESYSGEN IF CE_MODULES_MSROMA
+; @CESYSGEN ENDIF CE_MODULES_MSROMA
+
+; @CESYSGEN IF CE_MODULES_LARGEKB
+; @CESYSGEN ENDIF CE_MODULES_LARGEKB
+
+
+; @CESYSGEN IF CE_MODULES_REMOTEKBD
+[HKEY_CURRENT_USER\ControlPanel\Sip]
+"DefaultIm"="{A523DFC7-1A7E-4af6-991A-510E75847828}"
+; @CESYSGEN ENDIF CE_MODULES_REMOTEKBD
+
+; @CESYSGEN IF CE_MODULES_REMOTEKBD
+[HKEY_CLASSES_ROOT\CLSID\{A523DFC7-1A7E-4af6-991A-510E75847828}]
+@="RemoteKbd"
+"KBMode"=dword:0
+[HKEY_CLASSES_ROOT\CLSID\{A523DFC7-1A7E-4af6-991A-510E75847828}\InprocServer32]
+@="RemoteKbd.dll"
+[HKEY_CLASSES_ROOT\CLSID\{A523DFC7-1A7E-4af6-991A-510E75847828}\IsSIPInputMethod]
+@="1"
+[HKEY_CLASSES_ROOT\CLSID\{A523DFC7-1A7E-4af6-991A-510E75847828}\DefaultIcon]
+@="RemoteKbd.dll,0"
+; @CESYSGEN ENDIF CE_MODULES_REMOTEKBD
+
+
+; @CESYSGEN IF CE_MODULES_MSIM
+; @CESYSGEN ENDIF CE_MODULES_MSIM
+
+; @CESYSGEN ENDIF
+
+; @CESYSGEN IF CE_MODULES_SOFTKB
+; @CESYSGEN IF CE_MODULES_MSIM
+; @CESYSGEN ENDIF CE_MODULES_MSIM
+
+
+; @CESYSGEN IF CE_MODULES_LARGEKB
+; @CESYSGEN ENDIF CE_MODULES_LARGEKB
+
+
+IF LOCALE=0411
+; @CESYSGEN IF CE_MODULES_CACJPN
+; @CESYSGEN ENDIF CE_MODULES_CACJPN
+ENDIF   LOCALE=0411
+
+; @CESYSGEN IF CE_MODULES_MULTIBOX
+; @CESYSGEN ENDIF CE_MODULES_MULTIBOX
+
+IF LOCALE=0411
+; @CESYSGEN IF CE_MODULES_MSKANA
+; @CESYSGEN ENDIF CE_MODULES_MSKANA
+
+; @CESYSGEN IF CE_MODULES_MSROMA
+; @CESYSGEN ENDIF CE_MODULES_MSROMA
+
+; @CESYSGEN IF CE_MODULES_MSALLCHAR
+; @CESYSGEN ENDIF CE_MODULES_MSALLCHAR
+
+; @CESYSGEN IF CE_MODULES_MSRADLIST
+; @CESYSGEN ENDIF CE_MODULES_MSRADLIST
+
+; @CESYSGEN IF CE_MODULES_MSSTRKLIST
+; @CESYSGEN ENDIF CE_MODULES_MSSTRKLIST
+ENDIF   LOCALE=0411
+
+; @CESYSGEN IF CE_MODULES_MBOXKOR
+; @CESYSGEN ENDIF CE_MODULES_MBOXKOR
+
+; @CESYSGEN IF CE_MODULES_MBOXCHT
+; @CESYSGEN ENDIF CE_MODULES_MBOXCHT
+
+;       CHT     Input Methods (IM's)
+; @CESYSGEN IF CE_MODULES_PHONIM
+; @CESYSGEN ENDIF CE_MODULES_PHONIM
+
+; @CESYSGEN IF CE_MODULES_CHAJEIIM
+; @CESYSGEN ENDIF CE_MODULES_CHAJEIIM
+
+; @CESYSGEN ENDIF CE_MODULES_SOFTKB
+
+
+;       Bluetooth
+;
+; @CESYSGEN IF CE_MODULES_IPNAT
+; @CESYSGEN IF CE_MODULES_BTGW
+; @CESYSGEN ENDIF
+; @CESYSGEN ENDIF
+
+; @CESYSGEN IF CE_MODULES_BTSVC
+; @CESYSGEN ENDIF
+
+; @CESYSGEN IF CE_MODULES_BTHHID
+; @CESYSGEN ENDIF
+
+; @CESYSGEN IF CE_MODULES_BTMODEM
+; @CESYSGEN ENDIF
+
+; @CESYSGEN IF CE_MODULES_BTAGSVC
+; @CESYSGEN ENDIF CE_MODULES_BTAGSVC
+
+; @CESYSGEN IF CE_MODULES_BTSCOSND
+; @CESYSGEN IF CE_MODULES_BTAGSVC
+; @CESYSGEN ENDIF CE_MODULES_BTAGSVC
+; @CESYSGEN ENDIF CE_MODULES_BTSCOSND
+
+; @CESYSGEN IF CE_MODULES_BTA2DP
+; @CESYSGEN ENDIF CE_MODULES_BTA2DP
+
+; @CESYSGEN IF CE_MODULES_BTD
+; @CESYSGEN IF CE_MODULES_BTSVC || CE_MODULES_NETUI
+; @CESYSGEN ENDIF
+; @CESYSGEN IF CE_MODULES_BTGW
+; @CESYSGEN ENDIF
+; @CESYSGEN ENDIF
+
+;
+;       Flags (ORed):
+;               1 - do not perform reset
+;               2 - local name is not supported
+;               4 - role switch on connection requests is not supported
+;
+
+; @CESYSGEN IF BTD_USB
+; @CESYSGEN IF CE_MODULES_BTSCOSND
+; @CESYSGEN ENDIF CE_MODULES_BTSCOSND
+; @CESYSGEN ENDIF
+
+; @CESYSGEN IF BTD_CSR
+; @CESYSGEN ENDIF
+
+; @CESYSGEN IF BTD_UART
+; @CESYSGEN ENDIF
+
+; @CESYSGEN IF CE_MODULES_BTHUNIV
+; @CESYSGEN ENDIF
+
+
+;--------- Bluetooth Transport keys--------------------------------------------------
+; These are the keys for bluetooth universal transport manager.
+; BthUniv first looks for PnP devices (e.g. PCMCIA, USB, SDIO, etc). If none are present, it checks
+; for builtin devices in the order listed.  Each PnP device must specify an IClass GUID or manually
+; call AdvertiseInterface to notify the universal transport manager of which transport registry
+; settings to use.  These settings are copied over to [HKEY_LOCAL_MACHINE\Software\Microsoft\Bluetooth\HCI]
+; before opening a connection to the device.
+;
+
+;
+; Built-in Transports
+;
+
+; @CESYSGEN IF CE_MODULES_BTHUART
+; @CESYSGEN ENDIF
+
+
+;
+; PnP Transports
+;
+
+;;;;;;;;;;;;;;;SocketCom card;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+; @CESYSGEN IF CE_MODULES_WENDYSER
+; @CESYSGEN ENDIF
+
+; @CESYSGEN IF CE_MODULES_BTHSC
+; @CESYSGEN ENDIF
+
+;;;;;;;;;;;;;;;CSR-based cards;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+; @CESYSGEN IF CE_MODULES_SIO950
+; @CESYSGEN ENDIF
+
+; @CESYSGEN IF CE_MODULES_BTHCSR
+; @CESYSGEN ENDIF
+
+; @CESYSGEN IF CE_MODULES_BTHCSR
+; @CESYSGEN ENDIF
+
+;;;;;;;;;;;;;;;UART-based cards;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+; @CESYSGEN IF CE_MODULES_BTHUART
+; @CESYSGEN ENDIF
+
+; @CESYSGEN IF CE_MODULES_WCESTREAMBT
+; @CESYSGEN ENDIF
+
+; @CESYSGEN IF CE_MODULES_BTHUART
+; @CESYSGEN ENDIF
+
+;;;;;;;;;;;;;;;Ambicom variation of UART;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; @CESYSGEN IF CE_MODULES_BTHAMB
+; @CESYSGEN ENDIF
+
+;;;;;;;;;;;;;;;USB-based cards;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+; @CESYSGEN IF CE_MODULES_BTHUSB
+; @CESYSGEN IF CE_MODULES_BTSCOSND
+; @CESYSGEN ENDIF CE_MODULES_BTSCOSND
+; @CESYSGEN ENDIF
+
+;;;;;;;;;;;;;;;SDIO-based cards;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+; @CESYSGEN IF CE_MODULES_BTHSDIO
+; @CESYSGEN ENDIF
+
+;--------- END Bluetooth Transport keys--------------------------------------------------
+
+
+;
+;-------------------------------- Bluetooth ISDP_XXX interface COM object -----------------------
+;
+
+; @CESYSGEN IF BTDRT_SDPUSER
+; @CESYSGEN ENDIF
+
+
+; @CESYSGEN IF BTD_BTPAN
+; @CESYSGEN IF CE_MODULES_BTSVC || CE_MODULES_NETUI
+; @CESYSGEN ENDIF
+; @CESYSGEN ENDIF
+
+;
+;----------------------------------------------------------------------------------
+;
+
+; @CESYSGEN IF CE_MODULES_DISPLAY
+; @CESYSGEN IF CE_MODULES_MULTIMON
+
+; Set this value to the total number of monitors expected on your
+; system.  Rather than changing the value in common.reg (where it
+; affects all configurations you will build), consider setting
+; it in your platform.reg or project.reg files.  Values in those
+; files override the ones in common.reg.
+[HKEY_LOCAL_MACHINE\System\GDI\Monitors]
+        "Total Monitors"=dword:1
+
+; @CESYSGEN ENDIF CE_MODULES_MULTIMON
+; @CESYSGEN ENDIF CE_MODULES_DISPLAY
+
+; @CESYSGEN IF CE_MODULES_DISPLAY
+
+;
+; Display drivers --
+; GWES determines which display driver to load by doing the following:
+;    1. Looking at the list of "candidate" displays in
+;       HKLM\System\GDI\DisplayCandidates to see if any are instantiated
+;       on the local system.  If so, it takes the first one it finds (ie,
+;       the one with the lowest number).  This list is usually set up in
+;       platform.reg.
+;    2. Looking at HKLM\System\GDI\Drivers.  This value explicitly names
+;       the display driver.
+;    3. Attempting to load ddi.dll (the default display driver name).
+; Thus, GWES allows OEMs to create OS images that determine the display
+; adapter at runtime (based, for example, on PCI instance data) and load
+; the appropriate driver.  If it is possible that no display adapter will
+; be present, ddi_nop can be used.
+;
+; For example, assume that a device could have a RAGEXL display in a
+; PCI slot.  However, the system could also run in a "headless"
+; configuration with no display adapter.  The OEM could create an image
+; to support this by setting BSP_DISPLAY_RAGEXL=1 and
+; BSP_DISPLAY_NOP=1.  They would also need to create PCI templates and a
+; GDI candidate list in their platform.reg file.  If the PCI bus driver
+; detects a display adapter card it will create a PCI instance key that
+; GDI will use to load the driver.  If no adapter cards are found, the
+; ddi_nop driver will be loaded because it appears after the others in the
+; list below.
+;
+
+IF BSP_NODISPLAY !
+
+IF BSP_DISPLAY_SMI3DR
+[HKEY_LOCAL_MACHINE\System\GDI\Drivers]
+    "Display"="ddi_3dr.dll"
+ENDIF
+
+IF BSP_DISPLAY_RAGEXL
+[HKEY_LOCAL_MACHINE\System\GDI\Drivers]
+    "Display"="ddi_ragexl.dll"
+ENDIF
+
+IF BSP_DISPLAY_FLAT
+[HKEY_LOCAL_MACHINE\System\GDI\Drivers]
+    "Display"="ddi_flat.dll"
+ENDIF
+
+IF BSP_DISPLAY_CER
+[HKEY_LOCAL_MACHINE\System\GDI\Drivers]
+    "Display"="ddi_cer.dll"
+ENDIF
+
+IF BSP_DISPLAY_NOP
+[HKEY_LOCAL_MACHINE\System\GDI\Drivers]
+    "Display"="ddi_nop.dll"
+ENDIF
+
+ENDIF BSP_NODISPLAY !
+
+; @CESYSGEN ENDIF CE_MODULES_DISPLAY
+
+; @CESYSGEN IF CE_MODULES_DISPLAY
+
+IF BSP_DISPLAY_OFFONROTATION
+[HKEY_LOCAL_MACHINE\System\GDI\ClearTypeSettings]
+    "OffOnRotation"=dword:1
+ENDIF
+
+; @CESYSGEN ENDIF CE_MODULES_DISPLAY
+
+; @CESYSGEN IF CE_MODULES_STANSDK
+; @CESYSGEN ENDIF CE_MODULES_STANSDK
+
+; The path lookups for SHGetSpecialFolderPath
+; @CESYSGEN IF COREDLL_FILEINFO
+[HKEY_LOCAL_MACHINE\SYSTEM\Explorer\Shell Folders]
+        "Application Data"=LOC_PATH_APPDATA
+        "Desktop"=LOC_PATH_DESKTOP
+        "Favorites"=LOC_PATH_FAVORITES
+        "Fonts"=LOC_PATH_FONTS
+        "My Documents"=LOC_PATH_MYDOCUMENTS
+        "Program Files"=LOC_PATH_PROGRAMFILES
+        "Programs"=LOC_PATH_PROGRAMS
+        "Recent"=LOC_PATH_RECENT
+        "StartUp"=LOC_PATH_STARTUP
+        "Windows"=LOC_PATH_WINDOWS
+; @CESYSGEN ENDIF
+
+; @CESYSGEN IF CE_MODULES_EVENTLOG
+; @CESYSGEN ENDIF
+
+
+; @CESYSGEN IF CE_MODULES_WLDAP32
+[HKEY_LOCAL_MACHINE\System\CurrentControlSet\Services\LDAP]
+"LdapClientIntegrity"=dword:0
+; @CESYSGEN ENDIF
+
+; @CESYSGEN IF CE_MODULES_NOTIFY
+[HKEY_LOCAL_MACHINE\SYSTEM\Events]
+    "system/events/notify/APIReady"="Notifications API set ready"
+
+[HKEY_LOCAL_MACHINE\notify]
+   "Dll"="NOTIFY.Dll"
+   "Order"=dword:0
+   "Keep"=dword:1
+   "Prefix"="NFY"
+   "Index"=dword:0
+   ; DEVFLAGS_LOAD_AS_USERPROC | DEVFLAGS_LOADLIBRARY
+   "Flags"=dword:12
+   "UserProcGroup"=dword:3 ; // default to group 3
+   ; this is the IOCTL_SERVICE_STARTED ioctl used as post-init ioctl
+   "Ioctl"=dword:1040038
+
+; @CESYSGEN ENDIF
+
+;
+; IPSECSVC
+;
+; @CESYSGEN IF CE_MODULES_IPSECSVC
+; @CESYSGEN ENDIF
+
+;
+; Credential Manager
+;
+
+; @CESYSGEN IF CE_MODULES_CREDMAN
+
+[HKEY_LOCAL_MACHINE\Drivers\Builtin\credsvc]
+   "Dll"="credsvc.dll"
+   "Order"=dword:8
+   "Keep"=dword:1
+   "FriendlyName"="CredentialManager"
+   "Index"=dword:0
+   "Prefix"="CRD"
+   "Flags"=dword:10
+
+[HKEY_LOCAL_MACHINE\comm\security\CredMan]
+
+[HKEY_LOCAL_MACHINE\comm\security\CredMan\Creds]
+        "FreeSlot"=dword:1
+        "NumCreds"=dword:0
+
+[HKEY_LOCAL_MACHINE\comm\security\CredMan\Types]
+
+[HKEY_LOCAL_MACHINE\comm\security\CredMan\Types\Primitive]
+
+[HKEY_LOCAL_MACHINE\comm\security\CredMan\Types\Virtual]
+
+;
+; Credential Manager Default Type Provider
+;
+
+[HKEY_LOCAL_MACHINE\comm\security\CredMan\Types\Primitive\65542]
+        "dll"="credprov.dll"
+        "flags"=dword:e
+
+[HKEY_LOCAL_MACHINE\comm\security\CredMan\Types\Primitive\65544]
+        "dll"="credprov.dll"
+        "flags"=dword:e
+
+[HKEY_LOCAL_MACHINE\comm\security\CredMan\Types\Primitive\65546]
+        "dll"="credprov.dll"
+        "flags"=dword:e
+
+; @CESYSGEN IF CE_MODULES_NTLMSSP
+
+[HKEY_LOCAL_MACHINE\comm\security\CredMan\Types\Primitive\65538]
+        "dll"="ntlmssp.dll"
+        "flags"=dword:1
+
+; @CESYSGEN IF CE_MODULES_KERBEROS
+[HKEY_LOCAL_MACHINE\comm\security\CredMan\Types\Virtual\65537]
+        "ids"="65538,65540"
+; @CESYSGEN ELSE
+; @CESYSGEN ENDIF
+
+; @CESYSGEN ENDIF
+
+; @CESYSGEN IF CE_MODULES_KERBEROS
+
+[HKEY_LOCAL_MACHINE\comm\security\CredMan\Types\Primitive\65540]
+        "dll"="kerberos.dll"
+        "flags"=dword:1
+
+; @CESYSGEN IF CE_MODULES_NTLMSSP
+[HKEY_LOCAL_MACHINE\comm\security\CredMan\Types\Virtual\65537]
+        "ids"="65538,65540"
+; @CESYSGEN ELSE
+; @CESYSGEN ENDIF
+
+; @CESYSGEN ENDIF
+
+;
+; Credential Manager LASS AE stuff
+; AE_CREDMAN
+;
+
+[HKEY_LOCAL_MACHINE\Comm\Security\LASSD\AE\{125399AC-EF80-4934-9274-186797C0DFAD}]
+"FriendlyName"="Credential Manager"
+"DisplayText"="Credential Manager"
+"AEFrequencyType"=dword:2
+"AEFrequencyValue"=dword:3
+
+; @CESYSGEN ENDIF
+
+; @CESYSGEN IF CE_MODULES_LASSD
+; @CESYSGEN ENDIF
+
+
+
+; @XIPREGION IF COMMON_REGISTRY_TOGGLE
+;Enabling ALT+SHIFT keyboard layout toggle short cut key
+;   "Hotkey"="1" => ALT+SHIFT
+;   "Hotkey"="2" => CTRL+SHIFT
+;   "Hotkey"="3" => None
+; The toggle key is disabled even if the key is not defined.
+[HKEY_CURRENT_USER\keyboard layout\toggle]
+    "Hotkey"="1"
+; @XIPREGION ENDIF COMMON_REGISTRY_TOGGLE
+
+
+; @CESYSGEN IF CE_MODULES_KEYBD
+; @XIPREGION IF COMMON_REGISTRY_KEYBOARD_LAYOUT
+
+;Setting the unnamed value of the key HKEY_CURRENT_USER\Keyboard Layout\Preload
+;to the default HKL value according to the locale of the current config.
+[HKEY_CURRENT_USER\Keyboard Layout\Preload]
+   @=LOC_HKL_DEFAULT
+
+[HKEY_CURRENT_USER\Keyboard Layout\Preload\1]
+    @=LOC_HKL_DEFAULT
+
+; @XIPREGION ENDIF COMMON_REGISTRY_KEYBOARD_LAYOUT
+; @CESYSGEN ENDIF CE_MODULES_KEYBD
+
+
+; Overwriting the above Preload & Preload\1 keys with the appropriate
+; values based on which IMEs are brought into the image. If there are
+; multiple IMEs bieng brought in, these keys will be overwriting each
+; others & for that reason, when building images with multiple IMEs
+; all the prealod entries have to be listed in platform.reg.
+
+; @CESYSGEN IF WCESHELLFE_MODULES_MSHIME97
+; @CESYSGEN ENDIF WCESHELLFE_MODULES_MSHIME97
+
+
+; @CESYSGEN IF WCESHELLFE_MODULES_MSIMESP || WCESHELLFE_MODULES_CHSIME98 || WCESHELLFE_MODULES_CHSIME03
+; @CESYSGEN IF WCESHELLFE_MODULES_MSIMESP
+; @CESYSGEN ENDIF WCESHELLFE_MODULES_MSIMESP
+; @CESYSGEN ENDIF WCESHELLFE_MODULES_MSIMESP || WCESHELLFE_MODULES_CHSIME98 || WCESHELLFE_MODULES_CHSIME03
+
+
+; @CESYSGEN IF WCESHELLFE_MODULES_MSIMEPH
+; @CESYSGEN ENDIF WCESHELLFE_MODULES_MSIMEPH
+
+
+; @CESYSGEN IF CE_MODULES_IMEJPP || CE_MODULES_IMJP31K || CE_MODULES_TESTIME
+; @CESYSGEN ENDIF CE_MODULES_IMEJPP || CE_MODULES_IMJP31K || CE_MODULES_TESTIME
+
+; Keyboard layouts
+
+; @CESYSGEN IF CE_MODULES_KBDA1
+; @CESYSGEN ENDIF CE_MODULES_KBDA1
+
+; @CESYSGEN IF CE_MODULES_KBDHEB
+; @CESYSGEN ENDIF CE_MODULES_KBDHEB
+
+; @CESYSGEN IF CE_MODULES_KBDTH0
+; @CESYSGEN ENDIF CE_MODULES_KBDTH0
+
+; @CESYSGEN IF CE_MODULES_KBDINHIN
+; @CESYSGEN ENDIF CE_MODULES_KBDINHIN
+
+; @CESYSGEN IF CE_MODULES_KBDINMAR
+; @CESYSGEN ENDIF CE_MODULES_KBDINMAR
+
+; @CESYSGEN IF CE_MODULES_KBDINPUN
+; @CESYSGEN ENDIF CE_MODULES_KBDINPUN
+
+; @CESYSGEN IF CE_MODULES_KBDINTEL
+; @CESYSGEN ENDIF CE_MODULES_KBDINTEL
+
+; @CESYSGEN IF CE_MODULES_KBDINGUJ
+; @CESYSGEN ENDIF CE_MODULES_KBDINGUJ
+
+; @CESYSGEN IF CE_MODULES_KBDINKAN
+; @CESYSGEN ENDIF CE_MODULES_KBDINKAN
+
+; @CESYSGEN IF CE_MODULES_KBDINTAM
+; @CESYSGEN ENDIF CE_MODULES_KBDINTAM
+
+; @CESYSGEN IF CE_MODULES_KBDDV
+; @CESYSGEN ENDIF CE_MODULES_KBDDV
+
+; @CESYSGEN IF CE_MODULES_KBDUS
+; @CESYSGEN ENDIF CE_MODULES_KBDUS
+
+#if defined BSP_KEYBD_JPN1
+; @CESYSGEN IF CE_MODULES_KBDJPN1
+; @CESYSGEN ENDIF CE_MODULES_KBDJPN1
+#else
+; @CESYSGEN IF CE_MODULES_KBDJPN
+; @CESYSGEN ENDIF CE_MODULES_KBDJPN
+#endif
+
+; @CESYSGEN IF CE_MODULES_KBDKOR
+; @CESYSGEN ENDIF CE_MODULES_KBDKOR
+
+
+; @CESYSGEN IF CE_MODULES_NULLCAM
+; @CESYSGEN ENDIF CE_MODULES_NULLCAM
+
+; @CESYSGEN IF CE_MODULES_SAMPLECAM
+; @CESYSGEN ENDIF CE_MODULES_SAMPLECAM
+
+
+; @CESYSGEN IF CE_MODULES_VEIM
+[HKEY_LOCAL_MACHINE\Comm\VEM]
+   "DisplayName"="Virtual Ethernet Intermediate Miniport"
+   "Group"="NDIS"
+   "ImagePath"="veim.dll"
+   "NoDeviceCreate"=dword:1
+; @CESYSGEN ENDIF CE_MODULES_VEIM
+
+; @CESYSGEN IF CE_MODULES_NTLMSSP_SVC
+;
+; NTLMSSP device driver
+;
+[HKEY_LOCAL_MACHINE\Drivers\BuiltIn\NTLMSSP_SVC]
+; Flags==12 is DEVFLAGS_LOADLIBRARY and DEVFLAGS_LOAD_AS_USERPROC
+   "Flags"=dword:12
+   "Order"=dword:1
+   "Dll"="ntlmssp_svc.dll"
+   "Keep"=dword:1
+   "FriendlyName"="NTLMSSP_SVC"
+   "Index"=dword:0
+   "Prefix"="SSP"
+; @CESYSGEN ENDIF CE_MODULES_NTLMSSP_SVC
+
+;  GPS Intermediate Driver (Abstracts GPS hardware)
+;
+; @CESYSGEN IF CE_MODULES_GPSID
+; @CESYSGEN ENDIF
+
+; @CESYSGEN IF CE_MODULES_UIPROXY
+[HKEY_LOCAL_MACHINE\uiproxy]
+    "Dll"="uiproxy.dll"
+    "Prefix"="UIP"
+    "Index"=dword:1
+    "Order"=dword:0
+    "Flags"=dword:10
+; @CESYSGEN ENDIF
+
+; default cert store
+; @CESYSGEN IF CE_MODULES_CERTMOD
+; @CESYSGEN ENDIF
+
+; @CESYSGEN IF CE_MODULES_EAPSIM
+; @CESYSGEN ENDIF
+
+
+;
+; disable copy-on-write keys for VS debugger
+;
+; @CESYSGEN IF NK_NKMSGQ
+[HKEY_LOCAL_MACHINE\Software\Microsoft\VSD\Debugger]
+    "CopyWriteOn"=dword:0
+    "CopyWriteROM"=dword:0
+    "CopyWriteExe"=dword:0
+    "CopyWriteDll"=dword:0
+; @CESYSGEN ENDIF
+
+; @CESYSGEN IF CE_MODULES_REGEXTDEV
+; @CESYSGEN ENDIF CE_MODULES_REGEXTDEV
+

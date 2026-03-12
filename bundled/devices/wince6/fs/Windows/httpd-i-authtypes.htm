@@ -1,0 +1,38 @@
+<!--
+Copyright (c) Microsoft Corporation.  All rights reserved.
+-->
+<!--
+Use of this sample source code is subject to the terms of the Microsoft
+license agreement under which you licensed this sample source code. If
+you did not accept the terms of the license agreement, you are not
+authorized to use this sample source code. For the terms of the license,
+please see the license agreement between you and Microsoft or, if applicable,
+see the LICENSE.RTF on your install media or the root of your tools installation.
+THE SAMPLE SOURCE CODE IS PROVIDED "AS IS", WITH NO WARRANTIES.
+-->
+<H2><FONT COLOR="#FF0000" SIZE=5>What types of authentication protocols are supported?</font></H2>
+Authentication protocols are used to verify the identity of users logging 
+onto a computer system. The Windows CE Web server currently supports two 
+authentication protocols: Basic and Network LAN Manager (NTLM). These 
+protocols are used for authenticating your user name and password with the 
+Web server before a request to access information is granted. 
+
+<P><B>Note:</B> If you disable both NTLM and Basic on a Web site or 
+virtual directory, then the Web server will be unable to authenticate any clients.
+
+<UL>
+<LI><B>Basic</B> -- A standard authentication mechanism supported by a wide variety 
+       of Web browsers. User names and passwords are sent in plain text (no encryption). 
+       <B>Caution:</B> This creates a security risk because if a hacker could eavesdrop on your connection
+       he could easily obtain your user name and password.  Enable Basic authentication with extreme caution.
+
+<LI><B>NTLM</B> -- A more secure authentication protocol than Basic, NTLM does not send user names
+       and passwords in clear text.  NTLM supported by Microsoft Internet Explorer running 
+       on Windows platforms, but may not be supported by other browsers or on other platforms.
+</UL>
+
+<P>The Web server can be configured to allow Basic only, NTLM only, or both Basic and NTLM authentication.
+Authentication settings can be configured for each <A HREF="httpd-i-website.htm">Web site</A> 
+or for each <A HREF="httpd-i-vdirs.htm">virtual directory</A> individually.  If both Basic and NTLM 
+are enabled at the same time, the Web client chooses whether it uses Basic or NTLM.
+

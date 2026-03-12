@@ -1,0 +1,50 @@
+<!--
+Copyright (c) Microsoft Corporation.  All rights reserved.
+-->
+<!--
+Use of this sample source code is subject to the terms of the Microsoft
+license agreement under which you licensed this sample source code. If
+you did not accept the terms of the license agreement, you are not
+authorized to use this sample source code. For the terms of the license,
+please see the license agreement between you and Microsoft or, if applicable,
+see the LICENSE.RTF on your install media or the root of your tools installation.
+THE SAMPLE SOURCE CODE IS PROVIDED "AS IS", WITH NO WARRANTIES OR INDEMNITIES.
+-->
+<HTML>
+<HEAD>
+<TITLE>MSMQ Administration Page</TITLE>
+<meta http-equiv=Content-Type content="text/html; charset=Windows-1252">
+</HEAD>
+<B>MSMQ Administration Page</B>
+
+
+<P>Command Shortcut Table
+<TABLE BORDER =0 WIDTH=40%>
+<TR>
+<TD><FORM ACTION = "/MsmqAdmin" METHOD = "post"><INPUT TYPE = submit NAME = "register install netreg" VALUE = "Install"></FORM></TD>
+<TD><FORM ACTION = "/MsmqAdmin" METHOD = "post"><INPUT TYPE = submit NAME = "register" VALUE = "Register" ></FORM></TD>
+<TD><FORM ACTION = "/MsmqAdmin" METHOD = "post"><INPUT TYPE = submit NAME = "status" VALUE = "Status" ></FORM></TD>
+<TD><FORM ACTION = "/MsmqAdmin" METHOD = "post"><INPUT TYPE = submit NAME = "net connect" VALUE = "Net Connect" ></FORM></TD>
+<TD><FORM ACTION = "/MsmqAdmin" METHOD = "post"><INPUT TYPE = submit NAME = "start" VALUE = "Start" ></FORM></TD>
+</TR>
+<TR>
+<TD><FORM ACTION = "/MsmqAdmin" METHOD = "post"><INPUT TYPE = submit NAME = "register uninstall" VALUE = "Uninstall" ></FORM></TD>
+<TD><FORM ACTION = "/MsmqAdmin" METHOD = "post"><INPUT TYPE = submit NAME = "verify" VALUE = "Verify"></FORM></TD>
+<TD><FORM ACTION = "/MsmqAdmin" METHOD = "post"><INPUT TYPE = submit NAME = "log" VALUE = "Log" ></FORM></TD>
+<TD><FORM ACTION = "/MsmqAdmin" METHOD = "post"><INPUT TYPE = submit NAME = "enum queues" VALUE = "List Queues" ></FORM></TD>
+<TD><FORM ACTION = "/MsmqAdmin" METHOD = "post"><INPUT TYPE = submit NAME = "stop" VALUE = "Stop" ></FORM></TD>
+</TR>
+</TABLE>
+
+
+<FORM METHOD="post">
+Enter a custom command:  <INPUT NAME = "run" width=50>
+<INPUT TYPE = SUBMIT VALUE = "Submit">
+</FORM>
+<HR>
+
+
+<B>Output</B>
+<P>
+<!--  The script appends the output to this page, so don't terminated with </HTML> tags in this file -->
+

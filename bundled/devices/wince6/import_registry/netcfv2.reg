@@ -1,0 +1,88 @@
+;
+; Copyright (c) Microsoft Corporation.  All rights reserved.
+;
+;
+; Use of this sample source code is subject to the terms of the Microsoft
+; license agreement under which you licensed this sample source code. If
+; you did not accept the terms of the license agreement, you are not
+; authorized to use this sample source code. For the terms of the license,
+; please see the license agreement between you and Microsoft or, if applicable,
+; see the LICENSE.RTF on your install media or the root of your tools installation.
+; THE SAMPLE SOURCE CODE IS PROVIDED "AS IS", WITH NO WARRANTIES OR INDEMNITIES.
+;
+;
+; NETCF GAC entries (Global Assembly Cache)
+
+; @CESYSGEN IF NETCFV2_MODULES_DOTNETV2
+[HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\.NETCompactFramework]
+"2.0.7045.00"=dword:1
+
+[HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\.NETCompactFramework\Installer\Assemblies\Global]
+"CustomMarshalers, Version=2.0.0.0, Culture=neutral, PublicKeyToken=969DB8053D3322AC"=multi_sz:"\\windows\\GAC_CustomMarshalers_v2_0_0_0_cneutral_1.dll","CustomMarshalers.dll"
+"Microsoft.VisualBasic, Version=8.0.0.0, Culture=neutral, PublicKeyToken=969DB8053D3322AC"=multi_sz:"\\windows\\GAC_Microsoft.VisualBasic_v8_0_0_0_cneutral_1.dll","Microsoft.VisualBasic.dll"
+"Microsoft.WindowsCE.Forms, Version=2.0.0.0, Culture=neutral, PublicKeyToken=969DB8053D3322AC"=multi_sz:"\\windows\\GAC_Microsoft.WindowsCE.Forms_v2_0_0_0_cneutral_1.dll","Microsoft.WindowsCE.Forms.dll"
+"Microsoft.WindowsMobile.DirectX, Version=2.0.0.0, Culture=neutral, PublicKeyToken=969DB8053D3322AC"=multi_sz:"\\windows\\GAC_Microsoft.WindowsMobile.DirectX_v2_0_0_0_cneutral_1.dll","Microsoft.WindowsMobile.DirectX.dll"
+"mscorlib, Version=2.0.0.0, Culture=neutral, PublicKeyToken=969DB8053D3322AC"=multi_sz:"\\windows\\GAC_mscorlib_v2_0_0_0_cneutral_1.dll","mscorlib.dll"
+"System.Data, Version=2.0.0.0, Culture=neutral, PublicKeyToken=969DB8053D3322AC"=multi_sz:"\\windows\\GAC_System.Data_v2_0_0_0_cneutral_1.dll","System.Data.dll"
+"System, Version=2.0.0.0, Culture=neutral, PublicKeyToken=969DB8053D3322AC"=multi_sz:"\\windows\\GAC_System_v2_0_0_0_cneutral_1.dll","System.dll"
+"System.Drawing, Version=2.0.0.0, Culture=neutral, PublicKeyToken=969DB8053D3322AC"=multi_sz:"\\windows\\GAC_System.Drawing_v2_0_0_0_cneutral_1.dll","System.Drawing.dll"
+"System.Messaging, Version=2.0.0.0, Culture=neutral, PublicKeyToken=969DB8053D3322AC"=multi_sz:"\\windows\\GAC_System.Messaging_v2_0_0_0_cneutral_1.dll","System.Messaging.dll"
+"System.Net.IrDA, Version=2.0.0.0, Culture=neutral, PublicKeyToken=969DB8053D3322AC"=multi_sz:"\\windows\\GAC_System.Net.IrDA_v2_0_0_0_cneutral_1.dll","System.Net.IrDA.dll"
+"System.Web.Services, Version=2.0.0.0, Culture=neutral, PublicKeyToken=969DB8053D3322AC"=multi_sz:"\\windows\\GAC_System.Web.Services_v2_0_0_0_cneutral_1.dll","System.Web.Services.dll"
+"System.Windows.Forms, Version=2.0.0.0, Culture=neutral, PublicKeyToken=969DB8053D3322AC"=multi_sz:"\\windows\\GAC_System.Windows.Forms_v2_0_0_0_cneutral_1.dll","System.Windows.Forms.dll"
+"System.Windows.Forms.DataGrid, Version=2.0.0.0, Culture=neutral, PublicKeyToken=969DB8053D3322AC"=multi_sz:"\\windows\\GAC_System.Windows.Forms.DataGrid_v2_0_0_0_cneutral_1.dll","System.Windows.Forms.DataGrid.dll"
+"System.Xml, Version=2.0.0.0, Culture=neutral, PublicKeyToken=969DB8053D3322AC"=multi_sz:"\\windows\\GAC_System.Xml_v2_0_0_0_cneutral_1.dll","System.Xml.dll"
+
+[HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\.NETCompactFramework\Installer\Assemblies\ROM]
+"CustomMarshalers, Version=2.0.0.0, Culture=neutral, PublicKeyToken=969DB8053D3322AC"=multi_sz:"\\windows\\GAC_CustomMarshalers_v2_0_0_0_cneutral_1.dll","CustomMarshalers.dll"
+"Microsoft.VisualBasic, Version=8.0.0.0, Culture=neutral, PublicKeyToken=969DB8053D3322AC"=multi_sz:"\\windows\\GAC_Microsoft.VisualBasic_v8_0_0_0_cneutral_1.dll","Microsoft.VisualBasic.dll"
+"Microsoft.WindowsCE.Forms, Version=2.0.0.0, Culture=neutral, PublicKeyToken=969DB8053D3322AC"=multi_sz:"\\windows\\GAC_Microsoft.WindowsCE.Forms_v2_0_0_0_cneutral_1.dll","Microsoft.WindowsCE.Forms.dll"
+"Microsoft.WindowsMobile.DirectX, Version=2.0.0.0, Culture=neutral, PublicKeyToken=969DB8053D3322AC"=multi_sz:"\\windows\\GAC_Microsoft.WindowsMobile.DirectX_v2_0_0_0_cneutral_1.dll","Microsoft.WindowsMobile.DirectX.dll"
+"mscorlib, Version=2.0.0.0, Culture=neutral, PublicKeyToken=969DB8053D3322AC"=multi_sz:"\\windows\\GAC_mscorlib_v2_0_0_0_cneutral_1.dll","mscorlib.dll"
+"System.Data, Version=2.0.0.0, Culture=neutral, PublicKeyToken=969DB8053D3322AC"=multi_sz:"\\windows\\GAC_System.Data_v2_0_0_0_cneutral_1.dll","System.Data.dll"
+"System, Version=2.0.0.0, Culture=neutral, PublicKeyToken=969DB8053D3322AC"=multi_sz:"\\windows\\GAC_System_v2_0_0_0_cneutral_1.dll","System.dll"
+"System.Drawing, Version=2.0.0.0, Culture=neutral, PublicKeyToken=969DB8053D3322AC"=multi_sz:"\\windows\\GAC_System.Drawing_v2_0_0_0_cneutral_1.dll","System.Drawing.dll"
+"System.Messaging, Version=2.0.0.0, Culture=neutral, PublicKeyToken=969DB8053D3322AC"=multi_sz:"\\windows\\GAC_System.Messaging_v2_0_0_0_cneutral_1.dll","System.Messaging.dll"
+"System.Net.IrDA, Version=2.0.0.0, Culture=neutral, PublicKeyToken=969DB8053D3322AC"=multi_sz:"\\windows\\GAC_System.Net.IrDA_v2_0_0_0_cneutral_1.dll","System.Net.IrDA.dll"
+"System.Web.Services, Version=2.0.0.0, Culture=neutral, PublicKeyToken=969DB8053D3322AC"=multi_sz:"\\windows\\GAC_System.Web.Services_v2_0_0_0_cneutral_1.dll","System.Web.Services.dll"
+"System.Windows.Forms, Version=2.0.0.0, Culture=neutral, PublicKeyToken=969DB8053D3322AC"=multi_sz:"\\windows\\GAC_System.Windows.Forms_v2_0_0_0_cneutral_1.dll","System.Windows.Forms.dll"
+"System.Windows.Forms.DataGrid, Version=2.0.0.0, Culture=neutral, PublicKeyToken=969DB8053D3322AC"=multi_sz:"\\windows\\GAC_System.Windows.Forms.DataGrid_v2_0_0_0_cneutral_1.dll","System.Windows.Forms.DataGrid.dll"
+"System.Xml, Version=2.0.0.0, Culture=neutral, PublicKeyToken=969DB8053D3322AC"=multi_sz:"\\windows\\GAC_System.Xml_v2_0_0_0_cneutral_1.dll","System.Xml.dll"
+; @CESYSGEN ENDIF
+
+; @CESYSGEN IF NETCFV2_MODULES_DOTNETV2_HEADLESS
+; @CESYSGEN ENDIF
+
+; @CESYSGEN IF NETCFV2_MODULES_DOTNETV2_SMARTFON
+; @CESYSGEN ENDIF
+
+; @CESYSGEN IF NETCFV2_MODULES_DOTNETV2_STRING
+; @CESYSGEN ENDIF
+
+; @CESYSGEN IF NETCFV2_MODULES_DOTNETV2_STRING_JA
+; @CESYSGEN ENDIF
+
+; @CESYSGEN IF NETCFV2_MODULES_DOTNETV2_STRING_DE
+; @CESYSGEN ENDIF
+
+; @CESYSGEN IF NETCFV2_MODULES_DOTNETV2_STRING_ES
+; @CESYSGEN ENDIF
+
+; @CESYSGEN IF NETCFV2_MODULES_DOTNETV2_STRING_FR
+; @CESYSGEN ENDIF
+
+; @CESYSGEN IF NETCFV2_MODULES_DOTNETV2_STRING_PT
+; @CESYSGEN ENDIF
+
+; @CESYSGEN IF NETCFV2_MODULES_DOTNETV2_STRING_IT
+; @CESYSGEN ENDIF
+
+; @CESYSGEN IF NETCFV2_MODULES_DOTNETV2_STRING_KO
+; @CESYSGEN ENDIF
+
+; @CESYSGEN IF NETCFV2_MODULES_DOTNETV2_STRING_CHS
+; @CESYSGEN ENDIF
+
+; @CESYSGEN IF NETCFV2_MODULES_DOTNETV2_STRING_CHT
+; @CESYSGEN ENDIF
+

@@ -1,0 +1,83 @@
+<!--
+Copyright (c) Microsoft Corporation.  All rights reserved.
+-->
+<!--
+Use of this sample source code is subject to the terms of the Microsoft
+license agreement under which you licensed this sample source code. If
+you did not accept the terms of the license agreement, you are not
+authorized to use this sample source code. For the terms of the license,
+please see the license agreement between you and Microsoft or, if applicable,
+see the LICENSE.RTF on your install media or the root of your tools installation.
+THE SAMPLE SOURCE CODE IS PROVIDED "AS IS", WITH NO WARRANTIES.
+-->
+<H2><FONT COLOR="#FF0000">Network Interfaces Configuration</font></H2>
+Configure network interfaces mappings to the <b>$$WebsiteName$$</b> Web site.
+For more information, click <A HREF="instructions/httpd-i-website.htm">here</A>.
+
+<script language="JavaScript"><!--
+function SubmitRequest()
+{
+   document.forms[0].submit()
+   return false
+}
+
+// -->
+</SCRIPT>
+<FORM ACTION /WebAdmin/ METHOD = post>
+<INPUT TYPE=HIDDEN NAME=Context VALUE=Website>
+<INPUT TYPE=HIDDEN NAME=WebsiteName VALUE="$$WebsiteName$$">
+Return to the <B>$$WebsiteName$$</B> Web site <A HREF="javascript:SubmitRequest();">configuration page.</A>
+</FORM>
+<HR>
+
+<P>
+$$if (IsWebsiteConfigAllowed=="True")$$
+  <FORM ACTION = "/WebAdmin/" METHOD = "post">
+  <INPUT TYPE=HIDDEN name=Context value=Update-NetInterfacePage>
+  <INPUT TYPE=HIDDEN name=WebsiteName value="$$Website$$">
+$$endif$$
+<TABLE BORDER=0 WIDTH=400>
+
+<script language="JavaScript"><!--
+function ConfirmModify()
+{
+   return confirm ("You are modifying the base settings for this Web site.  If this is misconfigured, you may not be able to access this site again and/or unwanted users may be able to get access to it.  Click OK to make your changes take affect.")
+}
+
+document.forms[1].onsubmit = ConfirmModify
+// -->
+</SCRIPT>
+
+<THEAD>
+<TR>
+<TH>Adapter Name</TH>
+<TH>Enabled</TH>
+<TH>Disabled</TH>
+
+</TR>
+<TBODY>
+
+$$foreach NetworkInterface$$
+  <TR>
+  <TD><B>$$NetworkInterface.FriendlyName$$</B>
+  <TD><INPUT type=RADIO name="net-$$NetworkInterface.Name$$" VALUE=Enabled  $$CHECKED(NetworkInterface.State=="Enabled")$$>
+  <TD><INPUT type=RADIO name="net-$$NetworkInterface.Name$$" VALUE=Disabled $$CHECKED(NetworkInterface.State=="Disabled")$$>
+$$endif$$
+</TABLE>
+
+<P>
+<INPUT type=CHECKBOX name=EnableDefaultNetInterface $$CHECKED(EnableDefaultNetInterface=="Enabled")$$>
+<B>Enable default network interface</B>
+<FONT SIZE=2>If checked, requests to interfaces not explicitly enabled are allowed to be mapped to this Web site.  <FONT COLOR=F00000>Microsoft recommends leaving this value set to its original factory setting.</FONT></FONT>
+
+<P>
+$$if (WebsiteName=="Default")$$
+  <TD><INPUT type=CHECKBOX name=AllowDefaultSite $$CHECKED(AllowDefaultSite=="True")$$>
+  <B>Allow default site to receive unmapped requests</B>
+  <FONT SIZE=2>If checked, if an incoming request does not map to any Web site, then the default site will service it.  <FONT COLOR=F00000>Microsoft recommends leaving this value set to its original factory setting.</FONT></FONT>
+$$endif$$
+<P>
+$$if (IsWebsiteConfigAllowed=="True")$$
+  <P><INPUT TYPE=submit Name=Submit value="Update Settings">
+  </FORM>
+$$endif$$

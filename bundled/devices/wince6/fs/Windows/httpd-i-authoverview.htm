@@ -1,0 +1,53 @@
+<!--
+Copyright (c) Microsoft Corporation.  All rights reserved.
+-->
+<!--
+Use of this sample source code is subject to the terms of the Microsoft
+license agreement under which you licensed this sample source code. If
+you did not accept the terms of the license agreement, you are not
+authorized to use this sample source code. For the terms of the license,
+please see the license agreement between you and Microsoft or, if applicable,
+see the LICENSE.RTF on your install media or the root of your tools installation.
+THE SAMPLE SOURCE CODE IS PROVIDED "AS IS", WITH NO WARRANTIES.
+-->
+<H2><FONT COLOR="#FF0000" SIZE=5>How do I configure Web server security?</font></H2>
+Securing your Web server involves establishing rules for which users can access 
+which files and possibly creating multiple Web sites.  Because a lack of proper 
+security can allow both the files and utilities on your system to be accessed 
+by anyone on the Internet, the need to restrict access to sensitive data is an 
+important part of maintaining a Web server.
+
+<H4>Multiple Web sites</H4>
+Putting sensitive information on one Web site and less sensitive information on another 
+can greatly increase security in gateway scenarios where one network interface is considered
+private or trusted and another interface is exposed to the Internet.
+
+<P>Using multiple Web sites will not work in all scenarios.  If your device only has one network card
+then this method will not work at all, in fact.  Even for devices with more than 
+one network card, there are other considerations.  In a home gateway scenario,
+perhaps you want mom and dad to be able to access WebAdmin but you do not
+want the kids to have access.
+
+<H4>Protecting Virtual Directories</H4>
+Most Web servers use multiple <A HREF="httpd-i-vdirs.htm">virtual directories</A>.
+Some virtual directories contain sensitive information that is meant to be 
+access only by a small group of users. Other virtual directories may contain 
+information intended for sharing across a broad group. For this reason, each 
+virtual directory should be managed separately and the appropriate 
+authentication levels should be set based on the type of information being 
+shared.
+
+<P>When configuring authentication for a virtual directory, consider the 
+following information: 
+
+<UL>
+<LI>Determine the <A HREF="httpd-i-authlevel.htm">authentication level</A> required.  
+Is the information appropriate for anonymous users or should a user name and password be required?
+<LI>Choose which <A HREF="httpd-i-authtypes.htm">authentication protocols</A> are used.
+<LI>Choose which users have access to which resources.  Assuming a user can provide a 
+valid user name and password, is their user name included in the <A HREF="httpd-i-userlists.htm">user list</A> for the virtual directory?
+<LI>Define <A HREF="httpd-i-permissions.htm">access rules</A>.  Once a user has 
+access to a resource, what operations may they perform?
+
+</UL>
+

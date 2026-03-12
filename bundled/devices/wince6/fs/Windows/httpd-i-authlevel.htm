@@ -1,0 +1,34 @@
+<!--
+Copyright (c) Microsoft Corporation.  All rights reserved.
+-->
+<!--
+Use of this sample source code is subject to the terms of the Microsoft
+license agreement under which you licensed this sample source code. If
+you did not accept the terms of the license agreement, you are not
+authorized to use this sample source code. For the terms of the license,
+please see the license agreement between you and Microsoft or, if applicable,
+see the LICENSE.RTF on your install media or the root of your tools installation.
+THE SAMPLE SOURCE CODE IS PROVIDED "AS IS", WITH NO WARRANTIES.
+-->
+<H2><FONT COLOR="#FF0000" SIZE=5>What are security access levels?</font></H2>
+Each virtual directory is set to one of three authentication levels, 
+depending on how restrictive it should be in allowing users to access it. The 
+authentication levels are:
+
+<UL>
+<LI><B>Public</B> - Available to all users.  No authentication 
+       check is required.  This authentication level is used for 
+       virtual directories that can be shared with the broadest audience. 
+
+<LI><B>User</B> - User name/password authentication required.
+       Users attempting to access this resource must submit a valid user name and 
+       password as authentication. This authentication level is used for virtual 
+       directories that contain sensitive information or contain server-side scripts.
+
+<LI><B>Administrator</B> - Administrators only.  Users attempting to access this resource 
+       must submit a valid user name and password, and be listed in the Admin Users group 
+       for the Web site. This authentication level provides access to all virtual 
+       directories and management tools on the device.  
+</UL>
+
+

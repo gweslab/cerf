@@ -1,0 +1,252 @@
+;
+; Copyright (c) Microsoft Corporation.  All rights reserved.
+;
+;
+; Use of this sample source code is subject to the terms of the Microsoft
+; license agreement under which you licensed this sample source code. If
+; you did not accept the terms of the license agreement, you are not
+; authorized to use this sample source code. For the terms of the license,
+; please see the license agreement between you and Microsoft or, if applicable,
+; see the LICENSE.RTF on your install media or the root of your tools installation.
+; THE SAMPLE SOURCE CODE IS PROVIDED "AS IS", WITH NO WARRANTIES OR INDEMNITIES.
+;
+
+;--------------------------------- HPC SHELL ---------------------------------
+
+; @CESYSGEN IF SHELL_MODULES_EXPLORER
+
+; -- Set up the init key for explorer
+;
+[HKEY_LOCAL_MACHINE\init]
+        "Launch50"="explorer.exe"
+        "Depend50"=hex:14,00, 1e,00
+
+; -- Set up init event for the shell API set
+;
+[HKEY_LOCAL_MACHINE\System\Events]
+        "SYSTEM/ShellAPIReady"="Shell APIs"
+
+; -- Set memory thresholds for Hibernate
+;
+[HKEY_LOCAL_MACHINE\SYSTEM\Hibernate]
+        "Bytes"=dword:20000
+        "Pages"=dword:28
+
+; -- Make sure the clock registry entry exists for taskbar
+;
+[HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Clock]
+        @=""
+
+; -- Make sure that the run dialog history list is there
+;
+[HKEY_LOCAL_MACHINE\Explorer\RunHistory]
+        @=""
+
+; @CESYSGEN IF !COREDLL_BATTERY
+; -- Only display power status in the taskbar if the system 
+; supports the power APIs.  These boolean variables
+; default to TRUE (that is, 1) in the shell.
+;
+[HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Power]
+        "ShowIcon"=hex:00
+        "ShowWarnings"=hex:00
+; @CESYSGEN ENDIF !COREDLL_BATTERY
+
+; @CESYSGEN IF SHELL_MODULES_QVGAP
+; @CESYSGEN ENDIF SHELL_MODULES_QVGAP
+
+; @CESYSGEN ENDIF SHELL_MODULES_EXPLORER
+
+;------------------------------- end HPC SHELL -------------------------------
+
+; @CESYSGEN IF SHELL_MODULES_CESHELL
+
+; -- Explorer special folder information (see also shellapi)
+;
+[HKEY_LOCAL_MACHINE\Explorer\Desktop]
+    "{000214A0-0000-0000-C000-000000000046}"="My Device"
+; @CESYSGEN IF CESHELL_CESHRECBIN
+    "{000214A1-0000-0000-C000-000000000046}"="Recycle Bin"
+; @CESYSGEN ENDIF
+
+; The Desktop
+[HKEY_CLASSES_ROOT\CLSID\{00021400-0000-0000-C000-000000000046}]
+    "Properties"="cplmain.cpl,6"
+
+; @CESYSGEN IF !SHELL_MODULES_SHELLRES
+[HKEY_CLASSES_ROOT\CLSID\{00021400-0000-0000-C000-000000000046}]
+    "DisplayName"=mui_sz:"ceshell.dll,#20480"
+; @CESYSGEN ENDIF !SHELL_MODULES_CESHELL
+
+; @CESYSGEN IF SHELL_MODULES_SHELLRES
+; @CESYSGEN ENDIF SHELL_MODULES_CESHELL
+    
+[HKEY_CLASSES_ROOT\CLSID\{00021400-0000-0000-C000-000000000046}\InprocServer32]
+        @="\\Windows\\ceshell.dll"
+
+
+; Drives (My Device)
+[HKEY_CLASSES_ROOT\CLSID\{000214A0-0000-0000-C000-000000000046}]
+    "Properties"="cplmain.cpl,6"
+
+; @CESYSGEN IF !SHELL_MODULES_SHELLRES
+[HKEY_CLASSES_ROOT\CLSID\{000214A0-0000-0000-C000-000000000046}]
+    "DisplayName"=mui_sz:"ceshell.dll,#20482"
+    "DefaultIcon"="\\Windows\\ceshell.dll,-4354"
+; @CESYSGEN ENDIF !SHELL_MODULES_CESHELL
+
+; @CESYSGEN IF SHELL_MODULES_SHELLRES
+; @CESYSGEN ENDIF SHELL_MODULES_CESHELL
+
+[HKEY_CLASSES_ROOT\CLSID\{000214A0-0000-0000-C000-000000000046}\InprocServer32]
+    @="\\Windows\\ceshell.dll"
+
+
+; Recycle Bin (BitBucket)
+; @CESYSGEN IF !SHELL_MODULES_SHELLRES
+[HKEY_CLASSES_ROOT\CLSID\{000214A1-0000-0000-C000-000000000046}]
+    "DisplayName"=mui_sz:"ceshell.dll,#20481"
+    "DefaultIcon"="\\Windows\\ceshell.dll,-5632"
+    "AltIcon"="\\Windows\\ceshell.dll,-5633"
+; @CESYSGEN ENDIF !SHELL_MODULES_CESHELL
+
+; @CESYSGEN IF SHELL_MODULES_SHELLRES
+; @CESYSGEN ENDIF SHELL_MODULES_CESHELL
+
+[HKEY_CLASSES_ROOT\CLSID\{000214A1-0000-0000-C000-000000000046}\InprocServer32]
+        @="\\Windows\\ceshell.dll"
+
+
+; Net Folder
+[HKEY_CLASSES_ROOT\CLSID\{000214A2-0000-0000-C000-000000000046}\InprocServer32]
+        @="\\Windows\\ceshell.dll"
+
+; TaskbarList
+[HKEY_CLASSES_ROOT\CLSID\{56FDF344-FD6D-11d0-958A-006097C9A090}\InprocServer32]
+        @="\\Windows\\ceshell.dll"
+
+; Start
+[HKEY_CLASSES_ROOT\CLSID\{0AB7D10E-CFC1-46a4-88AF-63281E305B99}]
+        "DisplayName"="Start"
+[HKEY_CLASSES_ROOT\CLSID\{0AB7D10E-CFC1-46a4-88AF-63281E305B99}\InprocServer32]
+        @="ceshell.dll"
+
+
+; -- File type settings
+;
+[HKEY_CLASSES_ROOT\.exe]
+        @="exefile"
+; @CESYSGEN IF !SHELL_MODULES_SHELLRES
+[HKEY_CLASSES_ROOT\exefile]
+        @=mui_sz:"ceshell.dll,#24576"
+; @CESYSGEN ENDIF !SHELL_MODULES_SHELLRES
+; @CESYSGEN IF SHELL_MODULES_SHELLRES
+; @CESYSGEN ENDIF SHELL_MODULES_SHELLRES
+[HKEY_CLASSES_ROOT\exefile\DefaultIcon]
+        @="%1"
+[HKEY_CLASSES_ROOT\exefile\Shell\Open\Command]
+        @="\"%1\" %*"
+
+; @CESYSGEN IF !IE_MODULES_URLMON
+[HKEY_CLASSES_ROOT\file]
+        @="URL:File Protocol"
+        "URL Protocol"=""
+; @CESYSGEN ENDIF !IE_MODULES_URLMON
+[HKEY_CLASSES_ROOT\file\Shell\Open\Command]
+        @="explorer.exe %1"
+
+; @CESYSGEN IF !IE_MODULES_URLMON
+[HKEY_CLASSES_ROOT\.url]
+        @="urlfile"
+[HKEY_CLASSES_ROOT\urlfile]
+        @="URL Location"
+; @CESYSGEN ENDIF !IE_MODULES_URLMON
+[HKEY_CLASSES_ROOT\urlfile\Shell\Open\Command]
+        @="explorer.exe -u%1"
+
+; This should be in wceshellfe until we move ctlpnl
+[HKEY_CLASSES_ROOT\.cpl]
+        @="cplfile"
+; @CESYSGEN IF !SHELL_MODULES_SHELLRES
+[HKEY_CLASSES_ROOT\cplfile]
+        @=mui_sz:"ceshell.dll,#24577"
+[HKEY_CLASSES_ROOT\cplfile\DefaultIcon]
+        @="\\Windows\\ceshell.dll,-4608"
+; @CESYSGEN ENDIF !SHELL_MODULES_SHELLRES
+; @CESYSGEN IF SHELL_MODULES_SHELLRES
+; @CESYSGEN ENDIF SHELL_MODULES_SHELLRES
+[HKEY_CLASSES_ROOT\cplfile\Shell\Open\Command]
+        @="\\Windows\\ctlpnl.exe %1"
+
+[HKEY_CLASSES_ROOT\.dll]
+        @="dllfile"
+; @CESYSGEN IF !SHELL_MODULES_SHELLRES
+[HKEY_CLASSES_ROOT\dllfile]
+        @=mui_sz:"ceshell.dll,#24578"
+[HKEY_CLASSES_ROOT\dllfile\DefaultIcon]
+        @="\\Windows\\ceshell.dll,-4608"
+; @CESYSGEN ENDIF !SHELL_MODULES_SHELLRES
+; @CESYSGEN IF SHELL_MODULES_SHELLRES
+; @CESYSGEN ENDIF SHELL_MODULES_SHELLRES
+
+[HKEY_CLASSES_ROOT\.ttf]
+        @="ttffile"
+; @CESYSGEN IF !SHELL_MODULES_SHELLRES
+[HKEY_CLASSES_ROOT\ttffile]
+        @=mui_sz:"ceshell.dll,#24580"
+[HKEY_CLASSES_ROOT\ttffile\DefaultIcon]
+        @="\\Windows\\ceshell.dll,-4609"
+; @CESYSGEN ENDIF !SHELL_MODULES_SHELLRES
+; @CESYSGEN IF SHELL_MODULES_SHELLRES
+; @CESYSGEN ENDIF SHELL_MODULES_SHELLRES
+
+[HKEY_CLASSES_ROOT\.wav]
+        @="wavfile"
+; @CESYSGEN IF !SHELL_MODULES_SHELLRES
+[HKEY_CLASSES_ROOT\wavfile]
+        @=mui_sz:"ceshell.dll,#24581"
+[HKEY_CLASSES_ROOT\wavfile\DefaultIcon]
+        @="\\Windows\\ceshell.dll,-4610"
+; @CESYSGEN ENDIF !SHELL_MODULES_SHELLRES
+; @CESYSGEN IF SHELL_MODULES_SHELLRES
+; @CESYSGEN ENDIF SHELL_MODULES_SHELLRES
+
+; -- User settings
+;
+; @CESYSGEN IF SHELL_MODULES_EXPLORER
+[HKEY_LOCAL_MACHINE\Explorer]
+        "RecycleBinSize"=dword:A
+        "ShowExt"=dword:0
+        "ShowSys"=dword:0
+        "UseCompatibleBGImage"=dword:1
+        "UseDragDrop"=dword:1
+        "UseRecycleBin"=dword:1
+        "ViewAll"=dword:0
+        "ShowOverlayMask"=dword:1
+; @CESYSGEN ENDIF SHELL_MODULES_EXPLORER
+
+; @CESYSGEN IF SHELL_MODULES_MEXPLORER
+; @CESYSGEN ENDIF SHELL_MODULES_MEXPLORER
+
+; @CESYSGEN ENDIF SHELL_MODULES_CESHELL
+
+; @CESYSGEN IF SHELL_MODULES_AYGSHELL
+; @CESYSGEN ENDIF SHELL_MODULES_AYGSHELL
+
+;----------------------------------------------------------------------------
+; Management Transition API Data
+;----------------------------------------------------------------------------
+; @CESYSGEN IF SHELL_MODULES_AYGSHELL
+; @CESYSGEN ENDIF SHELL_MODULES_AYGSHELL
+
+; @CESYSGEN IF SHELL_MODULES_MENUMANAGER
+; @CESYSGEN ENDIF SHELL_MODULES_MENUMANAGER
+
+;----------------------------------------------------------------------------
+; File explorer settings
+;----------------------------------------------------------------------------
+; @CESYSGEN IF SHELL_MODULES_MEXPLORER
+; @CESYSGEN ENDIF SHELL_MODULES_MEXPLORER
+
+; @CESYSGEN IF SHELL_MODULES_XRSHELL
+;@CESYSGEN ENDIF SHELL_MODULES_XRSHELL

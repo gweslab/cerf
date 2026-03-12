@@ -1,0 +1,42 @@
+<!--
+Copyright (c) Microsoft Corporation.  All rights reserved.
+-->
+<!--
+Use of this sample source code is subject to the terms of the Microsoft
+license agreement under which you licensed this sample source code. If
+you did not accept the terms of the license agreement, you are not
+authorized to use this sample source code. For the terms of the license,
+please see the license agreement between you and Microsoft or, if applicable,
+see the LICENSE.RTF on your install media or the root of your tools installation.
+THE SAMPLE SOURCE CODE IS PROVIDED "AS IS", WITH NO WARRANTIES.
+-->
+<H2><FONT COLOR="#FF0000" SIZE=5>What is Web logging?</font></H2>
+
+The Windows CE Web Server can be configured to log all incoming requests.  The 
+log files can be used to check for suspicious activity or to track the 
+most commonly requested pages. 
+
+<P>Each log entry contains the time and date of the request in Greenwich Mean Time (GMT), 
+the requestor's IP address, the URL they requested, the HTTP request type used, and the HTTP 
+status code.
+
+<P>The following example shows a Web server log: 
+
+<PRE>
+   Tue, 08 Oct 2002 22:17:12 192.168.0.2 GET /WebAdmin 401
+   Tue, 08 Oct 2002 22:17:15 192.168.0.2 GET /WebAdmin 401
+   Tue, 08 Oct 2002 22:17:12 192.168.0.2 GET /WebAdmin 401
+   Tue, 08 Oct 2002 22:25:39 192.168.0.3 GET /WebAdmin 200
+   Tue, 08 Oct 2002 22:25:40 192.168.0.3 POST /WebAdmin 200
+   Tue, 08 Oct 2002 22:25:49 192.168.0.3 POST /WebAdmin 200
+</PRE>
+
+<P>In this example, a user with an IP address 192.168.0.2 tried to access the /
+WebAdmin location on your Web server and was denied (401 error). Another user 
+at IP address 192.168.0.3 has attempted the same request with success. 
+
+<P>New log entries are written to the file current-httpd.log, which is located 
+in the directory you specify on the <A HREF="/WebAdmin/logging/">Logging Configuration</A> page. 
+Once the current log file exceeds its maximum allowed size, the Web server deletes the 
+previous log and moves the contents of current log to the previous log.
+

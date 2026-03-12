@@ -1,0 +1,262 @@
+;
+; Copyright (c) Microsoft Corporation.  All rights reserved.
+;
+;
+; Use of this sample source code is subject to the terms of the Microsoft
+; license agreement under which you licensed this sample source code. If
+; you did not accept the terms of the license agreement, you are not
+; authorized to use this sample source code. For the terms of the license,
+; please see the license agreement between you and Microsoft or, if applicable,
+; see the LICENSE.RTF on your install media or the root of your tools installation.
+; THE SAMPLE SOURCE CODE IS PROVIDED "AS IS", WITH NO WARRANTIES OR INDEMNITIES.
+;
+; ---------------- JSCRIPT ------------------------------
+; @CESYSGEN IF SCRIPT_MODULES_JSCRIPT
+
+;
+; JScript ProgID
+;
+[HKEY_CLASSES_ROOT\JScript\CLSID]
+	@="{F414C260-6AC0-11CF-B6D1-00AA00BBBB58}"
+[HKEY_CLASSES_ROOT\JScript\OLEScript]
+	; no value
+
+[HKEY_CLASSES_ROOT\LiveScript\CLSID]
+	@="{F414C260-6AC0-11CF-B6D1-00AA00BBBB58}"
+[HKEY_CLASSES_ROOT\LiveScript\OLEScript]
+	; no value
+
+[HKEY_CLASSES_ROOT\JavaScript\CLSID]
+	@="{F414C260-6AC0-11CF-B6D1-00AA00BBBB58}"
+[HKEY_CLASSES_ROOT\JavaScript\OLEScript]
+	; no value
+
+[HKEY_CLASSES_ROOT\JavaScript1.1\CLSID]
+	@="{F414C260-6AC0-11CF-B6D1-00AA00BBBB58}"
+[HKEY_CLASSES_ROOT\JavaScript1.1\OLEScript]
+	; no value
+
+[HKEY_CLASSES_ROOT\JavaScript1.2\CLSID]
+	@="{F414C260-6AC0-11CF-B6D1-00AA00BBBB58}"
+[HKEY_CLASSES_ROOT\JavaScript1.2\OLEScript]
+	; no value
+
+[HKEY_CLASSES_ROOT\JavaScript1.3\CLSID]
+	@="{F414C260-6AC0-11CF-B6D1-00AA00BBBB58}"
+[HKEY_CLASSES_ROOT\JavaScript1.3\OLEScript]
+	; no value
+
+[HKEY_CLASSES_ROOT\ECMAScript\CLSID]
+	@="{F414C260-6AC0-11CF-B6D1-00AA00BBBB58}"
+[HKEY_CLASSES_ROOT\ECMAScript\OLEScript]
+	; no value
+
+;
+; JScript CLSID
+;
+[HKEY_CLASSES_ROOT\CLSID\{F414C260-6AC0-11CF-B6D1-00AA00BBBB58}\InprocServer32]
+	@="jscript.dll"
+	"ThreadingModel"="both"
+
+[HKEY_CLASSES_ROOT\CLSID\{f414c260-6ac0-11cf-b6d1-00aa00bbbb58}\ProgID]
+	@="JScript"
+[HKEY_CLASSES_ROOT\CLSID\{f414c260-6ac0-11cf-b6d1-00aa00bbbb58}\OLEScript]
+	; no value
+
+;
+; JScript Author ProgID
+;
+[HKEY_CLASSES_ROOT\JScript Author\CLSID]
+	@="{F414C261-6AC0-11CF-B6D1-00AA00BBBB58}"
+[HKEY_CLASSES_ROOT\JScript Author\OLEScript]
+	; no value
+
+[HKEY_CLASSES_ROOT\LiveScript Author\CLSID]
+	@="{F414C261-6AC0-11CF-B6D1-00AA00BBBB58}"
+[HKEY_CLASSES_ROOT\LiveScript Author\OLEScript]
+	; no value
+
+[HKEY_CLASSES_ROOT\JavaScript Author\CLSID]
+	@="{F414C261-6AC0-11CF-B6D1-00AA00BBBB58}"
+[HKEY_CLASSES_ROOT\JavaScript Author\OLEScript]
+	; no value
+
+[HKEY_CLASSES_ROOT\JavaScript1.1 Author\CLSID]
+	@="{F414C261-6AC0-11CF-B6D1-00AA00BBBB58}"
+[HKEY_CLASSES_ROOT\JavaScript1.1 Author\OLEScript]
+	; no value
+
+[HKEY_CLASSES_ROOT\JavaScript1.2 Author\CLSID]
+	@="{F414C261-6AC0-11CF-B6D1-00AA00BBBB58}"
+[HKEY_CLASSES_ROOT\JavaScript1.2 Author\OLEScript]
+	; no value
+
+;
+; JScript Author CLSID
+;
+[HKEY_CLASSES_ROOT\CLSID\{F414C261-6AC0-11CF-B6D1-00AA00BBBB58}\InprocServer32]
+	@="jscript.dll"
+	"ThreadingModel"="both"
+
+[HKEY_CLASSES_ROOT\CLSID\{f414c261-6ac0-11cf-b6d1-00aa00bbbb58}\ProgID]
+	@="JScript Author"
+[HKEY_CLASSES_ROOT\CLSID\{f414c261-6ac0-11cf-b6d1-00aa00bbbb58}\OLEScript]
+	; no value
+
+;
+; JScript Encode CLSID
+;
+
+[HKEY_CLASSES_ROOT\JScript.Encode\CLSID]
+	@="{f414c262-6ac0-11cf-b6d1-00aa00bbbb58}"
+[HKEY_CLASSES_ROOT\JScript.Encode\OLEScript]
+	; no value
+
+[HKEY_CLASSES_ROOT\CLSID\{f414c262-6ac0-11cf-b6d1-00aa00bbbb58}\Implemented Categories\{F0B7A1A1-9847-11CF-8F20-00805F2CD064}]
+
+[HKEY_CLASSES_ROOT\CLSID\{f414c262-6ac0-11cf-b6d1-00aa00bbbb58}\Implemented Categories\{F0B7A1A2-9847-11CF-8F20-00805F2CD064}]
+
+[HKEY_CLASSES_ROOT\CLSID\{f414c262-6ac0-11cf-b6d1-00aa00bbbb58}\Implemented Categories\{F0B7A1A3-9847-11CF-8F20-00805F2CD064}]
+
+[HKEY_CLASSES_ROOT\CLSID\{f414c262-6ac0-11cf-b6d1-00aa00bbbb58}\InprocServer32]
+@="jscript.dll"
+"ThreadingModel"="Both"
+
+[HKEY_CLASSES_ROOT\CLSID\{f414c262-6ac0-11cf-b6d1-00aa00bbbb58}\OLEScript]
+	; no value
+
+[HKEY_CLASSES_ROOT\CLSID\{f414c262-6ac0-11cf-b6d1-00aa00bbbb58}\ProgID]
+@="JScript.Encode"
+
+; @CESYSGEN ENDIF SCRIPT_MODULES_JSCRIPT
+
+
+
+
+; ---------------------------------------------------------------------------
+; VBScript
+;----------------------------------------------------------------------------
+
+; @CESYSGEN IF SCRIPT_MODULES_VBSCRIPT
+
+;
+; VBScript ProgID
+;
+[HKEY_CLASSES_ROOT\VBScript\CLSID]
+@="{B54F3741-5B07-11cf-A4B0-00AA004A55E8}"
+[HKEY_CLASSES_ROOT\VBScript\OLEScript]
+	; no value
+
+[HKEY_CLASSES_ROOT\VBS\CLSID]
+@="{B54F3741-5B07-11cf-A4B0-00AA004A55E8}"
+[HKEY_CLASSES_ROOT\VBS\OLEScript]
+	; no value
+
+;
+; VBScript CLSID
+;
+[HKEY_CLASSES_ROOT\CLSID\{B54F3741-5B07-11cf-A4B0-00AA004A55E8}\InprocServer32]
+	@="vbscript.dll"
+	"ThreadingModel"="Both"
+
+[HKEY_CLASSES_ROOT\CLSID\{B54F3741-5B07-11cf-A4B0-00AA004A55E8}\ProgID]
+	@="VBScript"
+[HKEY_CLASSES_ROOT\CLSID\{B54F3741-5B07-11cf-A4B0-00AA004A55E8}\OLEScript]
+	; no value
+
+
+; VBScript.RegExp
+[HKEY_CLASSES_ROOT\CLSID\{3F4DACA4-160D-11D2-A8E9-00104B365C9F}\InprocServer32]
+	@="vbscript.dll"
+	"ThreadingModel"="Both"
+
+[HKEY_CLASSES_ROOT\CLSID\{3F4DACA4-160D-11D2-A8E9-00104B365C9F}\OLEScript]
+	; no value
+
+[HKEY_CLASSES_ROOT\CLSID\{3F4DACA4-160D-11D2-A8E9-00104B365C9F}\ProgId]
+	@="VBScript.RegExp"
+
+[HKEY_CLASSES_ROOT\VBScript.RegExp\CLSID]
+	@="{3F4DACA4-160D-11D2-A8E9-00104B365C9F}"
+
+[HKEY_CLASSES_ROOT\VBScript.RegExp\OLEScript]
+	; no value
+
+
+[HKEY_CLASSES_ROOT\TypeLib\{3F4DACA7-160D-11D2-A8E9-00104B365C9F}\1.0\0\win32]
+@="vbscript.dll\\2"
+
+[HKEY_CLASSES_ROOT\TypeLib\{3F4DACA7-160D-11D2-A8E9-00104B365C9F}\1.0\FLAGS]
+@="0"
+
+[HKEY_CLASSES_ROOT\TypeLib\{3F4DACA7-160D-11D2-A8E9-00104B365C9F}\5.5\0\win32]
+@="vbscript.dll\\3"
+
+[HKEY_CLASSES_ROOT\TypeLib\{3F4DACA7-160D-11D2-A8E9-00104B365C9F}\5.5\FLAGS]
+@="0"
+
+;
+; VBScript Author ProgID
+;
+[HKEY_CLASSES_ROOT\VBScript Author\CLSID]
+@="{B54F3742-5B07-11cf-A4B0-00AA004A55E8}"
+[HKEY_CLASSES_ROOT\VBScript Author\OLEScript]
+	; no value
+
+[HKEY_CLASSES_ROOT\VBS Author\CLSID]
+@="{B54F3742-5B07-11cf-A4B0-00AA004A55E8}"
+[HKEY_CLASSES_ROOT\VBS Author\OLEScript]
+	; no value
+
+;
+; VBScript Author CLSID
+;
+[HKEY_CLASSES_ROOT\CLSID\{B54F3742-5B07-11cf-A4B0-00AA004A55E8}\InprocServer32]
+	@="vbscript.dll"
+	"ThreadingModel"="both"
+
+[HKEY_CLASSES_ROOT\CLSID\{B54F3742-5B07-11cf-A4B0-00AA004A55E8}\ProgID]
+	@="VBScript Author"
+[HKEY_CLASSES_ROOT\CLSID\{B54F3742-5B07-11cf-A4B0-00AA004A55E8}\OLEScript]
+	; no value
+
+; STDOLE2.TLB
+;[HKEY_CLASSES_ROOT\TypeLib\{00020430-0000-0000-C000-000000000046}\2.0\0]
+;@="oleaut32.dll"
+
+; STDOLE2.TLB
+;[HKEY_CLASSES_ROOT\TypeLib\{00020430-0000-0000-C000-000000000046}\1.0\0]
+;@="oleaut32.dll"
+
+; mshtml provided Protocols
+;[HKEY_CLASSES_ROOT\PROTOCOLS\Handler\vbscript]
+;"CLSID"="{3050F3B2-98B5-11CF-BB82-00AA00BDCE0B}"
+
+
+;
+; VBScript Encode CLSID
+;
+
+[HKEY_CLASSES_ROOT\VBScript.Encode\CLSID]
+	@="{B54F3743-5B07-11cf-A4B0-00AA004A55E8}"
+[HKEY_CLASSES_ROOT\VBScript.Encode\OLEScript]
+	; no value
+
+[HKEY_CLASSES_ROOT\CLSID\{B54F3743-5B07-11cf-A4B0-00AA004A55E8}\Implemented Categories\{F0B7A1A1-9847-11CF-8F20-00805F2CD064}]
+
+[HKEY_CLASSES_ROOT\CLSID\{B54F3743-5B07-11cf-A4B0-00AA004A55E8}\Implemented Categories\{F0B7A1A2-9847-11CF-8F20-00805F2CD064}]
+
+[HKEY_CLASSES_ROOT\CLSID\{B54F3743-5B07-11cf-A4B0-00AA004A55E8}\Implemented Categories\{F0B7A1A3-9847-11CF-8F20-00805F2CD064}]
+
+[HKEY_CLASSES_ROOT\CLSID\{B54F3743-5B07-11cf-A4B0-00AA004A55E8}\InprocServer32]
+@="vbscript.dll"
+"ThreadingModel"="Both"
+
+[HKEY_CLASSES_ROOT\CLSID\{B54F3743-5B07-11cf-A4B0-00AA004A55E8}\OLEScript]
+	; no value
+
+[HKEY_CLASSES_ROOT\CLSID\{B54F3743-5B07-11cf-A4B0-00AA004A55E8}\ProgID]
+@="VBScript.Encode"
+
+; @CESYSGEN ENDIF SCRIPT_MODULES_VBSCRIPT
+

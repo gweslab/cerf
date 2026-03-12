@@ -1,0 +1,344 @@
+;
+; Copyright (c) Microsoft Corporation.  All rights reserved.
+;
+;
+; Use of this source code is subject to the terms of the Microsoft end-user
+; license agreement (EULA) under which you licensed this SOFTWARE PRODUCT.
+; If you did not accept the terms of the EULA, you are not authorized to use
+; this source code. For a copy of the EULA, please see the LICENSE.RTF on your
+; install media.
+;
+
+; @XIPREGION IF WCESHELLFE_REGISTRY_INIT
+[HKEY_LOCAL_MACHINE\init]
+; @XIPREGION ENDIF WCESHELLFE_REGISTRY_INIT
+
+; Choose only *one* of the taskman or explorer components in your cesysgen.bat
+; @CESYSGEN IF WCESHELLFE_MODULES_TASKMAN
+; @CESYSGEN ENDIF
+
+
+;---------------------------- TASKMAN ----------------------------------------
+; Set memory thresholds for Hibernate
+;
+; @CESYSGEN IF WCESHELLFE_MODULES_TASKMAN
+; @CESYSGEN ENDIF WCESHELLFE_MODULES_TASKMAN
+
+
+;----------------------------start CONTROL PANEL ---------------------------------------
+;
+
+; @CESYSGEN IF WCESHELLFE_MODULES_CPLMAIN
+;
+
+; @CESYSGEN IF CPLMAIN_COLORSCHEME
+;
+[HKEY_CURRENT_USER\ControlPanel\Appearance]
+"Current"=mui_sz:"cplmain.cpl,#33406"
+
+[HKEY_CURRENT_USER\ControlPanel\Appearance\Schemes\WHEAT]
+"DisplayName"=mui_sz:"cplmain.cpl,#33407"
+"Settings"=hex:\
+      ff,ff,00,00,f0,f0,d5,00,00,40,1d,00,80,80,00,02,bc,bc,41,02,c4,c4,55,00,ff,\
+      ff,ff,02,00,00,00,02,00,00,00,02,00,00,00,02,ff,ff,ff,02,c4,c4,55,00,c4,c4,\
+      55,00,ee,ee,d0,02,80,80,00,02,ff,ff,ff,02,c4,c4,55,00,80,80,80,00,8c,8d,8b,\
+      00,00,00,00,02,ff,ff,ff,02,f0,f0,d5,00,00,00,00,00,ff,ff,ff,00,00,00,00,02,\
+      ff,ff,ff,02,c7,c7,61,00,00,00,00,00
+[HKEY_CURRENT_USER\ControlPanel\Appearance\Schemes\MARINE]
+"DisplayName"=mui_sz:"cplmain.cpl,#33408"
+"Settings"=hex:\
+      ff,ff,00,00,d8,f5,eb,00,80,00,00,02,46,46,8c,00,8d,8b,cb,00,a3,e7,cf,00,ff,\
+      ff,ff,02,16,56,40,00,00,00,00,00,00,00,00,02,ff,ff,ff,02,64,d7,ae,00,64,d7,\
+      ae,00,80,80,80,02,70,70,b8,00,ff,ff,ff,02,64,d7,ae,00,80,80,80,00,4f,65,7d,\
+      02,00,00,00,02,d7,d7,d7,00,d8,f5,eb,00,00,00,00,00,ff,ff,ff,00,00,00,00,02,\
+      ff,ff,ff,02,64,d7,ae,00,00,00,00,00
+[HKEY_CURRENT_USER\ControlPanel\Appearance\Schemes\ROSE]
+"DisplayName"=mui_sz:"cplmain.cpl,#33409"
+"Settings"=hex:\
+      ff,ff,00,00,ff,e6,e6,00,80,80,80,02,9f,60,70,02,a0,a0,a4,02,ff,ca,ca,00,ff,\
+      ff,ff,02,00,00,00,02,00,00,00,02,00,00,00,02,ff,ff,ff,02,ff,97,97,00,ff,97,\
+      97,00,9f,60,70,02,9f,60,70,02,ff,ff,ff,02,ff,97,97,00,7f,7f,7f,00,89,89,89,\
+      00,00,00,00,02,00,00,00,02,ff,e6,e6,00,00,00,00,00,ff,ff,ff,00,00,00,00,02,\
+      ff,ff,ff,02,ff,95,95,00,00,00,00,00
+[HKEY_CURRENT_USER\ControlPanel\Appearance\Schemes\BRICK]
+"DisplayName"=mui_sz:"cplmain.cpl,#33410"
+"Settings"=hex:\
+      ff,ff,00,00,e8,e7,dd,00,9b,00,00,00,80,00,00,00,8d,89,61,00,a2,9d,75,00,ff,\
+      ff,ff,00,00,00,00,00,00,00,00,00,00,00,00,00,e1,e0,d2,00,a3,9e,76,00,a3,9e,\
+      76,00,e1,e0,d2,00,8d,89,61,00,ff,ff,ff,00,a3,9e,76,00,80,80,80,00,80,80,80,\
+      00,00,00,00,00,e1,e0,d2,00,e8,e7,dd,00,00,00,00,00,ff,ff,ff,00,80,00,00,00,\
+      e1,e0,d2,00,9f,9b,73,00,00,00,00,00
+[HKEY_CURRENT_USER\ControlPanel\Appearance\Schemes\DESERT]
+"DisplayName"=mui_sz:"cplmain.cpl,#33411"
+"Settings"=hex:\
+      ff,ff,00,00,ea,e6,dd,00,a2,8d,68,00,00,80,80,00,a2,8d,68,00,cc,c2,ad,00,ff,\
+      ff,ff,00,00,00,00,00,00,00,00,00,00,00,00,00,ff,ff,ff,00,cc,c2,ad,00,cc,c2,\
+      ad,00,a2,8d,68,00,00,80,80,00,ff,ff,ff,00,cc,c2,ad,00,80,80,80,00,a2,8d,68,\
+      00,00,00,00,00,ff,ff,ff,00,ea,e6,dd,00,00,00,00,00,ff,ff,ff,00,00,00,00,00,\
+      ff,ff,ff,00,cc,c2,ad,00,00,00,00,00
+[HKEY_CURRENT_USER\ControlPanel\Appearance\Schemes\EGGPLANT]
+"DisplayName"=mui_sz:"cplmain.cpl,#33412"
+"Settings"=hex:\
+      ff,ff,00,00,d5,e7,d3,00,40,00,40,00,4d,00,4d,00,a5,50,8d,00,5b,98,56,00,ff,\
+      ff,ff,00,00,00,00,00,00,00,00,00,00,00,00,00,ff,ff,ff,00,5b,98,56,00,5b,98,\
+      56,00,80,80,80,00,37,5c,34,00,ff,ff,ff,00,5b,98,56,00,80,80,80,00,78,52,6d,\
+      00,00,00,00,00,4f,4f,4f,00,a0,c9,9c,00,00,00,00,00,ff,ff,ff,00,80,00,80,00,\
+      ff,ff,ff,00,5b,98,56,00,00,00,00,00
+[HKEY_CURRENT_USER\ControlPanel\Appearance\Schemes\HCBLACK]
+"DisplayName"=mui_sz:"cplmain.cpl,#33413"
+"Settings"=hex:\
+      ff,ff,00,00,c0,c0,c0,00,00,00,00,00,80,00,80,00,00,80,00,00,00,00,00,00,00,\
+      00,00,00,ff,ff,ff,00,ff,ff,ff,00,ff,ff,ff,00,ff,ff,ff,00,80,80,80,00,c0,c0,\
+      c0,00,80,80,80,00,ff,ff,ff,00,00,00,00,00,00,00,00,00,80,80,80,00,80,80,80,\
+      00,ff,ff,ff,00,ff,ff,ff,00,c0,c0,c0,00,ff,ff,ff,00,c0,c0,c0,00,ff,ff,ff,00,\
+      00,00,00,00,00,00,00,00,ff,ff,ff,00
+[HKEY_CURRENT_USER\ControlPanel\Appearance\Schemes\HCWHITE]
+"DisplayName"=mui_sz:"cplmain.cpl,#33414"
+"Settings"=hex:\
+      ff,ff,00,00,ff,ff,ff,00,ff,ff,ff,00,00,00,00,00,ff,ff,ff,00,ff,ff,ff,00,ff,\
+      ff,ff,00,00,00,00,00,00,00,00,00,00,00,00,00,ff,ff,ff,00,80,80,80,00,c0,c0,\
+      c0,00,80,80,80,00,00,00,00,00,ff,ff,ff,00,ff,ff,ff,00,80,80,80,00,80,80,80,\
+      00,00,00,00,00,00,00,00,00,c0,c0,c0,00,00,00,00,00,c0,c0,c0,00,00,00,00,00,\
+      ff,ff,ff,00,ff,ff,ff,00,00,00,00,00
+[HKEY_CURRENT_USER\ControlPanel\Appearance\Schemes\LILAC]
+"DisplayName"=mui_sz:"cplmain.cpl,#33415"
+"Settings"=hex:\
+      ff,ff,00,00,ae,a8,d9,00,00,00,00,00,5a,4e,b1,00,80,80,80,00,ae,a8,d9,00,ff,\
+      ff,ff,00,00,00,00,00,00,00,00,00,00,00,00,00,ff,ff,ff,00,ae,a8,d9,00,ae,a8,\
+      d9,00,5a,4e,b1,00,5a,4e,b1,00,ff,ff,ff,00,ae,a8,d9,00,80,80,80,00,69,69,69,\
+      00,00,00,00,00,ff,ff,ff,00,d8,d5,ec,00,00,00,00,00,ff,ff,ff,00,00,00,00,00,\
+      ff,ff,ff,00,ae,a8,d9,00,00,00,00,00
+[HKEY_CURRENT_USER\ControlPanel\Appearance\Schemes\MAPLE]
+"DisplayName"=mui_sz:"cplmain.cpl,#33416"
+"Settings"=hex:\
+      ff,ff,00,00,f3,ed,da,00,00,00,00,02,b3,94,37,00,a0,a0,a4,02,e6,d8,ae,02,ff,\
+      ff,ff,02,00,00,00,02,00,00,00,02,00,00,00,02,ff,ff,ff,02,d0,b6,66,00,d0,b6,\
+      66,00,f2,ec,d7,02,a3,87,32,02,00,00,00,02,d0,b6,66,00,80,80,80,00,70,6f,71,\
+      00,00,00,00,02,f2,ec,d7,02,f3,ed,da,00,00,00,00,00,ff,ff,ff,00,00,00,00,02,\
+      ff,ff,ff,02,d2,ba,6f,00,00,00,00,02
+[HKEY_CURRENT_USER\ControlPanel\Appearance\Schemes\SPRUCE]
+"DisplayName"=mui_sz:"cplmain.cpl,#33417"
+"Settings"=hex:\
+      ff,ff,00,00,d0,e3,d3,00,2e,58,2e,00,59,97,64,00,7f,7f,7f,00,a2,c8,a9,00,ff,\
+      ff,ff,00,00,00,00,00,00,00,00,00,00,00,00,00,ff,ff,ff,00,a2,c8,a9,00,a2,c8,\
+      a9,00,d0,e3,d3,00,59,97,64,00,ff,ff,ff,00,a2,c8,a9,00,80,80,80,00,63,a5,63,\
+      00,00,00,00,00,d0,e3,d3,00,d0,e3,d3,00,00,00,00,00,ff,ff,ff,00,00,00,00,00,\
+      ff,ff,ff,00,a2,c8,a9,00,00,00,00,00
+[HKEY_CURRENT_USER\ControlPanel\Appearance\Schemes\STORM]
+"DisplayName"=mui_sz:"cplmain.cpl,#33418"
+"Settings"=hex:\
+      ff,ff,00,00,e7,e7,e7,00,00,00,00,00,00,00,2f,00,80,80,80,00,c0,c0,c0,00,ff,\
+      ff,ff,00,00,00,00,00,00,00,00,00,00,00,00,00,ff,ff,ff,00,a0,a0,a0,00,a0,a0,\
+      a0,00,80,80,80,00,00,00,66,00,ff,ff,ff,00,a0,a0,a0,00,80,80,80,00,80,80,80,\
+      00,00,00,00,00,24,24,24,00,e7,e7,e7,00,00,00,00,00,ff,ff,ff,00,80,00,80,00,\
+      ff,ff,ff,00,a0,a0,a0,00,00,00,00,00
+[HKEY_CURRENT_USER\ControlPanel\Appearance\Schemes\STANDARD]
+"DisplayName"=mui_sz:"cplmain.cpl,#33406"
+"Settings"=hex:\
+      ff,ff,00,00,e0,e0,e0,00,3a,6e,a5,00,00,00,80,00,80,80,80,00,c0,c0,c0,00,ff,\
+      ff,ff,00,00,00,00,00,00,00,00,00,00,00,00,00,ff,ff,ff,00,c0,c0,c0,00,c0,c0,\
+      c0,00,80,80,80,00,00,00,80,00,ff,ff,ff,00,c0,c0,c0,00,80,80,80,00,80,80,80,\
+      00,00,00,00,00,c0,c0,c0,00,ff,ff,ff,00,00,00,00,00,df,df,df,00,00,00,00,00,\
+      ff,ff,ff,00,c0,c0,c0,00,00,00,00,00
+;
+; @CESYSGEN ENDIF CPLMAIN_COLORSCHEME
+
+; @CESYSGEN IF CPLMAIN_SOUNDS
+;
+; Sound CPL registry values
+[HKEY_CURRENT_USER\ControlPanel\Volume]
+	"Key"=dword:10002		; Keyclicks: 1=soft, 0x10002=loud
+	"Screen"=dword:10002	; ScreenTaps: 1=soft, 0x10002=loud
+	"Mute"=dword:7			; 7=Enable all sounds (1=Notifications, 2=Apps, 4=Events.)
+	"Volume"=dword:99999999	; 0=off, 0xFFFFFFFF=maximum
+
+[HKEY_LOCAL_MACHINE\Snd\Scheme]
+	".DefaultSounds"=mui_sz:"cplmain.cpl,#33123"
+	".AllSounds"=mui_sz:"cplmain.cpl,#33124"
+	".NoSounds"=mui_sz:"cplmain.cpl,#33127"
+	
+[HKEY_LOCAL_MACHINE\Snd\Event]
+	".Scheme"=".DefaultSounds"		; Current scheme
+		; This mask allows a device to hide some events	that are N/A to that device
+		; (e.g. 1FFFF hides window-min & max, by enabling only the bottom 17 events)
+	"EventMask"=dword:FFFFFF
+	; Cache menu popup and menu select.
+	"EventCache"=dword:300
+; Scheme descriptions	
+	".NoSounds"=multi_sz:"","","","","","","","","","","","","","","","","","","","",""
+	".DefaultSounds"=multi_sz:"Asterisk","","critical","default","","exclam",
+			"infbeg","infend","infintr","","","","question",
+			"Infbeg","Infend","Infintr","startup","","","",""
+	".AllSounds"=multi_sz:"Asterisk","Close","critical","default","Empty","exclam",
+			"infbeg","infend","infintr","MenuPop","MenuSel","OpenProg","question",
+			"Infbeg","Infend","Infintr","startup","WindMax","WindMin","RecStart","RecEnd"
+;
+; @CESYSGEN ENDIF CPLMAIN_SOUNDS
+
+; @CESYSGEN IF CPLMAIN_POWER
+; @CESYSGEN ENDIF CPLMAIN_POWER
+
+; @CESYSGEN IF CPLMAIN_BACKLIGHT
+;
+; Backlight tab of Display control panel (timeouts in seconds)
+[HKEY_CURRENT_USER\ControlPanel\BackLight]
+	"BatteryTimeout"=dword:3c
+	"ACTimeout"=dword:258
+;
+; @CESYSGEN ENDIF CPLMAIN_BACKLIGHT
+
+; @CESYSGEN IF CPLMAIN_COMM
+; @CESYSGEN ENDIF CPLMAIN_COMM
+
+; @CESYSGEN IF CPLMAIN_DISPLAY
+;
+; initial value for background bitmap, if any
+[HKEY_CURRENT_USER\ControlPanel\Desktop]
+; @CESYSGEN IF IMAGING_IMG_JPEGDECODER
+	"wallpaper"="\\Windows\\WindowsCE.jpg"
+; @CESYSGEN ELSE
+; @CESYSGEN ENDIF IMAGING_IMG_JPEGDECODER
+
+;
+; @CESYSGEN ENDIF CPLMAIN_DISPLAY
+
+; @CESYSGEN IF CPLMAIN_OWNER
+;
+; power up flag for Owner applet to save Area code
+[HKEY_CURRENT_USER\Start]
+	"dummy"=dword:1
+;
+; @CESYSGEN ENDIF CPLMAIN_OWNER
+
+; @CESYSGEN IF CPLMAIN_CERTS
+; This registry key is used to register the RootStorePrompt message box
+; This message box is invoked by CAPI2 whenever a certificate is added
+; or removed from the Root certificate store
+[HKEY_LOCAL_MACHINE\Comm\Security\Crypto\UI]
+	"Dll"="\\Windows\\cplmain.cpl"
+	
+; @CESYSGEN ENDIF CPLMAIN_CERTS
+
+;
+; @CESYSGEN ENDIF WCESHELLFE_MODULES_CPLMAIN
+
+; @CESYSGEN IF WCESHELLFE_MODULES_INTLL || WCESHELLFE_MODULES_INTLP
+;
+; Add an extra locale-specific currency symbol (e.g. Euro)
+[HKEY_LOCAL_MACHINE\nls]
+	"ExtraCurrency"=dword:LOC_EXTRACURRENCY
+;
+; @CESYSGEN ENDIF WCESHELLFE_MODULES_INTLL || WCESHELLFE_MODULES_INTLP
+
+
+
+;
+;----------------------------end CONTROL PANEL ---------------------------------------
+
+; @CESYSGEN IF WCESHELLFE_MODULES_MSTRANSCRIBER
+; @CESYSGEN ENDIF WCESHELLFE_MODULES_MSTRANSCRIBER
+
+; register the language dependent portions of transcriber
+IF LOCALE=0409    ;English (US)
+; @CESYSGEN IF WCESHELLFE_MODULES_MSTRANSCRIBER
+; @CESYSGEN ENDIF WCESHELLFE_MODULES_MSTRANSCRIBER
+ENDIF
+
+IF LOCALE=040c    ;French (France)
+; @CESYSGEN IF WCESHELLFE_MODULES_MSTRANSCRIBER
+; @CESYSGEN ENDIF WCESHELLFE_MODULES_MSTRANSCRIBER
+ENDIF
+
+IF LOCALE=0407    ;German (Germany)
+; @CESYSGEN IF WCESHELLFE_MODULES_MSTRANSCRIBER
+; @CESYSGEN ENDIF WCESHELLFE_MODULES_MSTRANSCRIBER
+ENDIF
+
+
+; @CESYSGEN IF WCESHELLFE_MODULES_MSHIME97
+; @CESYSGEN IF WCESHELLFE_MODULES_INTLL
+; @CESYSGEN ENDIF
+; @CESYSGEN IF WCESHELLFE_MODULES_INTLP
+; @CESYSGEN ENDIF
+; @CESYSGEN ENDIF
+
+; @CESYSGEN IF WCESHELLFE_MODULES_KIMEUI
+; @CESYSGEN ENDIF
+
+; @CESYSGEN IF WCESHELLFE_MODULES_MSIMK
+; @CESYSGEN ENDIF
+
+
+;	Tell edit controls to use level 3 processing for Chinese Ime's.
+
+; @CESYSGEN IF WCESHELLFE_MODULES_CHSIME03
+; @CESYSGEN ENDIF
+
+
+;	"DefaultIm"="LOC_MSIM_CLSID"
+;	@=LOC_SPIMNAME
+;	@=LOC_PHONIMNAME
+;	@=LOC_CHAJEIIMNAME
+
+
+;	CHS Input Methods (IM's)
+; @CESYSGEN IF WCESHELLFE_MODULES_SPIM
+; @CESYSGEN ENDIF
+
+;	Shuangpin Chinese Input Methods (IM's)
+; @CESYSGEN IF WCESHELLFE_MODULES_SSKIM
+; @CESYSGEN ENDIF
+
+;	Shuangpin Chinese Large Input Methods (IM's)
+; @CESYSGEN IF WCESHELLFE_MODULES_SSK3DIM
+; @CESYSGEN ENDIF
+
+; CHT IMs are in COMMON.REG
+
+
+; @CESYSGEN IF WCESHELLFE_MODULES_MSIMESP
+; @CESYSGEN IF WCESHELLFE_MODULES_INTLL
+; @CESYSGEN ENDIF
+; @CESYSGEN IF WCESHELLFE_MODULES_INTLP
+; @CESYSGEN ENDIF
+; @CESYSGEN IF WCESHELLFE_MODULES_INTLL
+; @CESYSGEN ENDIF
+; @CESYSGEN IF WCESHELLFE_MODULES_INTLP
+; @CESYSGEN ENDIF
+; @CESYSGEN ENDIF
+
+; @CESYSGEN IF WCESHELLFE_MODULES_CHSIME03
+; @CESYSGEN IF WCESHELLFE_MODULES_INTLL
+; @CESYSGEN ENDIF
+; @CESYSGEN IF WCESHELLFE_MODULES_INTLP
+; @CESYSGEN ENDIF
+; @CESYSGEN ENDIF
+
+
+; @CESYSGEN IF WCESHELLFE_MODULES_MSIMEPH
+; @CESYSGEN IF WCESHELLFE_MODULES_INTLL
+; @CESYSGEN ENDIF
+; @CESYSGEN IF WCESHELLFE_MODULES_INTLP
+; @CESYSGEN ENDIF
+; @CESYSGEN IF WCESHELLFE_MODULES_INTLL
+; @CESYSGEN ENDIF
+; @CESYSGEN IF WCESHELLFE_MODULES_INTLP
+; @CESYSGEN ENDIF
+; @CESYSGEN ENDIF
+
+;---------------------------- start WATSON ---------------------------------
+;
+
+
+; @CESYSGEN IF WCESHELLFE_MODULES_DWXFER
+; @CESYSGEN ENDIF WCESHELLFE_MODULES_DWXFER
+   
+; @CESYSGEN IF WCESHELLFE_MODULES_DWXFER || WCESHELLFE_MODULES_DW
+; @CESYSGEN ENDIF WCESHELLFE_MODULES_DWXFER || WCESHELLFE_MODULES_DW
+
+; @CESYSGEN IF WCESHELLFE_MODULES_DW
+; @CESYSGEN ENDIF WCESHELLFE_MODULES_DW
+
+;
+;---------------------------- end WATSON ---------------------------------
+

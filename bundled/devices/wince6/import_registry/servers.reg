@@ -1,0 +1,719 @@
+;
+; Copyright (c) Microsoft Corporation.  All rights reserved.
+;
+;
+; Use of this sample source code is subject to the terms of the Microsoft
+; license agreement under which you licensed this sample source code. If
+; you did not accept the terms of the license agreement, you are not
+; authorized to use this sample source code. For the terms of the license,
+; please see the license agreement between you and Microsoft or, if applicable,
+; see the LICENSE.RTF on your install media or the root of your tools installation.
+; THE SAMPLE SOURCE CODE IS PROVIDED "AS IS", WITH NO WARRANTIES OR INDEMNITIES.
+;
+
+; @CESYSGEN IF SERVERS_MODULES_TELNETD
+; @CESYSGEN IF CE_MODULES_TCPIP6
+; @CESYSGEN ENDIF CE_MODULES_TCPIP6
+; @CESYSGEN IF CE_MODULES_EVENTLOG
+; @CESYSGEN ENDIF CE_MODULES_EVENTLOG
+; @CESYSGEN ENDIF SERVERS_MODULES_TELNETD
+
+
+; @CESYSGEN IF SERVERS_MODULES_HTTPD
+[HKEY_LOCAL_MACHINE\Services\HTTPD\Accept\TCP-80]
+   ; TCP port 80.  Default HTTPD listen port.
+   "SockAddr"=hex:02,00,00,50,00,00,00,00,00,00,00,00,00,00,00,00
+
+; @CESYSGEN IF CE_MODULES_TCPIP6
+[HKEY_LOCAL_MACHINE\Services\HTTPD\Accept\TCP-80v6]
+   ; TCP port 80.  Default HTTPD listen port.
+   "SockAddr"=hex:17,00,00,50,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00
+; @CESYSGEN ENDIF CE_MODULES_TCPIP6
+
+
+[HKEY_LOCAL_MACHINE\Services\HTTPD\Accept\TCP-443]
+   ; TCP port 443, all addresses.  Default SSL listen port.
+   "SockAddr"=hex:02,00,01,BB,00,00,00,00,00,00,00,00,00,00,00,00
+
+; @CESYSGEN IF CE_MODULES_TCPIP6
+[HKEY_LOCAL_MACHINE\Services\HTTPD\Accept\TCP-443v6]
+   ; TCP port 443, all addresses.  Default SSL listen port.
+   "SockAddr"=hex:17,00,01,BB,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00
+; @CESYSGEN ENDIF CE_MODULES_TCPIP6
+
+
+[HKEY_LOCAL_MACHINE\Services\HTTPD]
+; @CESYSGEN IF SERVERS_MODULES_ASP
+; @CESYSGEN ELSE
+  ; SERVICE_INIT_STOPPED | SERVICE_NET_ADDR_CHANGE_THREAD
+  "ServiceContext"=dword:9
+; @CESYSGEN ENDIF SERVERS_MODULES_ASP
+  "FriendlyName"="World Wide Web Publishing"
+   "Dll"="HTTPD.DLL"
+   "Order"=dword:8
+   "Keep"=dword:1
+   "Prefix"="HTP"
+   "Index"=dword:0
+
+; Default HTTP server settings
+[HKEY_LOCAL_MACHINE\COMM\HTTPD\]
+"MaxLogSize"=dword:8000
+"LogFileDirectory"="\\windows\\www"
+"NTLM"=dword:1
+"Basic"=dword:0
+; Many configuration web pages (and telnet/ftp servers) by convention use a  
+; user named ADMIN to have admin level priveleges.  Make sure this special ADMIN user
+; has admin-level access to all Virtual Roots in web server as well, for convenience.
+"AdminUsers"="ADMIN"
+
+[HKEY_LOCAL_MACHINE\COMM\HTTPD\VROOTS\/]
+@="\\windows\\www\\wwwpub\\"				
+"a"=dword:0
+
+; Specify Content-Type mappings.  If an extension is not explicitly mapped
+; in the registry, HTTPD will send "Content-Type: application/octet-stream" when it is downloaded.
+
+[HKEY_CLASSES_ROOT\.htm]
+"Content Type"="text/html"
+
+[HKEY_CLASSES_ROOT\.html]
+"Content Type"="text/html"
+
+[HKEY_CLASSES_ROOT\.css]
+"Content Type"="text/css"
+
+[HKEY_CLASSES_ROOT\.asp]
+"Content Type"="text/asp"
+
+[HKEY_CLASSES_ROOT\.exe]
+"Content Type"="application/x-msdownload"
+
+[HKEY_CLASSES_ROOT\.gif]
+"Content Type"="image/gif"
+
+[HKEY_CLASSES_ROOT\.jpe]
+"Content Type"="image/jpeg"
+
+[HKEY_CLASSES_ROOT\.jpg]
+"Content Type"="image/jpeg"
+
+[HKEY_CLASSES_ROOT\.jfif]
+"Content Type"="image/pjpeg"
+
+[HKEY_CLASSES_ROOT\.jpeg]
+"Content Type"="image/jpeg"
+
+[HKEY_CLASSES_ROOT\.txt]
+"Content Type"="text/plain"
+
+[HKEY_CLASSES_ROOT\.xml]
+"Content Type"="text/xml"
+
+[HKEY_CLASSES_ROOT\.xsl]
+"Content Type"="text/xml"
+
+[HKEY_CLASSES_ROOT\.wav]
+"Content Type"="audio/wav"
+
+[HKEY_CLASSES_ROOT\.mid]
+"Content Type"="audio/mid"
+
+[HKEY_CLASSES_ROOT\.rmi]
+"Content Type"="audio/mid"
+
+[HKEY_CLASSES_ROOT\.avi]
+"Content Type"="video/avi"
+
+[HKEY_CLASSES_ROOT\.mpeg]
+"Content Type"="video/mpeg"
+
+[HKEY_CLASSES_ROOT\.mpg]
+"Content Type"="video/mpeg"
+
+[HKEY_CLASSES_ROOT\.mp2]
+"Content Type"="video/mpeg"
+
+[HKEY_CLASSES_ROOT\.mp3]
+"Content Type"="audio/mpeg"
+
+[HKEY_CLASSES_ROOT\.mpa]
+"Content Type"="audio/mpeg"
+
+[HKEY_CLASSES_ROOT\.qt]
+"Content Type"="video/quicktime"
+
+[HKEY_CLASSES_ROOT\.mov]
+"Content Type"="video/quicktime"
+
+[HKEY_CLASSES_ROOT\.wma]
+"Content Type"="audio/x-ms-wma"
+
+[HKEY_CLASSES_ROOT\.wax]
+"Content Type"="audio/x-ms-wax"
+
+[HKEY_CLASSES_ROOT\.wvx]
+"Content Type"="video/x-ms-wvx"
+
+[HKEY_CLASSES_ROOT\.asf]
+"Content Type"="video/x-ms-asf"
+
+[HKEY_CLASSES_ROOT\.asx]
+"Content Type"="video/x-ms-asf"
+
+[HKEY_CLASSES_ROOT\.wmv]
+"Content Type"="video/x-ms-wmv"
+
+[HKEY_CLASSES_ROOT\.wmx]
+"Content Type"="video/x-ms-wmx"
+
+[HKEY_CLASSES_ROOT\.wm]
+"Content Type"="video/x-ms-wm"
+
+; @CESYSGEN IF CE_MODULES_IPNAT
+; @CESYSGEN ENDIF CE_MODULES_IPNAT
+; @CESYSGEN ENDIF SERVERS_MODULES_HTTPD
+
+
+; @CESYSGEN IF SERVERS_MODULES_FTPD
+; @CESYSGEN ENDIF SERVERS_MODULES_FTPD
+
+
+
+
+
+; @CESYSGEN IF SERVERS_MODULES_ASP
+; @CESYSGEN ENDIF SERVERS_MODULES_ASP
+
+
+; @CESYSGEN IF SERVERS_MODULES_ROUTENBTD
+; @CESYSGEN ENDIF SERVERS_MODULES_ROUTENBTD
+
+
+; @CESYSGEN IF SERVERS_MODULES_HTTPDADM
+; @CESYSGEN IF SERVERS_MODULES_REMOTEADMIN
+; @CESYSGEN ENDIF SERVERS_MODULES_REMOTEADMIN
+; @CESYSGEN ENDIF SERVERS_MODULES_HTTPDADM
+
+
+; @CESYSGEN IF SERVERS_MODULES_MSMQADMEXT
+; @CESYSGEN IF SERVERS_MODULES_REMOTEADMIN
+; @CESYSGEN ENDIF SERVERS_MODULES_REMOTEADMIN
+; @CESYSGEN ENDIF SERVERS_MODULES_MSMQADMEXT
+
+; @CESYSGEN IF SERVERS_MODULES_SRMPISAPI
+; @CESYSGEN ENDIF
+
+
+; @CESYSGEN IF SERVERS_MODULES_BTCONFIG
+; @CESYSGEN IF SERVERS_MODULES_REMOTEADMIN
+; @CESYSGEN ENDIF SERVERS_MODULES_REMOTEADMIN
+; @CESYSGEN ENDIF SERVERS_MODULES_BTCONFIG
+
+
+; @CESYSGEN IF SERVERS_MODULES_WEBPROXY
+; @CESYSGEN IF SERVERS_MODULES_PCFILTER
+; @CESYSGEN ENDIF SERVERS_MODULES_PCFILTER
+; @CESYSGEN ENDIF SERVERS_MODULES_WEBPROXY
+
+
+; ---------------------------------------------------------------------------
+;  SOAP Support
+; ---------------------------------------------------------------------------
+; @CESYSGEN IF SERVERS_MODULES_MSSOAP1
+; @CESYSGEN ENDIF SERVERS_MODULES_MSSOAP1
+
+
+
+; @CESYSGEN IF SERVERS_MODULES_DISCOVERSERVICE
+; @CESYSGEN IF SERVERS_MODULES_SMBSERVER
+; @CESYSGEN IF SERVERS_MODULES_REMOTEADMIN
+; @CESYSGEN ENDIF CE_MODULES_REMOTEADMIN
+; @CESYSGEN ENDIF SERVERS_MODULES_SMBSERVER
+; @CESYSGEN ENDIF SERVERS_MODULES_DISCOVERSERVICE
+
+
+
+
+
+; @CESYSGEN IF SERVERS_MODULES_SMBSERVER
+; @CESYSGEN ENDIF SERVERS_MODULES_SMBSERVER
+
+
+
+; ---------------------------------------------------------------------------
+;  OBEX Support
+; ---------------------------------------------------------------------------
+; @CESYSGEN IF SERVERS_MODULES_OBEXSRVR
+
+; @CESYSGEN IF CE_MODULES_IRDASTK
+; @CESYSGEN ENDIF CE_MODULES_IRDASTK
+
+[HKEY_LOCAL_MACHINE\Services\OBEX]
+    "FriendlyName"="OBEX"
+	"DLL"="OBEXSrVr.dll"
+	"Keep"=dword:1
+	"Order"=dword:9
+        "Prefix"="OBX"
+        "Index"=dword:0
+
+[HKEY_LOCAL_MACHINE\Software\Microsoft\Obex]
+     "LogSize"=dword:10
+     "DebugOutputMask"=dword:0
+     "DebugOutputChannels"=dword:4
+
+; @CESYSGEN IF CE_MODULES_BTD
+   ; @CESYSGEN IF CE_MODULES_IRDASTK
+   ; @CESYSGEN ELSE
+   ; @CESYSGEN ENDIF CE_MODULES_IRDASTK
+; @CESYSGEN ELSE
+   ; @CESYSGEN IF CE_MODULES_IRDASTK
+   ; @CESYSGEN ENDIF CE_MODLUES_IRDASTK
+; @CESYSGEN ENDIF CE_MODULES_BTD
+
+; @CESYSGEN ENDIF SERVERS_MODULES_OBEXSRVR
+
+
+; @CESYSGEN IF SERVERS_MODULES_OBEXINBX					
+; @CESYSGEN IF CE_MODULES_BTD
+; @CESYSGEN ENDIF CE_MODULES_BTD
+; @CESYSGEN ENDIF SERVERS_MODULES_OBEXINBX
+
+
+; @CESYSGEN IF SERVERS_MODULES_OBEXVCRD
+; @CESYSGEN ENDIF SERVERS_MODULES_OBEXVCRD
+
+
+; @CESYSGEN IF SERVERS_MODULES_OBEXVCAL
+; @CESYSGEN ENDIF SERVERS_MODULES_OBEXVCAL
+
+
+; @CESYSGEN IF SERVERS_MODULES_OBEXFILE
+; @CESYSGEN IF CE_MODULES_BTD
+; @CESYSGEN ENDIF CE_MODULES_BTD
+; @CESYSGEN ENDIF SERVERS_MODULES_OBEXFILE
+
+
+; @CESYSGEN IF SERVERS_MODULES_OBEXEXEC
+; @CESYSGEN ENDIF SERVERS_MODULES_OBEXEXEC
+
+
+
+
+
+; @CESYSGEN IF SERVERS_MODULES_OBEXAPI
+; @CESYSGEN IF CE_MODULES_IRDASTK
+; @CESYSGEN ENDIF CE_MODULES_IRDASTK
+; @CESYSGEN IF CE_MODULES_BTD
+; @CESYSGEN ENDIF CE_MODULES_BTD
+; @CESYSGEN IF CE_MODULES_IRDASTK
+; @CESYSGEN ENDIF CE_MODULES_IRDASTK
+; @CESYSGEN IF CE_MODULES_BTD
+; @CESYSGEN ENDIF CE_MODULES_BTD
+; @CESYSGEN ENDIF SERVERS_MODULES_OBEXAPI
+
+
+; ---------------------------------------------------------------------------
+;  Remote Configuration UI
+; ---------------------------------------------------------------------------
+; @CESYSGEN IF SERVERS_MODULES_REMOTEADMIN
+; @CESYSGEN IF SERVERS_MODULES_RUI_COREUI
+; @CESYSGEN ENDIF SERVERS_MODULES_RUI_COREUI
+; @CESYSGEN IF SERVERS_MODULES_RUI_TIMESERVICE
+; @CESYSGEN ENDIF SERVERS_MODULES_RUI_TIMESERVICE
+; @CESYSGEN IF SERVERS_MODULES_RUI_GATEWAYUI
+; @CESYSGEN IF SERVERS_MODULES_RUI_WATSON
+; @CESYSGEN ENDIF SERVERS_MODULES_RUI_WATSON
+; @CESYSGEN ENDIF
+; @CESYSGEN IF SERVERS_MODULES_RUI_NETLOG
+; @CESYSGEN ENDIF
+; @CESYSGEN IF SERVERS_MODULES_RUI_SMBFILE
+; @CESYSGEN ENDIF
+; @CESYSGEN IF SERVERS_MODULES_RUI_SMBPRINT
+; @CESYSGEN ENDIF
+; @CESYSGEN IF SERVERS_MODULES_RUI_GATEWAYUI
+; @CESYSGEN ENDIF SERVERS_MODULES_RUI_GATEWAYUI
+; @CESYSGEN IF SERVERS_MODULES_RUI_PORTFORWARD
+; @CESYSGEN ENDIF SERVERS_MODULES_RUI_PORTFORWARD
+; @CESYSGEN IF SERVERS_MODULES_RUI_NAT
+; @CESYSGEN ENDIF SERVERS_MODULES_RUI_NAT
+; @CESYSGEN IF SERVERS_MODULES_RUI_ROOTDIRS
+; @CESYSGEN ENDIF SERVERS_MODULES_RUI_ROOTDIRS
+; @CESYSGEN IF SERVERS_MODULES_RUI_SMBFILE
+; @CESYSGEN ENDIF SERVERS_MODULES_RUI_SMBFILE
+; @CESYSGEN IF SERVERS_MODULES_RUI_SMBPRINT
+; @CESYSGEN ENDIF SERVERS_MODULES_RUI_SMBPRINT
+; @CESYSGEN IF SERVERS_MODULES_RUI_USERMANAGER
+; @CESYSGEN ENDIF SERVERS_MODULES_RUI_USERMANAGER
+; @CESYSGEN IF SERVERS_MODULES_RUI_TIMESERVICE
+; @CESYSGEN ENDIF SERVERS_MODULES_RUI_TIMESERVICE
+; @CESYSGEN IF SERVERS_MODULES_RUI_RAS
+; @CESYSGEN ENDIF SERVERS_MODULES_RUI_RAS
+; @CESYSGEN IF SERVERS_MODULES_RUI_FIREWALL
+; @CESYSGEN ENDIF SERVERS_MODULES_RUI_FIREWALL
+; @CESYSGEN IF SERVERS_MODULES_RUI_PC
+; @CESYSGEN ENDIF SERVERS_MODULES_RUI_PC
+; @CESYSGEN IF SERVERS_MODULES_RUI_WATSON
+; @CESYSGEN ENDIF SERVERS_MODULES_RUI_WATSON
+; @CESYSGEN IF SERVERS_MODULES_RUI_NETLOG
+; @CESYSGEN ENDIF SERVERS_MODULES_RUI_NETLOG
+; @CESYSGEN IF CE_MODULES_EVENTLOG
+; @CESYSGEN ENDIF
+; @CESYSGEN IF SERVERS_MODULES_RUI_SMBPRINT || SERVERS_MODULES_HTTPDADM
+; @CESYSGEN ENDIF
+; @CESYSGEN IF SERVERS_MODULES_TELNETD
+; @CESYSGEN ENDIF SERVERS_MODULES_TELNETD
+; @CESYSGEN IF SERVERS_MODULES_FTPD
+; @CESYSGEN ENDIF SERVERS_MODULES_FTPD
+; @CESYSGEN ENDIF CE_MODULES_REMOTEADMIN
+
+
+; ---------------------------------------------------------------------------
+;  Universal Plug and Play (UPnP)
+; ---------------------------------------------------------------------------
+
+; @CESYSGEN IF SERVERS_MODULES_UPNPSVC
+[HKEY_LOCAL_MACHINE\Services\UPNPSVC]
+   "Prefix"="UPP"
+   "Dll"="upnpsvc.dll"
+   "Index"=dword:1
+   "Order"=dword:5
+
+; HTTPD virtual root for UPNP
+[HKEY_LOCAL_MACHINE\COMM\HTTPD\VROOTS\/upnp]
+   @="\\windows\\upnp\\"				
+   "a"=dword:0
+
+[HKEY_LOCAL_MACHINE\COMM\HTTPD\VROOTS\/upnpisapi]
+   @="\\windows\\upnpsvc.dll"				
+   "a"=dword:0
+
+[HKEY_LOCAL_MACHINE\COMM\UPnP]
+   "Port"=dword:1400
+   "DiscoveryTimeToLive"=dword:1
+
+[HKEY_LOCAL_MACHINE\Services\HTTPD\Accept\TCP-5120]
+   ; TCP port 5120. UPnP listen port.
+   "SockAddr"=hex:02,00,14,00,00,00,00,00,00,00,00,00,00,00,00,00
+
+; @CESYSGEN IF CE_MODULES_TCPIP6
+[HKEY_LOCAL_MACHINE\Services\HTTPD\Accept\TCP-5120v6]
+   ; TCP port 5120. UPnP listen port.
+   "SockAddr"=hex:17,00,14,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00
+; @CESYSGEN ENDIF CE_MODULES_TCPIP6   
+
+; @CESYSGEN ENDIF SERVERS_MODULES_UPNPSVC
+
+; @CESYSGEN IF SERVERS_MODULES_UPNPLOADER
+[HKEY_LOCAL_MACHINE\Services\UPNPLOADER]
+   "Prefix"="UPL"
+   "Dll"="upnploader.dll"
+   "Index"=dword:1
+   ; must load after upnpsvc and httpd
+   "Order"=dword:10
+
+; @CESYSGEN ENDIF SERVERS_MODULES_UPNPLOADER
+
+; @CESYSGEN IF SERVERS_MODULES_UPNPHOST
+
+[HKEY_CLASSES_ROOT\CLSID\{204810b9-73b2-11d4-bf42-00b0d0118b56}]
+	@="UPnP Registrar Class"
+
+[HKEY_CLASSES_ROOT\CLSID\{204810b9-73b2-11d4-bf42-00b0d0118b56}\ProgID]
+	@="UPnP.UPnPRegistrar.1"
+
+[HKEY_CLASSES_ROOT\CLSID\{204810b9-73b2-11d4-bf42-00b0d0118b56}\VersionIndependentProgID]
+	@="UPnP.UPnPRegistrar"
+
+[HKEY_CLASSES_ROOT\CLSID\{204810b9-73b2-11d4-bf42-00b0d0118b56}\InprocServer32]
+	@="\\Windows\\upnphost.dll"
+	"ThreadingModel"="Both"
+
+[HKEY_CLASSES_ROOT\UPnP.UPnPRegistrar.1]
+	@="UPnP Registrar Class"
+
+[HKEY_CLASSES_ROOT\UPnP.UPnPRegistrar.1\CLSID]	
+	@="{204810b9-73b2-11d4-bf42-00b0d0118b56}"
+
+[HKEY_CLASSES_ROOT\UPnP.UPnPRegistrar]
+	@="UPnP Registrar Class"
+
+[HKEY_CLASSES_ROOT\UPnP.UPnPRegistrar\CurVer]	
+	@="UPnP.UPnPRegistrar.1"
+
+; @CESYSGEN ENDIF SERVERS_MODULES_UPNPHOST
+
+
+; @CESYSGEN IF SERVERS_MODULES_UPNPCTRL
+
+[HKEY_CLASSES_ROOT\CLSID\{E2085F28-FEB7-404A-B8E7-E659BDEAAA02}]
+	@="UPnP DeviceFinder Class"
+
+[HKEY_CLASSES_ROOT\CLSID\{E2085F28-FEB7-404A-B8E7-E659BDEAAA02}\ProgID]
+	@="UPnP.UPnPDeviceFinder.1"
+
+[HKEY_CLASSES_ROOT\CLSID\{E2085F28-FEB7-404A-B8E7-E659BDEAAA02}\VersionIndependentProgID]
+	@="UPnP.UPnPDeviceFinder"
+
+[HKEY_CLASSES_ROOT\CLSID\{E2085F28-FEB7-404A-B8E7-E659BDEAAA02}\InprocServer32]
+	@="\\Windows\\upnpctrl.dll"
+	"ThreadingModel"="Both"
+
+[HKEY_CLASSES_ROOT\UPnP.UPnPDeviceFinder.1]
+	@="UPnP DeviceFinder Class"
+
+[HKEY_CLASSES_ROOT\UPnP.UPnPDeviceFinder.1\CLSID]	
+	@="{E2085F28-FEB7-404A-B8E7-E659BDEAAA02}"
+
+[HKEY_CLASSES_ROOT\UPnP.UPnPDeviceFinder]
+	@="UPnP DeviceFinder Class"
+
+[HKEY_CLASSES_ROOT\UPnP.UPnPDeviceFinder\CurVer]
+	@="UPnP.UPnPDeviceFinder.1"
+
+
+[HKEY_CLASSES_ROOT\CLSID\{1d8a9b47-3a28-4ce2-8a4b-bd34e45bceeb}]
+	@="UPnP DescriptionDocument Class"
+
+[HKEY_CLASSES_ROOT\CLSID\{1d8a9b47-3a28-4ce2-8a4b-bd34e45bceeb}\ProgID]
+	@="UPnP.DescriptionDocument.1"
+
+[HKEY_CLASSES_ROOT\CLSID\{1d8a9b47-3a28-4ce2-8a4b-bd34e45bceeb}\VersionIndependentProgID]
+	@="UPnP.DescriptionDocument"
+
+[HKEY_CLASSES_ROOT\CLSID\{1d8a9b47-3a28-4ce2-8a4b-bd34e45bceeb}\InprocServer32]
+	@="\\Windows\\upnpctrl.dll"
+	"ThreadingModel"="Both"
+
+[HKEY_CLASSES_ROOT\UPnP.DescriptionDocument.1]
+	@="UPnP DescriptionDocument Class"
+
+[HKEY_CLASSES_ROOT\UPnP.DescriptionDocument.1\CLSID]	
+	@="{1d8a9b47-3a28-4ce2-8a4b-bd34e45bceeb}"
+
+[HKEY_CLASSES_ROOT\UPnP.DescriptionDocument]
+	@="UPnP DescriptionDocument Class"
+
+[HKEY_CLASSES_ROOT\UPnP.DescriptionDocument\CurVer]	
+	@="UPnP.DescriptionDocument.1"
+
+; @CESYSGEN ENDIF SERVERS_MODULES_UPNPCTRL
+
+
+; @CESYSGEN IF SERVERS_MODULES_IGD
+; @CESYSGEN ENDIF SERVERS_MODULES_IGD
+
+; @CESYSGEN IF SERVERS_MODULES_AV_DLL
+
+[HKEY_CLASSES_ROOT\TypeLib\{2432AD2B-4D63-47FB-9838-BECA90E1DC97}\1.0\0]
+    @="\\windows\\av_dll.dll"
+
+[HKEY_CLASSES_ROOT\TypeLib\{2432AD2B-4D63-47FB-9838-BECA90E1DC97}\1.0\0\win32]
+    @="\\windows\\av_dll.dll"
+
+; @CESYSGEN ENDIF SERVERS_MODULES_AV_DLL
+
+
+; @CESYSGEN IF SERVERS_MODULES_MSMQD
+; @CESYSGEN ENDIF
+
+
+; @CESYSGEN IF SERVERS_MODULES_MQOA
+; @CESYSGEN ENDIF
+
+
+; @CESYSGEN IF SERVERS_MODULES_SVCSTART
+; @CESYSGEN ENDIF
+
+; @CESYSGEN IF SERVERS_MODULES_TIMESVC
+;
+;
+;	"server" - FQDN of sntp server, or list thereof (REG_SZ or REG_MULTI_SZ). If not given, server-only operation assumed.
+;	"refresh" - period (in ms) between syncs with SNTP server. Ignored in server-only mode
+;	"recoveryrefresh" - time (in ms) to next sync if last attempt failed. Ignored in server-only mode
+;	"threshold" - interval (in sec) between time on SNTP server and current time when adjustment
+;		is allowed. If the difference between SNTP server time and local system time is bigger,
+;		update is ignored unless system clock is presumed incorrect (see below). Ignored in server-only mode
+;	"ServerRole" - if 1, enables server operation.
+;	"AutoUpdate" - if 1, enables automatic time updates by SNTP client. "server" must be specified.
+;	"trustlocalclock" - if 0, system is presumed to not have RTC capabilities. If this is the case,
+;		server multicast is disabled until clock sync with sntp server succeeds, and queries to the
+;               server return "unreliable clock" flag. Also, the time synchronization is forced on wake-up.
+;               If client is disabled, the clock is presumed trusted and this value is ignored
+;	"multicast" - dword of ipv4 address of multicast (deprecated; for compatibility only)
+;               or multi_sz of ipv4 and ipv6 multicast addreses. Default value below is for gateways.
+;               224.0.0.1=all systems on the subnet
+;               224.0.1.1=all NTP systems within router-defined scope
+;               FF02::1=all nodes on the link
+;               FF0X::101=NTP systems within site
+;               "multicast"=dword:010000e0 ; == 224.0.0.1
+;       "multicastperiod" - interval between subsequent multicasts.
+;
+[HKEY_LOCAL_MACHINE\Services\TIMESVC]
+   "Dll"="timesvc.dll"
+   "Order"=dword:99
+   "Keep"=dword:1
+   "Prefix"="NTP"
+   "Index"=dword:0
+
+; @CESYSGEN IF TIMESVC_TSVC_SNTP
+; @CESYSGEN IF TIMESVC_TSVC_AUTO_UPDATE
+; @CESYSGEN IF CE_MODULES_IPNAT
+; @CESYSGEN ENDIF CE_MODULES_IPNAT
+; @CESYSGEN ENDIF TIMESVC_TSVC_AUTO_UPDATE
+; @CESYSGEN ENDIF TIMESVC_TSVC_SNTP
+
+; @CESYSGEN IF TIMESVC_TSVC_DST
+; Have DST changes automatically enabled
+[HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Clock]
+"AutoDST"=dword:1
+; @CESYSGEN ENDIF TIMESVC_TSVC_DST
+
+; @CESYSGEN ENDIF SERVERS_MODULES_TIMESVC
+; 
+; Event logging rules
+;
+
+
+; @CESYSGEN IF SERVERS_MODULES_USBFLASHAPSERVICE
+; @CESYSGEN ENDIF SERVERS_MODULES_USBFLASHAPSERVICE
+
+; @CESYSGEN IF SERVERS_MODULES_RGLOGMSGS
+; @CESYSGEN ENDIF
+
+
+; @CESYSGEN IF SERVERS_MODULES_RGLOGEVENTMON
+; @CESYSGEN IF CE_MODULES_FW6
+; @CESYSGEN ENDIF
+; @CESYSGEN IF CE_MODULES_AUTODIAL
+; @CESYSGEN ENDIF
+; @CESYSGEN IF CE_MODULES_PPPOE
+; @CESYSGEN ENDIF
+; @CESYSGEN IF CE_MODULES_PPPOE
+; @CESYSGEN ENDIF
+; @CESYSGEN ENDIF
+
+
+
+; @CESYSGEN IF SERVERS_MODULES_LFSVC
+; @CESYSGEN ENDIF
+
+
+
+; @CESYSGEN IF SERVERS_MODULES_LFFAKEPROVIDER
+; @CESYSGEN ENDIF
+
+
+; @CESYSGEN IF SERVERS_MODULES_LFFAKERESOLVER
+; @CESYSGEN ENDIF
+
+
+
+; @CESYSGEN IF SERVERS_MODULES_LFGPSPROVIDER
+; @CESYSGEN ENDIF
+
+
+
+; @CESYSGEN IF SERVERS_MODULES_LFWIFIPROVIDER
+; @CESYSGEN ENDIF
+
+; @CESYSGEN IF SERVERS_MODULES_HTTPSYS
+[HKEY_LOCAL_MACHINE\Services\HTTPSYS]
+  "FriendlyName"="HttpSys"
+   "Dll"="HttpSys.DLL"
+   "Order"=dword:20
+   "Keep"=dword:1
+   "Prefix"="HSY"
+   "Index"=dword:0
+    ;
+    ; Set the web server read size to 64K
+    ;
+[HKEY_LOCAL_MACHINE\COMM\HTTPD]
+  "PostReadSize"=dword:10000
+; @CESYSGEN ENDIF
+
+; @CESYSGEN IF SERVERS_MODULES_WSDAPI
+[HKEY_LOCAL_MACHINE\Services\HTTPD\Accept\TCP-5357]
+  ;By default, WSD listens on 5357 (0x14ED).
+  "SockAddr"=hex:02,00,14,ED,00,00,00,00,00,00,00,00,00,00,00,00
+; @CESYSGEN ENDIF SERVERS_MODULES_WSDAPI
+
+
+; @CESYSGEN IF SERVERS_MODULES_WSDAPI
+;clsid for device host
+[HKEY_CLASSES_ROOT\CLSID\{124e20f4-0fba-44e7-8ceb-85234132055a}\InprocServer32]
+  @="wsdapi.dll"
+  "ThreadingModle" = "Both"
+
+[HKEY_CLASSES_ROOT\CLSID\{072c5931-f75e-4f79-809b-326a72fc4cde}\InprocServer32]
+  @="wsdapi.dll"
+  "ThreadingModle" = "Both"
+
+[HKEY_CLASSES_ROOT\CLSID\{04e02e35-6913-4c94-b51a-43130c8a2dd4}\InprocServer32]
+  @="wsdapi.dll"
+  "ThreadingModle" = "Both"
+
+[HKEY_CLASSES_ROOT\CLSID\{dffb1b36-3f0f-439b-8bca-6f5fdde177db}\InprocServer32]
+  @="wsdapi.dll"
+  "ThreadingModle" = "Both"
+
+[HKEY_CLASSES_ROOT\CLSID\{480b94b2-4475-46d7-bed7-5eaa45503156}\InprocServer32]
+  @="wsdapi.dll"
+  "ThreadingModle" = "Both"
+
+[HKEY_CLASSES_ROOT\CLSID\{0ccf0ca4-d350-4e9d-a0d1-e0e41ecee240}\InprocServer32]
+  @="wsdapi.dll"
+  "ThreadingModle" = "Both"
+
+[HKEY_CLASSES_ROOT\CLSID\{624b6d92-31b4-4bb7-b083-8fc017736fd6}\InprocServer32]
+  @="wsdapi.dll"
+  "ThreadingModle" = "Both"
+
+;saxxmlreader 3.0
+[HKEY_CLASSES_ROOT\CLSID\{3124c396-fb13-4836-a6ad-1317f1713688}\InprocServer32]
+  @="wsdapi.dll"
+  "ThreadingModle" = "Both"
+
+;saxxmlreader 4.0
+[HKEY_CLASSES_ROOT\CLSID\{7c6e29bc-8b8b-4c3d-859e-af6cd158be0f}\InprocServer32]
+  @="wsdapi.dll"
+  "ThreadingModle" = "Both"
+
+;saxxmlreader 6.0
+[HKEY_CLASSES_ROOT\CLSID\{88d96a0c-f192-11d4-a65f-0040963251e5}\InprocServer32]
+  @="wsdapi.dll"
+  "ThreadingModle" = "Both"
+
+;DOMDocument
+[HKEY_CLASSES_ROOT\CLSID\{F6D90F11-9C73-11D3-B32E-00C04F990BB4}\InprocServer32]
+  @="wsdapi.dll"
+  "ThreadingModle" = "Both"
+
+;DOMDocument rental
+[HKEY_CLASSES_ROOT\CLSID\{f5078f1b-c551-11d3-89b9-0000f81fe221}\InprocServer32]
+  @="wsdapi.dll"
+  "ThreadingModle" = "Both"
+
+[HKEY_CLASSES_ROOT\CLSID\{88d96a0c-f192-11d4-a65f-0040963251e5}\InprocServer32]
+  @="wsdapi.dll"
+  "ThreadingModle" = "Both"
+
+[HKEY_CLASSES_ROOT\CLSID\{88d96a0c-f192-11d4-a65f-0040963251e5}\InprocServer32]
+  @="wsdapi.dll"
+  "ThreadingModle" = "Both"
+
+[HKEY_CLASSES_ROOT\CLSID\{88d96a0c-f192-11d4-a65f-0040963251e5}\InprocServer32]
+  @="wsdapi.dll"
+  "ThreadingModle" = "Both"
+
+[HKEY_CLASSES_ROOT\CLSID\{88d96a0c-f192-11d4-a65f-0040963251e5}\InprocServer32]
+  @="wsdapi.dll"
+  "ThreadingModle" = "Both"
+
+[HKEY_CLASSES_ROOT\CLSID\{88d96a0c-f192-11d4-a65f-0040963251e5}\InprocServer32]
+  @="wsdapi.dll"
+  "ThreadingModle" = "Both"
+
+[HKEY_CLASSES_ROOT\CLSID\{88d96a0c-f192-11d4-a65f-0040963251e5}\InprocServer32]
+  @="wsdapi.dll"
+  "ThreadingModle" = "Both"
+; @CESYSGEN ENDIF SERVERS_MODULES_WSDAPI

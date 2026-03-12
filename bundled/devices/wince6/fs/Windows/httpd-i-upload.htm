@@ -1,0 +1,43 @@
+<!--
+Copyright (c) Microsoft Corporation.  All rights reserved.
+-->
+<!--
+Use of this sample source code is subject to the terms of the Microsoft
+license agreement under which you licensed this sample source code. If
+you did not accept the terms of the license agreement, you are not
+authorized to use this sample source code. For the terms of the license,
+please see the license agreement between you and Microsoft or, if applicable,
+see the LICENSE.RTF on your install media or the root of your tools installation.
+THE SAMPLE SOURCE CODE IS PROVIDED "AS IS", WITH NO WARRANTIES.
+-->
+<H2><FONT COLOR="#FF0000" SIZE=5>How do I upload files to my device?</font></H2>
+
+$$if (IsWebDavBuiltIn=="Enabled")$$
+<H4>Using WebDAV to upload files.</H4>
+The Windows CE Web Server supports WebDAV, which is a protocol that enables web clients to upload
+files.  On Windows XP and other Microsoft products, WebDAV is sometimes referred to as "Web Folders".
+
+
+<P>To allow a Web server <A HREF="httpd-i-vdirs.htm">virtual directory</A> to act as a Web Folder, you will need to take the following steps on the server:
+
+<UL>
+<LI>Carefully consider the security implications of this action.
+<LI>Enable WebDAV globally for the Web site.
+<LI>Set the virtual directory to allow directory browsing.  Click <A HREF="httpd-i-dirbrowse.htm">here</A> for instructions.
+<LI>Set the virtual directory to grant write permissions.  Click <A HREF="httpd-i-permissions.htm">here</A> for instructions.
+<LI>Restart the Web server to make the changes take effect.
+</UL>
+
+<P>Now you need to configure your client machine to use the WebDAV folder you have shared.  On Windows XP, 
+click on the Start button, select Run, and then type \\<I>WinCEDeviceName</I>\<I>DavFolder</I>.  <I>WinCEDeviceName</I> is 
+the device's name and <I>DavFolder</I> is the name of the folder you have shared.  After running this command,
+a browser window will appear that will let you browse and modify the virtual root as if it were a directory on 
+your hard drive.  To use WebDAV with other operating systems and applications, check your documentation.
+
+<P><B>Caution:</B> If a hacker can gain write access a WebDAV share, they can add or delete files to your device.
+Always require authentication on WebDAV shares that are not on trusted networks.
+
+$$else$$
+<P>Consult the documentation provided with this device for instructions on uploading files. 
+$$endif$$
+

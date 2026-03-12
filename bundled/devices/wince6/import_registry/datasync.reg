@@ -1,0 +1,71 @@
+;
+; Copyright (c) Microsoft Corporation.  All rights reserved.
+;
+;
+; Use of this sample source code is subject to the terms of the Microsoft
+; license agreement under which you licensed this sample source code. If
+; you did not accept the terms of the license agreement, you are not
+; authorized to use this sample source code. For the terms of the license,
+; please see the license agreement between you and Microsoft or, if applicable,
+; see the LICENSE.RTF on your install media or the root of your tools installation.
+; THE SAMPLE SOURCE CODE IS PROVIDED "AS IS", WITH NO WARRANTIES.
+;
+; ---------------------------------------------------------------------------
+; Shell32 registry keys
+; ---------------------------------------------------------------------------
+;
+; We have a  restriction on where the user is allowed
+; to create subfolders.  Active Sync reads this setting and
+; enforces that restriction.
+;
+; @CESYSGEN IF DATASYNC_MODULES_REPLLOG || DATASYNC_MODULES_RAPISRV
+; @CESYSGEN ENDIF
+
+; @CESYSGEN IF DATASYNC_MODULES_RRA_STM
+; @CESYSGEN ENDIF
+
+; @CESYSGEN IF DATASYNC_MODULES_CEFOBJ
+; @CESYSGEN ENDIF
+
+; @CESYSGEN IF DATASYNC_MODULES_PEGOBJ
+; @CESYSGEN ENDIF
+
+; @CESYSGEN IF DATASYNC_MODULES_WCELOAD || DATASYNC_MODULES_WCELDCMD
+; BEGIN: AppInstall reg settings
+;
+[HKEY_CLASSES_ROOT\.cab]
+@="cabfile"
+
+[HKEY_CLASSES_ROOT\cabfile]
+@="CAB File"
+
+; @CESYSGEN IF DATASYNC_MODULES_WCELOAD
+[HKEY_CLASSES_ROOT\cabfile\DefaultIcon]
+@="\\Windows\\wceload.exe,-101"
+
+[HKEY_CLASSES_ROOT\cabfile\Shell\Open\Command]
+@="\\Windows\\wceload.exe \"%1\""
+; @CESYSGEN ENDIF
+
+; @CESYSGEN IF DATASYNC_MODULES_WCELDCMD
+; @CESYSGEN ENDIF
+
+[HKEY_LOCAL_MACHINE\Software\Apps\Microsoft Application Installer]
+"fAskOptions"=dword:0
+"fAskDest"=dword:1
+"nDynamicDelete"=dword:2
+; END:   AppInstall reg settings
+; @CESYSGEN ENDIF
+
+; @CESYSGEN IF DATASYNC_MODULES_UDP2TCP
+; @CESYSGEN ENDIF
+
+; @CESYSGEN IF DATASYNC_MODULES_DMINFOS
+; @CESYSGEN ENDIF
+
+; @CESYSGEN IF DATASYNC_MODULES_DMSCRIPT
+; @CESYSGEN ENDIF
+
+; @CESYSGEN IF DATASYNC_MODULES_DMSVC
+; @CESYSGEN ENDIF DATASYNC_MODULES_DMSVC
+

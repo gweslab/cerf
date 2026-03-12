@@ -1,0 +1,36 @@
+<!--
+Copyright (c) Microsoft Corporation.  All rights reserved.
+-->
+<!--
+Use of this sample source code is subject to the terms of the Microsoft
+license agreement under which you licensed this sample source code. If
+you did not accept the terms of the license agreement, you are not
+authorized to use this sample source code. For the terms of the license,
+please see the license agreement between you and Microsoft or, if applicable,
+see the LICENSE.RTF on your install media or the root of your tools installation.
+THE SAMPLE SOURCE CODE IS PROVIDED "AS IS", WITH NO WARRANTIES.
+-->
+<H2><FONT COLOR="#FF0000" SIZE=5>What is directory browsing and what is the default document?</font></H2>
+
+<H4>Default Documents</H4>
+<P>When a browser requests a directory, rather than a file name, (for example, http://
+WinCEDevice/shared/), the Web server displays a "default" page if possible.
+Default documents are typically named default.htm or index.htm. 
+
+<P>More than one default document can be specified when you configure the Web 
+server. If configured to use default.htm and index.htm, the Web server first looks in the 
+physical directory of the requested virtual directory for a file named default.htm. If no such file exists, it looks for a file 
+named index.htm, and so on.  The list of default documents are configured on the Web site configuration page.
+
+<H4>Directory Browsing</H4>
+If a directory is requested and a default document does not exist in it, the Web server
+will send a list of files and sub directories of the current directory if Directory Browsing 
+is enabled.  If directory browsing is disabled, the Web server issues an error. 
+
+<P>Directory browsing can be configured for the entire Web site or, for greater 
+control, you can override the default setting on each individual virtual 
+directory. 
+
+<B>Note:</B> Enabling directory browsing can make looking for files on your Web server 
+more convenient, however it reduces the privacy of your site. 
+

@@ -1,0 +1,89 @@
+<!--
+Copyright (c) Microsoft Corporation.  All rights reserved.
+-->
+<!--
+Use of this sample source code is subject to the terms of the Microsoft
+license agreement under which you licensed this sample source code. If
+you did not accept the terms of the license agreement, you are not
+authorized to use this sample source code. For the terms of the license,
+please see the license agreement between you and Microsoft or, if applicable,
+see the LICENSE.RTF on your install media or the root of your tools installation.
+THE SAMPLE SOURCE CODE IS PROVIDED "AS IS", WITH NO WARRANTIES.
+-->
+<script language="JavaScript"><!--
+function ConfirmDelete() {
+   return confirm("You have requested to delete a Web site.  You will not be able to undo this operation.  Click OK to continue this operation.")
+}
+
+function ConfirmNew() {
+   return confirm("You have requested to create a new Web site.  Since you can potentially lock yourself out of your device or open it to hackers, creating new Web sites is for advanced users only.  Click OK to continue this operation.")
+}
+// -->
+</SCRIPT>
+
+<H2><FONT COLOR="#FF0000" SIZE=5>Web Server Configuration</font></H2>
+The Web Server Administration (WebAdmin) page for the Windows CE Web Server 
+enables you to remotely administer your Web server using your Web browser. 
+Use WebAdmin to manage the accessibility, security, and file sharing features 
+of your Web server, including the following tasks: 
+
+<UL>
+<LI>Configure which files are shared and how they are accessed.
+<LI>Configure which users have access to which files.
+<LI>Configure the authentication protocols the Web server will use.
+<LI>View and configure the Web server log.
+</UL>
+
+<P><B>Caution:</B> Incorrectly configuring the Web server increases 
+the likelihood a hacker could gain control of your Windows CE device and
+the likelihood that the system will be inaccessible.  The Web server configuration 
+is intended for advanced users only.  For more information, refer to the 
+<A HREF="instructions/">help topics</A> included with the Web server or consult a System Administrator.
+
+<HR>
+<H4><FONT COLOR="#0000FF">Choose a Web site</font></H4>
+A Web server can contain multiple Web sites. You can configure a variety of 
+options for each Web site created on your Web server, including virtual 
+directories, authentication, and directory browsing. For more information, see <A HREF="instructions/httpd-i-website.htm">configuring Web sites</A>.
+If you do not have multiple Web sites, all requests will be processed on the <B>Default Web site</B>.
+
+<P>Select an existing Web site $$if (IsWebsiteConfigAllowed=="True")$$ or create a new one$$endif$$:
+
+<UL>
+
+<TABLE>
+<FORM ACTION="/WebAdmin/" METHOD = "post">
+<INPUT TYPE=HIDDEN NAME=Context VALUE=Website>
+<INPUT TYPE=HIDDEN NAME=WebsiteName VALUE=Default>
+<TR><TD><FONT COLOR=#0000FF><B>Default Web site</B></FONT></TD>
+<TD><INPUT TYPE=submit Name=Submit value=Modify></TD>
+</FORM>
+
+$$foreach Website$$
+  <FORM ACTION="/WebAdmin/" METHOD = "post">
+  <INPUT TYPE=HIDDEN NAME=Context VALUE=Website>
+  <INPUT TYPE=HIDDEN NAME=WebsiteName VALUE="$$Global.WebsiteName$$">
+  <TR><TD><FONT COLOR=#0000FF><B>$$Global.WebsiteName$$ Website</B></FONT></TD>
+  <TD><INPUT TYPE=submit Name=Submit value=Modify></TD>
+  </FORM>
+
+  
+  $$if (IsWebsiteConfigAllowed=="True")$$
+    <FORM ACTION="/WebAdmin/" onsubmit="return(ConfirmDelete());" METHOD = "post">
+    <INPUT TYPE=HIDDEN NAME=Context VALUE=DeleteWebsite>
+    <INPUT TYPE=HIDDEN NAME=WebsiteName VALUE="$$Global.WebsiteName$$">
+    <TD><INPUT TYPE=submit Name=Submit value=Delete></TD>
+    </FORM>
+  $$endif$$
+  </FORM>
+$$endif$$
+
+$$if (IsWebsiteConfigAllowed=="True")$$
+  <FORM ACTION="/WebAdmin/" onsubmit="return(ConfirmNew());" METHOD = "post">
+  <INPUT TYPE=HIDDEN NAME=Context VALUE=NewWebsite>
+  <TR><TD><FONT COLOR=#0000FF><B>Create a new Web site</B></FONT></TD>
+  <TD><INPUT TYPE=submit Name=Submit value=CreateNew></TD>
+  </FORM>
+$$endif$$
+</TABLE>
+

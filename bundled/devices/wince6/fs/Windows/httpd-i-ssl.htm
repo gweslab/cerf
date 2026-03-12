@@ -1,0 +1,35 @@
+<!--
+Copyright (c) Microsoft Corporation.  All rights reserved.
+-->
+<!--
+Use of this sample source code is subject to the terms of the Microsoft
+license agreement under which you licensed this sample source code. If
+you did not accept the terms of the license agreement, you are not
+authorized to use this sample source code. For the terms of the license,
+please see the license agreement between you and Microsoft or, if applicable,
+see the LICENSE.RTF on your install media or the root of your tools installation.
+THE SAMPLE SOURCE CODE IS PROVIDED "AS IS", WITH NO WARRANTIES.
+-->
+<H2><FONT COLOR="#FF0000" SIZE=5>What is SSL?</font></H2>
+Secure Sockets Layer (SSL) is a security protocol that encrypts and decrypts 
+data transmitted over a network connection. The SSL protocol decreases the 
+potential for access by unauthorized users, such as computer hackers.
+If a hacker is able to eavesdrop on data sent across a network that is not encrypted, 
+they could gain potentially valuable information about you such as your credit card number.
+
+<H4>Setting up SSL for the Web server</H4>
+The SSL protocol requires all Web servers to use certificates when 
+transmitting data over a network connection. When a session is initiated, a 
+Web client requests the server's certificate to authenticate the identity of the 
+server. On Windows CE, this certificate must reside in the "My" store.
+
+<P>Once the certificate is added, navigate to the <A HREF="/WebAdmin/SSL/">SSL page</A>, 
+select Enable SSL, and then type the certificate's subject into the input field. Once 
+SSL is enabled, clients are allowed access to any virtual directory using an SSL 
+connection. To force a virtual directory to use SSL, open the configuration 
+page and select <B>SSL Required</B> or <B>SSL 128 bit</B> required to enforce stronger 
+encryption.
+
+<P>For more information about installing an SSL certificate, refer to the 
+documentation included with your device. 
+

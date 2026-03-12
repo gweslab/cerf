@@ -1,0 +1,185 @@
+;
+; Copyright (c) Microsoft Corporation.  All rights reserved.
+;
+;
+; Use of this sample source code is subject to the terms of the Microsoft
+; license agreement under which you licensed this sample source code. If
+; you did not accept the terms of the license agreement, you are not
+; authorized to use this sample source code. For the terms of the license,
+; please see the license agreement between you and Microsoft or, if applicable,
+; see the LICENSE.RTF on your install media or the root of your tools installation.
+; THE SAMPLE SOURCE CODE IS PROVIDED "AS IS", WITH NO WARRANTIES OR INDEMNITIES.
+;
+;
+; Notes: 
+;
+;   To save space, the values under [HKEY_CLASSES_ROOT\CLSID\{clsid}\Pins\<Input|Output>]
+; are commented out if they are zero, as zero is the default. 
+;
+;   If you have [Key\SubKey1] with no leaf values, you don't save registry space by removing it
+; if there exists a [Key\SubKey1\SubKey2].
+;
+;   PID interfaces w/o registry entries will default to trying CLSID_FGControl as the distributor.
+
+
+; ---------------------------------------------------------------------------
+; RTC - Real Time Communication (Voice over IP)
+;----------------------------------------------------------------------------
+
+
+; @CESYSGEN IF VOIP_MODULES_RTCDLL
+;
+; RTCClient COM Interfaces
+;
+
+; [HKEY_CLASSES_ROOT\CLSID_RTCDll
+[HKEY_CLASSES_ROOT\CLSID\{7a42ea29-a2b7-40c4-b091-f6f024aa89be}\InprocServer32]
+@="rtcdll.dll"
+
+[HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\EventLog\VOIP]
+    "Format"="PlainText"
+    "Output"="File"
+    "File"="VoipLog.txt"
+    "MaxSize"=dword:12C00
+    "EventMessageFile"="evtlgres.dll"
+
+;
+; Symmetric Response Routing
+; Response Port
+;
+;[HKEY_LOCAL_MACHINE\COMM\RTC\SymmetricResponseRouting]
+    ;  determine if the rport extension is enabled (default: disabled)
+;   "ResponsePort"=dword:0
+
+;
+; Session Timer
+;
+;[HKEY_LOCAL_MACHINE\COMM\RTC\Session Timers]
+    ;  determine if session timer extension is enabled (default: disabled)
+;   "SessionTimerOn"=dword:0
+    ;  default value in seconds for the "Session-Expires" Header (default: 1800)
+;   "SessionExpire"=dword:708
+    ;  default value in seconds for the "Min-SE" Header (default: 90) absolute minimum
+;   "MinimumSessionExpire"=dword:5A
+
+;
+; Expires Header in REGISTER message
+;
+;[HKEY_LOCAL_MACHINE\COMM\RTC\Register]
+    ;  default value for the Expires Header in REGISTER message (default: 3600)
+    ;  when present and >0, the optional header will be added to the initial REGISTER
+;   "Expires"=dword:E10
+
+;
+; Unsolicited Notification treatment
+;
+;[HKEY_LOCAL_MACHINE\COMM\RTC\UnsolicitedNotification]
+    ;  treatment for Unsolicited Notification messages
+    ;  if value is dword:0  (default)
+    ;      respond with 200 when application has registered for the specific Event package
+    ;      respond with 481 otherwise
+    ;  if value is dword:1
+    ;      respond with 481 unconditionally
+    ;  all other values are reserved
+;   "Response"=dword:0
+
+; @CESYSGEN ENDIF
+
+; @CESYSGEN IF VOIP_MODULES_RTCPROXY
+; @CESYSGEN ENDIF
+
+; @CESYSGEN IF VOIP_MODULES_MEDIA_GSM
+; @CESYSGEN ENDIF
+
+; @CESYSGEN IF VOIP_MODULES_VOIP_VIDEO
+; @CESYSGEN ENDIF
+
+
+
+; Messenger
+; @CESYSGEN IF VOIP_MODULES_MSMSGS
+[HKEY_CLASSES_ROOT\CLSID\{F3A614DC-ABE0-11d2-A441-00C04F795683}\LocalServer32]
+@="msmsgs.exe"
+
+[HKEY_CLASSES_ROOT\CLSID\{F3A614DC-ABE0-11d2-A441-00C04F795683}\ProgID]
+@="Messenger.MsgrObject.1"
+[HKEY_CLASSES_ROOT\CLSID\{F3A614DC-ABE0-11d2-A441-00C04F795683}\VersionIndependentProgID]
+@="Messenger.MsgrObject"
+
+[HKEY_CLASSES_ROOT\CLSID\{F3A614DC-ABE0-11d2-A441-00C04F795683}\TypeLib]
+@="{218CB45F-20B6-11d2-8E17-0000F803A446}"
+
+[HKEY_CLASSES_ROOT\CLSID\{FB7199AB-79BF-11d2-8D94-0000F875C541}]
+@="MSN Messenger Application"
+
+[HKEY_CLASSES_ROOT\CLSID\{FB7199AB-79BF-11d2-8D94-0000F875C541}\LocalServer32]
+@="msmsgs.exe"
+
+[HKEY_CLASSES_ROOT\CLSID\{FB7199AB-79BF-11d2-8D94-0000F875C541}\ProgID]
+@="Messenger.MessengerApp.1"
+
+[HKEY_CLASSES_ROOT\CLSID\{FB7199AB-79BF-11d2-8D94-0000F875C541}\TypeLib]
+@="{218CB45F-20B6-11d2-8E17-0000F803A446}"
+
+[HKEY_CURRENT_USER\Software\Microsoft\MessengerService]
+    "PrimaryService"="MSN Messenger Service"
+	"IMSBHide"=dword:1
+
+[HKEY_LOCAL_MACHINE\Software\Microsoft\MessengerService]
+	"InstallationDirectory"="\\Windows"
+	"Help"="\\Windows\\msmsgs.htm"	
+
+[HKEY_CLASSES_ROOT\TypeLib\{53CED51D-432B-45b2-A3E0-0CE2C24235D4}\1.0\0\win32]
+@="\\Windows\\msmsgs.exe\\2"
+
+
+; @CESYSGEN ENDIF
+
+; @CESYSGEN IF VOIP_MODULES_RTCIMSP
+; Messenger's RTC Instant Messaging Service Provider 
+; CLSID_RTCIMService;
+[HKEY_CLASSES_ROOT\CLSID\{83D4679F-B6D7-11D2-BF36-00C04FB90A03}\InprocServer32]
+@="rtcimsp.dll"
+
+[HKEY_LOCAL_MACHINE\Software\Microsoft\MessengerService\ServiceProviders\{83D4679F-B6D7-11D2-BF36-00C04FB90A03}]
+	"Enabled"=dword:1		
+
+[HKEY_CURRENT_USER\Software\Microsoft\RTCIMSP] 
+;Manual Configuration 
+	"ConfigurationMode"=dword:1
+
+;Transport
+;0x00000001 - UDP
+;0x00000002 - TCP (default)
+;0x00000004 - TLS
+	"Transport"=dword:4
+
+; @CESYSGEN ENDIF
+
+; @CESYSGEN IF VOIP_MODULES_VOIPSTORE
+; @CESYSGEN ENDIF
+
+; @CESYSGEN IF VOIP_MODULES_PHCOMMON
+; @CESYSGEN IF CE_MODULES_SOFTKB
+; @CESYSGEN ENDIF
+; @CESYSGEN ENDIF
+
+; @CESYSGEN IF VOIP_MODULES_OWAEXCHANGECLIENT
+; @CESYSGEN ENDIF
+
+; @CESYSGEN IF VOIP_MODULES_PHONEIME
+; @CESYSGEN ENDIF
+
+; @CESYSGEN IF VOIP_MODULES_PHONEAPP
+; @CESYSGEN ENDIF 
+
+; @CESYSGEN IF VOIP_MODULES_HOMESCREEN
+; @CESYSGEN ENDIF
+
+IF _VOIPNODISTRIBUTIONDIR
+; Microsoft specific for voip testing - adds non-redistributable codecs to image
+#include "$(_FLATRELEASEDIR)\voipCodecs.reg"
+; Microsoft specific for voip testing - adds test driver to image
+#include "$(_FLATRELEASEDIR)\camera.reg"
+ENDIF
+

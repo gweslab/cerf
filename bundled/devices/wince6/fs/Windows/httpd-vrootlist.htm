@@ -1,0 +1,89 @@
+<!--
+Copyright (c) Microsoft Corporation.  All rights reserved.
+-->
+<!--
+Use of this sample source code is subject to the terms of the Microsoft
+license agreement under which you licensed this sample source code. If
+you did not accept the terms of the license agreement, you are not
+authorized to use this sample source code. For the terms of the license,
+please see the license agreement between you and Microsoft or, if applicable,
+see the LICENSE.RTF on your install media or the root of your tools installation.
+THE SAMPLE SOURCE CODE IS PROVIDED "AS IS", WITH NO WARRANTIES.
+-->
+<script language="JavaScript"><!--
+function ConfirmDelete() {
+   return confirm("You have requested to delete a virtual directory.  You will not be able to undo this operation.  Click OK to continue this operation.")
+}
+
+function SubmitRequest()
+{
+   document.forms[0].submit()
+   return false
+}
+
+// -->
+</SCRIPT>
+
+<H2><FONT COLOR=#FF0000>Virtual Directory Configuration</font></H2>
+
+Virtual directories provide a mapping from the URL a client browser requests and the page returned by the Web server.
+For more information, click <A HREF="instructions/httpd-i-vdirs.htm">here</A>.
+
+<FORM ACTION /WebAdmin/ METHOD = post>
+<INPUT TYPE=HIDDEN NAME=Context VALUE=Website>
+<INPUT TYPE=HIDDEN NAME=WebsiteName VALUE="$$WebsiteName$$">
+Return to the <B>$$WebsiteName$$</B> Web site <A HREF="javascript:SubmitRequest();">configuration page.</A>
+</FORM>
+
+<HR>
+
+<P>
+<TABLE BORDER=0>
+<THEAD>
+<TR>
+<TH>Virtual Path</TH>
+<TH>Physical Path</TH>
+
+</TR>
+<TBODY>
+
+$$foreach VRoot$$
+  <TR>
+  <TD><FONT COLOR=#0000FF><B>/$$VRoot.VRootName$$</B></FONT></TD>
+  <TD><FONT COLOR=#0000FF><B>$$VRoot.PhysicalPath$$</B></FONT></TD>
+  <TD>
+
+  <FORM ACTION /WebAdmin/ METHOD = post>
+  <INPUT TYPE=HIDDEN NAME=Context VALUE=VRootConfig>
+  <INPUT TYPE=HIDDEN NAME=WebsiteName VALUE="$$WebsiteName$$">
+  <INPUT TYPE=HIDDEN NAME=VRootName VALUE="/$$VRoot.VRootName$$">
+  <TD><INPUT TYPE=submit NAME=Submit VALUE=Modify WIDTH=50></TD>
+  </FORM>
+  
+  $$if (VRoot.IsVRootPathReadOnly==False)$$
+    <FORM ACTION /WebAdmin/ onsubmit="return(ConfirmDelete());" METHOD = post>
+    <INPUT TYPE=HIDDEN NAME=Context VALUE=DeleteVRoot>
+    <INPUT TYPE=HIDDEN NAME=WebsiteName VALUE="$$WebsiteName$$">
+    <INPUT TYPE=HIDDEN NAME=VRootName VALUE="/$$VRoot.VRootName$$">
+    <TD><INPUT TYPE = submit NAME=Submit VALUE=Delete LENGTH=500></TD>
+    </FORM>
+  $$endif$$
+  </FORM>  
+$$endif$$
+
+</TABLE>
+
+<P>
+<TABLE BORDER=0>
+<FORM ACTION = /WebAdmin/ METHOD = post>
+<TD>
+<INPUT TYPE=HIDDEN NAME=Context VALUE=NewVDir>
+<INPUT TYPE=HIDDEN NAME=WebsiteName VALUE="$$WebsiteName$$">
+<INPUT TYPE=submit NAME=Submit VALUE="Create a new virtual directory" WIDTH=50></TD>
+</FORM>  
+</TABLE>
+
+
+
+
+

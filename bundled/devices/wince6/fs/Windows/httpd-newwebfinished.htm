@@ -1,0 +1,38 @@
+<!--
+Copyright (c) Microsoft Corporation.  All rights reserved.
+-->
+<!--
+Use of this sample source code is subject to the terms of the Microsoft
+license agreement under which you licensed this sample source code. If
+you did not accept the terms of the license agreement, you are not
+authorized to use this sample source code. For the terms of the license,
+please see the license agreement between you and Microsoft or, if applicable,
+see the LICENSE.RTF on your install media or the root of your tools installation.
+THE SAMPLE SOURCE CODE IS PROVIDED "AS IS", WITH NO WARRANTIES.
+-->
+<H2><FONT COLOR="#FF0000" SIZE=5>Web Site Creation Finished</font></H2>
+
+You have successfully created Web site <B>$$WebsiteName$$</B>!
+
+Your next steps should be:
+
+<UL>
+<LI>If you created this Web site using another Web site as a template, carefully
+review all the security options.  It is possible that security policy
+that was appropriate for the template Web site (for instance the private interface of a
+home network) is inappropriate for the Web site you just created (such as
+a network interface that is accessible via the Internet).
+<LI>Add additional virtual directories and settings as you see fit.
+<LI>Configure the network adapter and/or host names that are mapped to this Web site.
+Currently this Web site will not accept any traffic because both its network interfaces  
+and host names fields not set.  Only enable this Web site once you are comfortable
+with its security.
+<LI>Restart the Web server to make the changes take affect.
+</UL>
+
+
+<FORM ACTION="/WebAdmin/" METHOD = "post">
+<INPUT TYPE=HIDDEN NAME=Context VALUE=Website>
+<INPUT TYPE=HIDDEN NAME=WebsiteName VALUE="$$WebsiteName$$">
+<TD><INPUT TYPE=submit Name=Submit value="Click here to customize this Web site"></TD>
+

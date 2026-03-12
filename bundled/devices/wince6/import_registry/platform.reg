@@ -1,0 +1,1367 @@
+;
+; Copyright (c) Microsoft Corporation.  All rights reserved.
+;
+;
+; Use of this sample source code is subject to the terms of the Microsoft
+; license agreement under which you licensed this sample source code. If
+; you did not accept the terms of the license agreement, you are not
+; authorized to use this sample source code. For the terms of the license,
+; please see the license agreement between you and Microsoft or, if applicable,
+; see the LICENSE.RTF on your install media or the root of your tools installation.
+; THE SAMPLE SOURCE CODE IS PROVIDED "AS IS", WITH NO WARRANTIES OR INDEMNITIES.
+;
+
+; Our variables
+#define BUILTIN_ROOT HKEY_LOCAL_MACHINE\Drivers\BuiltIn
+;#define PCI_BUS_ROOT $(BUILTIN_ROOT)\PCI
+#define DRIVERS_DIR $(_PUBLICROOT)\common\oak\drivers
+
+  
+
+; @CESYSGEN IF CE_MODULES_RAMFMD
+; @CESYSGEN IF FILESYS_FSREGHIVE
+; @CESYSGEN ENDIF FILESYS_FSREGHIVE
+; @CESYSGEN IF CE_MODULES_FILESYS && COREDLL_DEVLOAD
+; @CESYSGEN ENDIF CE_MODULES_FILESYS && COREDLL_DEVLOAD
+; @CESYSGEN IF CE_MODULES_FSREPLXFILT
+; @CESYSGEN ENDIF CE_MODULES_FSREPLXFILT
+; @CESYSGEN ENDIF CE_MODULES_RAMFMD
+
+; @XIPREGION IF DEFAULT_REGISTRY
+; Must go in default.fdf to allow loading of registry!
+[HKEY_LOCAL_MACHINE\System\Platform]
+    "DataPath" = "\\"
+    "PSAtRoot"=dword:1
+; @XIPREGION ENDIF DEFAULT_REGISTRY
+
+; @CESYSGEN IF CE_MODULES_FILESYS && COREDLL_DEVLOAD
+; @XIPREGION IF PACKAGE_OEMXIPKERNEL
+IF BSP_NONOR !
+; HIVE BOOT SECTION
+
+[HKEY_LOCAL_MACHINE\Drivers\BuiltIn\AmdNorFMD]
+   "Dll"="amdnord.dll"
+   "Order"=dword:2
+   "Prefix"="DSK"
+   "Ioctl"=dword:4
+   "Profile"="MSFlash"
+   "IClass"="{A4E7EDDA-E575-4252-9D6B-4195D48BB865}"
+   "MemBase"=dword:B2020000
+   "MemLen"=dword:01FE0000
+   "Flags"=dword:00010000
+
+; END HIVE BOOT SECTION
+ENDIF ; BSP_NONOR !
+; @XIPREGION ENDIF PACKAGE_OEMXIPKERNEL
+; @CESYSGEN ENDIF CE_MODULES_FILESYS && COREDLL_DEVLOAD
+
+; @CESYSGEN IF WCESHELLFE_MODULES_CTLPNL
+; @XIPREGION IF DEFAULT_DEVICEEMULATOR_REG
+; This registry setting controls the checkboxes displayed in the Sounds CPL
+; under "enable clicks & taps". Set bit0 if you have a keyboard, set bit1 if
+; you have a touch screen. Set bit2 if you have HW buttons (NOTE: for now
+; HW buttons are mutually exclusive with the keyboard)
+[HKEY_LOCAL_MACHINE\ControlPanel]
+IF IMGTPC !
+    "InputConfig"=dword:3   ; 3 => keybd and touch screen
+ENDIF IMGTPC !
+IF IMGTPC
+    "InputConfig"=dword:1   ; 1 => keybd only
+ENDIF IMGTPC    
+; @XIPREGION ENDIF DEFAULT_DEVICEEMULATOR_REG
+; @CESYSGEN ENDIF WCESHELLFE_MODULES_CTLPNL
+
+; @XIPREGION IF DEFAULT_DEVICEEMULATOR_REG
+[HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Power\Timeouts]
+    "ACSuspendTimeout"=dword:0          ; timeout disabled on AC power
+    "ACResumingSuspendTimeout"=dword:0      ; timeout diasable on AC power
+    "BattSuspendTimeout"=dword:B4       ; 3 minutes (180 seconds) on battery
+    "BattResumingSuspendTimeout"=dword:F    ; 15 seconds
+
+; Don't prompt when establishing a network connection. This is disabled for emulator
+; as it would otherwise detract from the SDK emulator experience as everytime the ISV would
+; launch the emulator they would be prompted. User can always go to the connections CPL
+; and change the setting.
+[HKEY_CURRENT_USER\ControlPanel\Notifications\{8ddf46e7-56ed-4750-9e58-afc6ce486d03}]
+ "Options"=dword:0
+; @XIPREGION ENDIF DEFAULT_DEVICEEMULATOR_REG
+
+; @CESYSGEN IF CE_MODULES_DEVICE
+
+; @XIPREGION IF DEFAULT_DEVICEEMULATOR_REG
+; Resources available at time of device.exe initialization.
+; Key names are descriptive; resource ids are definitive.
+; System ids are defined in ddk\inc\resmgr.h.
+; HIVE BOOT SECTION
+[HKEY_LOCAL_MACHINE\Drivers\Resources\IRQ]
+   "Identifier"=dword:1
+   "Minimum"=dword:1
+   "Space"=dword:20
+   "Ranges"="1-0x20"
+;  "Shared"=""
+
+[HKEY_LOCAL_MACHINE\Drivers\Resources\IO]
+   "Identifier"=dword:2
+   "Minimum"=dword:0
+   "Space"=dword:10000
+   "Ranges"="0-0xFFFF"
+
+; END HIVE BOOT SECTION
+; @XIPREGION ENDIF DEFAULT_DEVICEEMULATOR_REG
+
+; @CESYSGEN IF CE_MODULES_POINTER
+; @CESYSGEN IF GWES_MGBASE
+; @XIPREGION IF DEFAULT_DEVICEEMULATOR_REG
+[HKEY_LOCAL_MACHINE\HARDWARE\DEVICEMAP\TOUCH]
+  "MaxCalError"=dword:7
+; portrait 
+;  "CalibrationData"="500,512 762,268 758,760 244,758 241,266 "
+; Landscape 
+;   "CalibrationData"="515,503 763,748 258,749 269,255 764,255 "
+; @XIPREGION ENDIF DEFAULT_DEVICEEMULATOR_REG
+; @CESYSGEN ENDIF GWES_MGBASE
+; @CESYSGEN ENDIF CE_MODULES_POINTER   
+
+; @CESYSGEN IF CE_MODULES_DISPLAY
+; @XIPREGION IF DEFAULT_DEVICEEMULATOR_REG
+IF BSP_NODISPLAY !
+[HKEY_LOCAL_MACHINE\Drivers\Display\S3C2410\CONFIG]
+    "DisplayDll"="DeviceEmulator_lcd.dll"
+    "LCDVirtualFrameBase"=dword:A3F00000
+    "LCDPhysicalFrameBase"=dword:33F00000
+
+[HKEY_LOCAL_MACHINE\System\GDI\Drivers]
+    "Display"="DeviceEmulator_lcd.dll"
+
+; GWES will pass this value to the LCD driver; the driver will open the
+; key to which it points to read its configuration.
+[HKEY_LOCAL_MACHINE\System\GDI\DisplayCandidates]
+    "Candidate10"="Drivers\\Display\\S3C2410\\CONFIG"
+
+IF BSP_NOBACKLIGHT !
+[HKEY_LOCAL_MACHINE\Drivers\BuiltIn\Backlight]
+    "Prefix"="BKL"
+    "Dll"="backlight.dll"
+    "Index"=dword:1
+    "Order"=dword:1
+    "IClass"="{A32942B7-920C-486b-B0E6-92A702A99B35}"
+
+; Backlight tab of Display control panel (timeouts in seconds)
+[HKEY_CURRENT_USER\ControlPanel\Backlight]
+    "BatteryTimeout"=dword:3c	; 60 seconds
+    "BacklightOnTap"=dword:1
+    "ACTimeout"=dword:258	; 600 seconds
+    "ACBacklightOnTap"=dword:1
+ENDIF BSP_NOBACKLIGHT !
+
+; GWES uses this to set the default display contrast
+; (yes, Keybd is unintuitive)
+[HKEY_CURRENT_USER\ControlPanel\Keybd]
+    "Contrast"=dword:15   ; 0 (lowest contrast) - 15 (highest contrast)
+
+ENDIF ; BSP_NODISPLAY !
+; @XIPREGION ENDIF DEFAULT_DEVICEEMULATOR_REG
+; @CESYSGEN ENDIF CE_MODULES_DISPLAY
+
+; @CESYSGEN IF CE_MODULES_KEYBD
+; @XIPREGION IF DEFAULT_DEVICEEMULATOR_REG
+; Keybd driver is the same.
+IF BSP_NOKEYBD !
+
+; Eventually, we will want to make smartfon and wpc specific keybd.reg
+; and LayMgr.reg files so that other platforms which can be built both
+; CEBase and wpc/smartfon will not have to duplicate the entirety of this
+; code.  However, currently there is no intuitive place to store these
+; files.  So for now we will make our localization decisions here and
+; not include the common reg files if our project is wpc/smartfon
+
+[HKEY_LOCAL_MACHINE\HARDWARE\DEVICEMAP\KEYBD]
+    "DriverName"="kbdmouse.dll"
+    "Irq"=dword:1
+    "IOBase"=dword:B1600000
+    "SSPBase"=dword:B1900000
+
+IF IMGTPC !
+; Is keyboard plugged in?
+[HKEY_CURRENT_USER\Software\Microsoft\Shell]
+"HasKeyboard"=dword:1
+ENDIF ; IMGTPC !
+
+#if ! (defined IMGPPC || defined IMGTPC)
+; This gets the keyboard working, mapping a request for e0010409 onto the keyboard driver's 00000409
+[HKEY_LOCAL_MACHINE\System\CurrentControlSet\Control\Layouts\e0010409]
+    "Keyboard Layout"="00000409"
+#include "$(DRIVERS_DIR)\keybd\keybd.reg"
+#include "$(DRIVERS_DIR)\keybd\LayMgr.reg"
+[HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Layouts\$(input_locale)]
+    "Matrix"="kbdmouse.dll"
+#endif
+
+; @CESYSGEN IF CE_MODULES_KBDA1
+; @CESYSGEN ENDIF CE_MODULES_KBDA1
+
+; @CESYSGEN IF CE_MODULES_KBDHEB
+; @CESYSGEN ENDIF CE_MODULES_KBDHEB
+
+; @CESYSGEN IF CE_MODULES_KBDTH0
+; @CESYSGEN ENDIF CE_MODULES_KBDTH0
+
+; @CESYSGEN IF CE_MODULES_KBDINHIN
+; @CESYSGEN ENDIF CE_MODULES_KBDINHIN
+
+; @CESYSGEN IF CE_MODULES_KBDINMAR
+; @CESYSGEN ENDIF CE_MODULES_KBDINMAR
+
+; @CESYSGEN IF CE_MODULES_KBDINPUN
+; @CESYSGEN ENDIF CE_MODULES_KBDINPUN
+
+; @CESYSGEN IF CE_MODULES_KBDINTEL
+; @CESYSGEN ENDIF CE_MODULES_KBDINTEL
+
+; @CESYSGEN IF CE_MODULES_KBDINGUJ
+; @CESYSGEN ENDIF CE_MODULES_KBDINGUJ
+
+; @CESYSGEN IF CE_MODULES_KBDINKAN
+; @CESYSGEN ENDIF CE_MODULES_KBDINKAN
+
+; @CESYSGEN IF CE_MODULES_KBDINTAM
+; @CESYSGEN ENDIF CE_MODULES_KBDINTAM
+
+; @CESYSGEN IF CE_MODULES_KBDDV
+; @CESYSGEN ENDIF CE_MODULES_KBDDV
+
+; @CESYSGEN IF CE_MODULES_KBDUS
+; @CESYSGEN ENDIF CE_MODULES_KBDUS
+
+; @CESYSGEN IF CE_MODULES_KBDJPN
+; @CESYSGEN ENDIF CE_MODULES_KBDJPN
+
+; @CESYSGEN IF CE_MODULES_KBDKOR
+; @CESYSGEN ENDIF CE_MODULES_KBDKOR
+
+[HKEY_LOCAL_MACHINE\HARDWARE\DEVICEMAP\KEYBD]
+    "CalVKey"=dword:0
+    "ContLessVKey"=-	; use the keyboard driver's default (comma)
+    "ContMoreVKey"=-	; use the keyboard driver's default (period)
+    "TaskManVKey"=dword:2E
+
+IF IMGPPC
+#if ! defined keybd_driver
+#define keybd_driver "kbdmouse.dll"
+#endif
+
+[HKEY_LOCAL_MACHINE\HARDWARE\DEVICEMAP\KEYBD]
+    "DriverName"=$(keybd_driver)
+
+IF BSP_KEYBD_JPN1
+; @BEGINASSOC LOCALE 0411
+; Japanese US substitute keyboard layout
+[HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Layouts\00000411]
+    "Layout File"=$(keybd_driver)
+    "Layout Text"="Japanese 1"
+    "PS2_AT"=$(keybd_driver)
+    "Matrix"="kbdmouse.dll"
+[HKEY_LOCAL_MACHINE\System\CurrentControlSet\Control\Layouts\e0010411]
+     "Keyboard Layout"="00000411"
+; @ENDASSOC
+ENDIF ; BSP_KEYBD_JPN1
+IF BSP_KEYBD_JPN1 !
+; @BEGINASSOC LOCALE 0411
+; Japanese keyboard layout
+[HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Layouts\00000411]
+    "Layout File"=$(keybd_driver)
+    "Layout Text"="Japanese"
+    "PS2_AT"=$(keybd_driver)
+    "Matrix"="kbdmouse.dll"
+[HKEY_LOCAL_MACHINE\System\CurrentControlSet\Control\Layouts\e0010411]
+     "Keyboard Layout"="00000411"
+; @ENDASSOC
+ENDIF ; BSP_KEYBD_JPN1 !
+
+; @BEGINASSOC LOCALE 0412
+; Korean keyboard layout
+[HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Layouts\00000412]
+    "Layout File"=$(keybd_driver)
+    "Layout Text"="Korean"
+    "PS2_AT"=$(keybd_driver)
+    "Matrix"="kbdmouse.dll"
+[HKEY_LOCAL_MACHINE\System\CurrentControlSet\Control\Layouts\e0010412]
+     "Keyboard Layout"="00000412"
+; @ENDASSOC
+
+{BEGIN MULTILANG}
+{SKIPLANG 0411 0412}
+; @BEGINASSOC LOCALE %LANGID%
+; This gets the keyboard working, mapping a request for e0010409 onto the keyboard driver's 00000409
+[HKEY_LOCAL_MACHINE\System\CurrentControlSet\Control\Layouts\e0010409]
+     "Keyboard Layout"="00000409"
+; Default to US keyboard layout
+[HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Layouts\00000409]
+    "Layout File"=$(keybd_driver)
+    "Layout Text"="US"
+    "PS2_AT"=$(keybd_driver)
+    "Matrix"="kbdmouse.dll"
+; @ENDASSOC
+{END MULTILANG}
+ENDIF ; IMGPPC
+
+IF IMGTPC
+#if ! defined keybd_driver
+#define keybd_driver "kbdmouse.dll"
+#endif
+
+[HKEY_LOCAL_MACHINE\HARDWARE\DEVICEMAP\KEYBD]
+    "DriverName"=$(keybd_driver)
+
+; @XIPREGION IF OEM_COMMONNONEA
+[HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Layouts\00000409]
+    "Layout File"=$(keybd_driver)
+    "Layout Text"="US"
+    "PS2_AT"=$(keybd_driver)
+    "Matrix"="kbdmouse.dll"
+[HKEY_LOCAL_MACHINE\System\CurrentControlSet\Control\Layouts\e0010409]
+     "Keyboard Layout"="00000409"
+; @XIPREGION ENDIF OEM_COMMONNONEA
+
+; @BEGINASSOC LOCALE 0404
+[HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Layouts\00000409]
+    "Layout File"=$(keybd_driver)
+    "Layout Text"="US"
+    "PS2_AT"=$(keybd_driver)
+    "Matrix"="kbdmouse.dll"
+[HKEY_LOCAL_MACHINE\System\CurrentControlSet\Control\Layouts\e0010409]
+     "Keyboard Layout"="00000409"
+; @ENDASSOC
+
+; @BEGINASSOC LOCALE 0804
+[HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Layouts\00000409]
+    "Layout File"=$(keybd_driver)
+    "Layout Text"="US"
+    "PS2_AT"=$(keybd_driver)
+    "Matrix"="kbdmouse.dll"
+[HKEY_LOCAL_MACHINE\System\CurrentControlSet\Control\Layouts\e0010409]
+     "Keyboard Layout"="00000409"
+; @ENDASSOC
+
+IF BSP_KEYBD_JPN1
+; @BEGINASSOC LOCALE 0411
+[HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Layouts\00000411]
+    "Layout File"=$(keybd_driver)
+    "Layout Text"="Japanese 1"
+    "PS2_AT"=$(keybd_driver)
+    "Matrix"="kbdmouse.dll"
+[HKEY_LOCAL_MACHINE\System\CurrentControlSet\Control\Layouts\e0010409]
+ "Keyboard Layout"="00000411"
+; @ENDASSOC
+ENDIF ; BSP_KEYBD_JPN1
+IF BSP_KEYBD_JPN1 !
+; @BEGINASSOC LOCALE 0411
+[HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Layouts\00000411]
+    "Layout File"=$(keybd_driver)
+    "Layout Text"="Japanese"
+    "PS2_AT"=$(keybd_driver)
+    "Matrix"="kbdmouse.dll"
+[HKEY_LOCAL_MACHINE\System\CurrentControlSet\Control\Layouts\e0010409]
+ "Keyboard Layout"="00000411"
+; @ENDASSOC
+ENDIF ; BSP_KEYBD_JPN1 !
+
+; @BEGINASSOC LOCALE 0412
+[HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Layouts\00000412]
+    "Layout File"=$(keybd_driver)
+    "Layout Text"="Korean"
+    "PS2_AT"=$(keybd_driver)
+    "Matrix"="kbdmouse.dll"
+[HKEY_LOCAL_MACHINE\System\CurrentControlSet\Control\Layouts\e0010409]
+ "Keyboard Layout"="00000412"
+; @ENDASSOC
+ENDIF ; IMGTPC
+
+ENDIF ; BSP_NOKEYBD !
+; @XIPREGION ENDIF DEFAULT_DEVICEEMULATOR_REG
+; @CESYSGEN ENDIF CE_MODULES_KEYBD
+
+; @CESYSGEN IF CE_MODULES_PCCARD
+; @XIPREGION IF DEFAULT_DEVICEEMULATOR_REG
+IF BSP_NOPCCARD !
+#include "$(_TARGETPLATROOT)\src\drivers\pccard\pcc_smdk2410.reg"
+#include "$(DRIVERS_DIR)\pccard\mdd\pcc_serv.reg"
+[HKEY_LOCAL_MACHINE\Drivers\PCCARD\PCMCIA\TEMPLATE\PCMCIA]
+   "Dll"="pcmcia.dll"
+   "NoConfig"=dword:1
+   "NoISR"=dword:1 ; Do not load any ISR.
+   "IClass"=multi_sz:"{6BEAB08A-8914-42fd-B33F-61968B9AAB32}=PCMCIA Card Services"
+ENDIF ; BSP_NOPCCARD !
+; @XIPREGION ENDIF DEFAULT_DEVICEEMULATOR_REG
+; @CESYSGEN ENDIF CE_MODULES_PCCARD
+
+
+; @XIPREGION IF DEFAULT_DEVICEEMULATOR_REG
+IF BSP_NOPWRBTN !
+[HKEY_LOCAL_MACHINE\Drivers\BuiltIn\PBUT2410]
+    "Dll"="pwrbtn2410.dll"
+    "Prefix"="PBT"
+    "Index"=dword:2
+    "Order"=dword:2
+    "Ioctl"=dword:4
+    "FSD"= "fatfs.dll"
+ENDIF ; BSP_NOPWRBTN !
+; @XIPREGION ENDIF DEFAULT_DEVICEEMULATOR_REG
+
+
+
+IF BSP_NOAUDIO !
+; @CESYSGEN IF CE_MODULES_WAVEAPI
+; @XIPREGION IF DEFAULT_DEVICEEMULATOR_REG
+[HKEY_LOCAL_MACHINE\Drivers\BuiltIn\Audio]
+   "Prefix"="WAV"
+   "Dll"="s3c2410x_wavedev.dll"
+   "Index"=dword:1
+   "Order"=dword:0
+   ; publish mixer & power manager interfaces
+   "IClass"=multi_sz:"{37168569-61C4-45fd-BD54-9442C7DBA46F}","{A32942B7-920C-486b-B0E6-92A702A99B35}"
+
+; Uncomment this to make wave driver pageable: Flags==2 is DEVFLAGS_LOADLIBRARY
+;   "Flags"=dword:2
+
+; power manager values
+;   "InactivityTimeout"=dword:ffffffff ; in ms, disabled if set to INFINITE
+;   "MaxActivityTimeout"=dword:ffffffff ; in ms, disabled if set to INFINITE
+; @XIPREGION ENDIF DEFAULT_DEVICEEMULATOR_REG
+; @CESYSGEN ENDIF CE_MODULES_WAVEAPI
+ENDIF ; BSP_NOAUDIO !
+
+; HIVE BOOT SECTION
+; @CESYSGEN IF CE_MODULES_SDNPCID
+; @CESYSGEN ENDIF CE_MODULES_SDNPCID
+; END HIVE BOOT SECTION
+
+;================= USB =================
+; @CESYSGEN IF CE_MODULES_SERIAL
+; @XIPREGION IF DEFAULT_DEVICEEMULATOR_REG
+;=============== UART0 (physical COM1 connector P1) (Serial) ===============
+IF BSP_NOSERIAL !
+#include "$(_TARGETPLATROOT)\src\drivers\serial\ser_smdk2410.reg"
+ENDIF ; BSP_NOSERIAL !
+;=========== End of UART(Serial) ===============
+; @XIPREGION ENDIF DEFAULT_DEVICEEMULATOR_REG
+; @CESYSGEN ENDIF CE_MODULES_SERIAL
+
+; @XIPREGION IF DEFAULT_DEVICEEMULATOR_REG
+[HKEY_LOCAL_MACHINE\Drivers\BuiltIn\SER2410\Unimodem]
+   "Tsp"="Unimodem.dll"
+   "DeviceType"=dword:0
+   "FriendlyName"="SER2410 UNIMODEM"
+   "DevConfig"=hex: 10,00, 00,00, 05,00,00,00, 10,01,00,00, 00,4B,00,00, 00,00, 08, 00, 00, 00,00,00,00
+
+; S2410 IrDA(UART2)
+[HKEY_LOCAL_MACHINE\Drivers\BuiltIn\IRDA2410]
+   "DeviceArrayIndex"=dword:1
+   "Irq"=dword:09
+   "IoBase"=dword:50008000
+   "IoLen"=dword:2C
+   "Prefix"="COM"
+   "Dll"="IRDA2410.Dll"
+   "Order"=dword:0
+   "Priority"=dword:0
+   "Port"="COM3:"
+   "DeviceType"=dword:0  ; IRDA modem, 0 -> null modem
+   "FriendlyName"="S2410 IRDA2410"
+;   "Index"=dword:2
+
+[HKEY_LOCAL_MACHINE\Comm\IrDA\Linkage]
+    "Bind"=multi_sz:"Irsir1"
+
+[HKEY_LOCAL_MACHINE\Comm\Irsir]
+   "DisplayName"=LOC_DISPLAYNAME_COMM_IRSIR
+   "Group"="NDIS"
+   "ImagePath"="irsir.dll"
+
+[HKEY_LOCAL_MACHINE\Comm\Irsir\Linkage]
+   "Route"=multi_sz:"Irsir1"
+
+[HKEY_LOCAL_MACHINE\Comm\Irsir1\Parms]
+   "BusNumber"=dword:0
+   "BusType"=dword:0
+   "Port"=dword:2
+   ; 0 = Use external dongle, 1 = Use internal IR
+   "IntIR"=dword:0
+   ; 0 = Internal transceiver, 1 = Extended Systems JetEye dongle
+   "TransceiverType"=dword:1
+   "Baud"=dword:3F
+;=========== End of UART(Serial) ===============
+; @XIPREGION ENDIF DEFAULT_DEVICEEMULATOR_REG
+
+; ----------------------------------------------------------------------------
+; DeviceEmulator DMA and bootstrap
+; @CESYSGEN IF CE_MODULES_DEVICE
+; @XIPREGION IF DEFAULT_DEVICEEMULATOR_REG
+IF IMGNOEMULSRV !
+[HKEY_LOCAL_MACHINE\Drivers\BuiltIn\DMA4]
+    "Irq"=dword:26
+    "Index"=dword:4
+    "Prefix"="DMA"
+    "Dll"="dmatrans.dll"
+    "Order"=dword:0
+
+[HKEY_LOCAL_MACHINE\Drivers\BuiltIn\DMA5]
+    "Irq"=dword:26
+    "Index"=dword:5
+    "Prefix"="DMA"
+    "Dll"="dmatrans.dll"
+    "Order"=dword:0
+
+[HKEY_LOCAL_MACHINE\Drivers\BuiltIn\DMA6]
+    "Irq"=dword:26
+    "Index"=dword:6
+    "Prefix"="DMA"
+    "Dll"="dmatrans.dll"
+    "Order"=dword:0
+
+[HKEY_LOCAL_MACHINE\Drivers\BuiltIn\DMA7]
+    "Irq"=dword:26
+    "Index"=dword:7
+    "Prefix"="DMA"
+    "Dll"="dmatrans.dll"
+    "Order"=dword:0
+
+[HKEY_LOCAL_MACHINE\Drivers\BuiltIn\DMA8]
+    "Irq"=dword:26
+    "Index"=dword:8
+    "Prefix"="DMA"
+    "Dll"="dmatrans.dll"
+    "Order"=dword:0
+
+[HKEY_LOCAL_MACHINE\Drivers\BuiltIn\DMA9]
+    "Irq"=dword:26
+    "Index"=dword:9
+    "Prefix"="DMA"
+    "Dll"="dmatrans.dll"
+    "Order"=dword:0
+
+; @XIPREGION ENDIF DEFAULT_DEVICEEMULATOR_REG
+; @CESYSGEN ENDIF CE_MODULES_DEVICE
+
+; @CESYSGEN IF CE_MODULES_DEVICE && COREDLL_CORESTRA && COREDLL_FULL_CRT && COREDLL_CRT_CPP_EH_AND_RTTI
+; @XIPREGION IF DEFAULT_DEVICEEMULATOR_REG
+[HKEY_LOCAL_MACHINE\init]
+"Launch98"="EmulatorStub.exe"
+"Depend98"=hex:14,00
+; @XIPREGION ENDIF DEFAULT_DEVICEEMULATOR_REG
+; @CESYSGEN ENDIF ; CE_MODULES_DEVICE && COREDLL_CORESTRA && COREDLL_FULL_CRT && COREDLL_CRT_CPP_EH_AND_RTTI
+
+; @CESYSGEN IF CE_MODULES_SERIAL
+; @XIPREGION IF DEFAULT_DEVICEEMULATOR_REG
+[HKEY_LOCAL_MACHINE\Drivers\BuiltIn\SERDMA]
+    "Dll"="SERDMA.DLL"
+    "Prefix"="SER"
+    "DeviceArrayIndex"=dword:0
+    "DMAChannel"=dword:6  ; bind this instance to DMA6
+    "Index"=dword:6       ; this instance will be SER6
+    "Tsp"="Unimodem.dll"
+    "DeviceType"=dword:0  ; 0 means "direct"
+    "FriendlyName"="Serial over DMA"
+    "DevConfig"=hex: 10,00, 00,00, 05,00,00,00, 10,01,00,00, 00,4B,00,00, 00,00,08, 00, 00, 00,00,00,00
+    "Order"=dword:1
+    "IClass"="{A32942B7-920C-486b-B0E6-92A702A99B35}"
+; @XIPREGION ENDIF DEFAULT_DEVICEEMULATOR_REG
+; @CESYSGEN ENDIF CE_MODULES_SERIAL
+
+; @XIPREGION IF DEFAULT_DEVICEEMULATOR_REG
+[HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Shell\Extensions\ContextMenus\ActiveSync\ActiveSyncConnect\{f672ddb2-bb6f-4b8c-b580-e8b71758e394}]
+    @="Connect via DMA..."
+    "Delay"=dword:1
+; @XIPREGION ENDIF DEFAULT_DEVICEEMULATOR_REG
+
+; @CESYSGEN IF CE_MODULES_PPP
+; @CESYSGEN IF SHELLSDK_MODULES_AYGSHELL || SHELLW_MODULES_AYGSHELL
+; @XIPREGION IF DEFAULT_DEVICEEMULATOR_REG
+[HKEY_CLASSES_ROOT\CLSID\{f672ddb2-bb6f-4b8c-b580-e8b71758e394}\InProcServer32]
+    @="SERDMAASPlugIn.dll"
+; @XIPREGION ENDIF DEFAULT_DEVICEEMULATOR_REG
+; @CESYSGEN ENDIF SHELLSDK_MODULES_AYGSHELL || SHELLW_MODULES_AYGSHELL
+; @CESYSGEN ENDIF CE_MODULES_PPP
+
+;End of DMA Transport
+
+ENDIF ; IMGNOEMULSRV !
+
+
+; @XIPREGION IF DEFAULT_DEVICEEMULATOR_REG
+; Welcome.exe: Disable tutorial and calibration pages
+; PAGE_TOUCHSCREEN (2), PAGE_STYLUS (4), PAGE_POPUPMENU (8), PAGE_TIMEZONE (0x10), PAGE_COMPLETE (0x20)
+[HKEY_LOCAL_MACHINE\Software\Microsoft\Welcome]
+    "Disable"=dword:ffffffff
+
+; Welcome.exe: Disable tutorial will be overwritten if security is not turned off by default.
+; This reg key turns the security off by default - when it is set to a nonzero value, querying device management policy SECPOLICY_LASS_PWD_REQUIRED will return FALSE.
+[HKEY_LOCAL_MACHINE\Security\Policies\Policies]
+    "00001023"=dword:1
+
+; This registry setting enables the Explorer's suspend menu button
+[HKEY_LOCAL_MACHINE\Explorer]
+    "Suspend"=dword:1
+
+; @XIPREGION ENDIF DEFAULT_DEVICEEMULATOR_REG
+
+IF IMGPERSISTENTSTORAGE
+
+; @XIPREGION IF DEFAULT_DEVICEEMULATOR_REG
+; Must go in default.fdf to allow loading of registry!
+[HKEY_LOCAL_MACHINE\System\Platform]
+    "DataPath" = "\\"
+
+[HKEY_LOCAL_MACHINE\SYSTEM\GWE\Notify]
+    "volume"="\\mxip_notify.vol"
+; @XIPREGION ENDIF DEFAULT_DEVICEEMULATOR_REG
+
+; @CESYSGEN IF FILESYS_FSDBASE
+[HKEY_CURRENT_USER\Software\Microsoft\Windows]
+    ; The following are fixed names based on the way ColdInit creates database volumes
+    "DbPath" = "\\mxip_initdb.vol"
+
+; @XIPREGION IF PLATFORM_LANGDB_VOLUMES
+    ; language databases live in their own database volume
+    "LangDbPath" = "\\mxip_lang.vol"
+; @XIPREGION ENDIF PLATFORM_LANGDB_VOLUMES
+
+; @CESYSGEN ENDIF FILESYS_FSDBASE
+
+; @CESYSGEN IF SHELLW_MODULES_TELSHELL
+; @CESYSGEN ENDIF SHELLW_MODULES_TELSHELL
+
+ENDIF ; IMGPERSISTENTSTORAGE
+
+
+; @CESYSGEN IF CELLCORE_MODULES_RIL
+; @CESYSGEN ENDIF CELLCORE_MODULES_RIL
+
+;;hwkey assignments array in btnprop.cpp
+
+; @XIPREGION IF DEFAULT_DEVICEEMULATOR_REG
+; Start Menu
+[HKEY_LOCAL_MACHINE\Software\Microsoft\Shell\Keys\40C1]
+IF IMGPPC
+"Name"=LOC_APPBUTTON1
+ENDIF ; IMGPPC
+"Icon"="shellres.dll, -4617"
+"Flags"=dword:1
+"ResetFlags"=dword:1
+
+[HKEY_LOCAL_MACHINE\Software\Microsoft\Shell\Keys\40C2]
+IF IMGPPC
+"Name"=LOC_APPBUTTON2
+ENDIF ; IMGPPC
+"Icon"="outres.dll, -10000"
+"Flags"=dword:C
+"ResetFlags"=dword:C
+
+; Context Menu
+[HKEY_LOCAL_MACHINE\Software\Microsoft\Shell\Keys\40C3]
+IF IMGPPC
+"Name"=LOC_APPBUTTON3
+ENDIF ; IMGPPC
+"Icon"="shellres.dll, -4619"
+"Flags"=dword:B
+"ResetFlags"=dword:B
+
+; Foo Button
+[HKEY_LOCAL_MACHINE\Software\Microsoft\Shell\Keys\40C4]
+IF IMGPPC
+"Name"=LOC_APPBUTTON4
+ENDIF ; IMGPPC
+"Icon"="shellres.dll, -4618"
+"Flags"=dword:A
+"ResetFlags"=dword:A
+; @XIPREGION ENDIF DEFAULT_DEVICEEMULATOR_REG
+
+IF IMGUNSIGNEDTRUSTED !
+; @XIPREGION IF MISC_DEVICEEMULATOR_REG
+
+;
+; These security policies and certs are for the SDK.
+;
+
+; Unsigned Applications Policy
+[HKEY_LOCAL_MACHINE\Security\Policies\Policies]
+    "00001006"=dword:1
+
+; Unsigned Cabs Policy
+[HKEY_LOCAL_MACHINE\Security\Policies\Policies]
+    "00001005"=dword:10
+
+; Prompting for unsigned applications Policy
+[HKEY_LOCAL_MACHINE\Security\Policies\Policies]
+    "0000101a"=dword:1
+
+
+[HKEY_LOCAL_MACHINE\Comm\Security\SystemCertificates\Privileged Execution Trust Authorities]
+    "UpdateTime"=hex:00, 79, 32, 70, 45, 53, C2, 01
+
+[HKEY_LOCAL_MACHINE\Comm\Security\SystemCertificates\Privileged Execution Trust Authorities\Certificates\8AEB6E720079EB0494AE9BE32CB13A9E3687D913]
+    "Blob"=hex: 03, 00, 00, 00, 01, 00, 00, 00, 14, 00, 00, 00, 8A, EB, 6E, 72, \
+        00, 79, EB, 04, 94, AE, 9B, E3, 2C, B1, 3A, 9E, 36, 87, D9, 13, \
+        00, 80, 00, 00, 01, 00, 00, 00, 04, 00, 00, 00, FF, 00, 00, 00, \
+        20, 00, 00, 00, 01, 00, 00, 00, 05, 03, 00, 00, 30, 82, 03, 01, \
+        30, 82, 02, 6E, A0, 03, 02, 01, 02, 02, 10, 72, 44, EE, 1C, 73, \
+        3B, 44, 95, 40, 9C, B4, 3D, 19, 3B, 40, 43, 30, 09, 06, 05, 2B, \
+        0E, 03, 02, 1D, 05, 00, 30, 3C, 31, 3A, 30, 38, 06, 03, 55, 04, \
+        03, 13, 31, 53, 6D, 61, 72, 74, 70, 68, 6F, 6E, 65, 20, 32, 30, \
+        30, 33, 20, 50, 72, 69, 76, 69, 6C, 65, 67, 65, 64, 20, 54, 65, \
+        73, 74, 20, 53, 69, 67, 6E, 69, 6E, 67, 20, 41, 75, 74, 68, 6F, \
+        72, 69, 74, 79, 30, 1E, 17, 0D, 30, 32, 31, 32, 33, 31, 30, 38, \
+        30, 30, 30, 30, 5A, 17, 0D, 32, 32, 31, 32, 33, 31, 30, 38, 30, \
+        30, 30, 30, 5A, 30, 3C, 31, 3A, 30, 38, 06, 03, 55, 04, 03, 13, \
+        31, 53, 6D, 61, 72, 74, 70, 68, 6F, 6E, 65, 20, 32, 30, 30, 33, \
+        20, 50, 72, 69, 76, 69, 6C, 65, 67, 65, 64, 20, 54, 65, 73, 74, \
+        20, 53, 69, 67, 6E, 69, 6E, 67, 20, 41, 75, 74, 68, 6F, 72, 69, \
+        74, 79, 30, 81, 9F, 30, 0D, 06, 09, 2A, 86, 48, 86, F7, 0D, 01, \
+        01, 01, 05, 00, 03, 81, 8D, 00, 30, 81, 89, 02, 81, 81, 00, AE, \
+        0A, DD, E4, 72, 84, 69, E9, A3, E5, 91, AF, E8, 75, 5A, BB, 6E, \
+        69, B4, 0E, 81, 4F, 48, F9, 4B, B5, A3, 55, B0, CB, D0, C6, 05, \
+        A6, D0, 80, 54, 6D, 8C, 36, 56, 7A, CC, 39, 3B, 3C, E7, BA, 2A, \
+        FC, 43, A8, 5C, FC, 11, D9, 41, 37, E0, 4A, AB, C7, D9, E3, 1C, \
+        B2, 11, 68, 4B, A2, A2, AB, A2, B5, A8, 28, 60, 7D, 9C, AA, F6, \
+        A8, 46, 52, 4F, 5F, C8, 4F, A8, 74, D8, D6, BD, 95, 05, 6F, C9, \
+        44, 65, B9, 27, 38, 8B, 6C, C8, E7, C9, 45, 3E, 6C, 0D, E4, 84, \
+        ED, 57, C8, 13, 2B, 0E, 16, 1D, 95, D2, 43, 22, 62, C8, BF, 02, \
+        03, 01, 00, 01, A3, 82, 01, 0A, 30, 82, 01, 06, 30, 0D, 06, 03, \
+        55, 1D, 0A, 04, 06, 30, 04, 03, 02, 06, 40, 30, 71, 06, 03, 55, \
+        04, 03, 04, 6A, 1E, 68, 00, 43, 00, 4E, 00, 3D, 00, 53, 00, 6D, \
+        00, 61, 00, 72, 00, 74, 00, 70, 00, 68, 00, 6F, 00, 6E, 00, 65, \
+        00, 20, 00, 32, 00, 30, 00, 30, 00, 33, 00, 20, 00, 50, 00, 72, \
+        00, 69, 00, 76, 00, 69, 00, 6C, 00, 65, 00, 67, 00, 65, 00, 64, \
+        00, 20, 00, 54, 00, 65, 00, 73, 00, 74, 00, 20, 00, 53, 00, 69, \
+        00, 67, 00, 6E, 00, 69, 00, 6E, 00, 67, 00, 20, 00, 41, 00, 75, \
+        00, 74, 00, 68, 00, 6F, 00, 72, 00, 69, 00, 74, 00, 79, 30, 13, \
+        06, 03, 55, 1D, 25, 04, 0C, 30, 0A, 06, 08, 2B, 06, 01, 05, 05, \
+        07, 03, 03, 30, 6D, 06, 03, 55, 1D, 01, 04, 66, 30, 64, 80, 10, \
+        C6, B0, 3B, AA, C8, 4B, 9C, 0F, 3B, 33, ED, C8, 7A, 3D, 6A, 1E, \
+        A1, 3E, 30, 3C, 31, 3A, 30, 38, 06, 03, 55, 04, 03, 13, 31, 53, \
+        6D, 61, 72, 74, 70, 68, 6F, 6E, 65, 20, 32, 30, 30, 33, 20, 50, \
+        72, 69, 76, 69, 6C, 65, 67, 65, 64, 20, 54, 65, 73, 74, 20, 53, \
+        69, 67, 6E, 69, 6E, 67, 20, 41, 75, 74, 68, 6F, 72, 69, 74, 79, \
+        82, 10, 72, 44, EE, 1C, 73, 3B, 44, 95, 40, 9C, B4, 3D, 19, 3B, \
+        40, 43, 30, 09, 06, 05, 2B, 0E, 03, 02, 1D, 05, 00, 03, 81, 81, \
+        00, 96, 9B, B5, 47, 61, 9F, 28, DB, 37, DD, C1, C0, 41, 87, CB, \
+        50, 26, B5, 8F, 60, 19, F9, BC, 75, 3B, C2, 35, 1F, C8, 9A, 67, \
+        45, 5E, E6, FE, 68, FD, 3E, 66, EA, B4, 71, B4, BE, 79, B8, 64, \
+        30, 07, 06, 2E, C9, 10, 68, 76, 35, 33, 04, 4F, 7A, 04, 0A, 80, \
+        DE, 8C, 54, 6F, A2, 34, AC, 92, 80, 05, 7F, 7B, 75, B1, 43, AD, \
+        42, BE, 44, 1A, 44, 3E, 95, 96, DA, 03, 90, 0C, D1, 5E, 5E, C6, \
+        FE, 63, DF, B3, A6, CD, B1, 85, 2A, 2A, F8, 78, 81, B6, 6D, 18, \
+        0F, 54, D8, 69, A7, D3, 55, C1, ED, 44, CE, 1D, CC, 87, 9C, 91, \
+        0A
+
+[HKEY_LOCAL_MACHINE\Comm\Security\SystemCertificates\UnPrivileged Execution Trust Authorities\Certificates\3F43176D9094FC2262313793157F23515FE55686]
+    "Blob"=hex: 03, 00, 00, 00, 01, 00, 00, 00, 14, 00, 00, 00, 3F, 43, 17, 6D, \
+        90, 94, FC, 22, 62, 31, 37, 93, 15, 7F, 23, 51, 5F, E5, 56, 86, \
+        00, 80, 00, 00, 01, 00, 00, 00, 04, 00, 00, 00, FF, 00, 00, 00, \
+        20, 00, 00, 00, 01, 00, 00, 00, 0F, 03, 00, 00, 30, 82, 03, 0B, \
+        30, 82, 02, 78, A0, 03, 02, 01, 02, 02, 10, 83, 85, 64, 79, 84, \
+        02, 0F, B9, 49, 12, 37, 79, 05, 21, D5, 20, 30, 09, 06, 05, 2B, \
+        0E, 03, 02, 1D, 05, 00, 30, 3E, 31, 3C, 30, 3A, 06, 03, 55, 04, \
+        03, 13, 33, 53, 6D, 61, 72, 74, 70, 68, 6F, 6E, 65, 20, 32, 30, \
+        30, 33, 20, 55, 6E, 70, 72, 69, 76, 69, 6C, 65, 67, 65, 64, 20, \
+        54, 65, 73, 74, 20, 53, 69, 67, 6E, 69, 6E, 67, 20, 41, 75, 74, \
+        68, 6F, 72, 69, 74, 79, 30, 1E, 17, 0D, 30, 32, 31, 32, 33, 31, \
+        30, 38, 30, 30, 30, 30, 5A, 17, 0D, 32, 32, 31, 32, 33, 31, 30, \
+        38, 30, 30, 30, 30, 5A, 30, 3E, 31, 3C, 30, 3A, 06, 03, 55, 04, \
+        03, 13, 33, 53, 6D, 61, 72, 74, 70, 68, 6F, 6E, 65, 20, 32, 30, \
+        30, 33, 20, 55, 6E, 70, 72, 69, 76, 69, 6C, 65, 67, 65, 64, 20, \
+        54, 65, 73, 74, 20, 53, 69, 67, 6E, 69, 6E, 67, 20, 41, 75, 74, \
+        68, 6F, 72, 69, 74, 79, 30, 81, 9F, 30, 0D, 06, 09, 2A, 86, 48, \
+        86, F7, 0D, 01, 01, 01, 05, 00, 03, 81, 8D, 00, 30, 81, 89, 02, \
+        81, 81, 00, BA, F8, CC, 71, CA, CD, BA, 2B, 28, 8A, 9B, 91, 6C, \
+        14, 73, 23, 8A, 5E, 3A, 5F, B2, ED, 69, C3, 2B, E7, 36, 74, 4F, \
+        9E, 4F, 6F, 02, BB, 7F, A4, 2A, DE, 51, B2, 73, 0E, B0, 55, 22, \
+        32, 18, B6, F0, E8, BC, 3C, 50, 0B, 11, 3F, 8A, 40, D1, B1, 3B, \
+        4B, AB, 85, 3A, EE, 80, C2, 23, 97, F2, 1B, 6E, CF, B5, B1, 62, \
+        28, B3, BD, 28, DF, 0A, E0, B3, 18, 1A, 00, 1E, 01, 9E, ED, D9, \
+        CB, 67, 8D, 85, E5, A6, E5, A6, 7E, 7E, C7, B7, D4, 4D, A5, 90, \
+        37, 1A, 9F, 4B, 05, 95, 25, AA, 74, 29, D9, 77, 22, C4, 2C, 4D, \
+        16, EF, 59, 02, 03, 01, 00, 01, A3, 82, 01, 10, 30, 82, 01, 0C, \
+        30, 0D, 06, 03, 55, 1D, 0A, 04, 06, 30, 04, 03, 02, 06, 40, 30, \
+        75, 06, 03, 55, 04, 03, 04, 6E, 1E, 6C, 00, 43, 00, 4E, 00, 3D, \
+        00, 53, 00, 6D, 00, 61, 00, 72, 00, 74, 00, 70, 00, 68, 00, 6F, \
+        00, 6E, 00, 65, 00, 20, 00, 32, 00, 30, 00, 30, 00, 33, 00, 20, \
+        00, 55, 00, 6E, 00, 70, 00, 72, 00, 69, 00, 76, 00, 69, 00, 6C, \
+        00, 65, 00, 67, 00, 65, 00, 64, 00, 20, 00, 54, 00, 65, 00, 73, \
+        00, 74, 00, 20, 00, 53, 00, 69, 00, 67, 00, 6E, 00, 69, 00, 6E, \
+        00, 67, 00, 20, 00, 41, 00, 75, 00, 74, 00, 68, 00, 6F, 00, 72, \
+        00, 69, 00, 74, 00, 79, 30, 13, 06, 03, 55, 1D, 25, 04, 0C, 30, \
+        0A, 06, 08, 2B, 06, 01, 05, 05, 07, 03, 03, 30, 6F, 06, 03, 55, \
+        1D, 01, 04, 68, 30, 66, 80, 10, 71, 08, CE, 1A, 01, B6, A3, 21, \
+        25, 43, 93, E2, 16, 30, D2, AD, A1, 40, 30, 3E, 31, 3C, 30, 3A, \
+        06, 03, 55, 04, 03, 13, 33, 53, 6D, 61, 72, 74, 70, 68, 6F, 6E, \
+        65, 20, 32, 30, 30, 33, 20, 55, 6E, 70, 72, 69, 76, 69, 6C, 65, \
+        67, 65, 64, 20, 54, 65, 73, 74, 20, 53, 69, 67, 6E, 69, 6E, 67, \
+        20, 41, 75, 74, 68, 6F, 72, 69, 74, 79, 82, 10, 83, 85, 64, 79, \
+        84, 02, 0F, B9, 49, 12, 37, 79, 05, 21, D5, 20, 30, 09, 06, 05, \
+        2B, 0E, 03, 02, 1D, 05, 00, 03, 81, 81, 00, 98, D5, 12, D7, 73, \
+        39, 0D, FC, 23, 19, D4, 7A, BD, 3F, 9C, 5D, 5D, B0, DB, EA, CD, \
+        E7, 79, 73, EB, BA, 45, 9C, C5, 0B, 3C, D7, 6C, 47, 3D, 93, 52, \
+        A2, 4A, C2, 77, 28, 97, 40, 92, 87, F4, 13, 81, 79, A0, 2B, 3D, \
+        85, EA, B4, EA, 70, 2B, FA, 92, 22, 4E, A7, 30, FB, 1F, F2, D8, \
+        E5, 52, 01, D7, A8, 7B, A3, FA, E4, 0C, 85, 83, 08, 14, C9, 36, \
+        FD, ED, 8B, AA, 81, 29, DF, 3A, D3, C0, 5B, 64, EE, 03, 6E, 01, \
+        6D, 24, CB, 5C, 99, 15, E2, 17, 17, CD, 95, 82, E5, 8C, 25, 82, \
+        42, 6E, E6, 17, F8, AD, D6, CA, 28, F3, 02
+
+[HKEY_LOCAL_MACHINE\Comm\Security\SystemCertificates\SPC\Certificates\8AEB6E720079EB0494AE9BE32CB13A9E3687D913]
+    "Blob"=hex: 03, 00, 00, 00, 01, 00, 00, 00, 14, 00, 00, 00, 8A, EB, 6E, 72, \
+        00, 79, EB, 04, 94, AE, 9B, E3, 2C, B1, 3A, 9E, 36, 87, D9, 13, \
+        00, 80, 00, 00, 01, 00, 00, 00, 04, 00, 00, 00, FF, 00, 00, 00, \
+        20, 00, 00, 00, 01, 00, 00, 00, 05, 03, 00, 00, 30, 82, 03, 01, \
+        30, 82, 02, 6E, A0, 03, 02, 01, 02, 02, 10, 72, 44, EE, 1C, 73, \
+        3B, 44, 95, 40, 9C, B4, 3D, 19, 3B, 40, 43, 30, 09, 06, 05, 2B, \
+        0E, 03, 02, 1D, 05, 00, 30, 3C, 31, 3A, 30, 38, 06, 03, 55, 04, \
+        03, 13, 31, 53, 6D, 61, 72, 74, 70, 68, 6F, 6E, 65, 20, 32, 30, \
+        30, 33, 20, 50, 72, 69, 76, 69, 6C, 65, 67, 65, 64, 20, 54, 65, \
+        73, 74, 20, 53, 69, 67, 6E, 69, 6E, 67, 20, 41, 75, 74, 68, 6F, \
+        72, 69, 74, 79, 30, 1E, 17, 0D, 30, 32, 31, 32, 33, 31, 30, 38, \
+        30, 30, 30, 30, 5A, 17, 0D, 32, 32, 31, 32, 33, 31, 30, 38, 30, \
+        30, 30, 30, 5A, 30, 3C, 31, 3A, 30, 38, 06, 03, 55, 04, 03, 13, \
+        31, 53, 6D, 61, 72, 74, 70, 68, 6F, 6E, 65, 20, 32, 30, 30, 33, \
+        20, 50, 72, 69, 76, 69, 6C, 65, 67, 65, 64, 20, 54, 65, 73, 74, \
+        20, 53, 69, 67, 6E, 69, 6E, 67, 20, 41, 75, 74, 68, 6F, 72, 69, \
+        74, 79, 30, 81, 9F, 30, 0D, 06, 09, 2A, 86, 48, 86, F7, 0D, 01, \
+        01, 01, 05, 00, 03, 81, 8D, 00, 30, 81, 89, 02, 81, 81, 00, AE, \
+        0A, DD, E4, 72, 84, 69, E9, A3, E5, 91, AF, E8, 75, 5A, BB, 6E, \
+        69, B4, 0E, 81, 4F, 48, F9, 4B, B5, A3, 55, B0, CB, D0, C6, 05, \
+        A6, D0, 80, 54, 6D, 8C, 36, 56, 7A, CC, 39, 3B, 3C, E7, BA, 2A, \
+        FC, 43, A8, 5C, FC, 11, D9, 41, 37, E0, 4A, AB, C7, D9, E3, 1C, \
+        B2, 11, 68, 4B, A2, A2, AB, A2, B5, A8, 28, 60, 7D, 9C, AA, F6, \
+        A8, 46, 52, 4F, 5F, C8, 4F, A8, 74, D8, D6, BD, 95, 05, 6F, C9, \
+        44, 65, B9, 27, 38, 8B, 6C, C8, E7, C9, 45, 3E, 6C, 0D, E4, 84, \
+        ED, 57, C8, 13, 2B, 0E, 16, 1D, 95, D2, 43, 22, 62, C8, BF, 02, \
+        03, 01, 00, 01, A3, 82, 01, 0A, 30, 82, 01, 06, 30, 0D, 06, 03, \
+        55, 1D, 0A, 04, 06, 30, 04, 03, 02, 06, 40, 30, 71, 06, 03, 55, \
+        04, 03, 04, 6A, 1E, 68, 00, 43, 00, 4E, 00, 3D, 00, 53, 00, 6D, \
+        00, 61, 00, 72, 00, 74, 00, 70, 00, 68, 00, 6F, 00, 6E, 00, 65, \
+        00, 20, 00, 32, 00, 30, 00, 30, 00, 33, 00, 20, 00, 50, 00, 72, \
+        00, 69, 00, 76, 00, 69, 00, 6C, 00, 65, 00, 67, 00, 65, 00, 64, \
+        00, 20, 00, 54, 00, 65, 00, 73, 00, 74, 00, 20, 00, 53, 00, 69, \
+        00, 67, 00, 6E, 00, 69, 00, 6E, 00, 67, 00, 20, 00, 41, 00, 75, \
+        00, 74, 00, 68, 00, 6F, 00, 72, 00, 69, 00, 74, 00, 79, 30, 13, \
+        06, 03, 55, 1D, 25, 04, 0C, 30, 0A, 06, 08, 2B, 06, 01, 05, 05, \
+        07, 03, 03, 30, 6D, 06, 03, 55, 1D, 01, 04, 66, 30, 64, 80, 10, \
+        C6, B0, 3B, AA, C8, 4B, 9C, 0F, 3B, 33, ED, C8, 7A, 3D, 6A, 1E, \
+        A1, 3E, 30, 3C, 31, 3A, 30, 38, 06, 03, 55, 04, 03, 13, 31, 53, \
+        6D, 61, 72, 74, 70, 68, 6F, 6E, 65, 20, 32, 30, 30, 33, 20, 50, \
+        72, 69, 76, 69, 6C, 65, 67, 65, 64, 20, 54, 65, 73, 74, 20, 53, \
+        69, 67, 6E, 69, 6E, 67, 20, 41, 75, 74, 68, 6F, 72, 69, 74, 79, \
+        82, 10, 72, 44, EE, 1C, 73, 3B, 44, 95, 40, 9C, B4, 3D, 19, 3B, \
+        40, 43, 30, 09, 06, 05, 2B, 0E, 03, 02, 1D, 05, 00, 03, 81, 81, \
+        00, 96, 9B, B5, 47, 61, 9F, 28, DB, 37, DD, C1, C0, 41, 87, CB, \
+        50, 26, B5, 8F, 60, 19, F9, BC, 75, 3B, C2, 35, 1F, C8, 9A, 67, \
+        45, 5E, E6, FE, 68, FD, 3E, 66, EA, B4, 71, B4, BE, 79, B8, 64, \
+        30, 07, 06, 2E, C9, 10, 68, 76, 35, 33, 04, 4F, 7A, 04, 0A, 80, \
+        DE, 8C, 54, 6F, A2, 34, AC, 92, 80, 05, 7F, 7B, 75, B1, 43, AD, \
+        42, BE, 44, 1A, 44, 3E, 95, 96, DA, 03, 90, 0C, D1, 5E, 5E, C6, \
+        FE, 63, DF, B3, A6, CD, B1, 85, 2A, 2A, F8, 78, 81, B6, 6D, 18, \
+        0F, 54, D8, 69, A7, D3, 55, C1, ED, 44, CE, 1D, CC, 87, 9C, 91, \
+        0A
+
+[HKEY_LOCAL_MACHINE\Comm\Security\SystemCertificates\SPC\Certificates\3F43176D9094FC2262313793157F23515FE55686]
+    "Blob"=hex: 03, 00, 00, 00, 01, 00, 00, 00, 14, 00, 00, 00, 3F, 43, 17, 6D, \
+        90, 94, FC, 22, 62, 31, 37, 93, 15, 7F, 23, 51, 5F, E5, 56, 86, \
+        00, 80, 00, 00, 01, 00, 00, 00, 04, 00, 00, 00, FF, 00, 00, 00, \
+        20, 00, 00, 00, 01, 00, 00, 00, 0F, 03, 00, 00, 30, 82, 03, 0B, \
+        30, 82, 02, 78, A0, 03, 02, 01, 02, 02, 10, 83, 85, 64, 79, 84, \
+        02, 0F, B9, 49, 12, 37, 79, 05, 21, D5, 20, 30, 09, 06, 05, 2B, \
+        0E, 03, 02, 1D, 05, 00, 30, 3E, 31, 3C, 30, 3A, 06, 03, 55, 04, \
+        03, 13, 33, 53, 6D, 61, 72, 74, 70, 68, 6F, 6E, 65, 20, 32, 30, \
+        30, 33, 20, 55, 6E, 70, 72, 69, 76, 69, 6C, 65, 67, 65, 64, 20, \
+        54, 65, 73, 74, 20, 53, 69, 67, 6E, 69, 6E, 67, 20, 41, 75, 74, \
+        68, 6F, 72, 69, 74, 79, 30, 1E, 17, 0D, 30, 32, 31, 32, 33, 31, \
+        30, 38, 30, 30, 30, 30, 5A, 17, 0D, 32, 32, 31, 32, 33, 31, 30, \
+        38, 30, 30, 30, 30, 5A, 30, 3E, 31, 3C, 30, 3A, 06, 03, 55, 04, \
+        03, 13, 33, 53, 6D, 61, 72, 74, 70, 68, 6F, 6E, 65, 20, 32, 30, \
+        30, 33, 20, 55, 6E, 70, 72, 69, 76, 69, 6C, 65, 67, 65, 64, 20, \
+        54, 65, 73, 74, 20, 53, 69, 67, 6E, 69, 6E, 67, 20, 41, 75, 74, \
+        68, 6F, 72, 69, 74, 79, 30, 81, 9F, 30, 0D, 06, 09, 2A, 86, 48, \
+        86, F7, 0D, 01, 01, 01, 05, 00, 03, 81, 8D, 00, 30, 81, 89, 02, \
+        81, 81, 00, BA, F8, CC, 71, CA, CD, BA, 2B, 28, 8A, 9B, 91, 6C, \
+        14, 73, 23, 8A, 5E, 3A, 5F, B2, ED, 69, C3, 2B, E7, 36, 74, 4F, \
+        9E, 4F, 6F, 02, BB, 7F, A4, 2A, DE, 51, B2, 73, 0E, B0, 55, 22, \
+        32, 18, B6, F0, E8, BC, 3C, 50, 0B, 11, 3F, 8A, 40, D1, B1, 3B, \
+        4B, AB, 85, 3A, EE, 80, C2, 23, 97, F2, 1B, 6E, CF, B5, B1, 62, \
+        28, B3, BD, 28, DF, 0A, E0, B3, 18, 1A, 00, 1E, 01, 9E, ED, D9, \
+        CB, 67, 8D, 85, E5, A6, E5, A6, 7E, 7E, C7, B7, D4, 4D, A5, 90, \
+        37, 1A, 9F, 4B, 05, 95, 25, AA, 74, 29, D9, 77, 22, C4, 2C, 4D, \
+        16, EF, 59, 02, 03, 01, 00, 01, A3, 82, 01, 10, 30, 82, 01, 0C, \
+        30, 0D, 06, 03, 55, 1D, 0A, 04, 06, 30, 04, 03, 02, 06, 40, 30, \
+        75, 06, 03, 55, 04, 03, 04, 6E, 1E, 6C, 00, 43, 00, 4E, 00, 3D, \
+        00, 53, 00, 6D, 00, 61, 00, 72, 00, 74, 00, 70, 00, 68, 00, 6F, \
+        00, 6E, 00, 65, 00, 20, 00, 32, 00, 30, 00, 30, 00, 33, 00, 20, \
+        00, 55, 00, 6E, 00, 70, 00, 72, 00, 69, 00, 76, 00, 69, 00, 6C, \
+        00, 65, 00, 67, 00, 65, 00, 64, 00, 20, 00, 54, 00, 65, 00, 73, \
+        00, 74, 00, 20, 00, 53, 00, 69, 00, 67, 00, 6E, 00, 69, 00, 6E, \
+        00, 67, 00, 20, 00, 41, 00, 75, 00, 74, 00, 68, 00, 6F, 00, 72, \
+        00, 69, 00, 74, 00, 79, 30, 13, 06, 03, 55, 1D, 25, 04, 0C, 30, \
+        0A, 06, 08, 2B, 06, 01, 05, 05, 07, 03, 03, 30, 6F, 06, 03, 55, \
+        1D, 01, 04, 68, 30, 66, 80, 10, 71, 08, CE, 1A, 01, B6, A3, 21, \
+        25, 43, 93, E2, 16, 30, D2, AD, A1, 40, 30, 3E, 31, 3C, 30, 3A, \
+        06, 03, 55, 04, 03, 13, 33, 53, 6D, 61, 72, 74, 70, 68, 6F, 6E, \
+        65, 20, 32, 30, 30, 33, 20, 55, 6E, 70, 72, 69, 76, 69, 6C, 65, \
+        67, 65, 64, 20, 54, 65, 73, 74, 20, 53, 69, 67, 6E, 69, 6E, 67, \
+        20, 41, 75, 74, 68, 6F, 72, 69, 74, 79, 82, 10, 83, 85, 64, 79, \
+        84, 02, 0F, B9, 49, 12, 37, 79, 05, 21, D5, 20, 30, 09, 06, 05, \
+        2B, 0E, 03, 02, 1D, 05, 00, 03, 81, 81, 00, 98, D5, 12, D7, 73, \
+        39, 0D, FC, 23, 19, D4, 7A, BD, 3F, 9C, 5D, 5D, B0, DB, EA, CD, \
+        E7, 79, 73, EB, BA, 45, 9C, C5, 0B, 3C, D7, 6C, 47, 3D, 93, 52, \
+        A2, 4A, C2, 77, 28, 97, 40, 92, 87, F4, 13, 81, 79, A0, 2B, 3D, \
+        85, EA, B4, EA, 70, 2B, FA, 92, 22, 4E, A7, 30, FB, 1F, F2, D8, \
+        E5, 52, 01, D7, A8, 7B, A3, FA, E4, 0C, 85, 83, 08, 14, C9, 36, \
+        FD, ED, 8B, AA, 81, 29, DF, 3A, D3, C0, 5B, 64, EE, 03, 6E, 01, \
+        6D, 24, CB, 5C, 99, 15, E2, 17, 17, CD, 95, 82, E5, 8C, 25, 82, \
+        42, 6E, E6, 17, F8, AD, D6, CA, 28, F3, 02
+
+
+[HKEY_LOCAL_MACHINE\Comm\Security\SystemCertificates\Privileged Execution Trust Authorities\Certificates\884B8CDDB6FF1A3D2FF4BC09EC45E2AE2CCB244C]
+"Blob"=hex:\
+      03,00,00,00,01,00,00,00,14,00,00,00,88,4b,8c,dd,b6,ff,1a,3d,2f,f4,bc,09,ec,\
+      45,e2,ae,2c,cb,24,4c,00,80,00,00,01,00,00,00,04,00,00,00,00,00,00,00,20,00,\
+      00,00,01,00,00,00,91,04,00,00,30,82,04,8d,30,82,03,f6,a0,03,02,01,02,02,10,\
+      b8,2c,a4,bd,fe,ac,f4,a5,4b,ec,72,32,b1,ce,e7,b3,30,0d,06,09,2a,86,48,86,f7,\
+      0d,01,01,04,05,00,30,81,b9,31,0b,30,09,06,03,55,04,06,13,02,55,53,31,13,30,\
+      11,06,03,55,04,08,13,0a,57,61,73,68,69,6e,67,74,6f,6e,31,10,30,0e,06,03,55,\
+      04,07,13,07,52,65,64,6d,6f,6e,64,31,1e,30,1c,06,03,55,04,0a,13,15,4d,69,63,\
+      72,6f,73,6f,66,74,20,43,6f,72,70,6f,72,61,74,69,6f,6e,31,22,30,20,06,03,55,\
+      04,0b,13,19,56,69,73,75,61,6c,20,53,74,75,64,69,6f,20,66,6f,72,20,44,65,76,\
+      69,63,65,73,31,3f,30,3d,06,03,55,04,03,13,36,4d,69,63,72,6f,73,6f,66,74,20,\
+      56,69,73,75,61,6c,20,53,74,75,64,69,6f,20,49,6e,74,65,72,6d,65,64,69,61,74,\
+      65,20,53,69,67,6e,69,6e,67,20,41,75,74,68,6f,72,69,74,79,30,1e,17,0d,30,34,\
+      31,30,31,31,32,32,35,32,30,30,5a,17,0d,33,39,31,32,33,31,32,33,35,39,35,39,\
+      5a,30,81,ac,31,0b,30,09,06,03,55,04,06,13,02,55,53,31,13,30,11,06,03,55,04,\
+      08,13,0a,57,61,73,68,69,6e,67,74,6f,6e,31,10,30,0e,06,03,55,04,07,13,07,52,\
+      65,64,6d,6f,6e,64,31,1e,30,1c,06,03,55,04,0a,13,15,4d,69,63,72,6f,73,6f,66,\
+      74,20,43,6f,72,70,6f,72,61,74,69,6f,6e,31,22,30,20,06,03,55,04,0b,13,19,56,\
+      69,73,75,61,6c,20,53,74,75,64,69,6f,20,66,6f,72,20,44,65,76,69,63,65,73,31,\
+      32,30,30,06,03,55,04,03,13,29,4d,69,63,72,6f,73,6f,66,74,20,56,69,73,75,61,\
+      6c,20,53,74,75,64,69,6f,20,53,69,67,6e,69,6e,67,20,41,75,74,68,6f,72,69,74,\
+      79,30,81,9f,30,0d,06,09,2a,86,48,86,f7,0d,01,01,01,05,00,03,81,8d,00,30,81,\
+      89,02,81,81,00,e3,5d,83,cc,37,90,de,e2,64,15,4e,1c,31,4f,5b,8d,65,1b,07,e7,\
+      72,c5,7e,03,2e,24,91,14,0e,cd,e2,81,8c,1d,fa,18,f4,3b,ea,be,c8,ce,96,c0,2f,\
+      c1,11,af,de,4e,f3,74,c9,77,56,05,af,7f,54,56,10,de,5a,9b,70,c4,cc,17,fb,cf,\
+      4d,6a,81,cd,8f,da,3a,1a,b6,84,71,39,8a,4a,ac,4f,7c,88,50,a0,78,d9,04,e9,29,\
+      3f,32,a2,9a,db,38,e9,1d,27,4f,7b,6c,3a,89,11,ae,a3,b2,29,2b,66,59,10,7d,74,\
+      d8,6a,c4,85,a3,a8,1f,e9,02,03,01,00,01,a3,82,01,9f,30,82,01,9b,30,0d,06,03,\
+      55,1d,0a,04,06,30,04,03,02,06,40,30,7b,06,03,55,04,03,04,74,1e,72,00,4d,00,\
+      69,00,63,00,72,00,6f,00,73,00,6f,00,66,00,74,00,20,00,56,00,69,00,73,00,75,\
+      00,61,00,6c,00,20,00,53,00,74,00,75,00,64,00,69,00,6f,00,20,00,50,00,72,00,\
+      69,00,76,00,69,00,6c,00,65,00,64,00,67,00,65,00,64,00,20,00,45,00,78,00,65,\
+      00,63,00,75,00,74,00,69,00,6f,00,6e,00,20,00,43,00,65,00,72,00,74,00,69,00,\
+      66,00,69,00,63,00,61,00,74,00,65,30,24,06,03,55,1d,25,04,1d,30,1b,06,01,01,\
+      06,01,03,06,01,06,06,01,01,06,01,05,06,01,05,06,01,07,06,01,03,06,01,03,30,\
+      81,e6,06,03,55,1d,01,04,81,de,30,81,db,80,10,c4,c5,35,ea,e9,e7,ca,d0,a8,96,\
+      64,bb,b2,cc,a5,83,a1,81,b4,30,81,b1,31,0b,30,09,06,03,55,04,06,13,02,55,53,\
+      31,13,30,11,06,03,55,04,08,13,0a,57,61,73,68,69,6e,67,74,6f,6e,31,10,30,0e,\
+      06,03,55,04,07,13,07,52,65,64,6d,6f,6e,64,31,1e,30,1c,06,03,55,04,0a,13,15,\
+      4d,69,63,72,6f,73,6f,66,74,20,43,6f,72,70,6f,72,61,74,69,6f,6e,31,22,30,20,\
+      06,03,55,04,0b,13,19,56,69,73,75,61,6c,20,53,74,75,64,69,6f,20,66,6f,72,20,\
+      44,65,76,69,63,65,73,31,37,30,35,06,03,55,04,03,13,2e,4d,69,63,72,6f,73,6f,\
+      66,74,20,56,69,73,75,61,6c,20,53,74,75,64,69,6f,20,52,6f,6f,74,20,53,69,67,\
+      6e,69,6e,67,20,41,75,74,68,6f,72,69,74,79,82,10,63,47,d6,92,67,86,c9,ac,4d,\
+      fc,73,56,dd,21,89,d7,30,0d,06,09,2a,86,48,86,f7,0d,01,01,04,05,00,03,81,81,\
+      00,4d,15,fe,7a,34,79,37,12,e9,42,93,95,1e,98,2e,56,df,31,15,2f,c3,71,b1,d9,\
+      fe,da,6d,99,87,59,dd,83,72,75,61,2c,4d,63,fb,24,8f,38,73,ce,ef,c7,30,81,d3,\
+      67,dc,40,d3,8c,68,1c,30,94,8b,8b,43,2c,fc,bc,12,13,46,92,e5,1d,56,85,e1,28,\
+      20,8e,48,d0,34,29,c3,36,c9,08,d6,22,95,dc,2e,ad,8c,19,91,3d,b9,5f,32,15,d0,\
+      5a,38,88,8a,05,33,3e,7c,9a,bd,37,37,93,46,d3,dd,6c,1d,23,49,7f,34,d2,5e,c8,\
+      dd,15,c5,a4
+
+
+[HKEY_LOCAL_MACHINE\Comm\Security\SystemCertificates\SPC\Certificates\884B8CDDB6FF1A3D2FF4BC09EC45E2AE2CCB244C]
+"Blob"=hex:\
+      03,00,00,00,01,00,00,00,14,00,00,00,88,4b,8c,dd,b6,ff,1a,3d,2f,f4,bc,09,ec,\
+      45,e2,ae,2c,cb,24,4c,00,80,00,00,01,00,00,00,04,00,00,00,08,00,00,00,20,00,\
+      00,00,01,00,00,00,91,04,00,00,30,82,04,8d,30,82,03,f6,a0,03,02,01,02,02,10,\
+      b8,2c,a4,bd,fe,ac,f4,a5,4b,ec,72,32,b1,ce,e7,b3,30,0d,06,09,2a,86,48,86,f7,\
+      0d,01,01,04,05,00,30,81,b9,31,0b,30,09,06,03,55,04,06,13,02,55,53,31,13,30,\
+      11,06,03,55,04,08,13,0a,57,61,73,68,69,6e,67,74,6f,6e,31,10,30,0e,06,03,55,\
+      04,07,13,07,52,65,64,6d,6f,6e,64,31,1e,30,1c,06,03,55,04,0a,13,15,4d,69,63,\
+      72,6f,73,6f,66,74,20,43,6f,72,70,6f,72,61,74,69,6f,6e,31,22,30,20,06,03,55,\
+      04,0b,13,19,56,69,73,75,61,6c,20,53,74,75,64,69,6f,20,66,6f,72,20,44,65,76,\
+      69,63,65,73,31,3f,30,3d,06,03,55,04,03,13,36,4d,69,63,72,6f,73,6f,66,74,20,\
+      56,69,73,75,61,6c,20,53,74,75,64,69,6f,20,49,6e,74,65,72,6d,65,64,69,61,74,\
+      65,20,53,69,67,6e,69,6e,67,20,41,75,74,68,6f,72,69,74,79,30,1e,17,0d,30,34,\
+      31,30,31,31,32,32,35,32,30,30,5a,17,0d,33,39,31,32,33,31,32,33,35,39,35,39,\
+      5a,30,81,ac,31,0b,30,09,06,03,55,04,06,13,02,55,53,31,13,30,11,06,03,55,04,\
+      08,13,0a,57,61,73,68,69,6e,67,74,6f,6e,31,10,30,0e,06,03,55,04,07,13,07,52,\
+      65,64,6d,6f,6e,64,31,1e,30,1c,06,03,55,04,0a,13,15,4d,69,63,72,6f,73,6f,66,\
+      74,20,43,6f,72,70,6f,72,61,74,69,6f,6e,31,22,30,20,06,03,55,04,0b,13,19,56,\
+      69,73,75,61,6c,20,53,74,75,64,69,6f,20,66,6f,72,20,44,65,76,69,63,65,73,31,\
+      32,30,30,06,03,55,04,03,13,29,4d,69,63,72,6f,73,6f,66,74,20,56,69,73,75,61,\
+      6c,20,53,74,75,64,69,6f,20,53,69,67,6e,69,6e,67,20,41,75,74,68,6f,72,69,74,\
+      79,30,81,9f,30,0d,06,09,2a,86,48,86,f7,0d,01,01,01,05,00,03,81,8d,00,30,81,\
+      89,02,81,81,00,e3,5d,83,cc,37,90,de,e2,64,15,4e,1c,31,4f,5b,8d,65,1b,07,e7,\
+      72,c5,7e,03,2e,24,91,14,0e,cd,e2,81,8c,1d,fa,18,f4,3b,ea,be,c8,ce,96,c0,2f,\
+      c1,11,af,de,4e,f3,74,c9,77,56,05,af,7f,54,56,10,de,5a,9b,70,c4,cc,17,fb,cf,\
+      4d,6a,81,cd,8f,da,3a,1a,b6,84,71,39,8a,4a,ac,4f,7c,88,50,a0,78,d9,04,e9,29,\
+      3f,32,a2,9a,db,38,e9,1d,27,4f,7b,6c,3a,89,11,ae,a3,b2,29,2b,66,59,10,7d,74,\
+      d8,6a,c4,85,a3,a8,1f,e9,02,03,01,00,01,a3,82,01,9f,30,82,01,9b,30,0d,06,03,\
+      55,1d,0a,04,06,30,04,03,02,06,40,30,7b,06,03,55,04,03,04,74,1e,72,00,4d,00,\
+      69,00,63,00,72,00,6f,00,73,00,6f,00,66,00,74,00,20,00,56,00,69,00,73,00,75,\
+      00,61,00,6c,00,20,00,53,00,74,00,75,00,64,00,69,00,6f,00,20,00,50,00,72,00,\
+      69,00,76,00,69,00,6c,00,65,00,64,00,67,00,65,00,64,00,20,00,45,00,78,00,65,\
+      00,63,00,75,00,74,00,69,00,6f,00,6e,00,20,00,43,00,65,00,72,00,74,00,69,00,\
+      66,00,69,00,63,00,61,00,74,00,65,30,24,06,03,55,1d,25,04,1d,30,1b,06,01,01,\
+      06,01,03,06,01,06,06,01,01,06,01,05,06,01,05,06,01,07,06,01,03,06,01,03,30,\
+      81,e6,06,03,55,1d,01,04,81,de,30,81,db,80,10,c4,c5,35,ea,e9,e7,ca,d0,a8,96,\
+      64,bb,b2,cc,a5,83,a1,81,b4,30,81,b1,31,0b,30,09,06,03,55,04,06,13,02,55,53,\
+      31,13,30,11,06,03,55,04,08,13,0a,57,61,73,68,69,6e,67,74,6f,6e,31,10,30,0e,\
+      06,03,55,04,07,13,07,52,65,64,6d,6f,6e,64,31,1e,30,1c,06,03,55,04,0a,13,15,\
+      4d,69,63,72,6f,73,6f,66,74,20,43,6f,72,70,6f,72,61,74,69,6f,6e,31,22,30,20,\
+      06,03,55,04,0b,13,19,56,69,73,75,61,6c,20,53,74,75,64,69,6f,20,66,6f,72,20,\
+      44,65,76,69,63,65,73,31,37,30,35,06,03,55,04,03,13,2e,4d,69,63,72,6f,73,6f,\
+      66,74,20,56,69,73,75,61,6c,20,53,74,75,64,69,6f,20,52,6f,6f,74,20,53,69,67,\
+      6e,69,6e,67,20,41,75,74,68,6f,72,69,74,79,82,10,63,47,d6,92,67,86,c9,ac,4d,\
+      fc,73,56,dd,21,89,d7,30,0d,06,09,2a,86,48,86,f7,0d,01,01,04,05,00,03,81,81,\
+      00,4d,15,fe,7a,34,79,37,12,e9,42,93,95,1e,98,2e,56,df,31,15,2f,c3,71,b1,d9,\
+      fe,da,6d,99,87,59,dd,83,72,75,61,2c,4d,63,fb,24,8f,38,73,ce,ef,c7,30,81,d3,\
+      67,dc,40,d3,8c,68,1c,30,94,8b,8b,43,2c,fc,bc,12,13,46,92,e5,1d,56,85,e1,28,\
+      20,8e,48,d0,34,29,c3,36,c9,08,d6,22,95,dc,2e,ad,8c,19,91,3d,b9,5f,32,15,d0,\
+      5a,38,88,8a,05,33,3e,7c,9a,bd,37,37,93,46,d3,dd,6c,1d,23,49,7f,34,d2,5e,c8,\
+      dd,15,c5,a4
+; @XIPREGION ENDIF MISC_DEVICEEMULATOR_REG
+
+
+ENDIF ; IMGUNSIGNEDTRUSTED !
+
+; @XIPREGION IF MISC_DEVICEEMULATOR_REG
+
+IF IMGTPC
+; @BEGINASSOC DPI 131
+[HKEY_LOCAL_MACHINE\Drivers\Display\GPE]
+"LogicalPixelsX"=dword:83
+"LogicalPixelsY"=dword:83
+; @ENDASSOC
+ENDIF ; IMGTPC
+
+IF IMGPPC
+IF IMGMEDDPI
+; @BEGINASSOC DPI 128
+[HKEY_LOCAL_MACHINE\Drivers\Display\GPE]
+"LogicalPixelsX"=dword:80
+"LogicalPixelsY"=dword:80
+; @ENDASSOC
+ENDIF ; IMGMEDDPI
+
+; @BEGINASSOC DPI 192
+[HKEY_LOCAL_MACHINE\Drivers\Display\GPE]
+"LogicalPixelsX"=dword:C0
+"LogicalPixelsY"=dword:C0
+; @ENDASSOC
+ENDIF ; IMGPPC
+
+; @XIPREGION ENDIF MISC_DEVICEEMULATOR_REG
+
+
+; this is required in order for Windows Media Player to launch
+; @XIPREGION IF DEFAULT_DEVICEEMULATOR_REG
+[HKEY_LOCAL_MACHINE\Software\Microsoft\Shell\Keys]
+
+; @CESYSGEN IF CE_MODULES_DEVICE
+; @CESYSGEN IF CE_MODULES_FSDMGR
+; @CESYSGEN IF GWES_MSGQUE
+
+[HKEY_LOCAL_MACHINE\Drivers\BuiltIn\EMS]
+    "Irq"=dword:27
+    "Prefix"="EMS"
+    "Dll"="emulserv.dll"
+    "Order"=dword:0
+
+; Default values for EFS.  These can be overridden per profile
+[HKEY_LOCAL_MACHINE\System\StorageManager\VCE]
+    "FriendlyName"="VCE FileSystem"
+    "Dll"="VCEFSD.dll"
+    "Paging"=dword:1
+
+[HKEY_LOCAL_MACHINE\System\StorageManager\Profiles\VCEFSD]
+    "Name"="EMULATOR SHARED FOLDER FS"
+IF IMGPPC
+    "Folder"="SharedStorage"
+ENDIF   ; IMGPPC
+IF IMGPPC !
+    "Folder"="Storage"
+ENDIF   ; IMGPPC !
+    "DefaultFileSystem"="VCE"
+    "PartitionDriver"=""
+
+; Override default partition table with an empty one, so DefaultFileSystem is used
+[HKEY_LOCAL_MACHINE\System\StorageManager\Profiles\VCEFSD\PartitionTable]
+
+[HKEY_LOCAL_MACHINE\Drivers\EMULSERV]
+    "Dll"="EMULSERV.DLL"
+    "Prefix"="DSK"
+    "Profile"="VCEFSD"
+    ; Indicate we are a power manageable interface
+    "IClass"=multi_sz:"{A32942B7-920C-486b-B0E6-92A702A99B35}","{A4E7EDDA-E575-4252-9D6B-4195D48BB865}"
+
+[HKEY_LOCAL_MACHINE\System\StorageManager]
+    "PNPUnloadDelay"=dword:0
+
+IF IMGHEADSET
+[HKEY_LOCAL_MACHINE\Drivers\Carkit]
+    "Name"="SPK1:"
+
+[HKEY_LOCAL_MACHINE\Drivers\Headset]
+    "Name"="SPK1:"
+
+[HKEY_LOCAL_MACHINE\Drivers\Speaker]
+    "Name"="SPK1:"
+
+[HKEY_LOCAL_MACHINE\Drivers\BuiltIn\SPK]
+   "Prefix"="SPK"
+   "Dll"="emulserv.dll"
+   "Order"=dword:1
+   "Index"=dword:1
+ENDIF
+
+; @CESYSGEN ENDIF GWES_MSGQUE
+; @CESYSGEN ENDIF CE_MODULES_FSDMGR
+; @CESYSGEN ENDIF CE_MODULES_DEVICE
+
+; @XIPREGION ENDIF DEFAULT_DEVICEEMULATOR_REG
+
+; @CESYSGEN IF CE_MODULES_BATTDRVR
+; @CESYSGEN ENDIF CE_MODULES_BATTDRVR
+
+; @CESYSGEN IF CE_MODULES_NLEDDRVR
+; @XIPREGION IF DEFAULT_DEVICEEMULATOR_REG
+#include "$(DRIVERS_DIR)\nleddrvr\nleddrvr.reg"
+; @XIPREGION ENDIF DEFAULT_DEVICEEMULATOR_REG
+; @CESYSGEN ENDIF CE_MODULES_NLEDDRVR
+
+; @CESYSGEN IF DIRECTX_MODULES_D3DMREF
+; @CESYSGEN ENDIF DIRECTX_MODULES_D3DMREF
+
+; Keys needed for camera support
+
+; @XIPREGION IF DEFAULT_DEVICEEMULATOR_REG
+IF IMGCAMERAOEM
+;NULL camera driverr
+;only support RGB color format
+;Preview: (a0,78), (b0,90), (140, f0)
+;Still: (140,f0), (280,1e0)
+;Video: (a0,78), (b0,90), (140, f0)
+
+[HKEY_LOCAL_MACHINE\Software\Microsoft\Pictures\Camera\OEM]
+"BackLight"=dword:78
+"EnableZoom"=dword:1
+"CompressionQuality"=dword:0
+"EnableVideo"=dword:1
+"EnableTimeCaption"=dword:1
+"VideoRecordLimitation"="0 15 30"
+"OpenDefault"=dword:0
+"PowerSaveTimeInterval"=dword:1e
+"SupportedVideoFormat"="*.wma;*.wmv"
+"IsPortraitScreen"=dword:1
+"EnableBrightness"=dword:1
+"EnableFlash"=dword:1
+"HandleOOMEvent"=dword:0
+"VideoBufferingDepth"=dword:1312d00
+
+[HKEY_LOCAL_MACHINE\System\Pictures\Camera\OEM]
+"SoundFile"="\\windows\\ShutterSound.wav"
+"ForceShutterSound"=dword:1
+"ShutterSoundVolume"=dword:8000
+
+[HKEY_LOCAL_MACHINE\Software\Microsoft\Pictures\Camera\OEM\PictureResolution]
+"OptionNum"=dword:2
+
+[HKEY_LOCAL_MACHINE\Software\Microsoft\Pictures\Camera\OEM\PictureResolution\1]
+"Width"=dword:140
+"Height"=dword:f0
+"HighQualityFileSize"=dword:38c0
+"NormalQualityFileSize"=dword:1800
+"LowQualityFileSize"=dword:1000
+"ItemString"="320x240"
+
+[HKEY_LOCAL_MACHINE\Software\Microsoft\Pictures\Camera\OEM\PictureResolution\2]
+"Width"=dword:280
+"Height"=dword:1e0
+"HighQualityFileSize"=dword:de60
+"NormalQualityFileSize"=dword:6400
+"LowQualityFileSize"=dword:2800
+"ItemString"="640x480"
+
+[HKEY_LOCAL_MACHINE\Software\Microsoft\Pictures\Camera\OEM\VideoProfile]
+"OptionNum"=dword:3
+
+[HKEY_LOCAL_MACHINE\Software\Microsoft\Pictures\Camera\OEM\VideoProfile\1]
+"Width"=dword:a0
+"Height"=dword:78
+"VideoAudioFileSizePerSecond"=dword:116000
+"VideoOnlyFileSizePerSecond"=dword:44000
+"ItemString"="160x120"
+
+[HKEY_LOCAL_MACHINE\Software\Microsoft\Pictures\Camera\OEM\VideoProfile\2]
+"Width"=dword:b0
+"Height"=dword:90
+"VideoAudioFileSizePerSecond"=dword:7c00
+"VideoOnlyFileSizePerSecond"=dword:4400
+"ItemString"="176x144"
+
+[HKEY_LOCAL_MACHINE\Software\Microsoft\Pictures\Camera\OEM\VideoProfile\3]
+"Width"=dword:140
+"Height"=dword:f0
+"VideoAudioFileSizePerSecond"=dword:16900
+"VideoOnlyFileSizePerSecond"=dword:9900
+"ItemString"="320x240"
+
+[HKEY_LOCAL_MACHINE\Software\Microsoft\Pictures\Camera\OEM\Zoom]
+"OptionNum"=dword:6
+
+[HKEY_LOCAL_MACHINE\Software\Microsoft\Pictures\Camera\OEM\Zoom\1]
+"PhysicalZoom"=dword:64
+"LogicalZoom"=dword:1
+"ItemString"="zoom x1"
+
+[HKEY_LOCAL_MACHINE\Software\Microsoft\Pictures\Camera\OEM\Zoom\2]
+"PhysicalZoom"=dword:c8
+"LogicalZoom"=dword:2
+"ItemString"="zoom x2"
+
+[HKEY_LOCAL_MACHINE\Software\Microsoft\Pictures\Camera\OEM\Zoom\3]
+"PhysicalZoom"=dword:12c
+"LogicalZoom"=dword:3
+"ItemString"="zoom x3"
+
+[HKEY_LOCAL_MACHINE\Software\Microsoft\Pictures\Camera\OEM\Zoom\4]
+"PhysicalZoom"=dword:190
+"LogicalZoom"=dword:4
+"ItemString"="zoom x4"
+
+[HKEY_LOCAL_MACHINE\Software\Microsoft\Pictures\Camera\OEM\Zoom\5]
+"PhysicalZoom"=dword:1f4
+"LogicalZoom"=dword:5
+"ItemString"="zoom x5"
+
+[HKEY_LOCAL_MACHINE\Software\Microsoft\Pictures\Camera\OEM\Zoom\6]
+"PhysicalZoom"=dword:258
+"LogicalZoom"=dword:6
+"ItemString"="zoom x6"
+
+[HKEY_LOCAL_MACHINE\Software\Microsoft\Pictures\Camera\OEM\VideoEncoderCLSID]
+"IClass"="{d23b90d0-144f-46bd-841d-59e4eb19dc59}"
+
+[HKEY_LOCAL_MACHINE\Software\Microsoft\Pictures\Camera\OEM\MuxCLSID]
+"IClass"="{4f4ba16c-ccb0-4d23-b1e8-672c7dfe4a02}"
+"VideoFileExt"="wmv"
+
+[HKEY_LOCAL_MACHINE\Software\Microsoft\Pictures\Camera\OEM\PreviewColorFormatCLSID]
+"IClass"="{e436eb7b-524f-11ce-9f53-0020af0ba770}"
+
+[HKEY_LOCAL_MACHINE\Software\Microsoft\Pictures\Camera\OEM\CaptureColorFormatCLSID]
+"IClass"="{e436eb7b-524f-11ce-9f53-0020af0ba770}"
+
+[HKEY_LOCAL_MACHINE\Software\Microsoft\Pictures\Camera\OEM\StillColorFormatCLSID]
+"IClass"="{e436eb7b-524f-11ce-9f53-0020af0ba770}"
+
+
+;default video encoder property
+[HKEY_LOCAL_MACHINE\Software\Microsoft\Pictures\Camera\OEM\VideoEncoderProperty]
+"PropertyNum"=dword:2
+
+[HKEY_LOCAL_MACHINE\Software\Microsoft\Pictures\Camera\OEM\VideoEncoderProperty\1]
+"VideoPropertyName"="_VBRQUALITY"
+"VideoPropertyVT"=dword:3
+"VidoepropertyValue"=dword:14
+
+[HKEY_LOCAL_MACHINE\Software\Microsoft\Pictures\Camera\OEM\VideoEncoderProperty\2]
+"VideoPropertyName"="_COMPLEXITYEX"
+"VideoPropertyVT"=dword:3
+"VidoepropertyValue"=dword:0
+
+;default audio encoder property
+[HKEY_LOCAL_MACHINE\Software\Microsoft\Pictures\Camera\OEM\AudioEncoderProperty]
+"PropertyNum"=dword:0
+
+;default auido capture property
+[HKEY_LOCAL_MACHINE\Software\Microsoft\Pictures\Camera\OEM\AudioCaptureFilter]
+"FormatTag"=dword:1
+"Channels"=dword:1
+"SamplesPerSec"=dword:1f40
+"AvgBytesPerSec"=dword:1f40
+"BlockAlign"=dword:1
+"BitsPerSample"=dword:8
+"SamplesPerBlock"=dword:0
+
+;user settings
+[HKEY_CURRENT_USER\Software\Microsoft\Pictures\Camera\USER]
+"CurrentZoom"=dword:0
+"Flash"=dword:1
+"Brightness"=dword:3
+"FileNumber"=dword:1
+"QualitySetting"=dword:0
+"AudioEnabled"=dword:1
+"Resolution"=dword:1
+"UserVideoTime"=dword:1E
+"DefaultDir"=""
+"FilePrefix"="img"
+"VideoProfile"=dword:1
+
+;jpg file compression quality. 0 is the lowest quality
+
+[HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\DirectShow\ImageSink\Quality\0\jpg\Quality]
+"Value"=hex:\
+      19,00,00,00
+"Type"=dword:00000004
+"NumberOfValues"=dword:00000001
+"GUID"="{1D5BE4B5-FA4A-452D-9CDD-5DB35105E7EB}"
+
+[HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\DirectShow\ImageSink\Quality\1\jpg\Quality]
+"Value"=hex:\
+      41,00,00,00
+"Type"=dword:00000004
+"NumberOfValues"=dword:00000001
+"GUID"="{1D5BE4B5-FA4A-452D-9CDD-5DB35105E7EB}"
+
+[HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\DirectShow\ImageSink\Quality\2\jpg\Quality]
+"Value"=hex:\
+      5a,00,00,00
+"Type"=dword:00000004
+"NumberOfValues"=dword:00000001
+"GUID"="{1D5BE4B5-FA4A-452D-9CDD-5DB35105E7EB}"
+
+ENDIF ; IMGCAMERAOEM !
+
+; ConnMgr: Enable Wake on Input for WiFi, Ethernet, and DTPT.
+[HKEY_LOCAL_MACHINE\Comm\ConnMgr\Providers\{f792e23c-dc19-4668-9be4-f8688b4c18d6}]
+    "WakeOnIncoming"=hex(7):57,00,69,00,46,00,69,00,00,00,45,00,74,00,68,00,65, \
+    00,72,00,6e,00,65,00,74,00,00,00,44,00,54,00,50,00,54,00,00,00,00,00
+
+; @XIPREGION ENDIF DEFAULT_DEVICEEMULATOR_REG
+
+; @CESYSGEN ENDIF CE_MODULES_DEVICE
+
+[HKEY_LOCAL_MACHINE\System\CurrentControlSet\Control\Layouts\e0010401]
+     "Keyboard Layout"="00000401"
+
+; Hotkey mapping specific to the IP Phone Suite. See fp_voip.reg for more details 
+; on functionality and format
+;
+
+; @CESYSGEN IF FP_VOIP_MODULES_HOMESCREEN
+; @CESYSGEN IF FP_VOIP_MODULES_PHRESOURCE_PORT
+; @CESYSGEN ENDIF FP_VOIP_MODULES_PHRESOURCE_PORT
+; @CESYSGEN IF FP_VOIP_MODULES_PHRESOURCE
+; @CESYSGEN ENDIF FP_VOIP_MODULES_PHRESOURCE
+; @CESYSGEN ENDIF FP_VOIP_MODULES_HOMESCREEN
+
+
+; @CESYSGEN IF FP_VOIP_MODULES_PHONEAPP
+; @CESYSGEN IF FP_VOIP_MODULES_PHRESOURCE_PORT
+; @CESYSGEN ENDIF FP_VOIP_MODULES_PHRESOURCE_PORT
+; @CESYSGEN IF FP_VOIP_MODULES_PHRESOURCE
+; @CESYSGEN ENDIF FP_VOIP_MODULES_PHRESOURCE
+; @CESYSGEN ENDIF FP_VOIP_MODULES_PHONEAPP
+
+; @CESYSGEN IF FP_VOIP_MODULES_BOOTSTRAP
+; @CESYSGEN IF FP_VOIP_MODULES_PHRESOURCE
+; @CESYSGEN ENDIF FP_VOIP_MODULES_PHRESOURCE
+; @CESYSGEN ENDIF FP_VOIP_MODULES_BOOTSTRAP
+

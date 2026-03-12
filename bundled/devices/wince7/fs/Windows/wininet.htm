@@ -1,0 +1,107 @@
+<!--
+Copyright (c) Microsoft Corporation.  All rights reserved.
+-->
+<!--
+Use of this sample source code is subject to the terms of the Microsoft
+license agreement under which you licensed this sample source code. If
+you did not accept the terms of the license agreement, you are not
+authorized to use this sample source code. For the terms of the license,
+please see the license agreement between you and Microsoft or, if applicable,
+see the LICENSE.RTF on your install media or the root of your tools installation.
+THE SAMPLE SOURCE CODE IS PROVIDED "AS IS", WITH NO WARRANTIES OR INDEMNITIES.
+-->
+<html>
+<head>
+<meta http-equiv=Content-Type content="text/html; charset=Windows-1252">
+</head>
+<body>
+
+<!-- Main topic -->
+<a name="certificate_intro"></a>
+
+<h2>Certificates Overview</h2>
+
+<p>A certificate is a digital voucher that contains information about the device presenting the voucher. For example, a device such as a Web server can have a certificate that contains information about itself. Valid certificates are signed by a certifying authority (CA), and include information regarding who authorized the certificate, its public keys, and its expiration date. </p>
+
+<p>When you are connected to the Internet, it is important for you to trust the certification of the Web sites you visit. Web sites that are not trusted, or properly certified, are potentially harmful to the information stored on your device. If you are unsure, you can view the Web server certificate from your device and decide whether or not to visit the Web site. </p>
+
+<p>The security and privacy features on your device help to protect your privacy and make sure your personal information is secure. These privacy features enable you to protect your personally identifiable information (PII). The features help you control how Web sites you visit are able to use your PII. With the privacy controls on your device, you can also specify privacy settings that determine what information is shared when you visit a Web site and what information can be saved to your device when you visit  a Web site.</p>
+
+
+<!-- Sub topic -->
+<a name="certificates"></a>
+
+<h2>Client Certificates</h2>
+
+<p>A client certificate is a digital statement verifying the identity of a user or a device, such as a personal computer. Client certificates are issued to establish identity, and to provide a level of authentication and security for information exchanged using a variety of devices. Some Web sites require you to identify yourself using client certificates. When you send a client certificate to another computer, you are using public and private keys that allow you to share data with that device in a secure manner. Public and private keys also help prevent unauthorized users from accessing your device and its information.</p>
+
+<p>The following list shows the information contained in certificates:</p>
+
+
+<ul>
+<li>The subject's public key value and identifier information</li>
+<li>The issuer's identifier information</li>
+<li>The validity period</li>
+<li>The digital signature of the issuer</li>
+</ul>
+
+<p>The subject is the entity that receives the certificate; the issuer of the certificate is the certification authority.</p>
+
+<h3>Personal and root certificates</h3>
+
+<p>You can store two types of certificates on your device: personal certificates that establish your identity, and root certificates that establish the identity of Web servers. For example, when you send personal information over the Internet, a personal certificate authenticates you with the Web site you visit, while a root certificate helps protect your personal information while you are visiting the Web site.</p>
+
+
+<!-- Sub topic -->
+<a name="privacy"></a>
+
+<h2>Privacy Overview</h2>
+
+<p>With the privacy features on your device, you can protect your personally identifiable information (PII). The privacy features help you control how Web sites you visit use your PII. These features enable you to specify privacy settings that determine whether or not you want to allow Web sites to save information, such as cookies, on your personal computer.</p>
+
+<h3>Cookies</h3>
+
+<p>Each time you visit a Web site, the Web site stores a small file, called a cookie, on your personal computer. Cookies are created by the Web site to store information, such as your preferences when visiting that Web site. Some cookies  contain a record of the Web pages you viewed within the Web site you visited, to help the Web site customize the view for you the next time you visit. </p>
+
+<p>Cookies can also store personally identifiable information, such as your name, e-mail address, home or work address, or telephone number. However, a Web site only has access to the personally identifiable information that you provide.</p>
+
+<p>The following list shows the privacy features on your device:</p>
+
+<ul>
+<li>Privacy settings that specify how your computer deals with cookies</li>
+<li>Privacy alerts that let you know when you try to gain access to a site that doesn't meet the criteria in your privacy settings</li>
+<li>The ability to view a Web site's P3P privacy policy</li>
+</ul>
+
+<p>You can use the privacy features on your device to limit the use of cookies. However, because many applications depend on the information contained in cookies, disabling cookies altogether is not always the best solution.  </p>
+
+<h3>First-party vs. third-party content</h3>
+
+<p>First-party content contains information associated with the host domain, or the Web site you are visiting. Third-party content originates from any other domain. For example, when you visit a Web site that contains a banner advertisement, the Web site you are visiting is considered the first-party content, while the banner advertisement is considered third-party content.</p>
+
+<p>Many commercial Web pages use a combination of first and third-party cookies to collect and relay data relevant to these pages. The privacy features on your device distinguish between first and third-party content, and establish a different relationship with first parties than with third parties. In fact, default privacy settings for third-party content are more stringent than for first parties. The privacy settings on your Windows Embedded Compact-based device enable you to disallow cookies from third parties, and either allow cookies from first parties or prompt you to allow or disallow them.</p>
+
+
+<!-- Sub topic -->
+<a name="security"></a>
+
+<h2>Security Overview</h2>
+
+<p>Security features on your device help prevent people from gaining access to information that you have not given them permission to access, such as credit card information you enter when shopping on the Internet. Security features can also protect your personal computer or wireless device from unsafe software.</p>
+
+<p>You can also browse securely whenever you visit a Web site that uses the Hypertext Transfer Protocol over Secure Socket Layer (HTTPS). HTTPS is a secure Web communications protocol that encrypts data sent through this connectionany connection using HTTPS. The data encrypted using HTTPS cannot be intercepted and understood by a third party.</p>
+
+
+<h3>Security Alerts</h3>
+
+<p>Security alerts may appear for the following reasons:</p>
+
+<ul>
+<li>The Web server you are connecting to contains an invalid server certificate </li>
+<li>The Web server you are connecting to contains mixed security (secure and insecure data)</li>
+<li>You are leaving a secure connection</li>
+</ul>
+
+
+</body>
+</html>

@@ -1,0 +1,814 @@
+;
+; Copyright (c) Microsoft Corporation.  All rights reserved.
+;
+;
+; Use of this sample source code is subject to the terms of the Microsoft
+; license agreement under which you licensed this sample source code. If
+; you did not accept the terms of the license agreement, you are not
+; authorized to use this sample source code. For the terms of the license,
+; please see the license agreement between you and Microsoft or, if applicable,
+; see the LICENSE.RTF on your install media or the root of your tools installation.
+; THE SAMPLE SOURCE CODE IS PROVIDED "AS IS", WITH NO WARRANTIES OR INDEMNITIES.
+;
+; @CESYSGEN IF RDP_MODULES_CETSC
+
+; Associate .rdp files with cetsc
+[HKEY_CLASSES_ROOT\.rdp]
+@="rdpfile"
+[HKEY_CLASSES_ROOT\rdpfile]
+;LOC_RDPCONNECTION
+@=mui_sz:"cetsc.exe,#30001"
+[HKEY_CLASSES_ROOT\rdpfile\DefaultIcon]
+@="\\Windows\\cetsc.exe,-101"
+[HKEY_CLASSES_ROOT\rdpfile\Shell\Open\Command]
+@="\\Windows\\cetsc.exe %1"
+; @CESYSGEN ENDIF RDP_MODULES_CETSC
+
+
+; @CESYSGEN IF RDP_MODULES_TSCAXCTRL
+;Default location of bitmap cache location
+[HKEY_LOCAL_MACHINE\Software\Microsoft\Terminal Server Client]
+"BitmapPersistCacheLocation"="\\Temp"
+
+;Disable Password saving
+[HKEY_LOCAL_MACHINE\Software\Policies\Microsoft\Windows NT\Terminal Services]
+"DisablePasswordSaving"=dword:1
+; @CESYSGEN ENDIF RDP_MODULES_TSCAXCTRL
+
+;Turn on shell CF_HDROP clipboard
+; @CESYSGEN IF SHELL_MODULES_CESHELL
+; @CESYSGEN IF TSCAXCTRL_RDRCLIP && TSCAXCTRL_RDRDRIVE
+[HKEY_LOCAL_MACHINE\Explorer]
+"Use2ndClipboard"=dword:1
+; @CESYSGEN ENDIF TSCAXCTRL_RDRCLIP && TSCAXCTRL_RDRDRIVE
+; @CESYSGEN ENDIF SHELL_MODULES_CESHELL
+
+; @CESYSGEN IF RDP_MODULES_TSCAXCTRL
+;RDP ActiveX control registry settings
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+[HKEY_CLASSES_ROOT\MsRDP.MsRDP]
+@="MsRDP Class v7"
+
+[HKEY_CLASSES_ROOT\MsRDP.MsRDP\CurVer]
+@="MsRDP.MsRDP.7"
+
+[HKEY_CLASSES_ROOT\MsRDP.MsRDP.2]
+@="MsRDP Class v3"
+
+[HKEY_CLASSES_ROOT\MsRDP.MsRDP.2\CLSID]
+@="{971127BB-259F-48c2-BD75-5F97A3331551}"
+
+[HKEY_CLASSES_ROOT\MsRDP.MsRDP.2.a]
+@="MsRDP Class v3"
+
+[HKEY_CLASSES_ROOT\MsRDP.MsRDP.2.a\CLSID]
+@="{971127BB-259F-48c2-BD75-5F97A3331551}"
+
+[HKEY_CLASSES_ROOT\MsRDP.MsRDP.3]
+@="MsRDP Class v4"
+
+[HKEY_CLASSES_ROOT\MsRDP.MsRDP.3\CLSID]
+@="{6A6F4B83-45C5-4ca9-BDD9-0D81C12295E4}"
+
+[HKEY_CLASSES_ROOT\MsRDP.MsRDP.3.a]
+@="MsRDP Class v4"
+
+[HKEY_CLASSES_ROOT\MsRDP.MsRDP.3.a\CLSID]
+@="{6A6F4B83-45C5-4ca9-BDD9-0D81C12295E4}"
+
+[HKEY_CLASSES_ROOT\MsRDP.MsRDP.4]
+@="MsRDP Class v5"
+
+[HKEY_CLASSES_ROOT\MsRDP.MsRDP.4\CLSID]
+@="{54CE37E0-9834-41ae-9896-4DAB69DC022B}"
+
+[HKEY_CLASSES_ROOT\MsRDP.MsRDP.4.a]
+@="MsRDP Class v5"
+
+[HKEY_CLASSES_ROOT\MsRDP.MsRDP.4.a\CLSID]
+@="{54CE37E0-9834-41ae-9896-4DAB69DC022B}"
+
+[HKEY_CLASSES_ROOT\MsRDP.MsRDP.5]
+@="MsRDP Class v6"
+
+[HKEY_CLASSES_ROOT\MsRDP.MsRDP.5\CLSID]
+@="{4eb89ff4-7f78-4a0f-8b8d-2bf02e94e4b2}"
+
+[HKEY_CLASSES_ROOT\MsRDP.MsRDP.6]
+@="MsRDP Class v7"
+
+[HKEY_CLASSES_ROOT\MsRDP.MsRDP.6\CLSID]
+@="{7390f3d8-0439-4c05-91e3-cf5cb290c3d0}"
+
+[HKEY_CLASSES_ROOT\MsRDP.MsRDP.7]
+@="MsRDP Class v8"
+
+[HKEY_CLASSES_ROOT\MsRDP.MsRDP.7\CLSID]
+@="{a9d7038d-b5ed-472e-9c47-94bea90a5910}"
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+[HKEY_CLASSES_ROOT\MsTscAx.MsTscAx]
+@="MsTscAx Class v5"
+
+[HKEY_CLASSES_ROOT\MsTscAx.MsTscAx\CurVer]
+@="MsTscAx.MsTscAx.8"
+
+[HKEY_CLASSES_ROOT\MsTscAx.MsTscAx.1]
+@="MsTscAx Class v1"
+
+[HKEY_CLASSES_ROOT\MsTscAx.MsTscAx.1\CLSID]
+@="{a41a4187-5a86-4e26-b40a-856f9035d9cb}"
+
+[HKEY_CLASSES_ROOT\MsTscAx.MsTscAx.2]
+@="MsRDP Class v2"
+
+[HKEY_CLASSES_ROOT\MsTscAx.MsTscAx.2\CLSID]
+@="{7cacbd7b-0d99-468f-ac33-22e495c0afe5}"
+
+[HKEY_CLASSES_ROOT\MsTscAx.MsTscAx.3]
+@="MsTscAx Class v3"
+
+[HKEY_CLASSES_ROOT\MsTscAx.MsTscAx.3\CLSID]
+@="{3523c2fb-4031-44e4-9a3b-f1e94986ee7f}"
+
+[HKEY_CLASSES_ROOT\MsTscAx.MsTscAx.4]
+@="MsTscAx Class v4"
+
+[HKEY_CLASSES_ROOT\MsTscAx.MsTscAx.4\CLSID]
+@="{ace575fd-1fcf-4074-9401-ebab990fa9de}"
+
+[HKEY_CLASSES_ROOT\MsTscAx.MsTscAx.5]
+@="MsTscAx Class v5"
+
+[HKEY_CLASSES_ROOT\MsTscAx.MsTscAx.5\CLSID]
+@="{6AE29350-321B-42be-BBE5-12FB5270C0DE}"
+
+[HKEY_CLASSES_ROOT\MsTscAx.MsTscAx.6]
+@="MsTscAx Class v6"
+
+[HKEY_CLASSES_ROOT\MsTscAx.MsTscAx.6\CLSID]
+@="{4eb2f086-c818-447e-b32c-c51ce2b30d31}"
+
+[HKEY_CLASSES_ROOT\MsTscAx.MsTscAx.7]
+@="MsTscAx Class v7"
+
+[HKEY_CLASSES_ROOT\MsTscAx.MsTscAx.7\CLSID]
+@="{d2ea46a7-c2bf-426b-af24-e19c44456399}"
+
+
+[HKEY_CLASSES_ROOT\MsTscAx.MsTscAx.8]
+@="MsTscAx Class v8"
+
+[HKEY_CLASSES_ROOT\MsTscAx.MsTscAx.8\CLSID]
+@="{54d38bf7-b1ef-4479-9674-1bd6ea465258}"
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;MsRdpClient2;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+[HKEY_CLASSES_ROOT\CLSID\{9059f30f-4eb1-4bd2-9fdc-36f43a218f4a}]
+@="Microsoft RDP Client Control (redistributable) - version 3"
+
+[HKEY_CLASSES_ROOT\CLSID\{9059f30f-4eb1-4bd2-9fdc-36f43a218f4a}\InprocServer32]
+@="\\WINDOWS\\mstscax.dll"
+"ThreadingModel"="Both"
+
+[HKEY_CLASSES_ROOT\CLSID\{9059f30f-4eb1-4bd2-9fdc-36f43a218f4a}\MiscStatus]
+@="0"
+
+[HKEY_CLASSES_ROOT\CLSID\{9059f30f-4eb1-4bd2-9fdc-36f43a218f4a}\MiscStatus\1]
+@="131473"
+
+[HKEY_CLASSES_ROOT\CLSID\{9059f30f-4eb1-4bd2-9fdc-36f43a218f4a}\ProgID]
+@="MsRDP.MsRDP.2"
+
+[HKEY_CLASSES_ROOT\CLSID\{9059f30f-4eb1-4bd2-9fdc-36f43a218f4a}\Programmable]
+
+[HKEY_CLASSES_ROOT\CLSID\{9059f30f-4eb1-4bd2-9fdc-36f43a218f4a}\ToolboxBitmap32]
+@="\\WINDOWS\\mstscax.dll, 1"
+
+[HKEY_CLASSES_ROOT\CLSID\{9059f30f-4eb1-4bd2-9fdc-36f43a218f4a}\TypeLib]
+@="{8C11EFA1-92C3-11D1-BC1E-00C04FA31489}"
+
+[HKEY_CLASSES_ROOT\CLSID\{9059f30f-4eb1-4bd2-9fdc-36f43a218f4a}\Version]
+@="2.0"
+
+[HKEY_CLASSES_ROOT\CLSID\{9059f30f-4eb1-4bd2-9fdc-36f43a218f4a}\VersionIndependentProgID]
+@="MsRDP.MsRDP"
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;MsRdpClient2a;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+[HKEY_CLASSES_ROOT\CLSID\{971127BB-259F-48c2-BD75-5F97A3331551}]
+@="Microsoft RDP Client Control (redistributable) - version 3a"
+
+[HKEY_CLASSES_ROOT\CLSID\{971127BB-259F-48c2-BD75-5F97A3331551}\InprocServer32]
+@="\\WINDOWS\\mstscax.dll"
+"ThreadingModel"="Both"
+
+[HKEY_CLASSES_ROOT\CLSID\{971127BB-259F-48c2-BD75-5F97A3331551}\MiscStatus]
+@="0"
+
+[HKEY_CLASSES_ROOT\CLSID\{971127BB-259F-48c2-BD75-5F97A3331551}\MiscStatus\1]
+@="131473"
+
+[HKEY_CLASSES_ROOT\CLSID\{971127BB-259F-48c2-BD75-5F97A3331551}\ProgID]
+@="MsRDP.MsRDP.2.a"
+
+[HKEY_CLASSES_ROOT\CLSID\{971127BB-259F-48c2-BD75-5F97A3331551}\Programmable]
+
+[HKEY_CLASSES_ROOT\CLSID\{971127BB-259F-48c2-BD75-5F97A3331551}\ToolboxBitmap32]
+@="\\WINDOWS\\mstscax.dll, 1"
+
+[HKEY_CLASSES_ROOT\CLSID\{971127BB-259F-48c2-BD75-5F97A3331551}\TypeLib]
+@="{8C11EFA1-92C3-11D1-BC1E-00C04FA31489}"
+
+[HKEY_CLASSES_ROOT\CLSID\{971127BB-259F-48c2-BD75-5F97A3331551}\Version]
+@="2.0"
+
+[HKEY_CLASSES_ROOT\CLSID\{971127BB-259F-48c2-BD75-5F97A3331551}\VersionIndependentProgID]
+@="MsRDP.MsRDP"
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;MsRdpClient3;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+[HKEY_CLASSES_ROOT\CLSID\{7584c670-2274-4efb-b00b-d6aaba6d3850}]
+@="Microsoft RDP Client Control (redistributable) - version 4"
+
+[HKEY_CLASSES_ROOT\CLSID\{7584c670-2274-4efb-b00b-d6aaba6d3850}\InprocServer32]
+@="\\WINDOWS\\mstscax.dll"
+"ThreadingModel"="Both"
+
+[HKEY_CLASSES_ROOT\CLSID\{7584c670-2274-4efb-b00b-d6aaba6d3850}\MiscStatus]
+@="0"
+
+[HKEY_CLASSES_ROOT\CLSID\{7584c670-2274-4efb-b00b-d6aaba6d3850}\MiscStatus\1]
+@="131473"
+
+[HKEY_CLASSES_ROOT\CLSID\{7584c670-2274-4efb-b00b-d6aaba6d3850}\ProgID]
+@="MsRDP.MsRDP.3"
+
+[HKEY_CLASSES_ROOT\CLSID\{7584c670-2274-4efb-b00b-d6aaba6d3850}\Programmable]
+
+[HKEY_CLASSES_ROOT\CLSID\{7584c670-2274-4efb-b00b-d6aaba6d3850}\ToolboxBitmap32]
+@="\\WINDOWS\\mstscax.dll, 1"
+
+[HKEY_CLASSES_ROOT\CLSID\{7584c670-2274-4efb-b00b-d6aaba6d3850}\TypeLib]
+@="{8C11EFA1-92C3-11D1-BC1E-00C04FA31489}"
+
+[HKEY_CLASSES_ROOT\CLSID\{7584c670-2274-4efb-b00b-d6aaba6d3850}\Version]
+@="2.0"
+
+[HKEY_CLASSES_ROOT\CLSID\{7584c670-2274-4efb-b00b-d6aaba6d3850}\VersionIndependentProgID]
+@="MsRDP.MsRDP"
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;MsRdpClient3a;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+[HKEY_CLASSES_ROOT\CLSID\{6A6F4B83-45C5-4ca9-BDD9-0D81C12295E4}]
+@="Microsoft RDP Client Control (redistributable) - version 4a"
+
+[HKEY_CLASSES_ROOT\CLSID\{6A6F4B83-45C5-4ca9-BDD9-0D81C12295E4}\InprocServer32]
+@="\\WINDOWS\\mstscax.dll"
+"ThreadingModel"="Both"
+
+[HKEY_CLASSES_ROOT\CLSID\{6A6F4B83-45C5-4ca9-BDD9-0D81C12295E4}\MiscStatus]
+@="0"
+
+[HKEY_CLASSES_ROOT\CLSID\{6A6F4B83-45C5-4ca9-BDD9-0D81C12295E4}\MiscStatus\1]
+@="131473"
+
+[HKEY_CLASSES_ROOT\CLSID\{6A6F4B83-45C5-4ca9-BDD9-0D81C12295E4}\ProgID]
+@="MsRDP.MsRDP.3.a"
+
+[HKEY_CLASSES_ROOT\CLSID\{6A6F4B83-45C5-4ca9-BDD9-0D81C12295E4}\Programmable]
+
+[HKEY_CLASSES_ROOT\CLSID\{6A6F4B83-45C5-4ca9-BDD9-0D81C12295E4}\ToolboxBitmap32]
+@="\\WINDOWS\\mstscax.dll, 1"
+
+[HKEY_CLASSES_ROOT\CLSID\{6A6F4B83-45C5-4ca9-BDD9-0D81C12295E4}\TypeLib]
+@="{8C11EFA1-92C3-11D1-BC1E-00C04FA31489}"
+
+[HKEY_CLASSES_ROOT\CLSID\{6A6F4B83-45C5-4ca9-BDD9-0D81C12295E4}\Version]
+@="2.0"
+
+[HKEY_CLASSES_ROOT\CLSID\{6A6F4B83-45C5-4ca9-BDD9-0D81C12295E4}\VersionIndependentProgID]
+@="MsRDP.MsRDP"
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;MsRdpClient4;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+[HKEY_CLASSES_ROOT\CLSID\{4EDCB26C-D24C-4e72-AF07-B576699AC0DE}]
+@="Microsoft RDP Client Control (redistributable) - version 5"
+
+[HKEY_CLASSES_ROOT\CLSID\{4EDCB26C-D24C-4e72-AF07-B576699AC0DE}\InprocServer32]
+@="\\WINDOWS\\mstscax.dll"
+"ThreadingModel"="Both"
+
+[HKEY_CLASSES_ROOT\CLSID\{4EDCB26C-D24C-4e72-AF07-B576699AC0DE}\MiscStatus]
+@="0"
+
+[HKEY_CLASSES_ROOT\CLSID\{4EDCB26C-D24C-4e72-AF07-B576699AC0DE}\MiscStatus\1]
+@="131473"
+
+[HKEY_CLASSES_ROOT\CLSID\{4EDCB26C-D24C-4e72-AF07-B576699AC0DE}\ProgID]
+@="MsRDP.MsRDP.4"
+
+[HKEY_CLASSES_ROOT\CLSID\{4EDCB26C-D24C-4e72-AF07-B576699AC0DE}\Programmable]
+
+[HKEY_CLASSES_ROOT\CLSID\{4EDCB26C-D24C-4e72-AF07-B576699AC0DE}\ToolboxBitmap32]
+@="\\WINDOWS\\mstscax.dll, 1"
+
+[HKEY_CLASSES_ROOT\CLSID\{4EDCB26C-D24C-4e72-AF07-B576699AC0DE}\TypeLib]
+@="{8C11EFA1-92C3-11D1-BC1E-00C04FA31489}"
+
+[HKEY_CLASSES_ROOT\CLSID\{4EDCB26C-D24C-4e72-AF07-B576699AC0DE}\Version]
+@="2.0"
+
+[HKEY_CLASSES_ROOT\CLSID\{4EDCB26C-D24C-4e72-AF07-B576699AC0DE}\VersionIndependentProgID]
+@="MsRDP.MsRDP"
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;MsRdpClient4a;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+[HKEY_CLASSES_ROOT\CLSID\{54CE37E0-9834-41ae-9896-4DAB69DC022B}]
+@="Microsoft RDP Client Control (redistributable) - version 5a"
+
+[HKEY_CLASSES_ROOT\CLSID\{54CE37E0-9834-41ae-9896-4DAB69DC022B}\InprocServer32]
+@="\\WINDOWS\\mstscax.dll"
+"ThreadingModel"="Both"
+
+[HKEY_CLASSES_ROOT\CLSID\{54CE37E0-9834-41ae-9896-4DAB69DC022B}\MiscStatus]
+@="0"
+
+[HKEY_CLASSES_ROOT\CLSID\{54CE37E0-9834-41ae-9896-4DAB69DC022B}\MiscStatus\1]
+@="131473"
+
+[HKEY_CLASSES_ROOT\CLSID\{54CE37E0-9834-41ae-9896-4DAB69DC022B}\ProgID]
+@="MsRDP.MsRDP.4.a"
+
+[HKEY_CLASSES_ROOT\CLSID\{54CE37E0-9834-41ae-9896-4DAB69DC022B}\Programmable]
+
+[HKEY_CLASSES_ROOT\CLSID\{54CE37E0-9834-41ae-9896-4DAB69DC022B}\ToolboxBitmap32]
+@="\\WINDOWS\\mstscax.dll, 1"
+
+[HKEY_CLASSES_ROOT\CLSID\{54CE37E0-9834-41ae-9896-4DAB69DC022B}\TypeLib]
+@="{8C11EFA1-92C3-11D1-BC1E-00C04FA31489}"
+
+[HKEY_CLASSES_ROOT\CLSID\{54CE37E0-9834-41ae-9896-4DAB69DC022B}\Version]
+@="2.0"
+
+[HKEY_CLASSES_ROOT\CLSID\{54CE37E0-9834-41ae-9896-4DAB69DC022B}\VersionIndependentProgID]
+@="MsRDP.MsRDP"
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;MsRdpClient5;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+[HKEY_CLASSES_ROOT\CLSID\{4eb89ff4-7f78-4a0f-8b8d-2bf02e94e4b2}]
+@="Microsoft RDP Client Control (redistributable) - version 6"
+
+[HKEY_CLASSES_ROOT\CLSID\{4eb89ff4-7f78-4a0f-8b8d-2bf02e94e4b2}\InprocServer32]
+@="\\WINDOWS\\mstscax.dll"
+"ThreadingModel"="Both"
+
+[HKEY_CLASSES_ROOT\CLSID\{4eb89ff4-7f78-4a0f-8b8d-2bf02e94e4b2}\MiscStatus]
+@="0"
+
+[HKEY_CLASSES_ROOT\CLSID\{4eb89ff4-7f78-4a0f-8b8d-2bf02e94e4b2}\MiscStatus\1]
+@="131473"
+
+[HKEY_CLASSES_ROOT\CLSID\{4eb89ff4-7f78-4a0f-8b8d-2bf02e94e4b2}\ProgID]
+@="MsRPD.MsRDP.5"
+
+[HKEY_CLASSES_ROOT\CLSID\{4eb89ff4-7f78-4a0f-8b8d-2bf02e94e4b2}\Programmable]
+
+[HKEY_CLASSES_ROOT\CLSID\{4eb89ff4-7f78-4a0f-8b8d-2bf02e94e4b2}\ToolboxBitmap32]
+@="\\WINDOWS\\mstscax.dll, 1"
+
+[HKEY_CLASSES_ROOT\CLSID\{4eb89ff4-7f78-4a0f-8b8d-2bf02e94e4b2}\TypeLib]
+@="{8C11EFA1-92C3-11D1-BC1E-00C04FA31489}"
+
+[HKEY_CLASSES_ROOT\CLSID\{4eb89ff4-7f78-4a0f-8b8d-2bf02e94e4b2}\Version]
+@="2.0"
+
+[HKEY_CLASSES_ROOT\CLSID\{4eb89ff4-7f78-4a0f-8b8d-2bf02e94e4b2}\VersionIndependentProgID]
+@="MsRDP.MsRDP"
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;MsRdpClient6;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+[HKEY_CLASSES_ROOT\CLSID\{7390f3d8-0439-4c05-91e3-cf5cb290c3d0}]
+@="Microsoft RDP Client Control (redistributable) - version 7"
+
+[HKEY_CLASSES_ROOT\CLSID\{7390f3d8-0439-4c05-91e3-cf5cb290c3d0}\InprocServer32]
+@="\\WINDOWS\\mstscax.dll"
+"ThreadingModel"="Both"
+
+[HKEY_CLASSES_ROOT\CLSID\{7390f3d8-0439-4c05-91e3-cf5cb290c3d0}\MiscStatus]
+@="0"
+
+[HKEY_CLASSES_ROOT\CLSID\{7390f3d8-0439-4c05-91e3-cf5cb290c3d0}\MiscStatus\1]
+@="131473"
+
+[HKEY_CLASSES_ROOT\CLSID\{7390f3d8-0439-4c05-91e3-cf5cb290c3d0}\ProgID]
+@="MsRDP.MsRDP.6"
+
+[HKEY_CLASSES_ROOT\CLSID\{7390f3d8-0439-4c05-91e3-cf5cb290c3d0}\Programmable]
+
+[HKEY_CLASSES_ROOT\CLSID\{7390f3d8-0439-4c05-91e3-cf5cb290c3d0}\ToolboxBitmap32]
+@="\\WINDOWS\\mstscax.dll, 1"
+
+[HKEY_CLASSES_ROOT\CLSID\{7390f3d8-0439-4c05-91e3-cf5cb290c3d0}\TypeLib]
+@="{8C11EFA1-92C3-11D1-BC1E-00C04FA31489}"
+
+[HKEY_CLASSES_ROOT\CLSID\{7390f3d8-0439-4c05-91e3-cf5cb290c3d0}\Version]
+@="2.0"
+
+[HKEY_CLASSES_ROOT\CLSID\{7390f3d8-0439-4c05-91e3-cf5cb290c3d0}\VersionIndependentProgID]
+@="MsRDP.MsRDP"
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;MsRdpClient7;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+[HKEY_CLASSES_ROOT\CLSID\{a9d7038d-b5ed-472e-9c47-94bea90a5910}]
+@="Microsoft RDP Client Control (redistributable) - version 8"
+
+[HKEY_CLASSES_ROOT\CLSID\{a9d7038d-b5ed-472e-9c47-94bea90a5910}\InprocServer32]
+@="\\WINDOWS\\mstscax.dll"
+"ThreadingModel"="Both"
+
+[HKEY_CLASSES_ROOT\CLSID\{a9d7038d-b5ed-472e-9c47-94bea90a5910}\MiscStatus]
+@="0"
+
+[HKEY_CLASSES_ROOT\CLSID\{a9d7038d-b5ed-472e-9c47-94bea90a5910}\MiscStatus\1]
+@="131473"
+
+[HKEY_CLASSES_ROOT\CLSID\{a9d7038d-b5ed-472e-9c47-94bea90a5910}\ProgID]
+@="MsRDP.MsRDP.7"
+
+[HKEY_CLASSES_ROOT\CLSID\{a9d7038d-b5ed-472e-9c47-94bea90a5910}\Programmable]
+
+[HKEY_CLASSES_ROOT\CLSID\{a9d7038d-b5ed-472e-9c47-94bea90a5910}\ToolboxBitmap32]
+@="\\WINDOWS\\mstscax.dll, 1"
+
+[HKEY_CLASSES_ROOT\CLSID\{a9d7038d-b5ed-472e-9c47-94bea90a5910}\TypeLib]
+@="{8C11EFA1-92C3-11D1-BC1E-00C04FA31489}"
+
+[HKEY_CLASSES_ROOT\CLSID\{a9d7038d-b5ed-472e-9c47-94bea90a5910}\Version]
+@="2.0"
+
+[HKEY_CLASSES_ROOT\CLSID\{a9d7038d-b5ed-472e-9c47-94bea90a5910}\VersionIndependentProgID]
+@="MsRDP.MsRDP"
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+[HKEY_CLASSES_ROOT\CLSID\{a41a4187-5a86-4e26-b40a-856f9035d9cb}]
+@="Microsoft Terminal Services Client Control - version 1"
+
+[HKEY_CLASSES_ROOT\CLSID\{a41a4187-5a86-4e26-b40a-856f9035d9cb}\InprocServer32]
+@="\\WINDOWS\\mstscax.dll"
+"ThreadingModel"="Both"
+
+[HKEY_CLASSES_ROOT\CLSID\{a41a4187-5a86-4e26-b40a-856f9035d9cb}\MiscStatus]
+@="0"
+
+[HKEY_CLASSES_ROOT\CLSID\{a41a4187-5a86-4e26-b40a-856f9035d9cb}\MiscStatus\1]
+@="131473"
+
+[HKEY_CLASSES_ROOT\CLSID\{a41a4187-5a86-4e26-b40a-856f9035d9cb}\ProgID]
+@="MsTscAx.MsTscAx.1"
+
+[HKEY_CLASSES_ROOT\CLSID\{a41a4187-5a86-4e26-b40a-856f9035d9cb}\Programmable]
+
+[HKEY_CLASSES_ROOT\CLSID\{a41a4187-5a86-4e26-b40a-856f9035d9cb}\ToolboxBitmap32]
+@="\\WINDOWS\\mstscax.dll, 1"
+
+[HKEY_CLASSES_ROOT\CLSID\{a41a4187-5a86-4e26-b40a-856f9035d9cb}\TypeLib]
+@="{8C11EFA1-92C3-11D1-BC1E-00C04FA31489}"
+
+[HKEY_CLASSES_ROOT\CLSID\{a41a4187-5a86-4e26-b40a-856f9035d9cb}\Version]
+@="2.0"
+
+[HKEY_CLASSES_ROOT\CLSID\{a41a4187-5a86-4e26-b40a-856f9035d9cb}\VersionIndependentProgID]
+@="MsTscAx.MsTscAx"
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+[HKEY_CLASSES_ROOT\CLSID\{7cacbd7b-0d99-468f-ac33-22e495c0afe5}]
+@="Microsoft RDP Client Control - version 2"
+
+[HKEY_CLASSES_ROOT\CLSID\{7cacbd7b-0d99-468f-ac33-22e495c0afe5}\InprocServer32]
+@="\\WINDOWS\\mstscax.dll"
+"ThreadingModel"="Both"
+
+[HKEY_CLASSES_ROOT\CLSID\{7cacbd7b-0d99-468f-ac33-22e495c0afe5}\MiscStatus]
+@="0"
+
+[HKEY_CLASSES_ROOT\CLSID\{7cacbd7b-0d99-468f-ac33-22e495c0afe5}\MiscStatus\1]
+@="131473"
+
+[HKEY_CLASSES_ROOT\CLSID\{7cacbd7b-0d99-468f-ac33-22e495c0afe5}\ProgID]
+@="MsTscAx.MsTscAx.2"
+
+[HKEY_CLASSES_ROOT\CLSID\{7cacbd7b-0d99-468f-ac33-22e495c0afe5}\Programmable]
+
+[HKEY_CLASSES_ROOT\CLSID\{7cacbd7b-0d99-468f-ac33-22e495c0afe5}\ToolboxBitmap32]
+@="\\WINDOWS\\mstscax.dll, 1"
+
+[HKEY_CLASSES_ROOT\CLSID\{7cacbd7b-0d99-468f-ac33-22e495c0afe5}\TypeLib]
+@="{8C11EFA1-92C3-11D1-BC1E-00C04FA31489}"
+
+[HKEY_CLASSES_ROOT\CLSID\{7cacbd7b-0d99-468f-ac33-22e495c0afe5}\Version]
+@="2.0"
+
+[HKEY_CLASSES_ROOT\CLSID\{7cacbd7b-0d99-468f-ac33-22e495c0afe5}\VersionIndependentProgID]
+@="MsTscAx.MsTscAx"
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+[HKEY_CLASSES_ROOT\CLSID\{3523c2fb-4031-44e4-9a3b-f1e94986ee7f}]
+@="Microsoft RDP Client Control - version 3"
+
+[HKEY_CLASSES_ROOT\CLSID\{3523c2fb-4031-44e4-9a3b-f1e94986ee7f}\InprocServer32]
+@="\\WINDOWS\\mstscax.dll"
+"ThreadingModel"="Both"
+
+[HKEY_CLASSES_ROOT\CLSID\{3523c2fb-4031-44e4-9a3b-f1e94986ee7f}\MiscStatus]
+@="0"
+
+[HKEY_CLASSES_ROOT\CLSID\{3523c2fb-4031-44e4-9a3b-f1e94986ee7f}\MiscStatus\1]
+@="131473"
+
+[HKEY_CLASSES_ROOT\CLSID\{3523c2fb-4031-44e4-9a3b-f1e94986ee7f}\ProgID]
+@="MsTscAx.MsTscAx.3"
+
+[HKEY_CLASSES_ROOT\CLSID\{3523c2fb-4031-44e4-9a3b-f1e94986ee7f}\Programmable]
+
+[HKEY_CLASSES_ROOT\CLSID\{3523c2fb-4031-44e4-9a3b-f1e94986ee7f}\ToolboxBitmap32]
+@="\\WINDOWS\\mstscax.dll, 1"
+
+[HKEY_CLASSES_ROOT\CLSID\{3523c2fb-4031-44e4-9a3b-f1e94986ee7f}\TypeLib]
+@="{8C11EFA1-92C3-11D1-BC1E-00C04FA31489}"
+
+[HKEY_CLASSES_ROOT\CLSID\{3523c2fb-4031-44e4-9a3b-f1e94986ee7f}\Version]
+@="2.0"
+
+[HKEY_CLASSES_ROOT\CLSID\{3523c2fb-4031-44e4-9a3b-f1e94986ee7f}\VersionIndependentProgID]
+@="MsTscAx.MsTscAx"
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+[HKEY_CLASSES_ROOT\CLSID\{ace575fd-1fcf-4074-9401-ebab990fa9de}]
+@="Microsoft RDP Client Control - version 4"
+
+[HKEY_CLASSES_ROOT\CLSID\{ace575fd-1fcf-4074-9401-ebab990fa9de}\InprocServer32]
+@="\\WINDOWS\\mstscax.dll"
+"ThreadingModel"="Both"
+
+[HKEY_CLASSES_ROOT\CLSID\{ace575fd-1fcf-4074-9401-ebab990fa9de}\MiscStatus]
+@="0"
+
+[HKEY_CLASSES_ROOT\CLSID\{ace575fd-1fcf-4074-9401-ebab990fa9de}\MiscStatus\1]
+@="131473"
+
+[HKEY_CLASSES_ROOT\CLSID\{ace575fd-1fcf-4074-9401-ebab990fa9de}\ProgID]
+@="MsTscAx.MsTscAx.4"
+
+[HKEY_CLASSES_ROOT\CLSID\{ace575fd-1fcf-4074-9401-ebab990fa9de}\Programmable]
+
+[HKEY_CLASSES_ROOT\CLSID\{ace575fd-1fcf-4074-9401-ebab990fa9de}\ToolboxBitmap32]
+@="\\WINDOWS\\mstscax.dll, 1"
+
+[HKEY_CLASSES_ROOT\CLSID\{ace575fd-1fcf-4074-9401-ebab990fa9de}\TypeLib]
+@="{8C11EFA1-92C3-11D1-BC1E-00C04FA31489}"
+
+[HKEY_CLASSES_ROOT\CLSID\{ace575fd-1fcf-4074-9401-ebab990fa9de}\Version]
+@="2.0"
+
+[HKEY_CLASSES_ROOT\CLSID\{ace575fd-1fcf-4074-9401-ebab990fa9de}\VersionIndependentProgID]
+@="MsTscAx.MsTscAx"
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+[HKEY_CLASSES_ROOT\CLSID\{6AE29350-321B-42be-BBE5-12FB5270C0DE}]
+@="Microsoft RDP Client Control - version 5"
+
+[HKEY_CLASSES_ROOT\CLSID\{6AE29350-321B-42be-BBE5-12FB5270C0DE}\InprocServer32]
+@="\\WINDOWS\\mstscax.dll"
+"ThreadingModel"="Both"
+
+[HKEY_CLASSES_ROOT\CLSID\{6AE29350-321B-42be-BBE5-12FB5270C0DE}\MiscStatus]
+@="0"
+
+[HKEY_CLASSES_ROOT\CLSID\{6AE29350-321B-42be-BBE5-12FB5270C0DE}\MiscStatus\1]
+@="131473"
+
+[HKEY_CLASSES_ROOT\CLSID\{6AE29350-321B-42be-BBE5-12FB5270C0DE}\ProgID]
+@="MsTscAx.MsTscAx.5"
+
+[HKEY_CLASSES_ROOT\CLSID\{6AE29350-321B-42be-BBE5-12FB5270C0DE}\Programmable]
+
+[HKEY_CLASSES_ROOT\CLSID\{6AE29350-321B-42be-BBE5-12FB5270C0DE}\ToolboxBitmap32]
+@="\\WINDOWS\\mstscax.dll, 1"
+
+[HKEY_CLASSES_ROOT\CLSID\{6AE29350-321B-42be-BBE5-12FB5270C0DE}\TypeLib]
+@="{8C11EFA1-92C3-11D1-BC1E-00C04FA31489}"
+
+[HKEY_CLASSES_ROOT\CLSID\{6AE29350-321B-42be-BBE5-12FB5270C0DE}\Version]
+@="2.0"
+
+[HKEY_CLASSES_ROOT\CLSID\{6AE29350-321B-42be-BBE5-12FB5270C0DE}\VersionIndependentProgID]
+@="MsTscAx.MsTscAx"
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+[HKEY_CLASSES_ROOT\CLSID\{4eb2f086-c818-447e-b32c-c51ce2b30d31}]
+@="Microsoft RDP Client Control - version 6"
+
+[HKEY_CLASSES_ROOT\CLSID\{4eb2f086-c818-447e-b32c-c51ce2b30d31}\InprocServer32]
+@="\\WINDOWS\\mstscax.dll"
+"ThreadingModel"="Both"
+
+[HKEY_CLASSES_ROOT\CLSID\{4eb2f086-c818-447e-b32c-c51ce2b30d31}\MiscStatus]
+@="0"
+
+[HKEY_CLASSES_ROOT\CLSID\{4eb2f086-c818-447e-b32c-c51ce2b30d31}\MiscStatus\1]
+@="131473"
+
+[HKEY_CLASSES_ROOT\CLSID\{4eb2f086-c818-447e-b32c-c51ce2b30d31}\ProgID]
+@="MsTscAx.MsTscAx.6"
+
+[HKEY_CLASSES_ROOT\CLSID\{4eb2f086-c818-447e-b32c-c51ce2b30d31}\Programmable]
+
+[HKEY_CLASSES_ROOT\CLSID\{4eb2f086-c818-447e-b32c-c51ce2b30d31}\ToolboxBitmap32]
+@="\\WINDOWS\\mstscax.dll, 1"
+
+[HKEY_CLASSES_ROOT\CLSID\{4eb2f086-c818-447e-b32c-c51ce2b30d31}\TypeLib]
+@="{8C11EFA1-92C3-11D1-BC1E-00C04FA31489}"
+
+[HKEY_CLASSES_ROOT\CLSID\{4eb2f086-c818-447e-b32c-c51ce2b30d31}\Version]
+@="2.0"
+
+[HKEY_CLASSES_ROOT\CLSID\{4eb2f086-c818-447e-b32c-c51ce2b30d31}\VersionIndependentProgID]
+@="MsTscAx.MsTscAx"
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+[HKEY_CLASSES_ROOT\CLSID\{d2ea46a7-c2bf-426b-af24-e19c44456399}]
+@="Microsoft RDP Client Control - version 7"
+
+[HKEY_CLASSES_ROOT\CLSID\{d2ea46a7-c2bf-426b-af24-e19c44456399}\InprocServer32]
+@="\\WINDOWS\\mstscax.dll"
+"ThreadingModel"="Both"
+
+[HKEY_CLASSES_ROOT\CLSID\{d2ea46a7-c2bf-426b-af24-e19c44456399}\MiscStatus]
+@="0"
+
+[HKEY_CLASSES_ROOT\CLSID\{d2ea46a7-c2bf-426b-af24-e19c44456399}\MiscStatus\1]
+@="131473"
+
+[HKEY_CLASSES_ROOT\CLSID\{d2ea46a7-c2bf-426b-af24-e19c44456399}\ProgID]
+@="MsTscAx.MsTscAx.7"
+
+[HKEY_CLASSES_ROOT\CLSID\{d2ea46a7-c2bf-426b-af24-e19c44456399}\Programmable]
+
+[HKEY_CLASSES_ROOT\CLSID\{d2ea46a7-c2bf-426b-af24-e19c44456399}\ToolboxBitmap32]
+@="\\WINDOWS\\mstscax.dll, 1"
+
+[HKEY_CLASSES_ROOT\CLSID\{d2ea46a7-c2bf-426b-af24-e19c44456399}\TypeLib]
+@="{8C11EFA1-92C3-11D1-BC1E-00C04FA31489}"
+
+[HKEY_CLASSES_ROOT\CLSID\{d2ea46a7-c2bf-426b-af24-e19c44456399}\Version]
+@="2.0"
+
+[HKEY_CLASSES_ROOT\CLSID\{d2ea46a7-c2bf-426b-af24-e19c44456399}\VersionIndependentProgID]
+@="MsTscAx.MsTscAx"
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+[HKEY_CLASSES_ROOT\CLSID\{54d38bf7-b1ef-4479-9674-1bd6ea465258}]
+@="Microsoft RDP Client Control - version 8"
+
+[HKEY_CLASSES_ROOT\CLSID\{54d38bf7-b1ef-4479-9674-1bd6ea465258}\InprocServer32]
+@="\\WINDOWS\\mstscax.dll"
+"ThreadingModel"="Both"
+
+[HKEY_CLASSES_ROOT\CLSID\{54d38bf7-b1ef-4479-9674-1bd6ea465258}\MiscStatus]
+@="0"
+
+[HKEY_CLASSES_ROOT\CLSID\{54d38bf7-b1ef-4479-9674-1bd6ea465258}\MiscStatus\1]
+@="131473"
+
+[HKEY_CLASSES_ROOT\CLSID\{54d38bf7-b1ef-4479-9674-1bd6ea465258}\ProgID]
+@="MsTscAx.MsTscAx.8"
+
+[HKEY_CLASSES_ROOT\CLSID\{54d38bf7-b1ef-4479-9674-1bd6ea465258}\Programmable]
+
+[HKEY_CLASSES_ROOT\CLSID\{54d38bf7-b1ef-4479-9674-1bd6ea465258}\ToolboxBitmap32]
+@="\\WINDOWS\\mstscax.dll, 1"
+
+[HKEY_CLASSES_ROOT\CLSID\{54d38bf7-b1ef-4479-9674-1bd6ea465258}\TypeLib]
+@="{8C11EFA1-92C3-11D1-BC1E-00C04FA31489}"
+
+[HKEY_CLASSES_ROOT\CLSID\{54d38bf7-b1ef-4479-9674-1bd6ea465258}\Version]
+@="2.0"
+
+[HKEY_CLASSES_ROOT\CLSID\{54d38bf7-b1ef-4479-9674-1bd6ea465258}\VersionIndependentProgID]
+@="MsTscAx.MsTscAx"
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
+[HKEY_CLASSES_ROOT\TypeLib\{8C11EFA1-92C3-11D1-BC1E-00C04FA31489}\1.0]
+@="Microsoft Terminal Services Active Client 1.0 Type Library"
+
+[HKEY_CLASSES_ROOT\TypeLib\{8C11EFA1-92C3-11D1-BC1E-00C04FA31489}\1.0\0]
+
+[HKEY_CLASSES_ROOT\TypeLib\{8C11EFA1-92C3-11D1-BC1E-00C04FA31489}\1.0\0\win32]
+@="\\WINDOWS\\mstscax.dll"
+
+[HKEY_CLASSES_ROOT\TypeLib\{8C11EFA1-92C3-11D1-BC1E-00C04FA31489}\1.0\FLAGS]
+@="0"
+
+[HKEY_CLASSES_ROOT\TypeLib\{8C11EFA1-92C3-11D1-BC1E-00C04FA31489}\1.0\HELPDIR]
+@="\\WINDOWS"
+
+[HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Internet Explorer\ActiveX Compatibility\{4eb89ff4-7f78-4a0f-8b8d-2bf02e94e4b2}]
+"Compatibility Flags"=dword:00000820
+"MiscStatus Flags"=dword:00000128
+
+; @CESYSGEN ENDIF RDP_MODULES_TSCAXCTRL
+
+
+; @CESYSGEN IF RDP_MODULES_CETSC
+; settings of redirector presence state
+
+; @CESYSGEN IF TSCAXCTRL_RDRSCARD
+[HKEY_LOCAL_MACHINE\Software\Microsoft\Terminal Server Client]
+"Redir0"=dword:1
+; @CESYSGEN ENDIF TSCAXCTRL_RDRSCARD
+
+; @CESYSGEN IF TSCAXCTRL_RDRDRIVE
+[HKEY_LOCAL_MACHINE\Software\Microsoft\Terminal Server Client]
+"Redir1"=dword:1
+; @CESYSGEN ENDIF TSCAXCTRL_RDRDRIVE
+
+; @CESYSGEN IF TSCAXCTRL_RDRPORT
+[HKEY_LOCAL_MACHINE\Software\Microsoft\Terminal Server Client]
+"Redir2"=dword:1
+; @CESYSGEN ENDIF TSCAXCTRL_RDRPORT
+
+; @CESYSGEN IF TSCAXCTRL_RDRPRINTER
+[HKEY_LOCAL_MACHINE\Software\Microsoft\Terminal Server Client]
+"Redir3"=dword:1
+; @CESYSGEN ENDIF TSCAXCTRL_RDRPRINTER
+
+; @CESYSGEN IF TSCAXCTRL_RDRAUDIO
+[HKEY_LOCAL_MACHINE\Software\Microsoft\Terminal Server Client]
+"Redir4"=dword:1
+; @CESYSGEN ENDIF TSCAXCTRL_RDRAUDIO
+
+; @CESYSGEN IF TSCAXCTRL_RDRCLIP
+[HKEY_LOCAL_MACHINE\Software\Microsoft\Terminal Server Client]
+"Redir5"=dword:1
+; @CESYSGEN ENDIF TSCAXCTRL_RDRCLIP
+
+; end of settings of redirector presence state
+; @CESYSGEN ENDIF RDP_MODULES_CETSC
+
+
+; @CESYSGEN IF RDP_MODULES_WBTSHELL
+; @CESYSGEN IF IE_MODULES_IESAMPLE
+; @CESYSGEN ENDIF IE_MODULES_IESAMPLE
+; @CESYSGEN IF RDP_MODULES_SSFLOAT
+; @CESYSGEN ENDIF RDP_MODULES_SSFLOAT
+; @CESYSGEN IF RDP_MODULES_SSBLANK
+; @CESYSGEN ENDIF RDP_MODULES_SSBLANK
+; @CESYSGEN IF RDP_MODULES_SSTILE
+; @CESYSGEN ENDIF RDP_MODULES_SSTILE
+; @CESYSGEN ELSE
+
+; WBT Shell is not included
+[HKEY_LOCAL_MACHINE\Software\Microsoft\Terminal Server Client]
+        "CEConfig"="Maxall"
+
+; @CESYSGEN ENDIF RDP_MODULES_WBTSHELL
+
+; @CESYSGEN IF RDP_MODULES_ATLWBTWIZ
+; @CESYSGEN ENDIF RDP_MODULES_ATLWBTWIZ
+
+; @CESYSGEN IF RDP_MODULES_PRNPRXY
+[HKEY_LOCAL_MACHINE\WBT\Printers\PRNPRXY]
+   "Prefix"="PRN"
+   "Dll"="prnprxy.dll"
+   "Flags"=dword:10
+   "ProcGroup"=dword:3
+; @CESYSGEN ENDIF RDP_MODULES_PRNPRXY
+
+; @CESYSGEN IF RDP_MODULES_FILTERFSD
+[HKEY_LOCAL_MACHINE\System\StorageManager\AutoLoad\FilterFsd]
+    "Dll"="filterfsd.dll"
+    "Paging"=dword:0
+    "LoadFlags"=dword:1
+    "BootPhase"=dword:2
+    "MountFlags"=dword:1
+    "FolderName"="FILTERFS"
+    "RootPath"="\\"
+; @CESYSGEN ENDIF RDP_MODULES_FILTERFSD
+
+; @CESYSGEN IF RDP_MODULES_PICTORAPP
+; @CESYSGEN ENDIF RDP_MODULES_PICTORAPP
+
+
+;WSD PICTOR REGISTRIES
+
+; @CESYSGEN IF RDP_MODULES_PICTORSERVICE
+; @CESYSGEN ENDIF RDP_MODULES_PICTORSERVICE
+
+; @CESYSGEN IF RDP_MODULES_PCMCONV
+
+[HKEY_LOCAL_MACHINE\Drivers32]
+"msacm.pcmconv"="pcmconv.dll"
+
+[HKEY_LOCAL_MACHINE\AudioCompressionManager\DriverCache\msacm.pcmconv]
+"fdwSupport"=dword:00000001
+"cFormatTags"=dword:00000001
+"aFormatTagCache"=hex:01,00,00,00,10,00,00,00
+"cFilterTags"=dword:00000000
+
+; @CESYSGEN ENDIF

@@ -1,0 +1,213 @@
+;
+; Copyright (c) Microsoft Corporation.  All rights reserved.
+;
+;
+; Use of this sample source code is subject to the terms of the Microsoft
+; license agreement under which you licensed this sample source code. If
+; you did not accept the terms of the license agreement, you are not
+; authorized to use this sample source code. For the terms of the license,
+; please see the license agreement between you and Microsoft or, if applicable,
+; see the LICENSE.RTF on your install media or the root of your tools installation.
+; THE SAMPLE SOURCE CODE IS PROVIDED "AS IS", WITH NO WARRANTIES OR INDEMNITIES.
+;
+; @CESYSGEN IF RDP_MODULES_CETSC
+
+; Associate .rdp files with cetsc
+[HKEY_CLASSES_ROOT\.rdp]
+@="rdpfile"
+[HKEY_CLASSES_ROOT\rdpfile]
+;LOC_RDPCONNECTION
+@=mui_sz:"cetsc.exe,#30001"
+[HKEY_CLASSES_ROOT\rdpfile\DefaultIcon]
+@="\\Windows\\cetsc.exe,-101"
+[HKEY_CLASSES_ROOT\rdpfile\Shell\Open\Command]
+@="\\Windows\\cetsc.exe %1"
+; @CESYSGEN ENDIF RDP_MODULES_CETSC
+
+
+; @CESYSGEN IF RDP_MODULES_TSCAXCTRL
+;Default location of bitmap cache location
+[HKEY_LOCAL_MACHINE\Software\Microsoft\Terminal Server Client]
+"BitmapPersistCacheLocation"="\\Temp"
+
+;Disable Password saving
+[HKEY_LOCAL_MACHINE\Software\Policies\Microsoft\Windows NT\Terminal Services]
+"DisablePasswordSaving"=dword:1
+; @CESYSGEN ENDIF RDP_MODULES_TSCAXCTRL
+
+;Turn on shell CF_HDROP clipboard
+; @CESYSGEN IF SHELL_MODULES_CESHELL
+; @CESYSGEN IF TSCAXCTRL_RDRCLIP && TSCAXCTRL_RDRDRIVE
+[HKEY_LOCAL_MACHINE\Explorer]
+"Use2ndClipboard"=dword:1
+; @CESYSGEN ENDIF TSCAXCTRL_RDRCLIP && TSCAXCTRL_RDRDRIVE
+; @CESYSGEN ENDIF SHELL_MODULES_CESHELL
+
+; @CESYSGEN IF RDP_MODULES_TSCAXCTRL
+;RDP ActiveX control registry settings
+[HKEY_CLASSES_ROOT\MsTscAx.MsTscAx]
+@="MsTscAx Class v6"
+
+[HKEY_CLASSES_ROOT\MsTscAx.MsTscAx\CurVer]
+@="MsTscAx.MsTscAx.6"
+
+[HKEY_CLASSES_ROOT\MsTscAx.MsTscAx.3]
+@="MsTscAx Class v6"
+
+[HKEY_CLASSES_ROOT\MsTscAx.MsTscAx.3\CLSID]
+@="{4eb89ff4-7f78-4a0f-8b8d-2bf02e94e4b2}"
+
+[HKEY_CLASSES_ROOT\CLSID\{4eb89ff4-7f78-4a0f-8b8d-2bf02e94e4b2}]
+@="Microsoft RDP Client Control"
+
+[HKEY_CLASSES_ROOT\CLSID\{4eb89ff4-7f78-4a0f-8b8d-2bf02e94e4b2}\InprocServer32]
+@="\\WINDOWS\\mstscax.dll"
+"ThreadingModel"="Both"
+
+[HKEY_CLASSES_ROOT\CLSID\{4eb89ff4-7f78-4a0f-8b8d-2bf02e94e4b2}\MiscStatus]
+@="0"
+
+[HKEY_CLASSES_ROOT\CLSID\{4eb89ff4-7f78-4a0f-8b8d-2bf02e94e4b2}\MiscStatus\1]
+@="131473"
+
+[HKEY_CLASSES_ROOT\CLSID\{4eb89ff4-7f78-4a0f-8b8d-2bf02e94e4b2}\ProgID]
+@="MsTscAx.MsTscAx.6"
+
+[HKEY_CLASSES_ROOT\CLSID\{4eb89ff4-7f78-4a0f-8b8d-2bf02e94e4b2}\Programmable]
+
+[HKEY_CLASSES_ROOT\CLSID\{4eb89ff4-7f78-4a0f-8b8d-2bf02e94e4b2}\ToolboxBitmap32]
+@="\\WINDOWS\\mstscax.dll, 1"
+
+[HKEY_CLASSES_ROOT\CLSID\{4eb89ff4-7f78-4a0f-8b8d-2bf02e94e4b2}\TypeLib]
+@="{8C11EFA1-92C3-11D1-BC1E-00C04FA31489}"
+
+[HKEY_CLASSES_ROOT\CLSID\{4eb89ff4-7f78-4a0f-8b8d-2bf02e94e4b2}\Version]
+@="2.0"
+
+[HKEY_CLASSES_ROOT\CLSID\{4eb89ff4-7f78-4a0f-8b8d-2bf02e94e4b2}\VersionIndependentProgID]
+@="MsTscAx.MsTscAx"
+
+[HKEY_CLASSES_ROOT\TypeLib\{8C11EFA1-92C3-11D1-BC1E-00C04FA31489}\1.0]
+@="Microsoft Terminal Services Active Client 1.0 Type Library"
+
+[HKEY_CLASSES_ROOT\TypeLib\{8C11EFA1-92C3-11D1-BC1E-00C04FA31489}\1.0\0]
+
+[HKEY_CLASSES_ROOT\TypeLib\{8C11EFA1-92C3-11D1-BC1E-00C04FA31489}\1.0\0\win32]
+@="\\WINDOWS\\mstscax.dll"
+
+[HKEY_CLASSES_ROOT\TypeLib\{8C11EFA1-92C3-11D1-BC1E-00C04FA31489}\1.0\FLAGS]
+@="0"
+
+[HKEY_CLASSES_ROOT\TypeLib\{8C11EFA1-92C3-11D1-BC1E-00C04FA31489}\1.0\HELPDIR]
+@="\\WINDOWS"
+
+[HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Internet Explorer\ActiveX Compatibility\{4eb89ff4-7f78-4a0f-8b8d-2bf02e94e4b2}]
+"Compatibility Flags"=dword:00000820
+"MiscStatus Flags"=dword:00000128
+
+; @CESYSGEN ENDIF RDP_MODULES_TSCAXCTRL
+
+
+; @CESYSGEN IF RDP_MODULES_CETSC
+; settings of redirector presence state
+
+; @CESYSGEN IF TSCAXCTRL_RDRSCARD
+[HKEY_LOCAL_MACHINE\Software\Microsoft\Terminal Server Client]
+"Redir0"=dword:1
+; @CESYSGEN ENDIF TSCAXCTRL_RDRSCARD
+
+; @CESYSGEN IF TSCAXCTRL_RDRDRIVE
+[HKEY_LOCAL_MACHINE\Software\Microsoft\Terminal Server Client]
+"Redir1"=dword:1
+; @CESYSGEN ENDIF TSCAXCTRL_RDRDRIVE
+
+; @CESYSGEN IF TSCAXCTRL_RDRPORT
+[HKEY_LOCAL_MACHINE\Software\Microsoft\Terminal Server Client]
+"Redir2"=dword:1
+; @CESYSGEN ENDIF TSCAXCTRL_RDRPORT
+
+; @CESYSGEN IF TSCAXCTRL_RDRPRINTER
+[HKEY_LOCAL_MACHINE\Software\Microsoft\Terminal Server Client]
+"Redir3"=dword:1
+; @CESYSGEN ENDIF TSCAXCTRL_RDRPRINTER
+
+; @CESYSGEN IF TSCAXCTRL_RDRAUDIO
+[HKEY_LOCAL_MACHINE\Software\Microsoft\Terminal Server Client]
+"Redir4"=dword:1
+; @CESYSGEN ENDIF TSCAXCTRL_RDRAUDIO
+
+; @CESYSGEN IF TSCAXCTRL_RDRCLIP
+[HKEY_LOCAL_MACHINE\Software\Microsoft\Terminal Server Client]
+"Redir5"=dword:1
+; @CESYSGEN ENDIF TSCAXCTRL_RDRCLIP
+
+; end of settings of redirector presence state
+; @CESYSGEN ENDIF RDP_MODULES_CETSC
+
+
+; @CESYSGEN IF RDP_MODULES_WBTSHELL
+; @CESYSGEN IF IE_MODULES_IESAMPLE
+; @CESYSGEN ENDIF IE_MODULES_IESAMPLE
+; @CESYSGEN IF RDP_MODULES_SSFLOAT
+; @CESYSGEN ENDIF RDP_MODULES_SSFLOAT
+; @CESYSGEN IF RDP_MODULES_SSBLANK
+; @CESYSGEN ENDIF RDP_MODULES_SSBLANK
+; @CESYSGEN IF RDP_MODULES_SSTILE
+; @CESYSGEN ENDIF RDP_MODULES_SSTILE
+; @CESYSGEN ELSE
+
+; WBT Shell is not included
+[HKEY_LOCAL_MACHINE\Software\Microsoft\Terminal Server Client]
+        "CEConfig"="Maxall"
+
+; @CESYSGEN ENDIF RDP_MODULES_WBTSHELL
+
+; @CESYSGEN IF RDP_MODULES_ATLWBTWIZ
+; @CESYSGEN ENDIF RDP_MODULES_ATLWBTWIZ
+
+; @CESYSGEN IF RDP_MODULES_PRNPRXY
+[HKEY_LOCAL_MACHINE\WBT\Printers\PRNPRXY]
+   "Prefix"="PRN"
+   "Dll"="prnprxy.dll"
+   "Flags"=dword:10
+   "ProcGroup"=dword:3
+; @CESYSGEN ENDIF RDP_MODULES_PRNPRXY
+
+; @CESYSGEN IF RDP_MODULES_FILTERFSD
+[HKEY_LOCAL_MACHINE\System\StorageManager\AutoLoad\FilterFsd]
+    "Dll"="filterfsd.dll"
+    "Paging"=dword:0
+    "LoadFlags"=dword:1
+    "BootPhase"=dword:2
+    "MountFlags"=dword:1
+    "FolderName"="FILTERFS"
+    "RootPath"="\\"
+; @CESYSGEN ENDIF RDP_MODULES_FILTERFSD
+
+; @CESYSGEN IF RDP_MODULES_PICTORAPP
+; @CESYSGEN ENDIF RDP_MODULES_PICTORAPP
+
+
+;WSD PICTOR REGISTRIES
+
+; @CESYSGEN IF RDP_MODULES_PICTORSERVICE
+[HKEY_LOCAL_MACHINE\Services\PICTORSERVICE]
+  "FriendlyName"="PictorService"
+   "Dll"="PictorService.DLL"
+   "Order"=dword:160
+   "Keep"=dword:1
+   "Prefix"="PIC"
+   "Index"=dword:0
+
+[HKEY_LOCAL_MACHINE\Software\Microsoft\PictorService]
+   "ProjectorName"="CeProjector"
+   "AdhocSSID"="CeProjector"
+
+[HKEY_LOCAL_MACHINE\COMM\HTTPD\VROOTS\/]
+    @="\\windows\\pictor"
+
+[HKEY_LOCAL_MACHINE\COMM\HTTPD]
+    "DefaultPage"="PictorDeviceInfo.xml"
+
+
+; @CESYSGEN ENDIF RDP_MODULES_PICTORSERVICE

@@ -1,0 +1,61 @@
+<!--
+Copyright (c) Microsoft Corporation.  All rights reserved.
+-->
+<!--
+Use of this sample source code is subject to the terms of the Microsoft
+license agreement under which you licensed this sample source code. If
+you did not accept the terms of the license agreement, you are not
+authorized to use this sample source code. For the terms of the license,
+please see the license agreement between you and Microsoft or, if applicable,
+see the LICENSE.RTF on your install media or the root of your tools installation.
+THE SAMPLE SOURCE CODE IS PROVIDED "AS IS", WITH NO WARRANTIES.
+-->
+<H2><FONT COLOR="#FF0000" SIZE=5>What is a virtual directory?</font></H2>
+
+A virtual directory is a mapping between a URL that a client requests and
+a resource on the server.  To configure, create, or delete virtual directories
+for a given Web site, select that Web site and then follow the <b>virtual directories</b> link.
+
+<P>Suppose that on your device you have a directory named \windows\www\dadsPictures, 
+which contains pictures of dad.  While you could share out all the files on this device and allow the user to 
+navigate to dad's pictures directly (i.e. by requesting http://WinCEDevice/windows/www/dadsPictures), 
+doing this allows user to access any file on the device, including potentially sensitive ones.
+
+<P>Instead you should create a virtual directory named /DadPics and map it to the physical
+directory you want to share.  In this 
+case create a new virtual directory /DadPics, select the "local path on this 
+server" box, and enter "\windows\www\dadsPictures" as the physical directory.  
+When users browse to http://WinCEDevice/DadPics, the Web server will allow 
+them to access files only under the specified physical directory.
+
+<P><B>Windows CE note:</B> Other Microsoft operating systems use a drive letter to represent 
+the hard drive a file is located on.  For example, C:\MyWordFile.doc.  Windows CE does not use drive letters. 
+Instead, the root of the file system is represented as a \ and all directories are under it.  On 
+Windows CE this file would be simply \MyWordFile.doc. 
+
+<H4>Redirection URLs</H4>
+<P>Redirection URLs are used to move visitors to a different Web page when the 
+page they request is no longer available or has moved. The Web page that the 
+visitor is redirected to can be on the same device or on another computer. 
+
+<P>To enable redirection, navigate to the desired virtual directory 
+configuration page and select the A redirection to a URL option. To redirect 
+the browser to a new location on the device, type the redirection URL, but 
+omit the domain information, for example, http://WinCEDevice/
+RedirectVirtualDirectory is typed as /RedirectVirtualDirectory. To redirect 
+the browser to a location on a different server, enter the full URL, for 
+example, http://www.microsoft.com/RedirectVirtualDirectory.
+
+
+<H4>Why do some virtual directories map to DLLs?</H4>
+<P>Your Web server contains one or more virtual directory mappings to Dynamic Link 
+Libraries (DLLs). For example, the virtual directory /WebAdmin is mapped to 
+the file \windows\httpdadm.dll. Instead of containing information typically found 
+in virtual server mappings, this mapping enables the server-side script 
+called WebAdmin to work correctly. 
+
+<P><B>Note:</B> Unless you are writing custom ISAPI extensions for your device, you 
+should not map any virtual directories to DLLs. Additionally, do not delete 
+any pre-set DLL mappings configured by default. Deleting these mappings may 
+disable functionality on your device.
+

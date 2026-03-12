@@ -1,0 +1,44 @@
+<!--
+Copyright (c) Microsoft Corporation.  All rights reserved.
+-->
+<!--
+Use of this sample source code is subject to the terms of the Microsoft
+license agreement under which you licensed this sample source code. If
+you did not accept the terms of the license agreement, you are not
+authorized to use this sample source code. For the terms of the license,
+please see the license agreement between you and Microsoft or, if applicable,
+see the LICENSE.RTF on your install media or the root of your tools installation.
+THE SAMPLE SOURCE CODE IS PROVIDED "AS IS", WITH NO WARRANTIES.
+-->
+<H2><FONT COLOR="#FF0000" SIZE=5>How do I set access permissions for virtual directories?</FONT></H2>
+When a user requests a virtual directory that requires User or Administrator level 
+access, the Web server first verifies that the user name and password the client 
+sent are those of a valid account.  Assuming they are, the Web server next checks
+to make sure that the user has permission to the virtual directory.
+
+<P>Allowing and denying specific user's access to virtual directories, even after they 
+have been authenticated, is an important part of securing your Web server.  Just 
+because a user has a valid account does not mean they should have to
+every resource on the Web server.  For example, suppose that on a home gateway 
+the users mom, dad, and child each have their own account.  Mom and dad should have  
+access /WebAdmin, but child should not.
+
+<P>To set access User and Group permissions, navigate to the User Configuration 
+page. A list of all users and groups on the device is displayed. A user 
+or group has access if the Enabled option next to their name is selected. If 
+the Default option is selected and the Allow default items box is selected, 
+access is permitted.
+
+<P>Access permissions can be set for individual users or for groups of users on 
+the system. The Web server first checks 
+permissions at the User level, and then proceeds to the Group level. For 
+example, if a user is denied access to a resource as an individual, but 
+belongs to a group that is granted access, the individual user is denied 
+before the group settings are checked. Group settings are only checked if the 
+permissions for an individual user are set to Default.
+
+<P>If a new user is added to the device, they will be granted Default permission for
+existing virtual directories.  Until access permissions are changed, these users 
+can only access non-public virtual directories that have the Allow default 
+items option selected. 
+

@@ -1,0 +1,92 @@
+<!--
+Copyright (c) Microsoft Corporation.  All rights reserved.
+-->
+<!--
+Use of this sample source code is subject to the terms of the Microsoft
+license agreement under which you licensed this sample source code. If
+you did not accept the terms of the license agreement, you are not
+authorized to use this sample source code. For the terms of the license,
+please see the license agreement between you and Microsoft or, if applicable,
+see the LICENSE.RTF on your install media or the root of your tools installation.
+THE SAMPLE SOURCE CODE IS PROVIDED "AS IS", WITH NO WARRANTIES.
+-->
+<H2><FONT COLOR=#FF0000>"$$WebsiteName$$" Web Site</font></H2>
+
+<script language="JavaScript"><!--
+
+function SubmitRequest(context)
+{
+   document.forms[0].Context.value = context
+   document.forms[0].submit()
+   return false
+}
+// -->
+</SCRIPT>
+
+<FORM ACTION = /WebAdmin/ METHOD=post>
+  <INPUT TYPE=HIDDEN NAME=Context VALUE=unset>
+  <INPUT TYPE=HIDDEN NAME=WebsiteName VALUE="$$WebsiteName$$">
+
+  <BR><A HREF="javascript:SubmitRequest('VirtualDirs');">Configure the virtual directories on this Web site.</a>
+  <BR><A HREF="javascript:SubmitRequest('AdminUsers');">Configure the administrative users for this Web site.</a>
+  <BR><A HREF="javascript:SubmitRequest('NetInterfacePage');">Configure the network interfaces this Web site will service.</a>
+  <BR><A HREF="javascript:SubmitRequest('HostedSites');">Configure the host names this Web site will service.</a>
+</FORM>
+
+<FORM ACTION = "/WebAdmin/" METHOD = "post">
+<INPUT TYPE=HIDDEN NAME=Context VALUE=Update-Website>
+<INPUT TYPE=HIDDEN NAME=WebsiteName VALUE="$$WebsiteName$$">
+
+<HR>
+<B><FONT COLOR=#0000FF>Security Settings</font></b>
+<BR><FONT SIZE=2>Set the default security properties for virtual directories in this Web site.
+These settings can be overridden on a per-virtual directory basis.</FONT>
+
+
+<P>
+<TABLE BORDER=0>
+
+<TR>
+<TD><INPUT type=CHECKBOX name=DirBrowse $$CHECKED(DirBrowse=="Enabled")$$>
+<TD><B>Directory Browsing</B>
+<TD><FONT SIZE=2>Select this option to allow clients to browse the listings of virtual directories.<A HREF="instructions/httpd-i-dirbrowse.htm">(Help)</A></FONT>
+
+<TR>
+<TD><INPUT type=CHECKBOX name=Basic $$CHECKED(Basic=="Enabled")$$>
+<TD><B>Basic Authentication</B>
+<TD><FONT SIZE=2>Select this option for Basic authentication.<A HREF="instructions/httpd-i-authtypes.htm">(Help)</A></FONT>
+
+
+<TR>
+<TD><INPUT type=CHECKBOX name=NTLM $$CHECKED(NTLM=="Enabled")$$>
+<TD><B>NTLM Authentication</B>
+<TD><FONT SIZE=2>Select this option for NTLM-based authentication.<A HREF="instructions/httpd-i-authtypes.htm">(Help)</A></FONT>
+</TABLE>
+
+<HR>
+<B><FONT COLOR=#0000FF>Miscellaneous Settings</font></b>
+
+<P>
+<TABLE BORDER=0 WIDTH=700>
+<TR><TD WIDTH=500><B>Default Document</B>
+<font size=2><A HREF="instructions/httpd-i-dirbrowse.htm">(Help)</A>
+<BR>Specifies the file name that is the default to be sent to a client. Separate 
+multiple entries with a semicolon. The Web server searches for the files in 
+the order listed in the given directory. The file is sent when a match is located.
+</font></TD>
+</TD>
+<TD><INPUT NAME=DefaultPage VALUE = "$$DefaultPage$$"></TD>
+
+$$if (IsWebDavBuiltIn=="Enabled")$$
+  <TR><TD><B>WebDAV Support</B>
+  <FONT SIZE=2> <A HREF="instructions/httpd-i-upload.htm">(Help)</A>
+  <BR>Select this option for WebDAV file sharing.</FONT>
+  <TD><INPUT type=CHECKBOX name=WebDAV $$CHECKED(WebDAV=="Enabled")$$>
+$$endif$$
+
+</TABLE>
+<HR>
+<P><INPUT TYPE=submit Name=Submit value=Update Settings>
+
+</FORM>
+

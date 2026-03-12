@@ -1,0 +1,29 @@
+;
+; Copyright (c) Microsoft Corporation.  All rights reserved.
+;
+;
+; Use of this sample source code is subject to the terms of the Microsoft
+; license agreement under which you licensed this sample source code. If
+; you did not accept the terms of the license agreement, you are not
+; authorized to use this sample source code. For the terms of the license,
+; please see the license agreement between you and Microsoft or, if applicable,
+; see the LICENSE.RTF on your install media or the root of your tools installation.
+; THE SAMPLE SOURCE CODE IS PROVIDED "AS IS", WITH NO WARRANTIES OR INDEMNITIES.
+;
+;
+
+
+; @CESYSGEN IF GDIEX_MODULES_IMAGING
+[HKEY_CLASSES_ROOT\CLSID\{327ABDA8-072B-11D3-9D7B-0000F81EF32E}]
+@="ImagingFactory COM Component"
+[HKEY_CLASSES_ROOT\CLSID\{327ABDA8-072B-11D3-9D7B-0000F81EF32E}\InProcServer32]
+@="imaging.dll"
+"ThreadingModel"="Both"
+[HKEY_CLASSES_ROOT\CLSID\{327ABDA8-072B-11D3-9D7B-0000F81EF32E}\ProgID]
+@="imaging.Factory"
+
+[HKEY_CLASSES_ROOT\imaging.Factory]
+@="ImagingFactory COM Component"
+[HKEY_CLASSES_ROOT\imaging.Factory\CLSID]
+@="{327ABDA8-072B-11D3-9D7B-0000F81EF32E}"
+; @CESYSGEN ENDIF GDIEX_MODULES_IMAGING

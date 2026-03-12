@@ -1,0 +1,36 @@
+<!--
+Copyright (c) Microsoft Corporation.  All rights reserved.
+-->
+<!--
+Use of this sample source code is subject to the terms of the Microsoft
+license agreement under which you licensed this sample source code. If
+you did not accept the terms of the license agreement, you are not
+authorized to use this sample source code. For the terms of the license,
+please see the license agreement between you and Microsoft or, if applicable,
+see the LICENSE.RTF on your install media or the root of your tools installation.
+THE SAMPLE SOURCE CODE IS PROVIDED "AS IS", WITH NO WARRANTIES.
+-->
+<H2><FONT COLOR="#FF0000" SIZE=5>Create a new Web site</font></H2>
+Follow the steps on this and the following pages to create a new <A HREF="Instructions/httpd-i-website.htm">Web site</A>.
+This feature is for advanced users only.
+
+<FORM ACTION="/WebAdmin/" METHOD="post">
+<INPUT TYPE=HIDDEN NAME=Context VALUE=Update-NewWebsiteChoseVdirs>
+
+<HR>
+<B>Web site name:</B> <INPUT SIZE=40 TYPE=text Name=WebsiteName value="Enter a new website name here..."></TD>
+
+<P>Create a new Web site or use an existing Web site as a template.
+
+<P><SELECT NAME = "WebsiteTemplate">
+  <OPTION VALUE="__CreateNew" SELECTED>Create A Web site From Scratch
+  <OPTION VALUE="Default">Default Web site
+  $$foreach Website$$
+    <OPTION VALUE="$$Global.WebsiteName$$">$$Global.WebsiteName$$
+  $$endif$$  
+</SELECT>
+
+<P><INPUT TYPE=submit Name=Submit value=Continue></TD>
+</TABLE>
+
+</FORM>

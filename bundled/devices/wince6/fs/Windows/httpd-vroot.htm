@@ -1,0 +1,223 @@
+<!--
+Copyright (c) Microsoft Corporation.  All rights reserved.
+-->
+<!--
+Use of this sample source code is subject to the terms of the Microsoft
+license agreement under which you licensed this sample source code. If
+you did not accept the terms of the license agreement, you are not
+authorized to use this sample source code. For the terms of the license,
+please see the license agreement between you and Microsoft or, if applicable,
+see the LICENSE.RTF on your install media or the root of your tools installation.
+THE SAMPLE SOURCE CODE IS PROVIDED "AS IS", WITH NO WARRANTIES.
+-->
+<script language="JavaScript"><!--
+function ConfirmModify()
+{
+$$if (IsVRootPathReadOnly=="True")$$
+  $$if (VRootName=="/WebAdmin/")$$
+    return confirm ("You are modifying the WebAdmin virtual directory.  If this directory is misconfigured, you may not be able to get to the WebAdmin tool again and/or hackers may be able to get access to it.  Click OK to continue.")
+  $$else$$
+    return confirm("You have requested to modify a 'protected' virtual directory.  Although this is allowed, misconfiguration of this resource can open your device to hackers or block you out of it.  Click OK to continue.")
+  $$endif$$
+$$else$$
+  // non-read only vroot return true on
+  return true
+$$endif$$
+}
+
+function SubmitRequest(i,context)
+{
+   document.forms[i].Context.value = context
+   document.forms[i].submit()
+   return false
+}
+// -->
+</SCRIPT>
+
+
+<H2><FONT COLOR="#FF0000">$$VRootName$$ Configuration</font></H2>
+Virtual paths provide a mapping from the URL a client browser requests 
+and the page returned by the Web server.  For more information, click <A HREF="instructions/httpd-i-vdirs.htm">here</A>.</FONT>
+
+
+<FORM ACTION /WebAdmin/ METHOD = post>
+<INPUT TYPE=HIDDEN NAME=Context VALUE=Unset>
+<INPUT TYPE=HIDDEN NAME=WebsiteName VALUE="$$WebsiteName$$">
+Return to the <B>$$WebsiteName$$</B> Web site <A HREF="javascript:SubmitRequest(0,'Website');">configuration page</A>.
+<BR>Return to the <A HREF="javascript:SubmitRequest(0,'VirtualDirs');">virtual directory listing page</A>.
+</FORM>
+
+<HR>
+
+
+<P><B><FONT COLOR="#0000FF">Virtual path mapping</FONT></B>
+<BR><FONT SIZE=2>When connecting to this resource, content should come from:</FONT>
+
+<FORM ACTION=/WebAdmin/ onsubmit="return(ConfirmModify());" METHOD = "post">
+
+$$if (IsNewVRoot=="True")$$
+  <INPUT TYPE=HIDDEN NAME=Context VALUE=Update-NewVDir>
+$$else$$
+  <INPUT TYPE=HIDDEN NAME=Context VALUE=Update-VRootConfig>
+$$endif$$
+<INPUT TYPE=HIDDEN NAME=WebsiteName VALUE="$$WebsiteName$$">
+$$if (IsNewVRoot=="False")$$
+  <INPUT TYPE=HIDDEN NAME=VRootName VALUE="$$VRootName$$">
+$$endif$$
+
+$$if (IsVRootPathReadOnly=="False")$$
+  <TABLE>
+  <TR><TD><INPUT type="radio" name=Redirect VALUE="Disabled" $$CHECKED(Redirect==Disabled)$$>
+  <TD>A local path on this server.
+  <TR><TD><INPUT type="radio" name=Redirect VALUE="Enabled" $$CHECKED(Redirect==Enabled)$$>
+  <TD>A redirection to a URL.
+  </TABLE>
+$$endif$$
+
+
+<TABLE BORDER=0 WIDTH=500>
+<THEAD>
+<TR>
+<TH>Virtual Directory</TH>
+<TH>Physical Directory or Redirection URL</TH>
+
+</TR>
+<TBODY>
+<TR>
+$$if (IsNewVRoot=="True")$$
+  <TD><INPUT NAME = "VRootName" VALUE = "Enter a virtual directory name here...">
+$$else$$
+  <TD><FONT COLOR="#F00000"><B>$$VRootName$$</B></FONT></TD>
+$$endif$$
+
+$$if (IsVRootPathReadOnly=="True")$$
+  <TD><FONT COLOR="#F00000"><B>$$PhysicalPath$$</B></FONT></TD>
+$$else$$
+  <TD><INPUT NAME = "PhysicalPath" VALUE = 
+  $$if (IsNewVRoot=="True")$$
+    "Enter a new directory name here..."
+  $$else$$
+    "$$PhysicalPath$$"
+  $$endif$$
+  >
+$$endif$$
+
+</TD>
+<TD>
+</TABLE>
+
+$$if (IsVRootPathReadOnly=="False")$$
+<FONT SIZE=2><b>Note:</b> The parameters below only apply to local files.  If 
+redirection option was selected, all other parameters on this page are ignored.</FONT>
+$$endif$$
+
+<HR>
+<P><B><FONT COLOR="#0000FF">User settings</FONT></B>
+<BR><FONT SIZE=2>Who is allowed to access this resource?  The Level Required must be User or Administrator for the Allowed Users setting to take effect.
+
+<P>
+<TABLE BORDER=0 WIDTH=450>
+<THEAD>
+<TR>
+<TH>Level Required <FONT SIZE=2><A HREF="instructions/httpd-i-authlevel.htm">(Help)</A></FONT></TH>
+<TH>Allowed Users <FONT SIZE=2><A HREF="instructions/httpd-i-userlists.htm">(Help)</A></FONT>
+<TBODY>
+<TR>
+<TD><SELECT NAME = "AuthLevel">
+<OPTION VALUE="Public" $$SELECTED(AuthLevel=="Public")$$>Public
+<OPTION VALUE="User"   $$SELECTED(AuthLevel=="User")$$>User
+<OPTION VALUE="Admin"  $$SELECTED(AuthLevel=="Admin")$$>Administrator
+</OPTION>
+</TD>
+
+<TD>
+$$if (IsNewVRoot=="True")$$
+  <FONT SIZE=2>You will be able to configure which users may access this new virtual directory after you save it for the first time.
+$$else$$
+  <FONT SIZE=2><A HREF="javascript:SubmitRequest(1,'UserList');">Configure the allowed users</a></FONT>
+$$endif$$
+</TD>
+</TABLE>
+
+<HR>
+<B><FONT COLOR="#0000FF">Authentication and directory browsing</FONT></B>
+<BR><FONT SIZE=2>If a value is set to default, the virtual directory will use the 
+default value for the Web site.</FONT>
+
+<TABLE WIDTH=450>
+<TR>
+<TH></TH>
+<TH>Enabled</TH>
+<TH>Disabled</TH>
+<TH>Default</TH>
+
+
+<TR>
+<TD><B>Directory Browsing</B> <A HREF="instructions/httpd-i-dirbrowse.htm">(Help)</A>
+<TD><INPUT type="radio" name=DirBrowse VALUE="Enabled"  $$CHECKED(DirBrowse==Enabled)$$>
+<TD><INPUT type="radio" name=DirBrowse VALUE="Disabled" $$CHECKED(DirBrowse==Disabled)$$>
+<TD><INPUT type="radio" name=DirBrowse VALUE="Default"  $$CHECKED(DirBrowse==Default)$$>
+
+<TR>
+<TD><B>Basic Authentication</B> <A HREF="instructions/httpd-i-authtypes.htm">(Help)</A>
+<TD><INPUT type="radio" name=Basic VALUE="Enabled"  $$CHECKED(Basic==Enabled)$$>
+<TD><INPUT type="radio" name=Basic VALUE="Disabled" $$CHECKED(Basic==Disabled)$$>
+<TD><INPUT type="radio" name=Basic VALUE="Default"  $$CHECKED(Basic==Default)$$>
+
+<TR>
+<TD><B>NTLM Authentication</B> <A HREF="instructions/httpd-i-authtypes.htm">(Help)</A>
+<TD><INPUT type="radio" name=NTLM VALUE="Enabled"  $$CHECKED(NTLM==Enabled)$$>
+<TD><INPUT type="radio" name=NTLM VALUE="Disabled" $$CHECKED(NTLM==Disabled)$$>
+<TD><INPUT type="radio" name=NTLM VALUE="Default"  $$CHECKED(NTLM==Default)$$>
+</TABLE>
+
+<HR>
+<B><FONT COLOR="#0000FF">Permissions granted</FONT></B>
+<BR><FONT SIZE=2>Once a user has access, what actions are they allowed to take on it?  <A HREF="instructions/httpd-i-permissions.htm">(Help)</A></FONT>
+<TABLE BORDER=0 WIDTH=750>
+<TR><TD><INPUT TYPE="CHECKBOX" NAME="Read" $$CHECKED(Read=="Enabled")$$>
+<TD><B>Read</B>
+<TD><FONT SIZE=2>If checked, clients may download files from this resource.</FONT>
+
+<TR><TD><INPUT TYPE="CHECKBOX" NAME="Execute" $$CHECKED(Execute=="Enabled")$$> 
+<TD><B>Execute</B>
+<TD><FONT SIZE=2>If checked, clients may execute ISAPI extensions on this resource.</FONT>
+
+$$if (IsWebDavBuiltIn=="Enabled")$$
+  <TR><TD><INPUT TYPE="CHECKBOX" NAME="Write" $$CHECKED(Write=="Enabled")$$> 
+  <TD><B>Write</B>
+  <TD><FONT SIZE=2>If checked, clients may upload files to this resource using a WebDAV client. <A HREF="instructions/httpd-i-upload.htm">(Help)</A></FONT>
+$$endif$$
+
+<TR><TD><INPUT TYPE="CHECKBOX" NAME="Script" $$CHECKED(Script=="Enabled")$$ > 
+<TD><B>Script</B>
+<TD><FONT SIZE=2>If checked, clients may execute ASP pages on this resource.</FONT>
+
+<TR><TD><INPUT TYPE="CHECKBOX" NAME="ScriptAccess" $$CHECKED(ScriptAccess=="Enabled")$$> 
+<TD><B>Script Source Access</B>
+<TD><FONT SIZE=2>If checked, clients may view source code to ASP pages and ISAPI extensions.</FONT>
+</TABLE>
+
+
+<HR>
+<B><FONT COLOR="#0000FF">SSL Configuration</FONT></B>
+<BR><FONT SIZE=2>Are clients allowed to connect using plain-text or must they use secure SSL channels?  <A HREF="instructions/httpd-i-ssl.htm">(Help)</A></FONT>
+
+<TABLE WIDTH=850>
+
+<TR><TD><INPUT TYPE="CHECKBOX" NAME="SSLRequired" $$CHECKED(SSLRequired=="Enabled")$$> 
+<TD><B>SSL Required</B>
+<TD><FONT SIZE=2>If checked, the Web server will require clients to connect using SSL 
+encryption.</FONT>
+
+<TR><TD><INPUT TYPE="CHECKBOX" NAME="SSLRequired128" $$CHECKED(SSLRequired128=="Enabled")$$> 
+<TD><B>SSL 128 bit required</B>
+<TD><FONT SIZE=2>If checked, the Web server will require clients to connect using 128 bit 
+SSL encryption.</FONT>
+
+</TABLE>
+
+<HR>
+<TR><TD><INPUT TYPE = submit NAME="Submit" WIDTH=50 VALUE=Update></TD>
+</FORM>
+

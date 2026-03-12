@@ -1,0 +1,78 @@
+<!--
+Copyright (c) Microsoft Corporation.  All rights reserved.
+-->
+<!--
+Use of this sample source code is subject to the terms of the Microsoft
+license agreement under which you licensed this sample source code. If
+you did not accept the terms of the license agreement, you are not
+authorized to use this sample source code. For the terms of the license,
+please see the license agreement between you and Microsoft or, if applicable,
+see the LICENSE.RTF on your install media or the root of your tools installation.
+THE SAMPLE SOURCE CODE IS PROVIDED "AS IS", WITH NO WARRANTIES.
+-->
+<H2><FONT COLOR="#FF0000" SIZE=5>What is a Web site?</font></H2>
+
+A Web site can be thought of as the group of settings that that are applied to an incoming 
+Web request based on the network interface the client is connecting on or the host name 
+the client is connecting to.
+
+<P><B>Note:</B> The following topics are for advanced users only. 
+Great care must be taken when configuring multiple Web sites.  It is possible to misconfigure
+the Web server such that it would reject all Web requests.  This would require
+you to reset your device to its factory settings.  A misconfigured Web site could potentially  
+create a breach of privacy and allow a hacker to take control of your device.
+Before you create a new Web site or modify an existing Web site, be sure to 
+consider the policy and security implications contained in these help topics.
+
+<H4>Mapping a Network Interface Card to a Web site</H4>
+Some devices utilize more than one network interface card (NIC).  For example, a 
+home gateway may use one NIC to connect to the 
+Internet (which will be referred to as "PublicNIC") and another NIC to connect to the internal network ("PrivateNIC").
+
+<P>We trust the people in our home network more than we trust unknown Internet users, 
+so we give people connecting to the Windows CE Web server via PrivateNIC greater access
+than those connecting on PublicNIC.  We create one Web site that processes all requests that arrive
+on the PrivateNIC and another that handles all requests on PublicNIC.  Since hackers 
+anywhere in the world can access your device on the Internet, it is a bad idea to have
+the WebAdmin <A HREF="httpd-i-vdirs.htm">virtual directory</a> available on the PublicNIC Web site, so it
+should only be on the PrivateNIC Web site.  However, we could set up a virtual directory 
+named /Pictures that could be accessed from either Web site.
+
+<P>Select the <b>network interfaces</b> link on the page of a given Web site to configure which
+network interfaces it receives requests on.
+
+<H4>Mapping a hostname to a Web site</H4>
+Web requests can be mapped to Web sites based on the 
+host name that is specified in the request.  For example, 
+suppose MSN's music department purchased a company named http://www.worldwideimporters.com/ 
+and that this company sells music CDs.  MSN configures all requests to the IP address of 
+www.worldwideimporters.com to be redirected to the www.msn.com.
+
+<P>The main reason MSN made this 
+acquisition was because it wanted worldwideimporters.com's existing customers.  To keep the customers happy, MSN 
+wants them to continue to have the same experience they had when they used to visit worldwideimporters.com, even
+though the server msn.com is hosting the site now.  MSN's administrators do this by creating a Web site 'WorldWideImporters' that
+processes all requests made to the hostname worldwideimporters.com (even though it has the same IP as msn.com).  
+This site is configured so it feels to the customer like the original site, with the same pages, ordering scripts, and back-
+end databases.  All other requests to msn.com continue to go to the default Web site, which contains the settings for 
+the original MSN.
+
+<P><B>Note:</B> Mapping a request based on the host name to a Web site is for advanced user only.
+Unlike restricting access to certain pages based on what NIC the request arrives on,
+<B>mapping based on hostname offers no security advantages</B>.  Do not create a Web site that contains sensitive 
+information and protect it only by choosing an obscure hostname, as hackers could easily circumvent this protection.
+
+<P>Select the <b>host names</b> link on the page of a given Web site to configure which
+host names it receives requests on.
+
+$$if (IsWebsiteConfigAllowed=="True")$$
+  <H4>Creating a new Web site</H4>
+  To create a new Web site, navigate to the WebAdmin homepage, select <B>Create a 
+  new Web site</B>, and follow the instructions.
+$$endif$$
+
+<H4>The Default Web Site</H4>
+The Windows CE Web Server always has a Web site named "default" that cannot be deleted.  The default 
+Web site can be configured to accept Web requests that do not map to any other Web site by checking
+Allow default site on the network adapter configuration page for the default site.
+

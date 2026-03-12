@@ -1,0 +1,176 @@
+;
+; Copyright (c) Microsoft Corporation.  All rights reserved.
+;
+;
+; Use of this sample source code is subject to the terms of the Microsoft
+; license agreement under which you licensed this sample source code. If
+; you did not accept the terms of the license agreement, you are not
+; authorized to use this sample source code. For the terms of the license,
+; please see the license agreement between you and Microsoft or, if applicable,
+; see the LICENSE.RTF on your install media or the root of your tools installation.
+; THE SAMPLE SOURCE CODE IS PROVIDED "AS IS", WITH NO WARRANTIES OR INDEMNITIES.
+;
+
+;---------------------------- start PWORD ---------------------------------
+;
+; @CESYSGEN IF WCEAPPSFE_MODULES_PWORD
+;
+; .pwd files
+[HKEY_CLASSES_ROOT\.pwd]
+@="pwdfile"
+[HKEY_CLASSES_ROOT\pwdfile]
+;LOC_PWORDDOCUMENT
+@=mui_sz:"pwd_res.dll,#9007"
+; IDI_ICONDOC
+[HKEY_CLASSES_ROOT\pwdfile\DefaultIcon]
+@="\\Windows\\pword.exe,-107"
+[HKEY_CLASSES_ROOT\pwdfile\Shell\Open\Command]
+@="\\Windows\\pword.exe %1"
+
+; Associate .doc and .dot with PWord
+[HKEY_CLASSES_ROOT\.doc]
+@="docfile"
+[HKEY_CLASSES_ROOT\docfile]
+;LOC_WORDDOCUMENT
+@=mui_sz:"pwd_res.dll,#9011"
+[HKEY_CLASSES_ROOT\docfile\DefaultIcon]
+@="\\Windows\\pword.exe,-107"
+[HKEY_CLASSES_ROOT\docfile\Shell\Open\Command]
+@="\\Windows\\pword.exe %1"
+
+[HKEY_CLASSES_ROOT\.dot]
+@="dotfile"
+[HKEY_CLASSES_ROOT\dotfile]
+;LOC_WORDTEMPLATE
+@=mui_sz:"pwd_res.dll,#9012"
+[HKEY_CLASSES_ROOT\dotfile\DefaultIcon]
+@="\\Windows\\pword.exe,-109"
+[HKEY_CLASSES_ROOT\dotfile\Shell\Open\Command]
+@="\\Windows\\pword.exe %1"
+;
+; Pocket Word filter to read/write Word 95/97 documents and templates.
+;
+[HKEY_CLASSES_ROOT\CLSID\{F31F2300-7EDF-11D0-829B-00AA00C267C1}\InprocServer32]
+@="pwwiff.dll"
+[HKEY_CLASSES_ROOT\CLSID\{F31F2301-7EDF-11D0-829B-00AA00C267C1}\InprocServer32]
+@="pwwiff.dll"
+[HKEY_CLASSES_ROOT\CLSID\{F31F2302-7EDF-11D0-829B-00AA00C267C1}\InprocServer32]
+@="pwwiff.dll"
+[HKEY_CLASSES_ROOT\CLSID\{F31F2303-7EDF-11D0-829B-00AA00C267C1}\InprocServer32]
+@="pwwiff.dll"
+[HKEY_CLASSES_ROOT\CLSID\{F31F2304-7EDF-11D0-829B-00AA00C267C1}\InprocServer32]
+@="pwwiff.dll"
+[HKEY_CLASSES_ROOT\CLSID\{F31F2305-7EDF-11D0-829B-00AA00C267C1}\InprocServer32]
+@="pwwiff.dll"
+
+; Read Word documents
+[HKEY_LOCAL_MACHINE\Software\Microsoft\Pocket Word\Converters\Read\LOC_PWD_REG_READWORD]
+"EXTENSION"="doc"
+"STRUCTURED"=dword:1
+"PRIORITY"=dword:2
+"GUID"=hex:02,23,1f,f3,df,7e,d0,11,82,9b,00,aa,00,c2,67,c1
+"TEMPLATE"=dword:0
+"STREAM"="WordDocument"
+
+; Read Word templates
+[HKEY_LOCAL_MACHINE\Software\Microsoft\Pocket Word\Converters\Read\LOC_PWD_REG_READWORDTEMPLATE]
+"EXTENSION"="dot"
+"STRUCTURED"=dword:1
+"PRIORITY"=dword:2
+"GUID"=hex:05,23,1f,f3,df,7e,d0,11,82,9b,00,aa,00,c2,67,c1
+"TEMPLATE"=dword:1
+"STREAM"="WordDocument"
+
+; Write Word 97 documents
+[HKEY_LOCAL_MACHINE\Software\Microsoft\Pocket Word\Converters\Write\LOC_PWD_REG_WRITEWORD97]
+"EXTENSION"="doc"
+"STRUCTURED"=dword:1
+"PRIORITY"=dword:2
+"GUID"=hex:00,23,1f,f3,df,7e,d0,11,82,9b,00,aa,00,c2,67,c1
+"TEMPLATE"=dword:0
+"STREAM"="WordDocument"
+"NOLOSSWARNING"=dword:1
+
+; Write Word 95 documents
+[HKEY_LOCAL_MACHINE\Software\Microsoft\Pocket Word\Converters\Write\LOC_PWD_REG_WRITEWORD95]
+"EXTENSION"="doc"
+"STRUCTURED"=dword:1
+"PRIORITY"=dword:2
+"GUID"=hex:01,23,1f,f3,df,7e,d0,11,82,9b,00,aa,00,c2,67,c1
+"TEMPLATE"=dword:0
+"STREAM"="WordDocument"
+"NOLOSSWARNING"=dword:1
+
+; Write Word 97 templates
+[HKEY_LOCAL_MACHINE\Software\Microsoft\Pocket Word\Converters\Write\LOC_PWD_REG_WRITEWORD97TEMPLATE]
+"EXTENSION"="dot"
+"STRUCTURED"=dword:1
+"PRIORITY"=dword:2
+"GUID"=hex:03,23,1f,f3,df,7e,d0,11,82,9b,00,aa,00,c2,67,c1
+"TEMPLATE"=dword:1
+"STREAM"="WordDocument"
+"NOLOSSWARNING"=dword:1
+
+; Write Word 95 templates
+[HKEY_LOCAL_MACHINE\Software\Microsoft\Pocket Word\Converters\Write\LOC_PWD_REG_WRITEWORD95TEMPLATE]
+"EXTENSION"="dot"
+"STRUCTURED"=dword:1
+"PRIORITY"=dword:2
+"GUID"=hex:04,23,1f,f3,df,7e,d0,11,82,9b,00,aa,00,c2,67,c1
+"TEMPLATE"=dword:1
+"STREAM"="WordDocument"
+"NOLOSSWARNING"=dword:1
+
+; Pocket Word directory settings (for MUI)
+[HKEY_LOCAL_MACHINE\Software\Microsoft\Pocket Word\Directories]
+"Templates"="\\LOC_PROGRAMFILES_DIR\\LOC_OFFICE_DIR\\LOC_TEMPLATES_DIR"
+
+; .rtf files
+[HKEY_CLASSES_ROOT\.rtf]
+@="rtffile"
+[HKEY_CLASSES_ROOT\rtffile]
+;LOC_RTFDOCUMENT
+@=mui_sz:"pwd_res.dll,#9009"
+; IDI_ICONDOC
+[HKEY_CLASSES_ROOT\rtffile\DefaultIcon]
+@="\\Windows\\pword.exe,-107"
+[HKEY_CLASSES_ROOT\rtffile\Shell\Open\Command]
+@="\\Windows\\pword.exe %1"
+
+; .pwt files
+[HKEY_CLASSES_ROOT\.pwt]
+@="pwtfile"
+[HKEY_CLASSES_ROOT\pwtfile]
+;LOC_PWORDTEMPLATE
+@=mui_sz:"pwd_res.dll,#9010"
+; IDI_ICONPWT
+[HKEY_CLASSES_ROOT\pwtfile\DefaultIcon]
+@="\\Windows\\pword.exe,-109"
+[HKEY_CLASSES_ROOT\pwtfile\Shell\Open\Command]
+@="\\Windows\\pword.exe %1"
+
+; .txt files
+[HKEY_CLASSES_ROOT\.txt]
+@="txtfile"
+[HKEY_CLASSES_ROOT\txtfile]
+;LOC_TEXTDOCUMENT
+@=mui_sz:"pwd_res.dll,#9008"
+; IDI_ICONTXT
+[HKEY_CLASSES_ROOT\txtfile\DefaultIcon]
+@="\\Windows\\pword.exe,-108"
+[HKEY_CLASSES_ROOT\txtfile\Shell\Open\Command]
+@="\\Windows\\pword.exe %1"
+
+;Office directory settings (for MUI)
+[HKEY_LOCAL_MACHINE\Software\Microsoft\Office\Directories]
+"Templates"="\\LOC_PROGRAMFILES_DIR\\LOC_OFFICE_DIR\\LOC_TEMPLATES_DIR"
+
+;
+; @CESYSGEN ENDIF WCEAPPSFE_MODULES_PWORD
+
+;
+;---------------------------- end PWORD ---------------------------------
+
+
+
+

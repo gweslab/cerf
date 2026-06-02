@@ -12,7 +12,8 @@ constexpr uint8_t kTwlAddr_PWR_RTC     = 0x4B;
 }  /* namespace */
 
 bool Twl4030::ShouldRegister() {
-    return emu_.Get<BoardDetector>().GetSoc() == SocFamily::OMAP3530;
+    auto* bd = emu_.TryGet<BoardDetector>();
+    return bd && bd->GetSoc() == SocFamily::OMAP3530;
 }
 
 bool Twl4030::MatchesAddress(uint8_t slave_addr) const {
@@ -58,7 +59,7 @@ int Twl4030::AddrIndex(uint8_t slave_addr) {
     LOG(Caution, "Twl4030: AddrIndex called with unknown slave_addr "
             "0x%02X — bus dispatch should have rejected this\n",
             slave_addr);
-    CerfFatalExit(1);
+    CerfFatalExit(CERF_FATAL_RUNTIME_ERROR);
 }
 
 REGISTER_SERVICE(Twl4030);

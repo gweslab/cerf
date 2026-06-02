@@ -233,7 +233,7 @@ uint8_t* PlaceDecodedShift(uint8_t*           cursor,
 
     default:
         LOG(Caution, "PlaceDecodedShift: unhandled shift_type %u\n", shift_typ);
-        CerfFatalExit(2);
+        CerfFatalExit(CERF_FATAL_RUNTIME_ERROR);
         break;
     }
     return cursor;

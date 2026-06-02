@@ -27,6 +27,7 @@ This page is MANDATORY and complements `rules.md` (behavioral rules) and
 ## Logging
 
 - **Structured log channels** — `LOG(MEM, ...)`, `LOG(NET, ...)`, etc. One channel per subsystem. New subsystem → new channel in `log.h`, not a generic fallback. The exact set of channels is in flux during the v2 rewrite; align new code with whatever channels exist when you write it, and add a new one when no existing channel fits.
+- **Default log mask is mode-gated.** Dev builds (`CERF_DEV_MODE=1`) enable every channel by default, so investigations have full output with no flag. Production builds (`CERF_DEV_MODE=0`) start with the mask cleared — only the always-on `Cerf` / `Caution` categories reach `cerf.log` until the user passes `--log=...`. The switch is the `Log::detail::enabled_mask` initializer in `cerf/core/log.cpp`.
 - **Verbose LOG lines that print inputs/state are acceptable permanently — but only when low-frequency** — they are filtered by log level and aid future debugging at zero runtime cost when their fire-rate is low enough that the signal a future reader needs isn't buried in their noise. Anything firing per-clock, per-register-access, per-instruction, or per-context-switch is high-frequency and **must not ship in production**: either move it into a device-specific trace file under `cerf/tracing/<bundle>/` (gated by bundle CRC32, excluded from production builds), or wrap the LOG site in `#if CERF_DEV_MODE ... #endif` wherever a trace file doesn't apply. `build.ps1` sets `CERF_DEV_MODE=1` in dev and `CERF_DEV_MODE=0` in production. Per-clock UART register access logs are the cautionary tale: they once buried the actual UART TX bytes in `cerf.log` so badly that an agent had to build a separate script to reconstruct the TX stream. See `agent_docs/rules.md` § "Simple LOG verbose lines" for the full removal criteria.
 
 ## Services
@@ -102,7 +103,8 @@ public:
     using Service::Service;
 
     bool ShouldRegister() override {
-        return emu_.Get<BoardDetector>().GetSoc() == SocFamily::S3C2410;
+        auto* bd = emu_.TryGet<BoardDetector>();
+        return bd && bd->GetSoc() == SocFamily::S3C2410;
     }
 
     void OnReady() override {
@@ -136,7 +138,8 @@ public:
     using PageTableBuilder::PageTableBuilder;
 
     bool ShouldRegister() override {
-        return emu_.Get<BoardDetector>().GetSoc() == SocFamily::S3C2410;
+        auto* bd = emu_.TryGet<BoardDetector>();
+        return bd && bd->GetSoc() == SocFamily::S3C2410;
     }
 
     uint32_t InitStackTopPa() const override { /* S3C2410 DRAM top */ }
@@ -152,6 +155,7 @@ A sibling `pxa27x_page_table_builder.cpp` registers itself for `SocFamily::PXA27
 - **Exactly one impl wins for a required base.** Two `ShouldRegister` returning `true` for the same base is a bug; two returning `false` for a required base is also a bug. `BoardDetector` is the gate — its `GetSoc()` / `GetBoard()` answers come from heuristic ROM fingerprinting at boot, so each board lands in exactly one bucket. Optional bases (a peripheral that not every board has) may have zero winners — consumers use `emu.TryGet<Base>()` and tolerate absence.
 - **`ShouldRegister` may resolve any service via `emu_.Get<>()`** — same lazy/recursive shape as `OnReady`. The framework defers slot resolution until first `Get<>` and walks each candidate's `ShouldRegister` on demand, so a strategy whose decision depends on another service (e.g. "register this MMU policy iff `Get<BoardDetector>().GetSoc() == SocFamily::S3C2410`") composes cleanly. Cycles (`A.ShouldRegister` → `Get<B>` → `B.ShouldRegister` → `Get<A>`) halt loudly. NEVER reach into a specific concrete subclass by name (e.g. `Smdk2410DevEmuDetector::Fingerprint`) — that's a Dependency Inversion violation; depend on the abstract `Base` only.
 - **Never put `if (board == X)` or `if (soc == X)` inside the impl body.** The impl already represents one specific board / SoC; that branch belongs in `ShouldRegister` and nowhere else. If two boards share most of an impl and diverge in one method, the divergence goes into a separate Service that the shared impl resolves via `emu_.Get<>()` — not an inline branch.
+- **A shared-capable ISA capability goes in the shared path behind a `ProcessorConfig::HasX()` flag, never localized in one SoC's strategy.** When an instruction-set capability (VFP, NEON, DSP, …) currently appears on only one implemented SoC, its decode/dispatch still belongs in the shared decoder / emit path gated by an `ArmProcessorConfig` capability flag, not hardcoded into that SoC's `CoprocEmitter` / strategy. "Only one current SoC has it" is an artifact of the implemented-SoC set, not a property of the capability, and localizing it forces an expensive later re-extraction into the shared path.
 - **One concrete per file, filename matches the class name exactly.** `S3C2410FooPeripheral` → `s3c2410_foo_peripheral.{h,cpp}`, `PXA27xFooPeripheral` → `pxa27x_foo_peripheral.{h,cpp}`. Never gang two concretes into one file. Same strict naming rule as § Writing a service: snake_case of the full class name, no abbreviation, no rename, no dropped suffix. The 500-line cap and the "split into multiple services" rule apply identically here — if a concrete impl outgrows its file, split it into smaller services, not into sidecar `.cpp` files.
 
 ## When the Rule Breaks Down — Stop and Ask

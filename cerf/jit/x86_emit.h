@@ -129,7 +129,7 @@ inline void FixupLabel(uint8_t* label, uint8_t* target) {
                      "is too large to fit in a short jump\n",
             static_cast<void*>(label), static_cast<void*>(target),
             static_cast<long long>(disp), opcode);
-        CerfFatalExit(2);
+        CerfFatalExit(CERF_FATAL_RUNTIME_ERROR);
     }
     *(label - 1) = static_cast<uint8_t>(disp);
 }
@@ -352,6 +352,32 @@ inline void EmitMovByteRegBaseDisp32(uint8_t*& p, uint8_t dst, uint8_t base, int
 inline void EmitMovBaseDisp32Byte(uint8_t*& p, uint8_t base, int32_t disp, uint8_t src) {
     Emit8(p, 0x88); EmitModRmReg(p, 2, base, src);
     Emit32(p, static_cast<uint32_t>(disp));
+}
+
+/* MOVSX r32, byte [base + disp32] — 0F BE /r mod=10. Sign-extends the
+   addressed byte into the full 32-bit dst. */
+inline void EmitMovsxByteRegBaseDisp32(uint8_t*& p, uint8_t dst, uint8_t base, int32_t disp) {
+    Emit8(p, 0x0F); Emit8(p, 0xBE); EmitModRmReg(p, 2, base, dst);
+    Emit32(p, static_cast<uint32_t>(disp));
+}
+
+/* CMP r8, byte [base + disp32] — 3A /r mod=10. */
+inline void EmitCmpReg8BaseDisp32(uint8_t*& p, uint8_t reg8, uint8_t base, int32_t disp) {
+    Emit8(p, 0x3A); EmitModRmReg(p, 2, base, reg8);
+    Emit32(p, static_cast<uint32_t>(disp));
+}
+
+/* BT [base], index — 0F A3 /r mod=00. CF = bit `index` of the bit-string based
+   at [base] (memory bit-base addressing, so index may exceed 32). base must not
+   be EBP/ESP. */
+inline void EmitBtMemReg(uint8_t*& p, uint8_t base, uint8_t index) {
+    Emit16(p, 0xA30F); EmitModRmReg(p, 0, base, index);
+}
+
+/* BTS [base], index — 0F AB /r mod=00. Sets bit `index` of the bit-string based
+   at [base]. base must not be EBP/ESP. */
+inline void EmitBtsMemReg(uint8_t*& p, uint8_t base, uint8_t index) {
+    Emit16(p, 0xAB0F); EmitModRmReg(p, 0, base, index);
 }
 
 /* ADD r32, [base + disp32] — 03 /r mod=10. */

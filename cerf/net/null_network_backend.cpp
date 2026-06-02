@@ -19,7 +19,7 @@ static std::array<uint8_t, 6> ParseMac(const std::string& s) {
                         &bytes[3], &bytes[4], &bytes[5]);
     if (n != 6) {
         LOG(Caution, "FATAL: malformed network_mac='%s' (need XX:XX:XX:XX:XX:XX)\n", s.c_str());
-        CerfFatalExit(1);
+        CerfFatalExit(CERF_FATAL_RUNTIME_ERROR);
     }
     for (int i = 0; i < 6; i++) out[i] = (uint8_t)bytes[i];
     return out;

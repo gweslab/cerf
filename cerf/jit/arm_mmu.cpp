@@ -1,5 +1,6 @@
 #include "arm_mmu.h"
 
+#include "../boards/page_table_builder.h"
 #include "../core/cerf_emulator.h"
 #include "../cpu/arm_processor_config.h"
 #include "../cpu/emulated_memory.h"
@@ -13,6 +14,28 @@ ArmMmu::~ArmMmu() = default;
 void ArmMmu::OnReady() {
     memory_           = &emu_.Get<EmulatedMemory>();
     processor_config_ = &emu_.Get<ArmProcessorConfig>();
+
+    /* SMC word-bitmap spans the board's DRAM PA extent only: code is
+       writable (hence self-modifiable) solely in DRAM, so a write outside
+       this range can never invalidate a translation. */
+    uint32_t dram_min = 0xFFFFFFFFu;
+    uint32_t dram_max = 0u;
+    for (const auto& r : emu_.Get<PageTableBuilder>().CachedDramRegions()) {
+        if (r.pa_base < dram_min)          dram_min = r.pa_base;
+        if (r.pa_base + r.size > dram_max) dram_max = r.pa_base + r.size;
+    }
+    state_.code_word_base         = dram_min;
+    state_.code_word_top          = dram_max;
+    state_.code_word_bitmap_bytes =
+        (dram_max > dram_min) ? (((dram_max - dram_min) >> 2) + 7u) / 8u : 0u;
+
+    code_xlat_bitmap_storage_.assign(state_.code_word_bitmap_bytes, 0u);
+    state_.code_xlat_bitmap = code_xlat_bitmap_storage_.data();
+
+    state_.code_page_dirty_bytes =
+        (dram_max > dram_min) ? (((dram_max - dram_min) >> 12) + 7u) / 8u : 0u;
+    code_page_dirty_storage_.assign(state_.code_page_dirty_bytes, 0u);
+    state_.code_page_dirty = code_page_dirty_storage_.data();
 
     ArmTlbFlushAll(&state_.data_tlb);
     ArmTlbFlushAll(&state_.instruction_tlb);
@@ -32,6 +55,13 @@ void ArmMmu::RaiseAbort(uint32_t va, uint32_t fault_status, bool is_write) {
     state_.fault_address             = va;
 }
 
+void ArmMmu::RaiseAlignmentFault(uint32_t va) {
+    state_.fault_status.bits.status = ArmFaultStatus::kAlignment;
+    state_.fault_status.bits.d      = 0;
+    state_.fault_status.bits.x      = 0;
+    state_.fault_address            = va;
+}
+
 void ArmMmu::SetIoPending(uint32_t pa) {
     if (pa == 0u) {
         /* Encode PA-0 as (4, -4) so the io_pa sentinel is naturally
@@ -48,50 +78,33 @@ void ArmMmu::SetIoPending(uint32_t pa) {
 
 
 std::optional<uint8_t*> ArmMmu::PeekDataTlb(uint32_t va) const {
-    /* Slot scan matches MapGuestVirtualToHost's per-PTE-type shift
-       decode at lines 89-140 — section→20, large→16, small→12,
-       extended-small→10 — except this peek never mutates TLB state,
-       never raises an abort, never sets io_pending_address_. */
-    for (size_t i = 0; i < kArmTlbSlotCount; ++i) {
-        const ArmTlbSlot& slot = state_.data_tlb.slots[i];
-        if (!slot.valid) continue;
-
-        ArmL2Pte cached_pte;
-        cached_pte.word = slot.pte;
-
-        /* host_adjust is stored as (host_ptr - PA); using (VA + host_adjust)
-           is wrong by (VA - PA) for non-identity kernel mappings. */
-        uint32_t pa;
-        switch (cached_pte.fault.type) {
-        case 0:  /* section (1 MB) */
-            if ((va >> 20) != slot.virtual_address) continue;
-            pa = (cached_pte.word & 0xFFF00000u) | (va & 0x000FFFFFu);
-            break;
-        case 1:  /* large page (64 KB) */
-            if ((va >> 16) != slot.virtual_address) continue;
-            pa = (cached_pte.large_page.large_page_base << 16) | (va & 0xFFFFu);
-            break;
-        case 2:  /* small page (4 KB) */
-            if ((va >> 12) != slot.virtual_address) continue;
-            pa = (cached_pte.small_page.small_page_base << 12) | (va & 0x0FFFu);
-            break;
-        case 3:  /* extended small page (1 KB) */
-            if ((va >> 10) != slot.virtual_address) continue;
-            pa = (cached_pte.extended_small_page.extended_small_page_base << 10)
-                 | (va & 0x01FFu);
-            break;
-        default:
-            continue;
-        }
-
-        /* host_adjust == 0 marks a peripheral PA — no host mapping
-           exists, dereference would be wrong. Treat as "not
-           peekable" so trace handlers get nullopt rather than a
-           bogus host pointer. */
-        if (slot.host_adjust == 0) return std::nullopt;
-
-        return reinterpret_cast<uint8_t*>(
-            static_cast<uintptr_t>(pa) + slot.host_adjust);
+    /* Diagnostic-only: never walks, never raises, never mutates TLB state.
+       Returns a host pointer only on a direct-mapped fast-TLB hit. */
+    uint32_t p = va;
+    if (state_.control_register.bits.m && (p & 0xFE000000u) == 0u) {
+        p |= state_.process_id;
+    }
+    const uint8_t current_asid = static_cast<uint8_t>(state_.contextidr & 0xFFu);
+    const uint32_t base = ArmTlbSetBase(p);
+    const int w = ArmTlbMatchWay(&state_.data_tlb, base, p & 0xFFFFF000u,
+                                 current_asid, /*need_write=*/false);
+    if (w >= 0) {
+        const ArmTlbEntry& e = state_.data_tlb.entries[base + static_cast<uint32_t>(w)];
+        return reinterpret_cast<uint8_t*>(static_cast<uintptr_t>(p) + e.va_addend);
     }
     return std::nullopt;
+}
+
+bool ArmMmu::ExecPageGlobal(uint32_t va) const {
+    /* va is already FCSE-folded by the caller (JitCreateEntrypoints passes the
+       decoded insn's actual_guest_address). Absent ⇒ false: claiming global for
+       an evicted user (nG=1) page would route its block into the shared global
+       tree where another process would execute it. */
+    const uint8_t current_asid = static_cast<uint8_t>(state_.contextidr & 0xFFu);
+    const uint32_t base = ArmTlbSetBase(va);
+    const int w = ArmTlbMatchWay(&state_.instruction_tlb, base,
+                                 va & 0xFFFFF000u, current_asid,
+                                 /*need_write=*/false);
+    return w >= 0 &&
+           state_.instruction_tlb.entries[base + static_cast<uint32_t>(w)].global != 0u;
 }

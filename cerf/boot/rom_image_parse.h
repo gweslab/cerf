@@ -70,6 +70,13 @@ bool ResolveRomhdrAtEcec(std::span<const uint8_t> flat,
                          ParsedXipRegion&         out,
                          size_t&                  out_romhdr_off);
 
+/* CE2.x ROMs have no ECEC signature record (added in CE3 romldr.h);
+   their romimage patches the kernel pTOC directly. Finds the ROMHDR by
+   structural scan validating against nk.exe; false when none found. */
+bool ResolveRomhdrStructural(std::span<const uint8_t> flat,
+                             ParsedXipRegion&         out,
+                             size_t&                  out_romhdr_off);
+
 /* Parse `romhdr.nummods` TOCentry records and `romhdr.numfiles`
    FILESentry records starting at `romhdr_off + kRomHdrSize`,
    resolving filenames via `load_offset`. Appends to `toc.modules`

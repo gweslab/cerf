@@ -17,10 +17,9 @@ void PrintUsage(const char* prog) {
     printf("  --disable-network        Force-disable network backend\n");
     printf("  --screen-width=N         Override device cerf.json board.configurable_screen_width\n");
     printf("  --screen-height=N        Override device cerf.json board.configurable_screen_height\n");
-    printf("  --start-window-width=N   Initial host window width before LCD enables (default 800)\n");
-    printf("  --start-window-height=N  Initial host window height before LCD enables (default 600)\n");
-    printf("  --poc-rom-injection      Replace explorer.exe at runtime with the\n");
-    printf("                           bundled sampleapp.exe (PoC for ROM replacement)\n");
+    printf("  --guest-additions        Inject CERF guest-additions DLL into the ROM\n");
+    printf("                           (replaces matching modules with CERF-built equivalents)\n");
+    printf("  --recovery               Boot the device's recovery ROM (rom.recovery) instead of primary\n");
     printf("  --help                   Show this help\n");
     printf("\n");
     Log::PrintCategoryList();

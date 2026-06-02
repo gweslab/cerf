@@ -20,7 +20,8 @@ public:
     using CoprocEmitter::CoprocEmitter;
 
     bool ShouldRegister() override {
-        return emu_.Get<BoardDetector>().GetBoard() == Board::Ipaq3650;
+        auto* bd = emu_.TryGet<BoardDetector>();
+        return bd && bd->GetBoard() == Board::Ipaq3650;
     }
 
     /* SA-110 Data Sheet §3.3: cp15 is the only coprocessor on
@@ -32,9 +33,9 @@ public:
             return EmitRaiseUndAndReturn(cursor, d, ctx);
         }
         /* SA-1110 c15 (Dev Man §5.2 "Test, clock, idle"): writes have
-           no software-visible state; reads reserved. Intercept BEFORE
-           the shared cp15 emit, which treats c15 as ARM920T's CAC and
-           UND-faults on Rd bits 31:14 (kernel writes 0x80020000). */
+           no software-visible state; reads reserved. Kernel writes
+           0x80020000 here — without the intercept the shared dispatch
+           UNDs c15. */
         if (d->crn == 15) {
             /* MCR p15, 0, Rd, c15, c2, 2 — SA-1110 "Wait for Interrupt"
                (Dev Man §5.3.4). OEMIdle uses this to halt CPU until next

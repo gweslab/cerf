@@ -25,7 +25,8 @@ int MainSourceBitForEint(int n) {
 }  /* namespace */
 
 bool S3C2410IoPort::ShouldRegister() {
-    return emu_.Get<BoardDetector>().GetSoc() == SocFamily::S3C2410;
+    auto* bd = emu_.TryGet<BoardDetector>();
+    return bd && bd->GetSoc() == SocFamily::S3C2410;
 }
 
 void S3C2410IoPort::OnReady() {
@@ -68,7 +69,7 @@ void S3C2410IoPort::AssertEint(int n) {
     if (n < 0 || n >= 24) {
         LOG(Caution, "S3C2410IoPort::AssertEint: n=%d out of range "
                 "(EINT0..23)\n", n);
-        CerfFatalExit(1);
+        CerfFatalExit(CERF_FATAL_RUNTIME_ERROR);
     }
     bool     unmasked = false;
     uint32_t pend_after;
@@ -90,7 +91,7 @@ void S3C2410IoPort::ClearEint(int n) {
     if (n < 0 || n >= 24) {
         LOG(Caution, "S3C2410IoPort::ClearEint: n=%d out of range "
                 "(EINT0..23)\n", n);
-        CerfFatalExit(1);
+        CerfFatalExit(CERF_FATAL_RUNTIME_ERROR);
     }
     {
         std::lock_guard<std::mutex> lk(state_mutex_);

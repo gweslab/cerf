@@ -1,2 +1,29 @@
-// Application icon — lowest ID so it becomes the default exe icon
-1 ICON "cerf.ico"
+#include <winver.h>
+#include "version.h"
+
+1 ICON "assets/cerf.ico"
+
+VS_VERSION_INFO VERSIONINFO
+ FILEVERSION    CERF_VERSION_MAJOR,CERF_VERSION_MINOR,CERF_VERSION_PATCH,CERF_VERSION_BUILD
+ PRODUCTVERSION CERF_VERSION_MAJOR,CERF_VERSION_MINOR,CERF_VERSION_PATCH,CERF_VERSION_BUILD
+ FILEOS         VOS_NT_WINDOWS32
+ FILETYPE       VFT_APP
+BEGIN
+    BLOCK "StringFileInfo"
+    BEGIN
+        BLOCK "040904E4"
+        BEGIN
+            VALUE "CompanyName",      "CERF Project"
+            VALUE "FileDescription",  "CE Runtime Foundation - universal Windows CE ARM emulator"
+            VALUE "FileVersion",      CERF_VERSION_DISPLAY_STR
+            VALUE "InternalName",     "cerf"
+            VALUE "OriginalFilename", "cerf.exe"
+            VALUE "ProductName",      "CERF"
+            VALUE "ProductVersion",   CERF_VERSION_DISPLAY_STR
+        END
+    END
+    BLOCK "VarFileInfo"
+    BEGIN
+        VALUE "Translation", 0x0409, 0x04E4
+    END
+END

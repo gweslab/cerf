@@ -26,11 +26,20 @@ public:
     virtual void     WriteWord (uint32_t addr, uint32_t value);
     virtual void     WriteDword(uint32_t addr, uint64_t value);
 
+    using FastReadFn  = uint32_t (*)(void* ctx, uint32_t off, uint32_t width_bytes);
+    using FastWriteFn = void     (*)(void* ctx, uint32_t off, uint32_t value, uint32_t width_bytes);
+
+    /* Override to install direct-state thunks bypassing the virtual
+       Read / Write dispatch. Default routes through them. */
+    virtual FastReadFn  FastReader() { return &AutoFastRead;  }
+    virtual FastWriteFn FastWriter() { return &AutoFastWrite; }
+
 protected:
-    /* Convenience for concrete peripherals to halt their own paths
-       (e.g. valid width but invalid offset within the range). Logs
-       the peripheral's class name + address + value, then exits. */
     [[noreturn]] void HaltUnsupportedAccess(const char* op,
                                             uint32_t addr,
                                             uint64_t value) const;
+
+private:
+    static uint32_t AutoFastRead (void* ctx, uint32_t off, uint32_t width_bytes);
+    static void     AutoFastWrite(void* ctx, uint32_t off, uint32_t value, uint32_t width_bytes);
 };

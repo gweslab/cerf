@@ -52,6 +52,23 @@ jobs:
         run: |
           & "$env:VCPKG_INSTALLATION_ROOT\vcpkg.exe" integrate install
 
+      - name: Stamp version.h with CI build info
+        shell: pwsh
+        run: |
+          $vh   = Get-Content cerf/version.h -Raw
+          $maj  = [regex]::Match($vh, 'CERF_VERSION_MAJOR\s+(\d+)').Groups[1].Value
+          $min  = [regex]::Match($vh, 'CERF_VERSION_MINOR\s+(\d+)').Groups[1].Value
+          $pat  = [regex]::Match($vh, 'CERF_VERSION_PATCH\s+(\d+)').Groups[1].Value
+          $sha  = "${{ github.sha }}".Substring(0, 7)
+          $ts   = [DateTime]::UtcNow.ToString("yyyy-MM-dd HH:mm") + " UTC"
+          $run  = "${{ github.run_number }}"
+          $disp = "$maj.$min.$pat ($ts, $sha)"
+          $vh = $vh -replace '(?m)^#define\s+CERF_VERSION_BUILD\s+\d+', "#define CERF_VERSION_BUILD $run"
+          $vh = $vh -replace '(?m)^#define\s+CERF_VERSION_DISPLAY_STR\s+.*$',  "#define CERF_VERSION_DISPLAY_STR   `"$disp`""
+          $vh = $vh -replace '(?m)^#define\s+CERF_VERSION_DISPLAY_WSTR\s+.*$', "#define CERF_VERSION_DISPLAY_WSTR  L`"$disp`""
+          Set-Content cerf/version.h -Value $vh -Encoding utf8 -NoNewline
+          Write-Host "Stamped: $disp (build $run)"
+
       - name: Build
         shell: pwsh
         run: ./build.ps1 -Config ${{matrix.configuration}} -Mode production

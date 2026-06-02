@@ -2,6 +2,9 @@
 
 #include "../../core/cerf_emulator.h"
 #include "../../core/log.h"
+#include "../../cpu/arm_processor_config.h"
+#include "../../jit/arm_jit.h"
+#include "../../jit/cpu_state.h"
 #include "../../peripherals/peripheral_dispatcher.h"
 #include "../irq_controller.h"
 #include "../../boards/board_detector.h"
@@ -18,7 +21,6 @@ namespace {
 constexpr uint32_t kGptimer1BasePa  = 0x48318000u;
 constexpr uint32_t kGptimer1Size    = 0x00001000u;  /* 4 KB */
 constexpr int      kIrqGptimer1     = 37;            /* INTC source */
-constexpr uint64_t kClockHz         = 32768ull;     /* 32 kHz reference */
 
 /* Register offsets within the 4 KB window. */
 constexpr uint32_t kOffTidr   = 0x00;
@@ -65,9 +67,12 @@ public:
     }
 
     bool ShouldRegister() override {
-        return emu_.Get<BoardDetector>().GetSoc() == SocFamily::OMAP3530;
+        auto* bd = emu_.TryGet<BoardDetector>();
+        return bd && bd->GetSoc() == SocFamily::OMAP3530;
     }
     void OnReady() override {
+        divider_ = emu_.Get<ArmProcessorConfig>().CpuToOscrDivider();
+        if (divider_ == 0) divider_ = 1;
         emu_.Get<PeripheralDispatcher>().Register(this);
         tick_thread_ = std::thread(&Omap3530Gptimer1::TickLoop, this);
     }
@@ -79,15 +84,16 @@ public:
     void     WriteWord(uint32_t addr, uint32_t value) override;
 
 private:
-    using Clock = std::chrono::steady_clock;
+    /* TCRR derived from guest_cycle_counter (NOT host wall-clock);
+       reverting this to Clock::now() makes two same-input CERF runs
+       observe different TCRR values, which cascades into different
+       guest scheduler decisions and flaky boot. */
+    uint32_t ComputeTcrrLocked(uint32_t cycles_now) const;
 
-    /* Caller holds state_mutex_. Computes the interpolated TCRR at
-       wall-clock time `now`, treating the counter as 32-bit
-       free-running at kClockHz when TCLR.ST is set. */
-    uint32_t ComputeTcrrLocked(Clock::time_point now) const;
-
-    /* Worker entry — wakes every 1 ms, advances TCRR, dispatches
-       MATCH / OVF events, edges the IRQ line. */
+    /* Match-loop worker — wakes every 100 us host time, advances
+       state, dispatches MATCH / OVF, edges the IRQ line. The host
+       sleep is for poll cadence only; the state advance reads
+       guest_cycle_counter so the answer is host-clock-independent. */
     void TickLoop();
 
     /* Caller holds state_mutex_. Recompute the IRQ line state and
@@ -98,16 +104,16 @@ private:
        last_processed_tcrr_ and (the freshly-computed) new_tcrr
        given the current TCLR / TIER state: detect MATCH crossing,
        detect overflow, apply auto-reload. */
-    void AdvanceStateLocked(Clock::time_point now);
+    void AdvanceStateLocked(uint32_t cycles_now);
 
     /* Caller holds state_mutex_. Reset every per-timer register
        to its post-reset default. Called on TIOCP.SOFTRESET. */
-    void ApplySoftResetLocked(Clock::time_point now);
+    void ApplySoftResetLocked(uint32_t cycles_now);
 
     /* Caller holds state_mutex_. Reset the TCRR sampling base to
-       (value, now). Called from TCRR writes and from TCLR.ST
-       transitions. */
-    void SampleTcrrBaseLocked(uint32_t value, Clock::time_point now);
+       (value, cycles_now). Called from TCRR writes and from
+       TCLR.ST transitions. */
+    void SampleTcrrBaseLocked(uint32_t value, uint32_t cycles_now);
 
     /* Caller holds state_mutex_. Match-distance check in 32-bit
        modular arithmetic: returns true iff TMAR sits in
@@ -115,6 +121,10 @@ private:
        advances through the comparator. */
     static bool MatchCrossed(uint32_t old_tcrr, uint32_t new_tcrr,
                              uint32_t tmar);
+
+    uint32_t GuestCycles() const {
+        return emu_.Get<ArmJit>().CpuState()->guest_cycle_counter;
+    }
 
     mutable std::mutex state_mutex_;
 
@@ -128,11 +138,14 @@ private:
     uint32_t tmar_    = 0xFFFFFFFFu;
     uint32_t tsicr_   = 0;
 
-    /* TCRR base-sample. ComputeTcrrLocked turns these into the
-       interpolated current value. */
-    uint32_t          tcrr_base_           = 0;
-    Clock::time_point tcrr_base_time_      = {};
-    uint32_t          last_processed_tcrr_ = 0;
+    /* TCRR base-sample expressed as (tcrr_value, guest_cycle_counter
+       snapshot). ComputeTcrrLocked turns these into the interpolated
+       current value via cycles_delta / divider_. */
+    uint32_t tcrr_base_           = 0;
+    uint32_t tcrr_base_cycles_    = 0;
+    uint32_t last_processed_tcrr_ = 0;
+    uint32_t divider_             = 1;
+    uint32_t fractional_cycles_   = 0;
 
     /* True iff the IRQ output line to INTC source 37 is currently
        driven high. Tracked so we issue AssertIrq / DeAssertIrq
@@ -154,28 +167,27 @@ bool Omap3530Gptimer1::MatchCrossed(uint32_t old_tcrr, uint32_t new_tcrr,
     return advanced >= to_match;
 }
 
-uint32_t Omap3530Gptimer1::ComputeTcrrLocked(Clock::time_point now) const {
+uint32_t Omap3530Gptimer1::ComputeTcrrLocked(uint32_t cycles_now) const {
     if ((tclr_ & kTclrSt) == 0) {
         return tcrr_base_;
     }
-    const auto elapsed_ns =
-        std::chrono::duration_cast<std::chrono::nanoseconds>(
-            now - tcrr_base_time_).count();
-    if (elapsed_ns <= 0) return tcrr_base_;
-    const uint64_t elapsed_ticks =
-        static_cast<uint64_t>(elapsed_ns) * kClockHz / 1'000'000'000ull;
-    return static_cast<uint32_t>(
-        (static_cast<uint64_t>(tcrr_base_) + elapsed_ticks) & 0xFFFFFFFFull);
+    const uint32_t elapsed_cycles = cycles_now - tcrr_base_cycles_;
+    const uint64_t total_cycles   = static_cast<uint64_t>(elapsed_cycles) +
+                                    fractional_cycles_;
+    const uint32_t elapsed_ticks  = static_cast<uint32_t>(total_cycles /
+                                                          divider_);
+    return tcrr_base_ + elapsed_ticks;
 }
 
 void Omap3530Gptimer1::SampleTcrrBaseLocked(uint32_t value,
-                                            Clock::time_point now) {
+                                            uint32_t cycles_now) {
     tcrr_base_           = value;
-    tcrr_base_time_      = now;
+    tcrr_base_cycles_    = cycles_now;
     last_processed_tcrr_ = value;
+    fractional_cycles_   = 0;
 }
 
-void Omap3530Gptimer1::ApplySoftResetLocked(Clock::time_point now) {
+void Omap3530Gptimer1::ApplySoftResetLocked(uint32_t cycles_now) {
     tiocp_  = 0;
     tisr_   = 0;
     tier_   = 0;
@@ -185,7 +197,7 @@ void Omap3530Gptimer1::ApplySoftResetLocked(Clock::time_point now) {
     ttgr_   = 0;
     tmar_   = 0xFFFFFFFFu;
     tsicr_  = 0;
-    SampleTcrrBaseLocked(0, now);
+    SampleTcrrBaseLocked(0, cycles_now);
     /* Don't clear irq_line_high_ — caller's RecomputeIrqLineLocked
        needs its pre-reset value to detect the high→low edge and
        issue DeAssertIrq(37); clearing it strands ITR[37] high. */
@@ -200,11 +212,21 @@ void Omap3530Gptimer1::RecomputeIrqLineLocked() {
     else           intc.DeAssertIrq(kIrqGptimer1);
 }
 
-void Omap3530Gptimer1::AdvanceStateLocked(Clock::time_point now) {
+void Omap3530Gptimer1::AdvanceStateLocked(uint32_t cycles_now) {
     if ((tclr_ & kTclrSt) == 0) return;
 
-    const uint32_t new_tcrr = ComputeTcrrLocked(now);
-    const uint32_t old_tcrr = last_processed_tcrr_;
+    const uint32_t elapsed_cycles = cycles_now - tcrr_base_cycles_;
+    const uint64_t total_cycles   = static_cast<uint64_t>(elapsed_cycles) +
+                                    fractional_cycles_;
+    const uint32_t elapsed_ticks  = static_cast<uint32_t>(total_cycles /
+                                                          divider_);
+    const uint32_t new_tcrr       = tcrr_base_ + elapsed_ticks;
+    const uint32_t old_tcrr       = last_processed_tcrr_;
+
+    fractional_cycles_   = static_cast<uint32_t>(total_cycles % divider_);
+    tcrr_base_           = new_tcrr;
+    tcrr_base_cycles_    = cycles_now;
+
     if (new_tcrr == old_tcrr) return;
 
     /* Match crossing — only if CE is set. */
@@ -212,21 +234,16 @@ void Omap3530Gptimer1::AdvanceStateLocked(Clock::time_point now) {
         tisr_ |= kIntMat;
     }
 
-    /* Overflow detection: in modular arithmetic, overflow occurred
-       iff new_tcrr < old_tcrr (the counter wrapped through 0). */
+    /* Real 32-bit TCRR overflow: new_tcrr < old_tcrr after a
+       monotonic advance. With frequent resampling this only fires
+       on a true 0xFFFFFFFF wrap (~36 h at 32 kHz), not on the
+       cycles_now-base wrap that occurred every few seconds before. */
     if (new_tcrr < old_tcrr) {
         tisr_ |= kIntOvf;
         if ((tclr_ & kTclrAr) != 0) {
-            /* Auto-reload: re-sample TCRR base at TLDR. We re-anchor
-               the base time at `now` and let the next wake
-               interpolate from there. */
-            SampleTcrrBaseLocked(tldr_, now);
+            SampleTcrrBaseLocked(tldr_, cycles_now);
             return;
         }
-        /* If AR is 0, real silicon keeps counting from 0 after
-           overflow. Our model already reflects that — new_tcrr
-           wrapped and ComputeTcrrLocked will continue from
-           there. Just record the wake. */
     }
 
     last_processed_tcrr_ = new_tcrr;
@@ -234,10 +251,13 @@ void Omap3530Gptimer1::AdvanceStateLocked(Clock::time_point now) {
 
 void Omap3530Gptimer1::TickLoop() {
     while (!stop_thread_.load(std::memory_order_acquire)) {
-        std::this_thread::sleep_for(std::chrono::milliseconds(1));
+        /* 100 µs host poll cadence — matches Sa1110OsTimer. State
+           advance uses guest_cycle_counter, so the answer is
+           deterministic per-run despite the host sleep's jitter. */
+        std::this_thread::sleep_for(std::chrono::microseconds(100));
 
         std::lock_guard<std::mutex> lk(state_mutex_);
-        AdvanceStateLocked(Clock::now());
+        AdvanceStateLocked(GuestCycles());
         RecomputeIrqLineLocked();
     }
 }
@@ -245,12 +265,12 @@ void Omap3530Gptimer1::TickLoop() {
 uint32_t Omap3530Gptimer1::ReadWord(uint32_t addr) {
     const uint32_t off = addr - MmioBase();
     std::lock_guard<std::mutex> lk(state_mutex_);
-    const auto now = Clock::now();
-    AdvanceStateLocked(now);
+    const uint32_t cycles_now = GuestCycles();
+    AdvanceStateLocked(cycles_now);
     /* Log only TCRR reads with their values — that's what matters. */
     if (off == kOffTcrr) {
         static uint32_t last_tcrr = 0;
-        const uint32_t v = ComputeTcrrLocked(now);
+        const uint32_t v = ComputeTcrrLocked(cycles_now);
         if (v != last_tcrr) {
             LOG(Periph, "[GPTIMER1] TCRR=0x%08X (delta=%d) tclr=0x%02X\n",
                 v, (int32_t)(v - last_tcrr), tclr_);
@@ -266,7 +286,7 @@ uint32_t Omap3530Gptimer1::ReadWord(uint32_t addr) {
     case kOffTier:    return tier_ & kIntMask;
     case kOffTwer:    return twer_ & kIntMask;
     case kOffTclr:    return tclr_;
-    case kOffTcrr:    return ComputeTcrrLocked(now);
+    case kOffTcrr:    return ComputeTcrrLocked(cycles_now);
     case kOffTldr:    return tldr_;
     case kOffTtgr:    return ttgr_;
     case kOffTwps:    return 0u;                                  /* never busy */
@@ -288,8 +308,8 @@ uint32_t Omap3530Gptimer1::ReadWord(uint32_t addr) {
 void Omap3530Gptimer1::WriteWord(uint32_t addr, uint32_t value) {
     const uint32_t off = addr - MmioBase();
     std::lock_guard<std::mutex> lk(state_mutex_);
-    const auto now = Clock::now();
-    AdvanceStateLocked(now);
+    const uint32_t cycles_now = GuestCycles();
+    AdvanceStateLocked(cycles_now);
     LOG(Periph, "[GPTIMER1] W off=0x%02X <- 0x%08X\n", off, value);
 
     switch (off) {
@@ -298,7 +318,7 @@ void Omap3530Gptimer1::WriteWord(uint32_t addr, uint32_t value) {
         return;
     case kOffTiocp:
         if (value & kTiocpSoftReset) {
-            ApplySoftResetLocked(now);
+            ApplySoftResetLocked(cycles_now);
             RecomputeIrqLineLocked();
             return;
         }
@@ -326,14 +346,14 @@ void Omap3530Gptimer1::WriteWord(uint32_t addr, uint32_t value) {
         const bool new_st = (value & kTclrSt) != 0;
         if (!old_st && new_st) {
             /* 0->1 ST: start counting from the current tcrr_base_
-               value at the current wall-clock time. */
-            SampleTcrrBaseLocked(tcrr_base_, now);
+               value, anchored at the current guest cycle count. */
+            SampleTcrrBaseLocked(tcrr_base_, cycles_now);
         } else if (old_st && !new_st) {
             /* 1->0 ST: freeze the counter at its current
                interpolated value. */
-            const uint32_t frozen = ComputeTcrrLocked(now);
+            const uint32_t frozen = ComputeTcrrLocked(cycles_now);
             tcrr_base_           = frozen;
-            tcrr_base_time_      = now;
+            tcrr_base_cycles_    = cycles_now;
             last_processed_tcrr_ = frozen;
         }
         tclr_ = value;
@@ -342,7 +362,7 @@ void Omap3530Gptimer1::WriteWord(uint32_t addr, uint32_t value) {
         return;
     }
     case kOffTcrr:
-        SampleTcrrBaseLocked(value, now);
+        SampleTcrrBaseLocked(value, cycles_now);
         return;
     case kOffTldr:
         tldr_ = value;
@@ -350,7 +370,7 @@ void Omap3530Gptimer1::WriteWord(uint32_t addr, uint32_t value) {
     case kOffTtgr:
         /* Writing TTGR triggers a reload from TLDR. */
         ttgr_ = value;
-        SampleTcrrBaseLocked(tldr_, now);
+        SampleTcrrBaseLocked(tldr_, cycles_now);
         return;
     case kOffTwps:
         /* Posted-write status — read-only. */

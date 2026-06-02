@@ -19,15 +19,62 @@ which fire, narrow. Repeat until the dead branch is named in the log.
 No step is skippable. "I already know what it is" is never permitted
 to replace a hook — write the hook anyway.
 
-### Required: a ground-truth reference
+### New session? Compaction? Lost context?
 
-Without a reference, you're guessing about what "correct" means. The
-canonical WM5 reference is `tmp/wm5_dev_emu_full_boot_tx.txt` — the
-kernel UART output from real `dev_emu_src` booting the same ROM.
-Other valid references: a known-good build's `cerf.log`, an IDA
-decompile of the expected codepath, a captured trace from a
-different device. The reference is what CE is *supposed* to do;
-CERF's `cerf.log` is what it *actually* does.
+Then see what trace hooks you created in previous session(s). See all pre-existing hooks.
+If you are working on a problem accross multiple session (basically on any problem)
+then most likely you already hooked the entire path. 
+
+If it's at least the second session you are continuing working on a problem,
+propose (strongly recommended) user to create a tracking document, otherwise
+in 3rd session you will drift and do literally everything you did in 1st session.
+
+This entire section exists to prevent you from drifting into rediscovery/destruction path.
+If you are working for more than 1 session on the problem, it most likely already has 
+tons of debugging details stored. Never rediscover. Never destroy wallet to repeat entire
+debuggin setup session. Ask user if he has a tracking document for current bug. Always
+check pre-existing tracing setup so you don't accidentally spend huge money
+to setup tracing hooks which already exist.
+
+### The reference is the guest binary — you ALWAYS have one
+
+The ground truth for "what is correct" is the guest binary itself. Every
+ROM module — kernel, drivers, the app — ran on real hardware, so its code
+IS the spec: at each function the decompiled guest states exactly what
+value it expects CERF's virtual hardware to return, and every binary is
+open in IDA. There is no captured hardware trace and none is needed — so
+**"I have no reference" / "I'd need a real-hardware trace or a TX log" is
+never true and never a stop condition; it is a bailout.** Diff CERF's
+behavior against the guest code, not against any external capture.
+
+The method is always nuclear bisection: drill into the last function,
+deeper through each layer / binary / library, hooking each candidate,
+until the single dead branch is named. The divergence is the first hop
+where CERF returns a value the guest code does not expect — a wrong
+register read, MMU/translate result, API return, or memory value — found
+by comparing CERF's actual value to what the decompiled guest at that hop
+expects.
+
+**The dead branch is always a CERF defect** — a JIT, MMU, or peripheral
+bug, or (rarely) a ROM-placement bug. It is never "the real device would
+fail here too" / "the app is buggy"; the ROM shipped and worked on
+hardware (`agent_docs/rules.md` § "Bug reports describe verified
+real-device behavior").
+
+The layer is almost never simple and almost always far deeper than it
+looks. A symptom like "the app asked to render and nothing painted" rarely
+bottoms out in the top-level library it entered — it bottoms out many
+layers down in a DRIVER reached through complex PSL traps and indirection.
+For example, a blank UI can trace down to an on-screen-keyboard driver
+whose parse hits a JIT defect — nowhere near where the draw call started,
+and not in any imported library directly. Reaching that depth is
+mechanical and strict: drill the LAST function deeper, one layer at a
+time — resolve each PSL trap the ROM uses, identify each wait object and
+what signals it, hook to learn where a stall/WSO actually originates,
+follow the call into the next function and the next binary. Never jump
+sideways to a different surface and never theorize a cause. Each new layer
+is progress, never a stop — drill the last functions until the one dead
+branch is named.
 
 ### Steps
 
@@ -104,7 +151,7 @@ CERF's `cerf.log` is what it *actually* does.
   could loop. The one that floods the log is your loop.
 - **Wrong value?** Hook `OnPc` at the writer instruction (find it
   in IDA via a memory-write xref to the field), read the value via
-  `Mmu::PeekTranslate(va)` inside the handler. The PC at which the
+  `c.ReadVa8/16/32(va)` inside the handler. The PC at which the
   value changes from correct to wrong is your bug. There is no
   `OnRead` / `OnWrite` primitive — see `subsystems.md` § TraceManager
   for why.
@@ -131,16 +178,105 @@ narrow output during a long boot, but `--log=ALL` (default) is what
 you want when a crash already happened — read the tail and grep
 upward.
 
-## Crash shape #1 — JIT halt: unrecognised ARM instruction
+## Timeout selection for cerf runs
 
-```
-[FATAL] ArmInterpreter halt: unrecognized ARM insn pc=0xNNNNNNNN insn=0xNNNNNNNN
-```
+CERF runs MUST use GNU `timeout` in the command itself
+(`timeout 15s ./cerf.exe ...`). Picking the right number is part of
+the diagnostic, not an afterthought — too short and you miss the
+target; too long and every iteration wastes user budget on idle
+guest-time after the target already fired.
 
-Means: the JIT tried to translate / interpret an instruction that
-isn't valid ARM. The instruction bytes at `pc` are not what the kernel
-or driver expects to be there. **Almost always not a JIT bug** — the
-bytes at that PA in DRAM are wrong because something corrupted them.
+### Choosing the initial number
+
+Base the timeout on **when the target data is expected to appear**,
+not on a generic round number. The rule:
+
+- If the latest observed target timestamp is `t+12s`, use **15-20s**,
+  not 60s.
+- If the target hasn't been observed yet, pick the smallest
+  reasonable upper bound from a sibling milestone — a related log
+  line that appeared at `t+8s` in a prior run → use ~15s.
+- A timeout that worked for one investigation is **a target-specific
+  baseline**, not a default. The number for "boot far enough to see
+  X" is generally not the number for "boot far enough to see Y".
+
+A run that ends at 60s when the target fired at t+12 wasted 48s of
+guest time × N runs × however many sessions. Pick small numbers.
+
+### Single failure = re-run, not bump
+
+A run missing its target at the chosen timeout is data, but data of
+two possible shapes:
+
+- **Variance** — boot timing varies run-to-run (scheduler decisions,
+  libslirp, peripheral cadence, host-clock jitter). A single missed
+  target on a previously-working timeout is most likely variance.
+- **Regression** — recent code or diagnostic changes added overhead
+  so each host second produces fewer guest seconds.
+
+You cannot distinguish these from one run. **Re-run with the same
+timeout.** If 2-3 re-runs in a row miss the target, it's a
+regression, not variance.
+
+### Bumping the timeout
+
+A bump must satisfy ALL of:
+
+- **Evidence of forward progress at the cutoff** — the log's last
+  entries show the guest still executing (peripheral writes, JIT
+  compile lines, new progress markers), not parked (idle loops,
+  the same peripheral register being polled with no other activity,
+  no new milestones for several seconds). If the guest went idle
+  before the cutoff, more time gives it more time to stay idle;
+  find the idle cause first.
+- **Tiny increment: +5s.** Not +10, not +30, not +60, not "let's
+  just try 120". The increment is small enough that the next run's
+  log immediately tells you whether it was enough.
+- **The bump is a hypothesis to verify.** After the bumped run, read
+  the log and confirm the new cutoff actually fell past where the
+  target should have fired. If it didn't, the bump was wrong AND
+  there's a slowdown to investigate separately.
+
+### Forbidden values and patterns
+
+- Any **single bump ≥1.5× the working baseline** (65→90, 60→120, 30→60).
+- Any **round abnormal value picked without log evidence** (90s,
+  120s, 180s, 300s, 600s, 1h, "let's try a minute", "ten minutes").
+- Repeatedly bumping by +5 until the run succeeds — that's laziness
+  in slow motion. After 2-3 +5 increments without reaching the
+  target, stop bumping and investigate the slowdown.
+
+### Diagnosing slowdown instead of bumping
+
+If repeated runs at the working baseline consistently miss the
+target, the response is **find what slowed down**, not extend the
+window. Read the log's last few seconds and ask: is the guest
+making forward progress, or is it idle / spinning / waiting?
+
+- **Idle / waiting** — find what it's waiting for. An interrupt
+  that didn't fire, a peripheral that didn't respond, a kernel
+  primitive blocking on an event that never gets signalled.
+- **Forward progress but slower than before** — the recent change
+  added per-instruction or per-iteration overhead. Bisect the
+  change, profile, or remove the heaviest contributor.
+
+Once the slowdown is fixed, re-run at the original timeout. The
+target should now fire within it.
+
+## Crash shape #1 — guest hits an undecodable ARM instruction
+
+The JIT decoder couldn't translate an instruction at some guest PC.
+v2 doesn't halt CERF in this case; `ArmCpu::RaiseUndefinedException`
+vectors the guest into its own Undefined-mode handler at vector 0x4
+and the guest decides what to do (most CE kernels fault the
+offending thread). The symptom on the CERF side is therefore a
+guest-side fault / hang / wrong behavior, not a `[FATAL]` line. To
+catch it early, hook the Undefined-exception path in the JIT (set
+`OnPc` at `ArmCpu::RaiseUndefinedExceptionHelper`'s entry) and log
+the offending PC + insn bytes. The instruction bytes at `pc` are
+not what the kernel or driver expects to be there. **Almost always
+not a JIT bug** — the bytes at that PA in DRAM are wrong because
+something corrupted them.
 
 Investigation:
 
@@ -277,12 +413,68 @@ bisections — belong in **device-specific trace files** under
 `cerf/tracing/<bundle>/`, not in permanent code.
 
 See `agent_docs/subsystems.md` § TraceManager for the framework's
-hook surfaces (`OnPc`, `OnRunLoopIter`) and how device-specific files
-key off the bundle CRC32. **There is no `OnRead` / `OnWrite` memory-
-watch primitive** — see subsystems.md for the full reason; the short
-version is that page-level slow-path exclusion altered guest IRQ
-delivery alignment enough to manufacture Heisenbugs that did not
-exist in production CERF.
+hook surfaces (`OnPc`, `OnPcFiltered`, `OnRunLoopIter`) and how
+device-specific files key off the bundle CRC32. **There is no
+`OnRead` / `OnWrite` memory-watch primitive** — see subsystems.md for
+the full reason; the short version is that page-level slow-path
+exclusion altered guest IRQ delivery alignment enough to manufacture
+Heisenbugs that did not exist in production CERF.
+
+### `OnPc` / `OnPcFiltered` — picking a hook VA
+
+`OnPc(va, handler)` triggers on every guest execution of `va`. The VA
+is matched as-is — the JIT does the lookup, the handler fires.
+
+**Kernel-VA hooks** (PC ≥ `0x80000000`) — kernel image, the `k.*`
+kernel-mode twins, filesys/gwes/devmgr internals — are constant
+across all guest processes. A hook here fires exactly when that
+specific code runs. Pick this whenever you can.
+
+**User-VA hooks** (low addresses, e.g. `0x11B68` for an EXE entry,
+`0x40035C1C` for a coredll PSL stub) are not unambiguous: CE switches
+the currently-running process's address space into the low VAs of
+the active slot, so the SAME user-VA can resolve to DIFFERENT
+physical pages depending on which process is on-CPU. Two EXEs whose
+code happens to land at the same offset within their slot will both
+fire your hook. The `LR` captured in the handler is also a user-VA
+and has the same property — it doesn't identify the caller's process.
+
+To filter a user-VA hook to a specific process, use
+`OnPcFiltered(va, predicate, handler)`. The predicate runs at fire
+time and returns `true` to admit the call. Typical predicate body:
+read `emu.Get<ArmMmu>().State()->process_id & 0x7Fu` and compare
+against the target process's slot. Acquiring the target's slot
+number is CE-version-specific — observe it via a kernel-VA hook on
+process creation in your trace file and store name → slot.
+
+If a user-VA hook isn't strictly required, prefer a kernel-VA
+chokepoint that uniquely identifies the caller. Examples that come
+up often:
+
+- `xxx_*` PSL trap landings in `k.coredll` (every user-mode call from
+  any process funnels through here)
+- `filesys.dll!FS_SignalStarted(dw)` — `dw` is the RunApps
+  `Launch%NN` index, which uniquely names the launched EXE
+- Per-subsystem kernel routines that take a `pProc` argument
+
+These produce identifying data inline, without needing a per-process
+filter.
+
+**Duplicate-registration guard.** Two unfiltered `OnPc` at the same
+VA halts CERF — registration is exclusive and surfaced at startup,
+never silently stomped. `OnPcFiltered` instances at the same VA
+coexist with each other and with one unfiltered handler; each
+filtered handler is responsible for its own predicate-distinct
+admission.
+
+**Attribute a user-VA fire by instruction-byte signature when a
+name/slot resolver can't be trusted.** A per-process (low) VA hook can
+fire under any process whose code aliases that VA. When the resolver
+that maps a fire to a process is unreliable, identify the firing
+process by reading the runtime bytes at the hook PC (`c.ReadVa32`) and
+matching them against each candidate module's extracted `.text` — each
+module is byte-unique at a given VA, so the match is unambiguous where
+a name lookup is not.
 
 ### When to use TraceManager vs. a permanent LOG
 
@@ -290,8 +482,8 @@ exist in production CERF.
 | --- | --- |
 | Log every call to a host C++ function with its args / state at the call site | Permanent `LOG(<chan>, ...)` at that call site |
 | Log a host-side state transition that happens on a slow cadence (boot milestone, IRQ, mode switch) | Permanent `LOG(<chan>, ...)` at the transition |
-| Watch a specific guest VA for write — to see when it changes | Trace file `tm.OnPc(writer_pc, ...)` at every writer instruction PC + `Mmu::PeekTranslate(va)` inside the handler |
-| Watch a specific guest VA for value-change with unknown writers | Trace file `tm.OnRunLoopIter(...)` polling the value via `Mmu::PeekTranslate(va)` |
+| Watch a specific guest VA for write — to see when it changes | Trace file `tm.OnPc(writer_pc, ...)` at every writer instruction PC + `c.ReadVa8/16/32(va)` inside the handler |
+| Watch a specific guest VA for value-change with unknown writers | Trace file `tm.OnRunLoopIter(...)` polling the value via `c.ReadVa8/16/32(va)` |
 | Dump full register state every time a specific guest PC is reached | Trace file calling `tm.OnPc` |
 | Poll a guest-memory value and log every change | Trace file calling `tm.OnRunLoopIter` |
 | Dump a region of guest memory once at startup | Trace file calling `tm.OnRunLoopIter` with a one-shot flag |
@@ -312,7 +504,7 @@ exist in production CERF.
    whose `OnReady` calls `emu_.Get<TraceManager>().RegisterForBundle(
    kBundleCrc32, [&]{ ... });`. Inside the lambda, call `OnPc` and
    `OnRunLoopIter` as needed. Read memory inside handlers via
-   `Mmu::PeekTranslate(va)` — there is no `OnRead`/`OnWrite`
+   `c.ReadVa8/16/32(va)` — there is no `OnRead`/`OnWrite`
    primitive.
 4. `REGISTER_SERVICE(YourTraceClass);` at the bottom.
 5. Build with `build.ps1` (default `-Mode dev`). The trace file is
@@ -371,6 +563,16 @@ python tools/open_ida.py --wait references/extracted-roms/<device>/<rom>/fs/Wind
 
 The `--wait` flag blocks until IDA finishes analysis and the MCP
 server is registered.
+
+**The extracted PEs are reconstructions, not runtime captures.**
+`extract-wince-rom` rebuilds each module by placing its bytes at
+link-time RVAs and appending a `.cerom` section; the result is faithful
+for disassembly / decompilation but is NOT ground truth for PE
+structure or for how the module looks in live guest memory after the
+kernel loader maps it. Trust it for reading code, never for runtime
+layout questions — to learn how it diverges from live memory, read the
+extractor source rather than assuming the file mirrors the loader's
+output.
 
 Never run IDA from `build/` or `bundled/`. `build/` is wiped on
 rebuild and IDA holds locks; `bundled/` is CERF's runtime input — an

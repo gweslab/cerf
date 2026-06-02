@@ -2,6 +2,7 @@
 
 #include "rom_parser_service.h"
 
+#include "ce_imgfs_walker.h"
 #include "rom_image_parse.h"
 
 #include "../core/cerf_emulator.h"
@@ -24,6 +25,7 @@ using cerf::rom_image_parse::FindAllEcec;
 using cerf::rom_image_parse::FindImgfsBase;
 using cerf::rom_image_parse::ParseModulesAndFiles;
 using cerf::rom_image_parse::ResolveRomhdrAtEcec;
+using cerf::rom_image_parse::ResolveRomhdrStructural;
 using cerf::rom_image_parse::U32;
 using cerf::rom_image_parse::kB000FFSignature;
 
@@ -105,40 +107,54 @@ bool RomParserService::ParseOne(ParsedRom& rom) {
 
     const auto ececs = FindAllEcec(rom.flat);
     if (ececs.empty()) {
-        LOG(Caution, "RomParser %s: no ECEC marker in first 8 MB\n",
-            rom.filename.c_str());
-        return false;
-    }
-    LOG(Boot, "RomParser %s: %zu ECEC marker(s) in flat\n",
-        rom.filename.c_str(), ececs.size());
-
-    for (size_t e : ececs) {
         ParsedXipRegion xip;
         size_t          romhdr_off = 0;
-        if (!ResolveRomhdrAtEcec(rom.flat, e, rom.flat_base_va,
-                                 xip, romhdr_off)) {
-            LOG(Boot, "RomParser %s: ECEC @ 0x%zX did not resolve to a "
-                      "valid ROMHDR; skipping this XIP region\n",
-                rom.filename.c_str(), e);
-            continue;
+        if (!ResolveRomhdrStructural(rom.flat, xip, romhdr_off)) {
+            LOG(Caution, "RomParser %s: no ECEC marker and no structural "
+                         "ROMHDR found\n", rom.filename.c_str());
+            return false;
         }
         ParseModulesAndFiles(rom.flat, romhdr_off, xip.load_offset,
                              xip.toc.romhdr, xip.toc);
         const auto& h = xip.toc.romhdr;
-        LOG(Boot, "RomParser %s: XIP[%zu] ECEC @ 0x%zX  load_offset=0x%08X  "
-                  "romhdr_va=0x%08X  physfirst=0x%08X..physlast=0x%08X  "
-                  "nummods=%u  numfiles=%u\n",
-            rom.filename.c_str(), rom.xips.size(), e, xip.load_offset,
-            xip.toc.romhdr_va, h.physfirst, h.physlast,
-            h.nummods, h.numfiles);
+        LOG(Boot, "RomParser %s: no ECEC marker — structural ROMHDR @ file "
+                  "off 0x%zX  load_offset=0x%08X  romhdr_va=0x%08X  "
+                  "physfirst=0x%08X..physlast=0x%08X  nummods=%u  numfiles=%u\n",
+            rom.filename.c_str(), romhdr_off, xip.load_offset,
+            xip.toc.romhdr_va, h.physfirst, h.physlast, h.nummods, h.numfiles);
         rom.xips.push_back(std::move(xip));
-    }
-
-    if (rom.xips.empty()) {
-        LOG(Caution, "RomParser %s: no candidate ROMHDR validated "
-                     "across %zu ECEC marker(s)\n",
+    } else {
+        LOG(Boot, "RomParser %s: %zu ECEC marker(s) in flat\n",
             rom.filename.c_str(), ececs.size());
-        return false;
+
+        for (size_t e : ececs) {
+            ParsedXipRegion xip;
+            size_t          romhdr_off = 0;
+            if (!ResolveRomhdrAtEcec(rom.flat, e, rom.flat_base_va,
+                                     xip, romhdr_off)) {
+                LOG(Boot, "RomParser %s: ECEC @ 0x%zX did not resolve to a "
+                          "valid ROMHDR; skipping this XIP region\n",
+                    rom.filename.c_str(), e);
+                continue;
+            }
+            ParseModulesAndFiles(rom.flat, romhdr_off, xip.load_offset,
+                                 xip.toc.romhdr, xip.toc);
+            const auto& h = xip.toc.romhdr;
+            LOG(Boot, "RomParser %s: XIP[%zu] ECEC @ 0x%zX  load_offset=0x%08X  "
+                      "romhdr_va=0x%08X  physfirst=0x%08X..physlast=0x%08X  "
+                      "nummods=%u  numfiles=%u\n",
+                rom.filename.c_str(), rom.xips.size(), e, xip.load_offset,
+                xip.toc.romhdr_va, h.physfirst, h.physlast,
+                h.nummods, h.numfiles);
+            rom.xips.push_back(std::move(xip));
+        }
+
+        if (rom.xips.empty()) {
+            LOG(Caution, "RomParser %s: no candidate ROMHDR validated "
+                         "across %zu ECEC marker(s)\n",
+                rom.filename.c_str(), ececs.size());
+            return false;
+        }
     }
 
     const auto& primary = rom.xips[0];
@@ -155,17 +171,68 @@ bool RomParserService::ParseOne(ParsedRom& rom) {
         rom.entry_va     = primary.toc.romhdr.physfirst;
     }
 
-    /* IMGFS detection — NB0 flash-image only. B000FF kernel-image
-       bundles never carry IMGFS (they're just the kernel section
-       container; the surrounding flash content isn't included). */
     if (!rom.is_b000ff) {
         const size_t off = FindImgfsBase(rom.raw);
         if (off != SIZE_MAX) {
             rom.has_imgfs        = true;
             rom.imgfs_file_off   = uint32_t(off);
+            const uint32_t bpb = U32(rom.raw.data(), off + 0x24);
+            rom.imgfs_bytes_per_block = bpb;
             LOG(Boot, "RomParser %s: IMGFS superblock @ file offset 0x%zX "
-                      "(%.1f MB into image)\n",
-                rom.filename.c_str(), off, double(off) / 1024.0 / 1024.0);
+                      "(%.1f MB into image), bytes_per_block=0x%X\n",
+                rom.filename.c_str(), off,
+                double(off) / 1024.0 / 1024.0, bpb);
+
+            auto tr = cerf::ce_imgfs_walker::Translator::Detect(rom.raw, off);
+            rom.imgfs_is_ftl = tr.IsFtl();
+            auto mods = cerf::ce_imgfs_walker::CollectModules(
+                rom.raw, tr, bpb);
+            rom.imgfs_modules.reserve(mods.size());
+            for (auto& m : mods) {
+                ParsedImgfsModule out;
+                out.lpszFileName    = std::move(m.name);
+                out.dirent_file_off = m.dirent_off;
+                out.file_size       = m.file_size;
+                out.mod_indexptr    = m.mod_indexptr;
+                out.mod_indexsize   = m.mod_indexsize;
+                out.sections.reserve(m.sections.size());
+                for (auto& s : m.sections) {
+                    ParsedImgfsModule::Section ps;
+                    ps.name            = std::move(s.name);
+                    ps.dirent_file_off = s.dirent_off;
+                    ps.file_size       = s.file_size;
+                    ps.sec_indexptr    = s.sec_indexptr;
+                    ps.sec_indexsize   = s.sec_indexsize;
+                    out.sections.push_back(std::move(ps));
+                }
+                rom.imgfs_modules.push_back(std::move(out));
+            }
+            LOG(Boot, "RomParser %s: IMGFS %s, %zu module(s)\n",
+                rom.filename.c_str(),
+                rom.imgfs_is_ftl ? "FTL-mapped" : "direct-addressed",
+                rom.imgfs_modules.size());
+            /* Diagnostic: log section index pointers for victim + gwes —
+               lets the injector cross-compare which IMGFS pages it's
+               writing to and whether they overlap any other module's
+               storage (the WM6.5 gwes UND crash signature). */
+            for (const auto& m : rom.imgfs_modules) {
+                const bool relevant =
+                    _stricmp(m.lpszFileName.c_str(), "gwes.exe") == 0
+                 || _stricmp(m.lpszFileName.c_str(), "DeviceEmulator_lcd.dll") == 0
+                 || _stricmp(m.lpszFileName.c_str(), "ddi.dll") == 0;
+                if (!relevant) continue;
+                LOG(Boot, "RomParser %s: IMGFS module %s dirent=0x%zX "
+                          "mod_idx=0x%X(size=%u)\n",
+                    rom.filename.c_str(), m.lpszFileName.c_str(),
+                    m.dirent_file_off, m.mod_indexptr, m.mod_indexsize);
+                for (size_t si = 0; si < m.sections.size(); ++si) {
+                    const auto& s = m.sections[si];
+                    LOG(Boot, "RomParser %s:   %s sec[%zu] dirent=0x%zX "
+                              "sec_idx=0x%X(size=%u)\n",
+                        rom.filename.c_str(), m.lpszFileName.c_str(), si,
+                        s.dirent_file_off, s.sec_indexptr, s.sec_indexsize);
+                }
+            }
         }
     }
 
@@ -200,12 +267,23 @@ void RomParserService::OnReady() {
                                   + cfg.device_name + "/";
 
     std::vector<std::string> filenames;
-    if (!cfg.rom_primary.empty()) {
+    if (cfg.boot_in_recovery) {
+        /* --recovery: boot the standalone recovery ROM instead of the
+           primary (+extensions). Recovery is self-contained. */
+        if (cfg.rom_recovery.empty()) {
+            LOG(Caution, "RomParser: --recovery requested but device '%s' "
+                         "declares no rom.recovery\n", cfg.device_name.c_str());
+            return;
+        }
+        LOG(Boot, "RomParser: RECOVERY MODE — booting %s\n",
+            cfg.rom_recovery.c_str());
+        filenames.push_back(cfg.rom_recovery);
+    } else if (!cfg.rom_primary.empty()) {
         filenames.push_back(cfg.rom_primary);
         for (const auto& ext : cfg.rom_extensions) filenames.push_back(ext);
         if (!cfg.rom_recovery.empty()) {
             LOG(Boot, "RomParser: rom_recovery=%s declared, not loaded "
-                      "(recovery mode unsupported)\n",
+                      "(pass --recovery to boot it)\n",
                 cfg.rom_recovery.c_str());
         }
     } else {

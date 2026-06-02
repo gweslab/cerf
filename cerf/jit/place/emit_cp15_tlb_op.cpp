@@ -1,6 +1,7 @@
 #include <cstddef>
 #include <cstdint>
 
+#include "../../core/log.h"
 #include "../arm_mmu_state.h"
 #include "../arm_tlb_ops.h"
 #include "../cpu_state.h"
@@ -51,7 +52,13 @@ uint8_t* EmitCp15TlbOp(uint8_t*      cursor,
             EmitAddRegImm32(cursor, kEsp, 4);
             break;
         default:
-            cursor = EmitRaiseUndAndReturn(cursor, d, ctx);
+            LOG(Caution,
+                "EmitCp15TlbOp: unimplemented c8 maintenance op "
+                "(opc1=%u CRm=%u opc2=%u) at pc=0x%08X\n",
+                static_cast<unsigned>(d->cp_opc),
+                static_cast<unsigned>(d->crm),
+                static_cast<unsigned>(d->cp), d->guest_address);
+            CerfFatalExit(CERF_FATAL_RUNTIME_ERROR);
             break;
         }
         break;
@@ -71,12 +78,24 @@ uint8_t* EmitCp15TlbOp(uint8_t*      cursor,
             EmitCall(cursor, reinterpret_cast<void*>(&ArmTlbInvalidateByVa));
             EmitAddRegImm32(cursor, kEsp, 12);
         } else {
-            cursor = EmitRaiseUndAndReturn(cursor, d, ctx);
+            LOG(Caution,
+                "EmitCp15TlbOp: unimplemented c8 maintenance op "
+                "(opc1=%u CRm=%u opc2=%u) at pc=0x%08X\n",
+                static_cast<unsigned>(d->cp_opc),
+                static_cast<unsigned>(d->crm),
+                static_cast<unsigned>(d->cp), d->guest_address);
+            CerfFatalExit(CERF_FATAL_RUNTIME_ERROR);
         }
         break;
 
     default:
-        cursor = EmitRaiseUndAndReturn(cursor, d, ctx);
+        LOG(Caution,
+            "EmitCp15TlbOp: unimplemented c8 maintenance op "
+            "(opc1=%u CRm=%u opc2=%u) at pc=0x%08X\n",
+            static_cast<unsigned>(d->cp_opc),
+            static_cast<unsigned>(d->crm),
+            static_cast<unsigned>(d->cp), d->guest_address);
+        CerfFatalExit(CERF_FATAL_RUNTIME_ERROR);
         break;
     }
 

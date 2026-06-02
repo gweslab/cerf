@@ -1,6 +1,5 @@
 #include <cstddef>
 
-#include "../../core/log.h"
 #include "../../cpu/arm_processor_config.h"
 #include "../../peripherals/peripheral_dispatcher.h"
 #include "../arm_jit.h"
@@ -26,12 +25,9 @@ uint8_t* PlaceSingleDataTransfer(uint8_t*      cursor,
     const bool mmu_on                        = mmu->State()->control_register.bits.m;
     const bool alignment_check_on            = mmu->State()->control_register.bits.a;
 
-    /* Per-emit-site cache-slot back-patch pointers. The MMU helper
-       and IO helper each emit "MOV reg, <imm32>" inline at call
-       time; the imm32 is later back-patched to point at the 1-byte
-       cache slot stored at the end of the emitted block. */
-    uint8_t* tlb_hint_imm_location = nullptr;
-    uint8_t* io_hint_imm_location  = nullptr;
+    /* The IO helper emits "MOV ECX, <imm32>" inline; the imm32 is back-patched
+       to point at the 1-byte IO-hint cache slot at the end of the block. */
+    uint8_t* io_hint_imm_location = nullptr;
 
     uint8_t* abort_exception_or_io      = nullptr;
     uint8_t* abort_exception            = nullptr;
@@ -80,20 +76,8 @@ uint8_t* PlaceSingleDataTransfer(uint8_t*      cursor,
         }
 
         if (mmu_on) {
-            /* MOV EDX, <back-patch slot> — 0xBA + imm32 zero
-               initially; the imm32 is back-patched once the inline
-               TLB-hint byte's address is known. */
-            Emit8(cursor, static_cast<uint8_t>(0xB8 + kEdx));
-            tlb_hint_imm_location = cursor;
-            Emit32(cursor, 0);
-
-            EmitPush32(cursor,
-                static_cast<uint32_t>(reinterpret_cast<uintptr_t>(jit)));
-            if (d->l) {
-                EmitCall(cursor, reinterpret_cast<void*>(&ArmJit::TranslateReadHelper));
-            } else {
-                EmitCall(cursor, reinterpret_cast<void*>(&ArmJit::TranslateWriteHelper));
-            }
+            cursor = EmitTlbFastPath(cursor, ctx,
+                                     d->l ? TlbAccess::kRead : TlbAccess::kWrite);
         } else {
             /* MMU off — direct PA→host. ECX already holds the PA
                (no virtual-to-physical translation needed); EDX
@@ -213,15 +197,6 @@ uint8_t* PlaceSingleDataTransfer(uint8_t*      cursor,
             EmitMovRegImm32(cursor, kEcx, d->guest_address);
             EmitJmp32(cursor, ctx->raise_abort_data_helper_target);
 
-            /* Store TLB hint cache slot inline (only if MMU on,
-               since the slot wouldn't have been emitted otherwise). */
-            if (mmu_on) {
-                const uint32_t slot_addr =
-                    static_cast<uint32_t>(reinterpret_cast<uintptr_t>(cursor));
-                std::memcpy(tlb_hint_imm_location, &slot_addr, 4);
-                Emit8(cursor, 0);
-            }
-
             FixupLabel(load_byte_done1, cursor);
             FixupLabel(load_byte_done2, cursor);
             /* MOV [ESI + offsetof(gprs[Rd])], EAX — store loaded
@@ -231,7 +206,6 @@ uint8_t* PlaceSingleDataTransfer(uint8_t*      cursor,
                 kEax);
         } else {
             SdtLdrWordInputs in;
-            in.tlb_hint_imm_location          = tlb_hint_imm_location;
             in.abort_exception_or_io          = abort_exception_or_io;
             in.raise_alignment_exception      = raise_alignment_exception;
             in.needs_alignment_check          = fNeedsAlignmentCheck;
@@ -239,7 +213,6 @@ uint8_t* PlaceSingleDataTransfer(uint8_t*      cursor,
             in.base_restored_abort_model      = fBaseRestoredAbortModel;
             in.memory_before_writeback_model  = fMemoryBeforeWritebackModel;
             in.cache_hit                      = fCacheHit;
-            in.mmu_on                         = mmu_on;
             cursor = EmitLdrWord(cursor, d, ctx, in);
         }
     } else {
@@ -268,13 +241,6 @@ uint8_t* PlaceSingleDataTransfer(uint8_t*      cursor,
                 EmitModRmReg(cursor, 0, kEax, kCl);
             }
             store_byte_done1 = EmitJmpLabel(cursor);
-
-            if (mmu_on) {
-                const uint32_t slot_addr =
-                    static_cast<uint32_t>(reinterpret_cast<uintptr_t>(cursor));
-                std::memcpy(tlb_hint_imm_location, &slot_addr, 4);
-                Emit8(cursor, 0);
-            }
 
             FixupLabel(abort_exception_or_io, cursor);
             EmitMovRegDwordPtr(cursor, kEax, mmu->IoPendingAddressPtr());
@@ -394,13 +360,6 @@ uint8_t* PlaceSingleDataTransfer(uint8_t*      cursor,
             FixupLabel(abort_exception, cursor);
             EmitMovRegImm32(cursor, kEcx, d->guest_address);
             EmitJmp32(cursor, ctx->raise_abort_data_helper_target);
-
-            if (mmu_on) {
-                const uint32_t slot_addr =
-                    static_cast<uint32_t>(reinterpret_cast<uintptr_t>(cursor));
-                std::memcpy(tlb_hint_imm_location, &slot_addr, 4);
-                Emit8(cursor, 0);
-            }
 
             if (alignment_check_on && fNeedsAlignmentCheck) {
                 FixupLabel(raise_alignment_exception, cursor);

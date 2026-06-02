@@ -1,9 +1,6 @@
 #include <cstddef>
 #include <cstdint>
 
-#include "../arm_jit.h"
-#include "../arm_mmu.h"
-#include "../arm_mmu_state.h"
 #include "../block_context.h"
 #include "../cpu_state.h"
 #include "../place_fns.h"
@@ -23,28 +20,12 @@ constexpr int32_t MonitorArmedDisp() {
     return static_cast<int32_t>(offsetof(ArmCpuState, ldrex_monitor_armed));
 }
 
-constexpr int32_t TlbHintDisp() {
-    return static_cast<int32_t>(offsetof(ArmMmuState, ldrex_strex_tlb_hint));
-}
-
 uint8_t* EmitTranslatePrefix(uint8_t*& cursor, DecodedInsn* d,
-                             BlockContext* ctx, void* translate_helper) {
+                             BlockContext* ctx, bool is_write) {
     using namespace x86;
-    ArmJit* jit = ctx->jit;
-
     EmitMovRegBaseDisp32(cursor, kEcx, kStateReg, GprDisp(d->rn));
-
-    int8_t* hint_ptr = reinterpret_cast<int8_t*>(
-        reinterpret_cast<uint8_t*>(jit->Mmu()->State()) + TlbHintDisp());
-    EmitMovRegImm32(cursor, kEdx,
-        static_cast<uint32_t>(reinterpret_cast<uintptr_t>(hint_ptr)));
-
-    Emit8 (cursor, 0x68);                                /* PUSH imm32 */
-    Emit32(cursor, static_cast<uint32_t>(reinterpret_cast<uintptr_t>(jit)));
-
-    EmitCall(cursor, translate_helper);
-    EmitAddRegImm32(cursor, kEsp, 4);
-
+    cursor = EmitTlbFastPath(cursor, ctx,
+                             is_write ? TlbAccess::kWrite : TlbAccess::kRead);
     EmitTestRegReg(cursor, kEax, kEax);
     return EmitJzLabel32(cursor);
 }
@@ -64,9 +45,7 @@ uint8_t* PlaceLdrex(uint8_t*      cursor,
                     BlockContext* ctx) {
     using namespace x86;
 
-    uint8_t* abort_label = EmitTranslatePrefix(
-        cursor, d, ctx,
-        reinterpret_cast<void*>(&ArmJit::TranslateReadHelper));
+    uint8_t* abort_label = EmitTranslatePrefix(cursor, d, ctx, /*is_write=*/false);
 
     /* Success path. Load 32-bit value from translated host pointer.
        MOV ECX, [EAX] — 0x8B with ModR/M mod=00 r/m=EAX reg=ECX. */
@@ -110,9 +89,7 @@ uint8_t* PlaceStrex(uint8_t*      cursor,
     uint8_t* fail_label_b = EmitJnzLabel32(cursor);
 
     /* Monitor armed and address matches. Now translate the write. */
-    uint8_t* abort_label = EmitTranslatePrefix(
-        cursor, d, ctx,
-        reinterpret_cast<void*>(&ArmJit::TranslateWriteHelper));
+    uint8_t* abort_label = EmitTranslatePrefix(cursor, d, ctx, /*is_write=*/true);
 
     /* Translation succeeded. Load Rt source value, write to host ptr. */
     EmitMovRegBaseDisp32(cursor, kEcx, kStateReg, GprDisp(d->rm));

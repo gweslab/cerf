@@ -99,7 +99,9 @@ constexpr uint8_t kCardIrqSelectMask = 0x0F;
 }  /* namespace */
 
 bool Pd6710Controller::ShouldRegister() {
-    const Board b = emu_.Get<BoardDetector>().GetBoard();
+    auto* bd = emu_.TryGet<BoardDetector>();
+    if (!bd) return false;
+    const auto b = bd->GetBoard();
     return b == Board::Smdk2410DevEmu;
 }
 

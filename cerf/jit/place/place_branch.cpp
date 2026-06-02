@@ -46,19 +46,33 @@ uint8_t* PlaceBranch(uint8_t*      cursor,
         }
     }
 
-    /* Optimistic emit-time lookup: if the destination is already
-       translated, emit a direct JMP rel32 to its native_start. */
-    JitBlock* ep =
-        ArmJit::FindBlockExactHelper(ctx->jit, static_cast<uint32_t>(d->offset));
-    if (ep) {
-        EmitJmp32(cursor, ep->native_start);
+    /* Bake a direct JMP only for a same-page target: cross-page, the target VA
+       remaps to a different phys on a context switch, so a baked JMP would jump
+       into the prior process's stale block. Cross-page re-resolves via the cache. */
+    const uint32_t src_page  = ctx->insns[0].guest_address & 0xFFFFF000u;
+    const bool     same_page = (d->reserved3 & 0xFFFFF000u) == src_page;
+
+    if (same_page) {
+        const uint32_t dst_phys =
+            ctx->block_phys_page_base | (d->reserved3 & 0x00000FFFu);
+        const uint32_t dst_fva =
+            ApplyFcseFold(*ctx->jit->Mmu()->State(), d->reserved3);
+        JitBlock* ep = ctx->jit->LookupBlockByVaPhys(dst_fva, dst_phys);
+        if (ep) {
+            /* Already translated → direct JMP rel32 (phys-stable). */
+            EmitJmp32(cursor, ep->native_start);
+        } else {
+            /* MOV ECX, dest; CALL branch_helper. Resolves at runtime and
+               self-patches this 10-byte sequence into a JMP rel32 on hit —
+               safe to bake because same-page. */
+            EmitMovRegImm32(cursor, kEcx, d->reserved3);
+            EmitCall(cursor, ctx->branch_helper_target);
+        }
     } else {
-        /* Generic runtime path: MOV ECX, dest; CALL branch_helper.
-           Branch helper resolves at runtime, self-patches this
-           10-byte sequence on hit so subsequent executions skip
-           the trampoline. */
+        /* Cross-page: chain via the jump cache (indirect JMP on hit, RETN to
+           dispatcher on miss); a baked JMP would go stale on a context switch. */
         EmitMovRegImm32(cursor, kEcx, d->reserved3);
-        EmitCall(cursor, ctx->branch_helper_target);
+        EmitCall(cursor, ctx->cross_page_branch_helper_target);
     }
     return cursor;
 }

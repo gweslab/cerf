@@ -31,7 +31,7 @@ void ArmCpu::LateInit(ArmJit* jit) {
             "ArmCpu::LateInit: re-bound to a different ArmJit instance "
             "(jit_=%p new=%p) — multi-binding is a programming error\n",
             jit_, jit);
-        CerfFatalExit(2);
+        CerfFatalExit(CERF_FATAL_RUNTIME_ERROR);
     }
 }
 
@@ -137,12 +137,12 @@ uint32_t* ArmCpu::GetUserModeRegisterAddress(int reg_num) {
 
     case ArmMode::kFiq:
         LOG(Caution, "ArmCpu::GetUserModeRegisterAddress: FIQ mode not modelled\n");
-        CerfFatalExit(2);
+        CerfFatalExit(CERF_FATAL_RUNTIME_ERROR);
 
     default:
         LOG(Caution, "ArmCpu::GetUserModeRegisterAddress: invalid mode 0x%X\n",
             state_.cpsr.bits.mode);
-        CerfFatalExit(2);
+        CerfFatalExit(CERF_FATAL_RUNTIME_ERROR);
     }
 }
 
@@ -160,7 +160,7 @@ void* __cdecl ArmCpu::RaiseSoftwareInterruptExceptionHelper(ArmCpu* cpu, uint32_
 
 void __cdecl ArmCpu::PerformSyscallHelper() {
     LOG(Caution, "ArmCpu::PerformSyscallHelper: SYSCALL on a board with no syscall mechanism\n");
-    CerfFatalExit(2);
+    CerfFatalExit(CERF_FATAL_RUNTIME_ERROR);
 }
 
 void __cdecl ArmCpu::PowerDownHelper() {
@@ -202,7 +202,7 @@ uint8_t ArmCpu::GetX86FlagsMask(const DecodedInsn* d) {
     default:
         LOG(Caution, "ArmCpu::GetX86FlagsMask: unhandled flags_set=0x%X\n",
             d->flags_set);
-        CerfFatalExit(2);
+        CerfFatalExit(CERF_FATAL_RUNTIME_ERROR);
     }
 }
 

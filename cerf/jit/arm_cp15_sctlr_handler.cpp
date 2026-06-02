@@ -44,7 +44,8 @@ int ArmCp15SctlrHandler::HandleWrite(ArmJit*  jit,
     /* v4/v5 only — ARMv7 SCTLR has different reserved/fixed bits;
        applying ARM920T constraints to a v7 SCTLR write would UND
        or silently rewrite v7-specific bits the kernel just set. */
-    if (!jit->ProcessorConfig()->HasCp15V7()) {
+    if (!jit->ProcessorConfig()->HasCp15V6() &&
+        !jit->ProcessorConfig()->HasCp15V7()) {
         if (reg.bits.reserved2 != 0 ||
             (reg.bits.reserved3 != 0xC000u && reg.bits.reserved3 != 0u)) {
             (void)jit->Cpu()->RaiseUndefinedException(guest_addr);
@@ -72,29 +73,24 @@ int ArmCp15SctlrHandler::HandleWrite(ArmJit*  jit,
             ? (guest_addr | state->process_id)
             : guest_addr;
 
-        ArmL1Pte section_pte;
-        section_pte.word = 0;
-        section_pte.section.type         = 0;  /* TLB-slot section marker */
-        section_pte.section.section_base = (actual_guest_addr + 4u) >> 20;
-        if (jit->ProcessorConfig()->HasCp15V7()) {
-            /* v7 AP=001 (UNO_KRW) — bits[11:10]=01, APX(bit15)=0.
-               Without this the seed inherits AP=000 (no access) and
-               the kernel's post-MMU prefetch faults. v5 path keeps
-               AP=00 (S/R-bit controlled, permits svc execute). */
-            section_pte.word |= (1u << 10);
+        /* Identity PA at this transition (pre-MMU VA == PA); global so the
+           seed matches under any ASID. A present ITLB entry is executable —
+           the fast-path fetch skips the permission re-check the walk did. */
+        const uint32_t seed_va_page = (actual_guest_addr + 4u) & 0xFFFFF000u;
+        const uint32_t seed_pa_page = (guest_addr + 4u) & 0xFFFFF000u;
+        uint8_t* host_page = memory_->TryTranslate(seed_pa_page);
+
+        if (host_page) {
+            ArmTlbEntry& e = ArmTlbInsertSlot(&state->instruction_tlb,
+                                              ArmTlbSetBase(seed_va_page));
+            e.tag       = seed_va_page;
+            e.va_addend = static_cast<uint32_t>(
+                reinterpret_cast<uintptr_t>(host_page) - seed_va_page);
+            e.pa_page   = seed_pa_page;
+            e.asid      = static_cast<uint8_t>(state->contextidr & 0xFFu);
+            e.global    = 1u;
+            e.writable  = 0u;
         }
-
-        const uint32_t section_va = section_pte.section.section_base << 20;
-        uint8_t* host_pa_base = memory_->TryTranslate(
-            (guest_addr + 4u) & 0xFFF00000u);
-
-        ArmTlbSlot& slot = state->instruction_tlb.slots[0];
-        slot.valid           = true;
-        slot.virtual_address = section_pte.section.section_base;
-        slot.pte             = section_pte.word;
-        slot.host_adjust     = host_pa_base
-            ? (reinterpret_cast<uintptr_t>(host_pa_base) - section_va)
-            : 0u;
 
         jit->FlushTranslationCache(0, 0xFFFFFFFFu);
         state->control_register.word    = reg.word;
@@ -129,7 +125,7 @@ void ArmCp15SctlrHandler::InitializeTrampoline(ArmJit* jit) {
     if (!trampoline_) {
         LOG(Caution, "ArmCp15SctlrHandler: VirtualAlloc(trampoline) failed gle=%lu\n",
             GetLastError());
-        CerfFatalExit(2);
+        CerfFatalExit(CERF_FATAL_RUNTIME_ERROR);
     }
 
     using namespace x86;

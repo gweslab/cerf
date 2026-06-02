@@ -166,6 +166,54 @@ bool ResolveRomhdrAtEcec(std::span<const uint8_t> flat,
     return false;
 }
 
+bool ResolveRomhdrStructural(std::span<const uint8_t> flat,
+                             ParsedXipRegion&         out,
+                             size_t&                  out_romhdr_off) {
+    for (size_t off = 0; off + kRomHdrSize <= flat.size(); off += 4) {
+        ParsedROMHDR h;
+        if (!ParseRomHdr(flat, off, h)) continue;
+        if (h.nummods == 0) continue;
+
+        const uint32_t load_offset = h.physfirst;
+        const size_t   toc_start   = off + kRomHdrSize;
+        const uint32_t scan        = std::min<uint32_t>(h.nummods, 512);
+
+        bool names_ok = true;
+        bool have_nk  = false;
+        for (uint32_t i = 0; i < scan && names_ok; ++i) {
+            const size_t e = toc_start + size_t(i) * kTocEntrySize;
+            if (e + kTocEntrySize > flat.size()) { names_ok = false; break; }
+            const uint32_t fname_va = U32(flat.data(), e + 0x10);
+            if (fname_va < load_offset) { names_ok = false; break; }
+            const size_t fo = size_t(fname_va - load_offset);
+            if (fo >= flat.size()) { names_ok = false; break; }
+            const std::string name = ReadAsciiZ(flat, fo);
+            if (name.empty()) { names_ok = false; break; }
+            for (char c : name) {
+                if (uint8_t(c) < 0x20 || uint8_t(c) > 0x7E) {
+                    names_ok = false;
+                    break;
+                }
+            }
+            if (names_ok && name.size() == 6
+                && (name[0] | 0x20) == 'n' && (name[1] | 0x20) == 'k'
+                && name[2] == '.'
+                && (name[3] | 0x20) == 'e' && (name[4] | 0x20) == 'x'
+                && (name[5] | 0x20) == 'e') {
+                have_nk = true;
+            }
+        }
+        if (!names_ok || !have_nk) continue;
+
+        out.toc.romhdr    = h;
+        out.toc.romhdr_va = load_offset + uint32_t(off);
+        out.load_offset   = load_offset;
+        out_romhdr_off    = off;
+        return true;
+    }
+    return false;
+}
+
 void ParseModulesAndFiles(std::span<const uint8_t> flat,
                           size_t                   romhdr_off,
                           uint32_t                 load_offset,

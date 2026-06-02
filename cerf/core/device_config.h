@@ -1,7 +1,7 @@
 #pragma once
 #include <cstdint>
-#include <optional>
 #include <string>
+#include <utility>
 #include <vector>
 
 struct DeviceMeta {
@@ -19,8 +19,8 @@ struct DeviceConfig {
 
     DeviceMeta meta;
 
-    std::optional<uint32_t> board_configurable_screen_width;
-    std::optional<uint32_t> board_configurable_screen_height;
+    uint32_t board_configurable_screen_width  = 800;
+    uint32_t board_configurable_screen_height = 600;
 
     bool        network_enabled = true;
     std::string network_mac     = "02:CE:5F:00:00:01";
@@ -32,5 +32,17 @@ struct DeviceConfig {
     std::vector<std::string> rom_extensions;
     std::string              rom_recovery;
 
-    bool poc_rom_injection = false;
+    bool boot_in_recovery = false;
+    bool guest_additions = false;
+
+    /* Guest-additions ROM-module substitutions from the GLOBAL cerf.json
+       ("global_substitutions_inside_rom"): {ROM module name -> ce_apps DLL}.
+       GuestAdditionsInjector replaces each present ROM module with the named
+       CERF-built binary from build/<cfg>/Win32/ce_apps/. */
+    std::vector<std::pair<std::string, std::string>> global_rom_substitutions;
+
+    /* When true, ConfigLoader overwrites board_configurable_screen_* with the
+       host monitor size (host_w-10 x host_h-40, capped 3840x2160) so a
+       guest-additions display fills the host screen. Read from cerf.json. */
+    bool adopt_guest_additions_resolution_for_host_screen = false;
 };

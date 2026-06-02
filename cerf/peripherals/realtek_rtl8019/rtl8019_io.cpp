@@ -46,7 +46,7 @@ uint8_t PageOf(uint8_t cmd) {
             "unsupported register access; halting (matches host "
             "runtime TerminateWithMessage behavior)\n",
             op, offset, page, value);
-    CerfFatalExit(1);
+    CerfFatalExit(CERF_FATAL_RUNTIME_ERROR);
 }
 
 }  /* namespace */
@@ -178,7 +178,7 @@ uint16_t Rtl8019::ReadHalf(uint32_t offset) {
     if (offset != 0x10) {
         LOG(Caution, "[NE2000] read16 unsupported offset 0x%02X — only "
                 "NIC_RACK_NIC supports 16-bit reads; halting\n", offset);
-        CerfFatalExit(1);
+        CerfFatalExit(CERF_FATAL_RUNTIME_ERROR);
     }
     /* 16-bit DMA read from NIC_RACK_NIC. */
     if (dma_count_ == 0u) return 0u;
@@ -390,6 +390,7 @@ void Rtl8019::WriteByte(uint32_t offset, uint8_t value) {
     }
     if (!tx_pending.empty() && net_) {
         net_->SendFrame(tx_pending.data(), tx_pending.size());
+        MarkTx();
         std::lock_guard<std::mutex> lk(state_mutex_);
         if ((nic_command_ & kCrStop) == 0u) {
             nic_command_ &= ~kCrXmit;
@@ -404,7 +405,7 @@ void Rtl8019::WriteHalf(uint32_t offset, uint16_t value) {
         LOG(Caution, "[NE2000] write16 unsupported offset 0x%02X = 0x%04X — "
                 "only NIC_RACK_NIC supports 16-bit writes; halting\n",
                 offset, value);
-        CerfFatalExit(1);
+        CerfFatalExit(CERF_FATAL_RUNTIME_ERROR);
     }
     /* 16-bit DMA write into CardRAM. */
     if (dma_count_ == 0u) return;

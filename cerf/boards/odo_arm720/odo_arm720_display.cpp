@@ -6,6 +6,7 @@
 #include "../../lcd/lcd_content_latch.h"
 
 #include "../../core/cerf_emulator.h"
+#include "../../core/device_config.h"
 #include "../../core/log.h"
 #include "../../boards/board_detector.h"
 #include "../../cpu/emulated_memory.h"
@@ -47,7 +48,8 @@ public:
     using Peripheral::Peripheral;
 
     bool ShouldRegister() override {
-        return emu_.Get<BoardDetector>().GetBoard() == Board::OdoArm720;
+        auto* bd = emu_.TryGet<BoardDetector>();
+        return bd && bd->GetBoard() == Board::OdoArm720;
     }
     void OnReady() override {
         /* Poseidon FPGA populates DISP_XSIZE / DISP_YSIZE at silicon
@@ -121,7 +123,8 @@ public:
     using Peripheral::Peripheral;
 
     bool ShouldRegister() override {
-        return emu_.Get<BoardDetector>().GetBoard() == Board::OdoArm720;
+        auto* bd = emu_.TryGet<BoardDetector>();
+        return bd && bd->GetBoard() == Board::OdoArm720;
     }
     void OnReady() override {
         emu_.Get<PeripheralDispatcher>().Register(this);
@@ -174,7 +177,9 @@ public:
     using FrameRenderer::FrameRenderer;
 
     bool ShouldRegister() override {
-        return emu_.Get<BoardDetector>().GetBoard() == Board::OdoArm720;
+        if (emu_.Get<DeviceConfig>().guest_additions) return false;
+        auto* bd = emu_.TryGet<BoardDetector>();
+        return bd && bd->GetBoard() == Board::OdoArm720;
     }
 
     bool HasFrame() override {
@@ -216,6 +221,16 @@ public:
                 dst_row[x] = kGrayscaleBgra[level];
             }
         }
+    }
+
+    std::optional<FbLayout> GetFbLayout() override {
+        auto& regs = emu_.Get<OdoArm720DisplayRegs>();
+        const uint32_t w = regs.XSize();
+        if (w == 0) return std::nullopt;
+        /* 2-bpp packed grayscale, 4 px/byte (same packing RenderInto unpacks),
+           so the row pitch is w/4 bytes. */
+        return FbLayout{ emu_.Get<OdoArm720DisplayDma>().GetEffectivePa(),
+                         w / 4u, 2u, false };
     }
 
 private:

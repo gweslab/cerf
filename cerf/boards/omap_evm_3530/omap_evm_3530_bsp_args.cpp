@@ -29,7 +29,8 @@ public:
     using Service::Service;
 
     bool ShouldRegister() override {
-        return emu_.Get<BoardDetector>().GetBoard() == Board::OmapEvm3530;
+        auto* bd = emu_.TryGet<BoardDetector>();
+        return bd && bd->GetBoard() == Board::OmapEvm3530;
     }
 
     void OnReady() override {

@@ -8,7 +8,8 @@
 #include "../irq_controller.h"
 
 bool Omap3530Dss::ShouldRegister() {
-    return emu_.Get<BoardDetector>().GetSoc() == SocFamily::OMAP3530;
+    auto* bd = emu_.TryGet<BoardDetector>();
+    return bd && bd->GetSoc() == SocFamily::OMAP3530;
 }
 
 void Omap3530Dss::OnReady() {

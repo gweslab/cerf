@@ -30,7 +30,8 @@ struct TraceContext {
     std::optional<uint32_t> ReadVa32(uint32_t va) const;
 };
 
-using TraceHandler = std::function<void(const TraceContext&)>;
+using TraceHandler   = std::function<void(const TraceContext&)>;
+using TracePredicate = std::function<bool(const TraceContext&)>;
 
 #endif  /* CERF_DEV_MODE */
 
@@ -47,11 +48,11 @@ public:
     void RegisterForBundle(uint32_t expected_crc32,
                            const std::function<void()>& register_fn);
 
-    /* PC trace — handler fires once per execution of the guest
-       instruction at `runtime_va`. JitGenerateCode emits a CALL to
-       TraceDispatchPcHelper at flagged PCs ahead of each per-
-       instruction emit. */
-    void OnPc   (uint32_t runtime_va,  TraceHandler handler);
+    void OnPc(uint32_t runtime_va, TraceHandler handler);
+    void OnPcFiltered(uint32_t       runtime_va,
+                      TracePredicate predicate,
+                      TraceHandler   handler);
+
     void OnRunLoopIter(TraceHandler handler);
 
     /* Hot-path predicate. Single map lookup; empty map = single
@@ -74,7 +75,11 @@ private:
     uint32_t bundles_matched_ = 0;
     uint32_t bundles_skipped_ = 0;
 
-    std::unordered_map<uint32_t, TraceHandler> pc_traces_;
-    std::vector<TraceHandler>                  iter_handlers_;
+    struct PcEntry {
+        std::optional<TracePredicate> predicate;
+        TraceHandler                  handler;
+    };
+    std::unordered_map<uint32_t, std::vector<PcEntry>> pc_traces_;
+    std::vector<TraceHandler>                          iter_handlers_;
 #endif  /* CERF_DEV_MODE */
 };

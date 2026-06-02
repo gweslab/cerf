@@ -2,7 +2,7 @@
 
 #include "../core/cerf_emulator.h"
 #include "../core/log.h"
-#include "../socs/page_table_builder.h"
+#include "../boards/page_table_builder.h"
 
 #include <cstring>
 
@@ -30,7 +30,7 @@ void EmulatedMemory::AddRegion(uint32_t base, uint32_t size,
             LOG(Caution, "EmulatedMemory::AddRegion overlap: new "
                     "[0x%08X..0x%08X) vs existing [0x%08X..0x%08X)\n",
                     base, base + size, r.base, r.base + r.size);
-            CerfFatalExit(1);
+            CerfFatalExit(CERF_FATAL_RUNTIME_ERROR);
         }
     }
 
@@ -39,7 +39,7 @@ void EmulatedMemory::AddRegion(uint32_t base, uint32_t size,
                 "(new [0x%08X..0x%08X)). Bump kMaxRegions in "
                 "emulated_memory.h.\n",
                 kMaxRegions, base, base + size);
-        CerfFatalExit(1);
+        CerfFatalExit(CERF_FATAL_RUNTIME_ERROR);
     }
 
     regions_[n].base         = base;
@@ -76,7 +76,7 @@ uint8_t* EmulatedMemory::EnsureBacked(Region* r) {
         LOG(Caution, "EmulatedMemory::EnsureBacked VirtualAlloc failed "
                 "region 0x%08X size 0x%X (GLE=%lu)\n",
                 r->base, r->size, ::GetLastError());
-        CerfFatalExit(1);
+        CerfFatalExit(CERF_FATAL_RUNTIME_ERROR);
     }
 
     uint8_t* expected = nullptr;
@@ -98,7 +98,7 @@ uint8_t* EmulatedMemory::Translate(uint32_t vaddr) {
     Region* r = FindRegion(vaddr);
     if (!r) {
         LOG(Caution, "EmulatedMemory::Translate unmapped 0x%08X\n", vaddr);
-        CerfFatalExit(1);
+        CerfFatalExit(CERF_FATAL_RUNTIME_ERROR);
     }
     return EnsureBacked(r) + (vaddr - r->base);
 }
@@ -111,7 +111,9 @@ uint8_t* EmulatedMemory::TryTranslate(uint32_t paddr) {
 
 uint8_t* EmulatedMemory::TryTranslateWrite(uint32_t paddr) {
     Region* r = FindRegion(paddr);
-    if (!r) return nullptr;
+    if (!r) {
+        return nullptr;
+    }
 
     /* PAGE_READONLY / PAGE_EXECUTE_READ → flash / ROM region. Write
        must dispatch to the flash controller / I/O peripheral instead
@@ -123,6 +125,21 @@ uint8_t* EmulatedMemory::TryTranslateWrite(uint32_t paddr) {
     }
 
     return EnsureBacked(r) + (paddr - r->base);
+}
+
+bool EmulatedMemory::IsSlotRangeUniform(uint32_t pte, uint32_t pa) {
+    uint32_t gran;
+    switch (pte & 3u) {
+        case 0:  gran = 0x100000u; break;  /* section, 1 MB */
+        case 1:  gran = 0x10000u;  break;  /* large page, 64 KB */
+        default: return true;              /* small / ext-small <= 4 KB: one region */
+    }
+    const uint32_t base = pa & ~(gran - 1u);
+    Region* r = FindRegion(base);
+    if (!r) return true;  /* base not RAM-backed: host_adjust is 0 regardless. */
+    return base >= r->base &&
+           static_cast<uint64_t>(base) + gran <=
+               static_cast<uint64_t>(r->base) + r->size;
 }
 
 uint8_t EmulatedMemory::ReadByte(uint32_t vaddr) {
@@ -168,14 +185,14 @@ void EmulatedMemory::CopyIn(uint32_t vaddr, const void* host_src, size_t size) {
     if (!r) {
         LOG(Caution, "EmulatedMemory::CopyIn unmapped destination "
                 "0x%08X size 0x%zX\n", vaddr, size);
-        CerfFatalExit(1);
+        CerfFatalExit(CERF_FATAL_RUNTIME_ERROR);
     }
     uint64_t end = static_cast<uint64_t>(vaddr) + size;
     if (end > static_cast<uint64_t>(r->base) + r->size) {
         LOG(Caution, "EmulatedMemory::CopyIn crosses region boundary at "
                 "0x%08X size 0x%zX (region 0x%08X size 0x%X)\n",
                 vaddr, size, r->base, r->size);
-        CerfFatalExit(1);
+        CerfFatalExit(CERF_FATAL_RUNTIME_ERROR);
     }
     uint8_t* host = EnsureBacked(r);
     std::memcpy(host + (vaddr - r->base), host_src, size);

@@ -11,7 +11,8 @@ public:
     using LcdScanTick::LcdScanTick;
 
     bool ShouldRegister() override {
-        return emu_.Get<BoardDetector>().GetSoc() == SocFamily::OMAP3530;
+        auto* bd = emu_.TryGet<BoardDetector>();
+        return bd && bd->GetSoc() == SocFamily::OMAP3530;
     }
 
     void OnHostTick() override {

@@ -111,7 +111,8 @@ void RateProbe::LogLoop() {
             "jit_runs=%llu ost_rd=%llu ost_poll=%llu ost_fire=%llu "
             "intc_assert=%llu intc_deassert=%llu jit_pend_set=%llu "
             "jit_pend_clr=%llu dma_w=%llu audio_msg=%llu rd_per_run=%llu "
-            "run_ms=%llu ost_ms=%llu io_ms=%llu mmu_ms=%llu native_ms=%llu\n",
+            "run_ms=%llu ost_ms=%llu io_ms=%llu mmu_ms=%llu native_ms=%llu "
+            "mmu_calls=%llu\n",
             (unsigned long long)s[static_cast<uint8_t>(Counter::JitRuns)],
             (unsigned long long)s[static_cast<uint8_t>(Counter::OstReadOscr)],
             (unsigned long long)s[static_cast<uint8_t>(Counter::OstPolls)],
@@ -127,6 +128,7 @@ void RateProbe::LogLoop() {
             (unsigned long long)ost_ms,
             (unsigned long long)io_ms,
             (unsigned long long)mmu_ms,
-            (unsigned long long)native_ms);
+            (unsigned long long)native_ms,
+            (unsigned long long)s[static_cast<uint8_t>(Counter::MmuXlateCalls)]);
     }
 }

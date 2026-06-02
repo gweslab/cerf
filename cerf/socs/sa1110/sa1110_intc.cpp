@@ -8,7 +8,8 @@
 #include "../../peripherals/peripheral_dispatcher.h"
 
 bool Sa1110Intc::ShouldRegister() {
-    return emu_.Get<BoardDetector>().GetSoc() == SocFamily::SA1110;
+    auto* bd = emu_.TryGet<BoardDetector>();
+    return bd && bd->GetSoc() == SocFamily::SA1110;
 }
 
 void Sa1110Intc::OnReady() {
@@ -19,7 +20,7 @@ void Sa1110Intc::NotifyLocked() {
     if (IcFpLocked() != 0) {
         LOG(SocIntc, "FIQ asserted (ICFP=0x%08X) — FIQ delivery not "
                      "wired through ArmJit\n", IcFpLocked());
-        CerfFatalExit(1);
+        CerfFatalExit(CERF_FATAL_RUNTIME_ERROR);
     }
     auto& jit = emu_.Get<ArmJit>();
     if (IcIpLocked() != 0) {

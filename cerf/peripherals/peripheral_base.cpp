@@ -8,53 +8,35 @@
 
 #include <typeinfo>
 
-uint8_t Peripheral::ReadByte(uint32_t addr) {
-    LOG(Caution, "Peripheral '%s' does not support ReadByte at 0x%08X\n",
-            typeid(*this).name(), addr);
-    CerfFatalExit(1);
+uint8_t  Peripheral::ReadByte (uint32_t addr) { HaltUnsupportedAccess("ReadByte",  addr, 0); }
+uint16_t Peripheral::ReadHalf (uint32_t addr) { HaltUnsupportedAccess("ReadHalf",  addr, 0); }
+uint32_t Peripheral::ReadWord (uint32_t addr) { HaltUnsupportedAccess("ReadWord",  addr, 0); }
+uint64_t Peripheral::ReadDword(uint32_t addr) { HaltUnsupportedAccess("ReadDword", addr, 0); }
+void Peripheral::WriteByte (uint32_t addr, uint8_t  value) { HaltUnsupportedAccess("WriteByte",  addr, value); }
+void Peripheral::WriteHalf (uint32_t addr, uint16_t value) { HaltUnsupportedAccess("WriteHalf",  addr, value); }
+void Peripheral::WriteWord (uint32_t addr, uint32_t value) { HaltUnsupportedAccess("WriteWord",  addr, value); }
+void Peripheral::WriteDword(uint32_t addr, uint64_t value) { HaltUnsupportedAccess("WriteDword", addr, value); }
+
+uint32_t Peripheral::AutoFastRead(void* ctx, uint32_t off, uint32_t width) {
+    auto* p = static_cast<Peripheral*>(ctx);
+    const uint32_t addr = p->MmioBase() + off;
+    switch (width) {
+        case 1: return p->ReadByte(addr);
+        case 2: return p->ReadHalf(addr);
+        case 4: return p->ReadWord(addr);
+    }
+    p->HaltUnsupportedAccess("AutoFastRead", addr, width);
 }
 
-uint16_t Peripheral::ReadHalf(uint32_t addr) {
-    LOG(Caution, "Peripheral '%s' does not support ReadHalf at 0x%08X\n",
-            typeid(*this).name(), addr);
-    CerfFatalExit(1);
-}
-
-uint32_t Peripheral::ReadWord(uint32_t addr) {
-    LOG(Caution, "Peripheral '%s' does not support ReadWord at 0x%08X\n",
-            typeid(*this).name(), addr);
-    CerfFatalExit(1);
-}
-
-uint64_t Peripheral::ReadDword(uint32_t addr) {
-    LOG(Caution, "Peripheral '%s' does not support ReadDword at 0x%08X\n",
-            typeid(*this).name(), addr);
-    CerfFatalExit(1);
-}
-
-void Peripheral::WriteByte(uint32_t addr, uint8_t value) {
-    LOG(Caution, "Peripheral '%s' does not support WriteByte 0x%08X = 0x%02X\n",
-            typeid(*this).name(), addr, value);
-    CerfFatalExit(1);
-}
-
-void Peripheral::WriteHalf(uint32_t addr, uint16_t value) {
-    LOG(Caution, "Peripheral '%s' does not support WriteHalf 0x%08X = 0x%04X\n",
-            typeid(*this).name(), addr, value);
-    CerfFatalExit(1);
-}
-
-void Peripheral::WriteWord(uint32_t addr, uint32_t value) {
-    LOG(Caution, "Peripheral '%s' does not support WriteWord 0x%08X = 0x%08X\n",
-            typeid(*this).name(), addr, value);
-    CerfFatalExit(1);
-}
-
-void Peripheral::WriteDword(uint32_t addr, uint64_t value) {
-    LOG(Caution, "Peripheral '%s' does not support WriteDword 0x%08X = 0x%016llX\n",
-            typeid(*this).name(), addr,
-            static_cast<unsigned long long>(value));
-    CerfFatalExit(1);
+void Peripheral::AutoFastWrite(void* ctx, uint32_t off, uint32_t value, uint32_t width) {
+    auto* p = static_cast<Peripheral*>(ctx);
+    const uint32_t addr = p->MmioBase() + off;
+    switch (width) {
+        case 1: p->WriteByte(addr, static_cast<uint8_t> (value)); return;
+        case 2: p->WriteHalf(addr, static_cast<uint16_t>(value)); return;
+        case 4: p->WriteWord(addr, value); return;
+    }
+    p->HaltUnsupportedAccess("AutoFastWrite", addr, value);
 }
 
 void Peripheral::HaltUnsupportedAccess(const char* op,
@@ -77,5 +59,5 @@ void Peripheral::HaltUnsupportedAccess(const char* op,
     LOG(Caution, "      R8=0x%08X  R9=0x%08X  R10=0x%08X R11=0x%08X "
                  "R12=0x%08X SP=0x%08X  LR=0x%08X\n",
         r[8], r[9], r[10], r[11], r[12], r[13], r[14]);
-    CerfFatalExit(1);
+    CerfFatalExit(CERF_FATAL_RUNTIME_ERROR);
 }

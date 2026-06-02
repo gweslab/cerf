@@ -29,6 +29,12 @@ public:
        PAGE_EXECUTE_READ regions so writes dispatch as MMIO. */
     uint8_t* TryTranslateWrite(uint32_t paddr);
 
+    /* True iff the slot-granularity range containing `pa` lies entirely within
+       one backed region (a single host_adjust is valid for the whole TLB slot).
+       Section/large slots straddling a region boundary or peripheral hole
+       return false so the MMU routes them per access. pte[1:0] = granularity. */
+    bool IsSlotRangeUniform(uint32_t pte, uint32_t pa);
+
     uint8_t  ReadByte(uint32_t vaddr);
     uint16_t ReadHalf(uint32_t vaddr);
     uint32_t ReadWord(uint32_t vaddr);

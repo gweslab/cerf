@@ -34,7 +34,9 @@ namespace Log {
         X(Lcd,         "LCD",         "host display window + per-SoC LCD ctrl")     \
         X(Pcmcia,      "PCMCIA",      "board-level PCMCIA bus controller (PD6710)") \
         X(Trace,       "TRACE",       "TraceManager + device-specific trace files") \
-        X(Perf,        "PERF",        "RateProbe — per-second event counters")
+        X(Perf,        "PERF",        "RateProbe — per-second event counters")    \
+        X(GuestDriver, "GUEST",       "CERF guest driver runtime output via cerf_debug_tx") \
+        X(GuestAdditions, "GUEST_HOST", "CERF guest additions")
 
     enum class Cat : uint8_t {
     #define X(name, slug, desc) name,
@@ -110,6 +112,9 @@ namespace Log {
         Log::Print(Log::Cat::name, __VA_ARGS__);                                    \
 } while (0)
 
-[[noreturn]] void CerfFatalExit(int code = 1);
-[[noreturn]] void CerfExitMemoryCorruption(const char* thunk, uint32_t arm_addr,
-                                            const void* data, size_t len);
+inline constexpr int CERF_FATAL_RUNTIME_ERROR = 1;
+/* User/environment condition (unsupported board, no ROM installed), not a
+   CERF bug: CerfFatalExit skips the crash-dump path for this code. */
+inline constexpr int CERF_FATAL_USER_ERROR    = 2;
+
+[[noreturn]] void CerfFatalExit(int code = CERF_FATAL_RUNTIME_ERROR);

@@ -18,7 +18,9 @@ public:
     using Peripheral::Peripheral;
 
     bool ShouldRegister() override {
-        const auto b = emu_.Get<BoardDetector>().GetBoard();
+        auto* bd = emu_.TryGet<BoardDetector>();
+        if (!bd) return false;
+        const auto b = bd->GetBoard();
         return b == Board::Ipaq3650;
     }
     void OnReady() override {

@@ -4,6 +4,7 @@
 #include "../../core/log.h"
 #include "../../peripherals/peripheral_dispatcher.h"
 #include "../../boards/board_detector.h"
+#include "omap3530_sdma.h"
 #include "twl4030.h"
 
 #include <cstdint>
@@ -41,6 +42,8 @@ constexpr uint16_t kI2cConStt        = 1u << 0;
 constexpr uint16_t kI2cConTrx        = 1u << 9;
 constexpr uint16_t kI2cSyscSrst      = 1u << 1;
 constexpr uint16_t kI2cSyssRdone     = 1u << 0;
+constexpr uint16_t kI2cStatAl        = 1u << 0;
+constexpr uint16_t kI2cStatNack      = 1u << 1;
 constexpr uint16_t kI2cStatArdy      = 1u << 2;
 constexpr uint16_t kI2cStatRrdy      = 1u << 3;
 constexpr uint16_t kI2cStatXrdy      = 1u << 4;
@@ -53,13 +56,16 @@ constexpr uint16_t kI2cStatRxBits    =
     kI2cStatRrdy | kI2cStatRdr | (1u << 11);   /* ROVR */
 constexpr uint16_t kI2cBufTxFifoClr  = 1u << 6;
 constexpr uint16_t kI2cBufRxFifoClr  = 1u << 14;
+constexpr uint16_t kI2cBufXdmaEn     = 1u << 7;
+constexpr uint16_t kI2cBufRdmaEn     = 1u << 15;
 
 class Omap3530I2cBank : public Peripheral {
 public:
     using Peripheral::Peripheral;
 
     bool ShouldRegister() override {
-        return emu_.Get<BoardDetector>().GetSoc() == SocFamily::OMAP3530;
+        auto* bd = emu_.TryGet<BoardDetector>();
+        return bd && bd->GetSoc() == SocFamily::OMAP3530;
     }
     void OnReady() override {
         emu_.Get<PeripheralDispatcher>().Register(this);
@@ -85,6 +91,11 @@ protected:
                                       uint8_t  slave_addr,
                                       uint16_t count);
 
+    /* Per-bank SDMA sync source IDs. Default 0 = no DMA wiring
+       (I2C3 high-speed bus is PIO-only on OMAP3530). */
+    virtual int TxSyncSource() const { return 0; }
+    virtual int RxSyncSource() const { return 0; }
+
     mutable std::mutex  state_mutex_;
     std::deque<uint8_t> tx_fifo_;
     std::deque<uint8_t> rx_fifo_;
@@ -94,6 +105,8 @@ protected:
     bool    pending_active_     = false;
     bool    pending_is_read_    = false;
     uint8_t pending_slave_addr_ = 0;
+    bool    pending_tx_dma_req_ = false;
+    bool    pending_rx_dma_req_ = false;
 
 private:
     bool     IsKnownOffset(uint32_t off) const;
@@ -105,6 +118,7 @@ private:
     void     OnCntWriteLocked(uint32_t guest_addr_for_diag);
     void     OnStatW1cLocked (uint32_t guest_addr_for_diag,
                               uint16_t value);
+    void     FlushPendingDmaReqs(bool fire_tx, bool fire_rx);
 
     uint16_t stat_    = 0;
     uint16_t ie_      = 0;
@@ -135,26 +149,26 @@ void Omap3530I2cBank::ApplyResetLocked() {
     pending_active_ = false;
     pending_is_read_ = false;
     pending_slave_addr_ = 0;
+    pending_tx_dma_req_ = false;
+    pending_rx_dma_req_ = false;
 }
 
-void Omap3530I2cBank::DispatchWriteLocked(uint32_t guest_addr_for_diag,
+void Omap3530I2cBank::DispatchWriteLocked(uint32_t /*guest_addr_for_diag*/,
                                           uint8_t  slave_addr) {
     LOG(Caution, "Omap3530I2cBank: I2C write to slave 0x%02X but no "
             "slave is wired on this bus\n", slave_addr);
-    HaltUnsupportedAccess("I2C write to unmapped slave",
-                          guest_addr_for_diag,
-                          static_cast<uint64_t>(slave_addr));
+    /* Real silicon NACKs an unaddressed slave; oal_i2c.c:695 aborts
+       the transaction on STAT.NACK | STAT.AL | STAT.AERR. */
+    stat_ |= kI2cStatNack | kI2cStatArdy;
 }
 
-void Omap3530I2cBank::DispatchReadLocked(uint32_t guest_addr_for_diag,
+void Omap3530I2cBank::DispatchReadLocked(uint32_t /*guest_addr_for_diag*/,
                                          uint8_t  slave_addr,
                                          uint16_t count) {
     LOG(Caution, "Omap3530I2cBank: I2C read from slave 0x%02X "
             "(%u byte%s) but no slave is wired on this bus\n",
             slave_addr, count, count == 1 ? "" : "s");
-    HaltUnsupportedAccess("I2C read from unmapped slave",
-                          guest_addr_for_diag,
-                          static_cast<uint64_t>(slave_addr));
+    stat_ |= kI2cStatNack | kI2cStatArdy;
 }
 
 bool Omap3530I2cBank::IsKnownOffset(uint32_t off) const {
@@ -187,6 +201,9 @@ void Omap3530I2cBank::OnCntWriteLocked(uint32_t guest_addr_for_diag) {
     DispatchReadLocked(guest_addr_for_diag, pending_slave_addr_, cnt_);
     stat_ |= kI2cStatRrdy | kI2cStatArdy;
     pending_active_ = false;
+    if (!rx_fifo_.empty() && (buf_ & kI2cBufRdmaEn) && RxSyncSource() != 0) {
+        pending_rx_dma_req_ = true;
+    }
 }
 
 void Omap3530I2cBank::OnStatW1cLocked(uint32_t guest_addr_for_diag,
@@ -218,6 +235,10 @@ uint16_t Omap3530I2cBank::ReadHalfLocked(uint32_t off) {
         if (rx_fifo_.empty()) return 0u;
         const uint8_t b = rx_fifo_.front();
         rx_fifo_.pop_front();
+        if (!rx_fifo_.empty() && (buf_ & kI2cBufRdmaEn) &&
+            RxSyncSource() != 0) {
+            pending_rx_dma_req_ = true;
+        }
         return b;
     }
     case kOffSysc:    return sysc_;
@@ -259,15 +280,25 @@ void Omap3530I2cBank::WriteHalfLocked(uint32_t guest_addr_for_diag,
         cnt_ = value;
         OnCntWriteLocked(guest_addr_for_diag);
         return;
-    case kOffData:    tx_fifo_.push_back(static_cast<uint8_t>(value & 0xFFu));
-                      return;
+    case kOffData:
+        tx_fifo_.push_back(static_cast<uint8_t>(value & 0xFFu));
+        if ((buf_ & kI2cBufXdmaEn) && TxSyncSource() != 0) {
+            pending_tx_dma_req_ = true;
+        }
+        return;
     case kOffSysc:
         if (value & kI2cSyscSrst) ApplyResetLocked();
         sysc_ = value & ~kI2cSyscSrst;
         return;
     case kOffCon:
         con_ = value;
-        if (value & kI2cConStt) OnConStartLocked(guest_addr_for_diag);
+        if (value & kI2cConStt) {
+            OnConStartLocked(guest_addr_for_diag);
+            if ((con_ & kI2cConTrx) && (buf_ & kI2cBufXdmaEn) &&
+                TxSyncSource() != 0) {
+                pending_tx_dma_req_ = true;
+            }
+        }
         return;
     case kOffOa0:     oa0_     = value; return;
     case kOffSa:      sa_      = value; return;
@@ -290,8 +321,16 @@ uint16_t Omap3530I2cBank::ReadHalf(uint32_t addr) {
         HaltUnsupportedAccess("ReadHalf (unknown offset or unaligned)",
                               addr, 0);
     }
-    std::lock_guard<std::mutex> lk(state_mutex_);
-    return ReadHalfLocked(off);
+    uint16_t result;
+    bool fire_tx, fire_rx;
+    {
+        std::lock_guard<std::mutex> lk(state_mutex_);
+        result = ReadHalfLocked(off);
+        fire_tx = pending_tx_dma_req_; pending_tx_dma_req_ = false;
+        fire_rx = pending_rx_dma_req_; pending_rx_dma_req_ = false;
+    }
+    FlushPendingDmaReqs(fire_tx, fire_rx);
+    return result;
 }
 
 void Omap3530I2cBank::WriteHalf(uint32_t addr, uint16_t value) {
@@ -300,8 +339,14 @@ void Omap3530I2cBank::WriteHalf(uint32_t addr, uint16_t value) {
         HaltUnsupportedAccess("WriteHalf (unknown offset or unaligned)",
                               addr, value);
     }
-    std::lock_guard<std::mutex> lk(state_mutex_);
-    WriteHalfLocked(addr, off, value);
+    bool fire_tx, fire_rx;
+    {
+        std::lock_guard<std::mutex> lk(state_mutex_);
+        WriteHalfLocked(addr, off, value);
+        fire_tx = pending_tx_dma_req_; pending_tx_dma_req_ = false;
+        fire_rx = pending_rx_dma_req_; pending_rx_dma_req_ = false;
+    }
+    FlushPendingDmaReqs(fire_tx, fire_rx);
 }
 
 uint8_t Omap3530I2cBank::ReadByte(uint32_t addr) {
@@ -311,11 +356,22 @@ uint8_t Omap3530I2cBank::ReadByte(uint32_t addr) {
             "ReadByte (only I2C_DATA at 0x1C supports byte access)",
             addr, 0);
     }
-    std::lock_guard<std::mutex> lk(state_mutex_);
-    if (rx_fifo_.empty()) return 0u;
-    const uint8_t b = rx_fifo_.front();
-    rx_fifo_.pop_front();
-    return b;
+    uint8_t result = 0;
+    bool fire_rx = false;
+    {
+        std::lock_guard<std::mutex> lk(state_mutex_);
+        if (!rx_fifo_.empty()) {
+            result = rx_fifo_.front();
+            rx_fifo_.pop_front();
+            if (!rx_fifo_.empty() && (buf_ & kI2cBufRdmaEn) &&
+                RxSyncSource() != 0) {
+                pending_rx_dma_req_ = true;
+            }
+        }
+        fire_rx = pending_rx_dma_req_; pending_rx_dma_req_ = false;
+    }
+    FlushPendingDmaReqs(false, fire_rx);
+    return result;
 }
 
 void Omap3530I2cBank::WriteByte(uint32_t addr, uint8_t value) {
@@ -325,8 +381,27 @@ void Omap3530I2cBank::WriteByte(uint32_t addr, uint8_t value) {
             "WriteByte (only I2C_DATA at 0x1C supports byte access)",
             addr, value);
     }
-    std::lock_guard<std::mutex> lk(state_mutex_);
-    tx_fifo_.push_back(value);
+    bool fire_tx = false;
+    {
+        std::lock_guard<std::mutex> lk(state_mutex_);
+        tx_fifo_.push_back(value);
+        if ((buf_ & kI2cBufXdmaEn) && TxSyncSource() != 0) {
+            pending_tx_dma_req_ = true;
+        }
+        fire_tx = pending_tx_dma_req_; pending_tx_dma_req_ = false;
+    }
+    FlushPendingDmaReqs(fire_tx, false);
+}
+
+void Omap3530I2cBank::FlushPendingDmaReqs(bool fire_tx, bool fire_rx) {
+    if (!fire_tx && !fire_rx) return;
+    auto& sdma = emu_.Get<Omap3530Sdma>();
+    if (fire_rx && RxSyncSource() != 0) {
+        sdma.RaiseSyncEvent(static_cast<uint32_t>(RxSyncSource()));
+    }
+    if (fire_tx && TxSyncSource() != 0) {
+        sdma.RaiseSyncEvent(static_cast<uint32_t>(TxSyncSource()));
+    }
 }
 
 uint32_t Omap3530I2cBank::ReadWord(uint32_t addr) {
@@ -355,6 +430,8 @@ public:
     uint32_t MmioBase() const override { return 0x48070000u; }
 
 protected:
+    int TxSyncSource() const override { return Omap3530Sdma::kSyncI2c1Tx; }
+    int RxSyncSource() const override { return Omap3530Sdma::kSyncI2c1Rx; }
     void DispatchWriteLocked(uint32_t guest_addr_for_diag,
                              uint8_t  slave_addr) override;
     void DispatchReadLocked (uint32_t guest_addr_for_diag,
@@ -394,11 +471,16 @@ class Omap3530I2c2 : public Omap3530I2cBank {
 public:
     using Omap3530I2cBank::Omap3530I2cBank;
     uint32_t MmioBase() const override { return 0x48072000u; }
+protected:
+    int TxSyncSource() const override { return Omap3530Sdma::kSyncI2c2Tx; }
+    int RxSyncSource() const override { return Omap3530Sdma::kSyncI2c2Rx; }
 };
 class Omap3530I2c3 : public Omap3530I2cBank {
 public:
     using Omap3530I2cBank::Omap3530I2cBank;
     uint32_t MmioBase() const override { return 0x48060000u; }
+    /* I2C3 is high-speed I2C with no SDMA wiring on OMAP3530 — uses
+       its own internal FIFO and CPU-driven transfers. */
 };
 
 }  /* namespace */

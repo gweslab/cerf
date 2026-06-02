@@ -74,7 +74,8 @@ OdoArm720TouchSound::~OdoArm720TouchSound() {
 }
 
 bool OdoArm720TouchSound::ShouldRegister() {
-    return emu_.Get<BoardDetector>().GetBoard() == Board::OdoArm720;
+    auto* bd = emu_.TryGet<BoardDetector>();
+    return bd && bd->GetBoard() == Board::OdoArm720;
 }
 
 void OdoArm720TouchSound::OnReady() {
@@ -252,7 +253,7 @@ void OdoArm720TouchSound::WriteHalf(uint32_t addr, uint16_t value) {
             LOG(Caution, "Odo TOUCH_SOUND: ioAdcStr write = 0x%04X "
                     "has bits outside W1C mask 0x%04X (pen/UCB/"
                     "pen-tmg).\n", value, kIoAdcStrW1cMask);
-            CerfFatalExit(1);
+            CerfFatalExit(CERF_FATAL_RUNTIME_ERROR);
         }
         {
             std::lock_guard<std::mutex> lk(state_mutex_);
@@ -266,7 +267,7 @@ void OdoArm720TouchSound::WriteHalf(uint32_t addr, uint16_t value) {
             LOG(Caution, "Odo TOUCH_SOUND: ucbStr write = 0x%04X "
                     "has bits outside W1C mask 0x%04X "
                     "(ucbStrRegIntr).\n", value, kUcbStrW1cMask);
-            CerfFatalExit(1);
+            CerfFatalExit(CERF_FATAL_RUNTIME_ERROR);
         }
         {
             std::lock_guard<std::mutex> lk(state_mutex_);
@@ -280,7 +281,7 @@ void OdoArm720TouchSound::WriteHalf(uint32_t addr, uint16_t value) {
             LOG(Caution, "Odo TOUCH_SOUND: ioSoundStr write = 0x%04X "
                     "has bits outside W1C mask 0x%04X (record/"
                     "playback intrs).\n", value, kIoSoundStrW1cMask);
-            CerfFatalExit(1);
+            CerfFatalExit(CERF_FATAL_RUNTIME_ERROR);
         }
         {
             std::lock_guard<std::mutex> lk(state_mutex_);
@@ -302,7 +303,7 @@ void OdoArm720TouchSound::WriteWord(uint32_t addr, uint32_t value) {
         LOG(Caution, "Odo TOUCH_SOUND: WriteWord 0x%08X = 0x%08X has "
                 "non-zero high 16 bits in PAD region (TCHAUD.H "
                 "USHORT+PAD layout).\n", addr, value);
-        CerfFatalExit(1);
+        CerfFatalExit(CERF_FATAL_RUNTIME_ERROR);
     }
     WriteHalf(addr, static_cast<uint16_t>(value & 0xFFFFu));
 }

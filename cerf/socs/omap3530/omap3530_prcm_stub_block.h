@@ -18,7 +18,8 @@ public:
     using Peripheral::Peripheral;
 
     bool ShouldRegister() override {
-        return emu_.Get<BoardDetector>().GetSoc() == SocFamily::OMAP3530;
+        auto* bd = emu_.TryGet<BoardDetector>();
+        return bd && bd->GetSoc() == SocFamily::OMAP3530;
     }
     void OnReady() override {
         regs_.resize(MmioSize() / 4u, 0u);
@@ -101,6 +102,12 @@ public:
         if (off == 0xE4u) {
             const uint32_t ctrl = PeekReg(0xE0u);
             return ctrl & 0x3u;
+        }
+        if (off == 0xE8u) {
+            /* PM_PREPWSTST=0 makes OALContextRestore re-init
+               GPIO/INTC, wiping driver register writes. */
+            const uint32_t ctrl = PeekReg(0xE0u);
+            return ctrl & 0x7u;
         }
         return Omap3530PrcmStubBlock::ReadWord(addr);
     }

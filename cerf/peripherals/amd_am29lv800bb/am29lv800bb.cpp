@@ -4,10 +4,14 @@
 #include "../../core/cerf_emulator.h"
 #include "../../core/log.h"
 #include "../../cpu/emulated_memory.h"
+#include "../../host/host_widget.h"
+#include "../../host/host_widget_registry.h"
 #include "../../peripherals/peripheral_dispatcher.h"
 
 #include <cstdint>
 #include <cstring>
+#include <string>
+#include <vector>
 
 namespace {
 
@@ -46,17 +50,20 @@ size_t SectorSizeFromAddress(uint32_t io_addr) {
     return 64u * 1024u;
 }
 
-class Am29Lv800Bb : public Peripheral {
+class Am29Lv800Bb : public Peripheral, public HostWidget {
 public:
     using Peripheral::Peripheral;
 
     bool ShouldRegister() override {
-        const Board b = emu_.Get<BoardDetector>().GetBoard();
+        auto* bd = emu_.TryGet<BoardDetector>();
+        if (!bd) return false;
+        const auto b = bd->GetBoard();
         return b == Board::Smdk2410DevEmu;
     }
     void OnReady() override {
         (void)emu_.Get<EmulatedMemory>().Translate(kBase);
         emu_.Get<PeripheralDispatcher>().Register(this);
+        emu_.Get<HostWidgetRegistry>().Register(this);
         LOG(Boot, "Am29Lv800Bb: AM29LV800BB at PA 0x%08X size 0x%X "
                   "(96 MB, EmulatedMemory-backed; FSM-write only)\n",
                   kBase, kSize);
@@ -64,6 +71,20 @@ public:
 
     uint32_t MmioBase() const override { return kBase; }
     uint32_t MmioSize() const override { return kSize; }
+
+    /* HostWidget. Reads bypass this peripheral (JIT TLB fast-path straight to
+       EmulatedMemory), so only writes (the FSM command/program/erase cycles)
+       are observable here — TX-only activity. */
+    std::wstring WidgetName() const override { return L"NOR Flash"; }
+    WidgetGroup  Group() const override { return WidgetGroup::Storage; }
+    std::wstring Tooltip() const override { return L"NOR Flash — AMD AM29LV800BB"; }
+    std::vector<WidgetMenuItem> BuildMenu() override {
+        WidgetMenuItem hdr;
+        hdr.label   = L"AM29LV800BB (8 Mbit NOR)";
+        hdr.enabled = false;
+        return { std::move(hdr) };
+    }
+    void DrawIcon(HDC dc, const RECT& box) const override;
 
     uint8_t  ReadByte (uint32_t addr) override {
         return emu_.Get<EmulatedMemory>().ReadByte(addr);
@@ -90,7 +111,29 @@ void Am29Lv800Bb::WriteByte(uint32_t addr, uint8_t value) {
     HaltUnsupportedAccess("WriteByte", addr, value);
 }
 void Am29Lv800Bb::WriteHalf(uint32_t addr, uint16_t value) {
+    MarkTx();
     DoWriteHalf(addr - kBase, value);
+}
+
+void Am29Lv800Bb::DrawIcon(HDC dc, const RECT& box) const {
+    const int cx = (box.left + box.right) / 2;
+    const int cy = (box.top + box.bottom) / 2;
+    RECT body = { cx - 8, cy - 6, cx + 8, cy + 6 };
+
+    HBRUSH  fill = CreateSolidBrush(RGB(40, 44, 52));
+    HPEN    pen  = CreatePen(PS_SOLID, 1, RGB(150, 150, 160));
+    HGDIOBJ ob   = SelectObject(dc, fill);
+    HGDIOBJ op   = SelectObject(dc, pen);
+    Rectangle(dc, body.left, body.top, body.right, body.bottom);
+    for (int i = -1; i <= 1; ++i) {
+        const int px = cx + i * 5;
+        MoveToEx(dc, px, body.top - 2, nullptr);    LineTo(dc, px, body.top);
+        MoveToEx(dc, px, body.bottom - 1, nullptr); LineTo(dc, px, body.bottom + 1);
+    }
+    SelectObject(dc, ob);
+    SelectObject(dc, op);
+    DeleteObject(fill);
+    DeleteObject(pen);
 }
 void Am29Lv800Bb::WriteWord(uint32_t addr, uint32_t value) {
     /* 32-bit writes are two 16-bit AMD bus cycles. Real hardware
@@ -154,7 +197,7 @@ void Am29Lv800Bb::DoWriteHalf(uint32_t io_addr, uint16_t value) {
                              "io_addr=0x%X value=0x%04X (expected "
                              "addr=0x%X value=0x%04X)\n",
                     io_addr, value, kUnlockAddr2, kUnlockData2);
-                CerfFatalExit(1);
+                CerfFatalExit(CERF_FATAL_RUNTIME_ERROR);
             }
             break;
         case kCmdUnlock1Era:
@@ -164,7 +207,7 @@ void Am29Lv800Bb::DoWriteHalf(uint32_t io_addr, uint16_t value) {
                              "io_addr=0x%X value=0x%04X (expected "
                              "addr=0x%X value=0x%04X)\n",
                     io_addr, value, kUnlockAddr2, kUnlockData2);
-                CerfFatalExit(1);
+                CerfFatalExit(CERF_FATAL_RUNTIME_ERROR);
             }
             cmd_ = kCmdSectErase;
             break;
@@ -182,7 +225,7 @@ void Am29Lv800Bb::DoWriteHalf(uint32_t io_addr, uint16_t value) {
             LOG(Caution, "Am29Lv800Bb unsupported FSM state: "
                          "cmd=0x%04X io_addr=0x%X value=0x%04X\n",
                 cmd_, io_addr, value);
-            CerfFatalExit(1);
+            CerfFatalExit(CERF_FATAL_RUNTIME_ERROR);
         }
         break;
     }

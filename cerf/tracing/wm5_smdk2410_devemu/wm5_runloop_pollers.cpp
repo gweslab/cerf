@@ -2,6 +2,9 @@
 #include "../../core/cerf_emulator.h"
 #include "../../core/log.h"
 #include "../../cpu/emulated_memory.h"
+#include "../../peripherals/cerf_virt/cerf_virt_framebuffer.h"
+#include "../../peripherals/cerf_virt/cerf_virt_addr_map.h"
+#include "../../host/host_screenshot.h"
 #include "wm5_bundle.h"
 
 #include <atomic>
@@ -20,14 +23,17 @@ public:
     void OnReady() override {
         auto& tm = emu_.Get<TraceManager>();
         tm.RegisterForBundle(kWm5BundleCrc32, [&] {
-            tm.OnRunLoopIter([this](const TraceContext& c) { UserSampler  (c); });
-            tm.OnRunLoopIter([this](const TraceContext& c) { AnyPcSampler (c); });
+            /* UserSampler/AnyPcSampler: unbounded per-PC dumps, disabled (certmod-loop only). */
+            /* tm.OnRunLoopIter([this](const TraceContext& c) { UserSampler  (c); }); */
+            /* tm.OnRunLoopIter([this](const TraceContext& c) { AnyPcSampler (c); }); */
             tm.OnRunLoopIter([this](const TraceContext& c) { CertModData  (c); });
             tm.OnRunLoopIter([this](const TraceContext& c) { L1Fs         (c); });
             tm.OnRunLoopIter([this](const TraceContext& c) { L2Page0xDC   (c); });
             tm.OnRunLoopIter([this](const TraceContext& c) { SavedLrPoll  (c); });
             tm.OnRunLoopIter([this](const TraceContext& c) { FlagsPoll    (c); });
             tm.OnRunLoopIter([this](const TraceContext& c) { DiagPeriodic (c); });
+            tm.OnRunLoopIter([this](const TraceContext& c) { TemplatePoll (c); });
+            tm.OnRunLoopIter([this](const TraceContext& c) { ShotCadence  (c); });
         });
     }
 
@@ -150,6 +156,48 @@ private:
             c.pc, (unsigned long long)n);
     }
 
+    /* Poll the shared bar template (FB-PA 0xD01B7490, stride 960) on a 5x4 grid:
+       logs each grid-point content change + PC, to see whether the surface is
+       (re)drawn between its realloc and the copy that reads it (stale vs fresh). */
+    void TemplatePoll(const TraceContext& c) {
+        auto* fb = c.emu.TryGet<CerfVirtFramebuffer>();
+        if (!fb) return;
+        static const int32_t kRows[5] = { 0, 8, 13, 20, 25 };
+        static const int32_t kCols[4] = { 0, 80, 160, 239 };
+        const uint32_t base = 0xD01B7490u - CerfVirt::kFramebufferMemBase;
+        for (int r = 0; r < 5; ++r) {
+            for (int col = 0; col < 4; ++col) {
+                const int idx = r * 4 + col;
+                const uint32_t off = base + (uint32_t)kRows[r] * 960u
+                                          + (uint32_t)kCols[col] * 4u;
+                if (off + 4u > fb->RegionBytes()) continue;
+                const uint32_t v = *reinterpret_cast<const uint32_t*>(fb->Bytes() + off);
+                const uint32_t prev = templ_grid_last_[idx].exchange(v, std::memory_order_relaxed);
+                if (prev == v) continue;
+                LOG(Trace, "[TEMPL] px(%d,%d) 0x%08X -> 0x%08X PC=0x%08X LR=0x%08X SP=0x%08X\n",
+                    kCols[col], kRows[r], prev, v, c.pc, c.regs[14], c.regs[13]);
+            }
+        }
+    }
+
+    /* Periodically save a host screenshot so the magenta-sentinel result
+       (composite-of-uninitialized bar surface) is captured without UI
+       interaction. Cadence by runloop iter; capped. */
+    void ShotCadence(const TraceContext& c) {
+        const uint64_t n = ++shot_iter_;
+        if ((n % 250000ull) != 0ull) return;
+        if (shot_count_.fetch_add(1, std::memory_order_relaxed) >= 16u) return;
+        c.emu.Get<HostScreenshot>().Save();
+    }
+
+    std::atomic<uint64_t> shot_iter_  {0};
+    std::atomic<uint32_t> shot_count_ {0};
+    std::atomic<uint32_t> templ_grid_last_[20]{
+        {0xCAFEBABEu},{0xCAFEBABEu},{0xCAFEBABEu},{0xCAFEBABEu},
+        {0xCAFEBABEu},{0xCAFEBABEu},{0xCAFEBABEu},{0xCAFEBABEu},
+        {0xCAFEBABEu},{0xCAFEBABEu},{0xCAFEBABEu},{0xCAFEBABEu},
+        {0xCAFEBABEu},{0xCAFEBABEu},{0xCAFEBABEu},{0xCAFEBABEu},
+        {0xCAFEBABEu},{0xCAFEBABEu},{0xCAFEBABEu},{0xCAFEBABEu} };
     std::atomic<uint32_t> user_pc_last_  {0xFFFFFFFFu};
     std::atomic<uint64_t> user_pc_count_ {0};
     std::atomic<uint32_t> any_pc_last_   {0};

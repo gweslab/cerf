@@ -11,7 +11,11 @@
 #include <atomic>
 #include <cstdio>
 
+#if CERF_DEV_MODE
 std::atomic<uint64_t> Log::detail::enabled_mask{Log::MASK_ALL};
+#else
+std::atomic<uint64_t> Log::detail::enabled_mask{Log::MASK_NONE};
+#endif
 static FILE* g_logfile = nullptr;
 static std::atomic<bool> g_flush{false};
 static std::atomic<bool> g_allow_flood{false};

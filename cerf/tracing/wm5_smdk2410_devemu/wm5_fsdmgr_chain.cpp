@@ -2,7 +2,7 @@
 #include "../../core/cerf_emulator.h"
 #include "../../core/log.h"
 #include "../../cpu/emulated_memory.h"
-#include "../../socs/page_table_builder.h"
+#include "../../boards/page_table_builder.h"
 #include "wm5_bundle.h"
 
 namespace {

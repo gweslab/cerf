@@ -6,7 +6,8 @@
 #include "../../peripherals/peripheral_dispatcher.h"
 
 bool Sa1110Lcd::ShouldRegister() {
-    return emu_.Get<BoardDetector>().GetSoc() == SocFamily::SA1110;
+    auto* bd = emu_.TryGet<BoardDetector>();
+    return bd && bd->GetSoc() == SocFamily::SA1110;
 }
 
 void Sa1110Lcd::OnReady() {

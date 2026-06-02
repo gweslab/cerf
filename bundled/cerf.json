@@ -1,3 +1,10 @@
 {
-  "device": "wm5_smdk2410_devemu"
+  "device": "cerfos",
+  "global_substitutions_inside_rom": {
+    "ddi.dll": "cerf_guest.dll",
+    "DeviceEmulator_lcd.dll": "cerf_guest.dll",
+    "s3c2410disp.dll": "cerf_guest.dll",
+    "ddi_tievm3530.dll": "cerf_guest.dll",
+    "ddraw_ipu_sdc.dll": "cerf_guest.dll"
+  }
 }

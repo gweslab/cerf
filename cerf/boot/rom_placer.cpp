@@ -7,7 +7,7 @@
 #include "../core/cerf_emulator.h"
 #include "../core/log.h"
 #include "../cpu/emulated_memory.h"
-#include "../socs/page_table_builder.h"
+#include "../boards/page_table_builder.h"
 
 #include <algorithm>
 #include <cstdint>
@@ -32,6 +32,10 @@ void RomPlacer::OnReady() {
         return;
     }
     auto& page_tables = emu_.Get<PageTableBuilder>();
+    if (page_tables.BackedMemoryRegions().empty()) {
+        LOG(Boot, "RomPlacer: no backed regions; nothing to place\n");
+        return;
+    }
     auto& mem         = emu_.Get<EmulatedMemory>();
 
     for (const auto& r : page_tables.BackedMemoryRegions()) {
@@ -79,9 +83,10 @@ void RomPlacer::OnReady() {
                 physfirst, uint32_t(physfirst + copy_len), pa_base);
         }
 
-        if (!rom.is_b000ff && rom.has_imgfs) {
+        if (!rom.is_b000ff) {
             uint32_t flash_va_base = 0;
             uint32_t flash_pa_base = 0;
+            uint32_t flash_size    = 0;
             bool     have_flash    = false;
             for (const auto& xip : rom.xips) {
                 const uint32_t va = xip.load_offset;
@@ -92,31 +97,32 @@ void RomPlacer::OnReady() {
                     if (pa >= reg.pa_base + reg.size) continue;
                     flash_va_base = va;
                     flash_pa_base = reg.pa_base;
+                    flash_size    = reg.size;
                     have_flash    = true;
                     break;
                 }
                 if (have_flash) break;
             }
-            if (!have_flash) {
+            if (have_flash) {
+                const uint32_t bank_va_base =
+                    flash_va_base - (page_tables.VaToPa(flash_va_base)
+                                     - flash_pa_base);
+                const size_t file_len =
+                    std::min<size_t>(rom.flat.size(), flash_size);
+                mem.CopyIn(flash_pa_base, rom.flat.data(), file_len);
+                LOG(Boot,
+                    "RomPlacer %s: full flash image %zu bytes placed at "
+                    "kva=0x%08X..0x%08X  pa=0x%08X..0x%08X  "
+                    "(fills inter-XIP gaps incl. XIPCHAIN table)\n",
+                    rom.filename.c_str(), file_len,
+                    bank_va_base, uint32_t(bank_va_base + file_len),
+                    flash_pa_base, uint32_t(flash_pa_base + file_len));
+            } else if (rom.has_imgfs) {
                 LOG(Caution,
                     "RomPlacer %s: IMGFS present but no XIP region maps "
                     "to a Flash backed region — IMGFS bytes will not be "
                     "reachable, userspace mount will fail\n",
                     rom.filename.c_str());
-            } else {
-                const uint32_t bank_va_base =
-                    flash_va_base - (page_tables.VaToPa(flash_va_base)
-                                     - flash_pa_base);
-                const size_t   file_len     = rom.flat.size();
-                mem.CopyIn(flash_pa_base, rom.flat.data(), file_len);
-                LOG(Boot,
-                    "RomPlacer %s: flash image %zu bytes placed at "
-                    "kva=0x%08X..0x%08X  pa=0x%08X..0x%08X  "
-                    "(IMGFS @ file_off=0x%X)\n",
-                    rom.filename.c_str(), file_len,
-                    bank_va_base, uint32_t(bank_va_base + file_len),
-                    flash_pa_base, uint32_t(flash_pa_base + file_len),
-                    rom.imgfs_file_off);
             }
         }
     }

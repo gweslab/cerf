@@ -80,6 +80,22 @@ struct ParsedXipRegion {
     ParsedTOC  toc;
 };
 
+struct ParsedImgfsModule {
+    std::string lpszFileName;
+    size_t      dirent_file_off = 0;
+    uint32_t    file_size       = 0;
+    uint32_t    mod_indexptr    = 0;
+    uint32_t    mod_indexsize   = 0;
+    struct Section {
+        std::string name;
+        size_t      dirent_file_off = 0;
+        uint32_t    file_size       = 0;
+        uint32_t    sec_indexptr    = 0;
+        uint32_t    sec_indexsize   = 0;
+    };
+    std::vector<Section> sections;
+};
+
 struct ParsedRom {
     std::string                  filename;       /* e.g. "NK.bin"      */
     std::string                  path;           /* absolute on disk   */
@@ -90,8 +106,11 @@ struct ParsedRom {
     uint32_t                     entry_va     = 0;
     bool                         is_b000ff    = false;
     bool                         has_imgfs        = false;
+    bool                         imgfs_is_ftl     = false;
     uint32_t                     imgfs_file_off   = 0;
+    uint32_t                     imgfs_bytes_per_block = 0;
     std::vector<ParsedXipRegion> xips;
+    std::vector<ParsedImgfsModule> imgfs_modules;
 };
 
 class RomParserService : public Service {

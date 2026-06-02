@@ -27,7 +27,7 @@ void ArmJit::InitializePopShadowStackHelper() {
     if (!pop_shadow_stack_helper_) {
         LOG(Caution, "ArmJit: VirtualAlloc(PopShadowStackHelper) failed gle=%lu\n",
             GetLastError());
-        CerfFatalExit(2);
+        CerfFatalExit(CERF_FATAL_RUNTIME_ERROR);
     }
 
     using namespace x86;

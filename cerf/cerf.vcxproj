@@ -73,7 +73,7 @@
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>kernel32.lib;user32.lib;gdi32.lib;shell32.lib;comctl32.lib;advapi32.lib;comdlg32.lib;imm32.lib;winmm.lib;msimg32.lib;psapi.lib;dbghelp.lib;Ws2_32.lib;iphlpapi.lib;dwmapi.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>kernel32.lib;user32.lib;gdi32.lib;shell32.lib;comctl32.lib;advapi32.lib;comdlg32.lib;imm32.lib;winmm.lib;msimg32.lib;psapi.lib;dbghelp.lib;Ws2_32.lib;iphlpapi.lib;dwmapi.lib;gdiplus.lib;uxtheme.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
@@ -95,7 +95,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>kernel32.lib;user32.lib;gdi32.lib;shell32.lib;comctl32.lib;advapi32.lib;comdlg32.lib;imm32.lib;winmm.lib;msimg32.lib;psapi.lib;dbghelp.lib;Ws2_32.lib;iphlpapi.lib;dwmapi.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>kernel32.lib;user32.lib;gdi32.lib;shell32.lib;comctl32.lib;advapi32.lib;comdlg32.lib;imm32.lib;winmm.lib;msimg32.lib;psapi.lib;dbghelp.lib;Ws2_32.lib;iphlpapi.lib;dwmapi.lib;gdiplus.lib;uxtheme.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
@@ -113,7 +113,8 @@
     <ResourceCompile Include="cerf.rc" />
   </ItemGroup>
   <ItemGroup>
-    <None Include="cerf.ico" />
+    <None Include="assets\cerf.ico" />
+    <None Include="assets\uart_boot_bar.png" />
   </ItemGroup>
   <!-- Bundled device files — copied to devices/ next to cerf.exe.
        OverwriteReadOnlyFiles: source bundles once contained ROM-extracted

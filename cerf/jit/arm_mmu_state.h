@@ -22,7 +22,11 @@ union ArmCp15ControlRegister {
         uint32_t v         : 1;   /* exception vector relocation (high vectors) */
         uint32_t rr        : 1;   /* cache replacement strategy */
         uint32_t l4        : 1;   /* load instruction bit-0 ignore-Thumb-mode */
-        uint32_t reserved3 : 16;
+        uint32_t reserved3 : 7;   /* bits 16..22 */
+        uint32_t xp        : 1;   /* bit 23: 0=subpage AP enabled (v5 fmt),
+                                              1=subpage AP disabled (ARMv6 fmt)
+                                              ARM1136 TRM Table 3-44 p3-64 */
+        uint32_t reserved4 : 8;   /* bits 24..31 */
     } bits;
     uint32_t word;
 };
@@ -99,24 +103,74 @@ enum class ArmMmuAccess : uint8_t {
     kExecute     = 10,
 };
 
-/* One TLB slot. PTE caches the L1/L2 descriptor word; HostAdjust is
-   (host_pointer - guest_VA) for the resolved page so the JIT-emit
-   fast path can compute the host load address with a single add. */
-struct ArmTlbSlot {
-    uint32_t  virtual_address;
-    uint32_t  pte;
-    uintptr_t host_adjust;
-    bool      valid;
+/* Direct-mapped 4 KB-granular TLB entry (QEMU softmmu CPUTLBEntry analog): one
+   slot per page lets the JIT load/store fast path resolve a host pointer with an
+   index + tag compare instead of a per-access call into the page-table walker. */
+constexpr uint32_t kArmTlbInvalidTag = 0xFFFFFFFFu;  /* low bits set ⇒ never equals a page-aligned tag */
+
+struct ArmTlbEntry {
+    uint32_t  tag;         /* FCSE-folded VA page, or kArmTlbInvalidTag when empty */
+    uint32_t  va_addend;   /* host_ptr - foldedVA, so host = foldedVA + va_addend (32-bit host) */
+    uint32_t  pa_page;     /* PA & ~0xFFF — store fast path rebuilds PA for the SMC code-dirty check */
+    uint8_t   asid;        /* ARM DDI 0406C.c B3.9.1: non-global matches only this CONTEXTIDR[7:0] */
+    uint8_t   global;      /* 1 ⇒ matches any ASID */
+    uint8_t   writable;    /* 1 ⇒ store fast path eligible (write-permitted + uniform RAM host) */
+    uint8_t   pad;
 };
+static_assert(sizeof(ArmTlbEntry) == 16, "ArmTlbEntry must be 16 bytes for index scaling");
 
-/* TLB unit — one per access kind (ITLB / DTLB). The TLB is a small
-   fixed-size cache; eviction is round-robin via next_free_slot. */
-constexpr size_t kArmTlbSlotCount = 64;
+/* N-way set-associative. SA-1110 Dev Man (MMU chapter): "two 32-entry fully
+   associative translation buffers" — direct-mapped can't emulate that, so under
+   FCSE two processes sharing a low VA collide on the dropped process_id bits,
+   evict each other, and hang the demand-pager. Inline probe checks only way 0. */
+constexpr uint32_t kArmTlbWays       = 8;
+constexpr uint32_t kArmTlbSetBits    = 9;
+constexpr uint32_t kArmTlbSets       = 1u << kArmTlbSetBits;       /* 512 */
+constexpr uint32_t kArmTlbSetMask    = kArmTlbSets - 1u;
+constexpr uint32_t kArmTlbEntryCount = kArmTlbSets * kArmTlbWays;  /* 4096 */
+constexpr uint32_t kArmTlbSetShift   = 7;  /* log2(kArmTlbWays * sizeof entry) */
+static_assert((1u << kArmTlbSetShift) == kArmTlbWays * sizeof(ArmTlbEntry),
+              "set byte-stride shift must match way count * entry size");
 
+/* Set for a VA is entries[ArmTlbSetBase(va) .. +kArmTlbWays); way 0 is MRU. */
 struct ArmTlbUnit {
-    int8_t      next_free_slot;
-    ArmTlbSlot  slots[kArmTlbSlotCount];
+    ArmTlbEntry entries[kArmTlbEntryCount];
 };
+
+inline uint32_t ArmTlbSetBase(uint32_t folded_va) {
+    return ((folded_va >> 12) & kArmTlbSetMask) * kArmTlbWays;
+}
+
+/* Scan a set's ways for a live match. asid is CONTEXTIDR[7:0]; need_write
+   requires the way's install-time write permission. Returns the way or -1. */
+inline int ArmTlbMatchWay(const ArmTlbUnit* unit, uint32_t base, uint32_t va_page,
+                          uint8_t asid, bool need_write) {
+    for (uint32_t w = 0; w < kArmTlbWays; ++w) {
+        const ArmTlbEntry& e = unit->entries[base + w];
+        if (e.tag == va_page && (e.global || e.asid == asid) &&
+            (!need_write || e.writable))
+            return static_cast<int>(w);
+    }
+    return -1;
+}
+
+/* Move way w to way 0 (MRU) so the way-0-only inline probe finds it next time. */
+inline void ArmTlbPromote(ArmTlbUnit* unit, uint32_t base, int w) {
+    if (w <= 0) return;
+    ArmTlbEntry hit = unit->entries[base + static_cast<uint32_t>(w)];
+    for (int i = w; i > 0; --i)
+        unit->entries[base + static_cast<uint32_t>(i)] =
+            unit->entries[base + static_cast<uint32_t>(i - 1)];
+    unit->entries[base] = hit;
+}
+
+/* Shift the set down (LRU evict of the last way) and return the freed way-0
+   slot for a freshly-walked entry. */
+inline ArmTlbEntry& ArmTlbInsertSlot(ArmTlbUnit* unit, uint32_t base) {
+    for (uint32_t i = kArmTlbWays - 1; i > 0; --i)
+        unit->entries[base + i] = unit->entries[base + i - 1];
+    return unit->entries[base];
+}
 
 /* Aggregate cp15 + TLB state. The MMU service holds exactly one
    instance; emitted JIT code reads/writes fields by absolute byte
@@ -142,14 +196,24 @@ struct ArmMmuState {
     uint32_t                     tpidruro;     /* c13 CRm=0 op2=3 */
     uint32_t                     tpidrprw;     /* c13 CRm=0 op2=4 */
 
-    /* TLB scan-bias slot shared by all LDREX/STREX call sites. The
-       bias only affects which TLB way is checked first, never
-       correctness — LDREX/STREX are kernel-lock instructions,
-       infrequent enough that one shared slot suffices. */
-    int8_t                       ldrex_strex_tlb_hint;
-
     ArmTlbUnit                   data_tlb;
     ArmTlbUnit                   instruction_tlb;
+
+    /* SMC code-word marks: 1 bit per 4-byte PA word over [code_word_base,
+       code_word_top), set on fetch. DO NOT coarsen below word granularity —
+       the kernel packs literal-pool data right after a BX LR, so a coarser
+       unit lets a data write false-positive its code page dirty. */
+    uint8_t*                     code_xlat_bitmap;
+    uint32_t                     code_word_base;
+    uint32_t                     code_word_top;
+    uint32_t                     code_word_bitmap_bytes;
+
+    /* SMC dirty set, 1 bit per 4 KB PA page over the same extent. A write
+       to a marked code word sets its page's bit; the next I-cache invalidate
+       invalidates only blocks on dirty pages (targeted, not a whole-cache
+       flush — that was the storm). */
+    uint8_t*                     code_page_dirty;
+    uint32_t                     code_page_dirty_bytes;
 };
 
 /* FCSE address fold. When the MMU is enabled and the guest VA is in

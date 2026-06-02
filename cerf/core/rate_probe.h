@@ -30,6 +30,7 @@ public:
         JitPendClr,
         DmaWrites,
         AudioMsgs,
+        MmuXlateCalls,
         Count,
     };
 

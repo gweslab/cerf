@@ -24,23 +24,33 @@ public:
        prepended to parent->sub_block. Returns the placed JitBlock. */
     JitBlock* PlaceSubAt(void* memory, JitBlock* parent, const JitBlock& block);
 
-    /* EPFromGuestAddr equivalent — find the outer entrypoint whose
-       [guest_start, guest_end] range contains guest_addr, then walk
-       its sub_block chain for an exact-PC match; fall back to the
-       outer entrypoint on no sub match. */
-    JitBlock* FindContaining(uint32_t guest_addr);
+    /* Find the outer entrypoint whose folded-VA range contains
+       folded_va, then walk its sub_block chain for an exact guest_start
+       match; fall back to the outer entrypoint on no sub match. */
+    JitBlock* FindContaining(uint32_t folded_va);
 
-    /* EPFromGuestAddrExact equivalent — like FindContaining but
-       returns nullptr unless the result's guest_start == guest_addr. */
-    JitBlock* FindExact(uint32_t guest_addr);
+    /* Like FindContaining but returns nullptr unless the result's
+       guest_start == folded_va. */
+    JitBlock* FindExact(uint32_t folded_va);
 
-    /* GetNextEPFromGuestAddr equivalent — first outer with
-       guest_start > guest_addr. */
-    JitBlock* FindNext(uint32_t guest_addr);
+    /* First outer with guest_start > folded_va. */
+    JitBlock* FindNext(uint32_t folded_va);
 
-    /* IsGuestRangeInCache equivalent — any outer entry's range
-       intersects [start_addr, end_addr]? */
-    bool ContainsRange(uint32_t start_addr, uint32_t end_addr) const;
+    /* Any outer entry's folded-VA range intersects [va_lo, va_hi]? */
+    bool ContainsRange(uint32_t va_lo, uint32_t va_hi) const;
+
+    /* Invoked once per removed block (outer entry + each of its sub-entries)
+       just before unlink, so the caller can drop that block's jump-cache slot. */
+    using RemovedCb = void (*)(uint32_t guest_start, void* ctx);
+
+    /* RbDelete one outer entry the caller already located (via the
+       IsaBlockSpace phys-page list or FindOuter); fires cb for it + each
+       sub-entry first. Arena memory is not freed (reclaimed on full Flush). */
+    void RemoveNode(JitBlock* outer, RemovedCb cb, void* ctx);
+
+    /* Outer entry whose folded-VA range contains folded_va (the RB node's
+       embedded block), or nullptr — locates an FCSE-PID-reuse stale block. */
+    JitBlock* FindOuter(uint32_t folded_va);
 
     /* FlushEntrypoints equivalent — forget all references. The
        backing memory is in the arena and is freed by arena flush;
@@ -76,6 +86,12 @@ private:
     Node* RbFind(Node* root, uint32_t addr) const;
     Node* RbFindNext(Node* root, uint32_t addr) const;
     bool  RbContainsRange(Node* root, uint32_t start_addr, uint32_t end_addr) const;
+
+    /* CLRS RB-delete (Ch. 13). Same root-returning style as RbInsert. */
+    Node* Transplant(Node* root, Node* u, Node* v);
+    Node* TreeMinimum(Node* x);
+    Node* RbDelete(Node* root, Node* z);
+    Node* RbDeleteFixup(Node* root, Node* x);
 };
 
 constexpr size_t JitBlockIndex::OuterEntrySize() {

@@ -5,14 +5,38 @@
 #include "../arm_jit.h"
 #include "../arm_mmu.h"
 #include "../arm_mmu_state.h"
+#include "../arm_tlb_ops.h"
 #include "../cpu_state.h"
 #include "../place_fns.h"
 #include "../x86_emit.h"
 
-/* Shared cp15 (system control coprocessor) MRC / MCR emit body —
-   the CRn dispatch shape is common to every ARM920T-class core
-   regardless of SoC, so this lives at the JIT-place layer and per-SoC
-   CoprocEmitter concretes delegate here for cp_num == 15. */
+namespace {
+
+/* Store Rd into the cp15 field at mmu_disp; on a real change drop the VA-keyed
+   native caches via ContextSwitchFlush. NOT a translation-cache flush — blocks
+   are phys-keyed so they survive an address-space change; a TC flush here would
+   reinstate the per-context-switch storm. `mask` is ANDed in (0xFFFFFFFF=none). */
+uint8_t* EmitFieldWriteContextSwitch(uint8_t* cursor, ArmJit* jit,
+                                     int32_t rd_disp, int32_t mmu_disp,
+                                     uint32_t mask) {
+    using namespace x86;
+    EmitMovRegBaseDisp32(cursor, kEax, kStateReg, rd_disp);
+    if (mask != 0xFFFFFFFFu) EmitAndRegImm32(cursor, kEax, mask);
+    EmitCmpRegBaseDisp32(cursor, kEax, kMmuReg, mmu_disp);
+    EmitMovBaseDisp32Reg(cursor, kMmuReg, mmu_disp, kEax);   /* store (keeps flags) */
+    uint8_t* same = EmitJzLabel(cursor);                     /* unchanged → no flush */
+    EmitMovRegImm32(cursor, kEcx,
+        static_cast<uint32_t>(reinterpret_cast<uintptr_t>(jit)));
+    EmitCall(cursor, reinterpret_cast<void*>(&ArmJit::ContextSwitchFlushHelper));
+    FixupLabel(same, cursor);
+    return cursor;
+}
+
+}  // namespace
+
+/* Shared cp15 MRC / MCR emit body — CRn dispatch common across the
+   ARMv4T..v7 cores supported today. Per-CPU concretes intercept any
+   register whose semantics diverge before delegating here. */
 uint8_t* EmitCp15RegisterTransfer(uint8_t*      cursor,
                                   DecodedInsn*  d,
                                   BlockContext* ctx) {
@@ -98,11 +122,8 @@ uint8_t* EmitCp15RegisterTransfer(uint8_t*      cursor,
                 EmitMovRegBaseDisp32(cursor, kEax, kMmuReg,
                     static_cast<int32_t>(offsetof(ArmMmuState, aux_control_register)));
                 EmitMovBaseDisp32Reg(cursor, kStateReg, rd_disp, kEax);
-            } else if (d->cp == 2 && jit->ProcessorConfig()->HasCp15V7() &&
+            } else if (d->cp == 2 && jit->ProcessorConfig()->HasCp15V6() &&
                        d->cp_opc == 0 && d->crm == 0) {
-                /* v7 CPACR — same coprocessor-access concept as the
-                   ARM920T CRn=15 register, just relocated. Reuse
-                   coprocessor_access storage. */
                 EmitMovRegBaseDisp32(cursor, kEax, kMmuReg,
                     static_cast<int32_t>(offsetof(ArmMmuState, coprocessor_access)));
                 EmitMovBaseDisp32Reg(cursor, kStateReg, rd_disp, kEax);
@@ -117,23 +138,10 @@ uint8_t* EmitCp15RegisterTransfer(uint8_t*      cursor,
                 EmitCall(cursor, ctx->sctlr_write_target);
             } else if (d->cp == 1) {
                 EmitMovRegBaseDisp32(cursor, kEax, kStateReg, rd_disp);
-                /* Reserved bits must be 0. */
-                EmitTestRegImm32(cursor, kEax, 0xFFFFFFCCu);
-                uint8_t* raise_label = EmitJnzLabel(cursor);
-                /* P bit (page table memory type) must be set. */
-                EmitTestRegImm32(cursor, kEax, 2u);
-                uint8_t* store_label = EmitJnzLabel(cursor);
-                FixupLabel(raise_label, cursor);
-                cursor = EmitRaiseUndAndReturn(cursor, d, ctx);
-                FixupLabel(store_label, cursor);
                 EmitMovBaseDisp32Reg(cursor, kMmuReg,
                     static_cast<int32_t>(offsetof(ArmMmuState, aux_control_register)), kEax);
-            } else if (d->cp == 2 && jit->ProcessorConfig()->HasCp15V7() &&
+            } else if (d->cp == 2 && jit->ProcessorConfig()->HasCp15V6() &&
                        d->cp_opc == 0 && d->crm == 0) {
-                /* v7 CPACR write — accept any value into the same
-                   coprocessor_access slot. The walker doesn't gate
-                   on CPACR yet; storage-only is consistent with the
-                   CRn=15 ARM920T path. */
                 EmitMovRegBaseDisp32(cursor, kEax, kStateReg, rd_disp);
                 EmitMovBaseDisp32Reg(cursor, kMmuReg,
                     static_cast<int32_t>(offsetof(ArmMmuState, coprocessor_access)), kEax);
@@ -144,11 +152,11 @@ uint8_t* EmitCp15RegisterTransfer(uint8_t*      cursor,
         break;
 
     case 2: {
-        /* Register 2 — Translation Table Base 0 / 1 / control. v7
-           cores add TTBR1 (op2=1) and TTBCR (op2=2) at the same
-           CRn. See references/omap3530/armv7_arch_excerpts.txt
-           § cp15 c2/c10/c13 for QEMU encodings. */
-        if (jit->ProcessorConfig()->HasCp15V7() &&
+        /* Register 2 — Translation Table Base 0/1 + control. v7 adds TTBR1
+           (op2=1) and TTBCR (op2=2) at the same CRn=2. */
+        const int32_t ttbr0_disp =
+            static_cast<int32_t>(offsetof(ArmMmuState, translation_table_base));
+        if (jit->ProcessorConfig()->HasCp15V6() &&
             (d->cp == 1 || d->cp == 2)) {
             const int32_t disp = (d->cp == 1)
                 ? static_cast<int32_t>(offsetof(ArmMmuState, ttbr1))
@@ -162,17 +170,16 @@ uint8_t* EmitCp15RegisterTransfer(uint8_t*      cursor,
             }
             break;
         }
-        /* v7: TTBR0 writes accept any value; the walker masks to bits[31:14]
-           (armv7_arch_excerpts.txt:522-527) on use. Re-tightening here UND-
-           faults legitimate kernel sentinel writes (observed: R1=0xFFFFFFFF). */
+        /* TTBR0 write accepts any value; the walker masks to bits[31:14] on
+           use. Do NOT re-tighten here — it UND-faults legitimate kernel
+           sentinel writes (observed R1=0xFFFFFFFF). A TTBR0 change is a
+           process switch → flush the VA-keyed caches (not the TC). */
         if (d->l) {
-            EmitMovRegBaseDisp32(cursor, kEax, kMmuReg,
-                static_cast<int32_t>(offsetof(ArmMmuState, translation_table_base)));
+            EmitMovRegBaseDisp32(cursor, kEax, kMmuReg, ttbr0_disp);
             EmitMovBaseDisp32Reg(cursor, kStateReg, rd_disp, kEax);
         } else if (jit->ProcessorConfig()->HasCp15V7()) {
-            EmitMovRegBaseDisp32(cursor, kEax, kStateReg, rd_disp);
-            EmitMovBaseDisp32Reg(cursor, kMmuReg,
-                static_cast<int32_t>(offsetof(ArmMmuState, translation_table_base)), kEax);
+            cursor = EmitFieldWriteContextSwitch(cursor, jit, rd_disp, ttbr0_disp,
+                                                 0xFFFFFFFFu);
         } else {
             EmitMovRegBaseDisp32(cursor, kEcx, kStateReg, rd_disp);
             EmitMovRegReg(cursor, kEax, kEcx);
@@ -187,34 +194,47 @@ uint8_t* EmitCp15RegisterTransfer(uint8_t*      cursor,
             FixupLabel(raise_label, cursor);
             cursor = EmitRaiseUndAndReturn(cursor, d, ctx);
             FixupLabel(store_label, cursor);
-            EmitMovRegBaseDisp32(cursor, kEax, kStateReg, rd_disp);
-            EmitMovBaseDisp32Reg(cursor, kMmuReg,
-                static_cast<int32_t>(offsetof(ArmMmuState, translation_table_base)), kEax);
+            cursor = EmitFieldWriteContextSwitch(cursor, jit, rd_disp, ttbr0_disp,
+                                                 0xFFFFFFFFu);
         }
         break;
     }
 
     case 3: {
-        /* DACR=1 only — the MMU walker skips per-domain checks; any
-           other value would silently bypass that assumption. */
+        /* DACR domain-0 field must be Client(0b01) or Manager(0b11): the
+           walker enforces AP for Client and skips it for Manager. bit0
+           clear = No-access/reserved → UND (can't be honored). Other
+           domains' fields are unused (the walk faults non-zero domains). */
         if (d->l) {
             EmitMovRegBaseDisp32(cursor, kEax, kMmuReg,
                 static_cast<int32_t>(offsetof(ArmMmuState, domain_access_control)));
             EmitMovBaseDisp32Reg(cursor, kStateReg, rd_disp, kEax);
         } else {
             EmitMovRegBaseDisp32(cursor, kEax, kStateReg, rd_disp);
-            EmitCmpRegImm32(cursor, kEax, 1);
-            uint8_t* store_label = EmitJzLabel(cursor);
+            EmitTestRegImm32(cursor, kEax, 1u);
+            uint8_t* store_label = EmitJnzLabel(cursor);
             cursor = EmitRaiseUndAndReturn(cursor, d, ctx);
             FixupLabel(store_label, cursor);
             EmitMovBaseDisp32Reg(cursor, kMmuReg,
                 static_cast<int32_t>(offsetof(ArmMmuState, domain_access_control)), kEax);
+            /* Flush both TLBs: a DACR change alters live AP enforcement, but the
+               inline fast path trusts the install-time permission, so a stale
+               entry would keep using the old domain access. */
+            EmitLeaRegBaseDisp32(cursor, kEax, kMmuReg,
+                static_cast<int32_t>(offsetof(ArmMmuState, data_tlb)));
+            EmitPushReg(cursor, kEax);
+            EmitCall(cursor, reinterpret_cast<void*>(&ArmTlbFlushAll));
+            EmitAddRegImm32(cursor, kEsp, 4);
+            EmitLeaRegBaseDisp32(cursor, kEax, kMmuReg,
+                static_cast<int32_t>(offsetof(ArmMmuState, instruction_tlb)));
+            EmitPushReg(cursor, kEax);
+            EmitCall(cursor, reinterpret_cast<void*>(&ArmTlbFlushAll));
+            EmitAddRegImm32(cursor, kEsp, 4);
         }
         break;
     }
 
     case 4:
-        /* Register 4 — reserved on ARM920T. */
         cursor = EmitRaiseUndAndReturn(cursor, d, ctx);
         break;
 
@@ -260,7 +280,7 @@ uint8_t* EmitCp15RegisterTransfer(uint8_t*      cursor,
     case 10: {
         /* PRRR/NMRR storage only valid while SCTLR.TRE=0 — if TRE
            becomes 1, walker must consult these or attributes diverge. */
-        if (jit->ProcessorConfig()->HasCp15V7() && d->cp_opc == 0 &&
+        if (jit->ProcessorConfig()->HasCp15V6() && d->cp_opc == 0 &&
             d->crm == 2 && (d->cp == 0 || d->cp == 1)) {
             const int32_t disp = (d->cp == 0)
                 ? static_cast<int32_t>(offsetof(ArmMmuState, prrr))
@@ -280,12 +300,11 @@ uint8_t* EmitCp15RegisterTransfer(uint8_t*      cursor,
 
     case 11:
     case 12:
-        /* Reserved on ARM920T. */
         cursor = EmitRaiseUndAndReturn(cursor, d, ctx);
         break;
 
     case 13: {
-        if (jit->ProcessorConfig()->HasCp15V7() &&
+        if (jit->ProcessorConfig()->HasCp15V6() &&
             d->cp >= 1 && d->cp <= 4) {
             int32_t disp = 0;
             switch (d->cp) {
@@ -297,6 +316,10 @@ uint8_t* EmitCp15RegisterTransfer(uint8_t*      cursor,
             if (d->l) {
                 EmitMovRegBaseDisp32(cursor, kEax, kMmuReg, disp);
                 EmitMovBaseDisp32Reg(cursor, kStateReg, rd_disp, kEax);
+            } else if (d->cp == 1) {
+                /* CONTEXTIDR[7:0] is the ASID — an address-space switch. */
+                cursor = EmitFieldWriteContextSwitch(cursor, jit, rd_disp, disp,
+                                                     0xFFFFFFFFu);
             } else {
                 EmitMovRegBaseDisp32(cursor, kEax, kStateReg, rd_disp);
                 EmitMovBaseDisp32Reg(cursor, kMmuReg, disp, kEax);
@@ -308,13 +331,12 @@ uint8_t* EmitCp15RegisterTransfer(uint8_t*      cursor,
                 static_cast<int32_t>(offsetof(ArmMmuState, process_id)));
             EmitMovBaseDisp32Reg(cursor, kStateReg, rd_disp, kEax);
         } else {
-            EmitMovRegBaseDisp32(cursor, kEax, kStateReg, rd_disp);
-            EmitTestRegImm32(cursor, kEax, 0x01FFFFFFu);
-            uint8_t* store_label = EmitJzLabel(cursor);
-            cursor = EmitRaiseUndAndReturn(cursor, d, ctx);
-            FixupLabel(store_label, cursor);
-            EmitMovBaseDisp32Reg(cursor, kMmuReg,
-                static_cast<int32_t>(offsetof(ArmMmuState, process_id)), kEax);
+            /* FCSE PID = bits[31:25] (ARM1136 TRM §3.3.35); [24:0] SBZ, ignored
+               not faulted. Mask so the walker's `p |= process_id` fold is right.
+               PID reuse is the stale-block trigger → context-switch flush. */
+            cursor = EmitFieldWriteContextSwitch(cursor, jit, rd_disp,
+                static_cast<int32_t>(offsetof(ArmMmuState, process_id)),
+                0xFE000000u);
         }
         break;
     }
@@ -324,30 +346,8 @@ uint8_t* EmitCp15RegisterTransfer(uint8_t*      cursor,
         cursor = EmitRaiseUndAndReturn(cursor, d, ctx);
         break;
 
-    case 15: {
-        /* Register 15 — Coprocessor Access Control. Read direct;
-           write must leave bits[31:14] clear (only the per-cp-num
-           access bits[13:0] are meaningful). */
-        if (d->l) {
-            EmitMovRegBaseDisp32(cursor, kEax, kMmuReg,
-                static_cast<int32_t>(offsetof(ArmMmuState, coprocessor_access)));
-            EmitMovBaseDisp32Reg(cursor, kStateReg, rd_disp, kEax);
-        } else {
-            EmitMovRegBaseDisp32(cursor, kEax, kStateReg, rd_disp);
-            EmitTestRegImm32(cursor, kEax, 0xFFFFC000u);
-            uint8_t* store_label = EmitJzLabel(cursor);
-            cursor = EmitRaiseUndAndReturn(cursor, d, ctx);
-            FixupLabel(store_label, cursor);
-            EmitMovBaseDisp32Reg(cursor, kMmuReg,
-                static_cast<int32_t>(offsetof(ArmMmuState, coprocessor_access)), kEax);
-        }
-        break;
-    }
-
+    case 15:
     default:
-        /* CRn is a 4-bit field so always 0..15 — this branch is
-           unreachable; matches the reference's ASSERT(FALSE) +
-           defensive UND raise. */
         cursor = EmitRaiseUndAndReturn(cursor, d, ctx);
         break;
     }

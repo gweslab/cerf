@@ -177,6 +177,13 @@ void Log::EmergencyPrintNativeStack(const char* tag) {
 /* ==== Terminal exits ===================================================== */
 
 void CerfFatalExit(int code) {
+    if (code == CERF_FATAL_USER_ERROR) {
+        /* Not a crash — skip the thread-freeze + crash.log + native-stack
+           dump so a missing ROM / unsupported board doesn't read as a bug. */
+        Log::Close();
+        ExitProcess((UINT)code);
+    }
+
     /* Freeze every other thread, open cerf.crash.log, stop using Log:: */
     Log::EmergencyStart();
     Log::EmergencyDumpAllThreadStacks();
@@ -184,23 +191,21 @@ void CerfFatalExit(int code) {
                    code, (unsigned long)GetCurrentThreadId());
     Log::EmergencyPrintNativeStack("[FATAL]");
     Log::Close();  /* flush-only, doesn't close g_logfile */
-    ExitProcess((UINT)code);
-}
 
-void CerfExitMemoryCorruption(const char* thunk, uint32_t arm_addr,
-                               const void* data, size_t len) {
-    Log::EmergencyStart();
-    Log::EmergencyDumpAllThreadStacks();
-    Log::Emergency("\n[FATAL] MEMORY CORRUPTION detected in %s\n", thunk);
-    Log::Emergency("[FATAL]   ARM address: 0x%08X\n", arm_addr);
-    if (data && len > 0) {
-        Log::Emergency("[FATAL]   Raw bytes: ");
-        const uint8_t* p = (const uint8_t*)data;
-        for (size_t i = 0; i < len && i < 64; i++)
-            Log::Emergency("%02X ", p[i]);
-        Log::Emergency("\n");
+#if !CERF_DEV_MODE
+    if (code == CERF_FATAL_RUNTIME_ERROR) {
+        MessageBoxA(nullptr,
+                    "Something inside CERF blew up and it has to close.\n\n"
+                    "Two log files were written next to cerf.exe:\n"
+                    "  - cerf.log         (full run log)\n"
+                    "  - cerf.crash.log   (thread snapshot at the crash)\n\n"
+                    "If you can share those, the developers can take a look "
+                    "and figure out what broke.",
+                    "CERF: unexpected error",
+                    MB_OK | MB_ICONERROR | MB_TASKMODAL | MB_TOPMOST);
     }
-    Log::Emergency("[FATAL]   Thread: tid=%lu\n", (unsigned long)GetCurrentThreadId());
-    CerfFatalExit(99);
+#endif
+
+    ExitProcess((UINT)code);
 }
 

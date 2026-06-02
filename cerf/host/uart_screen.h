@@ -46,4 +46,8 @@ private:
        Created lazily on first RenderInto call that needs them
        (HDC is needed for CreateFontW's matching). */
     HFONT font_cache_[2] = { nullptr, nullptr };
+
+    void DrawBootBar(uint32_t* dib_bgra32,
+                     uint32_t  width,
+                     uint32_t  height) const;
 };

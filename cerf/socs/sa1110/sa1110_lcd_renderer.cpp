@@ -4,6 +4,7 @@
 
 #include "../../boards/board_detector.h"
 #include "../../core/cerf_emulator.h"
+#include "../../core/device_config.h"
 #include "../../cpu/emulated_memory.h"
 #include "../../host/frame_renderer.h"
 #include "../../lcd/lcd_content_latch.h"
@@ -26,7 +27,9 @@ public:
     using FrameRenderer::FrameRenderer;
 
     bool ShouldRegister() override {
-        return emu_.Get<BoardDetector>().GetSoc() == SocFamily::SA1110;
+        if (emu_.Get<DeviceConfig>().guest_additions) return false;
+        auto* bd = emu_.TryGet<BoardDetector>();
+        return bd && bd->GetSoc() == SocFamily::SA1110;
     }
 
     /* iPAQ panel is portrait; SA1110 LCD controller scans landscape.
@@ -91,6 +94,15 @@ public:
                                              |  (uint32_t)b;
             }
         }
+    }
+
+    std::optional<FbLayout> GetFbLayout() override {
+        auto& lcd = emu_.Get<Sa1110Lcd>();
+        const uint32_t pa = lcd.GetFbPa();
+        if (pa == 0) return std::nullopt;
+        /* Pixel data follows the 32-byte dummy palette buffer (§11.7.1.2). */
+        return FbLayout{ pa + kDummyPaletteBytes,
+                         lcd.GetGuestW() * kBytesPerGuestPixel, 16u, true };
     }
 
 private:

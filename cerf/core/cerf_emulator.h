@@ -14,14 +14,14 @@
 
 class CerfEmulator {
 public:
-    explicit CerfEmulator(const CerfConfig& config);
+    CerfEmulator(const CerfConfig& config, int argc, char** argv);
     ~CerfEmulator();
 
     void Boot();
     void Bootstrap();
     void WaitForExit();
 
-    static constexpr int MAX_SERVICES = 192;
+    static constexpr int MAX_SERVICES = 512;
     static inline std::atomic<int> s_next_slot_{0};
 
     template<typename T>
@@ -32,7 +32,7 @@ public:
                 LOG(Caution, "Service slot overflow: %d >= MAX_SERVICES %d "
                         "(adding service %s). Raise MAX_SERVICES in cerf_emulator.h.\n",
                         s, MAX_SERVICES, typeid(T).name());
-                CerfFatalExit(2);
+                CerfFatalExit(CERF_FATAL_RUNTIME_ERROR);
             }
             return s;
         }();
@@ -48,7 +48,7 @@ public:
                     "REGISTER_SERVICE_AS this means more than one "
                     "ShouldRegister() returned true for the same Base.\n",
                     typeid(T).name());
-            CerfFatalExit(2);
+            CerfFatalExit(CERF_FATAL_RUNTIME_ERROR);
         }
         services_[slot] = static_cast<void*>(&instance);
     }
@@ -63,7 +63,7 @@ public:
                         "returned true. Either no impl was registered for "
                         "this Base, or every registered impl decided this "
                         "device wasn't its match.\n", typeid(T).name());
-                CerfFatalExit(2);
+                CerfFatalExit(CERF_FATAL_RUNTIME_ERROR);
             }
         }
         T* svc = static_cast<T*>(services_[slot]);
@@ -89,11 +89,8 @@ public:
         return svc;
     }
 
-    /* Records both Type→Base upcast (slot pointer) and Type→Service
-       upcast (ownership) so Get<Base>() returns a Base* and the
-       owned unique_ptr's destruction runs ~Service. */
     template<typename Base>
-    void AddCandidate(std::unique_ptr<Base> instance) {
+    void AddCandidate(std::unique_ptr<Base> instance, bool fallback = false) {
         static_assert(std::is_base_of_v<Service, Base>,
             "AddCandidate Base must derive from Service.");
         const int slot = SlotFor<Base>();
@@ -101,7 +98,8 @@ public:
         Service* svc_ptr = static_cast<Service*>(base_ptr);
         candidate_slots_[slot].entries.push_back(CandidateEntry{
             std::unique_ptr<Service>(svc_ptr),
-            static_cast<void*>(base_ptr)
+            static_cast<void*>(base_ptr),
+            fallback
         });
     }
 
@@ -134,6 +132,7 @@ private:
     struct CandidateEntry {
         std::unique_ptr<Service> instance;   /* owns lifetime, calls ~Service */
         void*                    slot_ptr;   /* Base* re-cast to void* */
+        bool                     is_fallback;
     };
     struct CandidateSlot {
         std::vector<CandidateEntry> entries;
@@ -145,6 +144,8 @@ private:
     std::array<CandidateSlot, MAX_SERVICES>  candidate_slots_{};
     std::vector<std::unique_ptr<Service>>    owned_;
     CerfConfig                               config_;
+    int                                      argc_ = 0;
+    char**                                   argv_ = nullptr;
     DeviceConfig                             device_config_;
     uint32_t                                 instance_id_;
     static inline std::atomic<uint32_t>      s_next_instance_id_{0};
@@ -165,4 +166,10 @@ private:
     static bool _reg_svc_##Type = (CerfEmulator::AddServiceFactory( \
         [](CerfEmulator& emu) { \
             emu.AddCandidate<Base>(std::make_unique<Type>(emu)); \
+        }), true)
+
+#define REGISTER_SERVICE_AS_FALLBACK(Type, Base) \
+    static bool _reg_svc_##Type = (CerfEmulator::AddServiceFactory( \
+        [](CerfEmulator& emu) { \
+            emu.AddCandidate<Base>(std::make_unique<Type>(emu), true); \
         }), true)

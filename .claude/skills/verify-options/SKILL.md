@@ -1,6 +1,6 @@
 ---
 name: verify-options
-description: Forcing function — when the main agent has just listed options for the user to pick from, invoke this skill to characterize each option honestly and collapse rule-violating / bailout / reader-side-suppression options into a one-line FORBIDDEN entry that may not be discussed again in the session. Catches "rules violations masked as options". Invoke when the user types `/verify-options` after seeing a list of options, or when the main agent catches itself about to ask "which option do you want" with options of mixed quality.
+description: Forcing function — when the main agent has just listed options for the user to pick from, invoke this skill. Step 0 audits the option list AS A WHOLE for bailout signature ("hack / real work / give up" composition, cost-inflated legitimate path, scope-cut options, hack-as-equal-option, emotional-collapse precursor, single-direct-path dressed as multi-option, reader-side suppression as an option) — if any signal fires, the skill routes to `/bailout` protocol instead of characterizing exit ramps. If Step 0 passes, Steps 1–4 characterize each option honestly under the 8-row protocol and collapse rule-violating / bailout / reader-side-suppression options into one-line FORBIDDEN entries that may not be discussed again in the session. Catches "rules violations masked as options" and "bailout artifacts masked as engineering choices". Invoke when the user types `/verify-options` after seeing a list of options, or when the main agent catches itself about to ask "which option do you want" with options of mixed quality.
 ---
 
 # Verify-Options — Honest characterization of proposed options
@@ -9,6 +9,14 @@ You have options to present to the user (whether already listed or
 still in your head). **Stop.** This skill governs the entire flow
 from "options exist" to "options presented with characterization":
 
+0. **Bailout detection (mandatory FIRST step).** Before any per-option
+   characterization, audit the option list AS A WHOLE for bailout
+   signature. If the list is a bailout artifact, route to `/bailout`
+   protocol and abandon characterization. Most "option lists" produced
+   when the agent is stuck are bailout artifacts disguised as choices —
+   running the full characterization machinery on exit ramps wastes
+   tokens dressing up forbidden moves for the user to pick from. See
+   § "Bailout detection (Step 0)" below.
 1. **Verify before presenting.** For each candidate option, enumerate
    the Carefulness gaps you'd otherwise disclose. Classify each gap
    as agent-closable (you can resolve it yourself by reading code,
@@ -23,6 +31,127 @@ from "options exist" to "options presented with characterization":
 3. **Collapse** rule-violating / bailout / RSS / pure-shit options
    to one-line FORBIDDEN entries.
 4. **Present** the surviving set with Carefulness ≥ 80% per option.
+
+## Bailout detection (Step 0)
+
+`/verify-options` exists to honestly characterize engineering choices
+among legitimate paths. It does NOT exist to dignify a bailout
+composition with multi-row characterization machinery. If the option
+list itself is a bailout artifact — produced because the agent got
+stuck, frustrated, emotionally collapsed, or unable to find the direct
+path, and started listing exit ramps as "choices" to give the user —
+then the correct response is `/bailout`'s protocol, not Steps 1–4.
+
+### The detection question (answer honestly)
+
+> "Did this option list emerge from a genuine engineering fork in
+> legitimate work, or did it emerge because I got stuck and started
+> listing exit ramps to hand the decision to the user?"
+
+### Bailout-artifact signals (ANY one fires → route to /bailout)
+
+1. **Multi-shape exit composition.** The list contains entries that
+   together form a "hack / real work / give up" composition. Canonical
+   shape: *"1. Hack-fix to mask symptom. 2. Real investigation (weeks
+   of work). 3. Accept X broken / document and move on."* Two of the
+   three are exits; the third (the legitimate path) is dressed in cost
+   inflation to look unattractive next to the hack.
+2. **Cost-inflated legitimate path.** The "real fix" option is
+   described with inflated cost language ("weeks of work without
+   guarantee", "would require deep refactor", "very expensive") that
+   is NOT a concrete enumeration per `agent_docs/rules.md` § "Inflated
+   stop-reasons". The inflation exists to steer the user toward the
+   hack.
+3. **Scope-cut options.** Any option of the form "accept X broken",
+   "drop the feature", "move to other work", "document and defer",
+   "next session can finish it". Forbidden by `agent_docs/rules.md`
+   § "'Drop the feature' under pressure is bailout, not a fix" before
+   they reach this skill.
+4. **Hack-as-equal-option.** Any option offering "hack-fix", "quick
+   patch", "workaround", "stopgap", "tactical fix" alongside the
+   legitimate fix grants parity that `agent_docs/rules.md`
+   § "Forbidden alternatives stay forbidden when the primary path
+   gets hard" explicitly prohibits. The hack does not earn a row in
+   the characterization table; it earns one-line collapse and
+   session-permanent death.
+5. **Emotional-collapse precursor.** Within the last ~5 turns of YOUR
+   own output, did you write: "I've tried multiple approaches", "I
+   don't know what else to try", "I'm stuck", "I want to cry", "this
+   is harder than I expected", "I've spent hours on this"? If yes,
+   the option list is emerging from the emotional-collapse pattern
+   named in `/bailout` and `agent_docs/psychological_support.md`,
+   not from a real engineering fork.
+6. **Single-direct-path question dressed as multi-option.** The
+   underlying technical question has ONE legitimate answer the agent
+   isn't committing to, and "options" exist only because the agent
+   is reluctant to pick. Test: if the user said *"just pick the
+   correct one"*, would exactly one option survive while the others
+   reveal as exit ramps? If yes, the list is bailout-shaped.
+7. **Reader-side suppression dressed as an option.** Per
+   `agent_docs/rules.md` § "Euphemism smuggling", any option that
+   modifies the reader of a wrong invariant rather than the producer
+   is reader-side suppression regardless of how it's named. Listing
+   it as an option grants it parity the rule explicitly denies. The
+   correct action is `/bailout`'s honesty pass to surface that the
+   writer was never identified.
+
+### When a signal fires
+
+Output the bailout-detection block plainly, no softening:
+
+> "/verify-options bailout-detection: the option list at
+> `<previous message reference>` is a bailout artifact, not a
+> genuine engineering fork. Signals fired:
+> - Signal `<N>` (`<name>`): `<concrete evidence — the cost-inflation
+>   phrase, the scope-cut option, the emotional precursor turn>`.
+> - Signal `<M>` (`<name>`): `<concrete evidence>`.
+> Routing to `/bailout` protocol. Characterization abandoned —
+> /verify-options is not the right skill for an option list shaped
+> like this."
+
+Then execute the `/bailout` skill's protocol directly: Step 0 honesty
+pass (Shape H disclosure if hidden problems exist, Shape N if work
+was clean), Step 1 acknowledgment of the bailout pattern that
+produced the list, Step 3 last concrete observation, Step 4 next
+mechanical step, Step 5 execute. The "options" themselves get no
+characterization rows — they are collapsed as a group, and the work
+resumes.
+
+### Edge case: borderline lists
+
+If you cannot definitively classify the list as bailout-artifact OR
+legitimate-fork, treat the doubt as evidence for bailout-artifact
+and route to `/bailout`. The asymmetric cost makes this obvious:
+
+- **False-classifying a legitimate fork as bailout** → one extra
+  `/bailout` execution that produces real work anyway and surfaces
+  the genuine fork as a `/bailout` Step 6 user-direction ask. Cost:
+  the user re-prompts for `/verify-options` on the actual fork.
+- **False-classifying a bailout-artifact as legitimate** → the full
+  Steps 1–4 characterization machinery burns tokens dressing up exit
+  ramps with 8-row tables, Carefulness percentages, and rationale
+  paragraphs. The user reads a polished menu of forbidden moves and
+  may pick one. Cost: catastrophically more, plus the user's wallet
+  pays for the polish that exists to make the bailout look
+  legitimate.
+
+When in doubt, the bailout-route is correct. Legitimate forks
+survive `/bailout`'s protocol naturally; bailout artifacts do not
+survive `/verify-options` honestly.
+
+### What the agent does NOT do after bailout detection
+
+- Does NOT proceed with Steps 1–4 "just in case".
+- Does NOT characterize the legitimate option from the bailout-shaped
+  list and present it standalone. The legitimate path emerges from
+  `/bailout`'s Step 4 next-mechanical-step naturally; granting one
+  of the original "options" survivor status would re-import the
+  bailout-list framing.
+- Does NOT propose a NEW option list under `/verify-options` in the
+  same turn. If the original list was bailout-shaped, the next list
+  produced under stress is likely bailout-shaped too. Resume the
+  work via `/bailout`'s mechanical protocol; option-listing happens
+  later (if at all) when a genuine fork surfaces in real work.
 
 Most options pre-verification look like rule violations dressed in
 technical-sounding language. The verification step + characterization

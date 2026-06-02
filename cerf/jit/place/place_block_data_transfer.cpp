@@ -1,5 +1,4 @@
 #include <cstddef>
-#include <cstring>
 
 #include "../../core/log.h"
 #include "../../cpu/arm_processor_config.h"
@@ -38,16 +37,12 @@ uint8_t* PlaceBlockDataTransfer(uint8_t*      cursor,
         LOG(Caution,
             "PlaceBlockDataTransfer: Rn == R15 at guest pc=0x%08X\n",
             d->guest_address);
-        CerfFatalExit(2);
+        CerfFatalExit(CERF_FATAL_RUNTIME_ERROR);
     }
 
     const uint8_t block_size =
         static_cast<uint8_t>(PopCount16(d->register_list) * 4u);
 
-    /* Per-emit-site TLB-hint cache slot (1 byte placed after the
-       JIT block emit, referenced via back-patched MOV EDX imm32). */
-    uint8_t* tlb_hint_imm_location_1 = nullptr;
-    uint8_t* tlb_hint_slot_pointer   = nullptr;
 
     uint8_t* abort_destination       = nullptr;
     uint8_t* raise_unaligned         = nullptr;
@@ -125,16 +120,8 @@ uint8_t* PlaceBlockDataTransfer(uint8_t*      cursor,
         EmitAndRegImm32(cursor, kEcx, ~uint32_t{3});
     }
     if (mmu_on) {
-        Emit8(cursor, static_cast<uint8_t>(0xB8 + kEdx));
-        tlb_hint_imm_location_1 = cursor;
-        Emit32(cursor, 0);
-        EmitPush32(cursor,
-            static_cast<uint32_t>(reinterpret_cast<uintptr_t>(jit)));
-        if (d->l) {
-            EmitCall(cursor, reinterpret_cast<void*>(&ArmJit::TranslateReadHelper));
-        } else {
-            EmitCall(cursor, reinterpret_cast<void*>(&ArmJit::TranslateWriteHelper));
-        }
+        cursor = EmitTlbFastPath(cursor, ctx,
+                                 d->l ? TlbAccess::kRead : TlbAccess::kWrite);
     } else {
         /* MMU off — direct PA→host. ECX holds the PA. */
         EmitMovRegImm32(cursor, kEdx,
@@ -162,16 +149,6 @@ uint8_t* PlaceBlockDataTransfer(uint8_t*      cursor,
         kEax);
     EmitMovRegImm32(cursor, kEcx, d->guest_address);
     EmitJmp32(cursor, ctx->raise_abort_data_helper_target);
-
-    /* Store the TLB-hint cache slot here (1 byte). The MOV EDX
-       imm32 above is back-patched to point at it. */
-    if (mmu_on) {
-        tlb_hint_slot_pointer = cursor;
-        const uint32_t slot_addr =
-            static_cast<uint32_t>(reinterpret_cast<uintptr_t>(cursor));
-        std::memcpy(tlb_hint_imm_location_1, &slot_addr, 4);
-        Emit8(cursor, 0);
-    }
 
     /* RaiseUnaligned: alignment fault path. EDX holds EA on entry
        (set by the cross-page branch below; for the single-page
@@ -340,7 +317,6 @@ uint8_t* PlaceBlockDataTransfer(uint8_t*      cursor,
         in.possibly_two_pages     = possibly_two_pages;
         in.abort_destination      = abort_destination;
         in.raise_unaligned        = raise_unaligned;
-        in.tlb_hint_slot_pointer  = tlb_hint_slot_pointer;
         in.block_size             = block_size;
         in.pc_store_offset        = pc_store_offset;
         in.alignment_check_on     = alignment_check_on;

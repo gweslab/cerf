@@ -10,7 +10,8 @@ public:
     using ArmProcessorConfig::ArmProcessorConfig;
 
     bool ShouldRegister() override {
-        return emu_.Get<BoardDetector>().GetBoard() == Board::OdoArm720;
+        auto* bd = emu_.TryGet<BoardDetector>();
+        return bd && bd->GetBoard() == Board::OdoArm720;
     }
 
     uint32_t PcStoreOffset()              const override { return 12; }
@@ -23,6 +24,9 @@ public:
 
     bool     HasDsp()                     const override { return false; }
     bool     HasLoadStoreDouble()         const override { return false; }
+
+    /* ARM720T core in Microsoft Poseidon NDA board: 70 MHz typical. */
+    uint32_t CpuClockHz()                 const override { return 70000000u; }
 };
 
 }  /* namespace */

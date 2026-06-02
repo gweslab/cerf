@@ -165,8 +165,13 @@ struct ArmCpuState {
        at 2^32. Consumer rebases against frequent polling (kPollInterval
        in Sa1110OsTimer) so cycles between polls are always < 2^32. */
     uint32_t       guest_cycle_counter;
+
+    /* XScale CP0 DSP 40-bit accumulator (acc0); low 40 bits used. Read/
+       written by MRA/MAR (MRRC/MCRR p0). Appended last — ArmCpuState
+       offsets above are baked into emitted code. */
+    uint64_t       acc0;
 };
-static_assert(sizeof(ArmCpuState) == 424,
+static_assert(sizeof(ArmCpuState) == 432,
               "ArmCpuState layout — JIT emit addresses fields by "
               "absolute byte offset; update emit-site offsets if size "
               "changes.");

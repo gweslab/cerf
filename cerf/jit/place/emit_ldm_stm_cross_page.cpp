@@ -41,18 +41,8 @@ uint8_t* EmitLdmStmCrossPage(uint8_t*                    cursor,
         EmitAndRegImm32(cursor, kEcx, ~uint32_t{3});
     }
 
-    /* MOV EDX, <tlb-hint-slot-addr> + PUSH jit + CALL Translate*. */
-    Emit8(cursor, static_cast<uint8_t>(0xB8 + kEdx));
-    const uint32_t slot_addr = static_cast<uint32_t>(
-        reinterpret_cast<uintptr_t>(in.tlb_hint_slot_pointer));
-    Emit32(cursor, slot_addr);
-    EmitPush32(cursor,
-        static_cast<uint32_t>(reinterpret_cast<uintptr_t>(jit)));
-    if (d->l) {
-        EmitCall(cursor, reinterpret_cast<void*>(&ArmJit::TranslateReadHelper));
-    } else {
-        EmitCall(cursor, reinterpret_cast<void*>(&ArmJit::TranslateWriteHelper));
-    }
+    cursor = EmitTlbFastPath(cursor, ctx,
+                             d->l ? TlbAccess::kRead : TlbAccess::kWrite);
 
     EmitPopReg(cursor, kEdx);
     EmitTestRegReg(cursor, kEax, kEax);

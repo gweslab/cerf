@@ -16,7 +16,7 @@
 #include "../cpu/emulated_memory.h"
 #include "../peripherals/peripheral_dispatcher.h"
 #include "../boot/rom_parser_service.h"
-#include "../socs/page_table_builder.h"
+#include "../boards/page_table_builder.h"
 #include "arm_cp15_sctlr_handler.h"
 #include "arm_cpu.h"
 #include "arm_cpu_exceptions.h"
@@ -25,6 +25,39 @@
 #include "arm_jit_runtime.h"
 #include "arm_mmu.h"
 #include "arm_vfp.h"
+#include "arm_neon.h"
+#include "arm_neon_2reg_bitcount.h"
+#include "arm_neon_2reg_bitwise_not.h"
+#include "arm_neon_2reg_compare_zero.h"
+#include "arm_neon_2reg_cvt_half_single.h"
+#include "arm_neon_2reg_cvt_int_fp.h"
+#include "arm_neon_2reg_narrow.h"
+#include "arm_neon_2reg_pairwise_add_long.h"
+#include "arm_neon_2reg_reciprocal.h"
+#include "arm_neon_2reg_reverse.h"
+#include "arm_neon_2reg_sat_abs_neg.h"
+#include "arm_neon_2reg_scalar_mul.h"
+#include "arm_neon_2reg_shuffle.h"
+#include "arm_neon_2reg_swap.h"
+#include "arm_neon_2reg_unary_arith.h"
+#include "arm_neon_2regscalar.h"
+#include "arm_neon_3same_fp_arith.h"
+#include "arm_neon_3same_fp_fma.h"
+#include "arm_neon_3same_fp_min_max.h"
+#include "arm_neon_3same_fp_mul_acc.h"
+#include "arm_neon_3same_fp_abs_compare.h"
+#include "arm_neon_3same_fp_compare.h"
+#include "arm_neon_3same_fp_recip_step.h"
+#include "arm_neon_vext.h"
+#include "arm_neon_scalar_move.h"
+#include "arm_neon_vtbl.h"
+#include "arm_neon_3same_fp_pair_add.h"
+#include "arm_neon_3same_fp_pair_min_max.h"
+#include "arm_neon_3difflen.h"
+#include "arm_neon_one_reg_imm.h"
+#include "arm_neon_sat.h"
+#include "arm_neon_shift_imm.h"
+#include "arm_neon_simd_3same.h"
 #include "arm_mmu_state.h"
 #include "coproc_emitter.h"
 #include "place_fns.h"
@@ -44,6 +77,10 @@ ArmJit::~ArmJit() {
     if (branch_helper_) {
         VirtualFree(branch_helper_, 0, MEM_RELEASE);
         branch_helper_ = nullptr;
+    }
+    if (cross_page_branch_helper_) {
+        VirtualFree(cross_page_branch_helper_, 0, MEM_RELEASE);
+        cross_page_branch_helper_ = nullptr;
     }
     if (shadow_stack_helper_) {
         VirtualFree(shadow_stack_helper_, 0, MEM_RELEASE);
@@ -94,17 +131,56 @@ void ArmJit::OnReady() {
     coproc_emitter_   = &emu_.Get<CoprocEmitter>();
     decoder_          = &emu_.Get<ArmDecoder>();
     vfp_              = &emu_.Get<ArmVfp>();
+    neon_             = &emu_.Get<ArmNeon>();
+    simd3_same_       = &emu_.Get<ArmNeonSimd3Same>();
+    neon_sat_         = &emu_.Get<ArmNeonSat>();
+    neon_shift_imm_   = &emu_.Get<ArmNeonShiftImm>();
+    neon_one_reg_imm_ = &emu_.Get<ArmNeonOneRegImm>();
+    neon_3difflen_    = &emu_.Get<ArmNeon3DiffLen>();
+    neon_2regscalar_       = &emu_.Get<ArmNeon2RegScalar>();
+    neon_2reg_scalar_mul_  = &emu_.Get<ArmNeon2RegScalarMul>();
+    neon_2reg_reverse_     = &emu_.Get<ArmNeon2RegReverse>();
+    neon_2reg_bitcount_    = &emu_.Get<ArmNeon2RegBitcount>();
+    neon_2reg_bitwise_not_ = &emu_.Get<ArmNeon2RegBitwiseNot>();
+    neon_2reg_unary_arith_ = &emu_.Get<ArmNeon2RegUnaryArith>();
+    neon_2reg_compare_zero_     = &emu_.Get<ArmNeon2RegCompareZero>();
+    neon_2reg_pairwise_add_long_= &emu_.Get<ArmNeon2RegPairwiseAddLong>();
+    neon_2reg_sat_abs_neg_      = &emu_.Get<ArmNeon2RegSatAbsNeg>();
+    neon_2reg_swap_             = &emu_.Get<ArmNeon2RegSwap>();
+    neon_2reg_shuffle_          = &emu_.Get<ArmNeon2RegShuffle>();
+    neon_2reg_narrow_           = &emu_.Get<ArmNeon2RegNarrow>();
+    neon_2reg_reciprocal_       = &emu_.Get<ArmNeon2RegReciprocal>();
+    neon_2reg_cvt_int_fp_       = &emu_.Get<ArmNeon2RegCvtIntFp>();
+    neon_2reg_cvt_half_single_  = &emu_.Get<ArmNeon2RegCvtHalfSingle>();
+    neon_3same_fp_arith_        = &emu_.Get<ArmNeon3SameFpArith>();
+    neon_3same_fp_mul_acc_      = &emu_.Get<ArmNeon3SameFpMulAcc>();
+    neon_3same_fp_min_max_      = &emu_.Get<ArmNeon3SameFpMinMax>();
+    neon_3same_fp_fma_          = &emu_.Get<ArmNeon3SameFpFma>();
+    neon_3same_fp_pair_add_     = &emu_.Get<ArmNeon3SameFpPairAdd>();
+    neon_3same_fp_pair_min_max_ = &emu_.Get<ArmNeon3SameFpPairMinMax>();
+    neon_3same_fp_compare_      = &emu_.Get<ArmNeon3SameFpCompare>();
+    neon_3same_fp_abs_compare_  = &emu_.Get<ArmNeon3SameFpAbsCompare>();
+    neon_3same_fp_recip_step_   = &emu_.Get<ArmNeon3SameFpRecipStep>();
+    neon_vext_                  = &emu_.Get<ArmNeonVext>();
+    neon_vtbl_                  = &emu_.Get<ArmNeonVtbl>();
+    neon_scalar_move_           = &emu_.Get<ArmNeonScalarMove>();
 
     /* Resolving ArmJit inside ArmCpu::OnReady would form a
        service-locator cycle — back-pointer wired here instead. */
     cpu_->LateInit(this);
 
     arena_.Initialize();
-    blocks_arm_  .Initialize();
-    blocks_thumb_.Initialize();
+    /* Size the SMC phys-page index over the DRAM extent the MMU already
+       computed for its code bitmaps (mmu_ resolved + OnReady'd above). */
+    const uint32_t dram_pg_base  = mmu_->State()->code_word_base >> 12;
+    const uint32_t dram_pg_count =
+        (mmu_->State()->code_word_top - mmu_->State()->code_word_base) >> 12;
+    blocks_arm_  .Initialize(dram_pg_base, dram_pg_count);
+    blocks_thumb_.Initialize(dram_pg_base, dram_pg_count);
     InitializeInterruptCheck();
     InitializeR15ModifiedHelper();
     InitializeBranchHelper();
+    InitializeCrossPageBranchHelper();
     InitializeShadowStackHelper();
     InitializePopShadowStackHelper();
     InitializeRaiseAbortDataHelper();
@@ -117,13 +193,14 @@ void ArmJit::OnReady() {
     if (!idle_event_) {
         LOG(Caution, "ArmJit: CreateEventW(idle_event) failed gle=%lu\n",
             GetLastError());
-        CerfFatalExit(2);
+        CerfFatalExit(CERF_FATAL_RUNTIME_ERROR);
     }
 
     block_ctx_.jit                        = this;
     block_ctx_.interrupt_check_target     = interrupt_check_;
     block_ctx_.r15_modified_helper_target = r15_modified_helper_;
     block_ctx_.branch_helper_target       = branch_helper_;
+    block_ctx_.cross_page_branch_helper_target = cross_page_branch_helper_;
     block_ctx_.shadow_stack_helper_target     = shadow_stack_helper_;
     block_ctx_.pop_shadow_stack_helper_target = pop_shadow_stack_helper_;
     block_ctx_.raise_abort_data_helper_target = raise_abort_data_helper_;
@@ -161,7 +238,7 @@ void ArmJit::UpdateInterruptOnPoll() {
     if (interrupt_lock_.try_lock()) {
         interrupt_lock_.unlock();
         LOG(Caution, "ArmJit::UpdateInterruptOnPoll called without InterruptLock\n");
-        CerfFatalExit(2);
+        CerfFatalExit(CERF_FATAL_RUNTIME_ERROR);
     }
 
     const ArmCpuState* state = cpu_->State();
@@ -208,9 +285,9 @@ void __fastcall ArmJit::WfiHelper(ArmJit* jit) {
     WaitForSingleObject(jit->idle_event_, 1);
     const auto elapsed_ns = std::chrono::duration_cast<std::chrono::nanoseconds>(
         std::chrono::steady_clock::now() - start).count();
-    const uint32_t divider = jit->ProcessorConfig()->CpuToOscrDivider();
-    const uint64_t oscr_ticks = (static_cast<uint64_t>(elapsed_ns) * 3686400ull) / 1000000000ull;
-    state->guest_cycle_counter += static_cast<uint32_t>(oscr_ticks * divider);
+    const uint64_t cpu_hz = jit->ProcessorConfig()->CpuClockHz();
+    state->guest_cycle_counter += static_cast<uint32_t>(
+        (static_cast<uint64_t>(elapsed_ns) * cpu_hz) / 1000000000ull);
 }
 
 void ArmJit::SetResetPending() {
@@ -225,16 +302,49 @@ void ArmJit::SetResetPending() {
     SetEvent(idle_event_);
 }
 
-void* ArmJit::FindBlockNativeStart(uint32_t guest_pc) {
-    /* FCSE fold — the block index is keyed on post-fold guest VAs
-       so two processes' low-32-MB code never aliases. */
-    const uint32_t folded = ApplyFcseFold(*mmu_->State(), guest_pc);
-
-    JitBlockIndex& idx = cpu_->State()->cpsr.bits.thumb_mode ? blocks_thumb_ : blocks_arm_;
-    JitBlock* block = idx.FindExact(folded);
-    if (!block) return nullptr;
-    return block->native_start;
+/* All three take an FCSE-folded VA — the index is VA-keyed. */
+JitBlock* ArmJit::LookupBlockExact(uint32_t folded_va) {
+    IsaBlockSpace& space =
+        cpu_->State()->cpsr.bits.thumb_mode ? blocks_thumb_ : blocks_arm_;
+    const uint8_t asid = static_cast<uint8_t>(mmu_->State()->contextidr & 0xFFu);
+    if (JitBlock* b = space.per_asid[asid].FindExact(folded_va)) return b;
+    return space.global.FindExact(folded_va);
 }
+
+JitBlock* ArmJit::LookupBlockContaining(uint32_t folded_va) {
+    IsaBlockSpace& space =
+        cpu_->State()->cpsr.bits.thumb_mode ? blocks_thumb_ : blocks_arm_;
+    const uint8_t asid = static_cast<uint8_t>(mmu_->State()->contextidr & 0xFFu);
+    if (JitBlock* b = space.per_asid[asid].FindContaining(folded_va)) return b;
+    return space.global.FindContaining(folded_va);
+}
+
+uint32_t ArmJit::NextBlockStart(uint32_t folded_va) {
+    IsaBlockSpace& space =
+        cpu_->State()->cpsr.bits.thumb_mode ? blocks_thumb_ : blocks_arm_;
+    const uint8_t asid = static_cast<uint8_t>(mmu_->State()->contextidr & 0xFFu);
+    JitBlock* a = space.per_asid[asid].FindNext(folded_va);
+    JitBlock* g = space.global.FindNext(folded_va);
+    const uint32_t na = a ? a->guest_start : 0xFFFFFFFFu;
+    const uint32_t ng = g ? g->guest_start : 0xFFFFFFFFu;
+    return na < ng ? na : ng;
+}
+
+/* Hot dispatch: VA jump cache only. A miss returns null → the caller
+   re-dispatches into JitCompile, which resolves phys from the fetch,
+   dedups against the phys index, and fills the jump cache. */
+void* ArmJit::FindBlockNativeStart(uint32_t guest_pc) {
+    const uint32_t folded = ApplyFcseFold(*mmu_->State(), guest_pc);
+    IsaBlockSpace& space =
+        cpu_->State()->cpsr.bits.thumb_mode ? blocks_thumb_ : blocks_arm_;
+    return space.JumpCacheLookup(folded);
+}
+
+JitBlock* ArmJit::LookupBlockByVaPhys(uint32_t folded_va, uint32_t phys) {
+    JitBlock* b = LookupBlockExact(folded_va);
+    return (b && b->phys_start == phys) ? b : nullptr;
+}
+
 
 /* Filter for the __except below: log the fault context (host EIP +
    guest state) before the handler runs CerfFatalExit. Lives here so
@@ -315,7 +425,7 @@ void ArmJit::Run() {
         Dispatch(native, state, mmu_->State());
     }
     __except (DispatchFaultFilter(GetExceptionInformation(), pc, native, state)) {
-        CerfFatalExit(2);
+        CerfFatalExit(CERF_FATAL_RUNTIME_ERROR);
     }
 }
 
@@ -343,23 +453,12 @@ __declspec(naked) void __cdecl ArmJit::Dispatch(void*        /* native_pc */,
     }
 }
 
-JitBlock* __cdecl ArmJit::FindBlockExactHelper(ArmJit*  jit,
-                                               uint32_t guest_pc) {
-    /* FCSE fold matches FindBlockNativeStart's behavior (so a
-       sub-32-MB guest_pc with the kernel's process_id active maps
-       to the same key the index was inserted with). */
-    const uint32_t folded = ApplyFcseFold(*jit->mmu_->State(), guest_pc);
-    JitBlockIndex& idx =
-        jit->CpuState()->cpsr.bits.thumb_mode ? jit->blocks_thumb_ : jit->blocks_arm_;
-    return idx.FindExact(folded);
-}
-
 __declspec(naked) void ArmJit::EntrypointEndHelper() {
-    /* EDI = patch slot, EAX = JitBlock* on entry. EDI is
-       callee-saved across __stdcall FlushInstructionCache; ESI must
-       stay untouched so the JIT's pinned ArmCpuState* survives. */
+    /* EDI = patch slot, EAX = native_start on entry (FindBlockNativeStartHelper
+       returns it directly). EDI is callee-saved across __stdcall
+       FlushInstructionCache; ESI must stay untouched so the JIT's pinned
+       ArmCpuState* survives. */
     __asm {
-        mov eax, [eax + 8]                  ; EAX = JitBlock::native_start
         mov byte ptr [edi], 0xE9            ; opcode: JMP rel32
         sub eax, edi
         sub eax, 5                          ; EAX = native_start - (EDI + 5) = rel32

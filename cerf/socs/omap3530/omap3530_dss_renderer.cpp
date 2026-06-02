@@ -4,6 +4,7 @@
 
 #include "../../boards/board_detector.h"
 #include "../../core/cerf_emulator.h"
+#include "../../core/device_config.h"
 #include "../../core/log.h"
 #include "../../cpu/emulated_memory.h"
 #include "../../host/frame_renderer.h"
@@ -23,7 +24,9 @@ public:
     using FrameRenderer::FrameRenderer;
 
     bool ShouldRegister() override {
-        return emu_.Get<BoardDetector>().GetSoc() == SocFamily::OMAP3530;
+        if (emu_.Get<DeviceConfig>().guest_additions) return false;
+        auto* bd = emu_.TryGet<BoardDetector>();
+        return bd && bd->GetSoc() == SocFamily::OMAP3530;
     }
 
     bool HasFrame() override {
@@ -55,7 +58,7 @@ public:
             LOG(Caution, "Omap3530DssRenderer: GFXFORMAT=0x%X not "
                     "modelled (only RGB16=0x6 verified from BSP). "
                     "Halting.\n", format);
-            CerfFatalExit(1);
+            CerfFatalExit(CERF_FATAL_RUNTIME_ERROR);
         }
 
         const uint32_t fb_pa   = dss.GetFbPa();
@@ -90,6 +93,13 @@ public:
                                          |  (uint32_t)b;
             }
         }
+    }
+
+    std::optional<FbLayout> GetFbLayout() override {
+        auto& dss = emu_.Get<Omap3530Dss>();
+        const uint32_t pa = dss.GetFbPa();
+        if (pa == 0) return std::nullopt;
+        return FbLayout{ pa, dss.GetGuestW() * 2u, 16u, true };
     }
 
 private:

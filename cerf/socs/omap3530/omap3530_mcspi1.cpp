@@ -4,6 +4,7 @@
 #include "../../core/cerf_emulator.h"
 #include "../../core/log.h"
 #include "../../peripherals/peripheral_dispatcher.h"
+#include "omap3530_sdma.h"
 
 namespace {
 
@@ -30,6 +31,8 @@ constexpr uint32_t kChstatRxFull       = 1u << 0;
 constexpr uint32_t kChstatTxEmpty      = 1u << 1;
 constexpr uint32_t kChstatEot          = 1u << 2;
 constexpr uint32_t kChctrlEn           = 1u << 0;
+constexpr uint32_t kChconfDmawEnable   = 1u << 14;
+constexpr uint32_t kChconfDmarEnable   = 1u << 15;
 constexpr uint32_t kRevisionValue      = 0x00000021u;
 
 }  /* namespace */
@@ -37,7 +40,8 @@ constexpr uint32_t kRevisionValue      = 0x00000021u;
 REGISTER_SERVICE(Omap3530Mcspi1);
 
 bool Omap3530Mcspi1::ShouldRegister() {
-    return emu_.Get<BoardDetector>().GetSoc() == SocFamily::OMAP3530;
+    auto* bd = emu_.TryGet<BoardDetector>();
+    return bd && bd->GetSoc() == SocFamily::OMAP3530;
 }
 
 void Omap3530Mcspi1::OnReady() {
@@ -111,53 +115,79 @@ uint32_t Omap3530Mcspi1::ReadWord(uint32_t addr) {
 }
 
 void Omap3530Mcspi1::WriteWord(uint32_t addr, uint32_t value) {
-    std::lock_guard<std::mutex> lk(mu_);
-    const uint32_t off = addr - MmioBase();
+    uint32_t fire_tx_mask = 0;
+    uint32_t fire_rx_mask = 0;
+    {
+        std::lock_guard<std::mutex> lk(mu_);
+        const uint32_t off = addr - MmioBase();
 
-    if (off >= kOffChconfBase) {
-        const uint32_t rel = off - kOffChconfBase;
-        const uint32_t ch  = rel / kChStride;
-        const uint32_t cof = rel % kChStride;
-        if (ch >= kNumChannels) {
-            HaltUnsupportedAccess("WriteWord(channel out-of-range)",
-                                  addr, value);
-        }
-        Channel& c = channels_[ch];
-        switch (cof) {
-        case kOffChconf:   c.chconf = value; return;
-        case kOffChstatus: return;
-        case kOffChctrl:   c.chctrl = value; return;
-        case kOffTx:
-            if (c.chctrl & kChctrlEn) PerformTransfer(ch, value);
-            return;
-        case kOffRx:       return;
-        }
-        HaltUnsupportedAccess("WriteWord(channel reg)", addr, value);
-    }
-
-    switch (off) {
-    case kOffRevision:     return;
-    case kOffSysconfig:
-        sysconfig_ = value;
-        if (value & kSysconfigSoftReset) {
-            sysconfig_ &= ~kSysconfigSoftReset;
-            irqstatus_ = 0;
-            irqenable_ = 0;
-            modulctrl_ = 0;
-            for (auto& c : channels_) {
-                c.chconf  = 0;
-                c.chctrl  = 0;
-                c.rx      = 0;
-                c.rx_full = false;
+        if (off >= kOffChconfBase) {
+            const uint32_t rel = off - kOffChconfBase;
+            const uint32_t ch  = rel / kChStride;
+            const uint32_t cof = rel % kChStride;
+            if (ch >= kNumChannels) {
+                HaltUnsupportedAccess("WriteWord(channel out-of-range)",
+                                      addr, value);
             }
+            Channel& c = channels_[ch];
+            switch (cof) {
+            case kOffChconf:   c.chconf = value; goto fire_then_release;
+            case kOffChstatus: goto fire_then_release;
+            case kOffChctrl:   c.chctrl = value; goto fire_then_release;
+            case kOffTx:
+                if (c.chctrl & kChctrlEn) {
+                    PerformTransfer(ch, value);
+                    if (c.chconf & kChconfDmarEnable)
+                        fire_rx_mask |= (1u << ch);
+                    if (c.chconf & kChconfDmawEnable)
+                        fire_tx_mask |= (1u << ch);
+                }
+                goto fire_then_release;
+            case kOffRx:       goto fire_then_release;
+            }
+            HaltUnsupportedAccess("WriteWord(channel reg)", addr, value);
         }
-        return;
-    case kOffSysstatus:    return;
-    case kOffIrqstatus:    irqstatus_ &= ~value; return;  /* W1C */
-    case kOffIrqenable:    irqenable_    = value; return;
-    case kOffWakeupenable: wakeupenable_ = value; return;
-    case kOffSyst:         syst_         = value; return;
-    case kOffModulctrl:    modulctrl_    = value; return;
+
+        switch (off) {
+        case kOffRevision:     goto fire_then_release;
+        case kOffSysconfig:
+            sysconfig_ = value;
+            if (value & kSysconfigSoftReset) {
+                sysconfig_ &= ~kSysconfigSoftReset;
+                irqstatus_ = 0;
+                irqenable_ = 0;
+                modulctrl_ = 0;
+                for (auto& c : channels_) {
+                    c.chconf  = 0;
+                    c.chctrl  = 0;
+                    c.rx      = 0;
+                    c.rx_full = false;
+                }
+            }
+            goto fire_then_release;
+        case kOffSysstatus:    goto fire_then_release;
+        case kOffIrqstatus:    irqstatus_ &= ~value; goto fire_then_release;  /* W1C */
+        case kOffIrqenable:    irqenable_    = value; goto fire_then_release;
+        case kOffWakeupenable: wakeupenable_ = value; goto fire_then_release;
+        case kOffSyst:         syst_         = value; goto fire_then_release;
+        case kOffModulctrl:    modulctrl_    = value; goto fire_then_release;
+        }
+        HaltUnsupportedAccess("WriteWord", addr, value);
+    fire_then_release:;
     }
-    HaltUnsupportedAccess("WriteWord", addr, value);
+    if (fire_tx_mask == 0 && fire_rx_mask == 0) return;
+    auto& sdma = emu_.Get<Omap3530Sdma>();
+    /* RX events first so the data is consumed before TX overwrites it
+       (our McSPI has no FIFO; rx_full bit clobbers if TX advances
+       before RX is read). */
+    for (uint32_t ch = 0; ch < kNumChannels; ++ch) {
+        if (fire_rx_mask & (1u << ch)) {
+            sdma.RaiseSyncEvent(Omap3530Sdma::kSyncSpi1Rx0 + 2u * ch);
+        }
+    }
+    for (uint32_t ch = 0; ch < kNumChannels; ++ch) {
+        if (fire_tx_mask & (1u << ch)) {
+            sdma.RaiseSyncEvent(Omap3530Sdma::kSyncSpi1Tx0 + 2u * ch);
+        }
+    }
 }

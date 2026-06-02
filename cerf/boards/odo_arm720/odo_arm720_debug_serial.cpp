@@ -36,7 +36,8 @@ public:
     using Peripheral::Peripheral;
 
     bool ShouldRegister() override {
-        return emu_.Get<BoardDetector>().GetBoard() == Board::OdoArm720;
+        auto* bd = emu_.TryGet<BoardDetector>();
+        return bd && bd->GetBoard() == Board::OdoArm720;
     }
     void OnReady() override {
         emu_.Get<PeripheralDispatcher>().Register(this);
@@ -103,7 +104,7 @@ public:
         LOG(Caution, "Odo DEBUG_SER TX_DMA: read at +0x%02X — kernel "
                 "never reads TX DMA pointers per DEBUG.C lines "
                 "221-222; unexpected codepath\n", off);
-        CerfFatalExit(1);
+        CerfFatalExit(CERF_FATAL_RUNTIME_ERROR);
     }
 };
 
@@ -121,7 +122,7 @@ public:
                 "is polling for RX bytes via OEMReadDebugByte "
                 "(DEBUG.C line 258/260); RX is not implemented.\n",
                 off);
-        CerfFatalExit(1);
+        CerfFatalExit(CERF_FATAL_RUNTIME_ERROR);
     }
 };
 
@@ -134,7 +135,8 @@ public:
     using Peripheral::Peripheral;
 
     bool ShouldRegister() override {
-        return emu_.Get<BoardDetector>().GetBoard() == Board::OdoArm720;
+        auto* bd = emu_.TryGet<BoardDetector>();
+        return bd && bd->GetBoard() == Board::OdoArm720;
     }
     void OnReady() override {
         emu_.Get<PeripheralDispatcher>().Register(this);
@@ -152,10 +154,6 @@ public:
             HaltUnsupportedAccess("ReadHalf", addr, 0);
         }
         const uint16_t value = core_.Read(off);
-#if CERF_DEV_MODE
-        LOG(SocUart, "Odo DEBUG_SER read  +0x%02X -> 0x%04X\n",
-            off, value);
-#endif
         return value;
     }
 
@@ -164,10 +162,6 @@ public:
         if (!P2FpgaSerial::IsValidOffset(off)) {
             HaltUnsupportedAccess("WriteHalf", addr, value);
         }
-#if CERF_DEV_MODE
-        LOG(SocUart, "Odo DEBUG_SER write +0x%02X = 0x%04X\n",
-            off, value);
-#endif
         const bool tx_en_rising = core_.Write(off, value);
         if (tx_en_rising) DispatchTx();
     }

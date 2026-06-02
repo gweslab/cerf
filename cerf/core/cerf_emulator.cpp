@@ -10,12 +10,13 @@ namespace ServiceInternal {
            worker thread) instead of doing it at OnReady time. */
         LOG(Caution, "Cycle in service OnReady graph at %s\n",
                 ti.name());
-        CerfFatalExit(2);
+        CerfFatalExit(CERF_FATAL_RUNTIME_ERROR);
     }
 }
 
-CerfEmulator::CerfEmulator(const CerfConfig& config)
-    : config_(config), instance_id_(s_next_instance_id_++)
+CerfEmulator::CerfEmulator(const CerfConfig& config, int argc, char** argv)
+    : config_(config), argc_(argc), argv_(argv),
+      instance_id_(s_next_instance_id_++)
 {
 }
 
@@ -30,8 +31,11 @@ void CerfEmulator::Bootstrap() {
     Provide<DeviceConfig>(device_config_);
 
     ConfigLoader loader(*this);
-    loader.Load(config_);
+    loader.Load(config_, argc_, argv_);
 
+    // Before declaringa  service call logic here - what makes your sevice so special
+    // that pre-existing OnReady/ShouldRegister that are used in hundreds of services
+    // appear to be insufficient for your new logic?
     CreateAllServices();    /* construct all candidates, populate per-slot lists */
     ResolveAllSlots();      /* run ShouldRegister, pick winners, drop losers */
 
@@ -49,7 +53,7 @@ void CerfEmulator::ResolveSlot(int slot, const char* requester_type_name) {
                 "into a Base that is itself currently being resolved. "
                 "Break the cycle by deferring one of the dependencies "
                 "to OnReady.\n", requester_type_name);
-        CerfFatalExit(2);
+        CerfFatalExit(CERF_FATAL_RUNTIME_ERROR);
     }
 
     cs.resolving = true;
@@ -60,6 +64,7 @@ void CerfEmulator::ResolveSlot(int slot, const char* requester_type_name) {
 
     for (size_t i = 0; i < cs.entries.size(); ++i) {
         auto& e = cs.entries[i];
+        if (e.is_fallback) continue;
         if (!e.instance->ShouldRegister()) continue;
         if (winner_svc != nullptr) {
             LOG(Caution, "Two ShouldRegister true for the same Base "
@@ -69,11 +74,32 @@ void CerfEmulator::ResolveSlot(int slot, const char* requester_type_name) {
                     requester_type_name,
                     typeid(*winner_svc).name(),
                     typeid(*e.instance).name());
-            CerfFatalExit(2);
+            CerfFatalExit(CERF_FATAL_RUNTIME_ERROR);
         }
         winner_svc      = e.instance.get();
         winner_slot_ptr = e.slot_ptr;
         winner_idx      = i;
+    }
+
+    if (winner_svc == nullptr) {
+        for (size_t i = 0; i < cs.entries.size(); ++i) {
+            auto& e = cs.entries[i];
+            if (!e.is_fallback) continue;
+            if (!e.instance->ShouldRegister()) continue;
+            if (winner_svc != nullptr) {
+                LOG(Caution, "Two fallback ShouldRegister true for the "
+                        "same Base (slot resolved as %s). Both '%s' and "
+                        "'%s' returned true. Each Base must have at "
+                        "most one fallback impl.\n",
+                        requester_type_name,
+                        typeid(*winner_svc).name(),
+                        typeid(*e.instance).name());
+                CerfFatalExit(CERF_FATAL_RUNTIME_ERROR);
+            }
+            winner_svc      = e.instance.get();
+            winner_slot_ptr = e.slot_ptr;
+            winner_idx      = i;
+        }
     }
 
     if (winner_svc) {

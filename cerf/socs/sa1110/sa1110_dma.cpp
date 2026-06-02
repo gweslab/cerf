@@ -41,7 +41,8 @@ bool Sa1110Dma::DecodeOffset(uint32_t off, uint32_t& ch, uint32_t& reg) {
 }
 
 bool Sa1110Dma::ShouldRegister() {
-    return emu_.Get<BoardDetector>().GetSoc() == SocFamily::SA1110;
+    auto* bd = emu_.TryGet<BoardDetector>();
+    return bd && bd->GetSoc() == SocFamily::SA1110;
 }
 
 void Sa1110Dma::OnReady() {

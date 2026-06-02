@@ -6,6 +6,7 @@
 
 class ArmCpu;
 class ArmProcessorConfig;
+class NeonUnconditionalDecoder;
 struct DecodedInsn;
 union  ArmOpcode;
 union  ThumbOpcode;
@@ -49,6 +50,7 @@ private:
 
     bool DecodeArmLdrexStrex(DecodedInsn* insn, ArmOpcode op);
 
-    ArmProcessorConfig* processor_config_ = nullptr;
-    ArmCpu*             cpu_              = nullptr;
+    ArmProcessorConfig*       processor_config_           = nullptr;
+    ArmCpu*                   cpu_                        = nullptr;
+    NeonUnconditionalDecoder* neon_unconditional_decoder_ = nullptr;
 };

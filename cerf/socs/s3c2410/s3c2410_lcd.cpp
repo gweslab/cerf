@@ -7,7 +7,8 @@
 #include "../../peripherals/peripheral_dispatcher.h"
 
 bool S3C2410Lcd::ShouldRegister() {
-    return emu_.Get<BoardDetector>().GetSoc() == SocFamily::S3C2410;
+    auto* bd = emu_.TryGet<BoardDetector>();
+    return bd && bd->GetSoc() == SocFamily::S3C2410;
 }
 
 void S3C2410Lcd::OnReady() {
@@ -60,7 +61,7 @@ bool S3C2410Lcd::IsEnabled() {
                 "Verify ScreenBitsPerPixel=16 in BSP_ARGS so the OAL "
                 "drives the kernel into the supported path.\n",
                 pnrmode, bppmode, (int)frm565);
-        CerfFatalExit(1);
+        CerfFatalExit(CERF_FATAL_RUNTIME_ERROR);
     }
     return true;
 }

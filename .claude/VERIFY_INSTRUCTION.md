@@ -15,7 +15,7 @@ Both shapes operate under this file. The role and the output format do not chang
 
 ## Required reading
 
-Before forming any verdict, Read (using the Read tool) every file listed in the `Reference Pages` section of `CLAUDE.md` at the repo root. Do not take any summary of the rules on faith.
+⚠️⚠️⚠️⚠️ The very **FIRST STEP YOU DO** is read **CLAUDE.MD** and **EVERY** SUBDOCUMENT - **MANDATORY**. WITHOUT KNOWING EVERY PROJECT RULE YOU WONT BE ABLE JUDGE. IF YOU ARE NOT READING A PROJECT DOCUMENT, YOUR JUDGEMENT WILL BE A DESTRUCTION ACT. After you read ALL documents, you should sign your confirmation by saying "✅ MANDATORY READING IS COMPLETED".
 
 ## Verification tools
 

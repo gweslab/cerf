@@ -27,7 +27,7 @@ void ArmJit::InitializeShadowStackHelper() {
     if (!shadow_stack_helper_) {
         LOG(Caution, "ArmJit: VirtualAlloc(ShadowStackHelper) failed gle=%lu\n",
             GetLastError());
-        CerfFatalExit(2);
+        CerfFatalExit(CERF_FATAL_RUNTIME_ERROR);
     }
 
     using namespace x86;
@@ -83,16 +83,14 @@ void ArmJit::InitializeShadowStackHelper() {
 
     EmitPushReg(p, kEcx);
     EmitPush32(p, static_cast<uint32_t>(reinterpret_cast<uintptr_t>(this)));
-    EmitCall(p, reinterpret_cast<void*>(&ArmJit::FindBlockExactHelper));
+    EmitCall(p, reinterpret_cast<void*>(&ArmJit::FindBlockNativeStartHelper));
     EmitAddRegImm32(p, kEsp, 8);
 
     EmitTestRegReg(p, kEax, kEax);
     uint8_t* jz_not_jitted = EmitJzLabel(p);
 
-    /* JitBlock found: cache its native_start in [EDI] and JMP back
-       to StartPush to push (LR, native_start) onto the shadow stack. */
-    EmitMovRegBaseDisp32(p, kEax, kEax,
-                         static_cast<int32_t>(offsetof(JitBlock, native_start)));
+    /* Found: EAX is native_start (from the VA jump cache). Cache it in [EDI]
+       and JMP back to StartPush to push (LR, native_start). */
     EmitMovBaseDisp32Reg(p, kEdi, 0, kEax);
     /* JMP rel32 back to start_push. */
     EmitJmp32(p, start_push);

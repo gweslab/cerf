@@ -29,4 +29,11 @@ public:
     virtual uint8_t* EmitDataOperation(uint8_t*      cursor,
                                        DecodedInsn*  d,
                                        BlockContext* ctx) = 0;
+
+    /* MCRR / MRRC — v5TE two-register coprocessor move. Default raises
+       guest UND; SoCs with a CP0/CP14 double-transfer (XScale acc0)
+       override. Not pure-virtual so existing emitters inherit the UND. */
+    virtual uint8_t* EmitRegisterTransferDouble(uint8_t*      cursor,
+                                                DecodedInsn*  d,
+                                                BlockContext* ctx);
 };

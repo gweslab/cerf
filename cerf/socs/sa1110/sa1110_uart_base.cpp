@@ -12,7 +12,8 @@
 
 
 bool Sa1110UartBase::ShouldRegister() {
-    return emu_.Get<BoardDetector>().GetSoc() == SocFamily::SA1110;
+    auto* bd = emu_.TryGet<BoardDetector>();
+    return bd && bd->GetSoc() == SocFamily::SA1110;
 }
 
 void Sa1110UartBase::OnReady() {

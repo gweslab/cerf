@@ -19,28 +19,27 @@ void PeripheralDispatcher::OnReady() {
 void PeripheralDispatcher::Register(Peripheral* p) {
     if (!p) {
         LOG(Caution, "PeripheralDispatcher::Register called with null\n");
-        CerfFatalExit(1);
+        CerfFatalExit(CERF_FATAL_RUNTIME_ERROR);
     }
     const uint32_t base = p->MmioBase();
     const uint32_t size = p->MmioSize();
+    const uint32_t end  = base + size;
     if (size == 0) {
         LOG(Caution, "PeripheralDispatcher::Register peripheral has "
                 "zero-size MMIO range (base 0x%08X)\n", base);
-        CerfFatalExit(1);
+        CerfFatalExit(CERF_FATAL_RUNTIME_ERROR);
     }
 
-    std::lock_guard<std::mutex> lk(io_lock_);
-
     for (const auto& e : entries_) {
-        if (base < e.base + e.size && e.base < base + size) {
+        if (base < e.end && e.base < end) {
             LOG(Caution, "PeripheralDispatcher::Register overlap: "
                     "new [0x%08X..0x%08X) vs existing [0x%08X..0x%08X)\n",
-                    base, base + size, e.base, e.base + e.size);
-            CerfFatalExit(1);
+                    base, end, e.base, e.end);
+            CerfFatalExit(CERF_FATAL_RUNTIME_ERROR);
         }
     }
 
-    Entry entry{base, size, p};
+    Entry entry{base, end, p->FastReader(), p->FastWriter(), p, p};
     auto pos = std::lower_bound(entries_.begin(), entries_.end(), base,
         [](const Entry& e, uint32_t b) { return e.base < b; });
     entries_.insert(pos, entry);
@@ -50,20 +49,14 @@ void PeripheralDispatcher::Register(Peripheral* p) {
                 "registered — the JIT IO helper's per-emit-site cache slot is a "
                 "signed int8 holding the entries_ array index; index space "
                 "exhausted.\n");
-        CerfFatalExit(1);
+        CerfFatalExit(CERF_FATAL_RUNTIME_ERROR);
     }
 
-    LOG(Periph, "Register 0x%08X size 0x%X\n", base, size);
+    LOG(Periph, "Register 0x%08X..0x%08X\n", base, end);
 }
 
 bool PeripheralDispatcher::IsPeripheralAddress(uint32_t addr) const {
-    std::lock_guard<std::mutex> lk(io_lock_);
-    return Lookup(addr) != nullptr;
-}
-
-Peripheral* PeripheralDispatcher::Lookup(uint32_t addr) const {
-    Entry* e = LookupEntry(addr);
-    return e ? e->p : nullptr;
+    return LookupEntry(addr) != nullptr;
 }
 
 PeripheralDispatcher::Entry* PeripheralDispatcher::LookupEntry(uint32_t addr) const {
@@ -74,65 +67,69 @@ PeripheralDispatcher::Entry* PeripheralDispatcher::LookupEntry(uint32_t addr) co
         [](uint32_t a, const Entry& e) { return a < e.base; });
     if (it == entries_.begin()) return nullptr;
     --it;
-    if (addr >= it->base && addr < it->base + it->size) {
+    if (addr >= it->base && addr < it->end) {
         return const_cast<Entry*>(&(*it));
     }
     return nullptr;
 }
 
 uint8_t PeripheralDispatcher::ReadByte(uint32_t addr) {
-    std::unique_lock<std::mutex> lk(io_lock_);
-    if (Peripheral* p = Lookup(addr)) { lk.unlock(); return p->ReadByte(addr); }
-    lk.unlock();
+    if (Entry* e = LookupEntry(addr)) {
+        return static_cast<uint8_t>(e->read(e->ctx, addr - e->base, 1));
+    }
     return emu_.Get<EmulatedMemory>().ReadByte(addr);
 }
 
 uint16_t PeripheralDispatcher::ReadHalf(uint32_t addr) {
-    std::unique_lock<std::mutex> lk(io_lock_);
-    if (Peripheral* p = Lookup(addr)) { lk.unlock(); return p->ReadHalf(addr); }
-    lk.unlock();
+    if (Entry* e = LookupEntry(addr)) {
+        return static_cast<uint16_t>(e->read(e->ctx, addr - e->base, 2));
+    }
     return emu_.Get<EmulatedMemory>().ReadHalf(addr);
 }
 
 uint32_t PeripheralDispatcher::ReadWord(uint32_t addr) {
-    std::unique_lock<std::mutex> lk(io_lock_);
-    if (Peripheral* p = Lookup(addr)) { lk.unlock(); return p->ReadWord(addr); }
-    lk.unlock();
+    if (Entry* e = LookupEntry(addr)) {
+        return e->read(e->ctx, addr - e->base, 4);
+    }
     return emu_.Get<EmulatedMemory>().ReadWord(addr);
 }
 
 uint64_t PeripheralDispatcher::ReadDword(uint32_t addr) {
-    std::unique_lock<std::mutex> lk(io_lock_);
-    if (Peripheral* p = Lookup(addr)) { lk.unlock(); return p->ReadDword(addr); }
-    lk.unlock();
+    if (Entry* e = LookupEntry(addr)) {
+        return e->p->ReadDword(addr);
+    }
     return emu_.Get<EmulatedMemory>().ReadDword(addr);
 }
 
 void PeripheralDispatcher::WriteByte(uint32_t addr, uint8_t value) {
-    std::unique_lock<std::mutex> lk(io_lock_);
-    if (Peripheral* p = Lookup(addr)) { lk.unlock(); p->WriteByte(addr, value); return; }
-    lk.unlock();
+    if (Entry* e = LookupEntry(addr)) {
+        e->write(e->ctx, addr - e->base, value, 1);
+        return;
+    }
     emu_.Get<EmulatedMemory>().WriteByte(addr, value);
 }
 
 void PeripheralDispatcher::WriteHalf(uint32_t addr, uint16_t value) {
-    std::unique_lock<std::mutex> lk(io_lock_);
-    if (Peripheral* p = Lookup(addr)) { lk.unlock(); p->WriteHalf(addr, value); return; }
-    lk.unlock();
+    if (Entry* e = LookupEntry(addr)) {
+        e->write(e->ctx, addr - e->base, value, 2);
+        return;
+    }
     emu_.Get<EmulatedMemory>().WriteHalf(addr, value);
 }
 
 void PeripheralDispatcher::WriteWord(uint32_t addr, uint32_t value) {
-    std::unique_lock<std::mutex> lk(io_lock_);
-    if (Peripheral* p = Lookup(addr)) { lk.unlock(); p->WriteWord(addr, value); return; }
-    lk.unlock();
+    if (Entry* e = LookupEntry(addr)) {
+        e->write(e->ctx, addr - e->base, value, 4);
+        return;
+    }
     emu_.Get<EmulatedMemory>().WriteWord(addr, value);
 }
 
 void PeripheralDispatcher::WriteDword(uint32_t addr, uint64_t value) {
-    std::unique_lock<std::mutex> lk(io_lock_);
-    if (Peripheral* p = Lookup(addr)) { lk.unlock(); p->WriteDword(addr, value); return; }
-    lk.unlock();
+    if (Entry* e = LookupEntry(addr)) {
+        e->p->WriteDword(addr, value);
+        return;
+    }
     emu_.Get<EmulatedMemory>().WriteDword(addr, value);
 }
 
@@ -143,32 +140,21 @@ uint8_t __fastcall PeripheralDispatcher::JitIoReadByte(int8_t* hint, PeripheralD
     const uint32_t addr = d->mmu_->io_pending_address() +
                           d->mmu_->io_pending_address_adjust();
 
-    if (d->fast_read_ && addr >= d->fast_base_ && addr < d->fast_end_) {
-        const uint8_t result = static_cast<uint8_t>(
-            d->fast_read_(d->fast_ctx_, addr - d->fast_base_, 1));
-#if CERF_DEV_MODE
-        auto& probe = d->emu_.Get<RateProbe>();
-        probe.RecordMmioPc(d->last_guest_pc_, addr);
-        probe.AddTsc(RateProbe::TimeCounter::JitIo, __rdtsc() - t0);
-#endif
-        return result;
-    }
-
     const int8_t cached_index = *hint;
     Entry* entry = &d->entries_[cached_index];
 
-    if (addr < entry->base || addr >= entry->base + entry->size) {
+    if (addr < entry->base || addr >= entry->end) {
         entry = d->LookupEntry(addr);
         if (!entry) {
             LOG(Caution, "PeripheralDispatcher::JitIoReadByte: no peripheral "
-                    "registered at 0x%08X\n", addr);
-            CerfFatalExit(2);
+                    "registered at 0x%08X (pc=0x%08X)\n", addr, d->last_guest_pc_);
+            CerfFatalExit(CERF_FATAL_RUNTIME_ERROR);
         }
         *hint = static_cast<int8_t>(entry - d->entries_.data());
     }
 
-    std::lock_guard<std::mutex> lk(d->io_lock_);
-    const uint8_t result = entry->p->ReadByte(addr);
+    const uint8_t result =
+        static_cast<uint8_t>(entry->read(entry->ctx, addr - entry->base, 1));
 #if CERF_DEV_MODE
     auto& probe = d->emu_.Get<RateProbe>();
     probe.RecordMmioPc(d->last_guest_pc_, addr);
@@ -184,32 +170,21 @@ uint16_t __fastcall PeripheralDispatcher::JitIoReadHalf(int8_t* hint, Peripheral
     const uint32_t addr = d->mmu_->io_pending_address() +
                           d->mmu_->io_pending_address_adjust();
 
-    if (d->fast_read_ && addr >= d->fast_base_ && addr < d->fast_end_) {
-        const uint16_t result = static_cast<uint16_t>(
-            d->fast_read_(d->fast_ctx_, addr - d->fast_base_, 2));
-#if CERF_DEV_MODE
-        auto& probe = d->emu_.Get<RateProbe>();
-        probe.RecordMmioPc(d->last_guest_pc_, addr);
-        probe.AddTsc(RateProbe::TimeCounter::JitIo, __rdtsc() - t0);
-#endif
-        return result;
-    }
-
     const int8_t cached_index = *hint;
     Entry* entry = &d->entries_[cached_index];
 
-    if (addr < entry->base || addr >= entry->base + entry->size) {
+    if (addr < entry->base || addr >= entry->end) {
         entry = d->LookupEntry(addr);
         if (!entry) {
             LOG(Caution, "PeripheralDispatcher::JitIoReadHalf: no peripheral "
-                    "registered at 0x%08X\n", addr);
-            CerfFatalExit(2);
+                    "registered at 0x%08X (pc=0x%08X)\n", addr, d->last_guest_pc_);
+            CerfFatalExit(CERF_FATAL_RUNTIME_ERROR);
         }
         *hint = static_cast<int8_t>(entry - d->entries_.data());
     }
 
-    std::lock_guard<std::mutex> lk(d->io_lock_);
-    const uint16_t result = entry->p->ReadHalf(addr);
+    const uint16_t result =
+        static_cast<uint16_t>(entry->read(entry->ctx, addr - entry->base, 2));
 #if CERF_DEV_MODE
     auto& probe = d->emu_.Get<RateProbe>();
     probe.RecordMmioPc(d->last_guest_pc_, addr);
@@ -225,31 +200,20 @@ uint32_t __fastcall PeripheralDispatcher::JitIoReadWord(int8_t* hint, Peripheral
     const uint32_t addr = d->mmu_->io_pending_address() +
                           d->mmu_->io_pending_address_adjust();
 
-    if (d->fast_read_ && addr >= d->fast_base_ && addr < d->fast_end_) {
-        const uint32_t result = d->fast_read_(d->fast_ctx_, addr - d->fast_base_, 4);
-#if CERF_DEV_MODE
-        auto& probe = d->emu_.Get<RateProbe>();
-        probe.RecordMmioPc(d->last_guest_pc_, addr);
-        probe.AddTsc(RateProbe::TimeCounter::JitIo, __rdtsc() - t0);
-#endif
-        return result;
-    }
-
     const int8_t cached_index = *hint;
     Entry* entry = &d->entries_[cached_index];
 
-    if (addr < entry->base || addr >= entry->base + entry->size) {
+    if (addr < entry->base || addr >= entry->end) {
         entry = d->LookupEntry(addr);
         if (!entry) {
             LOG(Caution, "PeripheralDispatcher::JitIoReadWord: no peripheral "
-                    "registered at 0x%08X\n", addr);
-            CerfFatalExit(2);
+                    "registered at 0x%08X (pc=0x%08X)\n", addr, d->last_guest_pc_);
+            CerfFatalExit(CERF_FATAL_RUNTIME_ERROR);
         }
         *hint = static_cast<int8_t>(entry - d->entries_.data());
     }
 
-    std::lock_guard<std::mutex> lk(d->io_lock_);
-    const uint32_t result = entry->p->ReadWord(addr);
+    const uint32_t result = entry->read(entry->ctx, addr - entry->base, 4);
 #if CERF_DEV_MODE
     auto& probe = d->emu_.Get<RateProbe>();
     probe.RecordMmioPc(d->last_guest_pc_, addr);
@@ -265,31 +229,21 @@ void __fastcall PeripheralDispatcher::JitIoWriteByte(int8_t* hint, PeripheralDis
     const uint32_t addr = d->mmu_->io_pending_address() +
                           d->mmu_->io_pending_address_adjust();
 
-    if (d->fast_write_ && addr >= d->fast_base_ && addr < d->fast_end_) {
-        d->fast_write_(d->fast_ctx_, addr - d->fast_base_, value, 1);
-#if CERF_DEV_MODE
-        auto& probe = d->emu_.Get<RateProbe>();
-        probe.RecordMmioPc(d->last_guest_pc_, addr);
-        probe.AddTsc(RateProbe::TimeCounter::JitIo, __rdtsc() - t0);
-#endif
-        return;
-    }
-
     const int8_t cached_index = *hint;
     Entry* entry = &d->entries_[cached_index];
 
-    if (addr < entry->base || addr >= entry->base + entry->size) {
+    if (addr < entry->base || addr >= entry->end) {
         entry = d->LookupEntry(addr);
         if (!entry) {
             LOG(Caution, "PeripheralDispatcher::JitIoWriteByte: no peripheral "
-                    "registered at 0x%08X\n", addr);
-            CerfFatalExit(2);
+                    "registered at 0x%08X (pc=0x%08X value=0x%08X)\n",
+                    addr, d->last_guest_pc_, value);
+            CerfFatalExit(CERF_FATAL_RUNTIME_ERROR);
         }
         *hint = static_cast<int8_t>(entry - d->entries_.data());
     }
 
-    std::lock_guard<std::mutex> lk(d->io_lock_);
-    entry->p->WriteByte(addr, value);
+    entry->write(entry->ctx, addr - entry->base, value, 1);
 #if CERF_DEV_MODE
     auto& probe = d->emu_.Get<RateProbe>();
     probe.RecordMmioPc(d->last_guest_pc_, addr);
@@ -304,31 +258,21 @@ void __fastcall PeripheralDispatcher::JitIoWriteHalf(int8_t* hint, PeripheralDis
     const uint32_t addr = d->mmu_->io_pending_address() +
                           d->mmu_->io_pending_address_adjust();
 
-    if (d->fast_write_ && addr >= d->fast_base_ && addr < d->fast_end_) {
-        d->fast_write_(d->fast_ctx_, addr - d->fast_base_, value, 2);
-#if CERF_DEV_MODE
-        auto& probe = d->emu_.Get<RateProbe>();
-        probe.RecordMmioPc(d->last_guest_pc_, addr);
-        probe.AddTsc(RateProbe::TimeCounter::JitIo, __rdtsc() - t0);
-#endif
-        return;
-    }
-
     const int8_t cached_index = *hint;
     Entry* entry = &d->entries_[cached_index];
 
-    if (addr < entry->base || addr >= entry->base + entry->size) {
+    if (addr < entry->base || addr >= entry->end) {
         entry = d->LookupEntry(addr);
         if (!entry) {
             LOG(Caution, "PeripheralDispatcher::JitIoWriteHalf: no peripheral "
-                    "registered at 0x%08X\n", addr);
-            CerfFatalExit(2);
+                    "registered at 0x%08X (pc=0x%08X value=0x%08X)\n",
+                    addr, d->last_guest_pc_, value);
+            CerfFatalExit(CERF_FATAL_RUNTIME_ERROR);
         }
         *hint = static_cast<int8_t>(entry - d->entries_.data());
     }
 
-    std::lock_guard<std::mutex> lk(d->io_lock_);
-    entry->p->WriteHalf(addr, value);
+    entry->write(entry->ctx, addr - entry->base, value, 2);
 #if CERF_DEV_MODE
     auto& probe = d->emu_.Get<RateProbe>();
     probe.RecordMmioPc(d->last_guest_pc_, addr);
@@ -343,31 +287,21 @@ void __fastcall PeripheralDispatcher::JitIoWriteWord(int8_t* hint, PeripheralDis
     const uint32_t addr = d->mmu_->io_pending_address() +
                           d->mmu_->io_pending_address_adjust();
 
-    if (d->fast_write_ && addr >= d->fast_base_ && addr < d->fast_end_) {
-        d->fast_write_(d->fast_ctx_, addr - d->fast_base_, value, 4);
-#if CERF_DEV_MODE
-        auto& probe = d->emu_.Get<RateProbe>();
-        probe.RecordMmioPc(d->last_guest_pc_, addr);
-        probe.AddTsc(RateProbe::TimeCounter::JitIo, __rdtsc() - t0);
-#endif
-        return;
-    }
-
     const int8_t cached_index = *hint;
     Entry* entry = &d->entries_[cached_index];
 
-    if (addr < entry->base || addr >= entry->base + entry->size) {
+    if (addr < entry->base || addr >= entry->end) {
         entry = d->LookupEntry(addr);
         if (!entry) {
             LOG(Caution, "PeripheralDispatcher::JitIoWriteWord: no peripheral "
-                    "registered at 0x%08X\n", addr);
-            CerfFatalExit(2);
+                    "registered at 0x%08X (pc=0x%08X value=0x%08X)\n",
+                    addr, d->last_guest_pc_, value);
+            CerfFatalExit(CERF_FATAL_RUNTIME_ERROR);
         }
         *hint = static_cast<int8_t>(entry - d->entries_.data());
     }
 
-    std::lock_guard<std::mutex> lk(d->io_lock_);
-    entry->p->WriteWord(addr, value);
+    entry->write(entry->ctx, addr - entry->base, value, 4);
 #if CERF_DEV_MODE
     auto& probe = d->emu_.Get<RateProbe>();
     probe.RecordMmioPc(d->last_guest_pc_, addr);

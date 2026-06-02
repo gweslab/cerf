@@ -102,3 +102,9 @@ union ArmL2Pte {
     } extended_small_page;
 };
 static_assert(sizeof(ArmL2Pte) == 4, "L2 PTE must be 32 bits");
+
+/* ARM1136 TRM Table 6-16 / Fig 6-5: 4 KB extended small page (coarse-L2
+   type=3 with SCTLR.XP=0) — PA = base[31:12] | VA[11:0]. */
+inline uint32_t ArmExtSmallPagePa(uint32_t pte_word, uint32_t va) {
+    return (pte_word & 0xFFFFF000u) | (va & 0x0FFFu);
+}

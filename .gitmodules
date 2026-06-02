@@ -1,6 +1,6 @@
-[submodule "references/wince5-full-sdk"]
-	path = references/wince5-full-sdk
-	url = git@github.com:gweslab/wince5-full-sdk.git
+[submodule "references/WindowsCE-Build-Tools"]
+	path = references/WindowsCE-Build-Tools
+	url = git@github.com:gweslab/WindowsCE-Build-Tools.git
 [submodule "references/extract-wince-rom"]
 	path = references/extract-wince-rom
 	url = git@github.com:gweslab/extract-wince-rom.git

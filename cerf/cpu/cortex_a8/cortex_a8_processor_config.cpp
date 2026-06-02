@@ -10,7 +10,8 @@ public:
     using ArmProcessorConfig::ArmProcessorConfig;
 
     bool ShouldRegister() override {
-        return emu_.Get<BoardDetector>().GetBoard() == Board::OmapEvm3530;
+        auto* bd = emu_.TryGet<BoardDetector>();
+        return bd && bd->GetBoard() == Board::OmapEvm3530;
     }
 
     uint32_t PcStoreOffset()              const override { return 12; }
@@ -21,17 +22,27 @@ public:
     uint32_t Midr()                       const override { return 0x410fc080u; }
     uint32_t Ctr()                        const override { return 0x82048004u; }
 
+    /* floor(720 000 000 / 32 768) — Cortex-A8 nominal max MPU clock
+       over GPTIMER1 32 kHz functional clock. Used by Omap3530Gptimer1
+       / Omap3530Synctimer to convert guest_cycle_counter → ticks. */
+    uint32_t CpuToOscrDivider()           const override { return 21972u; }
+
+    /* 720 MHz Cortex-A8 max MPU clock per OMAP3530 TRM §1.4.1. */
+    uint32_t CpuClockHz()                 const override { return 720000000u; }
+
     bool     HasDsp()                     const override { return true; }
     bool     HasLoadStoreDouble()         const override { return true; }
 
     bool     HasClz()                     const override { return true; }
     bool     HasBlxReg()                  const override { return true; }
+    bool     HasArmv5UnconditionalSpace() const override { return true; }
     bool     HasMovwMovt()                const override { return true; }
     bool     HasBitField()                const override { return true; }
     bool     HasRev()                     const override { return true; }
     bool     HasExtendRotate()            const override { return true; }
     bool     HasLdrexStrex()              const override { return true; }
     bool     HasBarrierInsn()             const override { return true; }
+    bool     HasCp15V6()                  const override { return true; }
     bool     HasCp15V7()                  const override { return true; }
     bool     HasVmsav7()                  const override { return true; }
 
@@ -51,6 +62,7 @@ public:
     }
 
     bool     HasVfp()  const override { return true; }
+    bool     HasNeon() const override { return true; }
     uint32_t Fpsid()   const override { return 0x410330C0u; }
     uint32_t Mvfr0()   const override { return 0x11110222u; }
     uint32_t Mvfr1()   const override { return 0x00011111u; }

@@ -9,8 +9,10 @@ class ConfigLoader : public Service {
 public:
     explicit ConfigLoader(CerfEmulator& emu) : Service(emu) {}
 
-    void Load(const CerfConfig& cli);
+    void Load(const CerfConfig& cli, int argc, char** argv);
 
 private:
+    void ApplyAdoptedGuestAdditionsResolution(DeviceConfig& config);
+
     std::string cerf_dir_;
 };

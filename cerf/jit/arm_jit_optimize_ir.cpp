@@ -48,12 +48,10 @@ int ArmJit::JitOptimizeIR() {
             const uint32_t addr = ApplyFcseFold(*mmu_->State(), insn.reserved3);
 
             if (mmu_->State()->control_register.bits.m && (addr & 3u) == 0u) {
-                int8_t tlb_index_hint = 0;
-
                 uint8_t* host_read_addr =
-                    mmu_->TranslateRead(cpu_->State(), addr, &tlb_index_hint);
+                    mmu_->TranslateRead(cpu_->State(), addr);
                 if (host_read_addr &&
-                    mmu_->TranslateReadWrite(cpu_->State(), addr, &tlb_index_hint) == nullptr) {
+                    mmu_->TranslateReadWrite(cpu_->State(), addr) == nullptr) {
                     uint32_t value;
                     std::memcpy(&value, host_read_addr, sizeof(value));
 

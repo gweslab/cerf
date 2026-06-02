@@ -132,6 +132,14 @@ find-next-after, range-intersects. Sub-entries (linked off the
 outer's `sub_block` chain) handle the case of re-entering the same
 outer block at a non-start instruction without fragmenting the tree.
 
+**Block physical identity comes from the fetch, never a re-walk.**
+When a block is keyed or validated by physical address, that PA must
+be captured from the same translation that fetched the block's bytes
+— an independent later page-table walk diverges from the fetch during
+transitional MMU states (a TLB-cached mapping the fresh walk can't
+see, or a partially-set-up TTBR0) and will mis-key or spuriously
+fault the block.
+
 ## JitCodeArena
 
 One large `VirtualAlloc PAGE_EXECUTE_READWRITE` region per `ArmJit`
@@ -169,6 +177,13 @@ fold base in cp13). The block-index key, the TLB key, and the
 shadow-stack key all use the post-fold VA; `DecodedInsn::guest_address`
 keeps the raw VA for diagnostics and for instruction-stream
 re-entry.
+
+**FCSE fold is identity on ASID kernels.** cp13 FCSE `process_id`
+separates per-process low VAs only on FCSE kernels (CE5 / ARMv5).
+CE6 / CE7 set `process_id = 0` and distinguish address spaces by ASID
+(CONTEXTIDR) instead, so the fold is a no-op there. Any VA-keyed
+structure that must stay process-private therefore has to incorporate
+the ASID rather than rely on the fold.
 
 ## I/O routing
 

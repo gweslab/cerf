@@ -19,6 +19,7 @@ public:
     const std::vector<uint8_t>&   Bytes()        const { return pe_bytes_; }
 
     uint32_t EntryRva()       const { return entry_rva_; }
+    uint16_t Machine()        const { return machine_; }
     uint32_t ImageBase()      const { return image_base_; }
     uint32_t ImageSize()      const { return image_size_; }
     uint32_t StackReserve()   const { return stack_reserve_; }
@@ -40,6 +41,7 @@ private:
 
     std::vector<uint8_t>  pe_bytes_;
     bool                  parsed_        = false;
+    uint16_t              machine_       = 0;
     uint32_t              entry_rva_     = 0;
     uint32_t              image_base_    = 0;
     uint32_t              image_size_    = 0;

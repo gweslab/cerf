@@ -19,10 +19,7 @@ public:
                     DumpFullRegs(c, "[PSL_ENTRY]", pc);
                 });
             }
-            /* sub_80077290 BL-setup window (read32 LDR sources from
-               stack into R0-R3 before the BL R12 to resolved API
-               method; R12 = method ptr already set). */
-            for (uint32_t pc = 0x800773D0u; pc <= 0x800773F8u; pc += 4) {
+            for (uint32_t pc = 0x800773D0u; pc <= 0x800773F0u; pc += 4) {
                 tm.OnPc(pc, [pc](const TraceContext& c) {
                     DumpFullRegs(c, "[PSL_BL_SETUP]", pc);
                 });

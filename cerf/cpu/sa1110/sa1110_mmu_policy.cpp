@@ -1,4 +1,4 @@
-#include "../../socs/mmu_policy.h"
+#include "../mmu_policy.h"
 
 #include "../../core/cerf_emulator.h"
 #include "../../boards/board_detector.h"
@@ -10,7 +10,8 @@ public:
     using MmuPolicy::MmuPolicy;
 
     bool ShouldRegister() override {
-        return emu_.Get<BoardDetector>().GetBoard() == Board::Ipaq3650;
+        auto* bd = emu_.TryGet<BoardDetector>();
+        return bd && bd->GetBoard() == Board::Ipaq3650;
     }
 
     /* SA-1110 Dev Manual §5.2.3: TTBR bits 13:0 ignored on write

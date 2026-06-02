@@ -100,21 +100,9 @@ uint8_t* EmitHalfwordSignedTransfer(uint8_t*      cursor,
     }
 
     /* === MMU translate === */
-    uint8_t* tlb_hint_imm_location = nullptr;
     if (mmu_on) {
-        /* MOV EDX, <back-patch slot for inline TLB hint byte>. */
-        Emit8(cursor, static_cast<uint8_t>(0xB8 + kEdx));
-        tlb_hint_imm_location = cursor;
-        Emit32(cursor, 0);
-        EmitPush32(cursor,
-            static_cast<uint32_t>(reinterpret_cast<uintptr_t>(jit)));
-        if (d->l) {
-            EmitCall(cursor,
-                reinterpret_cast<void*>(&ArmJit::TranslateReadHelper));
-        } else {
-            EmitCall(cursor,
-                reinterpret_cast<void*>(&ArmJit::TranslateWriteHelper));
-        }
+        cursor = EmitTlbFastPath(cursor, ctx,
+                                 d->l ? TlbAccess::kRead : TlbAccess::kWrite);
     } else {
         /* MMU off — direct PA→host. ECX holds the PA. */
         EmitMovRegImm32(cursor, kEdx,
@@ -383,14 +371,6 @@ uint8_t* EmitHalfwordSignedTransfer(uint8_t*      cursor,
         const uint32_t slot_addr =
             static_cast<uint32_t>(reinterpret_cast<uintptr_t>(cursor));
         std::memcpy(io_hint_imm_location, &slot_addr, 4);
-        Emit8(cursor, 0);
-    }
-
-    /* TLB hint cache slot inline (only if MMU on). */
-    if (mmu_on) {
-        const uint32_t slot_addr =
-            static_cast<uint32_t>(reinterpret_cast<uintptr_t>(cursor));
-        std::memcpy(tlb_hint_imm_location, &slot_addr, 4);
         Emit8(cursor, 0);
     }
 

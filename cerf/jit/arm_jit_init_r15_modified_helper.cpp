@@ -31,7 +31,7 @@ void ArmJit::InitializeR15ModifiedHelper() {
     if (!r15_modified_helper_) {
         LOG(Caution, "ArmJit: VirtualAlloc(R15ModifiedHelper) failed gle=%lu\n",
             GetLastError());
-        CerfFatalExit(2);
+        CerfFatalExit(CERF_FATAL_RUNTIME_ERROR);
     }
 
     using namespace x86;
@@ -66,15 +66,10 @@ void ArmJit::InitializeR15ModifiedHelper() {
     FixupLabel(jz_to_pid_not_needed_a, p);
     FixupLabel(jnz_to_pid_not_needed_b, p);
 
-    /* CMP ECX, [EDI + 0] — cache pair GuestLast field. */
-    EmitCmpRegBaseDisp32(p, kEcx, kEdi, 0);
-    uint8_t* jz_to_jump_to_native_target = EmitJzLabel(p);
-
-    /* Cache miss path. Save ECX in EBP across the helper CALL. */
-    EmitPushReg(p, kEbp);
-    EmitMovRegReg(p, kEbp, kEcx);
-
-    EmitPushReg(p, kEcx);                  /* arg2: post-fold guest PC */
+    /* Resolve through the VA jump cache (flushed on every context switch).
+       A per-site cache here would survive an address-space change un-flushed
+       and JMP a stale native after FCSE PID reuse. ECX folded; helper re-folds. */
+    EmitPushReg(p, kEcx);                  /* arg2: guest PC */
     EmitPush32 (p, static_cast<uint32_t>(reinterpret_cast<uintptr_t>(this)));
                                             /* arg1: jit baked here */
     EmitCall   (p, reinterpret_cast<void*>(&ArmJit::FindBlockNativeStartHelper));
@@ -83,19 +78,10 @@ void ArmJit::InitializeR15ModifiedHelper() {
     EmitTestRegReg(p, kEax, kEax);
     uint8_t* jz_to_not_compiled = EmitJzLabel(p);
 
-    /* Hit. Commit cache and JMP to resolved native PC. */
-    EmitMovBaseDisp32Reg(p, kEdi, 0, kEbp);  /* GuestLast = post-fold ECX */
-    EmitMovBaseDisp32Reg(p, kEdi, 4, kEax);  /* NativeLast = native ptr */
-    EmitPopReg(p, kEbp);
-    EmitJmpReg(p, kEax);
-
-    /* JumpToNativeTarget: */
-    FixupLabel(jz_to_jump_to_native_target, p);
-    EmitJmpBaseDisp32(p, kEdi, 4);
+    EmitJmpReg(p, kEax);                    /* hit → JMP native */
 
     /* NotCompiled: */
     FixupLabel(jz_to_not_compiled, p);
-    EmitPopReg(p, kEbp);
     EmitRetn(p, 0);
 
     FlushInstructionCache(GetCurrentProcess(), r15_modified_helper_,

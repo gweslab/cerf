@@ -174,7 +174,7 @@ int ArmJit::LocateEntrypoints() {
                    S effect — programmer / decoder error. */
                 LOG(Caution, "ArmJit::LocateEntrypoints: S-bit set on insn at "
                     "0x%08X with unhandled place_fn\n", insn.guest_address);
-                CerfFatalExit(2);
+                CerfFatalExit(CERF_FATAL_RUNTIME_ERROR);
             }
         }
     }

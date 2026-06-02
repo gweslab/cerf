@@ -43,7 +43,8 @@ public:
     using Peripheral::Peripheral;
 
     bool ShouldRegister() override {
-        return emu_.Get<BoardDetector>().GetBoard() == Board::OdoArm720;
+        auto* bd = emu_.TryGet<BoardDetector>();
+        return bd && bd->GetBoard() == Board::OdoArm720;
     }
     void OnReady() override {
         emu_.Get<PeripheralDispatcher>().Register(this);

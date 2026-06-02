@@ -26,12 +26,12 @@ struct DecodedInsn {
        descriptor). Decoders fill it directly from opcode bits[11:0]. */
     uint32_t operand2;
 
-    /* Register fields. Rd/Rn/Rm/Rs are 4-bit GPR indices; the
-       register list is the 16-bit LDM/STM mask. */
+    /* rs reused as BFI/SBFX/UBFX width (1..32); 4 bits silently
+       truncate width 16..32 → wrong src_mask. */
     uint32_t rd            : 4;
     uint32_t rn            : 4;
     uint32_t rm            : 4;
-    uint32_t rs            : 4;
+    uint32_t rs            : 6;
     uint16_t register_list;
 
     /* Coprocessor fields — for MCR/MRC/CDP/LDC/STC. */
@@ -68,6 +68,11 @@ struct DecodedInsn {
     uint32_t x1            : 4;
     uint32_t x2            : 12;
     uint32_t r15_modified  : 1;  /* set when the decoder proves the insn writes PC */
+    /* DO NOT collapse into r15_modified — plain BX / MOV PC, Rm set
+       r15_modified but are NOT exception returns (ddi0406c §A2.3.1
+       line 2079 lists them as interworking branches); the emit-side
+       CPSR-from-SPSR restore (§B1.8) must fire ONLY for this subset. */
+    uint32_t is_exception_return : 1;
 
     /* DSP instruction extras. */
     uint32_t x             : 1;

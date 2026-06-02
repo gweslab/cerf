@@ -138,7 +138,8 @@ public:
     using Peripheral::Peripheral;
 
     bool ShouldRegister() override {
-        return emu_.Get<BoardDetector>().GetBoard() == Board::OdoArm720;
+        auto* bd = emu_.TryGet<BoardDetector>();
+        return bd && bd->GetBoard() == Board::OdoArm720;
     }
     void OnReady() override {
         emu_.Get<PeripheralDispatcher>().Register(this);
@@ -209,7 +210,7 @@ void OdoArm720Keyboard::WriteHalf(uint32_t addr, uint16_t value) {
                         "KB_RDRF has a documented W1C semantic per "
                         "P2.H + KEYBDPDD.CPP. Halt rather than guess "
                         "behavior for other bits.\n", value);
-                CerfFatalExit(1);
+                CerfFatalExit(CERF_FATAL_RUNTIME_ERROR);
             }
             const bool was_set = (kb_isr_ & kKbRdrf) != 0;
             kb_isr_ &= static_cast<uint16_t>(~(value & kKbRdrf));
@@ -288,7 +289,8 @@ public:
     using KeyboardInput::KeyboardInput;
 
     bool ShouldRegister() override {
-        return emu_.Get<BoardDetector>().GetBoard() == Board::OdoArm720;
+        auto* bd = emu_.TryGet<BoardDetector>();
+        return bd && bd->GetBoard() == Board::OdoArm720;
     }
 
     void OnHostKey(uint8_t vk, bool key_up) override {

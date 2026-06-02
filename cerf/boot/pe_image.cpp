@@ -70,6 +70,7 @@ PeImage::PeImage(std::vector<uint8_t> pe_bytes)
     }
 
     const size_t file_hdr_off    = e_lfanew + 4;
+    machine_                     = RdU16(pe_bytes_.data(), file_hdr_off + 0);
     const uint16_t num_sections  = RdU16(pe_bytes_.data(), file_hdr_off + kFileOffNumberOfSections);
     const uint16_t opt_hdr_size  = RdU16(pe_bytes_.data(), file_hdr_off + kFileOffSizeOfOptionalHdr);
     image_flags_                 = RdU16(pe_bytes_.data(), file_hdr_off + kFileOffCharacteristics);

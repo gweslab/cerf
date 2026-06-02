@@ -11,13 +11,17 @@ public:
     using CoprocEmitter::CoprocEmitter;
 
     bool ShouldRegister() override {
-        return emu_.Get<BoardDetector>().GetBoard() == Board::OmapEvm3530;
+        auto* bd = emu_.TryGet<BoardDetector>();
+        return bd && bd->GetBoard() == Board::OmapEvm3530;
     }
 
     uint8_t* EmitRegisterTransfer(uint8_t*      cursor,
                                   DecodedInsn*  d,
                                   BlockContext* ctx) override {
         if (d->cp_num == 15) {
+            if (d->crn == 15) {
+                return EmitCp15Cacr(cursor, d, ctx);
+            }
             return EmitCp15RegisterTransfer(cursor, d, ctx);
         }
         if (d->cp_num == 10 || d->cp_num == 11) {

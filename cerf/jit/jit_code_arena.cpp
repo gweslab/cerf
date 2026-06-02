@@ -20,7 +20,7 @@ void JitCodeArena::Initialize() {
     if (!region_start_) {
         LOG(Caution, "JitCodeArena: VirtualAlloc(%zu) failed gle=%lu\n",
             kRegionSize, GetLastError());
-        CerfFatalExit(2);
+        CerfFatalExit(CERF_FATAL_RUNTIME_ERROR);
     }
     cursor_      = region_start_;
     region_end_  = region_start_ + kRegionSize;

@@ -6,6 +6,9 @@
 - [x] DevEmu BSP / SMDK 2410 SoC - MVP implementation - boot, display, touch
 - [x] Windows CE 3 Poseidon SoC+BSP - easiest next target, introduces first time ever proper Windows CE 3 ARM emulator to the world
 - [x] CERF v2 branch replaces CERF v1 on GitHub - long awaited release
+- [ ] Device frame in main window - devices need keypads, soft keys. Some devices need even more complex physical keys. Could be set up on board detection.
+- [ ] First thing that ALL devices lack today is the shared with host storage. For many devices this could be done via PCMCIA storage card emulation into host directory. Some might have no PCMCIA, but have ATA disks, etc.
+- [ ] Runtime PCMCIA slot switcher could be implemented
 - [ ] DevEmu BSP - Full implementation
 - [ ] Other BSPs and SoCs: OMAP 3510, SA-1110, etc.
 - [ ] CERF's guest additions - drop in pathes inside ROMs with CERF's ARM binaries - any drivers? any apps? - research point in future

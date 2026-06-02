@@ -1,3 +1,5 @@
+ce_apps/**/.build_mode
+
 # Device bundles are downloaded cache data.
 bundled/devices/manifest.json
 bundled/devices/*
@@ -22,7 +24,7 @@ local_files/
 # Only the README.md inside is tracked
 references/*
 !references/README.md
-!references/wince5-full-sdk
+!references/WindowsCE-Build-Tools
 !references/extract-wince-rom
 
 ## Ignore Visual Studio temporary files, build results, and

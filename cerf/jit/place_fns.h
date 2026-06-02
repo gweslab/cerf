@@ -24,6 +24,7 @@ uint8_t* PlaceArithmeticExtension          (uint8_t* cursor, DecodedInsn* d, Blo
 uint8_t* PlaceDataProcessing               (uint8_t* cursor, DecodedInsn* d, BlockContext* ctx);
 uint8_t* PlaceDataProcessingCALL           (uint8_t* cursor, DecodedInsn* d, BlockContext* ctx);
 uint8_t* PlaceMSRImmediate                 (uint8_t* cursor, DecodedInsn* d, BlockContext* ctx);
+uint8_t* PlaceWfi                          (uint8_t* cursor, DecodedInsn* d, BlockContext* ctx);
 uint8_t* PlaceMRSorMSR                     (uint8_t* cursor, DecodedInsn* d, BlockContext* ctx);
 uint8_t* PlaceSoftwareInterrupt            (uint8_t* cursor, DecodedInsn* d, BlockContext* ctx);
 uint8_t* PlaceSyscall                      (uint8_t* cursor, DecodedInsn* d, BlockContext* ctx);
@@ -70,6 +71,8 @@ uint8_t* PlaceStrex                        (uint8_t* cursor, DecodedInsn* d, Blo
 uint8_t* PlaceThumbBranchAndExchange       (uint8_t* cursor, DecodedInsn* d, BlockContext* ctx);
 uint8_t* PlaceThumbLoadAddressPC           (uint8_t* cursor, DecodedInsn* d, BlockContext* ctx);
 uint8_t* PlaceThumbLongBranch              (uint8_t* cursor, DecodedInsn* d, BlockContext* ctx);
+uint8_t* PlaceRfe                          (uint8_t* cursor, DecodedInsn* d, BlockContext* ctx);
+uint8_t* PlaceSrs                          (uint8_t* cursor, DecodedInsn* d, BlockContext* ctx);
 
 /* Non-ArmPlaceFn translators called by sibling Place fns. */
 
@@ -103,7 +106,19 @@ uint8_t* PlaceCoprocessorPermissionCheck(uint8_t* cursor, DecodedInsn* d, BlockC
 
 uint8_t* EmitRaiseUndAndReturn(uint8_t* cursor, DecodedInsn* d, BlockContext* ctx);
 
+/* Loud stub: a real-but-unimplemented coprocessor instruction. Runtime FATAL
+   naming the access. CoprocEmitters use this (not the UND path) for an access
+   that is architecturally valid on the core but not yet emitted. */
+uint8_t* EmitCoprocUnimplementedFatal(uint8_t* cursor, DecodedInsn* d, BlockContext* ctx);
+
+/* In: EAX = raw target. Out: EAX masked, CPSR.T set iff bit 0 was set.
+   Do NOT call from Thumb-state emit — Thumb PC writes halfword-align
+   without ISA switch (ddi0406c §A2.3.1, lines 2062-2066). */
+uint8_t* EmitArmInterworkingMaskEax(uint8_t* cursor);
+
 uint8_t* EmitCp15RegisterTransfer(uint8_t* cursor, DecodedInsn* d, BlockContext* ctx);
+
+uint8_t* EmitCp15Cacr(uint8_t* cursor, DecodedInsn* d, BlockContext* ctx);
 
 uint8_t* EmitVfpRegisterTransfer(uint8_t* cursor, DecodedInsn* d, BlockContext* ctx);
 uint8_t* EmitVfpDataTransfer    (uint8_t* cursor, DecodedInsn* d, BlockContext* ctx);
@@ -111,10 +126,114 @@ uint8_t* EmitVfpDataOperation   (uint8_t* cursor, DecodedInsn* d, BlockContext* 
 
 uint8_t* EmitVfpSystemRegTransfer(uint8_t* cursor, DecodedInsn* d, BlockContext* ctx);
 uint8_t* EmitVfpSingleMove       (uint8_t* cursor, DecodedInsn* d, BlockContext* ctx);
+uint8_t* EmitVfpSingleMoveIdx    (uint8_t* cursor, DecodedInsn* d, BlockContext* ctx,
+                                  uint32_t sn);
 
 uint8_t* EmitVfpBlockTransfer(uint8_t* cursor, DecodedInsn* d, BlockContext* ctx);
 
 uint8_t* EmitVfpSingleTransfer(uint8_t* cursor, DecodedInsn* d, BlockContext* ctx);
+
+uint8_t* EmitNeonVdup(uint8_t* cursor, DecodedInsn* d, BlockContext* ctx);
+
+uint8_t* PlaceNeonLoadStoreMultiple(uint8_t* cursor, DecodedInsn* d, BlockContext* ctx);
+
+uint8_t* PlaceNeonLoadStoreInterleaved(uint8_t* cursor, DecodedInsn* d, BlockContext* ctx);
+
+uint8_t* PlaceNeonLoadStoreSingleLane(uint8_t* cursor, DecodedInsn* d, BlockContext* ctx);
+
+uint8_t* PlaceNeonUnimplemented(uint8_t* cursor, DecodedInsn* d, BlockContext* ctx);
+
+uint8_t* PlaceNeonData3Same(uint8_t* cursor, DecodedInsn* d, BlockContext* ctx);
+
+uint8_t* PlaceNeonData3SameAcc(uint8_t* cursor, DecodedInsn* d, BlockContext* ctx);
+
+uint8_t* PlaceNeonData3SameSat(uint8_t* cursor, DecodedInsn* d, BlockContext* ctx);
+
+uint8_t* PlaceNeonData3SamePairwise(uint8_t* cursor, DecodedInsn* d, BlockContext* ctx);
+
+uint8_t* PlaceNeonShiftImm(uint8_t* cursor, DecodedInsn* d, BlockContext* ctx);
+
+uint8_t* PlaceNeonOneRegImm(uint8_t* cursor, DecodedInsn* d, BlockContext* ctx);
+
+uint8_t* PlaceNeonShiftImmSat(uint8_t* cursor, DecodedInsn* d, BlockContext* ctx);
+
+uint8_t* PlaceNeonShiftImmNarrow(uint8_t* cursor, DecodedInsn* d, BlockContext* ctx);
+
+uint8_t* PlaceNeonShiftImmNarrowSat(uint8_t* cursor, DecodedInsn* d, BlockContext* ctx);
+
+uint8_t* PlaceNeonShiftImmWiden(uint8_t* cursor, DecodedInsn* d, BlockContext* ctx);
+
+uint8_t* PlaceNeonData3DiffLen(uint8_t* cursor, DecodedInsn* d, BlockContext* ctx);
+
+uint8_t* PlaceNeonData3DiffLenHN(uint8_t* cursor, DecodedInsn* d, BlockContext* ctx);
+
+uint8_t* PlaceNeonData3DiffLenAbs(uint8_t* cursor, DecodedInsn* d, BlockContext* ctx);
+
+uint8_t* PlaceNeonData3DiffLenMul(uint8_t* cursor, DecodedInsn* d, BlockContext* ctx);
+
+uint8_t* PlaceNeonData3DiffLenMulSat(uint8_t* cursor, DecodedInsn* d, BlockContext* ctx);
+
+uint8_t* PlaceNeonData2RegScalarLong(uint8_t* cursor, DecodedInsn* d, BlockContext* ctx);
+
+uint8_t* PlaceNeonData2RegScalarMulSat(uint8_t* cursor, DecodedInsn* d, BlockContext* ctx);
+
+uint8_t* PlaceNeonData2RegScalarMulhSat(uint8_t* cursor, DecodedInsn* d, BlockContext* ctx);
+
+uint8_t* PlaceNeonData2RegScalarMul(uint8_t* cursor, DecodedInsn* d, BlockContext* ctx);
+
+uint8_t* PlaceNeonData2RegReverse(uint8_t* cursor, DecodedInsn* d, BlockContext* ctx);
+
+uint8_t* PlaceNeonData2RegBitcount(uint8_t* cursor, DecodedInsn* d, BlockContext* ctx);
+
+uint8_t* PlaceNeonData2RegBitwiseNot(uint8_t* cursor, DecodedInsn* d, BlockContext* ctx);
+
+uint8_t* PlaceNeonData2RegUnaryArith(uint8_t* cursor, DecodedInsn* d, BlockContext* ctx);
+
+uint8_t* PlaceNeonData2RegCompareZero(uint8_t* cursor, DecodedInsn* d, BlockContext* ctx);
+
+uint8_t* PlaceNeonData2RegPairwiseAddLong(uint8_t* cursor, DecodedInsn* d, BlockContext* ctx);
+
+uint8_t* PlaceNeonData2RegSatAbsNeg(uint8_t* cursor, DecodedInsn* d, BlockContext* ctx);
+
+uint8_t* PlaceNeonData2RegSwap(uint8_t* cursor, DecodedInsn* d, BlockContext* ctx);
+
+uint8_t* PlaceNeonData2RegShuffle(uint8_t* cursor, DecodedInsn* d, BlockContext* ctx);
+
+uint8_t* PlaceNeonData2RegNarrow(uint8_t* cursor, DecodedInsn* d, BlockContext* ctx);
+
+uint8_t* PlaceNeonData2RegWiden(uint8_t* cursor, DecodedInsn* d, BlockContext* ctx);
+
+uint8_t* PlaceNeonData2RegReciprocal(uint8_t* cursor, DecodedInsn* d, BlockContext* ctx);
+
+uint8_t* PlaceNeonData2RegCvtIntFp(uint8_t* cursor, DecodedInsn* d, BlockContext* ctx);
+
+uint8_t* PlaceNeonData2RegCvtHalfSingle(uint8_t* cursor, DecodedInsn* d, BlockContext* ctx);
+
+uint8_t* PlaceNeonData3SameFpArith(uint8_t* cursor, DecodedInsn* d, BlockContext* ctx);
+
+uint8_t* PlaceNeonData3SameFpMulAcc(uint8_t* cursor, DecodedInsn* d, BlockContext* ctx);
+
+uint8_t* PlaceNeonData3SameFpMinMax(uint8_t* cursor, DecodedInsn* d, BlockContext* ctx);
+
+uint8_t* PlaceNeonData3SameFpFma(uint8_t* cursor, DecodedInsn* d, BlockContext* ctx);
+
+uint8_t* PlaceNeonData3SameFpPairAdd(uint8_t* cursor, DecodedInsn* d, BlockContext* ctx);
+
+uint8_t* PlaceNeonData3SameFpPairMinMax(uint8_t* cursor, DecodedInsn* d, BlockContext* ctx);
+
+uint8_t* PlaceNeonData3SameFpCompare(uint8_t* cursor, DecodedInsn* d, BlockContext* ctx);
+
+uint8_t* PlaceNeonData3SameFpAbsCompare(uint8_t* cursor, DecodedInsn* d, BlockContext* ctx);
+
+uint8_t* PlaceNeonData3SameFpRecipStep(uint8_t* cursor, DecodedInsn* d, BlockContext* ctx);
+
+uint8_t* PlaceNeonDataVext(uint8_t* cursor, DecodedInsn* d, BlockContext* ctx);
+
+uint8_t* PlaceNeonDataVtbl(uint8_t* cursor, DecodedInsn* d, BlockContext* ctx);
+
+uint8_t* EmitNeonCoreToScalar(uint8_t* cursor, DecodedInsn* d, BlockContext* ctx);
+
+uint8_t* EmitNeonScalarToCore(uint8_t* cursor, DecodedInsn* d, BlockContext* ctx);
 
 /* SWP / SWPB — atomic swap (PlaceLoadStoreExtension d->op1 == 0 path). */
 uint8_t* EmitSwap(uint8_t* cursor, DecodedInsn* d, BlockContext* ctx);
@@ -136,11 +255,15 @@ uint8_t* PlaceSingleDataTransferOffset(uint8_t*           cursor,
                                        BlockContext*      ctx,
                                        bool*              needs_alignment_check);
 
+/* Inline DTLB probe emitted before the slow Translate*Helper call.
+   ECX = guest EA in; EAX = host pointer out (or null fault from the helper). */
+enum class TlbAccess { kRead, kWrite, kReadWrite };
+uint8_t* EmitTlbFastPath(uint8_t* cursor, BlockContext* ctx, TlbAccess access);
+
 struct PbdtCrossPageInputs {
     uint8_t* possibly_two_pages;
     uint8_t* abort_destination;
     uint8_t* raise_unaligned;
-    uint8_t* tlb_hint_slot_pointer;
     uint8_t  block_size;
     uint32_t pc_store_offset;
     bool     alignment_check_on;
@@ -158,7 +281,6 @@ uint8_t* EmitLdmStmCrossPage(uint8_t*                    cursor,
                              PbdtCrossPageOutputs*       out);
 
 struct SdtLdrWordInputs {
-    uint8_t* tlb_hint_imm_location;     /* MOV EDX imm32 slot the inline TLB-hint byte's address gets back-patched into */
     uint8_t* abort_exception_or_io;     /* JZ-label fixup at body entry */
     uint8_t* raise_alignment_exception; /* JNZ-label fixup on alignment fault */
     bool     needs_alignment_check;
@@ -166,7 +288,6 @@ struct SdtLdrWordInputs {
     bool     base_restored_abort_model;
     bool     memory_before_writeback_model;
     bool     cache_hit;                 /* PC-cache fast path skipped translation */
-    bool     mmu_on;
 };
 
 uint8_t* EmitLdrWord(uint8_t*                  cursor,

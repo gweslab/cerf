@@ -13,7 +13,8 @@ public:
     using Pd6710CardIrqLine::Pd6710CardIrqLine;
 
     bool ShouldRegister() override {
-        return emu_.Get<BoardDetector>().GetBoard() == Board::Smdk2410DevEmu;
+        auto* bd = emu_.TryGet<BoardDetector>();
+        return bd && bd->GetBoard() == Board::Smdk2410DevEmu;
     }
 
     void Assert() override {

@@ -27,7 +27,6 @@ uint8_t* EmitSwap(uint8_t*      cursor,
     const int32_t rd_disp =
         static_cast<int32_t>(offsetof(ArmCpuState, gprs) + d->rd * 4u);
 
-    uint8_t* tlb_hint_imm_location  = nullptr;
     uint8_t* io_hint_imm_location1  = nullptr;
     uint8_t* io_hint_imm_location2  = nullptr;
 
@@ -35,13 +34,7 @@ uint8_t* EmitSwap(uint8_t*      cursor,
     EmitMovRegBaseDisp32(cursor, kEcx, kStateReg, rn_disp);
 
     if (mmu_on) {
-        Emit8(cursor, static_cast<uint8_t>(0xB8 + kEdx));
-        tlb_hint_imm_location = cursor;
-        Emit32(cursor, 0);
-        EmitPush32(cursor,
-            static_cast<uint32_t>(reinterpret_cast<uintptr_t>(jit)));
-        EmitCall(cursor,
-            reinterpret_cast<void*>(&ArmJit::TranslateReadWriteHelper));
+        cursor = EmitTlbFastPath(cursor, ctx, TlbAccess::kReadWrite);
     } else {
         EmitMovRegImm32(cursor, kEdx,
             static_cast<uint32_t>(reinterpret_cast<uintptr_t>(jit)));
@@ -146,14 +139,6 @@ uint8_t* EmitSwap(uint8_t*      cursor,
     FixupLabel(abort_label, cursor);
     EmitMovRegImm32(cursor, kEcx, d->guest_address);
     EmitJmp32(cursor, ctx->raise_abort_data_helper_target);
-
-    /* TLB hint cache slot inline (only if MMU on). */
-    if (mmu_on) {
-        const uint32_t slot_addr =
-            static_cast<uint32_t>(reinterpret_cast<uintptr_t>(cursor));
-        std::memcpy(tlb_hint_imm_location, &slot_addr, 4);
-        Emit8(cursor, 0);
-    }
 
     FixupLabel(swap_done_mem, cursor);
     FixupLabel(swap_done_io, cursor);

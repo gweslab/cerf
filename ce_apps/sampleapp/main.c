@@ -196,26 +196,14 @@ static void HandleThreadStop(void);
 static const TCHAR kPaneClass[]  = TEXT("CerfSampleAppPane");
 static const TCHAR kPaintClass[] = TEXT("CerfSampleAppPaint");
 
-/* ===== WM_CTLCOLOR* helper =====
-   Controls (STATIC, BUTTON-derived radios/checkboxes/groupboxes) ask their
-   parent for a background brush via WM_CTLCOLOR{STATIC,BTN,DLG}. On CE5
-   DefWindowProc happens to return a brush whose color matches the pane's
-   COLOR_BTNFACE background, so the default works. On Windows Mobile the
-   default brush is white, producing a white island inside the gray pane
-   for every label / checkbox / groupbox. Answer the message ourselves with
-   the correct system brush so the result is consistent on both. */
+/* ===== WM_CTLCOLOR* helper ===== */
 static LRESULT SampleHandleCtlColor(HDC hdc) {
     SetBkColor(hdc, GetSysColor(COLOR_BTNFACE));
     SetTextColor(hdc, GetSysColor(COLOR_BTNTEXT));
     return (LRESULT)GetSysColorBrush(COLOR_BTNFACE);
 }
 
-/* ===== GroupBox subclass: forward WM_COMMAND + WM_CTLCOLOR* to parent =====
-   The BUTTON wndproc swallows WM_COMMAND from grandchildren, so radios
-   inside a groupbox never reach the main window without this. The same
-   wndproc also answers WM_CTLCOLOR* from inner radios/checkboxes with its
-   own brush - which on WM5 is the wrong (white) one - so forward those to
-   the pane so the answer matches every other control. */
+/* ===== GroupBox subclass: forward WM_COMMAND + WM_CTLCOLOR* to parent ===== */
 static LRESULT CALLBACK GroupBoxForwardProc(HWND hwnd, UINT msg,
                                              WPARAM wp, LPARAM lp) {
     if (msg == WM_COMMAND ||
@@ -227,13 +215,7 @@ static LRESULT CALLBACK GroupBoxForwardProc(HWND hwnd, UINT msg,
     return CallWindowProc(g_origGrpWndProc, hwnd, msg, wp, lp);
 }
 
-/* ===== Tab pane container - forwards control notifications to main =====
-   Tab panes are children of the tab control. WM_COMMAND/NOTIFY/DRAWITEM
-   from controls hosted in a pane bubble up here and we forward to the
-   main window so dispatch logic stays in one place. WM_CTLCOLOR* are
-   answered locally with COLOR_BTNFACE so static labels, checkboxes,
-   groupbox surfaces, and the trackbar/progress/updown control surfaces
-   all paint with the same gray as the pane on every device. */
+/* ===== Tab pane container ===== */
 static LRESULT CALLBACK TabPaneProc(HWND hwnd, UINT msg,
                                      WPARAM wp, LPARAM lp) {
     switch (msg) {
@@ -327,16 +309,6 @@ static LRESULT CALLBACK CustomPaintChildProc(HWND hwnd, UINT msg,
             SelectObject(hMemDC, hbrOld);
             DeleteObject(hbrShape);
         }
-
-        /* Diagonal lines via MoveToEx + LineTo. */
-        hpen = CreatePen(PS_SOLID, 1, RGB(180, 0, 0));
-        hpenOld = (HPEN)SelectObject(hMemDC, hpen);
-        MoveToEx(hMemDC, rc.left + 5, rc.top + 5, NULL);
-        LineTo(hMemDC, rc.right - 5, rc.bottom - 5);
-        MoveToEx(hMemDC, rc.right - 5, rc.top + 5, NULL);
-        LineTo(hMemDC, rc.left + 5, rc.bottom - 5);
-        SelectObject(hMemDC, hpenOld);
-        DeleteObject(hpen);
 
         /* Text - CE5 uses CreateFontIndirect + ExtTextOut. */
         {
@@ -494,7 +466,7 @@ static void BuildTabLists(HWND pane) {
             RGB(0x44, 0xCC, 0xCC),  /* audio    */
             RGB(0x88, 0x44, 0xCC),  /* video    */
         };
-        HIMAGELIST hImg = ImageList_Create(16, 16, ILC_COLOR24, 8, 0);
+        HIMAGELIST hImg = ImageList_Create(16, 16, ILC_COLOR, 8, 0);
         HDC hScreen = GetDC(NULL);
         HDC hMemDC = CreateCompatibleDC(hScreen);
         for (i = 0; i < 8; i++) {
@@ -598,11 +570,9 @@ static void BuildTabLists(HWND pane) {
     SendMessage(hLB, LB_ADDSTRING, 0, (LPARAM)TEXT("Purple"));
 }
 
-/* ===== Tab 3 - Sliders (trackbar, progress, updown, tooltip) =====
-   CE5 commctrl is built with NOHOTKEY, so the hotkey control is omitted. */
+/* ===== Tab 3 - Sliders (trackbar, progress, updown) ===== */
 static void BuildTabSliders(HWND pane) {
-    HWND hUpdownBuddy, hUpdown, hTip;
-    TOOLINFO ti;
+    HWND hUpdownBuddy, hUpdown;
 
     CreateWindow(TEXT("STATIC"), TEXT("Trackbar (horizontal, ticks every 10):"),
         WS_CHILD | WS_VISIBLE | SS_LEFT,
@@ -671,27 +641,9 @@ static void BuildTabSliders(HWND pane) {
         WS_CHILD | WS_VISIBLE | SS_LEFT,
         50, 168, 620, 14, pane, NULL, g_hInstance, NULL);
     CreateWindow(TEXT("STATIC"),
-        TEXT("A tooltip is attached to the horizontal trackbar above."),
-        WS_CHILD | WS_VISIBLE | SS_LEFT,
-        50, 188, 620, 14, pane, NULL, g_hInstance, NULL);
-    CreateWindow(TEXT("STATIC"),
         TEXT("The progress bar above ticks while the Tab 7 timer is running."),
         WS_CHILD | WS_VISIBLE | SS_LEFT,
         50, 208, 620, 14, pane, NULL, g_hInstance, NULL);
-
-    /* Tooltip on the horizontal trackbar */
-    hTip = CreateWindowEx(WS_EX_TOPMOST, TOOLTIPS_CLASS, NULL,
-        WS_POPUP | TTS_ALWAYSTIP, 0, 0, 0, 0,
-        pane, NULL, g_hInstance, NULL);
-    if (hTip) {
-        memset(&ti, 0, sizeof(ti));
-        ti.cbSize = sizeof(ti);
-        ti.uFlags = TTF_SUBCLASS | TTF_IDISHWND;
-        ti.hwnd = pane;
-        ti.uId = (UINT_PTR)GetDlgItem(pane, ID_TB3_TRACK_H);
-        ti.lpszText = (LPTSTR)TEXT("Drag me 0..100");
-        SendMessage(hTip, TTM_ADDTOOL, 0, (LPARAM)&ti);
-    }
 }
 
 /* ===== Tab 4 - GDI custom paint (paints to memory DC, BitBlts to screen) ===== */
@@ -779,14 +731,13 @@ static void BuildTabCombos(HWND pane) {
         8, 208, 200, 30, pane, (HMENU)ID_TB5_OD_BTN,
         g_hInstance, NULL);
 
-    /* Right column starts at x=216 (8px gap after the left column). */
     CreateWindow(TEXT("STATIC"),
-        TEXT("LBS_OWNERDRAWFIXED listbox:"),
+        TEXT("Listbox:"),
         WS_CHILD | WS_VISIBLE | SS_LEFT,
         216, 2, 460, 14, pane, NULL, g_hInstance, NULL);
     hLB = CreateWindowEx(WS_EX_CLIENTEDGE, TEXT("LISTBOX"), NULL,
         WS_CHILD | WS_VISIBLE | WS_VSCROLL |
-        LBS_NOTIFY | LBS_OWNERDRAWFIXED | LBS_HASSTRINGS,
+        LBS_NOTIFY | LBS_HASSTRINGS,
         216, 18, 464, 250, pane, (HMENU)ID_TB5_OD_LB,
         g_hInstance, NULL);
     SendMessage(hLB, LB_ADDSTRING, 0, (LPARAM)TEXT("Red"));
@@ -934,7 +885,7 @@ static void BuildTabAsync(HWND pane) {
 
 /* ===== Tab 8 - Toolbar + header + animate ===== */
 static void BuildTabToolbar(HWND pane) {
-    HWND hTb, hHdr, hAni;
+    HWND hTb, hHdr;
     TBBUTTON tbb[6];
     HDITEM hdi;
     int i;
@@ -1004,16 +955,6 @@ static void BuildTabToolbar(HWND pane) {
         hdi.cxy = 180; hdi.pszText = (LPTSTR)TEXT("Column 4");
         SendMessage(hHdr, HDM_INSERTITEM, 3, (LPARAM)&hdi);
     }
-
-    CreateWindow(TEXT("STATIC"),
-        TEXT("SysAnimate32 (no AVI loaded - control creation test):"),
-        WS_CHILD | WS_VISIBLE | SS_LEFT,
-        8, 102, 400, 14, pane, NULL, g_hInstance, NULL);
-    hAni = CreateWindow(ANIMATE_CLASS, NULL,
-        WS_CHILD | WS_VISIBLE | WS_BORDER | ACS_CENTER,
-        8, 118, 200, 50, pane, (HMENU)ID_TB8_ANIMATE,
-        g_hInstance, NULL);
-    (void)hAni;
 
     CreateWindow(TEXT("STATIC"),
         TEXT("Toolbar buttons fire the same IDM_FILE_*/IDM_EDIT_* commands"),
@@ -1436,27 +1377,6 @@ static LRESULT CALLBACK MainWndProc(HWND hwnd, UINT msg,
             SwitchTab(idx);
             return 0;
         }
-        /* Tab 8 toolbar's internal tooltip control asks us for text via
-           TTN_GETDISPINFO (alias TTN_NEEDTEXT). idFrom = button cmd id. */
-        if (hdr->code == (UINT)TTN_GETDISPINFOW ||
-            hdr->code == (UINT)TTN_GETDISPINFOA) {
-            LPTOOLTIPTEXT tt = (LPTOOLTIPTEXT)lp;
-            LPCTSTR text = TEXT("");
-            int cap = sizeof(tt->szText) / sizeof(tt->szText[0]);
-            int j;
-            switch ((int)hdr->idFrom) {
-            case IDM_FILE_NEW:  text = TEXT("New");      break;
-            case IDM_FILE_OPEN: text = TEXT("Open...");  break;
-            case IDM_FILE_SAVE: text = TEXT("Save...");  break;
-            case IDM_EDIT_CUT:  text = TEXT("Cut");      break;
-            case IDM_EDIT_COPY: text = TEXT("Copy");     break;
-            }
-            /* Bounded copy - CE5 coredll doesn't export lstrcpyn. */
-            for (j = 0; j < cap - 1 && text[j]; j++)
-                tt->szText[j] = text[j];
-            tt->szText[j] = 0;
-            return 0;
-        }
         return 0;
     }
 
@@ -1480,21 +1400,6 @@ static LRESULT CALLBACK MainWndProc(HWND hwnd, UINT msg,
         wsprintf(buf, TEXT("Thread %d"), (int)wp);
         SetStatusText(1, buf);
         if (g_hThreadLabel) SetWindowText(g_hThreadLabel, buf);
-        return 0;
-    }
-
-    case WM_CONTEXTMENU: {
-        POINT pt;
-        pt.x = (short)LOWORD(lp);
-        pt.y = (short)HIWORD(lp);
-        if (pt.x == -1 && pt.y == -1) {
-            RECT rc;
-            GetWindowRect(hwnd, &rc);
-            pt.x = rc.left + 50;
-            pt.y = rc.top + 50;
-        }
-        TrackPopupMenu(g_hCtxMenu, TPM_LEFTALIGN | TPM_TOPALIGN,
-                       pt.x, pt.y, 0, hwnd, NULL);
         return 0;
     }
 
@@ -1782,12 +1687,10 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPrev,
 
     g_hInstance = hInst;
 
-    /* Register every CE5 commctrl class up front. */
     icex.dwSize = sizeof(icex);
     icex.dwICC = ICC_LISTVIEW_CLASSES | ICC_TREEVIEW_CLASSES |
                  ICC_BAR_CLASSES      | ICC_TAB_CLASSES      |
                  ICC_UPDOWN_CLASS     | ICC_PROGRESS_CLASS   |
-                 ICC_ANIMATE_CLASS    | ICC_TOOLTIP_CLASSES  |
                  ICC_WIN95_CLASSES;
     InitCommonControlsEx(&icex);
 

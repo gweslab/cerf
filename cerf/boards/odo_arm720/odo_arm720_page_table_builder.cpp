@@ -1,4 +1,4 @@
-#include "../../socs/page_table_builder.h"
+#include "../page_table_builder.h"
 
 #include "../../core/cerf_emulator.h"
 #include "../../core/log.h"
@@ -39,7 +39,8 @@ public:
     using PageTableBuilder::PageTableBuilder;
 
     bool ShouldRegister() override {
-        return emu_.Get<BoardDetector>().GetBoard() == Board::OdoArm720;
+        auto* bd = emu_.TryGet<BoardDetector>();
+        return bd && bd->GetBoard() == Board::OdoArm720;
     }
 
     uint32_t InitStackTopPa() const override { return kInitStackTopPa; }
@@ -58,7 +59,7 @@ uint32_t OdoArm720PageTableBuilder::VaToPa(uint32_t va) const {
             "outside every BSP OAT band (see "
             "references/WINCE300/PLATFORM/ODO/KERNEL/HAL/ARM/MAP720.H)\n",
             va);
-    CerfFatalExit(1);
+    CerfFatalExit(CERF_FATAL_RUNTIME_ERROR);
 }
 
 std::vector<DramRegion> OdoArm720PageTableBuilder::CachedDramRegions() const {

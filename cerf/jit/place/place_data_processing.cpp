@@ -1,6 +1,7 @@
 #include <cstddef>
 
 #include "../../core/log.h"
+#include "../arm_cpu.h"
 #include "../arm_jit.h"
 #include "../cpu_state.h"
 #include "../place_fns.h"
@@ -233,13 +234,70 @@ uint8_t* PlaceDataProcessing(uint8_t*      cursor,
 
     default:
         LOG(Caution, "PlaceDataProcessing: unhandled opcode %u\n", d->opcode);
-        CerfFatalExit(2);
+        CerfFatalExit(CERF_FATAL_RUNTIME_ERROR);
         break;
     }
 
     if (d->r15_modified) {
-        if (d->opcode == 13 && d->rm == ArmGpr::kR14 && !d->i) {
-            /* MOV[S] R15, R14 — return idiom. */
+        if (d->is_exception_return) {
+            /* PUSH [ESI + offsetof(spsr)] */
+            EmitPushBaseDisp32(cursor, kStateReg,
+                static_cast<int32_t>(offsetof(ArmCpuState, spsr)));
+            EmitPush32(cursor,
+                static_cast<uint32_t>(reinterpret_cast<uintptr_t>(ctx->jit->Cpu())));
+            EmitCall(cursor,
+                reinterpret_cast<void*>(&ArmCpu::UpdateCpsrWithFlagsHelper));
+            EmitAddRegImm32(cursor, kEsp, 8);
+
+            /* MOV EAX, [ESI + offsetof(gprs[15])] — re-load PC value
+               the opcode case stored before CPSR restore. */
+            EmitMovRegBaseDisp32(cursor, kEax, kStateReg,
+                static_cast<int32_t>(offsetof(ArmCpuState, gprs) + 15u * 4u));
+            /* MOV EDX, ~1; MOV ECX, ~3; TEST [ESI+cpsr], 0x20;
+               CMOVNZ ECX, EDX; AND EAX, ECX. Pick the PC mask
+               based on CPSR.T. */
+            EmitMovRegImm32(cursor, kEdx, ~uint32_t{1});
+            EmitMovRegImm32(cursor, kEcx, ~uint32_t{3});
+            /* TEST DWORD PTR [ESI + offsetof(cpsr)], 0x20  —
+               F7 /0 mod=10 r/m=ESI(6) reg=0 disp32 imm32. */
+            Emit8(cursor, 0xF7);
+            EmitModRmReg(cursor, 2, kStateReg, 0);
+            Emit32(cursor,
+                static_cast<uint32_t>(offsetof(ArmCpuState, cpsr)));
+            Emit32(cursor, 0x20u);
+            /* CMOVNZ ECX, EDX — 0F 45 mod=11 r/m=EDX reg=ECX. */
+            Emit8(cursor, 0x0F); Emit8(cursor, 0x45);
+            EmitModRmReg(cursor, 3, kEdx, kEcx);
+            /* AND EAX, ECX — 23 mod=11 r/m=ECX reg=EAX. */
+            Emit8(cursor, 0x23);
+            EmitModRmReg(cursor, 3, kEcx, kEax);
+            EmitMovBaseDisp32Reg(cursor, kStateReg,
+                static_cast<int32_t>(offsetof(ArmCpuState, gprs) + 15u * 4u),
+                kEax);
+        } else if (!ctx->jit->CpuState()->cpsr.bits.thumb_mode) {
+            /* ARM-state data-proc Rd=PC without S: interworking branch
+               per ddi0406c §A2.3.1 line 2082. */
+            EmitMovRegBaseDisp32(cursor, kEax, kStateReg,
+                static_cast<int32_t>(offsetof(ArmCpuState, gprs) + 15u * 4u));
+            cursor = EmitArmInterworkingMaskEax(cursor);
+            EmitMovBaseDisp32Reg(cursor, kStateReg,
+                static_cast<int32_t>(offsetof(ArmCpuState, gprs) + 15u * 4u),
+                kEax);
+        } else {
+            /* Thumb-state data-proc Rd=PC (Thumb hi-ops synthesized into
+               ARM data-proc): halfword-align per ddi0406c §A2.3.1
+               lines 2065-2066. No ISA switch. */
+            EmitMovRegBaseDisp32(cursor, kEax, kStateReg,
+                static_cast<int32_t>(offsetof(ArmCpuState, gprs) + 15u * 4u));
+            EmitAndRegImm32(cursor, kEax, 0xFFFFFFFEu);
+            EmitMovBaseDisp32Reg(cursor, kStateReg,
+                static_cast<int32_t>(offsetof(ArmCpuState, gprs) + 15u * 4u),
+                kEax);
+        }
+        if (d->opcode == 13 && d->rm == ArmGpr::kR14 && !d->i && !d->s) {
+            /* MOV R15, R14 — plain return idiom (shadow-stack fast path).
+               MOVS R15, R14 (S=1) is an exception return — falls through
+               to PlaceR15ModifiedHelper with the CPSR restore from above. */
             EmitJmp32(cursor, ctx->pop_shadow_stack_helper_target);
         } else {
             cursor = PlaceR15ModifiedHelper(cursor, d, ctx);

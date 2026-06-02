@@ -1,17 +1,19 @@
 #pragma once
 
 #include "../cirrus_pd6710/pd6710_card.h"
+#include "../../host/host_widget.h"
 
 #include <array>
 #include <cstddef>
 #include <cstdint>
 #include <mutex>
+#include <string>
 #include <vector>
 
 class NetworkBackend;
 class Pd6710Controller;
 
-class Rtl8019 : public Pd6710Card {
+class Rtl8019 : public Pd6710Card, public HostWidget {
 public:
     using Pd6710Card::Pd6710Card;
 
@@ -20,6 +22,15 @@ public:
 
     void PowerOn () override;
     void PowerOff() override;
+
+    /* HostWidget. RX = a frame indicated to the guest (OnRxFrame), TX = a
+       frame sent to the wire (SendFrame). */
+    std::wstring WidgetName() const override { return L"Network"; }
+    WidgetGroup  Group() const override { return WidgetGroup::Pcmcia; }
+    std::wstring Tooltip() const override;
+    std::vector<WidgetMenuItem> BuildMenu() override;
+    void DrawIcon(HDC dc, const RECT& box) const override;
+    bool IsEnabled() const override;   /* dimmed when networking is off */
 
     uint8_t  ReadByte  (uint32_t offset)                       override;
     uint16_t ReadHalf  (uint32_t offset)                       override;

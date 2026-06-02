@@ -26,7 +26,8 @@ constexpr uint32_t kSlotCpuMr         = 0x04u;
 }  /* namespace */
 
 bool OdoArm720BoardIntc::ShouldRegister() {
-    return emu_.Get<BoardDetector>().GetBoard() == Board::OdoArm720;
+    auto* bd = emu_.TryGet<BoardDetector>();
+    return bd && bd->GetBoard() == Board::OdoArm720;
 }
 
 bool OdoArm720BoardIntc::HasPendingUnmaskedLocked() const {
@@ -49,7 +50,7 @@ void OdoArm720BoardIntc::AssertIrq(int source_bit) {
         LOG(Caution, "OdoArm720BoardIntc::AssertIrq: source_bit %d "
                 "out of range — cpuIsr/cpuMr are 32-bit registers "
                 "per ODOREGS.H struct cpureg\n", source_bit);
-        CerfFatalExit(1);
+        CerfFatalExit(CERF_FATAL_RUNTIME_ERROR);
     }
     {
         std::lock_guard<std::mutex> lk(state_mutex_);
@@ -62,7 +63,7 @@ void OdoArm720BoardIntc::DeAssertIrq(int source_bit) {
     if (source_bit < 0 || source_bit >= 32) {
         LOG(Caution, "OdoArm720BoardIntc::DeAssertIrq: source_bit "
                 "%d out of range\n", source_bit);
-        CerfFatalExit(1);
+        CerfFatalExit(CERF_FATAL_RUNTIME_ERROR);
     }
     {
         std::lock_guard<std::mutex> lk(state_mutex_);
@@ -76,7 +77,7 @@ void OdoArm720BoardIntc::AssertSubIrq(int main_source_bit, int sub_source_bit) {
             "INTC has no sub-interrupt register (main=%d, sub=%d) "
             "— caller is targeting the wrong SoC\n",
             main_source_bit, sub_source_bit);
-    CerfFatalExit(1);
+    CerfFatalExit(CERF_FATAL_RUNTIME_ERROR);
 }
 
 void OdoArm720BoardIntc::DeliverPendingIrq() {
@@ -99,7 +100,7 @@ uint32_t OdoArm720BoardIntc::ReadReg32(uint32_t offset) {
         LOG(Caution, "OdoArm720BoardIntc::ReadReg32: offset 0x%X "
                 "out of range — only 0x00 (cpuIsr) and 0x04 (cpuMr) "
                 "are defined per ODOREGS.H\n", offset);
-        CerfFatalExit(1);
+        CerfFatalExit(CERF_FATAL_RUNTIME_ERROR);
     }
     uint32_t value;
     {
@@ -118,7 +119,7 @@ uint16_t OdoArm720BoardIntc::ReadReg16(uint32_t offset) {
     if (slot_offset != kSlotCpuIsr && slot_offset != kSlotCpuMr) {
         LOG(Caution, "OdoArm720BoardIntc::ReadReg16: offset 0x%X "
                 "out of range\n", offset);
-        CerfFatalExit(1);
+        CerfFatalExit(CERF_FATAL_RUNTIME_ERROR);
     }
     uint32_t slot_value;
     {
@@ -139,7 +140,7 @@ void OdoArm720BoardIntc::WriteReg32(uint32_t offset, uint32_t value) {
     if (offset != kSlotCpuIsr && offset != kSlotCpuMr) {
         LOG(Caution, "OdoArm720BoardIntc::WriteReg32: offset 0x%X "
                 "out of range\n", offset);
-        CerfFatalExit(1);
+        CerfFatalExit(CERF_FATAL_RUNTIME_ERROR);
     }
 #if CERF_DEV_MODE
     LOG(SocIntc, "Odo BoardIntc write32 +0x%02X = 0x%08X\n",
@@ -150,7 +151,7 @@ void OdoArm720BoardIntc::WriteReg32(uint32_t offset, uint32_t value) {
                 "— kernel writes cpuIsr but BSP source (ARMINT.C) "
                 "never does; scope must be extended with the right "
                 "semantic before continuing\n", value);
-        CerfFatalExit(1);
+        CerfFatalExit(CERF_FATAL_RUNTIME_ERROR);
     }
     {
         std::lock_guard<std::mutex> lk(state_mutex_);
@@ -164,7 +165,7 @@ void OdoArm720BoardIntc::WriteReg16(uint32_t offset, uint16_t value) {
     if (slot_offset != kSlotCpuIsr && slot_offset != kSlotCpuMr) {
         LOG(Caution, "OdoArm720BoardIntc::WriteReg16: offset 0x%X "
                 "out of range\n", offset);
-        CerfFatalExit(1);
+        CerfFatalExit(CERF_FATAL_RUNTIME_ERROR);
     }
 #if CERF_DEV_MODE
     LOG(SocIntc, "Odo BoardIntc write16 +0x%02X = 0x%04X\n",
@@ -176,7 +177,7 @@ void OdoArm720BoardIntc::WriteReg16(uint32_t offset, uint16_t value) {
                 "(ARMINT.C) never does; scope must be extended with "
                 "the right semantic before continuing\n",
                 offset, value);
-        CerfFatalExit(1);
+        CerfFatalExit(CERF_FATAL_RUNTIME_ERROR);
     }
     {
         std::lock_guard<std::mutex> lk(state_mutex_);
@@ -200,7 +201,8 @@ public:
     using Peripheral::Peripheral;
 
     bool ShouldRegister() override {
-        return emu_.Get<BoardDetector>().GetBoard() == Board::OdoArm720;
+        auto* bd = emu_.TryGet<BoardDetector>();
+        return bd && bd->GetBoard() == Board::OdoArm720;
     }
     void OnReady() override {
         emu_.Get<PeripheralDispatcher>().Register(this);

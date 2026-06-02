@@ -16,7 +16,7 @@ namespace {
 
 [[noreturn]] void Fatal(const std::string& path, const std::string& msg) {
     LOG(Caution, "FATAL: '%s' %s\n", path.c_str(), msg.c_str());
-    CerfFatalExit(1);
+    CerfFatalExit(CERF_FATAL_RUNTIME_ERROR);
 }
 
 json ReadJsonFile(const std::string& path) {
@@ -91,6 +91,22 @@ void LoadBoard(const json& root, DeviceConfig& config, const std::string& path) 
         if (n < 1)
             Fatal(path, "board.configurable_screen_height must be >= 1");
         config.board_configurable_screen_height = (uint32_t)n;
+    }
+}
+
+/* Top-level device-feature flags (not board hardware): guest additions and
+   whether to size the guest-additions display to the host screen. */
+void LoadFeatures(const json& root, DeviceConfig& config, const std::string& path) {
+    if (root.contains("guest_additions")) {
+        if (!root["guest_additions"].is_boolean())
+            Fatal(path, "'guest_additions' must be a boolean");
+        config.guest_additions = root["guest_additions"].get<bool>();
+    }
+    const char* k = "adopt_guest_additions_resolution_for_host_screen";
+    if (root.contains(k)) {
+        if (!root[k].is_boolean())
+            Fatal(path, std::string("'") + k + "' must be a boolean");
+        config.adopt_guest_additions_resolution_for_host_screen = root[k].get<bool>();
     }
 }
 
@@ -169,9 +185,50 @@ void LoadRom(const json& root, DeviceConfig& config, const std::string& path) {
     }
 }
 
+/* Global cerf.json guest-additions substitution map:
+   "global_substitutions_inside_rom": { "romModule": "ceAppsDll", ... }. */
+void LoadGlobalSubstitutions(const json& root, DeviceConfig& config,
+                             const std::string& path) {
+    const char* k = "global_substitutions_inside_rom";
+    if (!root.contains(k)) return;
+    const auto& o = root[k];
+    if (!o.is_object())
+        Fatal(path, std::string("'") + k + "' must be an object "
+                    "{ \"romModule\": \"ceAppsDll\" }");
+    config.global_rom_substitutions.clear();
+    for (auto it = o.begin(); it != o.end(); ++it) {
+        if (!it.value().is_string())
+            Fatal(path, std::string(k) + "." + it.key()
+                        + " must be a string (ce_apps DLL name)");
+        config.global_rom_substitutions.emplace_back(
+            it.key(), it.value().get<std::string>());
+    }
+}
+
 }  // namespace
 
-void ConfigLoader::Load(const CerfConfig& cli) {
+void ConfigLoader::ApplyAdoptedGuestAdditionsResolution(DeviceConfig& config) {
+    const int scr_w = ::GetSystemMetrics(SM_CXSCREEN);
+    const int scr_h = ::GetSystemMetrics(SM_CYSCREEN);
+    if (scr_w > 10 && scr_h > 40) {
+        uint32_t w = (uint32_t)(scr_w - 10);
+        uint32_t h = (uint32_t)(scr_h - 40);
+        if (w > 3840) w = 3840;   /* clamp wide ultrawide/multimon spans */
+        if (h > 2160) h = 2160;
+        config.board_configurable_screen_width  = w;
+        config.board_configurable_screen_height = h;
+    } else {
+        LOG(Cfg, "adopt-GA-resolution: host metrics unusable (%dx%d); "
+                 "keeping %ux%u\n", scr_w, scr_h,
+            config.board_configurable_screen_width,
+            config.board_configurable_screen_height);
+    }
+    LOG(Cfg, "adopt-GA-resolution: host-derived screen=%ux%u\n",
+        config.board_configurable_screen_width,
+        config.board_configurable_screen_height);
+}
+
+void ConfigLoader::Load(const CerfConfig& cli, int argc, char** argv) {
     auto& config = emu_.Get<DeviceConfig>();
 
     wchar_t cerf_pathw[MAX_PATH];
@@ -186,15 +243,18 @@ void ConfigLoader::Load(const CerfConfig& cli) {
     const std::string top_path = cerf_dir_ + "cerf.json";
     {
         json j = ReadJsonFile(top_path);
-        if (!j.is_null() && j.contains("device")) {
-            if (!j["device"].is_string())
-                Fatal(top_path, "'device' must be a string");
-            device_name = j["device"].get<std::string>();
+        if (!j.is_null()) {
+            if (j.contains("device")) {
+                if (!j["device"].is_string())
+                    Fatal(top_path, "'device' must be a string");
+                device_name = j["device"].get<std::string>();
+            }
+            LoadGlobalSubstitutions(j, config, top_path);
         }
     }
     if (cli.device_override && cli.device_override[0])
         device_name = cli.device_override;
-    if (device_name.empty()) device_name = "ce5_smdk2410";
+    if (device_name.empty()) device_name = "cerfos";
     config.device_name = device_name;
 
     const std::string dev_path = cerf_dir_ + "devices/" + device_name + "/cerf.json";
@@ -203,14 +263,37 @@ void ConfigLoader::Load(const CerfConfig& cli) {
         LOG(Cfg, "No device config: %s (using DeviceConfig defaults)\n", dev_path.c_str());
     } else {
         LOG(Cfg, "Loading device config: %s\n", dev_path.c_str());
-        LoadMeta   (dev, config.meta, dev_path);
-        LoadBoard  (dev, config,      dev_path);
-        LoadNetwork(dev, config,      dev_path);
-        LoadRom    (dev, config,      dev_path);
+        LoadMeta    (dev, config.meta, dev_path);
+        LoadBoard   (dev, config,      dev_path);
+        LoadNetwork (dev, config,      dev_path);
+        LoadRom     (dev, config,      dev_path);
+        LoadFeatures(dev, config,      dev_path);
     }
 
-    if (cli.disable_network) config.network_enabled = false;
-    if (cli.screen_width)  config.board_configurable_screen_width  = cli.screen_width;
-    if (cli.screen_height) config.board_configurable_screen_height = cli.screen_height;
-    config.poc_rom_injection = cli.poc_rom_injection;
+    /* cerf.json may ask the guest-additions display to fill the host screen.
+       Applied before the CLI-override loop so an explicit
+       --screen-width/--screen-height still wins over the derived size. */
+    if (config.adopt_guest_additions_resolution_for_host_screen)
+        ApplyAdoptedGuestAdditionsResolution(config);
+
+    /* Device-config CLI overrides, applied after cerf.json so the command
+       line wins over the json value. */
+    for (int i = 1; i < argc; i++) {
+        const char* a = argv[i];
+        if (strcmp(a, kArgDisableNetwork) == 0) {
+            config.network_enabled = false;
+        } else if (strcmp(a, kArgGuestAdditions) == 0) {
+            config.guest_additions = true;
+        } else if (strcmp(a, kArgRecovery) == 0) {
+            config.boot_in_recovery = true;
+        } else if (strncmp(a, kArgScreenWidth, sizeof(kArgScreenWidth) - 1) == 0) {
+            int n = atoi(a + sizeof(kArgScreenWidth) - 1);
+            if (n < 1) Fatal("(command line)", "--screen-width must be >= 1");
+            config.board_configurable_screen_width = (uint32_t)n;
+        } else if (strncmp(a, kArgScreenHeight, sizeof(kArgScreenHeight) - 1) == 0) {
+            int n = atoi(a + sizeof(kArgScreenHeight) - 1);
+            if (n < 1) Fatal("(command line)", "--screen-height must be >= 1");
+            config.board_configurable_screen_height = (uint32_t)n;
+        }
+    }
 }

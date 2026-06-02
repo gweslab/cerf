@@ -1,31 +1,44 @@
 #!/usr/bin/env python3
 """
-PostToolUse hook for Write|Edit on .cpp/.h files. Warns about:
+PostToolUse hook for Write|Edit on C/C++ source files (.cpp/.h/.hpp/.cc/.c).
+Warns about:
   1. LINE-COUNT      — file > 500 lines (the pre-commit hook will reject it).
   2. BAILOUT-COMMENT — TODO / FIXME / HACK / XXX / "for now" / "temporary" /
                        "deferred" / "placeholder" / "good enough" /
                        "clean up later" / "fix later" / etc. — in comments only.
-  3. FABRICATION-CIT — "ARM ARM" in comments. Usually a tell that the citation
-                       was invented from training memory rather than verified
-                       against an actual section. Force the author to confirm
-                       a specific section number is attached.
-  4. LEAK-DEV-EMU    — "dev_emu_src" anywhere in the file. This is an internal
+  3. LEAK-DEV-EMU    — "dev_emu_src" anywhere in the file. This is an internal
                        reference-tree path and must never appear in source.
-  5. LEAK-CHECKLIST  — "docs/ai_checklists" path or any *.md filename under
+  4. LEAK-CHECKLIST  — "docs/ai_checklists" path or any *.md filename under
                        that dir. Checklists are confidential per
                        agent_docs/code_style.md § Comments and
                        agent_docs/rules.md.
-  6. REFERENCE-COMMENT — a comment references another `cerf/...path...\.cpp`
+  5. REFERENCE-COMMENT — a comment references another `cerf/...path...\.cpp`
                        (or .h) file. Often dead-weight narration ("Body lives
                        in X", "moved to Y", "out-of-line in Z") per
                        agent_docs/code_style.md § Comments. Advisory — agent
                        must self-check whether the reference adds technical
                        substance or is pointer-only narration.
-  7. BLOATED-COMMENT — /* ... */ block comments that are ≥5 lines OR contain
+  6. BLOATED-COMMENT — /* ... */ block comments that are ≥5 lines OR contain
                        internal blank lines (multi-paragraph essays). Forces
                        the agent to evaluate each block: real technical
                        comment or rotten yapping. Pre-existing comments are
                        NOT excluded — touching the file means owning its rot.
+  7. REFERENCE-TREE-PATH — a comment cites a path under references/. That
+                       tree is a gigabytes-scale external reference dump
+                       (chip datasheets, BSP source archives, ARM ARM
+                       excerpts). Pointing to a path in it is dead-weight
+                       narration; the comment should inline the SUBSTANCE
+                       (specific bits, register fields, BSP behaviour) or
+                       not exist.
+  8. ALWAYS-BAILOUT — scheduling-verb phrasings ("deferred to/until/for",
+                       "placeholder until X", "to/will be implemented",
+                       "TODO: implement X", "implement X later", etc.).
+                       The BAILOUT-COMMENT FP gate does NOT rescue these —
+                       there's no "specific technical mechanism" defence
+                       because the phrasing IS the deferral. Exists to
+                       close the dodge where agents invoke the FP gate
+                       by naming something technical near the matched
+                       word.
 
 Comment extraction is state-aware across lines, so naked-continuation lines
 inside a /* ... */ block (no leading `*`) are still recognised as comment
@@ -50,11 +63,35 @@ BAILOUT_WORDS_RE = re.compile(
     re.IGNORECASE,
 )
 
-ARM_ARM_RE = re.compile(r"\bARM ARM\b")
+# Scheduling-verb phrasings that document FUTURE WORK in a comment.
+# Unconditional bailouts — the BAILOUT-COMMENT FP gate does NOT apply
+# (there is no "specific technical mechanism" defence because the
+# phrasing itself IS the deferral, not a technical term that happens
+# to share a word). This category exists because agents repeatedly
+# dodged BAILOUT-COMMENT by naming something technical nearby and
+# claiming the matched word referred to that, not to deferral.
+ALWAYS_BAILOUT_RE = re.compile(
+    r"\b(?:"
+    r"deferred\s+(?:to|until|for|in)\b|"
+    r"placeholder\s+(?:until|for\s+(?:real|the|actual|future|next))\b|"
+    r"(?:to|will)\s+be\s+(?:implemented|added|wired|handled)\b|"
+    r"yet\s+to\s+be\s+(?:implemented|added|wired)\b|"
+    r"TODO\s*:?\s*implement\b|"
+    r"implement(?:ed|s|ing)?\s+(?:later|next|soon)\b"
+    r")",
+    re.IGNORECASE,
+)
 
 DEV_EMU_RE = re.compile(r"\bdev_emu_src\b", re.IGNORECASE)
 
 CHECKLIST_PATH_RE = re.compile(r"docs/ai_checklists\b", re.IGNORECASE)
+
+# Path under the references/ tree mentioned in a comment. The tree is
+# gitignored and gigabytes-scale (chip datasheets, BSP archives, ARM
+# manual excerpts) — enumerating filenames is impractical, so just
+# match the literal `references/<something>` shape. The substance the
+# referenced doc contains belongs inline; the path itself does not.
+REFERENCES_TREE_RE = re.compile(r"\breferences/[\w./_-]+", re.IGNORECASE)
 
 # Source-file reference in a comment, matched by basename (path prefix
 # optional). Requires at least one underscore in the basename — that's
@@ -148,7 +185,7 @@ def main() -> int:
 
     if not file_path:
         return 0
-    if not file_path.lower().endswith((".cpp", ".h")):
+    if not file_path.lower().endswith((".cpp", ".h", ".hpp", ".cc", ".c")):
         return 0
     if not os.path.isfile(file_path):
         return 0
@@ -181,11 +218,12 @@ def main() -> int:
             )
 
     bailout_hits = []
-    arm_arm_hits = []
     dev_emu_hits = []
     checklist_path_hits = []
     checklist_name_hits = []
     cerf_ref_hits = []
+    references_tree_hits = []
+    always_bailout_hits = []
 
     checklist_names = collect_checklist_filenames()
     checklist_name_re = (
@@ -201,8 +239,8 @@ def main() -> int:
         if comment_text and BAILOUT_WORDS_RE.search(comment_text):
             bailout_hits.append(f"  {rel_path}:{ln_idx}: {line.strip()}")
 
-        if comment_text and ARM_ARM_RE.search(comment_text):
-            arm_arm_hits.append(f"  {rel_path}:{ln_idx}: {line.strip()}")
+        if comment_text and ALWAYS_BAILOUT_RE.search(comment_text):
+            always_bailout_hits.append(f"  {rel_path}:{ln_idx}: {line.strip()}")
 
         if DEV_EMU_RE.search(line):
             dev_emu_hits.append(f"  {rel_path}:{ln_idx}: {line.strip()}")
@@ -216,10 +254,51 @@ def main() -> int:
         if comment_text and CERF_FILE_REF_RE.search(comment_text):
             cerf_ref_hits.append(f"  {rel_path}:{ln_idx}: {line.strip()}")
 
+        if comment_text and REFERENCES_TREE_RE.search(comment_text):
+            references_tree_hits.append(f"  {rel_path}:{ln_idx}: {line.strip()}")
+
     def fmt_block(label: str, hits: list, advice: str) -> str:
         sample = "\n".join(hits[:5])
         more = f"\n  ... and {len(hits) - 5} more" if len(hits) > 5 else ""
         return f"{label}: {rel_path} has {len(hits)} hit(s). {advice}\n\n{sample}{more}"
+
+    if always_bailout_hits:
+        warnings.append(fmt_block(
+            "ALWAYS-BAILOUT",
+            always_bailout_hits,
+            "THE BAILOUT-COMMENT FALSE-POSITIVE GATE DOES NOT APPLY TO "
+            "THIS CATEGORY. The phrasings caught here document FUTURE "
+            "WORK being scheduled in a comment — there is no 'specific "
+            "technical mechanism' defence because the phrasing IS the "
+            "deferral, not a technical term that happens to share a "
+            "word. The canonical dodge — agent naming something "
+            "technical nearby (a NEON instruction, a register, a Win32 "
+            "API) and claiming the matched word referred to that "
+            "instead of to deferral — is explicitly closed for these "
+            "phrasings.\n\n"
+            "Caught shapes (all unconditional bailouts):\n"
+            "  'deferred to next batch' / 'deferred until X is wired'\n"
+            "  'placeholder until real impl' / 'placeholder for future'\n"
+            "  '(to|will) be implemented / added / wired / handled'\n"
+            "  'yet to be implemented'\n"
+            "  'TODO: implement X' / 'implement X later/next/soon'\n\n"
+            "ONLY TWO LEGITIMATE RESPONSES (same as BAILOUT-COMMENT):\n"
+            "  (a) IMPLEMENT the missing logic NOW, in full, so the "
+            "deferral phrasing is no longer needed AND the code is "
+            "complete.\n"
+            "  (b) STOP the task, REVERT the incomplete code, and "
+            "surface the blocker to the user.\n\n"
+            "There is no 'next batch' in CLAUDE.md. There is no 'next "
+            "session'. There is no scheduled-for-later. The comment "
+            "documenting it is the disclosure that the code is "
+            "incomplete — fix the code or stop, but the phrasing "
+            "itself must not survive into the committed file.\n\n"
+            "REPHRASING the comment to drop the deferral verb while "
+            "leaving the code unchanged is the Euphemism Smuggling / "
+            "Disclosure Destruction pattern explicitly named in "
+            "agent_docs/rules.md and is even worse than the original "
+            "phrasing. Pre-existing comments are NOT excluded.",
+        ))
 
     if bailout_hits:
         warnings.append(fmt_block(
@@ -269,18 +348,6 @@ def main() -> int:
             "Patterns end-to-end before touching anything else.",
         ))
 
-    if arm_arm_hits:
-        warnings.append(fmt_block(
-            "FABRICATION-CITATION",
-            arm_arm_hits,
-            "'ARM ARM' citations are commonly fabricated from training memory. "
-            "Verify EACH one against a real ARM Architecture Reference Manual "
-            "section number that you have actually read this session. If you "
-            "haven't pasted the section text into the conversation, this is a "
-            "guessed implementation per CLAUDE.md § 'No guessed implementations' "
-            "— revert the code, not just the comment.",
-        ))
-
     if dev_emu_hits:
         warnings.append(fmt_block(
             "LEAK-DEV-EMU",
@@ -311,6 +378,35 @@ def main() -> int:
             "Checklist filenames are confidential (see pre-commit hook). The "
             "fix is NOT to reword — re-read agent_docs/code_style.md § "
             "Comments and reconsider whether the comment should exist at all.",
+        ))
+
+    if references_tree_hits:
+        warnings.append(fmt_block(
+            "REFERENCE-TREE-PATH",
+            references_tree_hits,
+            "A comment cites a path under references/. That tree is a "
+            "gigabytes-scale external reference dump (chip datasheets, "
+            "BSP source archives, ARM manual excerpts) and is gitignored. "
+            "Pointing to a path in it is dead-weight narration — the "
+            "comment should inline the SUBSTANCE the doc says at that "
+            "point (specific bits, register fields, BSP function "
+            "behaviour) or not exist at all. The PATH itself helps "
+            "nobody: it can't be opened from a fresh clone, and even "
+            "where the tree exists locally, the reader needs the "
+            "claim, not the pointer.\n\n"
+            "Three legitimate responses:\n"
+            "  1. Inline the specific technical claim the doc makes "
+            "(\"only bits 29:28 are RES0\" / \"DMA channel 0 must be "
+            "primed before SDC1\" / etc.) and DELETE the path mention.\n"
+            "  2. If the surrounding code is already self-explanatory "
+            "without the doc claim, DELETE the whole comment.\n"
+            "  3. (Rare) if the comment ALREADY inlines the substance "
+            "and the path was just decoration, DELETE only the path.\n\n"
+            "Common shape this catches: 'we use X instead of Y; see "
+            "references/foo/bar.txt' — both halves are bloat. The 'we "
+            "use X instead of Y' is design narration (the FAIL example "
+            "in BLOATED-COMMENT), and the references/ pointer is "
+            "dead-weight redirection.",
         ))
 
     if cerf_ref_hits:

@@ -1,49 +1,58 @@
-# Shared builder for CERF's Windows CE 5.0 ARMV4I apps and DLLs.
-#
-# Per-app build.ps1 scripts (one per directory under ce_apps/) call this
-# helper to compile their C source(s) and link an .exe or .dll using the
-# bundled WCE5 SDK at references/wince5-full-sdk/. Output is staged into
-# build/<Config>/Win32/platform/prebuilt/ — the canonical location where every
-# CERF-owned ARM CE binary lives at runtime (used by tests and by ad-hoc
-# launches).
-#
-# Incremental: skips cl when each .obj is newer than its source; skips link
-# when the staged artifact is newer than every .obj. The top-level build.ps1
-# fires every per-app build unconditionally on each cerf rebuild, so a
-# no-change run is a stat-only sweep.
-#
-# The caller (per-app build.ps1) is expected to Set-Location into its own
-# directory before invoking this helper.
+# Shared builder for CERF's CE 3.0 ARM apps and DLLs. Raising the
+# subsystem stamp from 3.00 locks the resulting binaries out of CE3 kernels.
 param(
     [Parameter(Mandatory)][ValidateSet("exe","dll")][string]$Type,
     [Parameter(Mandatory)][string]$Target,
     [string[]]$Sources = @("main.c"),
     [string]$Entry,
-    [string[]]$Libs = @("coredll")
+    [string[]]$Libs = @("coredll"),
+    [string[]]$LinkExtras = @(),
+    [string[]]$ExtraIncludes = @(),
+    [string[]]$ExtraLibPaths = @(),
+    [string]$ForcedInclude
 )
 $ErrorActionPreference = "Stop"
 
 $RepoRoot = (Resolve-Path "$PSScriptRoot/..").Path
-$SDK  = Join-Path $RepoRoot "references/wince5-full-sdk"
+$SDK  = Join-Path $RepoRoot "references/WindowsCE-Build-Tools"
 $CL   = Join-Path $SDK "bin/I386/ARM/cl.exe"
 $LINK = Join-Path $SDK "bin/I386/link.exe"
-$INC  = Join-Path $SDK "Include/Armv4i"
-$LIB  = Join-Path $SDK "Lib/ARMV4I"
 
-if (-not (Test-Path $CL))   { throw "WCE5 SDK toolchain missing: $CL"   }
-if (-not (Test-Path $LINK)) { throw "WCE5 SDK toolchain missing: $LINK" }
+$IncDirs = @()
+foreach ($i in $ExtraIncludes) { $IncDirs += (Resolve-Path $i).Path }
+$IncDirs += @(
+    (Join-Path $SDK "ce3-hpc2k/include"),
+    (Join-Path $SDK "ce3-oak/INC"),
+    $RepoRoot
+)
+$LIB       = Join-Path $SDK "ce42-standard/Lib/Armv4i"
+$Subsystem = "windowsce,3.00"
+$WceDef    = "_WIN32_WCE=300"
+
+if (-not (Test-Path $CL))   { throw "WCE toolchain missing: $CL"   }
+if (-not (Test-Path $LINK)) { throw "WCE toolchain missing: $LINK" }
 
 # cl.exe and link.exe both depend on companion DLLs (c1.dll / c1xx.dll / c2.dll
 # next to cl, mspdb*.dll under bin/I386). Wire PATH up before either is invoked.
 $env:PATH = "$SDK\bin\I386\ARM;$SDK\bin\I386;" + $env:PATH
 
 $Config = if ($env:CE_APPS_CONFIG) { $env:CE_APPS_CONFIG } else { "Release" }
-$OutDir = Join-Path $RepoRoot "build/$Config/Win32/platform/prebuilt"
+$Mode   = if ($env:CE_APPS_MODE)   { $env:CE_APPS_MODE }   else { "dev" }
+$devModeFlag = if ($Mode -eq "production") { "0" } else { "1" }
+$OutDir = Join-Path $RepoRoot "build/$Config/Win32/ce_apps"
 New-Item -ItemType Directory -Force -Path $OutDir | Out-Null
 $StagedTarget = Join-Path $OutDir $Target
 
 if (-not $Entry) {
     $Entry = if ($Type -eq "exe") { "WinMain" } else { "DllEntryPoint" }
+}
+
+# Mode-change marker — bust .obj cache if CERF_DEV_MODE flipped between runs.
+$modeMarker = ".build_mode"
+$cachedMode = if (Test-Path $modeMarker) { (Get-Content $modeMarker -Raw).Trim() } else { "" }
+if ($cachedMode -ne $Mode) {
+    Get-ChildItem -Filter "*.obj" -ErrorAction SilentlyContinue | Remove-Item -Force
+    Set-Content -Path $modeMarker -Value $Mode -Encoding ASCII -NoNewline
 }
 
 # Compile: each .obj is co-located with its source in the per-app dir, so
@@ -58,12 +67,16 @@ foreach ($src in $Sources) {
     }
     if ($needCompile) {
         Write-Host "[CE] cl  $src"
-        & $CL /nologo /c /W3 /O2 /DUNICODE /D_UNICODE /DUNDER_CE /DARM /D_ARM_ /I $INC $src
+        $incFlags = @()
+        foreach ($i in $IncDirs) { $incFlags += @("/I", $i) }
+        $fiFlag = @()
+        if ($ForcedInclude) { $fiFlag = @("/FI", $ForcedInclude) }
+        & $CL /nologo /c /W3 /WX /O2 /QRarch4T /QRinterwork-return /DUNICODE /D_UNICODE /DUNDER_CE /DARM /D_ARM_ /DARMV4I "/D$WceDef" "/DCERF_DEV_MODE=$devModeFlag" @incFlags @fiFlag $src
         if ($LASTEXITCODE -ne 0) { throw "Compile failed: $src" }
     }
 }
 
-# Link: staged target lives under build/<Config>/Win32/platform/prebuilt/.
+# Link: staged target lives under build/<Config>/Win32/ce_apps/.
 $needLink = -not (Test-Path $StagedTarget)
 if (-not $needLink) {
     $stagedTime = (Get-Item $StagedTarget).LastWriteTime
@@ -76,16 +89,20 @@ if (-not $needLink) {
 
 if ($needLink) {
     Write-Host "[CE] link $Target -> $StagedTarget"
-    $linkArgs = @("/nologo", "/subsystem:windowsce", "/entry:$Entry",
+    $linkArgs = @("/nologo", "/subsystem:$Subsystem", "/entry:$Entry",
                   "/machine:THUMB", "/nodefaultlib", "/libpath:$LIB",
                   "/out:$StagedTarget")
+    foreach ($p in $ExtraLibPaths) { $linkArgs += "/libpath:$((Resolve-Path $p).Path)" }
     if ($Type -eq "dll") {
-        # /IMPLIB keeps the auto-generated import .lib/.exp in the per-app dir
-        # so the staged prebuilt/ tree stays runtime-only.
         $implib = [System.IO.Path]::ChangeExtension($Target, ".lib")
         $linkArgs += "/dll"
         $linkArgs += "/implib:$implib"
+        $defFile = [System.IO.Path]::ChangeExtension($Target, ".def")
+        if (Test-Path $defFile) {
+            $linkArgs += "/def:$defFile"
+        }
     }
+    foreach ($extra in $LinkExtras) { $linkArgs += $extra }
     $linkArgs += $objs
     foreach ($lib in $Libs) { $linkArgs += "$lib.lib" }
     & $LINK @linkArgs

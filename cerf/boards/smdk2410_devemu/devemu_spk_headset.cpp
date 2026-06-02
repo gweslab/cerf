@@ -20,7 +20,8 @@ public:
     using Peripheral::Peripheral;
 
     bool ShouldRegister() override {
-        return emu_.Get<BoardDetector>().GetBoard() == Board::Smdk2410DevEmu;
+        auto* bd = emu_.TryGet<BoardDetector>();
+        return bd && bd->GetBoard() == Board::Smdk2410DevEmu;
     }
     void OnReady() override {
         emu_.Get<PeripheralDispatcher>().Register(this);

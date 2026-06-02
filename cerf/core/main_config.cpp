@@ -2,7 +2,6 @@
 #include "log.h"
 #include "cli_helpers.h"
 #include <cstring>
-#include <cstdlib>
 
 bool ParseCerfArgs(int argc, char* argv[], CerfConfig& cfg) {
     for (int i = 1; i < argc; i++) {
@@ -18,38 +17,14 @@ bool ParseCerfArgs(int argc, char* argv[], CerfConfig& cfg) {
             cfg.device_override = argv[i] + 9;
         } else if (strcmp(argv[i], "--allow-flood") == 0) {
             Log::SetAllowFlood(true);
-        } else if (strcmp(argv[i], "--disable-network") == 0) {
-            cfg.disable_network = true;
-        } else if (strncmp(argv[i], "--screen-width=", 15) == 0) {
-            int n = atoi(argv[i] + 15);
-            if (n < 1) {
-                LOG(Caution, "Invalid --screen-width: %s\n", argv[i] + 15);
-                return false;
-            }
-            cfg.screen_width = (uint32_t)n;
-        } else if (strncmp(argv[i], "--screen-height=", 16) == 0) {
-            int n = atoi(argv[i] + 16);
-            if (n < 1) {
-                LOG(Caution, "Invalid --screen-height: %s\n", argv[i] + 16);
-                return false;
-            }
-            cfg.screen_height = (uint32_t)n;
-        } else if (strncmp(argv[i], "--start-window-width=", 21) == 0) {
-            int n = atoi(argv[i] + 21);
-            if (n < 1) {
-                LOG(Caution, "Invalid --start-window-width: %s\n", argv[i] + 21);
-                return false;
-            }
-            cfg.start_window_width = (uint32_t)n;
-        } else if (strncmp(argv[i], "--start-window-height=", 22) == 0) {
-            int n = atoi(argv[i] + 22);
-            if (n < 1) {
-                LOG(Caution, "Invalid --start-window-height: %s\n", argv[i] + 22);
-                return false;
-            }
-            cfg.start_window_height = (uint32_t)n;
-        } else if (strcmp(argv[i], "--poc-rom-injection") == 0) {
-            cfg.poc_rom_injection = true;
+        } else if (strncmp(argv[i], kArgScreenWidth, sizeof(kArgScreenWidth) - 1) == 0 ||
+                   strncmp(argv[i], kArgScreenHeight, sizeof(kArgScreenHeight) - 1) == 0 ||
+                   strcmp(argv[i], kArgDisableNetwork) == 0 ||
+                   strcmp(argv[i], kArgGuestAdditions) == 0 ||
+                   strcmp(argv[i], kArgRecovery) == 0) {
+            /* Device-config overrides — applied to DeviceConfig by
+               ConfigLoader after cerf.json loads. Recognized here only so
+               they are not rejected as unknown args. */
         } else if (strcmp(argv[i], "--quiet") == 0) {
             Log::SetEnabled(Log::MASK_NONE);
         } else if (strcmp(argv[i], "--help") == 0 || strcmp(argv[i], "-h") == 0) {

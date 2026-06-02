@@ -19,7 +19,8 @@ public:
     using Peripheral::Peripheral;
 
     bool ShouldRegister() override {
-        return emu_.Get<BoardDetector>().GetSoc() == SocFamily::S3C2410;
+        auto* bd = emu_.TryGet<BoardDetector>();
+        return bd && bd->GetSoc() == SocFamily::S3C2410;
     }
     void OnReady() override {
         emu_.Get<PeripheralDispatcher>().Register(this);

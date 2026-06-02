@@ -34,14 +34,15 @@ uint8_t* PlaceCoprocessorPermissionCheck(uint8_t*      cursor,
 
     uint8_t* permission_granted_1 = EmitJnzLabel(cursor);
 
-    /* TEST [EBX + offsetof(coprocessor_access)], (1 << d->cp_num) —
-       coprocessor-access permission bit for this coproc number.
-       0xF7 /0 mod=10 r/m=EBX(3) reg=0 disp32 imm32. */
+    /* cp_n access lives at CPACR bits[2n+1:2n] (see
+       references/arm/cpacr_excerpt.txt); `1 << cp_num` reads
+       cp(n/2)'s low bit and would UND every user-mode VFP op
+       despite correct CPACR programming. */
     Emit8(cursor, 0xF7);
     EmitModRmReg(cursor, 2, kMmuReg, 0);
     Emit32(cursor,
         static_cast<uint32_t>(offsetof(ArmMmuState, coprocessor_access)));
-    Emit32(cursor, 1u << d->cp_num);
+    Emit32(cursor, 0x3u << (2u * d->cp_num));
 
     uint8_t* permission_granted_2 = EmitJnzLabel(cursor);
 

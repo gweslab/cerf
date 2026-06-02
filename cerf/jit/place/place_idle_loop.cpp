@@ -1,7 +1,3 @@
-#define WIN32_LEAN_AND_MEAN
-#define NOMINMAX
-#include <windows.h>
-
 #include "../arm_jit.h"
 #include "../place_fns.h"
 #include "../x86_emit.h"
@@ -11,13 +7,13 @@ uint8_t* PlaceIdleLoop(uint8_t*      cursor,
                        BlockContext* ctx) {
     using namespace x86;
 
-    /* PUSH INFINITE; PUSH idle_event_; CALL WaitForSingleObject;
-       then tail-call PlaceBranch (the original branch-to-self
-       loops back, so PlaceBranch emits the unconditional branch
-       target).  */
-    EmitPush32(cursor, 0xFFFFFFFFu);  /* INFINITE = (DWORD)-1 */
-    EmitPush32(cursor,
-               static_cast<uint32_t>(reinterpret_cast<uintptr_t>(ctx->jit->IdleEvent())));
-    EmitCall(cursor, reinterpret_cast<void*>(&WaitForSingleObject));
+    /* DO NOT replace WfiHelper with a raw WaitForSingleObject(INFINITE):
+       WfiHelper advances guest_cycle_counter by elapsed wall-clock, an
+       infinite wait does not — frozen cycles freeze the icount OSCR, the
+       OS-timer match the guest idles on is never reached, and no tick IRQ
+       ever fires to wake it (permanent park). */
+    EmitMovRegImm32(cursor, kEcx,
+        static_cast<uint32_t>(reinterpret_cast<uintptr_t>(ctx->jit)));
+    EmitCall(cursor, reinterpret_cast<void*>(&ArmJit::WfiHelper));
     return PlaceBranch(cursor, d, ctx);
 }

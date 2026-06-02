@@ -10,6 +10,11 @@
             "command": "python ${CLAUDE_PROJECT_DIR}/.claude/hooks/block_git_add_force.py",
             "if": "Bash(git *)",
             "timeout": 5
+          },
+          {
+            "type": "command",
+            "command": "python ${CLAUDE_PROJECT_DIR}/.claude/hooks/block_build_filter.py",
+            "timeout": 5
           }
         ]
       },
@@ -19,6 +24,11 @@
           {
             "type": "command",
             "command": "python ${CLAUDE_PROJECT_DIR}/.claude/hooks/block_pragma_lib.py",
+            "timeout": 5
+          },
+          {
+            "type": "command",
+            "command": "python ${CLAUDE_PROJECT_DIR}/.claude/hooks/block_grab_bag_filename.py",
             "timeout": 5
           }
         ]
@@ -46,6 +56,16 @@
           {
             "type": "command",
             "command": "python ${CLAUDE_PROJECT_DIR}/.claude/hooks/check_bundled_device_edit.py",
+            "timeout": 5
+          },
+          {
+            "type": "command",
+            "command": "python ${CLAUDE_PROJECT_DIR}/.claude/hooks/check_citation_verification.py",
+            "timeout": 5
+          },
+          {
+            "type": "command",
+            "command": "python ${CLAUDE_PROJECT_DIR}/.claude/hooks/check_unfiltered_user_va_onpc.py",
             "timeout": 5
           }
         ]

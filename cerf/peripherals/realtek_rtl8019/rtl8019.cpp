@@ -4,9 +4,12 @@
 
 #include "../../boards/board_detector.h"
 #include "../../core/cerf_emulator.h"
+#include "../../core/device_config.h"
 #include "../../core/log.h"
+#include "../../host/host_widget_registry.h"
 #include "../../net/network_backend.h"
 
+#include <cstdio>
 #include <cstring>
 
 namespace {
@@ -48,7 +51,8 @@ constexpr std::size_t kMacLen = 6;
 }  /* namespace */
 
 bool Rtl8019::ShouldRegister() {
-    return emu_.Get<BoardDetector>().GetBoard() == Board::Smdk2410DevEmu;
+    auto* bd = emu_.TryGet<BoardDetector>();
+    return bd && bd->GetBoard() == Board::Smdk2410DevEmu;
 }
 
 void Rtl8019::OnReady() {
@@ -71,6 +75,8 @@ void Rtl8019::OnReady() {
         [this](const uint8_t* frame, std::size_t len) {
             OnRxFrame(frame, len);
         });
+
+    emu_.Get<HostWidgetRegistry>().Register(this);
 
     LOG(Net, "[NE2000] ready: MAC=%02X:%02X:%02X:%02X:%02X:%02X "
              "(socket awaits power-on)\n",
@@ -234,7 +240,48 @@ void Rtl8019::OnRxFrame(const uint8_t* frame, std::size_t len) {
 
     nic_current_ = next_page;
     nic_rcv_status_ = kRsrPacketOk;
+    MarkRx();
     RaiseInterruptLocked(kIsrRcvBit);
+}
+
+std::wstring Rtl8019::Tooltip() const {
+    wchar_t buf[64];
+    swprintf_s(buf, L"PCMCIA #1 — Ethernet  %02X:%02X:%02X:%02X:%02X:%02X",
+               guest_mac_[0], guest_mac_[1], guest_mac_[2],
+               guest_mac_[3], guest_mac_[4], guest_mac_[5]);
+    return buf;
+}
+
+std::vector<WidgetMenuItem> Rtl8019::BuildMenu() {
+    WidgetMenuItem hdr;
+    hdr.label   = L"NE2000 Ethernet (RTL8019)";
+    hdr.enabled = false;
+    return { std::move(hdr) };
+}
+
+bool Rtl8019::IsEnabled() const {
+    return emu_.Get<DeviceConfig>().network_enabled;
+}
+
+void Rtl8019::DrawIcon(HDC dc, const RECT& box) const {
+    const int cx = (box.left + box.right) / 2;
+    const int cy = (box.top + box.bottom) / 2;
+    RECT body = { cx - 8, cy - 6, cx + 8, cy + 6 };
+
+    HBRUSH  fill = CreateSolidBrush(RGB(36, 50, 44));
+    HPEN    pen  = CreatePen(PS_SOLID, 1, RGB(150, 160, 150));
+    HGDIOBJ ob   = SelectObject(dc, fill);
+    HGDIOBJ op   = SelectObject(dc, pen);
+    Rectangle(dc, body.left, body.top, body.right, body.bottom);
+    /* RJ45 connector notch on the left edge. */
+    HBRUSH conn = CreateSolidBrush(RGB(170, 175, 185));
+    RECT jack = { body.left - 2, cy - 3, body.left + 2, cy + 3 };
+    FillRect(dc, &jack, conn);
+    DeleteObject(conn);
+    SelectObject(dc, ob);
+    SelectObject(dc, op);
+    DeleteObject(fill);
+    DeleteObject(pen);
 }
 
 bool Rtl8019::ShouldIndicateMulticastPacketLocked(const uint8_t* dest_mac) const {

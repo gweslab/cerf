@@ -58,13 +58,13 @@ void ArmJit::JitApplyFixups() {
                 "target=0x%08X\n",
                 off, block_ctx_.num_insns, i, insn.guest_address,
                 insn.reserved3);
-            CerfFatalExit(2);
+            CerfFatalExit(CERF_FATAL_RUNTIME_ERROR);
         }
         if (block_ctx_.insns[off].guest_address != insn.reserved3) {
             LOG(Caution, "ArmJit::JitApplyFixups: target offset %u guest_addr "
                 "0x%08X != recorded target 0x%08X for fixup at insn[%u]\n",
                 off, block_ctx_.insns[off].guest_address, insn.reserved3, i);
-            CerfFatalExit(2);
+            CerfFatalExit(CERF_FATAL_RUNTIME_ERROR);
         }
 
         uint8_t* cursor = insn.jmp_fixup_location;
@@ -75,7 +75,7 @@ void ArmJit::JitApplyFixups() {
 size_t ArmJit::JitGenerateCode(uint8_t* code_location, int /* entrypoint_count */) {
     if (block_ctx_.num_insns == 0) {
         LOG(Caution, "ArmJit::JitGenerateCode called with num_insns == 0\n");
-        CerfFatalExit(2);
+        CerfFatalExit(CERF_FATAL_RUNTIME_ERROR);
     }
 
     uint8_t* original_code_location = code_location;
@@ -198,7 +198,20 @@ size_t ArmJit::JitGenerateCode(uint8_t* code_location, int /* entrypoint_count *
 
 void ArmJit::JitCreateEntrypoints(JitBlock* containing_block,
                                   uint8_t*  prefix_slab) {
-    JitBlockIndex& idx = CpuState()->cpsr.bits.thumb_mode ? blocks_thumb_ : blocks_arm_;
+    IsaBlockSpace& space =
+        CpuState()->cpsr.bits.thumb_mode ? blocks_thumb_ : blocks_arm_;
+    const uint8_t asid = static_cast<uint8_t>(mmu_->State()->contextidr & 0xFFu);
+
+    /* Outer entrypoints route by nG (the decoded region is one
+       contiguous range → uniform): global (kernel/shared) → shared
+       tree; user (nG=1) → per-ASID. Subs chain off containing_block,
+       so PlaceSubAt's owning tree is irrelevant. */
+    const bool outer_global =
+        containing_block
+            ? false
+            : mmu_->ExecPageGlobal(block_ctx_.insns[0].actual_guest_address);
+    JitBlockIndex& outer_idx =
+        outer_global ? space.global : space.per_asid[asid];
 
     const size_t per_entry_size = containing_block
         ? JitBlockIndex::SubEntrySize()
@@ -224,6 +237,8 @@ void ArmJit::JitCreateEntrypoints(JitBlock* containing_block,
 
         JitBlock new_block{};
         new_block.guest_start  = block_ctx_.insns[i].actual_guest_address;
+        new_block.phys_start   = block_ctx_.block_phys_page_base |
+            (block_ctx_.insns[i].actual_guest_address & 0x00000FFFu);
         new_block.flags_needed = static_cast<uint32_t>(kFlagsAll);
         new_block.native_start = nullptr;
         new_block.native_end   = nullptr;
@@ -245,14 +260,22 @@ void ArmJit::JitCreateEntrypoints(JitBlock* containing_block,
         void* slot = prefix_slab + slot_offset;
         slot_offset += per_entry_size;
 
-        JitBlock* stored = containing_block
-            ? idx.PlaceSubAt  (slot, containing_block, new_block)
-            : idx.PlaceOuterAt(slot, new_block);
+        JitBlock* stored;
+        if (containing_block) {
+            stored = outer_idx.PlaceSubAt(slot, containing_block, new_block);
+        } else {
+            stored = outer_idx.PlaceOuterAt(slot, new_block);
+            space.IndexInsert(stored, &outer_idx);
+        }
 
         for (uint32_t k = i; k < j; ++k) {
             block_ctx_.insns[k].entry_point = stored;
         }
 
         i = j;
+    }
+
+    if (!containing_block && !outer_global) {
+        space.MarkPopulated(asid);
     }
 }

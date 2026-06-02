@@ -10,7 +10,8 @@ public:
     using ArmProcessorConfig::ArmProcessorConfig;
 
     bool ShouldRegister() override {
-        return emu_.Get<BoardDetector>().GetSoc() == SocFamily::S3C2410;
+        auto* bd = emu_.TryGet<BoardDetector>();
+        return bd && bd->GetSoc() == SocFamily::S3C2410;
     }
 
     uint32_t PcStoreOffset()              const override { return 12; }
@@ -22,6 +23,9 @@ public:
     uint32_t Ctr()                        const override { return 0x0B172172u; }
     bool     HasDsp()                     const override { return true; }
     bool     HasLoadStoreDouble()         const override { return true; }
+
+    /* S3C2410 User Manual §7.7.1 — FCLK default 200 MHz (max 266). */
+    uint32_t CpuClockHz()                 const override { return 200000000u; }
 };
 
 }  /* namespace */

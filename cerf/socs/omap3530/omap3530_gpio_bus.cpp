@@ -8,7 +8,8 @@
 REGISTER_SERVICE(Omap3530GpioBus);
 
 bool Omap3530GpioBus::ShouldRegister() {
-    return emu_.Get<BoardDetector>().GetSoc() == SocFamily::OMAP3530;
+    auto* bd = emu_.TryGet<BoardDetector>();
+    return bd && bd->GetSoc() == SocFamily::OMAP3530;
 }
 
 void Omap3530GpioBus::RegisterBank(uint32_t bank_index,

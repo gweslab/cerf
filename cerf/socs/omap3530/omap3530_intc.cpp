@@ -14,7 +14,8 @@
 #include <mutex>
 
 bool Omap3530Intc::ShouldRegister() {
-    return emu_.Get<BoardDetector>().GetSoc() == SocFamily::OMAP3530;
+    auto* bd = emu_.TryGet<BoardDetector>();
+    return bd && bd->GetSoc() == SocFamily::OMAP3530;
 }
 
 int Omap3530Intc::BankIndex(uint32_t off, uint32_t* bank_off_out) {
@@ -56,7 +57,7 @@ void Omap3530Intc::AssertIrq(int source_bit) {
     if (source_bit < 0 || source_bit >= static_cast<int>(kSourceCount)) {
         LOG(Caution, "Omap3530Intc::AssertIrq: source_bit %d out of "
                 "range — OMAP3 has 96 IRQ sources\n", source_bit);
-        CerfFatalExit(1);
+        CerfFatalExit(CERF_FATAL_RUNTIME_ERROR);
     }
 
     bool needs_irq = false;
@@ -69,7 +70,7 @@ void Omap3530Intc::AssertIrq(int source_bit) {
             LOG(Caution, "Omap3530Intc::AssertIrq: source %d routed to "
                     "FIQ (ILR[%d].bit0 set) — FIQ delivery not modelled\n",
                     source_bit, source_bit);
-            CerfFatalExit(1);
+            CerfFatalExit(CERF_FATAL_RUNTIME_ERROR);
         }
 
         const uint32_t bank     = source_bit / kBitsPerBank;
@@ -85,7 +86,7 @@ void Omap3530Intc::DeAssertIrq(int source_bit) {
     if (source_bit < 0 || source_bit >= static_cast<int>(kSourceCount)) {
         LOG(Caution, "Omap3530Intc::DeAssertIrq: source_bit %d out of "
                 "range — OMAP3 has 96 IRQ sources\n", source_bit);
-        CerfFatalExit(1);
+        CerfFatalExit(CERF_FATAL_RUNTIME_ERROR);
     }
 
     bool still_pending = false;
@@ -108,7 +109,7 @@ void Omap3530Intc::AssertSubIrq(int /*main_source_bit*/, int /*sub_source_bit*/)
     LOG(Caution, "Omap3530Intc::AssertSubIrq: OMAP3530 INTC has no "
             "sub-interrupt register layer; caller is using the wrong "
             "model for this SoC family\n");
-    CerfFatalExit(1);
+    CerfFatalExit(CERF_FATAL_RUNTIME_ERROR);
 }
 
 void Omap3530Intc::DeliverPendingIrq() {
@@ -150,7 +151,7 @@ uint32_t Omap3530Intc::ReadReg(uint32_t off) {
         LOG(Caution, "Omap3530Intc::ReadReg: bank %d offset 0x%X "
                 "outside the documented per-bank slot set\n",
                 bank_idx, bank_off);
-        CerfFatalExit(1);
+        CerfFatalExit(CERF_FATAL_RUNTIME_ERROR);
     }
 
     switch (off) {
@@ -174,7 +175,7 @@ uint32_t Omap3530Intc::ReadReg(uint32_t off) {
     }
     LOG(Caution, "Omap3530Intc::ReadReg: offset 0x%X is outside the "
             "documented OMAP_INTC_MPU_REGS layout\n", off);
-    CerfFatalExit(1);
+    CerfFatalExit(CERF_FATAL_RUNTIME_ERROR);
 }
 
 void Omap3530Intc::WriteReg(uint32_t off, uint32_t value) {
@@ -203,7 +204,7 @@ void Omap3530Intc::WriteReg(uint32_t off, uint32_t value) {
                     LOG(Caution, "Omap3530Intc::WriteReg: bank %d "
                             "offset 0x%X outside documented slots\n",
                             bank_idx, bank_off);
-                    CerfFatalExit(1);
+                    CerfFatalExit(CERF_FATAL_RUNTIME_ERROR);
                 }
             } else {
                 switch (off) {
@@ -227,7 +228,7 @@ void Omap3530Intc::WriteReg(uint32_t off, uint32_t value) {
                     LOG(Caution, "Omap3530Intc::WriteReg: offset 0x%X "
                             "is outside the documented "
                             "OMAP_INTC_MPU_REGS layout\n", off);
-                    CerfFatalExit(1);
+                    CerfFatalExit(CERF_FATAL_RUNTIME_ERROR);
                 }
             }
         }
@@ -257,7 +258,8 @@ public:
     using Peripheral::Peripheral;
 
     bool ShouldRegister() override {
-        return emu_.Get<BoardDetector>().GetSoc() == SocFamily::OMAP3530;
+        auto* bd = emu_.TryGet<BoardDetector>();
+        return bd && bd->GetSoc() == SocFamily::OMAP3530;
     }
     void OnReady() override {
         emu_.Get<PeripheralDispatcher>().Register(this);

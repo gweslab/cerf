@@ -27,7 +27,7 @@ void ArmJit::InitializeRaiseAbortDataHelper() {
     if (!raise_abort_data_helper_) {
         LOG(Caution, "ArmJit: VirtualAlloc(RaiseAbortDataHelper) failed gle=%lu\n",
             GetLastError());
-        CerfFatalExit(2);
+        CerfFatalExit(CERF_FATAL_RUNTIME_ERROR);
     }
 
     using namespace x86;

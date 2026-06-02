@@ -16,25 +16,23 @@ constexpr uint32_t kScreenSignatureOff   = 0x44u;
 constexpr uint32_t kBspScreenSignature   = 0xDE12DE34u;
 /* S3C2410 LCD handler halts on anything but 16bpp 5:6:5 ENVID=1. */
 constexpr uint16_t kPinnedColorDepthBpp  = 16u;
-constexpr uint32_t kDevEmuDefaultW       = 800u;
-constexpr uint32_t kDevEmuDefaultH       = 600u;
 
 class DevEmuBspArgs : public Service {
 public:
     using Service::Service;
 
     bool ShouldRegister() override {
-        return emu_.Get<BoardDetector>().GetBoard() == Board::Smdk2410DevEmu;
+        auto* bd = emu_.TryGet<BoardDetector>();
+        if (!bd || bd->GetBoard() != Board::Smdk2410DevEmu) return false;
+        return !emu_.Get<DeviceConfig>().guest_additions;
     }
 
     void OnReady() override {
         auto& cfg = emu_.Get<DeviceConfig>();
         auto& mem = emu_.Get<EmulatedMemory>();
 
-        const uint16_t w = static_cast<uint16_t>(
-            cfg.board_configurable_screen_width .value_or(kDevEmuDefaultW));
-        const uint16_t h = static_cast<uint16_t>(
-            cfg.board_configurable_screen_height.value_or(kDevEmuDefaultH));
+        const uint16_t w = static_cast<uint16_t>(cfg.board_configurable_screen_width);
+        const uint16_t h = static_cast<uint16_t>(cfg.board_configurable_screen_height);
 
         const uint32_t base = kBspArgsPa + kScreenSignatureOff;
         mem.WriteWord(base + 0u, kBspScreenSignature);

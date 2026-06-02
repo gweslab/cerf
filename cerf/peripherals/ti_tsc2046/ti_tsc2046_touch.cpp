@@ -7,7 +7,9 @@
 REGISTER_SERVICE(Tsc2046Touch);
 
 bool Tsc2046Touch::ShouldRegister() {
-    const auto b = emu_.Get<BoardDetector>().GetBoard();
+    auto* bd = emu_.TryGet<BoardDetector>();
+    if (!bd) return false;
+    const auto b = bd->GetBoard();
     return b == Board::OmapEvm3530;
 }
 
@@ -35,7 +37,7 @@ uint32_t Tsc2046Touch::Transfer(uint32_t out_word, uint32_t wl_bits) {
     if (wl_bits < 8u) {
         LOG(Caution, "Tsc2046Touch::Transfer wl_bits=%u; TSC2046 requires "
                      ">=8 bits per transaction\n", wl_bits);
-        CerfFatalExit(2);
+        CerfFatalExit(CERF_FATAL_RUNTIME_ERROR);
     }
     const uint32_t shift = wl_bits - 8u;
     const uint8_t  ctrl  = static_cast<uint8_t>((out_word >> shift) & 0xFFu);
@@ -47,6 +49,5 @@ uint32_t Tsc2046Touch::Transfer(uint32_t out_word, uint32_t wl_bits) {
     case 0x1: adc = adc_y_.load(std::memory_order_relaxed); break;  /* Y */
     default:  adc = 0; break;
     }
-
     return static_cast<uint32_t>(adc & 0x0FFFu) << 3;
 }

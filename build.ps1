@@ -2,7 +2,8 @@ param(
     [string]$Config = "Release",
     [ValidateSet("dev","production")]
     [string]$Mode   = "dev",
-    [switch]$ForceKill
+    [switch]$ForceKill,
+    [switch]$Rebuild
 )
 
 # Run from the repo root, regardless of where the script is invoked from.
@@ -19,7 +20,7 @@ if (-not (Test-Path "$env:LOCALAPPDATA\vcpkg\vcpkg.user.props")) {
     [Environment]::Exit(1)
 }
 
-$waitDeadline = (Get-Date).AddMinutes(5)
+$waitDeadline = (Get-Date).AddMinutes(7)
 while ($true) {
     $blockingProcs = @()
     foreach ($n in @("cerf","MSBuild","cl","link")) {
@@ -37,7 +38,7 @@ while ($true) {
 
     $names = ($blockingProcs | Select-Object -ExpandProperty Name -Unique) -join ", "
     if ((Get-Date) -ge $waitDeadline) {
-        Write-Host "[BUILD] FAILED! The user OR other agent has been building/running CERF for more than 5 minutes (processes: $names)."
+        Write-Host "[BUILD] FAILED! The user OR other agent has been building/running CERF for more than 7 minutes (processes: $names)."
         Write-Host "[BUILD] If you are 100% sure that this is yours stuck build, then re-run with: build.ps1 -ForceKill"
         Write-Host "[BUILD] Otherwise, WAIT for the process to be closed and +~1 minute (recommended). DONT CORRUPT SOMEONE'S WORK."
         [Environment]::Exit(1)
@@ -106,7 +107,9 @@ if (Test-Path $launcherBuild) {
     }
 }
 
-& $msbuild cerf.sln /p:Configuration=$Config /p:Platform=Win32 /m /v:minimal /p:CerfExtraDefines=$cerfDefines /p:CerfMode=$Mode
+$cerfTarget = if ($Rebuild) { "/t:Rebuild" } else { "/t:Build" }
+if ($Rebuild) { Write-Host "[BUILD] Clean rebuild requested (/t:Rebuild)" }
+& $msbuild cerf.sln /p:Configuration=$Config /p:Platform=Win32 $cerfTarget /m /v:minimal /p:CerfExtraDefines=$cerfDefines /p:CerfMode=$Mode
 $msbuildExit = $LASTEXITCODE
 $exePath = "build\$Config\Win32\cerf.exe"
 
@@ -127,6 +130,7 @@ if ($msbuildExit -ne 0) {
 }
 
 $env:CE_APPS_CONFIG = $Config
+$env:CE_APPS_MODE   = $Mode
 foreach ($appDir in (Get-ChildItem -Path "$PSScriptRoot/ce_apps" -Directory -ErrorAction SilentlyContinue)) {
     $appBuild = Join-Path $appDir.FullName "build.ps1"
     if (Test-Path $appBuild) {

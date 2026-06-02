@@ -4,16 +4,16 @@
 
 namespace {
 
-/* DeviceEmulator_lcd.dll is the DeviceEmulator BSP's display driver
-   and ships nowhere else; raw-byte scan rather than module-name scan
-   because WM6+ NB0 images put driver DLL names in IMGFS, which
+/* dmatrans.dll — the DeviceEmulator's DMA host-transport driver, present on
+   every DeviceEmulator BSP generation and no other board. Raw-byte scan, not
+   a module-name lookup: WM6+ NB0 images keep driver names in IMGFS, which
    RomParser does not parse. */
 class Smdk2410DevEmuDetector : public BoardDetector {
 public:
     using BoardDetector::BoardDetector;
 
     bool ShouldRegister() override {
-        return RomContainsString("DeviceEmulator_lcd");
+        return RomContainsString("dmatrans.dll");
     }
 
     Board       GetBoard()  const override { return Board::Smdk2410DevEmu; }

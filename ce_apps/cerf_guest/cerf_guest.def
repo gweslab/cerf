@@ -1,0 +1,5 @@
+LIBRARY cerf_guest
+
+EXPORTS
+    DrvEnableDriver
+    HALInit

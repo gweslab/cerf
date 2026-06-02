@@ -31,33 +31,51 @@ JitBlock* JitBlockIndex::PlaceSubAt(void* memory, JitBlock* parent, const JitBlo
     return sub;
 }
 
-JitBlock* JitBlockIndex::FindContaining(uint32_t guest_addr) {
-    Node* node = RbFind(root_, guest_addr);
+JitBlock* JitBlockIndex::FindContaining(uint32_t folded_va) {
+    Node* node = RbFind(root_, folded_va);
     if (!node) return nullptr;
     JitBlock* ep = &node->ep;
     do {
-        if (ep->guest_start == guest_addr) return ep;
+        if (ep->guest_start == folded_va) return ep;
         ep = ep->sub_block;
     } while (ep);
     /* No sub-entrypoint matches exactly — return the outer block. */
     return &node->ep;
 }
 
-JitBlock* JitBlockIndex::FindExact(uint32_t guest_addr) {
-    JitBlock* hit = FindContaining(guest_addr);
-    if (hit && hit->guest_start == guest_addr) return hit;
+JitBlock* JitBlockIndex::FindExact(uint32_t folded_va) {
+    JitBlock* hit = FindContaining(folded_va);
+    if (hit && hit->guest_start == folded_va) return hit;
     return nullptr;
 }
 
-JitBlock* JitBlockIndex::FindNext(uint32_t guest_addr) {
-    Node* node = RbFindNext(root_, guest_addr);
+JitBlock* JitBlockIndex::FindNext(uint32_t folded_va) {
+    Node* node = RbFindNext(root_, folded_va);
     if (!node || node == nil_) return nullptr;
     return &node->ep;
 }
 
-bool JitBlockIndex::ContainsRange(uint32_t start_addr, uint32_t end_addr) const {
+bool JitBlockIndex::ContainsRange(uint32_t va_lo, uint32_t va_hi) const {
     if (root_ == nil_) return false;
-    return RbContainsRange(root_, start_addr, end_addr);
+    return RbContainsRange(root_, va_lo, va_hi);
+}
+
+void JitBlockIndex::RemoveNode(JitBlock* outer, RemovedCb cb, void* ctx) {
+    if (cb) {
+        cb(outer->guest_start, ctx);
+        for (JitBlock* sub = outer->sub_block; sub; sub = sub->sub_block) {
+            cb(sub->guest_start, ctx);
+        }
+    }
+    /* outer is the JitBlock at the head of its Node (first field), so the
+       Node* recovers by reinterpret_cast — outer blocks only (subs chain
+       off the outer and leave with it). */
+    root_ = RbDelete(root_, reinterpret_cast<Node*>(outer));
+}
+
+JitBlock* JitBlockIndex::FindOuter(uint32_t folded_va) {
+    Node* n = RbFind(root_, folded_va);
+    return n ? &n->ep : nullptr;
 }
 
 void JitBlockIndex::Flush() {
@@ -202,15 +220,126 @@ JitBlockIndex::Node* JitBlockIndex::RbFindNext(Node* root, uint32_t addr) const 
 
 bool JitBlockIndex::RbContainsRange(Node* root, uint32_t start_addr, uint32_t end_addr) const {
     while (root != nil_) {
-        if (start_addr <= root->ep.guest_start && root->ep.guest_start <= end_addr) return true;
-        if (start_addr <= root->ep.guest_end   && root->ep.guest_end   <= end_addr) return true;
-        if (root->ep.guest_start <= start_addr && end_addr <= root->ep.guest_end)   return true;
+        const uint32_t vs = root->ep.guest_start;
+        const uint32_t ve = root->ep.guest_end;
+        if (start_addr <= vs && vs <= end_addr) return true;
+        if (start_addr <= ve && ve <= end_addr) return true;
+        if (vs <= start_addr && end_addr <= ve) return true;
 
-        if (start_addr < root->ep.guest_start) {
+        if (start_addr < vs) {
             root = root->left;
         } else {
             root = root->right;
         }
     }
     return false;
+}
+
+JitBlockIndex::Node* JitBlockIndex::Transplant(Node* root, Node* u, Node* v) {
+    if (u->parent == nil_) {
+        root = v;
+    } else if (u == u->parent->left) {
+        u->parent->left = v;
+    } else {
+        u->parent->right = v;
+    }
+    v->parent = u->parent;
+    return root;
+}
+
+JitBlockIndex::Node* JitBlockIndex::TreeMinimum(Node* x) {
+    while (x->left != nil_) x = x->left;
+    return x;
+}
+
+JitBlockIndex::Node* JitBlockIndex::RbDelete(Node* root, Node* z) {
+    Node*     y               = z;
+    NodeColor y_original_color = y->color;
+    Node*     x;
+
+    if (z->left == nil_) {
+        x    = z->right;
+        root = Transplant(root, z, z->right);
+    } else if (z->right == nil_) {
+        x    = z->left;
+        root = Transplant(root, z, z->left);
+    } else {
+        y                = TreeMinimum(z->right);
+        y_original_color = y->color;
+        x                = y->right;
+        if (y->parent == z) {
+            x->parent = y;   /* sentinel-safe: fixup needs x->parent */
+        } else {
+            root        = Transplant(root, y, y->right);
+            y->right    = z->right;
+            y->right->parent = y;
+        }
+        root     = Transplant(root, z, y);
+        y->left  = z->left;
+        y->left->parent = y;
+        y->color = z->color;
+    }
+
+    if (y_original_color == NodeColor::kBlack) {
+        root = RbDeleteFixup(root, x);
+    }
+    return root;
+}
+
+JitBlockIndex::Node* JitBlockIndex::RbDeleteFixup(Node* root, Node* x) {
+    while (x != root && x->color == NodeColor::kBlack) {
+        if (x == x->parent->left) {
+            Node* w = x->parent->right;
+            if (w->color == NodeColor::kRed) {
+                w->color         = NodeColor::kBlack;
+                x->parent->color = NodeColor::kRed;
+                root             = LeftRotate(root, x->parent);
+                w                = x->parent->right;
+            }
+            if (w->left->color == NodeColor::kBlack &&
+                w->right->color == NodeColor::kBlack) {
+                w->color = NodeColor::kRed;
+                x        = x->parent;
+            } else {
+                if (w->right->color == NodeColor::kBlack) {
+                    w->left->color = NodeColor::kBlack;
+                    w->color       = NodeColor::kRed;
+                    root           = RightRotate(root, w);
+                    w              = x->parent->right;
+                }
+                w->color          = x->parent->color;
+                x->parent->color  = NodeColor::kBlack;
+                w->right->color   = NodeColor::kBlack;
+                root              = LeftRotate(root, x->parent);
+                x                 = root;
+            }
+        } else {
+            Node* w = x->parent->left;
+            if (w->color == NodeColor::kRed) {
+                w->color         = NodeColor::kBlack;
+                x->parent->color = NodeColor::kRed;
+                root             = RightRotate(root, x->parent);
+                w                = x->parent->left;
+            }
+            if (w->right->color == NodeColor::kBlack &&
+                w->left->color == NodeColor::kBlack) {
+                w->color = NodeColor::kRed;
+                x        = x->parent;
+            } else {
+                if (w->left->color == NodeColor::kBlack) {
+                    w->right->color = NodeColor::kBlack;
+                    w->color        = NodeColor::kRed;
+                    root            = LeftRotate(root, w);
+                    w               = x->parent->left;
+                }
+                w->color          = x->parent->color;
+                x->parent->color  = NodeColor::kBlack;
+                w->left->color    = NodeColor::kBlack;
+                root              = RightRotate(root, x->parent);
+                x                 = root;
+            }
+        }
+    }
+    x->color = NodeColor::kBlack;
+    return root;
 }

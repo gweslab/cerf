@@ -11,7 +11,7 @@ uint8_t* PlaceSingleDataTransferRET(uint8_t*      cursor,
         LOG(Caution,
             "PlaceSingleDataTransferRET: r15_modified must be set on the "
             "RET-idiom LDR; got 0 at guest pc=0x%08X\n", d->guest_address);
-        CerfFatalExit(2);
+        CerfFatalExit(CERF_FATAL_RUNTIME_ERROR);
     }
 
     d->r15_modified = 0;

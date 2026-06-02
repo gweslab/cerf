@@ -10,6 +10,7 @@ enum class SocFamily {
     Unknown,
     S3C2410,
     SA1110,
+    PXA25x,    /* Intel XScale PXA255 ("Cotulla"), ARMv5TE */
     PXA27x,
     OMAP3530,
     Poseidon,
@@ -27,6 +28,10 @@ enum class Board {
                          _TGTCPUTYPE=THUMB, _TGTCPU=ARM720. */
     OmapEvm3530,      /* TI OMAP 3530 EVM (Cortex-A8 / CE7); EVM1 and EVM2 ship same BSP */
     Ipaq3650,         /* Compaq iPAQ H3000-platform Pocket PC 2000 (H3650 SKU), Intel SA-1110 */
+    ZuneKeel,         /* Microsoft Zune 30, board codename Keel, Freescale
+                         i.MX31L (ARM1136JF-S, ARMv6K + VFPv2). */
+    FalconPC3xx,      /* Datalogic Falcon 4220 rugged handheld, PC3xx board,
+                         Intel XScale PXA255 (ARMv5TE), Windows CE .NET 4.2. */
 };
 
 class BoardDetector : public Service {

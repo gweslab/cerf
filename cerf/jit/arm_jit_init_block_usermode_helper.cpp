@@ -16,7 +16,7 @@ void ArmJit::InitializeBlockUsermodeHelper() {
     if (!block_usermode_helper_) {
         LOG(Caution, "ArmJit: VirtualAlloc(BlockUsermodeHelper) failed gle=%lu\n",
             GetLastError());
-        CerfFatalExit(2);
+        CerfFatalExit(CERF_FATAL_RUNTIME_ERROR);
     }
 
     using namespace x86;

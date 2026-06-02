@@ -43,7 +43,8 @@ public:
     }
 
     bool ShouldRegister() override {
-        return emu_.Get<BoardDetector>().GetSoc() == SocFamily::S3C2410;
+        auto* bd = emu_.TryGet<BoardDetector>();
+        return bd && bd->GetSoc() == SocFamily::S3C2410;
     }
     void OnReady() override {
         emu_.Get<PeripheralDispatcher>().Register(this);
@@ -131,7 +132,7 @@ uint64_t S3C2410Timer::TimerFreqHz(int timer_idx) const {
     if (mux >= 4u) {
         LOG(Caution, "S3C2410Timer: timer %d mux %u (TCLK external) "
                 "not modelled\n", timer_idx, mux);
-        CerfFatalExit(1);
+        CerfFatalExit(CERF_FATAL_RUNTIME_ERROR);
     }
     /* mux 0..3 → divider 2,4,8,16 (= 1<<(mux+1)). */
     const uint64_t div = 1ull << (mux + 1);

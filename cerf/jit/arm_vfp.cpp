@@ -38,10 +38,9 @@ uint32_t ArmVfp::HandleBlockTransfer(uint32_t pc, uint32_t rn_idx, uint32_t vd,
     uint8_t* vfp_base = reinterpret_cast<uint8_t*>(state->vfp_d);
 
     for (uint32_t i = 0; i < n_regs; i++) {
-        int8_t   tlb_hint = 0;
         uint8_t* host = is_load
-            ? mmu.TranslateRead (state, addr, &tlb_hint)
-            : mmu.TranslateWrite(state, addr, &tlb_hint);
+            ? mmu.TranslateRead (state, addr)
+            : mmu.TranslateWrite(state, addr);
         if (!host) {
             cpu.RaiseAbortDataException(pc);
             return 1;
@@ -96,10 +95,9 @@ uint32_t ArmVfp::HandleSingleTransfer(uint32_t pc, uint32_t rn_idx, uint32_t vd,
     }
     addr += static_cast<uint32_t>(signed_off);
 
-    int8_t   tlb_hint = 0;
     uint8_t* host = is_load
-        ? mmu.TranslateRead (state, addr, &tlb_hint)
-        : mmu.TranslateWrite(state, addr, &tlb_hint);
+        ? mmu.TranslateRead (state, addr)
+        : mmu.TranslateWrite(state, addr);
     if (!host) {
         cpu.RaiseAbortDataException(pc);
         return 1;
@@ -128,13 +126,39 @@ namespace {
 
 inline uint32_t VfpCmpNzcv(double a, double b) {
     if (std::isnan(a) || std::isnan(b)) return 0x3u;
-    if (a < b) return 0x8u;
-    if (a > b) return 0x2u;
+    if (ArmVfp::FPCompareLtD(a, b)) return 0x8u;
+    if (ArmVfp::FPCompareGtD(a, b)) return 0x2u;
     return 0x6u;
 }
 
 inline void StoreFpscrNzcv(ArmCpuState* state, uint32_t nzcv4) {
     state->fpscr = (state->fpscr & ~0xF0000000u) | (nzcv4 << 28);
+}
+
+/* VFP short-vector register sequencing — ARM ARM DDI0100I §C5.1/§C5.3.
+   Invariant: LEN=0 (default) MUST yield vec_len=1 / identical indices, else
+   every scalar VFP op silently changes. dest in bank 0 also scalar; else regs
+   iterate within their 8(SP)/4(DP)-reg bank, 2nd src scalar iff in bank 0. */
+uint32_t VfpVectorRegs(const ArmCpuState* state, bool is_dp, bool monadic,
+                       uint32_t sd0, uint32_t sn0, uint32_t sm0,
+                       uint32_t* sd, uint32_t* sn, uint32_t* sm) {
+    const uint32_t len    = ((state->fpscr >> 16) & 7u) + 1u;
+    const uint32_t stride = ((state->fpscr >> 20) & 3u) == 0u ? 1u : 2u;
+    const uint32_t bank   = is_dp ? 4u : 8u;
+    if (len == 1u || sd0 / bank == 0u) {
+        sd[0] = sd0; sn[0] = sn0; sm[0] = sm0;
+        return 1u;
+    }
+    const bool     m_scalar = sm0 / bank == 0u;
+    const uint32_t d_base = sd0 / bank * bank, d_i0 = sd0 % bank;
+    const uint32_t n_base = sn0 / bank * bank, n_i0 = sn0 % bank;
+    const uint32_t m_base = sm0 / bank * bank, m_i0 = sm0 % bank;
+    for (uint32_t i = 0; i < len; ++i) {
+        sd[i] = d_base + (d_i0 + i * stride) % bank;
+        sn[i] = monadic ? sn0 : n_base + (n_i0 + i * stride) % bank;
+        sm[i] = m_scalar ? sm0 : m_base + (m_i0 + i * stride) % bank;
+    }
+    return len;
 }
 
 }  /* namespace */
@@ -179,38 +203,43 @@ uint32_t ArmVfp::ExecuteCdp(uint32_t pc, uint32_t packed) {
 
     if (T == 0u) {
         const uint32_t key = (opc << 1) | op6;
-        if (is_dp) {
-            const double dn = dp_regs[sn];
-            const double dm = dp_regs[sm];
-            const double dd = dp_regs[sd];
-            double r = 0.0;
-            switch (key) {
-                case 0: r =  dd + dn * dm;  break;  /* VMLA  */
-                case 1: r =  dd - dn * dm;  break;  /* VMLS  */
-                case 2: r = -dd + dn * dm;  break;  /* VNMLS */
-                case 3: r = -dd - dn * dm;  break;  /* VNMLA */
-                case 4: r =  dn * dm;       break;  /* VMUL  */
-                case 5: r = -(dn * dm);     break;  /* VNMUL */
-                case 6: r =  dn + dm;       break;  /* VADD  */
-                case 7: r =  dn - dm;       break;  /* VSUB  */
+        uint32_t vd[8], vn[8], vm[8];
+        const uint32_t vl = VfpVectorRegs(state, is_dp, false, sd, sn, sm,
+                                          vd, vn, vm);
+        for (uint32_t i = 0; i < vl; ++i) {
+            if (is_dp) {
+                const double dn = dp_regs[vn[i]];
+                const double dm = dp_regs[vm[i]];
+                const double dd = dp_regs[vd[i]];
+                double r = 0.0;
+                switch (key) {
+                    case 0: r = FPAddD(dd, FPMulD(dn, dm));         break;  /* VMLA  */
+                    case 1: r = FPSubD(dd, FPMulD(dn, dm));         break;  /* VMLS  */
+                    case 2: r = FPAddD(FPNegD(dd), FPMulD(dn, dm)); break;  /* VNMLS */
+                    case 3: r = FPSubD(FPNegD(dd), FPMulD(dn, dm)); break;  /* VNMLA */
+                    case 4: r = FPMulD(dn, dm);                     break;  /* VMUL  */
+                    case 5: r = FPNegD(FPMulD(dn, dm));             break;  /* VNMUL */
+                    case 6: r = FPAddD(dn, dm);                     break;  /* VADD  */
+                    case 7: r = FPSubD(dn, dm);                     break;  /* VSUB  */
+                }
+                dp_regs[vd[i]] = r;
+            } else {
+                const float fn = sp_regs[vn[i]];
+                const float fm = sp_regs[vm[i]];
+                const float fd = sp_regs[vd[i]];
+                float r = 0.0f;
+                switch (key) {
+                    case 0: r = FPAddS(fd, FPMulS(fn, fm));         break;
+                    case 1: r = FPSubS(fd, FPMulS(fn, fm));         break;
+                    case 2: r = FPAddS(FPNegS(fd), FPMulS(fn, fm)); break;
+                    case 3: r = FPSubS(FPNegS(fd), FPMulS(fn, fm)); break;
+                    case 4: r = FPMulS(fn, fm);                     break;
+                    case 5: r = FPNegS(FPMulS(fn, fm));             break;
+                    case 6: r = FPAddS(fn, fm);                     break;
+                    case 7: r = FPSubS(fn, fm);                     break;
+                }
+                sp_regs[vd[i]] = r;
             }
-            dp_regs[sd] = r;
-        } else {
-            const float fn = sp_regs[sn];
-            const float fm = sp_regs[sm];
-            const float fd = sp_regs[sd];
-            float r = 0.0f;
-            switch (key) {
-                case 0: r =  fd + fn * fm;  break;
-                case 1: r =  fd - fn * fm;  break;
-                case 2: r = -fd + fn * fm;  break;
-                case 3: r = -fd - fn * fm;  break;
-                case 4: r =  fn * fm;       break;
-                case 5: r = -(fn * fm);     break;
-                case 6: r =  fn + fm;       break;
-                case 7: r =  fn - fm;       break;
-            }
-            sp_regs[sd] = r;
         }
         return 0;
     }
@@ -218,8 +247,13 @@ uint32_t ArmVfp::ExecuteCdp(uint32_t pc, uint32_t packed) {
     /* T = 1 */
     if (opc == 0u && op6 == 0u) {
         /* VDIV */
-        if (is_dp) dp_regs[sd] = dp_regs[sn] / dp_regs[sm];
-        else       sp_regs[sd] = sp_regs[sn] / sp_regs[sm];
+        uint32_t vd[8], vn[8], vm[8];
+        const uint32_t vl = VfpVectorRegs(state, is_dp, false, sd, sn, sm,
+                                          vd, vn, vm);
+        for (uint32_t i = 0; i < vl; ++i) {
+            if (is_dp) dp_regs[vd[i]] = FPDivD(dp_regs[vn[i]], dp_regs[vm[i]]);
+            else       sp_regs[vd[i]] = FPDivS(sp_regs[vn[i]], sp_regs[vm[i]]);
+        }
         return 0;
     }
 
@@ -258,14 +292,24 @@ uint32_t ArmVfp::ExecuteCdp(uint32_t pc, uint32_t packed) {
             }
             if (op_sel == 1u) {
                 /* VMOV (register) — Vd = Vm */
-                if (is_dp) dp_regs[sd] = dp_regs[sm];
-                else       sp_regs[sd] = sp_regs[sm];
+                uint32_t vd[8], vn[8], vm[8];
+                const uint32_t vl = VfpVectorRegs(state, is_dp, true, sd, sn, sm,
+                                                  vd, vn, vm);
+                for (uint32_t i = 0; i < vl; ++i) {
+                    if (is_dp) dp_regs[vd[i]] = dp_regs[vm[i]];
+                    else       sp_regs[vd[i]] = sp_regs[vm[i]];
+                }
                 return 0;
             }
             if (op_sel == 3u) {
                 /* VABS */
-                if (is_dp) dp_regs[sd] = std::fabs(dp_regs[sm]);
-                else       sp_regs[sd] = std::fabs(sp_regs[sm]);
+                uint32_t vd[8], vn[8], vm[8];
+                const uint32_t vl = VfpVectorRegs(state, is_dp, true, sd, sn, sm,
+                                                  vd, vn, vm);
+                for (uint32_t i = 0; i < vl; ++i) {
+                    if (is_dp) dp_regs[vd[i]] = FPAbsD(dp_regs[vm[i]]);
+                    else       sp_regs[vd[i]] = FPAbsS(sp_regs[vm[i]]);
+                }
                 return 0;
             }
             cpu.RaiseUndefinedException(pc);
@@ -274,14 +318,24 @@ uint32_t ArmVfp::ExecuteCdp(uint32_t pc, uint32_t packed) {
         case 0x1: {
             if (op_sel == 1u) {
                 /* VNEG */
-                if (is_dp) dp_regs[sd] = -dp_regs[sm];
-                else       sp_regs[sd] = -sp_regs[sm];
+                uint32_t vd[8], vn[8], vm[8];
+                const uint32_t vl = VfpVectorRegs(state, is_dp, true, sd, sn, sm,
+                                                  vd, vn, vm);
+                for (uint32_t i = 0; i < vl; ++i) {
+                    if (is_dp) dp_regs[vd[i]] = FPNegD(dp_regs[vm[i]]);
+                    else       sp_regs[vd[i]] = FPNegS(sp_regs[vm[i]]);
+                }
                 return 0;
             }
             if (op_sel == 3u) {
                 /* VSQRT */
-                if (is_dp) dp_regs[sd] = std::sqrt(dp_regs[sm]);
-                else       sp_regs[sd] = std::sqrt(sp_regs[sm]);
+                uint32_t vd[8], vn[8], vm[8];
+                const uint32_t vl = VfpVectorRegs(state, is_dp, true, sd, sn, sm,
+                                                  vd, vn, vm);
+                for (uint32_t i = 0; i < vl; ++i) {
+                    if (is_dp) dp_regs[vd[i]] = FPSqrtD(dp_regs[vm[i]]);
+                    else       sp_regs[vd[i]] = FPSqrtS(sp_regs[vm[i]]);
+                }
                 return 0;
             }
             cpu.RaiseUndefinedException(pc);
@@ -301,16 +355,17 @@ uint32_t ArmVfp::ExecuteCdp(uint32_t pc, uint32_t packed) {
             return 0;
         }
         case 0x7: {
-            /* VCVT (precision conversion) at op_sel == 3. */
+            /* VCVT single<->double: cp10 = single->double (Dd<-Sm), cp11 =
+               double->single (Sd<-Dm). Do NOT swap — running FCVTDS (cp10)
+               through the double->single body writes Sd instead of Dd, leaving
+               Dd garbage. */
             if (op_sel == 3u) {
                 if (is_dp) {
-                    /* cp==11 means dest is DP — VCVT.F64.F32 Dd, Sm */
-                    const float src = sp_regs[(crm << 1) | M];
-                    dp_regs[sd] = static_cast<double>(src);
-                } else {
-                    /* cp==10 means dest is SP — VCVT.F32.F64 Sd, Dm */
                     const double src = dp_regs[(M << 4) | crm];
-                    sp_regs[sd] = static_cast<float>(src);
+                    sp_regs[(crd << 1) | D] = static_cast<float>(src);
+                } else {
+                    const float src = sp_regs[(crm << 1) | M];
+                    dp_regs[(D << 4) | crd] = static_cast<double>(src);
                 }
                 return 0;
             }

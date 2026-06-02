@@ -75,7 +75,25 @@ void TraceManager::RegisterForBundle(
 }
 
 void TraceManager::OnPc(uint32_t runtime_va, TraceHandler handler) {
-    pc_traces_[runtime_va] = std::move(handler);
+    auto& vec = pc_traces_[runtime_va];
+    for (const auto& e : vec) {
+        if (!e.predicate.has_value()) {
+            LOG(Caution, "TraceManager::OnPc duplicate registration at "
+                         "runtime_va=0x%08X — another UNFILTERED trace handler "
+                         "is already bound at this guest PC. Use OnPcFiltered "
+                         "if you intended per-process filtering.\n", runtime_va);
+            CerfFatalExit(CERF_FATAL_RUNTIME_ERROR);
+        }
+    }
+    vec.push_back({std::nullopt, std::move(handler)});
+}
+
+void TraceManager::OnPcFiltered(uint32_t       runtime_va,
+                                TracePredicate predicate,
+                                TraceHandler   handler) {
+    pc_traces_[runtime_va].push_back(
+        {std::optional<TracePredicate>{std::move(predicate)},
+         std::move(handler)});
 }
 
 void TraceManager::OnRunLoopIter(TraceHandler handler) {
@@ -92,7 +110,10 @@ void TraceManager::DispatchPc(uint32_t pc,
     auto it = pc_traces_.find(pc);
     if (it == pc_traces_.end()) return;
     TraceContext ctx{regs, cpsr, pc, emu_};
-    it->second(ctx);
+    for (const auto& e : it->second) {
+        if (e.predicate.has_value() && !(*e.predicate)(ctx)) continue;
+        e.handler(ctx);
+    }
 }
 
 void TraceManager::DispatchRunLoopIter(const uint32_t* regs, uint32_t cpsr) {

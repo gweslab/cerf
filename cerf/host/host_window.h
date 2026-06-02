@@ -17,43 +17,40 @@ public:
     ~HostWindow() override;
     void OnReady() override;
 
-    bool IsClosed() const { return close_requested_.load(); }
-
-    /* SoC LCD service calls on guest panel-enable edge. fb_(w|h) are
-       raw LCD-controller dimensions; HostWindow runs them through the
-       current FrameRenderer's HostSizeFor so rotating renderers can
-       swap. */
+    /* SoC LCD service calls on guest panel-enable edge. fb_(w|h) are raw
+       LCD-controller dimensions; run through the FrameRenderer's HostSizeFor
+       so rotating renderers can swap. */
     void OnLcdEnabled(uint32_t fb_w, uint32_t fb_h);
 
-    uint32_t ClientWidth () const { return width_.load(std::memory_order_acquire); }
-    uint32_t ClientHeight() const { return height_.load(std::memory_order_acquire); }
+    HWND Hwnd() const { return hwnd_; }
 
 private:
     void UiThreadMain();
-    void TickAndPresent();
-    void ResizeDibAndWindow(uint32_t new_w, uint32_t new_h);
-
     static LRESULT CALLBACK WndProcStatic(HWND, UINT, WPARAM, LPARAM);
     LRESULT WndProc(HWND, UINT, WPARAM, LPARAM);
 
+    HMENU BuildMenu();
+    void  SyncMenu();
+    void  HandleCommand(int id);
+    void  AutoResizeToGuest();
+
+    /* Size the window so its client holds an sw x sh guest surface, but never
+       larger than the work area, and pull the origin in so the whole frame
+       stays on-screen. An oversized surface leaves the canvas smaller than the
+       surface, which engages the canvas scrollbars. */
+    void  FitWindowToSurface(uint32_t sw, uint32_t sh);
+
     std::thread             ui_thread_;
-    std::atomic<bool>       close_requested_{false};
     std::atomic<bool>       ui_ready_{false};
     std::mutex              ui_ready_mutex_;
     std::condition_variable ui_ready_cv_;
 
-    HWND      hwnd_     = nullptr;
-    HDC       mem_dc_   = nullptr;
-    HBITMAP   dib_      = nullptr;
-    uint32_t* dib_bits_ = nullptr;
-    UINT_PTR  timer_id_ = 0;
+    HWND  hwnd_  = nullptr;
+    HMENU hmenu_ = nullptr;
 
-    std::atomic<uint32_t> width_ {0};
-    std::atomic<uint32_t> height_{0};
+    uint32_t initial_surface_w_ = 0;
+    uint32_t initial_surface_h_ = 0;
 
-    std::atomic<uint32_t> pending_w_{0};
-    std::atomic<uint32_t> pending_h_{0};
-
-    enum class LastRenderer { None, Uart, Frame };
-    LastRenderer last_renderer_ = LastRenderer::None;
+    bool follow_guest_  = true;   /* false once user resizes/maximizes */
+    bool user_resizing_ = false;  /* between WM_ENTER/EXITSIZEMOVE */
 };

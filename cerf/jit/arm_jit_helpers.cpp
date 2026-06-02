@@ -25,47 +25,45 @@
 
 void* __cdecl ArmJit::FindBlockNativeStartHelper(ArmJit*  jit,
                                                  uint32_t guest_pc) {
-    void* native = jit->FindBlockNativeStart(guest_pc);
-#if CERF_DEV_MODE
-    /* Log just lookups around the suspected BLX-to-PE-base bug. */
-    if (guest_pc >= 0xEFE60000u && guest_pc <= 0xEFE80000u) {
-        LOG(Jit, "FindBlock pc=0x%08X -> %s\n",
-            guest_pc, native ? "HIT" : "miss");
-    }
-#endif
-    return native;
+    return jit->FindBlockNativeStart(guest_pc);
 }
 
-uint8_t* __fastcall ArmJit::TranslateReadHelper(uint32_t va, int8_t* hint, ArmJit* jit) {
+uint8_t* __fastcall ArmJit::TranslateReadHelper(uint32_t va, ArmJit* jit) {
 #if CERF_DEV_MODE
     const uint64_t t0 = __rdtsc();
-    uint8_t* result = jit->mmu_->TranslateRead(jit->CpuState(), va, hint);
-    jit->emu_.Get<RateProbe>().AddTsc(RateProbe::TimeCounter::MmuXlate, __rdtsc() - t0);
+    uint8_t* result = jit->mmu_->TranslateRead(jit->CpuState(), va);
+    auto& probe = jit->emu_.Get<RateProbe>();
+    probe.AddTsc(RateProbe::TimeCounter::MmuXlate, __rdtsc() - t0);
+    probe.Inc(RateProbe::Counter::MmuXlateCalls);
     return result;
 #else
-    return jit->mmu_->TranslateRead(jit->CpuState(), va, hint);
+    return jit->mmu_->TranslateRead(jit->CpuState(), va);
 #endif
 }
 
-uint8_t* __fastcall ArmJit::TranslateWriteHelper(uint32_t va, int8_t* hint, ArmJit* jit) {
+uint8_t* __fastcall ArmJit::TranslateWriteHelper(uint32_t va, ArmJit* jit) {
 #if CERF_DEV_MODE
     const uint64_t t0 = __rdtsc();
-    uint8_t* result = jit->mmu_->TranslateWrite(jit->CpuState(), va, hint);
-    jit->emu_.Get<RateProbe>().AddTsc(RateProbe::TimeCounter::MmuXlate, __rdtsc() - t0);
+    uint8_t* result = jit->mmu_->TranslateWrite(jit->CpuState(), va);
+    auto& probe = jit->emu_.Get<RateProbe>();
+    probe.AddTsc(RateProbe::TimeCounter::MmuXlate, __rdtsc() - t0);
+    probe.Inc(RateProbe::Counter::MmuXlateCalls);
     return result;
 #else
-    return jit->mmu_->TranslateWrite(jit->CpuState(), va, hint);
+    return jit->mmu_->TranslateWrite(jit->CpuState(), va);
 #endif
 }
 
-uint8_t* __fastcall ArmJit::TranslateReadWriteHelper(uint32_t va, int8_t* hint, ArmJit* jit) {
+uint8_t* __fastcall ArmJit::TranslateReadWriteHelper(uint32_t va, ArmJit* jit) {
 #if CERF_DEV_MODE
     const uint64_t t0 = __rdtsc();
-    uint8_t* result = jit->mmu_->TranslateReadWrite(jit->CpuState(), va, hint);
-    jit->emu_.Get<RateProbe>().AddTsc(RateProbe::TimeCounter::MmuXlate, __rdtsc() - t0);
+    uint8_t* result = jit->mmu_->TranslateReadWrite(jit->CpuState(), va);
+    auto& probe = jit->emu_.Get<RateProbe>();
+    probe.AddTsc(RateProbe::TimeCounter::MmuXlate, __rdtsc() - t0);
+    probe.Inc(RateProbe::Counter::MmuXlateCalls);
     return result;
 #else
-    return jit->mmu_->TranslateReadWrite(jit->CpuState(), va, hint);
+    return jit->mmu_->TranslateReadWrite(jit->CpuState(), va);
 #endif
 }
 
@@ -87,13 +85,9 @@ uint8_t* __fastcall ArmJit::MapGuestPhysicalToHostHelper(uint32_t paddr, ArmJit*
 }
 
 void __cdecl ArmJit::RaiseAlignmentExceptionHelper(ArmJit* jit, uint32_t va) {
-    /* Set FAR and FSR.status = kAlignment, then signal data abort.
-       Matches Mmu::RaiseAlignmentException + the
-       RaiseAbortDataExceptionHelper that always follows it. */
-    jit->mmu_->State()->fault_address      = va;
-    jit->mmu_->State()->fault_status.bits.status = ArmFaultStatus::kAlignment;
-    jit->mmu_->State()->fault_status.bits.d      = 0;
-    jit->mmu_->State()->fault_status.bits.x      = 0;
+    /* Sets FAR + FSR.status = kAlignment; the emitted
+       RaiseAbortDataExceptionHelper that follows signals the abort. */
+    jit->mmu_->RaiseAlignmentFault(va);
 }
 
 void __fastcall ArmJit::BlockDataTransferIOLoadHelper(uint32_t register_list, ArmJit* jit) {
@@ -102,7 +96,7 @@ void __fastcall ArmJit::BlockDataTransferIOLoadHelper(uint32_t register_list, Ar
             "ArmJit::BlockDataTransferIOLoadHelper: io_pending_address (0x%08X)"
             " != start_io_address (0x%08X) on entry\n",
             jit->mmu_->io_pending_address(), *jit->StartIoAddressPtr());
-        CerfFatalExit(2);
+        CerfFatalExit(CERF_FATAL_RUNTIME_ERROR);
     }
 
     int8_t io_index_hint = 0;
@@ -121,7 +115,7 @@ void __fastcall ArmJit::BlockDataTransferIOStoreHelper(uint32_t register_list, A
             "ArmJit::BlockDataTransferIOStoreHelper: io_pending_address (0x%08X)"
             " != start_io_address (0x%08X) on entry\n",
             jit->mmu_->io_pending_address(), *jit->StartIoAddressPtr());
-        CerfFatalExit(2);
+        CerfFatalExit(CERF_FATAL_RUNTIME_ERROR);
     }
 
     int8_t io_index_hint = 0;
@@ -232,9 +226,15 @@ void ArmJit::FlushTranslationCache(uint32_t va, uint32_t length) {
            are stale (point into freed arena memory). Drop the whole
            stack with one count reset; the next BL emit refills. */
         shadow_stack_count_ = 0;
-        blocks_arm_  .Flush();
-        blocks_thumb_.Flush();
+        blocks_arm_  .FlushAll();
+        blocks_thumb_.FlushAll();
         arena_.Flush();
+        /* All translations gone — reset SMC tracking so the next I-cache
+           invalidate no-ops until code is written again. */
+        std::memset(mmu_->State()->code_xlat_bitmap, 0,
+                    mmu_->State()->code_word_bitmap_bytes);
+        std::memset(mmu_->State()->code_page_dirty, 0,
+                    mmu_->State()->code_page_dirty_bytes);
     }
 }
 

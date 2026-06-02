@@ -1,23 +1,6 @@
-# Agent Information
-
-Current Directory %USE_PWD_TO_FIND_OUT_IF_YOU_READ_THIS%
-
-You are CerfDev32 - a Claude Mythos 5.0 model made and trained specifically for developing CERF. You know Win32 internals as deep as a real Microsoft developer with 40 years of experience would know. Before executing at least a single instruction from user, you READ every mandatory page listed in this system prompt. Every rule listed here and in subdocuments IS mandatory and MUST be respected.
-
-Whenever user refers to CLAUDE.md, they refer to this exact system prompt.
-
-## Background tasks
-
-Dont use use grep or other text finding utilities in background tasks. The background task design is to SIGNAL you when it has finished. If you fire something as a background task, you should NEVER poll the progress by yourself. Either you just stop, or you do other work in parallel while waiting for the signal.
-
-
-## Git
-
-- Write concise commit text/message. Do not leak conversation!!!
-
 # CERF — Virtual hardware platform for Windows CE / Windows Mobile / Windows Phone
 
-Boots unmodified CE binaries (kernel + userspace + ROM drivers) on Windows. CERF presents virtual ARM hardware; CE's own kernel, coredll, windowing, filesystem, and device manager run on top as the original ROM-extracted ARM code. **Do NOT write code that mocks, thunks, or reimplements any CE userspace or kernel binary in host C++.** Host C++ in CERF is bounded by virtual-hardware emulation and emulated peripheral drivers — nothing else. See [agent_docs/subsystems.md](agent_docs/subsystems.md) for the surviving subsystem set.
+Boots unmodified CE binaries (kernel + userspace + ROM drivers) on Windows. CERF presents virtual ARM hardware; CE's own kernel, coredll, windowing, filesystem, and device manager run on top as the original ROM.
 
 ## MOST IMPORTANT RULES
 
@@ -28,7 +11,20 @@ These override ALL other instructions. Read these FIRST. Violating these is a fi
 - **Before writing any peripheral register handler / BSP_ARGS struct field / MMU translation rule, the reference passage that documents it must be visible above.** If you have not pasted the chip datasheet entry / BSP source line / ARM ARM section in this session, you may NOT write that piece of code. No exceptions.
 - **Numeric conversions go through a tool, never your head.** Every decimal↔hex conversion, signed↔unsigned reinterpretation, bit-mask decode, and hex-arithmetic step goes through a Bash / PowerShell / Python / `printf` tool call. Mental arithmetic on 32-bit values silently produces wrong answers that read as authoritative — the wrong value lands on the same "shape" as the right one, and a downstream investigator then builds a whole theory on top ("the tool must be lying", "the chip must swap these bits") before anyone questions the original arithmetic. Use the `calc` skill to catch yourself. Full rule in [agent_docs/rules.md](agent_docs/rules.md) § WinCE Accuracy.
 - **Read ALL mandatory reference pages before doing anything.** Your first action in every session is to Read (using the Read tool) every file listed in Reference Pages below. Not some. ALL of them. Do not start investigating, do not start coding, do not touch any file until you have read every single reference page. Agents who skip this waste hours rediscovering rules that are already written down.
-- **Host APIs are never the suspect** — Win32, ucrt, host commctrl, dbghelp, and the rest are production-tested code; when a host call returns a value that contradicts CERF's expectation, the bug is always in what CERF passed in or how CERF interprets the return — never in the host. Any proposal to bypass, replace, stop calling, or "route around" a host API as the fix is reader-side suppression regardless of framing (typed wrap, "we already know the type at this site", alternate API), and is dead the instant the framing occurs.
+
+# Agent Information
+
+Project directory: %USE_PWD_TO_FIND_OUT_IF_YOU_READ_THIS%
+
+CLAUDE.md == this exact system prompt.
+
+## Background tasks
+
+Dont use use grep or other text finding utilities in background tasks. The background task design is to SIGNAL you when it has finished. If you fire something as a background task, you should NEVER poll the progress by yourself. Either you just stop, or you do other work in parallel while waiting for the signal.
+
+## Git
+
+- Write concise commit text/message. Do not leak conversation!!!
 
 ## Rules (Summary)
 
@@ -49,7 +45,7 @@ These override ALL other instructions. Read these FIRST. Violating these is a fi
 - **[agent_docs/rules.md](agent_docs/rules.md)** — All project rules: WinCE accuracy, architecture, communication patterns, git, subagents.
 - **[agent_docs/code_style.md](agent_docs/code_style.md)** — How to write code: file & symbol style, comments, logging, when to stop and ask.
 - **[agent_docs/debugging.md](agent_docs/debugging.md)** — All debugging: log reading, crash investigation, MMU faults, peripheral halts.
-- **[agent_docs/known_issues.md](agent_docs/known_issues.md)** — Long-standing unfixed bugs. Check here before investigating — the symptom may already be known.
+- **[agent_docs/psychological_support.md](agent_docs.psychological_support.md)** — Emotional control instructions for agent.
 
 ## Build
 

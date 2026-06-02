@@ -18,6 +18,7 @@ const char* BoardDetector::SocFamilyName(SocFamily f) {
         case SocFamily::Unknown:   return "Unknown";
         case SocFamily::S3C2410:   return "S3C2410";
         case SocFamily::SA1110:    return "SA1110";
+        case SocFamily::PXA25x:    return "PXA25x";
         case SocFamily::PXA27x:    return "PXA27x";
         case SocFamily::OMAP3530:  return "OMAP3530";
         case SocFamily::Poseidon:  return "Poseidon";

@@ -118,7 +118,8 @@ class DevEmuKeyboardInput : public KeyboardInput {
 public:
     using KeyboardInput::KeyboardInput;
     bool ShouldRegister() override {
-        return emu_.Get<BoardDetector>().GetBoard() == Board::Smdk2410DevEmu;
+        auto* bd = emu_.TryGet<BoardDetector>();
+        return bd && bd->GetBoard() == Board::Smdk2410DevEmu;
     }
     void OnHostKey(uint8_t vk, bool key_up) override {
         emu_.Get<DevEmuPs2Keyboard>().OnHostKey(vk, key_up);
@@ -130,7 +131,8 @@ public:
 REGISTER_SERVICE_AS(DevEmuKeyboardInput, KeyboardInput);
 
 bool DevEmuPs2Keyboard::ShouldRegister() {
-    return emu_.Get<BoardDetector>().GetBoard() == Board::Smdk2410DevEmu;
+    auto* bd = emu_.TryGet<BoardDetector>();
+    return bd && bd->GetBoard() == Board::Smdk2410DevEmu;
 }
 
 void DevEmuPs2Keyboard::OnReady() {

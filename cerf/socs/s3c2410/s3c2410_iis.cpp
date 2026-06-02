@@ -35,7 +35,8 @@ constexpr UINT kMsgOutDmaEnable = 0xC001u;
 }  /* namespace */
 
 bool S3C2410Iis::ShouldRegister() {
-    return emu_.Get<BoardDetector>().GetSoc() == SocFamily::S3C2410;
+    auto* bd = emu_.TryGet<BoardDetector>();
+    return bd && bd->GetSoc() == SocFamily::S3C2410;
 }
 
 S3C2410Iis::~S3C2410Iis() {

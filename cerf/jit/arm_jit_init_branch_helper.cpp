@@ -27,7 +27,7 @@ void ArmJit::InitializeBranchHelper() {
     if (!branch_helper_) {
         LOG(Caution, "ArmJit: VirtualAlloc(BranchHelper) failed gle=%lu\n",
             GetLastError());
-        CerfFatalExit(2);
+        CerfFatalExit(CERF_FATAL_RUNTIME_ERROR);
     }
 
     using namespace x86;
@@ -38,20 +38,22 @@ void ArmJit::InitializeBranchHelper() {
                          static_cast<int32_t>(offsetof(ArmCpuState, gprs) + 15 * 4),
                          kEcx);
 
-    /* Lookup helper call. */
+    /* Lookup helper call — returns the destination's native_start (via the
+       VA jump cache) directly in EAX, or null. */
     EmitPushReg(p, kEcx);                                         /* arg2: guest_pc */
     EmitPush32(p, static_cast<uint32_t>(reinterpret_cast<uintptr_t>(this)));
                                                                    /* arg1: jit */
-    EmitCall(p, reinterpret_cast<void*>(&ArmJit::FindBlockExactHelper));
+    EmitCall(p, reinterpret_cast<void*>(&ArmJit::FindBlockNativeStartHelper));
     EmitAddRegImm32(p, kEsp, 8);
 
     EmitTestRegReg(p, kEax, kEax);
     EmitPopReg(p, kEcx);
     uint8_t* must_compile = EmitJzLabel(p);
 
-    /* Hit path: load native_start from JitBlock at offset 8. */
-    EmitMovRegBaseDisp32(p, kEdi, kEax,
-                         static_cast<int32_t>(offsetof(JitBlock, native_start)));
+    /* Hit path: EAX is native_start. Self-patch the 10-byte MOV+CALL at the
+       call site into JMP rel32 — reached only for same-page targets (chosen
+       in PlaceBranch), so the baked JMP is phys-stable across context switch. */
+    EmitMovRegReg(p, kEdi, kEax);
     /* EAX = EDI - 5 (computed via MOV+SUB since no LEA primitive). */
     EmitMovRegReg(p, kEax, kEdi);
     EmitSubRegImm32(p, kEax, 5);

@@ -4,7 +4,8 @@ import os
 
 THIS_DIR = Path(os.path.abspath(SPEC)).parent
 REPO_ROOT = THIS_DIR.parent
-ICON_PATH = str(REPO_ROOT / "cerf" / "cerf.ico")
+ICON_PATH    = str(REPO_ROOT / "cerf" / "assets" / "cerf.ico")
+VERSION_PATH = str(REPO_ROOT / "cerf" / "version.h")
 
 block_cipher = None
 
@@ -12,7 +13,7 @@ a = Analysis(
     [str(THIS_DIR / "launcher.py")],
     pathex=[str(THIS_DIR)],
     binaries=[],
-    datas=[(ICON_PATH, ".")],
+    datas=[(ICON_PATH, "."), (VERSION_PATH, ".")],
     hiddenimports=[],
     hookspath=[],
     runtime_hooks=[],

@@ -1,4 +1,4 @@
-#include "../../socs/mmu_policy.h"
+#include "../mmu_policy.h"
 
 #include "../../core/cerf_emulator.h"
 #include "../../boards/board_detector.h"
@@ -10,7 +10,8 @@ public:
     using MmuPolicy::MmuPolicy;
 
     bool ShouldRegister() override {
-        return emu_.Get<BoardDetector>().GetBoard() == Board::OdoArm720;
+        auto* bd = emu_.TryGet<BoardDetector>();
+        return bd && bd->GetBoard() == Board::OdoArm720;
     }
 
     uint32_t TtbrL1BaseMask() const override { return 0xFFFFC000u; }

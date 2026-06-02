@@ -1,4 +1,4 @@
-#include "../../socs/page_table_builder.h"
+#include "../page_table_builder.h"
 
 #include "../../core/cerf_emulator.h"
 #include "../../core/log.h"
@@ -44,7 +44,8 @@ public:
     using PageTableBuilder::PageTableBuilder;
 
     bool ShouldRegister() override {
-        return emu_.Get<BoardDetector>().GetBoard() == Board::OmapEvm3530;
+        auto* bd = emu_.TryGet<BoardDetector>();
+        return bd && bd->GetBoard() == Board::OmapEvm3530;
     }
 
     uint32_t InitStackTopPa() const override { return kInitStackTopPa; }
@@ -63,7 +64,7 @@ uint32_t OmapEvm3530PageTableBuilder::VaToPa(uint32_t va) const {
             "outside every BSP OAT band (see "
             "references/WINCE700/platform/ti_evm_3530/SRC/INC/addrtab_cfg.inc)\n",
             va);
-    CerfFatalExit(1);
+    CerfFatalExit(CERF_FATAL_RUNTIME_ERROR);
 }
 
 std::vector<DramRegion> OmapEvm3530PageTableBuilder::CachedDramRegions() const {

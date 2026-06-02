@@ -1,6 +1,6 @@
 #!/bin/bash
-# Pre-commit hook: reject source files larger than 300 lines.
-# Checks only staged .cpp, .h, .py files.
+# Pre-commit hook: reject source files larger than the line cap.
+# Checks only staged .cpp / .h / .hpp / .cc / .c files.
 #
 # Install: git config core.hooksPath .githooks
 
@@ -82,7 +82,7 @@ MAX_LINES=500
 FAIL=0
 
 # Skip trace files — they are large by nature (IDA-verified hook tables)
-for file in $(git diff --cached --name-only --diff-filter=ACM | grep -E '\.(cpp|h)$' | grep -v 'tracing/'); do
+for file in $(git diff --cached --name-only --diff-filter=ACM | grep -E '\.(cpp|h|hpp|cc|c)$' | grep -v 'tracing/'); do
     if [ -f "$file" ]; then
         lines=$(wc -l < "$file" | tr -d ' ')
         if [ "$lines" -gt "$MAX_LINES" ]; then

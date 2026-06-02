@@ -16,7 +16,7 @@ void ArmJit::InitializeFlushTranslationCacheHelper() {
     if (!flush_translation_cache_helper_) {
         LOG(Caution, "ArmJit: VirtualAlloc(FlushTranslationCacheHelper) failed gle=%lu\n",
             GetLastError());
-        CerfFatalExit(2);
+        CerfFatalExit(CERF_FATAL_RUNTIME_ERROR);
     }
 
     using namespace x86;

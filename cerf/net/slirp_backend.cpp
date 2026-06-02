@@ -51,7 +51,7 @@ std::array<uint8_t, 6> ParseMac(const std::string& s) {
     if (n != 6) {
         LOG(Caution, "FATAL: malformed network_mac='%s' (need XX:XX:XX:XX:XX:XX)\n",
                 s.c_str());
-        CerfFatalExit(1);
+        CerfFatalExit(CERF_FATAL_RUNTIME_ERROR);
     }
     for (int i = 0; i < 6; i++) out[i] = (uint8_t)bytes[i];
     return out;
@@ -138,7 +138,7 @@ void SlirpBackend::OnReady() {
     int wsa_rc = WSAStartup(MAKEWORD(2, 2), &wsa);
     if (wsa_rc != 0) {
         LOG(Caution, "FATAL: WSAStartup failed (%d)\n", wsa_rc);
-        CerfFatalExit(1);
+        CerfFatalExit(CERF_FATAL_RUNTIME_ERROR);
     }
 
     host_has_v6_ = ProbeHostIpv6Reachable();
@@ -202,7 +202,7 @@ void SlirpBackend::OnReady() {
     }
     if (!slirp_) {
         LOG(Caution, "FATAL: slirp_new returned null\n");
-        CerfFatalExit(1);
+        CerfFatalExit(CERF_FATAL_RUNTIME_ERROR);
     }
 
     LOG(Net, "SlirpBackend ready: guest=%02X:%02X:%02X:%02X:%02X:%02X "

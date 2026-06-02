@@ -19,7 +19,8 @@ public:
     using IrqController::IrqController;
 
     bool ShouldRegister() override {
-        return emu_.Get<BoardDetector>().GetSoc() == SocFamily::S3C2410;
+        auto* bd = emu_.TryGet<BoardDetector>();
+        return bd && bd->GetSoc() == SocFamily::S3C2410;
     }
 
     /* IrqController API. */
@@ -94,7 +95,7 @@ void S3C2410Intc::AssertIrq(int source_bit) {
         LOG(Caution, "S3C2410Intc::AssertIrq: source_bit %d out of "
                 "range — main SRCPND is 32 bits per S3C2410 UM\n",
                 source_bit);
-        CerfFatalExit(1);
+        CerfFatalExit(CERF_FATAL_RUNTIME_ERROR);
     }
 
     bool needs_irq = false;
@@ -108,7 +109,7 @@ void S3C2410Intc::AssertIrq(int source_bit) {
             LOG(Caution, "S3C2410Intc::AssertIrq: source %d configured "
                     "as FIQ (INTMOD bit set) — FIQ routing not "
                     "modelled\n", source_bit);
-            CerfFatalExit(1);
+            CerfFatalExit(CERF_FATAL_RUNTIME_ERROR);
         }
 
         storage_[kSlotSRCPND] |= bit_mask;
@@ -127,12 +128,12 @@ void S3C2410Intc::AssertSubIrq(int main_source_bit, int sub_source_bit) {
         LOG(Caution, "S3C2410Intc::AssertSubIrq: sub_source_bit %d out "
                 "of range — SUBSRCPND has 11 bits per S3C2410 UM\n",
                 sub_source_bit);
-        CerfFatalExit(1);
+        CerfFatalExit(CERF_FATAL_RUNTIME_ERROR);
     }
     if (main_source_bit < 0 || main_source_bit >= 32) {
         LOG(Caution, "S3C2410Intc::AssertSubIrq: main_source_bit %d "
                 "out of range\n", main_source_bit);
-        CerfFatalExit(1);
+        CerfFatalExit(CERF_FATAL_RUNTIME_ERROR);
     }
 
     bool needs_irq = false;
@@ -145,7 +146,7 @@ void S3C2410Intc::AssertSubIrq(int main_source_bit, int sub_source_bit) {
             LOG(Caution, "S3C2410Intc::AssertSubIrq: main source %d "
                     "configured as FIQ (INTMOD bit set) — FIQ routing "
                     "not modelled\n", main_source_bit);
-            CerfFatalExit(1);
+            CerfFatalExit(CERF_FATAL_RUNTIME_ERROR);
         }
 
         /* Sub-pending stays latched even when INTSUBMSK masks it —
@@ -189,7 +190,7 @@ uint32_t S3C2410Intc::ReadReg(uint32_t offset) {
     if (slot >= kSlotCount) {
         LOG(Caution, "S3C2410Intc::ReadReg: offset 0x%X out of range\n",
                 offset);
-        CerfFatalExit(1);
+        CerfFatalExit(CERF_FATAL_RUNTIME_ERROR);
     }
     uint32_t value;
     {
@@ -204,7 +205,7 @@ void S3C2410Intc::WriteReg(uint32_t offset, uint32_t value) {
     if (slot >= kSlotCount) {
         LOG(Caution, "S3C2410Intc::WriteReg: offset 0x%X out of range\n",
                 offset);
-        CerfFatalExit(1);
+        CerfFatalExit(CERF_FATAL_RUNTIME_ERROR);
     }
 
     bool needs_halt = false;
@@ -256,7 +257,8 @@ public:
     using Peripheral::Peripheral;
 
     bool ShouldRegister() override {
-        return emu_.Get<BoardDetector>().GetSoc() == SocFamily::S3C2410;
+        auto* bd = emu_.TryGet<BoardDetector>();
+        return bd && bd->GetSoc() == SocFamily::S3C2410;
     }
     void OnReady() override {
         emu_.Get<PeripheralDispatcher>().Register(this);

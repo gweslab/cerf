@@ -27,7 +27,7 @@
 # which we need to forward verbatim to claude. PS 5.1's
 # [Parameter(ValueFromRemainingArguments)] only captures POSITIONAL leftovers,
 # not switch-style args, so it doesn't help here.
-$MemoryLimitGB = 3.5
+$MemoryLimitGB = 4.2
 $PollSeconds   = 3
 $claudeArgs    = @()
 $i = 0
@@ -49,13 +49,14 @@ Clear-Host
 # section (the MANDATORY bullets — the lazy-read set is intentionally omitted).
 $files = @(
     @{ Name = $null;                      Path = 'CLAUDE.md' },
-    @{ Name = 'README.md';                Path = 'README.md' },
+    @{ Name = 'README.md';                Path = 'README_SOURCE.md' },
     @{ Name = 'agent_docs/workflow.md';   Path = 'agent_docs\workflow.md' },
     @{ Name = 'agent_docs/subsystems.md'; Path = 'agent_docs\subsystems.md' },
     @{ Name = 'agent_docs/jit.md';        Path = 'agent_docs\jit.md' },
     @{ Name = 'agent_docs/rules.md';      Path = 'agent_docs\rules.md' },
     @{ Name = 'agent_docs/code_style.md'; Path = 'agent_docs\code_style.md' },
     @{ Name = 'agent_docs/debugging.md'; Path = 'agent_docs\debugging.md' }
+    @{ Name = 'agent_docs/psychological_support.md'; Path = 'agent_docs\psychological_support.md' }
 )
 
 do {
@@ -199,7 +200,7 @@ do {
     $async = $ps.BeginInvoke()
 
     try {
-        & claude --effort max `
+        & claude --effort high `
                  --allow-dangerously-skip-permissions `
                  --permission-mode bypassPermissions `
                  --system-prompt-file $tempFile `

@@ -39,7 +39,7 @@ void ArmJit::OptimizeARMFlags() {
         if (pass_number > 2) {
             LOG(Caution, "ArmJit::OptimizeARMFlags: pass_number > 2 "
                 "(algorithm should converge in two passes)\n");
-            CerfFatalExit(2);
+            CerfFatalExit(CERF_FATAL_RUNTIME_ERROR);
         }
 
         uint32_t flags_needed = static_cast<uint32_t>(kFlagsAll);
@@ -107,9 +107,7 @@ void ArmJit::OptimizeARMFlags() {
                                 }
                             }
                         } else {
-                            JitBlockIndex& idx =
-                                CpuState()->cpsr.bits.thumb_mode ? blocks_thumb_ : blocks_arm_;
-                            JitBlock* ep = idx.FindExact(actual_dest);
+                            JitBlock* ep = LookupBlockExact(actual_dest);
                             if (ep) {
                                 flags_needed |= ep->flags_needed;
                             } else {

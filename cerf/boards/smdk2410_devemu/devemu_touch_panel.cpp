@@ -4,7 +4,7 @@
 
 #include "../../core/cerf_emulator.h"
 #include "../../core/log.h"
-#include "../../host/host_window.h"
+#include "../../host/host_canvas.h"
 #include "../../host/touch_input.h"
 #include "../../peripherals/peripheral_dispatcher.h"
 #include "../../socs/irq_controller.h"
@@ -50,7 +50,8 @@ class DevEmuTouchInput : public TouchInput {
 public:
     using TouchInput::TouchInput;
     bool ShouldRegister() override {
-        return emu_.Get<BoardDetector>().GetBoard() == Board::Smdk2410DevEmu;
+        auto* bd = emu_.TryGet<BoardDetector>();
+        return bd && bd->GetBoard() == Board::Smdk2410DevEmu;
     }
     void OnPenDown(int x, int y) override {
         emu_.Get<DevEmuTouchPanel>().OnPenDown(x, y);
@@ -71,7 +72,8 @@ public:
 REGISTER_SERVICE_AS(DevEmuTouchInput, TouchInput);
 
 bool DevEmuTouchPanel::ShouldRegister() {
-    return emu_.Get<BoardDetector>().GetBoard() == Board::Smdk2410DevEmu;
+    auto* bd = emu_.TryGet<BoardDetector>();
+    return bd && bd->GetBoard() == Board::Smdk2410DevEmu;
 }
 
 void DevEmuTouchPanel::OnReady() {
@@ -161,9 +163,9 @@ void DevEmuTouchPanel::UpdateSampleLocked(int host_x, int host_y) {
     if ((adcdat0_ & kAdcdatXyPstMask) == 0) return;
     if  (adcdat0_ & kAdcdatUpdown)          return;
 
-    auto&        hw       = emu_.Get<HostWindow>();
-    const double screen_x = (double)hw.ClientWidth ();
-    const double screen_y = (double)hw.ClientHeight();
+    auto&        hc       = emu_.Get<HostCanvas>();
+    const double screen_x = (double)hc.GuestSurfaceWidth ();
+    const double screen_y = (double)hc.GuestSurfaceHeight();
 
     sample_x_ = (uint16_t)(kSampleXOffset +
                            (int)((double)host_x * (kSampleXSpan / screen_x)));

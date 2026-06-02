@@ -21,7 +21,7 @@ int main(int argc, char* argv[]) {
     LOG(Cerf, "=== CERF ===\n");
     LOG(Cerf, "Built: %s %s\n\n", __DATE__, __TIME__);
 
-    CerfEmulator emu(cfg);
+    CerfEmulator emu(cfg, argc, argv);
     emu.Boot();
     emu.WaitForExit();
 

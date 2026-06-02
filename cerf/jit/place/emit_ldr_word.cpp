@@ -71,13 +71,6 @@ uint8_t* EmitLdrWord(uint8_t*                  cursor,
         EmitMovRegImm32(cursor, kEcx, d->guest_address);
         EmitJmp32(cursor, ctx->raise_abort_data_helper_target);
 
-        if (in.mmu_on) {
-            const uint32_t slot_addr =
-                static_cast<uint32_t>(reinterpret_cast<uintptr_t>(cursor));
-            std::memcpy(in.tlb_hint_imm_location, &slot_addr, 4);
-            Emit8(cursor, 0);
-        }
-
         if (in.needs_alignment_check && in.alignment_check_on) {
             FixupLabel(in.raise_alignment_exception, cursor);
             FixupLabel(raise_alignment_exception2, cursor);

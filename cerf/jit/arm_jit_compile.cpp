@@ -33,24 +33,29 @@ void ArmJit::JitDecode(JitBlock* containing_block, uint32_t guest_pc) {
         guest_pc &= 0xFFFFFFFCu;
     }
 
-    /* End of decode range: either the end of the containing block
-       (we cannot extend past an existing translation), or the
-       guest_start of the NEXT outer block in the index (we cannot
-       overlap), or 0xFFFFFFFF (no upper bound). */
-    JitBlockIndex& idx = cpu_->State()->cpsr.bits.thumb_mode ? blocks_thumb_ : blocks_arm_;
+    /* end_address is FOLDED-VA (the loop compares folded actual_guest_pc),
+       bounded to one 4 KB page so phys = page_base | (folded & 0xFFF) stays
+       unambiguous. Next-block bound is phys-keyed, mapped back via page base. */
+    const uint32_t folded_pc = ApplyFcseFold(*mmu_->State(), guest_pc);
+    const uint32_t page_end  = (folded_pc & 0xFFFFF000u) + 0x1000u;
+
     uint32_t end_address;
     if (containing_block) {
         end_address = containing_block->guest_end;
     } else {
-        JitBlock* next_block =
-            idx.FindNext(ApplyFcseFold(*mmu_->State(), guest_pc));
-        end_address = next_block ? next_block->guest_start : 0xFFFFFFFFu;
+        const uint32_t next_va = NextBlockStart(folded_pc);
+        if (next_va != 0xFFFFFFFFu &&
+            (next_va & 0xFFFFF000u) == (folded_pc & 0xFFFFF000u)) {
+            end_address = next_va;
+        } else {
+            end_address = page_end;
+        }
     }
+    if (end_address > page_end) end_address = page_end;
 
     /* Reset the decoded array. block_ctx_ is reused between
        JitCompile invocations; each call starts with a clean slate. */
     std::memset(block_ctx_.insns, 0, sizeof(block_ctx_.insns));
-    int8_t tlb_index_hint = 0;
 
     /* Apply FCSE fold once; thereafter both `guest_pc` (the raw
        guest-visible address) and `actual_guest_pc` (the post-fold
@@ -74,7 +79,7 @@ void ArmJit::JitDecode(JitBlock* containing_block, uint32_t guest_pc) {
            EmulatedMemory directly. */
         uint8_t* host_addr;
         if (mmu_->State()->control_register.bits.m) {
-            host_addr = mmu_->TranslateExecute(cpu_->State(), actual_guest_pc, &tlb_index_hint);
+            host_addr = mmu_->TranslateExecute(cpu_->State(), actual_guest_pc);
         } else {
             host_addr = memory_->TryTranslate(actual_guest_pc);
         }
@@ -84,7 +89,7 @@ void ArmJit::JitDecode(JitBlock* containing_block, uint32_t guest_pc) {
                 LOG(Caution,
                     "ArmJit::JitDecode: attempt to execute from I/O space "
                     "at guest PA 0x%08X\n", actual_guest_pc);
-                CerfFatalExit(2);
+                CerfFatalExit(CERF_FATAL_RUNTIME_ERROR);
             }
 
             if (guest_pc > 0xF0000000u) {
@@ -126,6 +131,17 @@ void ArmJit::JitDecode(JitBlock* containing_block, uint32_t guest_pc) {
                 insn.place_fn = &PlacePowerDown;
             }
         }
+
+        /* Stop at an unconditional control-leave (return / uncond jump):
+           bytes after are unreachable by fall-through (inline literal
+           pools); decoding them marks their words as code, false-tripping
+           the SMC flush. BL/BLX are calls (return falls through) — exclude. */
+        if (insn.r15_modified && insn.cond == 14u &&
+            !(insn.place_fn == &PlaceBranch && insn.l) &&
+            insn.place_fn != &PlaceBlxReg) {
+            ++i;
+            break;
+        }
     }
 
     block_ctx_.num_insns = i;
@@ -135,12 +151,57 @@ void* ArmJit::JitCompile(uint32_t guest_pc) {
     uint32_t cached_fault_status  = mmu_->State()->fault_status.word;
     uint32_t cached_fault_address = mmu_->State()->fault_address;
 
-    JitBlockIndex& idx = cpu_->State()->cpsr.bits.thumb_mode ? blocks_thumb_ : blocks_arm_;
     JitBlock* containing_block = nullptr;
 
     do {
-        containing_block =
-            idx.FindContaining(ApplyFcseFold(*mmu_->State(), guest_pc));
+        /* Resolve insn[0]'s PA from the fetch itself (this also warms the
+           I-TLB for the decode that follows) — never a separate page-table
+           walk, which would diverge from the fetch mid-TTBR0-setup. MMU
+           off ⇒ VA == PA. */
+        const bool     mmu_on  = mmu_->State()->control_register.bits.m;
+        const uint32_t aligned = cpu_->State()->cpsr.bits.thumb_mode
+            ? (guest_pc & 0xFFFFFFFEu) : (guest_pc & 0xFFFFFFFCu);
+        uint8_t* h0 = mmu_on
+            ? mmu_->TranslateExecute(cpu_->State(), aligned)
+            : memory_->TryTranslate(aligned);
+
+        if (h0) {
+            const uint32_t phys0 = mmu_on ? mmu_->LastExecPa() : aligned;
+            block_ctx_.block_phys_page_base = phys0 & 0xFFFFF000u;
+            const uint32_t fva = ApplyFcseFold(*mmu_->State(), guest_pc);
+            IsaBlockSpace& space =
+                cpu_->State()->cpsr.bits.thumb_mode ? blocks_thumb_ : blocks_arm_;
+
+            /* A phys mismatch on a folded-VA dedup hit is an FCSE-PID-reuse
+               stale block at the same VA; evict it or the recompile inserts
+               a duplicate VA key the next dedup keeps missing → unbounded
+               tree growth. */
+            if (JitBlock* ex = LookupBlockExact(fva)) {
+                if (ex->phys_start == phys0) {
+                    mmu_->State()->fault_status.word = cached_fault_status;
+                    mmu_->State()->fault_address     = cached_fault_address;
+                    space.JumpCacheInsert(fva, ex->native_start);
+                    return ex->native_start;
+                }
+                space.RemoveExact(fva);
+            }
+            containing_block = LookupBlockContaining(fva);
+            if (containing_block &&
+                containing_block->phys_start !=
+                    (block_ctx_.block_phys_page_base |
+                     (containing_block->guest_start & 0x00000FFFu))) {
+                /* Stale containing outer (same VA region, different phys) —
+                   evict so we don't sub-entry into dead native. */
+                space.RemoveExact(containing_block->guest_start);
+                containing_block = nullptr;
+            }
+        } else {
+            /* Fetch faulted. JitDecode may still emit a synthetic prefetch-abort
+               block (guest_pc > 0xF0000000); key it off the VA page so its
+               phys_start stays a high, non-colliding address in the index. */
+            block_ctx_.block_phys_page_base = aligned & 0xFFFFF000u;
+            containing_block = nullptr;
+        }
 
         /* Disassemble guest instructions starting at `guest_pc`
            into block_ctx_.insns[]. Sets block_ctx_.num_insns. */
@@ -190,7 +251,7 @@ void* ArmJit::JitCompile(uint32_t guest_pc) {
             LOG(Caution,
                 "ArmJit::JitCompile: arena allocation of %zu bytes failed twice "
                 "after flush\n", ep_size_retry + kCodeSize);
-            CerfFatalExit(2);
+            CerfFatalExit(CERF_FATAL_RUNTIME_ERROR);
         }
     }
 
@@ -231,5 +292,8 @@ void* ArmJit::JitCompile(uint32_t guest_pc) {
     FlushInstructionCache(GetCurrentProcess(), code_location,
                           static_cast<SIZE_T>(native_size));
 
-    return reinterpret_cast<JitBlock*>(slab)->native_start;
+    void* native = reinterpret_cast<JitBlock*>(slab)->native_start;
+    (cpu_->State()->cpsr.bits.thumb_mode ? blocks_thumb_ : blocks_arm_)
+        .JumpCacheInsert(ApplyFcseFold(*mmu_->State(), guest_pc), native);
+    return native;
 }

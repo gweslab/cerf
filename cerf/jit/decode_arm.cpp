@@ -8,24 +8,30 @@
 #include "arm_opcode.h"
 #include "cpu_state.h"
 #include "decoded_insn.h"
+#include "neon_unconditional_decoder.h"
 #include "place_fns.h"
 
 REGISTER_SERVICE(ArmDecoder);
 
 void ArmDecoder::OnReady() {
-    processor_config_ = &emu_.Get<ArmProcessorConfig>();
-    cpu_              = &emu_.Get<ArmCpu>();
+    processor_config_           = &emu_.Get<ArmProcessorConfig>();
+    cpu_                        = &emu_.Get<ArmCpu>();
+    neon_unconditional_decoder_ = &emu_.Get<NeonUnconditionalDecoder>();
 }
 
 bool ArmDecoder::DecodeArm(DecodedInsn* insn, uint32_t opcode_word) {
     ArmOpcode op;
     op.word = opcode_word;
 
-    insn->r15_modified = 0;
-    insn->cond         = op.generic.cond;
+    insn->r15_modified       = 0;
+    insn->is_exception_return = 0;
+    insn->cond               = op.generic.cond;
 
     if (insn->cond == 15) {
-        if (!DecodeArmUnconditional(insn, op)) goto RaiseException;
+        if (DecodeArmUnconditional(insn, op)) return true;
+        if (processor_config_->HasArmv5UnconditionalSpace()) goto RaiseException;
+        insn->place_fn = &PlaceNop;
+        insn->cond     = 14;
         return true;
     }
 
@@ -232,6 +238,17 @@ bool ArmDecoder::DecodeArm(DecodedInsn* insn, uint32_t opcode_word) {
         if (op.control_extension.reserved3 == 6u &&
             op.control_extension.reserved2 == 0u &&
             (op.control_extension.op1 & 1u) == 1u) {
+            /* ARMv7 WFI hint, encoding A1 (ARM ARM §A8.8.425): MSR-imm
+               with mask=0, Rd=SBO=15, imm12=3. Other imm12 hints
+               (NOP/YIELD/WFE/SEV/DBG) stay on the PlaceMSRImmediate
+               empty-mask no-op path. */
+            if (op.control_extension.op1 == 1u &&
+                op.control_extension.rn  == 0u &&
+                op.control_extension.rd  == 15u &&
+                op.control_extension.operand2 == 3u) {
+                insn->place_fn = &PlaceWfi;
+                return true;
+            }
             insn->place_fn  = &PlaceMSRImmediate;
             insn->s         = 1;
             insn->op1       = op.control_extension.op1;
@@ -272,6 +289,9 @@ bool ArmDecoder::DecodeArm(DecodedInsn* insn, uint32_t opcode_word) {
         insn->p            = op.block_data_transfer.p;
         if ((insn->register_list & (1u << ArmGpr::kR15)) && insn->l) {
             insn->r15_modified = true;
+            if (insn->s) {
+                insn->is_exception_return = 1;
+            }
         }
         return true;
     }
@@ -397,6 +417,9 @@ DataProcessing:
         insn->rd = op.data_processing.rd;
         if (insn->rd == ArmGpr::kR15) {
             insn->r15_modified = true;
+            if (insn->s) {
+                insn->is_exception_return = 1;
+            }
         }
         break;
 
@@ -411,6 +434,9 @@ DataProcessing:
         insn->rd = op.data_processing.rd;
         if (insn->rd == ArmGpr::kR15) {
             insn->r15_modified = true;
+            if (insn->s) {
+                insn->is_exception_return = 1;
+            }
         }
         insn->rm = insn->operand2 & 0xFu;
         break;
@@ -460,7 +486,11 @@ SingleDataTransfer:
     return true;
 
 RaiseException:
-    insn->cond     = 14;
-    insn->place_fn = &PlaceRaiseUndefinedException;
+    /* Do NOT force cond=14 here: a conditional undefined encoding whose
+       condition fails must do nothing, not trap (DDI0100I A1.2). Forcing
+       it defeats the generator's cond guard, faulting the guest where
+       ARM720T skips the instruction. */
+    insn->immediate = opcode_word;  /* raw bytes for the decode-gap log */
+    insn->place_fn  = &PlaceRaiseUndefinedException;
     return false;
 }

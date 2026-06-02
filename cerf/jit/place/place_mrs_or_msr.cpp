@@ -26,6 +26,12 @@ uint8_t* PlaceMRSorMSR(uint8_t*      cursor,
 
     switch (d->op1) {
     case 0:  /* MRS Rd, CPSR */
+        if (d->rd == ArmGpr::kR15) {
+            /* MRS with Rd=PC is UNPREDICTABLE per ddi0406c §B9.3.8
+               line 103351 (encoding A1: "if d == 15 then UNPREDICTABLE").
+               Raise UND rather than dispatch the unpredictable result. */
+            return EmitRaiseUndAndReturn(cursor, d, ctx);
+        }
         EmitPush32(cursor, cpu_imm);
         EmitCall(cursor, reinterpret_cast<void*>(&ArmCpu::GetCpsrWithFlagsHelper));
         EmitAddRegImm32(cursor, kEsp, 4);
@@ -65,6 +71,12 @@ uint8_t* PlaceMRSorMSR(uint8_t*      cursor,
 
     case 2: { /* MRS Rd, SPSR — but in user/system mode SPSR doesn't exist;
                  fall back to leaving GPRs[Rd] unchanged. */
+        if (d->rd == ArmGpr::kR15) {
+            /* MRS with Rd=PC is UNPREDICTABLE per ddi0406c §B9.3.8
+               line 103351 (the Rd=15 rule applies to both CPSR and
+               SPSR forms — the R bit just selects which source). */
+            return EmitRaiseUndAndReturn(cursor, d, ctx);
+        }
         /* MOV EAX, [ESI + cpsr] */
         EmitMovRegBaseDisp32(cursor, kEax, kStateReg,
             static_cast<int32_t>(offsetof(ArmCpuState, cpsr)));
@@ -107,7 +119,7 @@ uint8_t* PlaceMRSorMSR(uint8_t*      cursor,
 
     default:
         LOG(Caution, "PlaceMRSorMSR: unhandled op1=%u\n", d->op1);
-        CerfFatalExit(2);
+        CerfFatalExit(CERF_FATAL_RUNTIME_ERROR);
         break;
     }
     return cursor;

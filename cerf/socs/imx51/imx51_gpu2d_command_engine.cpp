@@ -268,11 +268,11 @@ void Imx51Gpu2dCommandEngine::StoreReg(uint32_t reg, uint32_t data) {
                mid-config with stale XY/WH); the fill itself fires at FLUSH. */
             if (vg_regs_[kAddrG2dInput] == 0x11u || vg_regs_[kAddrG2dInput] == 0x19u)
                 return;
-            /* INPUT 0x01 (COLOR, sub_41C6C6DC solid fill) and 0x09 (COLOR|COPYCOORD)
-               are rect fills. Under 0x09 with the GRADW paint engine (GRADIENT.ENABLE2)
-               + the blender enabled it is the multi-pass SRC_OVER image-paint composite
-               (sub_41C6338C); a flat vgClear/solid fill has neither. */
-            if (vg_regs_[kAddrG2dInput] == 0x01u || vg_regs_[kAddrG2dInput] == 0x09u) {
+            /* INPUT 0x01 (sub_41C6C6DC), 0x09 and 0x1B (libOpenVG.dll VA 0x41C718B8)
+               are rect fills; under 0x09 with GRADIENT.ENABLE2 + the blender enabled
+               it is the image-paint composite (sub_41C6338C) instead. */
+            if (vg_regs_[kAddrG2dInput] == 0x01u || vg_regs_[kAddrG2dInput] == 0x09u ||
+                vg_regs_[kAddrG2dInput] == 0x1Bu) {
                 if ((vg_regs_[0xD0] & 0x80u) && (vg_regs_[0x11] & (1u << 5))) {
                     emu_.Get<Imx51Gpu2dImagePaint>().Composite(vg_regs_);
                     return;

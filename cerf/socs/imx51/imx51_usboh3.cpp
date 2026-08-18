@@ -53,6 +53,12 @@ constexpr uint32_t kPortscPspdHs    = 0x2u << kPortscPspdShift;
 constexpr uint32_t kPortscDevAttached =
     kPortscCcs | kPortscPe | kPortscHsp | kPortscPspdHs;
 
+/* EHCI 1.0 Spec Table 2-16 (p27), PP field: with HCSPARAMS.PPC=0 (no port
+   power switches, kHcsparamsOnePort below) PP is RO and hard-wired to 1 -
+   "port power is always available". Host-mode PORTSC1 must reflect this on
+   every read, or guest port-reset gating that requires PP=1 never opens. */
+constexpr uint32_t kPortscPp = 1u << 12;
+
 constexpr uint32_t kOffUsbintr       = 0x00000148u;
 constexpr uint32_t kOffEndptlistaddr = 0x00000158u;  /* dQH array base (2 KB aligned) */
 constexpr uint32_t kOffEndptsetupstat= 0x000001ACu;  /* per-EP setup-received (w1c) */
@@ -125,6 +131,8 @@ uint32_t Imx51Usboh3::ReadWord(uint32_t addr) {
     if (off < kCoreSpan && !Core0IsDevice() && (coff == kOffUsbsts || coff == kOffPortsc)) {
         ExecuteAsyncSchedule();
     }
+    if (coff == kOffPortsc && !Core0IsDevice())
+        return regs_[off >> 2] | kPortscPp;
     return regs_[off >> 2];
 }
 

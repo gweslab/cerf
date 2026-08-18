@@ -1,9 +1,7 @@
 #include "imx51_usboh3.h"
 
 #include "../../core/cerf_emulator.h"
-#include "../../core/log.h"
 #include "../../cpu/emulated_memory.h"
-#include "../../jit/guest_engine.h"
 #include "../../peripherals/usb/usb_device.h"
 #include "../irq_controller.h"
 
@@ -67,7 +65,7 @@ void Imx51Usboh3::OnPortConnectChanged(int port_index) {
     if (otg_host_root_port_.IsConnected()) {
         regs_[idx] |= kPortscCcs | kPortscCsc;
     } else {
-        regs_[idx] &= ~(kPortscCcs | kPortscPed);
+        regs_[idx] &= ~(kPortscCcs | kPortscPed | kPortscSuspend | kPortscPhcd);
         regs_[idx] |= kPortscCsc;
     }
     regs_[kOffUsbstsRel >> 2] |= kStsPciLocal;
@@ -75,19 +73,19 @@ void Imx51Usboh3::OnPortConnectChanged(int port_index) {
 }
 
 void Imx51Usboh3::WriteOtgHostPortsc(uint32_t value) {
-    LOG(Caution, "[PORTSC_CALLER] guest_pc=%08X value=%08X\n",
-        emu_.Get<GuestEngine>().Pc(), value);
-
     const uint32_t idx = kOffPortscRel >> 2;
     const uint32_t old = regs_[idx];
     uint32_t next = old;
 
     if ((value & kPortscPr) && !(old & kPortscPr)) {
-        next |= kPortscPr;
-        next &= ~kPortscPed;
-    } else if (!(value & kPortscPr) && (old & kPortscPr)) {
+        /* MCIMX51RM 60.4.5.5.2 Discovery/Port Reset (p60-219): PORTSCx
+           auto-completes reset via its own 10ms counter and reports it via
+           a Port Enable Change interrupt; software never writes PR back. */
         next &= ~kPortscPr;
-        if (old & kPortscCcs) next |= kPortscPed;
+        if (old & kPortscCcs) {
+            next |= kPortscPed | kPortscPedc;
+            regs_[kOffUsbstsRel >> 2] |= kStsPciLocal;
+        }
     }
 
     if (value & kPortscCsc)  next &= ~kPortscCsc;

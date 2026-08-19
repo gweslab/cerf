@@ -9,8 +9,16 @@ namespace {
 
 constexpr uint32_t kOffUsbcmdRel  = 0x00000140u;
 constexpr uint32_t kOffUsbstsRel  = 0x00000144u;
+constexpr uint32_t kOffFrindexRel = 0x0000014Cu;
+constexpr uint32_t kOffPeriodicListBaseRel = 0x00000154u;
 constexpr uint32_t kOffAsyncListRel = 0x00000158u;
 constexpr uint32_t kOffPortscRel  = 0x00000184u;
+/* EHCI 1.0 Spec Table 2-12 (p23): FRINDEX is a 14-bit field, bits[13:0]. */
+constexpr uint32_t kFrindexMask = 0x00003FFFu;
+/* EHCI 1.0 Spec 2.3.4 (p23): with the default (non-programmable-length)
+   1024-element frame list, N=12, so the current entry is FRINDEX[12:3]. */
+constexpr uint32_t kFrameListIndexMask = 0x000003FFu;
+constexpr uint32_t kCmdPseLocal = 1u << 4;
 constexpr uint32_t kStsUiLocal  = 1u << 0;
 /* EHCI 1.0 Spec Table 2-10 (p22): USBSTS bit 2, Port Change Detect. */
 constexpr uint32_t kStsPciLocal = 1u << 2;
@@ -134,6 +142,28 @@ void Imx51Usboh3::ExecuteAsyncSchedule() {
         const uint32_t next_qh = link & ~0x1Fu;
         if (next_qh == start) break;
         qh = next_qh;
+    }
+}
+
+void Imx51Usboh3::ExecutePeriodicSchedule() {
+    const uint32_t cmd = regs_[kOffUsbcmdRel >> 2];
+    if (!(cmd & kCmdPseLocal)) return;
+
+    const uint32_t base = regs_[kOffPeriodicListBaseRel >> 2] & ~0xFFFu;
+    if (base == 0u) return;
+
+    const uint32_t frindex = (regs_[kOffFrindexRel >> 2] + 8u) & kFrindexMask;
+    regs_[kOffFrindexRel >> 2] = frindex;
+    const uint32_t index = (frindex >> 3) & kFrameListIndexMask;
+
+    auto& mem = emu_.Get<EmulatedMemory>();
+    uint32_t link = mem.ReadWord(base + index * 4u);
+    for (int i = 0; i < kQhRingGuard && !(link & kQtdTerminate); ++i) {
+        if ((link & kQhTypMask) != kQhTypQh) break;
+        const uint32_t qh = link & ~0x1Fu;
+        if (!mem.TryTranslate(qh)) break;
+        ExecuteQueueHead(qh);
+        link = mem.ReadWord(qh + kQhHorizLinkOff);
     }
 }
 

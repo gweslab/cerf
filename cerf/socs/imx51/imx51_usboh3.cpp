@@ -6,6 +6,7 @@
 #include "../../boards/board_context.h"
 #include "../../cpu/emulated_memory.h"
 #include "../../peripherals/peripheral_dispatcher.h"
+#include "../../state/emulation_freeze.h"
 #include "../../state/state_stream.h"
 #include "../irq_controller.h"
 
@@ -108,6 +109,40 @@ void Imx51Usboh3::OnReady() {
     for (auto& phy : phy_)
         for (uint8_t i = 0; i < 4; ++i) phy[i] = kUsb3317Id[i];
     emu_.Get<PeripheralDispatcher>().Register(this);
+    async_schedule_thread_ = std::thread([this] { AsyncScheduleLoop(); });
+}
+
+void Imx51Usboh3::StopAsyncScheduleThread() {
+    {
+        std::lock_guard<std::mutex> lk(async_schedule_mtx_);
+        async_schedule_stop_ = true;
+    }
+    async_schedule_cv_.notify_all();
+    if (async_schedule_thread_.joinable()) async_schedule_thread_.join();
+}
+
+void Imx51Usboh3::OnShutdown() { StopAsyncScheduleThread(); }
+
+Imx51Usboh3::~Imx51Usboh3() { StopAsyncScheduleThread(); }
+
+/* EHCI 1.0 Spec 4.8 (p71): the host controller "completes" (and restarts)
+   async-schedule processing at the end of each micro-frame - a continuous,
+   hardware-driven walk, not something only triggered by software polling
+   status registers. */
+void Imx51Usboh3::AsyncScheduleLoop() {
+    constexpr auto kSchedulePeriod = std::chrono::milliseconds(1);
+    auto& freeze = emu_.Get<EmulationFreeze>();
+    std::unique_lock<std::mutex> lk(async_schedule_mtx_);
+    while (!async_schedule_stop_) {
+        lk.unlock();
+        {
+            auto frozen = freeze.WorkerSection();
+            ExecuteAsyncSchedule();
+            ExecutePeriodicSchedule();
+        }
+        lk.lock();
+        async_schedule_cv_.wait_for(lk, kSchedulePeriod, [&] { return async_schedule_stop_; });
+    }
 }
 
 uint32_t Imx51Usboh3::MmioBase() const { return kBase; }

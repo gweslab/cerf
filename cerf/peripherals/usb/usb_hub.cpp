@@ -14,6 +14,10 @@ constexpr uint16_t kHubBcdDevice  = 0x08A2u;
 /* USB 2.0 Spec 11.23.2.1 Table 11-13 (p417): Hub Descriptor. */
 constexpr uint8_t kHubDescriptorType = 0x29u;
 
+/* USB 2.0 Spec 11.23.1 (p408): a single-TT hub sets bDeviceProtocol=1 with
+   the interface descriptor's bInterfaceProtocol left at 0. */
+constexpr uint8_t kHubDeviceProtocolSingleTt = 1u;
+
 }
 
 UsbHub::UsbHub(int num_ports) {
@@ -28,7 +32,7 @@ std::vector<uint8_t> UsbHub::BuildDeviceDescriptor() const {
     return {
         18u, kDescDevice,
         0x00u, 0x02u,
-        kHubClassCode, 0u, 0u,
+        kHubClassCode, 0u, kHubDeviceProtocolSingleTt,
         64u,
         static_cast<uint8_t>(kHubIdVendor & 0xFFu), static_cast<uint8_t>(kHubIdVendor >> 8),
         static_cast<uint8_t>(kHubIdProduct & 0xFFu), static_cast<uint8_t>(kHubIdProduct >> 8),
@@ -102,7 +106,10 @@ bool UsbHub::HandleClassRequest(const SetupPacket& setup,
             return true;
         }
         if (setup.wValue == kFeaturePortReset) {
-            status |= kPortStatusEnable;
+            /* USB 2.0 Spec 11.8.2 (p343-344): "Upon exit from the reset
+               process, the hub must set the PORT_HIGH_SPEED status bit
+               according to the detected speed." */
+            status |= kPortStatusEnable | kPortStatusHighSpeed;
             status &= ~kPortStatusReset;
             port_change_[static_cast<size_t>(port)] |= kPortChangeReset;
             return true;

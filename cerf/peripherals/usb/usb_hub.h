@@ -53,6 +53,7 @@ private:
     static constexpr uint16_t kPortStatusEnable     = 1u << 1;
     static constexpr uint16_t kPortStatusReset      = 1u << 4;
     static constexpr uint16_t kPortStatusPower      = 1u << 8;
+    static constexpr uint16_t kPortStatusHighSpeed  = 1u << 10;
     /* USB 2.0 Spec Table 11-22 (p431): Port Change Field, wPortChange. */
     static constexpr uint16_t kPortChangeConnection = 1u << 0;
     static constexpr uint16_t kPortChangeReset      = 1u << 4;

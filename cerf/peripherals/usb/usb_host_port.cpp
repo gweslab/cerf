@@ -13,6 +13,26 @@ void UsbHostPort::Detach() {
     host_.OnPortConnectChanged(port_index_);
 }
 
+void UsbHostPort::ForceReattachCycle() {
+    if (!device_) return;
+    force_detached_ = true;
+    host_.OnPortConnectChanged(port_index_);
+    force_detached_ = false;
+    host_.OnPortConnectChanged(port_index_);
+}
+
+void UsbHostPort::BeginForceDetach() {
+    if (!device_ || force_detached_) return;
+    force_detached_ = true;
+    host_.OnPortConnectChanged(port_index_);
+}
+
+void UsbHostPort::EndForceDetach() {
+    if (!device_ || !force_detached_) return;
+    force_detached_ = false;
+    host_.OnPortConnectChanged(port_index_);
+}
+
 void UsbHostPort::SaveState(StateWriter& w) {
     const bool connected = IsConnected();
     w.Write(connected);

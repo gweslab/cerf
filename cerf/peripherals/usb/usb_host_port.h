@@ -21,8 +21,11 @@ public:
 
     void Attach(std::unique_ptr<UsbDevice> device);
     void Detach();
+    void ForceReattachCycle();
+    void BeginForceDetach();
+    void EndForceDetach();
 
-    bool       IsConnected() const { return device_ != nullptr; }
+    bool       IsConnected() const { return device_ != nullptr && !force_detached_; }
     UsbDevice* Device() const { return device_.get(); }
 
     void SaveState(StateWriter& w);
@@ -33,4 +36,5 @@ private:
     UsbHostPortHost&          host_;
     int                       port_index_;
     std::unique_ptr<UsbDevice> device_;
+    bool                      force_detached_ = false;
 };

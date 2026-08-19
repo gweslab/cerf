@@ -262,6 +262,13 @@ uint32_t UsbMassStorageDevice::OnBulkIn(uint8_t /*ep*/, uint8_t* dst, uint32_t m
     const uint32_t n = remain < max ? remain : max;
     std::memcpy(dst, pending_in_.data() + pending_in_off_, n);
     pending_in_off_ += n;
+    /* USB Mass Storage Class BOT Rev. 1.0, 5.1 (p6): next CBW may follow
+       this CSW with no intervening IN poll - flip phase here, not lazily. */
+    if (phase_ == Phase::ReplyReady && pending_in_off_ >= pending_in_.size()) {
+        phase_ = Phase::AwaitingCbw;
+        pending_in_.clear();
+        pending_in_off_ = 0u;
+    }
     return n;
 }
 

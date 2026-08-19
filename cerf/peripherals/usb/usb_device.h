@@ -80,6 +80,15 @@ public:
         return ep < kMaxEndpoints && stalled_[ep];
     }
 
+    /* USB 2.0 Spec 9.1.2 (p242) step 4: after a port reset, "the USB device
+       is now in the Default state... All of its registers and state have
+       been reset and it answers to the default address." */
+    void ResetToDefault() {
+        address_ = 0u;
+        configuration_ = 0u;
+        for (bool& s : stalled_) s = false;
+    }
+
     virtual UsbDevice* FindByAddress(uint8_t addr) {
         return address_ == addr ? this : nullptr;
     }

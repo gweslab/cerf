@@ -93,6 +93,7 @@ void Imx51Usboh3::WriteOtgHostPortsc(uint32_t value) {
         if (old & kPortscCcs) {
             next |= kPortscPed | kPortscPedc;
             regs_[kOffUsbstsRel >> 2] |= kStsPciLocal;
+            if (UsbDevice* dev = otg_host_root_port_.Device()) dev->ResetToDefault();
         }
     }
 

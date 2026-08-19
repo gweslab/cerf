@@ -112,6 +112,9 @@ bool UsbHub::HandleClassRequest(const SetupPacket& setup,
             status |= kPortStatusEnable | kPortStatusHighSpeed;
             status &= ~kPortStatusReset;
             port_change_[static_cast<size_t>(port)] |= kPortChangeReset;
+            if (UsbDevice* dev = ports_[static_cast<size_t>(port)].Device()) {
+                dev->ResetToDefault();
+            }
             return true;
         }
         return true;

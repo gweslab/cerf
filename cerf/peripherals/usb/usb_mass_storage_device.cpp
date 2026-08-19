@@ -29,6 +29,7 @@ constexpr uint8_t kScsiInquiry         = 0x12u;
 constexpr uint8_t kScsiReadCapacity10  = 0x25u;
 constexpr uint8_t kScsiRead10          = 0x28u;
 constexpr uint8_t kScsiWrite10         = 0x2Au;
+constexpr uint8_t kScsiModeSense10     = 0x5Au;
 
 /* T10 SPC-3 Table 27 (p41): Sense key descriptions. */
 constexpr uint8_t kSenseNoSense    = 0x00u;
@@ -164,6 +165,17 @@ void UsbMassStorageDevice::ExecuteScsiCommand() {
         std::vector<uint8_t> d;
         PutBe32(d, last_lba);
         PutBe32(d, DiskImage::kSectorSize);
+        pending_in_.insert(pending_in_.end(), d.begin(), d.end());
+        SetSense(kSenseNoSense, 0u, 0u);
+        QueueCsw(kCswStatusPassed);
+        return;
+    }
+
+    if (op == kScsiModeSense10) {
+        /* T10 SPC-3 (spc3r23.pdf) Table 240 (p280): Mode parameter header(10),
+           zero block descriptors, no mode pages. */
+        std::vector<uint8_t> d(8u, 0u);
+        d[1] = 6u;
         pending_in_.insert(pending_in_.end(), d.begin(), d.end());
         SetSense(kSenseNoSense, 0u, 0u);
         QueueCsw(kCswStatusPassed);

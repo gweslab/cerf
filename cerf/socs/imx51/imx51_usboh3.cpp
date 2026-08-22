@@ -22,6 +22,9 @@ constexpr uint32_t kUsbcmdReset = 1u << 1;      /* USBCMD.RST */
 constexpr uint32_t kOffCaplen   = 0x00000100u;  /* CAPLENGTH(b0)+HCIVERSION(b16) */
 /* CAPLENGTH 0x40 (operational regs at cap+0x40) | HCIVERSION 0x0100 (EHCI 1.00). */
 constexpr uint32_t kCapReset = 0x01000040u;
+/* EHCI 1.0 Spec Table 2-5 (p13) + Table 2-6 (p14, N_PORTS bits 3:0). */
+constexpr uint32_t kOffHcsparams = kOffCaplen + 0x04u;
+constexpr uint32_t kHcsparamsOnePort = 1u;
 
 constexpr uint32_t kOffUsbsts = 0x00000144u;  /* USBSTS (=USBCMD+4) */
 constexpr uint32_t kCmdRs  = 1u << 0;   /* USBCMD.RS  Run/Stop */
@@ -95,6 +98,7 @@ void Imx51Usboh3::OnReady() {
         /* Out of reset the host controller is halted (Table 60-40/41). */
         regs_[(core + kOffUsbsts) >> 2] = kStsHch;
     }
+    regs_[kOffHcsparams >> 2] = kHcsparamsOnePort;
     for (auto& phy : phy_)
         for (uint8_t i = 0; i < 4; ++i) phy[i] = kUsb3317Id[i];
     emu_.Get<PeripheralDispatcher>().Register(this);
@@ -117,6 +121,10 @@ uint32_t Imx51Usboh3::ReadWord(uint32_t addr) {
        connected, enabled, high-speed device port (sub_8005D97C polls it). */
     if (off == kOffPortsc && Core0IsDevice())
         return regs_[off >> 2] | kPortscDevAttached;
+    const uint32_t coff = off % kCoreSpan;
+    if (off < kCoreSpan && !Core0IsDevice() && (coff == kOffUsbsts || coff == kOffPortsc)) {
+        ExecuteAsyncSchedule();
+    }
     return regs_[off >> 2];
 }
 
@@ -126,6 +134,7 @@ void Imx51Usboh3::WriteWord(uint32_t addr, uint32_t value) {
         const uint32_t coff = off % kCoreSpan;
         const bool core0_dev = off < kCoreSpan && Core0IsDevice();
         if (coff == kOffUsbcmd) {
+            const bool reset_requested = (value & kUsbcmdReset) != 0u;
             value &= ~kUsbcmdReset;   /* RST self-clears at reset completion */
             const uint32_t old = regs_[off >> 2];
             regs_[off >> 2] = value;
@@ -136,7 +145,11 @@ void Imx51Usboh3::WriteWord(uint32_t addr, uint32_t value) {
                     regs_[kOffUsbsts >> 2] |= kStsUri | kStsPci;
                 RefreshDeviceIrq();
             } else {
+                if (off < kCoreSpan && reset_requested) host_port_reported_ = false;
                 ReflectScheduleStatus(off, value);
+                if (off < kCoreSpan && (value & kCmdRs) && (value & kCmdAse)) {
+                    ExecuteAsyncSchedule();
+                }
             }
             return;
         }
@@ -151,10 +164,12 @@ void Imx51Usboh3::WriteWord(uint32_t addr, uint32_t value) {
                    delivered here would have its ENDPTSETUPSTAT wiped. */
                 if ((old & kStsUri) && (value & kStsUri))
                     reset_seen_ = true;
+            } else if (off < kCoreSpan) {
+                RefreshDeviceIrq();
             }
             return;
         }
-        if (core0_dev && coff == kOffUsbintr) {
+        if (off < kCoreSpan && coff == kOffUsbintr) {
             regs_[off >> 2] = value;
             RefreshDeviceIrq();
             return;
@@ -181,6 +196,15 @@ void Imx51Usboh3::WriteWord(uint32_t addr, uint32_t value) {
         }
         if (coff == kOffUlpiview) {
             regs_[off >> 2] = UlpiTransfer(off / kCoreSpan, value);
+            return;
+        }
+        if (off < kCoreSpan && !core0_dev && coff == kOffEndptlistaddr) {
+            regs_[off >> 2] = value;
+            ExecuteAsyncSchedule();
+            return;
+        }
+        if (off < kCoreSpan && !core0_dev && coff == kOffPortsc) {
+            WriteOtgHostPortsc(value);
             return;
         }
     }

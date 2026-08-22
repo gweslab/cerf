@@ -2,7 +2,7 @@
 
 #include "../../core/cerf_emulator.h"
 #include "../../boards/board_context.h"
-#include "pxa255_intc.h"
+#include "../pxa2xx/pxa2xx_intc.h"
 
 namespace {
 
@@ -22,8 +22,9 @@ public:
 
 protected:
     void SetMatchLevel(uint32_t level4) override {
-        emu_.Get<Pxa255Intc>().SetSourceLevel(0xFu << kIntcOst0Bit,
-                                              (level4 & 0xFu) << kIntcOst0Bit);
+        static_cast<Pxa2xxIntc&>(emu_.Get<IrqController>())
+            .SetSourceLevel(0xFu << kIntcOst0Bit,
+                            (level4 & 0xFu) << kIntcOst0Bit);
     }
 
     void OnResetLine() override {

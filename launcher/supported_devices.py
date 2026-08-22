@@ -65,6 +65,7 @@ from board_catalog_schema import (
     SOC_PR31500,
     SOC_PR31700,
     SOC_PXA255,
+    SOC_PXA270,
     SOC_S3C2410,
     SOC_SA1100,
     SOC_SA1110,
@@ -483,6 +484,25 @@ BOARDS_INFORMATION = [
             "GPU has severe visual artifacts.",
             "A click on screen will likely crash CERF due to missing GPU implementation",
             "Guest additions are launching if re-run with complete nand.img, but somehow causing stock GPU crash",
+        ],
+    },
+    {
+        "name": "Symbol MK500",
+        "board_id": "symbol_mk500",
+        "supported": False,
+        "soc": SOC_PXA270,
+        "operating_systems": [WINDOWS_CE_5],
+        "features": {
+            "display": True,
+            "touch": False,
+            "keyboard": True,
+            "sound": False,
+            "network": False,
+            "guest_additions": True,
+        },
+        "notes": [
+            "Bring-up in progress: the shell comes up only with guest additions loaded.",
+            "Stylus input is not working yet.",
         ],
     },
 ]

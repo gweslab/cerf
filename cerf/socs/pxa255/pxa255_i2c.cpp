@@ -4,18 +4,12 @@
 #include "../../boards/board_context.h"
 #include "../../peripherals/peripheral_dispatcher.h"
 #include "../../state/state_stream.h"
-#include "pxa255_intc.h"
+#include "../irq_controller.h"
 
 #include <cstdint>
 
 namespace {
 
-/* PXA255 I2C controller (§9, registers at 0x40301680). No slave is modeled
-   on the bus, so every master transfer completes immediately (TB → ITE/IRF):
-   a driver that sets ICR.TB and polls ISR for completion must see ITE/IRF
-   set or it spins forever. Interrupt-driven drivers additionally need the
-   unit to drive its INTC source (IS18) while a service request is enabled
-   and pending; without it WaitForSingleObject on the I2C event times out. */
 class Pxa255I2c : public Peripheral {
 public:
     using Peripheral::Peripheral;
@@ -105,16 +99,15 @@ void Pxa255I2c::WriteWord(uint32_t addr, uint32_t value) {
 
 /* §4.2.5 IS18: the I2C unit drives its INTC source while an enabled service
    request is pending - ITE (ISR bit6) gated by ITEIE (ICR bit8), IRF (ISR
-   bit7) gated by IRFIE (ICR bit9). Level-driven: the guest IST clears ITE/IRF
-   via the ISR W1C to deassert. DO NOT drop this to "set ISR only" - the
-   interrupt-driven bus driver (F75111 keypad init) blocks 3s/byte on
-   WaitForSingleObject(I2C event) without the INTC assert. */
+   bit7) gated by IRFIE (ICR bit9); the guest IST clears ITE/IRF via the ISR
+   W1C to deassert. */
 void Pxa255I2c::UpdateIrq() {
     const bool active =
         ((isr_ & kIsrITE) && (icr_ & kIcrITEIE)) ||
         ((isr_ & kIsrIRF) && (icr_ & kIcrIRFIE));
-    if (active) emu_.Get<Pxa255Intc>().AssertSource(kIntcI2cBit);
-    else        emu_.Get<Pxa255Intc>().DeassertSource(kIntcI2cBit);
+    auto& intc = emu_.Get<IrqController>();
+    if (active) intc.AssertIrq  (static_cast<int>(kIntcI2cBit));
+    else        intc.DeAssertIrq(static_cast<int>(kIntcI2cBit));
 }
 
 void Pxa255I2c::SaveState(StateWriter& w) {

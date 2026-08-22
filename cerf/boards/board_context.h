@@ -56,6 +56,7 @@ enum class Board {
     SharpMobilonHc4100,
     CasioCassiopeiaEm500,
     CasioCassiopeiaE55,
+    SymbolMk500,
 };
 
 /* A board's fixed host-window open size, in guest-surface pixels. */

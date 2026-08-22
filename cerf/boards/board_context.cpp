@@ -28,6 +28,7 @@ constexpr BoardIdEntry kBoardIds[] = {
     {"sharp_mobilon_hc4100", Board::SharpMobilonHc4100},
     {"casio_cassiopeia_em500", Board::CasioCassiopeiaEm500},
     {"casio_cassiopeia_e55", Board::CasioCassiopeiaE55},
+    {"symbol_mk500",      Board::SymbolMk500},
 };
 
 }  /* namespace */
@@ -76,6 +77,7 @@ const char* BoardContext::BoardName(Board b) {
         case Board::SharpMobilonHc4100: return "Sharp Mobilon HC-4100";
         case Board::CasioCassiopeiaEm500: return "Casio Cassiopeia EM-500";
         case Board::CasioCassiopeiaE55:   return "Casio Cassiopeia E-55";
+        case Board::SymbolMk500:      return "Symbol MK500";
     }
     return "Unknown / unsupported";
 }
@@ -104,6 +106,7 @@ const char* BoardContext::ShortBoardName(Board b) {
         case Board::SharpMobilonHc4100: return "Mobilon HC-4100";
         case Board::CasioCassiopeiaEm500: return "EM-500";
         case Board::CasioCassiopeiaE55:   return "E-55";
+        case Board::SymbolMk500:      return "MK500";
     }
     return "Unknown / unsupported";
 }

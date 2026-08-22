@@ -11,7 +11,7 @@
 #include "audio_out_sink.h"
 #include "pxa255_ac97.h"
 #include "pxa255_i2s.h"
-#include "pxa255_intc.h"
+#include "../irq_controller.h"
 
 #include <cstdint>
 #include <functional>
@@ -189,8 +189,9 @@ private:
     void UpdateIrqLocked() {
         bool any = false;
         for (uint32_t ch = 0; ch < kNumChannels && !any; ++ch) any = ChannelIrq(ch);
-        if (any) emu_.Get<Pxa255Intc>().AssertSource(kIntcDmaBit);
-        else     emu_.Get<Pxa255Intc>().DeassertSource(kIntcDmaBit);
+        auto& intc = emu_.Get<IrqController>();
+        if (any) intc.AssertIrq  (static_cast<int>(kIntcDmaBit));
+        else     intc.DeAssertIrq(static_cast<int>(kIntcDmaBit));
     }
 
     static bool IsAc97Target(uint32_t pa) { return pa >= kAc97Base && pa < kAc97End; }
@@ -277,12 +278,10 @@ private:
         LOG(SocDma, "ch%u audio-out stop DCSR=0x%08X\n", ch, dcsr_[ch]);
     }
 
-    /* Invoked by Pxa255Ac97 when the board pushes a pen sample into the modem-in
-       FIFO. Drains the whole pushed burst through the descriptor ring so BOTH
-       touch ring buffers are filled with the current sample: the IST decoder
-       (touch.dll sub_18E2194) median-filters four entries across both buffers,
-       and filling only one leaves the other half stale, so the filter rejects a
-       moving coordinate as an outlier and sticks touch at the old position. */
+    /* touch.dll sub_18E2194 median-filters four entries across both touch ring
+       buffers: draining fewer than the whole pushed burst leaves one buffer
+       stale and the filter rejects a moving coordinate as an outlier, sticking
+       touch at the old position. */
     void TouchTick(uint32_t ch) {
         auto frozen = emu_.Get<EmulationFreeze>().WorkerSection();
         std::lock_guard<std::mutex> lk(state_mutex_);

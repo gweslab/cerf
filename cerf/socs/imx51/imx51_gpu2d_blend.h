@@ -47,8 +47,7 @@ constexpr uint32_t PremultArgb(uint32_t argb) {
          | (Mul((argb >> 8) & 0xFFu, a) << 8) | Mul(argb & 0xFFu, a);
 }
 
-/* One un-premultiply channel divide (BLENDERCFG.OOALPHA result -> straight alpha);
-   the caller handles a==0 (a divide-by-zero on nonzero color is a corruption Halt). */
+/* One un-premultiply channel divide (BLENDERCFG.OOALPHA result -> straight alpha). */
 constexpr uint32_t UnpremultChannel(uint32_t ch, uint32_t a) {
     return (ch * 255u + a / 2u) / a > 255u ? 255u : (ch * 255u + a / 2u) / a;
 }

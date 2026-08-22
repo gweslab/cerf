@@ -32,6 +32,10 @@ constexpr uint32_t kInst0Affine = 0x10080632u, kInst1Affine = 0x12098695u;
 constexpr uint32_t kBcfgVal = 0x69u;                      /* ENABLE|OOALPHA|PASSES=1|ALPHAPASSES=1 */
 constexpr uint32_t kProgA0 = 0x065900E0u, kProgC0 = 0x065904E0u;  /* setup: TEMP1=SRC*IMG, TEMP2=SRC.a*IMG */
 constexpr uint32_t kProgA1 = 0x0A85A004u, kProgC1 = 0x0C85A004u;  /* combine: TEMP0=TEMP1+DEST*(1-TEMP2) */
+/* libOpenVG.dll sub_41C6338C (VA 0x41C6338C), captured live from a Ford SYNC 2
+   boot: second legal image-paint program (VG_BLEND_SRC). */
+constexpr uint32_t kProgA0Src = 0x00190320u, kProgC0Src = 0x00190020u;
+constexpr uint32_t kProgA1Src = 0x00852004u, kProgC1Src = 0x00852004u;
 /* TEXCFG minus STRIDE: FORMAT 7 | PREMULTIPLY[23] | TEX2D[28], everything else 0
    (TILED/WRAP/BILIN/SRGB/SWAP*). A BILIN or swapped or non-premult texture would
    sample wrong, so the whole upper word is gated. */
@@ -68,9 +72,12 @@ void Imx51Gpu2dImagePaint::CheckGates(const uint32_t (&regs)[0x100]) const {
         Halt(regs, "CONFIG (not DST-only, SRC1 disabled)", kConfig, regs[kConfig]);
     if (regs[kBcfg] != kBcfgVal)
         Halt(regs, "BLENDERCFG (not the SRC_OVER multi-pass)", kBcfg, regs[kBcfg]);
-    if (regs[kBlendC0] != kProgC0 || regs[kBlendA0] != kProgA0 ||
-        regs[kBlendC0 + 1u] != kProgC1 || regs[kBlendA0 + 1u] != kProgA1)
-        Halt(regs, "blend program (not the captured SRC_OVER)", kBlendC0, regs[kBlendC0]);
+    const bool isSrcOver = regs[kBlendC0] == kProgC0 && regs[kBlendA0] == kProgA0 &&
+        regs[kBlendC0 + 1u] == kProgC1 && regs[kBlendA0 + 1u] == kProgA1;
+    const bool isSrcCopy = regs[kBlendC0] == kProgC0Src && regs[kBlendA0] == kProgA0Src &&
+        regs[kBlendC0 + 1u] == kProgC1Src && regs[kBlendA0 + 1u] == kProgA1Src;
+    if (!isSrcOver && !isSrcCopy)
+        Halt(regs, "blend program (not a captured SRC_OVER/SRC_SRC)", kBlendC0, regs[kBlendC0]);
     if (regs[kAlphaBlend] != 0x4100u)  /* OBS_ENABLE[8] | PREMULTIPLYDST[14] */
         Halt(regs, "ALPHABLEND (not OBS_ENABLE|PREMULTIPLYDST)", kAlphaBlend, regs[kAlphaBlend]);
     if (regs[kRop] != 0x404u)
@@ -133,8 +140,7 @@ uint32_t Imx51Gpu2dImagePaint::BlendMultiPass(const uint32_t (&regs)[0x100],
     if (regs[kBcfg] & (1u << 6)) {  /* OOALPHA: un-premultiply back to straight-alpha */
         const uint32_t a = out >> 24;
         if (a == 0u) {
-            if (out & 0xFFFFFFu)
-                Halt(regs, "OOALPHA divide on zero-alpha nonzero color", kBcfg, out);
+            out = 0u;
         } else if (a != 255u) {
             out = (a << 24) | (UnpremultChannel((out >> 16) & 0xFFu, a) << 16)
                 | (UnpremultChannel((out >> 8) & 0xFFu, a) << 8) | UnpremultChannel(out & 0xFFu, a);

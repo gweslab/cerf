@@ -14,7 +14,7 @@ class Imx51Gpu2dGradwSampler;
    (G2D_BASE0/CFG0/SCISSORX/Y + VGV1_SCISSORX/Y + VGV1_CFG1 + G2D_COLOR). */
 struct Gpu2dFillTarget {
     uint32_t dest_pa;    /* G2D_BASE0 (tile-corner physical; gpuaddr==physical) */
-    uint32_t stride_px;  /* G2D_CFG0.STRIDE + 1, in 4-byte words (== pixels for a 32bpp dest) */
+    int32_t  stride_dw;
     bool     dest_565 = false;  /* G2D_CFG0.FORMAT: false=G2D_8888(7), true=G2D_0565(6) */
     int32_t  clip_l, clip_t, clip_r, clip_b;  /* inclusive px, scissors pre-intersected */
     uint32_t argb;       /* G2D_COLOR, PREMULTIPLIED ARGB8888 (paint setup premultiplies
@@ -38,9 +38,9 @@ struct Gpu2dFillTarget {
    (emitter sub_41C6C448 writes CFG=STRIDE|0x7000), so the copy is byte-identical. */
 struct Gpu2dCopySpec {
     uint32_t dst_pa;         /* G2D_BASE0 (tile-corner physical; gpuaddr==physical) */
-    uint32_t dst_stride_px;  /* G2D_CFG0.STRIDE + 1 */
+    int32_t  dst_stride_dw;
     uint32_t src_pa;         /* G2D_BASE1 */
-    uint32_t src_stride_px;  /* G2D_CFG1.STRIDE + 1 */
+    int32_t  src_stride_dw;
     int32_t  clip_l, clip_t, clip_r, clip_b;  /* inclusive dest G2D scissor */
     int32_t  dst_x, dst_y;   /* G2D_XY dest origin (signed 12-bit) */
     int32_t  src_x, src_y;   /* G2D_SXY source origin (unsigned 11-bit) */
@@ -87,7 +87,7 @@ public:
 
 private:
     [[noreturn]] void HaltBlend(const char* why, uint32_t prog) const;
-    /* Byte address of dest pixel (x,y) per t.dest_565 (row stride = stride_px
+    /* Byte address of dest pixel (x,y) per t.dest_565 (row stride = stride_dw
        4-byte words); FATAL if unbacked. */
     uint8_t* DestHost(const Gpu2dFillTarget& t, int32_t x, int32_t y);
     uint32_t LoadDest(const Gpu2dFillTarget& t, int32_t x, int32_t y);   /* dest as ARGB8888 */

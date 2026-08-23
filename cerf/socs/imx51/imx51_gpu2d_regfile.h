@@ -16,6 +16,14 @@ inline float RegF(const uint32_t (&regs)[0x100], uint32_t reg) {
     return f;
 }
 
+/* G2D_CFG0/1 STRIDE[11:0]+STRIDESIGN[23]: one 13-bit two's-complement of
+   (row 4-byte words - 1). sync_2 libOpenVG.dll FUN_41c6ae4c 0x41C6AE4C emits the
+   negative form with G2D_BASE advanced to the surface's last row. */
+inline int32_t StrideWords(uint32_t cfg) {
+    const uint32_t f13 = (cfg & 0xFFFu) | ((cfg >> 11) & 0x1000u);
+    return (static_cast<int32_t>(f13 << 19) >> 19) + 1;
+}
+
 /* 2^VGV2_MODE.EXPONENTADD[23:18] (signed 6-bit): the XF affine outputs subpixels
    that the driver premultiplies by this power of two (fill engine sub_41C63970). */
 inline float DeviceScale(const uint32_t (&regs)[0x100]) {

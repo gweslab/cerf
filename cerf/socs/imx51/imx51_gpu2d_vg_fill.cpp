@@ -91,13 +91,14 @@ void Imx51Gpu2dVgFill::Flush(const uint32_t (&regs)[0x100], bool bbox_live) {
     const uint32_t cfg0 = regs[0x1];
     if (((cfg0 >> 12) & 0xFu) != 7u)           /* G2D_CFG0.FORMAT: G2D_8888 only */
         Halt(regs, "dest format (not G2D_8888)", 0x1u, cfg0);
-    if (cfg0 >> 16)                            /* TILED/SRGB/swap/stridesign */
+    if (cfg0 & 0xFF7F0000u)                    /* TILED[16]/SRGB[17]/SWAP fields;
+                                                  STRIDESIGN[23] belongs to the stride */
         Halt(regs, "dest tiled/swapped/srgb (not modeled)", 0x1u, cfg0);
     if (regs[0x0] == 0u)                       /* null dest bind */
         Halt(regs, "dest BASE0 null bind", 0x0u, 0);
     Gpu2dFillTarget t{};
     t.dest_pa   = regs[0x0];
-    t.stride_px = (cfg0 & 0xFFFu) + 1u;
+    t.stride_dw = imx51_g2d_regfile::StrideWords(cfg0);
     /* sync_2 libOpenVG.dll 0x41C5B468 tile loop: VGV1_SCISSORX/Y (0x24/0x25) hold the
        tile clamped in a grid anchored at 0, VGV1_TILEOFS (0x22) that tile's grid origin
        plus the path-bbox sub-tile remainder, and G2D_SCISSORX/Y (0x8/0x9) the device

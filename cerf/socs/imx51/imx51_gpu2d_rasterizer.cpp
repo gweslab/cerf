@@ -117,11 +117,11 @@ uint32_t Imx51Gpu2dRasterizer::BlendPixel(const Gpu2dFillTarget& t, uint32_t src
     return (a << 24) | (r << 16) | (g << 8) | b;
 }
 
-/* gpuaddr==physical (GPU MMU disabled); row byte stride = stride_px 4-byte words,
+/* gpuaddr==physical (GPU MMU disabled); row byte stride = stride_dw 4-byte words,
    pixel size 2B (G2D_0565) or 4B (G2D_8888). An unbacked dest pixel halts. */
 uint8_t* Imx51Gpu2dRasterizer::DestHost(const Gpu2dFillTarget& t, int32_t x, int32_t y) {
-    const uint32_t pa = t.dest_pa + static_cast<uint32_t>(y) * t.stride_px * 4u
-                      + static_cast<uint32_t>(x) * (t.dest_565 ? 2u : 4u);
+    const uint32_t pa = t.dest_pa + static_cast<uint32_t>(y * t.stride_dw * 4)
+                      + static_cast<uint32_t>(x * (t.dest_565 ? 2 : 4));
     uint8_t* hp = emu_.Get<EmulatedMemory>().TryTranslateWrite(pa);
     if (!hp) {
         LOG(Caution, "[GPU2D-RAST] dest pixel unbacked pa=0x%08X (x=%d y=%d)\n", pa, x, y);

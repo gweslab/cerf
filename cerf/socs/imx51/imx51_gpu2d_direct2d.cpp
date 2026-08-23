@@ -6,6 +6,7 @@
 #include "../../boards/board_context.h"
 #include "../../cpu/emulated_memory.h"
 #include "imx51_gpu2d_rasterizer.h"
+#include "imx51_gpu2d_regfile.h"
 
 namespace {
 
@@ -49,7 +50,8 @@ void Imx51Gpu2dDirect2d::CheckCommonGates(const uint32_t (&regs)[0x100]) const {
     if (regs[0x10] != 0xFFFFFFu)  /* G2D_MASK identity wrap */
         Halt(regs, "direct-2D op MASK wrap (not modeled)", 0x10u, regs[0x10]);
     const uint32_t cfg0 = regs[0x1];
-    if (cfg0 >> 16)  /* TILED[16]/SRGB[17]/SWAP fields: linear, no swap - per-op FORMAT decode */
+    if (cfg0 & 0xFF7F0000u)  /* TILED[16]/SRGB[17]/SWAP fields: linear, no swap - per-op
+                                FORMAT decode; STRIDESIGN[23] is part of the stride */
         Halt(regs, "direct-2D op dest swap/tile/srgb (not modeled)", 0x1u, cfg0);
     if (regs[0x0] == 0u)
         Halt(regs, "direct-2D op dest BASE0 null bind", 0x0u, 0);
@@ -68,7 +70,7 @@ void Imx51Gpu2dDirect2d::Fill(const uint32_t (&regs)[0x100]) {
     const uint32_t xy = regs[kXy], wh = regs[kWh];
     Gpu2dFillTarget t{};
     t.dest_pa   = regs[0x0];
-    t.stride_px = (cfg0 & 0xFFFu) + 1u;
+    t.stride_dw = imx51_g2d_regfile::StrideWords(cfg0);
     t.dest_565  = (fmt == kG2d0565);
     /* G2D scissor only: the emitter programs it to the rect itself; the VGV1
        band scissor belongs to the VG rasterizer path and may be stale here. */
@@ -101,16 +103,16 @@ void Imx51Gpu2dDirect2d::Copy(const uint32_t (&regs)[0x100], uint32_t sxy) {
     const uint32_t cfg0 = regs[0x1], cfg1 = regs[0x3];
     if (((cfg0 >> 12) & 0xFu) != kG2d8888)  /* copy dest G2D_8888 only (565 dest copy not modeled) */
         Halt(regs, "SXY copy dest format (not G2D_8888)", 0x1u, cfg0);
-    if (((cfg1 >> 12) & 0xFu) != 7u || (cfg1 >> 16))  /* src G2D_8888, no swap/tile/srgb */
+    if (((cfg1 >> 12) & 0xFu) != 7u || (cfg1 & 0xFF7F0000u))  /* src G2D_8888, no swap/tile/srgb */
         Halt(regs, "SXY copy source format (not linear G2D_8888)", 0x3u, cfg1);
     if (regs[0x2] == 0u)
         Halt(regs, "SXY copy source BASE1 null bind", 0x2u, 0);
     const uint32_t xy = regs[kXy], wh = regs[kWh];
     Gpu2dCopySpec c{};
     c.dst_pa        = regs[0x0];
-    c.dst_stride_px = (cfg0 & 0xFFFu) + 1u;
+    c.dst_stride_dw = imx51_g2d_regfile::StrideWords(cfg0);
     c.src_pa        = regs[0x2];
-    c.src_stride_px = (cfg1 & 0xFFFu) + 1u;
+    c.src_stride_dw = imx51_g2d_regfile::StrideWords(cfg1);
     const uint32_t gsx = regs[0x8], gsy = regs[0x9];  /* dest G2D scissor (inclusive) */
     c.clip_l = static_cast<int32_t>(gsx & 0x7FFu);
     c.clip_r = static_cast<int32_t>((gsx >> 11) & 0x7FFu);
@@ -138,16 +140,16 @@ void Imx51Gpu2dDirect2d::CopyRect(const Gpu2dCopySpec& c) {
             const int32_t dx = c.dst_x + col;
             if (dx < c.clip_l || dx > c.clip_r) continue;
             const int32_t sx = c.src_x + col;
-            const uint32_t spa = c.src_pa + (static_cast<uint32_t>(sy) * c.src_stride_px
-                                             + static_cast<uint32_t>(sx)) * 4u;
+            const uint32_t spa = c.src_pa + static_cast<uint32_t>((sy * c.src_stride_dw
+                                                                   + sx) * 4);
             const uint8_t* shp = mem.TryTranslate(spa);
             if (!shp) {
                 LOG(Caution, "[GPU2D-D2D] copy source pixel unbacked pa=0x%08X (x=%d y=%d)\n",
                     spa, sx, sy);
                 CerfFatalExit(CERF_FATAL_RUNTIME_ERROR);
             }
-            const uint32_t dpa = c.dst_pa + (static_cast<uint32_t>(dy) * c.dst_stride_px
-                                             + static_cast<uint32_t>(dx)) * 4u;
+            const uint32_t dpa = c.dst_pa + static_cast<uint32_t>((dy * c.dst_stride_dw
+                                                                   + dx) * 4);
             uint8_t* dhp = mem.TryTranslateWrite(dpa);
             if (!dhp) {
                 LOG(Caution, "[GPU2D-D2D] copy dest pixel unbacked pa=0x%08X (x=%d y=%d)\n",

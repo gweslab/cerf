@@ -182,7 +182,7 @@ void FordSync2VmcuPeer::HandlePmInbound(const uint8_t* pm, std::size_t n) {
             /* IPC_SendRebootRequest (pm.dll sub_C028A22C, AUTOPM sub_C028765C cmd 5). */
             LOG(Caution,
                 "Sync 2 has requested reboot over VMCU (pm type=0x%02X len=%zu). "
-                "This is a known PANIC reboot, read NKDBG above or debug.\n",
+                "This is a known PANIC reboot, read NKDBG above or debug. Normal case is a corrupted nand.img\n",
                 static_cast<unsigned>(pm[0]), n);
 #if !CERF_DEV_MODE
             MessageBoxA(nullptr,

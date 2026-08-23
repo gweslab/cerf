@@ -237,6 +237,7 @@ BOARDS_INFORMATION = [
             "touch": True,
             "suspend": False,
             "guest_additions": True,
+            "network": False,
         },
         "notes": [
             "ROMs with Compositor are slower",

@@ -98,21 +98,31 @@ void Imx51Gpu2dVgFill::Flush(const uint32_t (&regs)[0x100], bool bbox_live) {
     Gpu2dFillTarget t{};
     t.dest_pa   = regs[0x0];
     t.stride_px = (cfg0 & 0xFFFu) + 1u;
-    /* Clip = G2D_SCISSORX/Y (LEFT[10:0]/RIGHT[21:11]) intersect VGV1_SCISSORX/Y. */
+    /* sync_2 libOpenVG.dll 0x41C5B468 tile loop: VGV1_SCISSORX/Y (0x24/0x25) hold the
+       tile clamped in a grid anchored at 0, VGV1_TILEOFS (0x22) that tile's grid origin
+       plus the path-bbox sub-tile remainder, and G2D_SCISSORX/Y (0x8/0x9) the device
+       scissor - so device = grid + (TILEOFS - VGV1 near edge). */
     const uint32_t gsx = regs[0x8], gsy = regs[0x9];
     const uint32_t bsx = regs[0x24], bsy = regs[0x25];
-    t.clip_l = static_cast<int32_t>(std::max(gsx & 0x7FFu, bsx & 0x7FFu));
-    t.clip_r = static_cast<int32_t>(std::min((gsx >> 11) & 0x7FFu, (bsx >> 16) & 0x7FFu));
-    t.clip_t = static_cast<int32_t>(std::max(gsy & 0x7FFu, bsy & 0x7FFu));
-    t.clip_b = static_cast<int32_t>(std::min((gsy >> 11) & 0x7FFu, (bsy >> 16) & 0x7FFu));
-    /* The tile loops write BBOX as band/tile rect + guard margins folded into XFT,
-       so (bbox+XFT)*2^exp is absolute-device; a tighter bbox is unmodeled. */
+    const int32_t v_l = static_cast<int32_t>(bsx & 0x7FFu);
+    const int32_t v_t = static_cast<int32_t>(bsy & 0x7FFu);
+    const int32_t ox = static_cast<int32_t>(regs[0x22] & 0xFFFu) - v_l;
+    const int32_t oy = static_cast<int32_t>((regs[0x22] >> 12) & 0xFFFu) - v_t;
+    t.clip_l = std::max(static_cast<int32_t>(gsx & 0x7FFu), v_l + ox);
+    t.clip_r = std::min(static_cast<int32_t>((gsx >> 11) & 0x7FFu),
+                        static_cast<int32_t>((bsx >> 16) & 0x7FFu) + ox);
+    t.clip_t = std::max(static_cast<int32_t>(gsy & 0x7FFu), v_t + oy);
+    t.clip_b = std::min(static_cast<int32_t>((gsy >> 11) & 0x7FFu),
+                        static_cast<int32_t>((bsy >> 16) & 0x7FFu) + oy);
+    /* The tile loops write BBOX as band/tile rect + guard margins folded into XFT, so
+       (bbox+XFT)*2^exp is grid-space and takes the same ox/oy shift as the clip. */
     if (bbox_live) {
         const float ke = DeviceScale(regs);
-        if ((RegF(regs, 0x5A) + RegF(regs, 0x54)) * ke > static_cast<float>(t.clip_l) + 0.5f ||
-            (RegF(regs, 0x5C) + RegF(regs, 0x54)) * ke < static_cast<float>(t.clip_r) - 0.5f ||
-            (RegF(regs, 0x5B) + RegF(regs, 0x55)) * ke > static_cast<float>(t.clip_t) + 0.5f ||
-            (RegF(regs, 0x5D) + RegF(regs, 0x55)) * ke < static_cast<float>(t.clip_b) - 0.5f)
+        const float fx = static_cast<float>(ox), fy = static_cast<float>(oy);
+        if ((RegF(regs, 0x5A) + RegF(regs, 0x54)) * ke + fx > static_cast<float>(t.clip_l) + 0.5f ||
+            (RegF(regs, 0x5C) + RegF(regs, 0x54)) * ke + fx < static_cast<float>(t.clip_r) - 0.5f ||
+            (RegF(regs, 0x5B) + RegF(regs, 0x55)) * ke + fy > static_cast<float>(t.clip_t) + 0.5f ||
+            (RegF(regs, 0x5D) + RegF(regs, 0x55)) * ke + fy < static_cast<float>(t.clip_b) - 0.5f)
             Halt(regs, "VGV2 BBOX binds tighter than the scissor clip (not modeled)",
                  0x5Au, regs[0x5A]);
     }

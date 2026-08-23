@@ -2,6 +2,7 @@
 #include "host_gdiplus.h"
 
 #include "../core/cerf_emulator.h"
+#include "host_resource.h"
 
 #include <objbase.h>
 #include <gdiplus.h>
@@ -59,17 +60,13 @@ void HostGdiPlus::FillPolygonAA(HDC dc, const POINT* pts, int count,
 }
 
 Gdiplus::Bitmap* HostGdiPlus::DecodeResourcePng(const wchar_t* name) {
-    HMODULE hmod = GetModuleHandleW(nullptr);
-    HRSRC hr = FindResourceW(hmod, name, RT_RCDATA);
-    if (!hr) return nullptr;
-    HGLOBAL res = LoadResource(hmod, hr);
-    void*   data = res ? LockResource(res) : nullptr;
-    DWORD   sz   = SizeofResource(hmod, hr);
-    if (!data || sz == 0) return nullptr;
+    std::span<const uint8_t> bytes = emu_.Get<HostResource>().Bytes(name);
+    if (bytes.empty()) return nullptr;
+    const SIZE_T sz = bytes.size();
 
     HGLOBAL hg = GlobalAlloc(GMEM_MOVEABLE, sz);
     if (!hg) return nullptr;
-    if (void* p = GlobalLock(hg)) { memcpy(p, data, sz); GlobalUnlock(hg); }
+    if (void* p = GlobalLock(hg)) { memcpy(p, bytes.data(), sz); GlobalUnlock(hg); }
     IStream* stm = nullptr;
     if (CreateStreamOnHGlobal(hg, TRUE, &stm) != S_OK) { GlobalFree(hg); return nullptr; }
     Gdiplus::Bitmap* bmp = Gdiplus::Bitmap::FromStream(stm);

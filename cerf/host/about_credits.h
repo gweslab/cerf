@@ -6,7 +6,6 @@
 #include <windows.h>
 
 #include <string>
-#include <vector>
 
 class AboutCredits : public Service {
 public:
@@ -14,32 +13,25 @@ public:
 
     void OnReady() override;
 
-    HWND Create(HWND parent, HFONT font, int x, int y, int w, int h, UINT dpi);
+    int  Height(UINT dpi) const;
+    void Create(HWND parent, HFONT font, int x, int y, int w, UINT dpi);
 
 private:
     static LRESULT CALLBACK WndProcStatic(HWND, UINT, WPARAM, LPARAM);
     LRESULT WndProc(HWND, UINT, WPARAM, LPARAM);
 
-    struct Line {
-        HWND hwnd;
-        int  y;
-        bool has_link;
-    };
-
-    bool LineHasLink(HWND h) const;
-
-    void BuildLines(int text_w);
-    void AddLine(const std::wstring& markup, int text_w, int& y);
-    void UpdateScrollInfo();
-    void ScrollTo(int pos);
+    std::wstring Contributors() const;
+    void Measure(HWND hwnd);
+    void Paint(HWND hwnd, HDC dc);
 
     int S(int v) const;
 
-    HWND  pane_ = nullptr;
-    HFONT font_ = nullptr;
-    UINT  dpi_  = USER_DEFAULT_SCREEN_DPI;
-
-    std::vector<Line> lines_;
-    int content_h_  = 0;
-    int scroll_pos_ = 0;
+    HFONT        font_      = nullptr;
+    UINT         dpi_       = USER_DEFAULT_SCREEN_DPI;
+    std::wstring text_;
+    std::wstring cycle_;
+    int          cycle_w_   = 0;
+    int          text_h_    = 0;
+    bool         scrolling_ = false;
+    ULONGLONG    start_ms_  = 0;
 };

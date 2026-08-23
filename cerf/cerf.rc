@@ -34,6 +34,8 @@ ICON_USB_FORD_FLASHER    ICON "assets/usb_ford_flasher.ico"
 
 CERF_LOGO        RCDATA "assets/cerf_1024.png"
 
+ABOUT_CONTRIBUTORS RCDATA "host/contributors_generated.txt"
+
 FONT_PLEX_SANS           RCDATA "assets/fonts/IBMPlexSans-Regular.ttf"
 FONT_PLEX_SANS_BOLD      RCDATA "assets/fonts/IBMPlexSans-Bold.ttf"
 FONT_PLEX_MONO_BOLD      RCDATA "assets/fonts/IBMPlexMono-Bold.ttf"

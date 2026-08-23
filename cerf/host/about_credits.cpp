@@ -1,69 +1,39 @@
 #define NOMINMAX
 #include "about_credits.h"
 
-#include <commctrl.h>
-#include <wchar.h>
-
-#include <algorithm>
-
 #include "../core/cerf_emulator.h"
+#include "../core/string_utils.h"
 #include "host_dark_mode.h"
-#include "host_link_opener.h"
+#include "host_resource.h"
 
 REGISTER_SERVICE(AboutCredits);
 
 namespace {
 
-constexpr wchar_t kClass[] = L"CerfAboutCredits";
-
-struct Contributor {
-    const wchar_t* name;
-    const wchar_t* url;
-    const wchar_t* contribution;
-    bool           anonymous;
-};
-
-constexpr Contributor kContributors[] = {
-    { L"Raul Merelli", nullptr, L"Siemens devices emulation", false },
-    { L"Karpour",      nullptr, L"Jornada 820 and EM500 ROMs, project support",
-      false },
-    { L"Anonymous 1",  nullptr, L"NEC MP700, Toricomail, Sharp HC-4100, Velo 1, "
-                                L"Nino 300 and Cassiopeia E-55 ROMs, project "
-                                L"support", true },
-};
+constexpr wchar_t kClass[]    = L"CerfAboutCredits";
+constexpr wchar_t kResource[] = L"ABOUT_CONTRIBUTORS";
+constexpr wchar_t kSeparator[] = L"   \x2022   ";
 
 constexpr wchar_t kHeader[] = L"Thanks to project contributors:";
 
-constexpr wchar_t kFooter[] =
-    L"Thanks to everyone else affiliated with or supporting the project who "
-    L"did not make it into this list!";
+constexpr wchar_t kEveryoneElse[] = L"everyone else who helped";
 
-constexpr int kScrollbarGutterDip = 20;
-constexpr int kEntryGapDip        = 2;
-constexpr int kBlockGapDip        = 10;
-constexpr int kFallbackLineDip    = 18;
-constexpr int kScrollStepDip      = 16;
-
-std::wstring ContributorMarkup(const Contributor& c) {
-    std::wstring s;
-    if (c.url) {
-        s += L"<a href=\"";
-        s += c.url;
-        s += L"\">";
-        s += c.name;
-        s += L"</a>";
-    } else {
-        s += c.name;
-    }
-    s += L"  -  ";
-    s += c.contribution;
-    return s;
-}
+constexpr int kHeaderDip      = 18;
+constexpr int kHeaderGapDip   = 0;
+constexpr int kMarqueeDip     = 22;
+constexpr int kTotalDip       = kHeaderDip + kHeaderGapDip + kMarqueeDip;
+constexpr int kSpeedDipPerSec = 34;
+constexpr int kFrameMs        = 16;
+constexpr UINT_PTR kTimerId   = 1;
 
 }
 
 int AboutCredits::S(int v) const {
     return MulDiv(v, (int)dpi_, USER_DEFAULT_SCREEN_DPI);
+}
+
+int AboutCredits::Height(UINT dpi) const {
+    return MulDiv(kTotalDip, (int)dpi, USER_DEFAULT_SCREEN_DPI);
 }
 
 void AboutCredits::OnReady() {
@@ -72,175 +42,149 @@ void AboutCredits::OnReady() {
     wc.lpfnWndProc   = &AboutCredits::WndProcStatic;
     wc.hInstance     = GetModuleHandleW(nullptr);
     wc.hCursor       = LoadCursorW(nullptr, IDC_ARROW);
-    wc.hbrBackground = (HBRUSH)(COLOR_BTNFACE + 1);
     wc.lpszClassName = kClass;
     RegisterClassExW(&wc);
 }
 
-HWND AboutCredits::Create(HWND parent, HFONT font, int x, int y, int w, int h,
-                          UINT dpi) {
-    dpi_        = dpi;
-    font_       = font;
-    scroll_pos_ = 0;
-    content_h_  = 0;
-    lines_.clear();
+std::wstring AboutCredits::Contributors() const {
+    std::span<const uint8_t> bytes = emu_.Get<HostResource>().Bytes(kResource);
+    if (bytes.empty()) return {};
+    const std::string utf8(reinterpret_cast<const char*>(bytes.data()),
+                           bytes.size());
+    const std::wstring list = Utf8ToWide(utf8.c_str());
 
-    pane_ = CreateWindowExW(0, kClass, nullptr,
-                            WS_CHILD | WS_VISIBLE | WS_VSCROLL,
-                            x, y, w, h, parent, nullptr,
-                            GetModuleHandleW(nullptr), this);
-
-    BuildLines(w - S(kScrollbarGutterDip));
-    UpdateScrollInfo();
-    return pane_;
-}
-
-void AboutCredits::BuildLines(int text_w) {
-    int y = 0;
-
-    AddLine(kHeader, text_w, y);
-    y += S(kBlockGapDip);
-
-    std::vector<const Contributor*> sorted;
-    sorted.reserve(std::size(kContributors));
-    for (const Contributor& c : kContributors) sorted.push_back(&c);
-    std::sort(sorted.begin(), sorted.end(),
-              [](const Contributor* a, const Contributor* b) {
-                  if (a->anonymous != b->anonymous) return !a->anonymous;
-                  return _wcsicmp(a->name, b->name) < 0;
-              });
-
-    for (const Contributor* c : sorted) {
-        AddLine(ContributorMarkup(*c), text_w, y);
-        y += S(kEntryGapDip);
+    std::wstring out;
+    size_t pos = 0;
+    while (pos < list.size()) {
+        size_t end = list.find(L'\n', pos);
+        if (end == std::wstring::npos) end = list.size();
+        std::wstring name = list.substr(pos, end - pos);
+        while (!name.empty() && (name.back() == L'\r' || name.back() == L' '))
+            name.pop_back();
+        if (!name.empty()) {
+            if (!out.empty()) out += kSeparator;
+            out += name;
+        }
+        pos = end + 1;
     }
-
-    y += S(kBlockGapDip);
-    AddLine(kFooter, text_w, y);
-
-    content_h_ = y;
+    if (!out.empty()) out += kSeparator;
+    out += kEveryoneElse;
+    return out;
 }
 
-void AboutCredits::AddLine(const std::wstring& markup, int text_w, int& y) {
-    const bool has_link = markup.find(L"<a ") != std::wstring::npos;
-    const DWORD style = WS_CHILD | WS_VISIBLE | LWS_TRANSPARENT |
-                        (has_link ? WS_TABSTOP : 0u);
+void AboutCredits::Measure(HWND hwnd) {
+    cycle_ = text_.empty() ? std::wstring() : text_ + kSeparator;
 
-    HWND h = CreateWindowExW(0, L"SysLink", markup.c_str(), style,
-                             0, y, text_w, S(kFallbackLineDip), pane_,
-                             nullptr, GetModuleHandleW(nullptr), nullptr);
-    SendMessageW(h, WM_SETFONT, (WPARAM)font_, FALSE);
+    HDC     dc  = GetDC(hwnd);
+    HGDIOBJ old = SelectObject(dc, font_);
+    SIZE full = { 0, 0 }, once = { 0, 0 };
+    GetTextExtentPoint32W(dc, cycle_.c_str(), (int)cycle_.size(), &full);
+    GetTextExtentPoint32W(dc, text_.c_str(), (int)text_.size(), &once);
+    SelectObject(dc, old);
+    ReleaseDC(hwnd, dc);
 
-    SIZE ideal = { 0, 0 };
-    SendMessageW(h, LM_GETIDEALSIZE, (WPARAM)text_w, (LPARAM)&ideal);
-    const int line_h = ideal.cy > 0 ? ideal.cy : S(kFallbackLineDip);
-    SetWindowPos(h, nullptr, 0, y, text_w, line_h,
-                 SWP_NOZORDER | SWP_NOACTIVATE);
+    cycle_w_ = full.cx;
+    text_h_  = once.cy;
 
-    lines_.push_back({ h, y, has_link });
-    y += line_h;
-}
-
-bool AboutCredits::LineHasLink(HWND h) const {
-    for (const Line& l : lines_)
-        if (l.hwnd == h) return l.has_link;
-    return false;
-}
-
-void AboutCredits::UpdateScrollInfo() {
     RECT rc = { 0, 0, 0, 0 };
-    GetClientRect(pane_, &rc);
+    GetClientRect(hwnd, &rc);
+    scrolling_ = cycle_w_ > 0 && once.cx > rc.right - rc.left;
 
-    SCROLLINFO si = { sizeof(si) };
-    si.fMask = SIF_RANGE | SIF_PAGE | SIF_POS;
-    si.nMin  = 0;
-    si.nMax  = content_h_ > 0 ? content_h_ - 1 : 0;
-    si.nPage = (UINT)(rc.bottom - rc.top);
-    si.nPos  = scroll_pos_;
-    SetScrollInfo(pane_, SB_VERT, &si, TRUE);
+    if (scrolling_) SetTimer(hwnd, kTimerId, kFrameMs, nullptr);
+    else            KillTimer(hwnd, kTimerId);
 }
 
-void AboutCredits::ScrollTo(int pos) {
+void AboutCredits::Paint(HWND hwnd, HDC dc) {
     RECT rc = { 0, 0, 0, 0 };
-    GetClientRect(pane_, &rc);
+    GetClientRect(hwnd, &rc);
+    const int w = rc.right - rc.left, h = rc.bottom - rc.top;
+    if (w <= 0 || h <= 0) return;
 
-    const int max_pos = std::max(0, content_h_ - (int)(rc.bottom - rc.top));
-    pos = std::clamp(pos, 0, max_pos);
-    if (pos == scroll_pos_) return;
-    scroll_pos_ = pos;
+    auto& dm = emu_.Get<HostDarkMode>();
+    const COLORREF bg = dm.IsDark() ? dm.BgColor() : GetSysColor(COLOR_BTNFACE);
+    const COLORREF fg = dm.IsDark() ? dm.TextColor()
+                                    : GetSysColor(COLOR_BTNTEXT);
 
-    HDWP dwp = BeginDeferWindowPos((int)lines_.size());
-    for (const Line& l : lines_)
-        dwp = DeferWindowPos(dwp, l.hwnd, nullptr, 0, l.y - scroll_pos_, 0, 0,
-                             SWP_NOZORDER | SWP_NOACTIVATE | SWP_NOSIZE);
-    EndDeferWindowPos(dwp);
+    HDC     mem = CreateCompatibleDC(dc);
+    HBITMAP bmp = CreateCompatibleBitmap(dc, w, h);
+    HGDIOBJ ob  = SelectObject(mem, bmp);
 
-    SetScrollPos(pane_, SB_VERT, scroll_pos_, TRUE);
-    InvalidateRect(pane_, nullptr, TRUE);
+    HBRUSH brush = CreateSolidBrush(bg);
+    RECT fill = { 0, 0, w, h };
+    FillRect(mem, &fill, brush);
+    DeleteObject(brush);
+
+    HGDIOBJ of = SelectObject(mem, font_);
+    SetBkMode(mem, TRANSPARENT);
+    SetTextColor(mem, fg);
+
+    const int y = (h - text_h_) / 2;
+    int x = 0;
+    if (scrolling_) {
+        const ULONGLONG elapsed = GetTickCount64() - start_ms_;
+        const ULONGLONG travel  = elapsed * (ULONGLONG)S(kSpeedDipPerSec) / 1000;
+        x = -(int)(travel % (ULONGLONG)cycle_w_);
+    }
+    const std::wstring& draw = scrolling_ ? cycle_ : text_;
+    TextOutW(mem, x, y, draw.c_str(), (int)draw.size());
+    if (scrolling_)
+        TextOutW(mem, x + cycle_w_, y, draw.c_str(), (int)draw.size());
+
+    SelectObject(mem, of);
+    BitBlt(dc, 0, 0, w, h, mem, 0, 0, SRCCOPY);
+    SelectObject(mem, ob);
+    DeleteObject(bmp);
+    DeleteDC(mem);
+}
+
+void AboutCredits::Create(HWND parent, HFONT font, int x, int y, int w,
+                          UINT dpi) {
+    dpi_      = dpi;
+    font_     = font;
+    text_     = Contributors();
+    start_ms_ = GetTickCount64();
+
+    HINSTANCE inst = GetModuleHandleW(nullptr);
+    auto mk = [&](const wchar_t* cls, const wchar_t* txt, DWORD style,
+                  int cy, int ch) {
+        return CreateWindowExW(0, cls, txt, WS_CHILD | WS_VISIBLE | style,
+                               x, cy, w, ch, parent, nullptr, inst, this);
+    };
+
+    int cy = y;
+    mk(L"STATIC", kHeader, SS_LEFT | SS_NOPREFIX, cy, S(kHeaderDip));
+    cy += S(kHeaderDip) + S(kHeaderGapDip);
+
+    HWND marquee = mk(kClass, nullptr, 0, cy, S(kMarqueeDip));
+
+    Measure(marquee);
 }
 
 LRESULT AboutCredits::WndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
     switch (msg) {
-        case WM_VSCROLL: {
-            RECT rc = { 0, 0, 0, 0 };
-            GetClientRect(hwnd, &rc);
-            const int page = rc.bottom - rc.top;
-            int pos = scroll_pos_;
-            switch (LOWORD(wp)) {
-                case SB_LINEUP:   pos -= S(kScrollStepDip); break;
-                case SB_LINEDOWN: pos += S(kScrollStepDip); break;
-                case SB_PAGEUP:   pos -= page;              break;
-                case SB_PAGEDOWN: pos += page;              break;
-                case SB_TOP:      pos = 0;                  break;
-                case SB_BOTTOM:   pos = content_h_;         break;
-                case SB_THUMBTRACK:
-                case SB_THUMBPOSITION: {
-                    SCROLLINFO si = { sizeof(si) };
-                    si.fMask = SIF_TRACKPOS;
-                    GetScrollInfo(hwnd, SB_VERT, &si);
-                    pos = si.nTrackPos;
-                    break;
-                }
-            }
-            ScrollTo(pos);
+        case WM_PAINT: {
+            PAINTSTRUCT ps;
+            HDC dc = BeginPaint(hwnd, &ps);
+            Paint(hwnd, dc);
+            EndPaint(hwnd, &ps);
             return 0;
         }
 
-        case WM_MOUSEWHEEL: {
-            const int delta = GET_WHEEL_DELTA_WPARAM(wp);
-            ScrollTo(scroll_pos_ - delta * S(kScrollStepDip) * 3 / WHEEL_DELTA);
+        case WM_TIMER:
+            InvalidateRect(hwnd, nullptr, FALSE);
             return 0;
-        }
 
-        case WM_NOTIFY: {
-            auto* nh = reinterpret_cast<NMHDR*>(lp);
-            if (nh->code == NM_CLICK || nh->code == NM_RETURN) {
-                emu_.Get<HostLinkOpener>().OpenNotified(hwnd, lp);
-                return 0;
-            }
-            if (nh->code == NM_CUSTOMDRAW && LineHasLink(nh->hwndFrom)) {
-                LRESULT out = 0;
-                if (emu_.Get<HostDarkMode>().HandleLinkCustomDraw(lp, out))
-                    return out;
-            }
-            break;
-        }
+        case WM_SETFONT:
+            font_ = (HFONT)wp;
+            Measure(hwnd);
+            InvalidateRect(hwnd, nullptr, FALSE);
+            return 0;
 
         case WM_ERASEBKGND:
-            if (emu_.Get<HostDarkMode>().EraseBackground((HDC)wp, hwnd))
-                return 1;
-            break;
-
-        case WM_CTLCOLORSTATIC: {
-            LRESULT br = 0;
-            if (emu_.Get<HostDarkMode>().HandleCtlColor(msg, wp, br))
-                return br;
-            break;
-        }
+            return 1;
 
         case WM_NCDESTROY:
-            pane_ = nullptr;
-            lines_.clear();
+            KillTimer(hwnd, kTimerId);
             break;
     }
     return DefWindowProcW(hwnd, msg, wp, lp);

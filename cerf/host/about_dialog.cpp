@@ -32,12 +32,12 @@ constexpr int kBuildDy   = 44;
 constexpr int kBuildH    = 18;
 constexpr int kLinksDy   = 66;
 constexpr int kDevDy     = 96;
-constexpr int kCopyrightDy = 120;
-constexpr int kCreditsDy = 150;
-constexpr int kCreditsH  = 130;
-constexpr int kContentH  = 336;
+constexpr int kCreditsDy = 122;
+constexpr int kCopyrightGapDy = 14;
+constexpr int kCopyrightH     = 22;
+constexpr int kTailDy    = 56;
 constexpr int kCloseGap  = 42;
-constexpr int kNoDeviceDrop = kCopyrightDy - kDevDy;
+constexpr int kNoDeviceDrop = kCreditsDy - kDevDy;
 
 enum : int {
     IDC_TITLE   = 5001,
@@ -53,6 +53,15 @@ enum : int {
 
 int AboutDialog::S(int v) const {
     return MulDiv(v, (int)dpi_, USER_DEFAULT_SCREEN_DPI);
+}
+
+int AboutDialog::CopyrightY() {
+    return band_px_h_ + S(kCreditsDy - layout_drop_ + kCopyrightGapDy) +
+           emu_.Get<AboutCredits>().Height(dpi_);
+}
+
+int AboutDialog::ClientHeight() {
+    return CopyrightY() + S(kCopyrightH + kTailDy);
 }
 
 void AboutDialog::OnReady() {
@@ -86,7 +95,7 @@ void AboutDialog::BuildControls(HWND hwnd, bool with_device) {
     };
 
     const int cb = band_px_h_;
-    const int clientH = cb + S(kContentH - layout_drop_);
+    const int clientH = ClientHeight();
     const int tx = S(20), tw = band_px_w_ - S(40);
 
     constexpr wchar_t kTitleText[] = L"CE Runtime Foundation";
@@ -138,8 +147,12 @@ void AboutDialog::BuildControls(HWND hwnd, bool with_device) {
            IDC_DEVICE);
     }
 
+    emu_.Get<AboutCredits>().Create(hwnd, ui_font_, tx,
+                                    cb + S(kCreditsDy - layout_drop_),
+                                    tw, dpi_);
+
     constexpr wchar_t kCopyright[] = L"Copyright (c) 2019-2026 ";
-    const int copyright_y = cb + S(kCopyrightDy - layout_drop_);
+    const int copyright_y = CopyrightY();
     SIZE prefix = { 0, 0 };
     {
         HDC     dc  = GetDC(hwnd);
@@ -149,17 +162,13 @@ void AboutDialog::BuildControls(HWND hwnd, bool with_device) {
         ReleaseDC(hwnd, dc);
     }
 
-    mk(L"STATIC", kCopyright, SS_LEFT, tx, copyright_y, prefix.cx, S(22),
-       IDC_COPYRIGHT_PREFIX);
+    mk(L"STATIC", kCopyright, SS_LEFT, tx, copyright_y, prefix.cx,
+       S(kCopyrightH), IDC_COPYRIGHT_PREFIX);
 
     mk(L"SysLink",
        L"<a href=\"https://yaroslavkibysh.com\">Yaroslav Kibysh</a>",
-       LWS_TRANSPARENT, tx + prefix.cx, copyright_y, tw - prefix.cx, S(22),
-       IDC_COPYRIGHT);
-
-    emu_.Get<AboutCredits>().Create(hwnd, ui_font_, tx,
-                                    cb + S(kCreditsDy - layout_drop_),
-                                    tw, S(kCreditsH), dpi_);
+       LWS_TRANSPARENT, tx + prefix.cx, copyright_y, tw - prefix.cx,
+       S(kCopyrightH), IDC_COPYRIGHT);
 
     mk(L"BUTTON", L"OK", BS_DEFPUSHBUTTON | WS_TABSTOP,
        band_px_w_ - tx - S(100), clientH - S(kCloseGap), S(100), S(30), IDOK);
@@ -210,7 +219,7 @@ void AboutDialog::Run(HWND owner, bool with_device) {
     auto& band = emu_.Get<DialogBand>();
     band_px_w_ = band.PixelWidth(dpi_);
     band_px_h_ = band.PixelHeight(dpi_);
-    const int clientH = band_px_h_ + S(kContentH - layout_drop_);
+    const int clientH = ClientHeight();
 
     const DWORD style = WS_CAPTION | WS_SYSMENU | WS_DLGFRAME | WS_POPUP;
     const DWORD ex    = WS_EX_DLGMODALFRAME;

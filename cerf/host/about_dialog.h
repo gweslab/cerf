@@ -27,6 +27,8 @@ private:
     void ApplyCustomFonts();      /* after HostDarkMode stomps the UI font */
 
     int S(int v) const;
+    int CopyrightY();
+    int ClientHeight();
 
     HWND hwnd_  = nullptr;
     HWND title_ = nullptr;

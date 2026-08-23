@@ -2,6 +2,7 @@
 
 #include "../core/cerf_emulator.h"
 #include "../core/log.h"
+#include "host_resource.h"
 
 REGISTER_SERVICE(HostFonts);
 
@@ -35,17 +36,13 @@ void HostFonts::OnShutdown() {
 }
 
 bool HostFonts::AddResourceFace(const wchar_t* resource_name) {
-    HMODULE hmod = GetModuleHandleW(nullptr);
-    HRSRC   hr   = FindResourceW(hmod, resource_name, RT_RCDATA);
-    if (!hr) return false;
-
-    HGLOBAL res  = LoadResource(hmod, hr);
-    void*   data = res ? LockResource(res) : nullptr;
-    DWORD   sz   = SizeofResource(hmod, hr);
-    if (!data || sz == 0) return false;
+    std::span<const uint8_t> bytes =
+        emu_.Get<HostResource>().Bytes(resource_name);
+    if (bytes.empty()) return false;
 
     DWORD  installed = 0;
-    HANDLE h = AddFontMemResourceEx(data, sz, nullptr, &installed);
+    HANDLE h = AddFontMemResourceEx(const_cast<uint8_t*>(bytes.data()),
+                                    (DWORD)bytes.size(), nullptr, &installed);
     if (!h || installed == 0) return false;
 
     faces_.push_back(h);

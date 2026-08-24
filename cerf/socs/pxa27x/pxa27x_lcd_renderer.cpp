@@ -4,10 +4,9 @@
 
 #include "../../boards/board_context.h"
 #include "../../core/cerf_emulator.h"
-#include "../../core/device_config.h"
 #include "../../core/log.h"
 #include "../../cpu/emulated_memory.h"
-#include "../../host/frame_renderer.h"
+#include "../../host/panel_frame_renderer.h"
 #include "../../lcd/lcd_pixel_expand.h"
 
 #include <cstring>
@@ -22,12 +21,11 @@ constexpr size_t kContentProbeStride = 251;
 constexpr uint32_t kBppCode16Bpp = 0x4u;
 constexpr uint32_t kBytesPerPixel16Bpp = 2u;
 
-class Pxa27xLcdRenderer : public FrameRenderer {
+class Pxa27xLcdRenderer : public PanelFrameRenderer {
 public:
-    using FrameRenderer::FrameRenderer;
+    using PanelFrameRenderer::PanelFrameRenderer;
 
     bool ShouldRegister() override {
-        if (emu_.Get<DeviceConfig>().guest_additions) return false;
         auto* bd = emu_.TryGet<BoardContext>();
         return bd && bd->GetSoc() == SocFamily::PXA27x;
     }
@@ -115,4 +113,4 @@ private:
 
 }
 
-REGISTER_SERVICE_AS(Pxa27xLcdRenderer, FrameRenderer);
+REGISTER_SERVICE_AS(Pxa27xLcdRenderer, PanelFrameRenderer);

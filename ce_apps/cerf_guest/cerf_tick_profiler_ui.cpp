@@ -19,6 +19,12 @@
 
 static const WCHAR kCerfTpUiClass[] = L"CerfTickProfiler";
 
+static void CerfTpUiFill(HDC dc, int l, int t, int r, int b, HBRUSH br) {
+    RECT rc;
+    rc.left = l; rc.top = t; rc.right = r; rc.bottom = b;
+    FillRect(dc, &rc, br);
+}
+
 static int CerfTpUiRatioToY(DWORD ratio) {
     DWORD span = CERF_TPUI_PLOT_H - 1;
     if (ratio > CERF_TP_FULL_SCALE) ratio = CERF_TP_FULL_SCALE;
@@ -27,28 +33,23 @@ static int CerfTpUiRatioToY(DWORD ratio) {
 
 static void CerfTpUiPaintChart(HDC dc) {
     DWORD  samples[CERF_TP_SAMPLES];
-    RECT   rc;
     HBRUSH bg     = CreateSolidBrush(RGB(0, 0, 0));
-    HPEN   border = CreatePen(PS_SOLID, 1, RGB(72, 72, 72));
-    HPEN   base   = CreatePen(PS_SOLID, 1, RGB(112, 112, 112));
-    HPEN   good   = CreatePen(PS_SOLID, 1, RGB(0, 224, 0));
-    HPEN   bad    = CreatePen(PS_SOLID, 1, RGB(232, 48, 48));
-    HPEN   old    = (HPEN)SelectObject(dc, border);
+    HBRUSH border = CreateSolidBrush(RGB(72, 72, 72));
+    HBRUSH base   = CreateSolidBrush(RGB(112, 112, 112));
+    HBRUSH good   = CreateSolidBrush(RGB(0, 224, 0));
+    HBRUSH bad    = CreateSolidBrush(RGB(232, 48, 48));
     int    y_base = CerfTpUiRatioToY(CERF_TP_UNITY);
     int    count, i;
 
-    rc.left = 0; rc.top = 0; rc.right = CERF_TPUI_W; rc.bottom = CERF_TPUI_H;
-    FillRect(dc, &rc, bg);
+    CerfTpUiFill(dc, 0, 0, CERF_TPUI_W, CERF_TPUI_H, bg);
 
-    MoveToEx(dc, 0, 0, NULL);
-    LineTo(dc, CERF_TPUI_W - 1, 0);
-    LineTo(dc, CERF_TPUI_W - 1, CERF_TPUI_H - 1);
-    LineTo(dc, 0, CERF_TPUI_H - 1);
-    LineTo(dc, 0, 0);
+    CerfTpUiFill(dc, 0, 0, CERF_TPUI_W, 1, border);
+    CerfTpUiFill(dc, 0, CERF_TPUI_H - 1, CERF_TPUI_W, CERF_TPUI_H, border);
+    CerfTpUiFill(dc, 0, 0, 1, CERF_TPUI_H, border);
+    CerfTpUiFill(dc, CERF_TPUI_W - 1, 0, CERF_TPUI_W, CERF_TPUI_H, border);
 
-    SelectObject(dc, base);
-    MoveToEx(dc, CERF_TPUI_PLOT_X, y_base, NULL);
-    LineTo(dc, CERF_TPUI_PLOT_X + CERF_TPUI_PLOT_W, y_base);
+    CerfTpUiFill(dc, CERF_TPUI_PLOT_X, y_base,
+                 CERF_TPUI_PLOT_X + CERF_TPUI_PLOT_W, y_base + 1, base);
 
     count = CerfTickProfilerSnapshot(samples, CERF_TP_SAMPLES);
     for (i = 0; i < count; ++i) {
@@ -57,12 +58,12 @@ static void CerfTpUiPaintChart(HDC dc) {
                                               : (CERF_TP_UNITY - ratio);
         int   x     = CERF_TPUI_PLOT_X + (CERF_TPUI_PLOT_W - count) + i;
         int   y     = CerfTpUiRatioToY(ratio);
-        SelectObject(dc, (dev > CERF_TPUI_TOLERANCE) ? bad : good);
-        MoveToEx(dc, x, y_base, NULL);
-        LineTo(dc, x, (y < y_base) ? y - 1 : y + 1);
+        int   top   = (y < y_base) ? y : y_base;
+        int   bot   = ((y > y_base) ? y : y_base) + 1;
+        CerfTpUiFill(dc, x, top, x + 1, bot,
+                     (dev > CERF_TPUI_TOLERANCE) ? bad : good);
     }
 
-    SelectObject(dc, old);
     DeleteObject(bad);
     DeleteObject(good);
     DeleteObject(base);
@@ -74,17 +75,16 @@ static void CerfTpUiPaint(HWND w) {
     PAINTSTRUCT ps;
     HDC     dc  = BeginPaint(w, &ps);
     HDC     mem = CreateCompatibleDC(dc);
-    HBITMAP bmp = CreateCompatibleBitmap(dc, CERF_TPUI_W, CERF_TPUI_H);
-    HBITMAP old;
-    if (mem && bmp) {
-        old = (HBITMAP)SelectObject(mem, bmp);
+    HBITMAP bmp = mem ? CreateCompatibleBitmap(dc, CERF_TPUI_W, CERF_TPUI_H) : NULL;
+    if (bmp) {
+        HBITMAP old = (HBITMAP)SelectObject(mem, bmp);
         CerfTpUiPaintChart(mem);
         BitBlt(dc, 0, 0, CERF_TPUI_W, CERF_TPUI_H, mem, 0, 0, SRCCOPY);
         SelectObject(mem, old);
+        DeleteObject(bmp);
     } else {
         CerfTpUiPaintChart(dc);
     }
-    if (bmp) DeleteObject(bmp);
     if (mem) DeleteDC(mem);
     EndPaint(w, &ps);
 }
@@ -95,6 +95,8 @@ static LRESULT CALLBACK CerfTpUiWndProc(HWND w, UINT msg, WPARAM wp, LPARAM lp) 
         CerfTpUiPaint(w);
         return 0;
     case WM_TIMER:
+        SetWindowPos(w, HWND_TOPMOST, 0, 0, 0, 0,
+                     SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
         InvalidateRect(w, NULL, FALSE);
         return 0;
     case WM_ERASEBKGND:
@@ -108,7 +110,7 @@ static LRESULT CALLBACK CerfTpUiWndProc(HWND w, UINT msg, WPARAM wp, LPARAM lp) 
 }
 
 static HWND CerfTpUiCreateWindow(void) {
-    HINSTANCE inst = GetModuleHandleW(NULL);
+    HINSTANCE inst = (HINSTANCE)CerfTickProfilerModule();
     WNDCLASSW wc;
     HWND      w;
     int       x = GetSystemMetrics(SM_CXSCREEN) - CERF_TPUI_W - CERF_TPUI_RIGHT_MARGIN;
@@ -120,7 +122,6 @@ static HWND CerfTpUiCreateWindow(void) {
     memset(&wc, 0, sizeof(wc));
     wc.lpfnWndProc   = CerfTpUiWndProc;
     wc.hInstance     = inst;
-    wc.hbrBackground = (HBRUSH)GetStockObject(BLACK_BRUSH);
     wc.lpszClassName = kCerfTpUiClass;
     RegisterClassW(&wc);
 
@@ -135,6 +136,14 @@ static HWND CerfTpUiCreateWindow(void) {
     SetWindowPos(w, HWND_TOPMOST, x, y, CERF_TPUI_W, CERF_TPUI_H,
                  SWP_NOACTIVATE | SWP_SHOWWINDOW);
     SetTimer(w, CERF_TPUI_TIMER_ID, CERF_TP_SAMPLE_MS, NULL);
+    {
+        RECT rc;
+        rc.left = rc.top = rc.right = rc.bottom = 0;
+        GetWindowRect(w, &rc);
+        CERF_LOG_X("cerf_guest: tickprof ui visible", (DWORD)IsWindowVisible(w));
+        CERF_LOG_X("cerf_guest: tickprof ui left", (DWORD)rc.left);
+        CERF_LOG_X("cerf_guest: tickprof ui top", (DWORD)rc.top);
+    }
     return w;
 }
 
@@ -144,7 +153,6 @@ static DWORD WINAPI CerfTpUiThread(LPVOID) {
     if (!w) return 0;
     CERF_LOG("cerf_guest: tickprof ui up");
     while (GetMessageW(&msg, NULL, 0, 0)) {
-        TranslateMessage(&msg);
         DispatchMessageW(&msg);
     }
     return 0;

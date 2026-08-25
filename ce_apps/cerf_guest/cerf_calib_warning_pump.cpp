@@ -2,6 +2,7 @@
 
 #include "cerf_regs_map.h"
 #include "cerf_gwes_ready.h"
+#include "cerf_window_owner.h"
 
 #include "cerf/peripherals/cerf_virt/cerf_virt_addr_map.h"
 
@@ -13,28 +14,6 @@
 #define CERF_CW_IDLE_POLLS 600u
 
 static volatile ULONG*  s_cw_regs     = NULL;
-
-static BOOL CerfCwOwnerIsCalibrator(HWND w) {
-    DWORD  pid = 0;
-    HANDLE hp;
-    WCHAR  path[MAX_PATH];
-    const WCHAR* base;
-    DWORD  n, i;
-
-    GetWindowThreadProcessId(w, &pid);
-    if (!pid) return FALSE;
-    hp = OpenProcess(0, FALSE, pid);
-    if (!hp) return FALSE;
-    path[0] = 0;
-    n = GetModuleFileNameW((HMODULE)hp, path, MAX_PATH);
-    CloseHandle(hp);
-    if (!n) return FALSE;
-
-    base = path;
-    for (i = 0; path[i]; ++i)
-        if (path[i] == L'\\' || path[i] == L'/') base = path + i + 1;
-    return lstrcmpiW(base, L"welcome.exe") == 0;
-}
 
 /* iPAQ H3600 PPC2000 gwes.exe sub_1EC14 builds the calibration overlay via
    sub_1C360: class L"static", style 0x90000000, w dword_9459C, h dword_945EC;
@@ -57,7 +36,7 @@ static HWND CerfCwFindCalibWindow(void) {
         cls[0] = 0;
         GetClassNameW(w, cls, 16);
         if (lstrcmpiW(cls, L"static") != 0) continue;
-        if (!CerfCwOwnerIsCalibrator(w)) continue;
+        if (!CerfWindowOwnerIs(w, L"welcome.exe")) continue;
         return w;
     }
     return NULL;

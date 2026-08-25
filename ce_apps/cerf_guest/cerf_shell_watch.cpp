@@ -3,6 +3,8 @@
 
 #include "cerf_regs_map.h"
 #include "cerf_shell_watch.h"
+#include "cerf_gwes_ready.h"
+#include "cerf_window_owner.h"
 
 #define CERF_SHELLWATCH_MAX_LAUNCH 48
 #define CERF_SHELLWATCH_EXE_WCHARS 64
@@ -34,13 +36,6 @@ static void CerfShellWatchFireCallbacks(void) {
     int i;
     for (i = 0; i < s_cb_count; ++i)
         if (s_cbs[i]) s_cbs[i]();
-}
-
-static const WCHAR* CerfBasenameW(const WCHAR* p) {
-    const WCHAR* b = p;
-    for (; *p; ++p)
-        if (*p == L'\\' || *p == L'/') b = p + 1;
-    return b;
 }
 
 static int CerfEqualsCIW(const WCHAR* a, const WCHAR* b) {
@@ -128,6 +123,21 @@ static BOOL CerfShellWatchPollOnce(const CerfLaunchEntry* tbl, int n, int gwes_o
     return hit;
 }
 
+static BOOL CerfShellWatchPollWindows(const CerfLaunchEntry* tbl, int n, int gwes_ord) {
+    HWND w;
+    if (!CerfGwesApiSetReady()) return FALSE;
+    w = GetForegroundWindow();
+    if (w) w = GetWindow(w, GW_HWNDFIRST);
+    for (; w; w = GetWindow(w, GW_HWNDNEXT)) {
+        int i;
+        for (i = 0; i < n; ++i) {
+            if (tbl[i].ord <= gwes_ord) continue;
+            if (CerfWindowOwnerIs(w, tbl[i].exe)) return TRUE;
+        }
+    }
+    return FALSE;
+}
+
 static CerfLaunchEntry s_tbl[CERF_SHELLWATCH_MAX_LAUNCH];
 static int             s_n        = 0;
 static int             s_gwes_ord = -1;
@@ -171,6 +181,7 @@ static BOOL CerfShellWatchBuildTargets(void) {
 static DWORD WINAPI CerfShellWatchThread(LPVOID) {
     DWORD start, elapsed;
     BOOL  resolved = FALSE;
+    BOOL  by_window = FALSE;
 
     if (!CerfShellWatchBuildTargets()) return 0;
 
@@ -180,11 +191,12 @@ static DWORD WINAPI CerfShellWatchThread(LPVOID) {
         if (!resolved) {
             resolved = TRUE;
             if (!CerfShellWatchResolveToolhelp()) {
-                CERF_LOG("cerf_guest: shellwatch toolhelp unavailable - OnShellIsUp disabled");
-                return 0;
+                by_window = TRUE;
+                CERF_LOG("cerf_guest: shellwatch no toolhelp - polling window owners");
             }
         }
-        if (CerfShellWatchPollOnce(s_tbl, s_n, s_gwes_ord)) {
+        if (by_window ? CerfShellWatchPollWindows(s_tbl, s_n, s_gwes_ord)
+                      : CerfShellWatchPollOnce(s_tbl, s_n, s_gwes_ord)) {
             CERF_LOG("cerf_guest: shellwatch shell is up - firing OnShellIsUp");
             CerfShellWatchFireCallbacks();
             return 0;

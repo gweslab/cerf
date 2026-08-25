@@ -10,8 +10,13 @@
 
 #define CERF_TP_DELTA_CAP 4000000u
 
-static DWORD s_tp_ring[CERF_TP_SAMPLES];
-static LONG  s_tp_written = 0;
+static DWORD   s_tp_ring[CERF_TP_SAMPLES];
+static LONG    s_tp_written = 0;
+static HMODULE s_tp_self    = NULL;
+
+extern "C" HMODULE CerfTickProfilerModule(void) {
+    return s_tp_self;
+}
 
 extern "C" int CerfTickProfilerSnapshot(DWORD* out, int max) {
     LONG written = s_tp_written;
@@ -58,7 +63,7 @@ static DWORD WINAPI CerfTickProfilerThread(LPVOID) {
     }
 }
 
-extern "C" void CerfStartTickProfiler(void) {
+extern "C" void CerfStartTickProfiler(HMODULE self) {
     static BOOL started = FALSE;
     volatile ULONG* regs;
     ULONG enabled;
@@ -66,6 +71,7 @@ extern "C" void CerfStartTickProfiler(void) {
 
     if (started) return;
     started = TRUE;
+    s_tp_self = self;
 
     regs = (volatile ULONG*)CerfMapRegsPage(
         g_CerfVirtBase + CerfVirt::kTickProfilerOffset,

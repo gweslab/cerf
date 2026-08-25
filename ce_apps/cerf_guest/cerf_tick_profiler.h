@@ -11,7 +11,9 @@
 extern "C" {
 #endif
 
-void CerfStartTickProfiler(void);
+void CerfStartTickProfiler(HMODULE self);
+
+HMODULE CerfTickProfilerModule(void);
 
 int  CerfTickProfilerSnapshot(DWORD* out, int max);
 

@@ -15,7 +15,7 @@ $sources = @("main.cpp","cerf_virt_base.cpp","cerf_regs_map.cpp","cerf_debug_log
              "cerf_gradient.cpp",
              "cerf_gwes_ready.cpp",
              "cerf_pointer_pump.cpp","cerf_keyboard_pump.cpp","cerf_resize_pump.cpp","cerf_task_manager_pump.cpp",
-             "cerf_calib_warning_pump.cpp","cerf_shell_watch.cpp",
+             "cerf_calib_warning_pump.cpp","cerf_shell_watch.cpp","cerf_window_owner.cpp",
              "cerf_tick_profiler.cpp","cerf_tick_profiler_ui.cpp",
              "cerf_power.cpp",
              "cerf_cursor.cpp",

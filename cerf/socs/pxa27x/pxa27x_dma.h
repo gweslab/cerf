@@ -5,6 +5,8 @@
 #include <cstdint>
 #include <mutex>
 
+class AudioOutSink;
+
 /* Intel PXA27x Developer's Manual 280000-001 Table 5-22 (pages 5-51 through
    5-58) "DMA Controller Register Summary". */
 class Pxa27xDma : public Peripheral {
@@ -108,11 +110,17 @@ protected:
     uint8_t  drcmr_lo_[64] = {}, drcmr_hi_[7] = {}, drcmr74_ = 0;
     uint32_t dalgn_ = 0;
     uint32_t dpcsr_ = kDpcsrReset;
+    bool          audio_active_[kNumChannels] = {};
+    AudioOutSink* audio_sink_[kNumChannels]   = {};
 
     uint32_t DcsrValue(uint32_t ch) const;
     void WriteDcsrLocked(uint32_t ch, uint32_t value);
     void StartChannelLocked(uint32_t ch);
     void RunChannelSyncLocked(uint32_t ch);
+    AudioOutSink* AudioSinkForChannelLocked(uint32_t ch);
+    bool DeliverNextAudioBlockLocked(uint32_t ch);
+    void AudioTick(uint32_t ch);
+    void StopAudioLocked(uint32_t ch);
     bool RunTransfer(uint32_t ch);
     bool RunCompareLocked(uint32_t ch);
     uint32_t DescriptorAddressLocked(uint32_t ch) const;

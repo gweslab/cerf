@@ -2,7 +2,7 @@
 
 #include "../../peripherals/peripheral_base.h"
 #include "../../host/paced_wave_out.h"
-#include "audio_out_sink.h"
+#include "../audio_out_sink.h"
 
 #include <atomic>
 #include <cstdint>

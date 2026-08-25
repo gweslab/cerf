@@ -25,6 +25,14 @@ constexpr uint32_t kPartitionTablePa    = 0x00080000u;
 constexpr uint32_t kDisplayIdOff = 0x890u;
 constexpr uint32_t kDisplayId    = 0x114u;
 
+/* symbol_mk500 MK500c50BenOS013014.bin FlashFx.Dll 0x022E9B94 u16 [args+0x824]
+   and u16 [args+0x826], matched at 0x022E9BE0 against record+0/+2 of the table
+   at 0x01DEB558; symbol_mk500 MK500c50XenMO0152XX.bin 0x000277CF parts table
+   stride 0x28 record (0x0089, 0x8803) size 0x04000000 block 0x00040000. */
+constexpr uint32_t kFlashIdOff = 0x824u;
+constexpr uint32_t kFlashMfr   = 0x0089u;
+constexpr uint32_t kFlashDev   = 0x8803u;
+
 class SymbolMk500BspArgs : public Service {
 public:
     using Service::Service;
@@ -46,10 +54,14 @@ private:
         mem.WriteWord(kArgsPa + kFlashKernelVaOff,    kFlashKernelVa);
         mem.WriteWord(kArgsPa + kPartitionTablePaOff, kPartitionTablePa);
         mem.WriteWord(kArgsPa + kDisplayIdOff,        kDisplayId);
+        mem.WriteWord(kArgsPa + kFlashIdOff,
+                      kFlashMfr | (kFlashDev << 16));
 
         LOG(Board, "SymbolMk500BspArgs: args block at PA 0x%08X; flash kernel VA "
-                   "0x%08X, partition table PA 0x%08X, DisplayID 0x%X\n",
-            kArgsPa, kFlashKernelVa, kPartitionTablePa, kDisplayId);
+                   "0x%08X, partition table PA 0x%08X, DisplayID 0x%X, flash id "
+                   "%04X:%04X\n",
+            kArgsPa, kFlashKernelVa, kPartitionTablePa, kDisplayId,
+            kFlashMfr, kFlashDev);
     }
 };
 

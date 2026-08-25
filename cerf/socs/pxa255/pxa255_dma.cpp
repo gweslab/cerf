@@ -8,9 +8,9 @@
 #include "../../peripherals/peripheral_dispatcher.h"
 #include "../../state/emulation_freeze.h"
 #include "../../state/state_stream.h"
-#include "audio_out_sink.h"
 #include "pxa255_ac97.h"
 #include "pxa255_i2s.h"
+#include "../audio_out_sink.h"
 #include "../irq_controller.h"
 
 #include <cstdint>

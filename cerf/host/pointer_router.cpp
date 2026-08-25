@@ -1,6 +1,7 @@
 #include "pointer_router.h"
 
 #include "../core/cerf_emulator.h"
+#include "../core/log.h"
 #include "pointer_input.h"
 #include "pointer_source.h"
 #include "relative_mouse_input.h"
@@ -27,11 +28,22 @@ void PointerRouter::SelectAutoLocked() {
     active_ = best_ready ? best_ready : best_any;
 }
 
+void PointerRouter::NoteActiveLocked(PointerSource* before) {
+    if (active_ == before) return;
+    LOG(GuestAdditions, "pointer source -> \"%ls\" priority %d ready %u user-picked %u\n",
+        active_ ? active_->SourceName().c_str() : L"(none)",
+        active_ ? active_->SourcePriority() : -1,
+        (active_ && active_->SourceReady()) ? 1u : 0u,
+        user_picked_ ? 1u : 0u);
+}
+
 void PointerRouter::Register(PointerSource* src) {
     std::lock_guard<std::mutex> lk(mtx_);
     for (auto* s : sources_) if (s == src) return;
+    PointerSource* before = active_;
     sources_.push_back(src);
     if (!user_picked_) SelectAutoLocked();
+    NoteActiveLocked(before);
 }
 
 std::vector<PointerSource*> PointerRouter::Sources() {
@@ -46,32 +58,41 @@ PointerSource* PointerRouter::Active() {
 
 void PointerRouter::SetActive(PointerSource* src) {
     std::lock_guard<std::mutex> lk(mtx_);
+    PointerSource* before = active_;
     for (auto* s : sources_)
-        if (s == src) { active_ = src; user_picked_ = true; return; }
+        if (s == src) { active_ = src; user_picked_ = true; break; }
+    NoteActiveLocked(before);
 }
 
 void PointerRouter::RestoreActiveByName(const std::wstring& name) {
     std::lock_guard<std::mutex> lk(mtx_);
+    PointerSource* before = active_;
     for (auto* s : sources_)
-        if (s->SourceName() == name) { active_ = s; return; }
+        if (s->SourceName() == name) { active_ = s; break; }
+    NoteActiveLocked(before);
 }
 
 void PointerRouter::CycleNext() {
     std::lock_guard<std::mutex> lk(mtx_);
     if (sources_.size() < 2) return;
+    PointerSource* before = active_;
     user_picked_ = true;
+    active_ = sources_.front();
     for (size_t i = 0; i < sources_.size(); ++i) {
-        if (sources_[i] == active_) {
+        if (sources_[i] == before) {
             active_ = sources_[(i + 1) % sources_.size()];
-            return;
+            break;
         }
     }
-    active_ = sources_.front();
+    NoteActiveLocked(before);
 }
 
 void PointerRouter::ReevaluateAuto() {
     std::lock_guard<std::mutex> lk(mtx_);
-    if (!user_picked_) SelectAutoLocked();
+    if (user_picked_) return;
+    PointerSource* before = active_;
+    SelectAutoLocked();
+    NoteActiveLocked(before);
 }
 
 bool PointerRouter::UserPicked() const {
@@ -86,6 +107,8 @@ void PointerRouter::RestoreUserPicked(bool picked) {
 
 void PointerRouter::RearmAutoSelect() {
     std::lock_guard<std::mutex> lk(mtx_);
+    PointerSource* before = active_;
     user_picked_ = false;
     SelectAutoLocked();
+    NoteActiveLocked(before);
 }

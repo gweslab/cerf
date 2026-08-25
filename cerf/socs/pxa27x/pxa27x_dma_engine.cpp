@@ -4,7 +4,10 @@
 #include "../../core/log.h"
 #include "../../cpu/emulated_memory.h"
 #include "../../peripherals/peripheral_dispatcher.h"
+#include "../../state/emulation_freeze.h"
+#include "../audio_out_sink.h"
 #include "../irq_controller.h"
+#include "pxa27x_ac97.h"
 
 #include <cstring>
 
@@ -22,7 +25,8 @@ void Pxa27xDma::WriteDcsrLocked(uint32_t ch, uint32_t value) {
     if (value & CLRCMPST) cur &= ~CMPST;
     if (value & SETCMPST) cur |= CMPST;
     dcsr_[ch] = cur;
-    if (!was_run && (cur & RUN)) StartChannelLocked(ch);
+    if (!was_run && (cur & RUN))                          StartChannelLocked(ch);
+    else if (was_run && !(cur & RUN) && audio_active_[ch]) StopAudioLocked(ch);
     UpdateIrqLocked();
 }
 
@@ -63,7 +67,67 @@ void Pxa27xDma::UpdateIrqLocked() {
 void Pxa27xDma::StartChannelLocked(uint32_t ch) {
     LOG(SocDma, "ch%u RUN DDADR=0x%08X DCSR=0x%08X nodesc=%u\n", ch, ddadr_[ch],
         dcsr_[ch], (dcsr_[ch] & NODESCFETCH) ? 1u : 0u);
+    if (AudioOutSink* sink = AudioSinkForChannelLocked(ch)) {
+        audio_active_[ch] = true;
+        audio_sink_[ch]   = sink;
+        sink->BeginAudioOut([this, ch] { AudioTick(ch); });
+        LOG(SocDma, "ch%u -> paced audio-out\n", ch);
+        if (!DeliverNextAudioBlockLocked(ch)) StopAudioLocked(ch);
+        return;
+    }
     RunChannelSyncLocked(ch);
+}
+
+AudioOutSink* Pxa27xDma::AudioSinkForChannelLocked(uint32_t ch) {
+    if (dcsr_[ch] & NODESCFETCH) return nullptr;
+    if (ddadr_[ch] & DDADR_STOP) return nullptr;
+    uint32_t dtadr = 0;
+    if (!ReadPhys32(DescriptorAddressLocked(ch) + 0x8u, &dtadr)) return nullptr;
+    auto& ac97 = emu_.Get<Pxa27xAc97>();
+    if (dtadr == ac97.PcmOutFifoAddr()) return &ac97;
+    return nullptr;
+}
+
+bool Pxa27xDma::DeliverNextAudioBlockLocked(uint32_t ch) {
+    if (!(dcsr_[ch] & RUN) || (ddadr_[ch] & DDADR_STOP)) return false;
+    const uint32_t desc = DescriptorAddressLocked(ch);
+    uint32_t w0 = 0, w1 = 0, w2 = 0, w3 = 0;
+    if (!ReadPhys32(desc, &w0) || !ReadPhys32(desc + 0x4u, &w1) ||
+        !ReadPhys32(desc + 0x8u, &w2) || !ReadPhys32(desc + 0xCu, &w3)) {
+        dcsr_[ch] |= BUSERRINTR;
+        return false;
+    }
+    ddadr_[ch] = w0 & kDdadrMask;
+    dsadr_[ch] = w1;
+    dtadr_[ch] = w2;
+    dcmd_[ch]  = w3 & kDcmdMask;
+    if (dcmd_[ch] & STARTIRQEN) dcsr_[ch] |= STARTINTR;
+    const uint32_t len = dcmd_[ch] & kDcmdLengthMask;
+    if (len == 0) return true;
+    const uint8_t* src =
+        emu_.Get<EmulatedMemory>().TryTranslate(AlignBaseLocked(ch, dsadr_[ch]));
+    if (!src) { dcsr_[ch] |= BUSERRINTR; return false; }
+    audio_sink_[ch]->QueueOutput(src, len);
+    return true;
+}
+
+void Pxa27xDma::AudioTick(uint32_t ch) {
+    auto frozen = emu_.Get<EmulationFreeze>().WorkerSection();
+    std::lock_guard<std::mutex> lk(state_mutex_);
+    if (!audio_active_[ch]) return;
+    if (!(dcsr_[ch] & RUN)) { StopAudioLocked(ch); UpdateIrqLocked(); return; }
+    dcmd_[ch] &= ~kDcmdLengthMask;
+    if (dcmd_[ch] & ENDIRQEN) dcsr_[ch] |= ENDINTR;
+    if (!DeliverNextAudioBlockLocked(ch)) StopAudioLocked(ch);
+    UpdateIrqLocked();
+}
+
+void Pxa27xDma::StopAudioLocked(uint32_t ch) {
+    if (!audio_active_[ch]) return;
+    audio_active_[ch] = false;
+    dcsr_[ch] &= ~RUN;
+    if (audio_sink_[ch]) { audio_sink_[ch]->StopAudioOut(); audio_sink_[ch] = nullptr; }
+    LOG(SocDma, "ch%u audio-out stop DCSR=0x%08X\n", ch, dcsr_[ch]);
 }
 
 /* Table 5-12 (page 5-32) "If both DDADRx[BREN] and DCSRx[CMPST] are set, the DMA

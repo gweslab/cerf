@@ -26,10 +26,16 @@ public:
 
 private:
     void Bump();
+    uint32_t TracePoll(uint32_t seq);
+
+    static constexpr uint32_t kTraceCap = 8u;
 
     std::atomic<uint32_t> x_{0};
     std::atomic<uint32_t> y_{0};
     std::atomic<uint32_t> buttons_{0};
     std::atomic<uint32_t> wheel_{0};
     std::atomic<uint32_t> seq_{0};
+
+    std::atomic<uint32_t> traced_set_{0};
+    std::atomic<uint32_t> traced_poll_{0};
 };

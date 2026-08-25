@@ -30,6 +30,7 @@ public:
 
 private:
     void SelectAutoLocked();
+    void NoteActiveLocked(PointerSource* before);
 
     mutable std::mutex          mtx_;
     std::vector<PointerSource*> sources_;

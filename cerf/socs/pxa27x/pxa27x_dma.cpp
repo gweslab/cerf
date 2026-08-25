@@ -164,6 +164,10 @@ void Pxa27xDma::RestoreState(StateReader& r) {
     r.Read(drcmr74_);
     r.Read(dalgn_);
     r.Read(dpcsr_);
+    for (uint32_t ch = 0; ch < kNumChannels; ++ch) {
+        audio_active_[ch] = false;
+        audio_sink_[ch]   = nullptr;
+    }
 }
 
 REGISTER_SERVICE(Pxa27xDma);

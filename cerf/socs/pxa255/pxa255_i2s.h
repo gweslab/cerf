@@ -7,7 +7,7 @@
 #include "../../host/paced_wave_out.h"
 #include "../../peripherals/peripheral_dispatcher.h"
 #include "../../state/state_stream.h"
-#include "audio_out_sink.h"
+#include "../audio_out_sink.h"
 
 #include <cstdint>
 

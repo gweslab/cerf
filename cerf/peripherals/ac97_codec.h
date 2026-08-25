@@ -17,6 +17,11 @@ public:
     virtual uint16_t ReadReg(uint32_t reg) = 0;
     virtual void     WriteReg(uint32_t reg, uint16_t value) = 0;
 
+    /* Intel PXA27x Developer's Manual 280000-001 section 13.6.5 (page 13-18):
+       "Modem receive FIFO, with sixteen 32-bit entries (upper 16 bits are
+       always 0)". */
+    virtual bool PopModemSlot(uint16_t& /*word*/) { return false; }
+
     /* The owning AC'97 controller forwards its snapshot here so the codec's
        guest-written registers survive a hibernate. */
     virtual void SaveState(StateWriter&) {}

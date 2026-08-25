@@ -71,20 +71,9 @@ void Pxa2xxIntc::AssertIrq(int source_bit) {
         icpr_[bank] |= mask;
 #if CERF_DEV_MODE
         emu_.Get<RateProbe>().Inc(RateProbe::Counter::IntcAsserts);
-        if (source_bit == 26)
-            LOG(SocIntc, "[INTC] OST(bit26) assert: icmr=0x%08X masked=%u "
-                         "icip26=%u\n",
-                icmr_[0], (icmr_[0] >> 26) & 1u ? 0u : 1u,
-                (IcIpLocked(0) >> 26) & 1u);
 #endif
         NotifyLocked();
     }
-#if CERF_DEV_MODE
-    else if (source_bit == 26) {
-        LOG(SocIntc, "[INTC] OST(bit26) assert NOOP (icpr already set) icmr=0x%08X\n",
-            icmr_[0]);
-    }
-#endif
 }
 
 void Pxa2xxIntc::DeAssertIrq(int source_bit) {
@@ -191,18 +180,6 @@ uint32_t Pxa2xxIntc::IchpLocked() {
         valid |= kIchpValFiq;
     }
     const uint32_t ichp = valid | (irq << kIchpIrqShift) | fiq;
-#if CERF_DEV_MODE
-    if (!ichp_logged_) {
-        ichp_logged_ = true;
-        uint32_t defined = 0;
-        for (uint32_t prio = 0; prio < kIprSlots; ++prio) {
-            if (ipr_[prio] & kIprVal) ++defined;
-        }
-        LOG(SocIntc, "[INTC] first ICHP read: %u/%u IPR slots valid, "
-                     "ICIP=0x%08X ICIP2=0x%08X ICMR=0x%08X -> ICHP=0x%08X\n",
-            defined, kIprSlots, IcIpLocked(0), IcIpLocked(1), icmr_[0], ichp);
-    }
-#endif
     return ichp;
 }
 

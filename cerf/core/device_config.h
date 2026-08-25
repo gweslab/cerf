@@ -23,6 +23,11 @@ struct BundledCompactFlashCard {
     bool insert_on_launch = false;
 };
 
+struct RomFlashRegion {
+    std::string file;
+    uint32_t    pa = 0;
+};
+
 /* Boot action when a saved state image exists in the device directory
    (--boot=resume|cold|warm). */
 enum class StateBootMode {
@@ -92,6 +97,10 @@ struct DeviceConfig : public Service {
     std::string              rom_eeprom;
 
     std::string              rom_flash;
+
+    std::vector<std::string> rom_volumes;
+
+    std::vector<RomFlashRegion> rom_flash_regions;
 
     /* Optional CF images bundled with the ROM (cerf.json
        "additional_packages.compact_flash_cards"); the CF insert menu offers

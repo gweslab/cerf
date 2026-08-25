@@ -33,15 +33,9 @@ uint32_t CerfVirtPointer::ReadWord(uint32_t addr) {
         case CerfVirt::kPtrY:           return y_.load();
         case CerfVirt::kPtrButtons:     return buttons_.load();
         case CerfVirt::kPtrWheelAccum:  return wheel_.load();
-        case CerfVirt::kPtrSeq:         return TracePoll(seq_.load());
+        case CerfVirt::kPtrSeq:         return seq_.load();
         default:                        return 0u;
     }
-}
-
-uint32_t CerfVirtPointer::TracePoll(uint32_t seq) {
-    if (traced_poll_.fetch_add(1u) < kTraceCap)
-        LOG(GuestAdditions, "pointer window: guest pump polled seq=%u\n", seq);
-    return seq;
 }
 
 void CerfVirtPointer::WriteWord(uint32_t, uint32_t) {}
@@ -70,9 +64,6 @@ void CerfVirtPointer::SetPointer(uint32_t nx, uint32_t ny, uint32_t buttons) {
     y_.store(ny);
     buttons_.store(buttons);
     Bump();
-    if (traced_set_.fetch_add(1u) < kTraceCap)
-        LOG(GuestAdditions, "pointer window: host x=%u y=%u buttons=0x%X seq=%u\n",
-            nx, ny, buttons, seq_.load());
 }
 
 void CerfVirtPointer::AddWheel(int delta) {

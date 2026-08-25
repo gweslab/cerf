@@ -5,6 +5,7 @@
 #include "ce1_rom_parse.h"
 #include "ce_imgfs_walker.h"
 #include "rom_image_parse.h"
+#include "rom_symbol_flash_parse.h"
 
 #include "../boards/board_context.h"
 #include "../core/cerf_emulator.h"
@@ -16,7 +17,6 @@
 
 #include <windows.h>
 
-#include <cctype>
 #include <cstring>
 #include <fstream>
 
@@ -38,24 +38,13 @@ using cerf::rom_image_parse::NosajOsXip;
 using cerf::rom_image_parse::ResolveNextStructuralXip;
 using cerf::rom_image_parse::ResolveRomhdrAtEcec;
 using cerf::rom_image_parse::ResolveRomhdrStructural;
+using cerf::rom_image_parse::SymbolFlashLocateOsXip;
+using cerf::rom_image_parse::SymbolFlashOsXip;
 using cerf::rom_image_parse::U32;
 using cerf::rom_image_parse::kArnoldSignature;
 using cerf::rom_image_parse::kB000FFSignature;
 using cerf::rom_image_parse::kIpaqNbfSignature;
 using cerf::rom_image_parse::kNosajSignature;
-
-inline char AsciiLower(char c) {
-    return char(std::tolower(static_cast<unsigned char>(c)));
-}
-
-bool EqualIgnoreCase(const std::string& a, const char* b) {
-    size_t blen = std::strlen(b);
-    if (a.size() != blen) return false;
-    for (size_t i = 0; i < blen; ++i) {
-        if (AsciiLower(a[i]) != AsciiLower(b[i])) return false;
-    }
-    return true;
-}
 
 std::vector<uint8_t> ReadWholeFile(const std::string& path) {
     std::ifstream f(path, std::ios::binary | std::ios::ate);
@@ -167,10 +156,25 @@ bool RomParserService::ParseOne(ParsedRom& rom) {
             rom.filename.c_str(), os.data_off,
             double(os.flat_size) / 1024.0 / 1024.0);
     } else {
-        rom.flat = std::span<const uint8_t>(rom.raw);
-        rom.flat_base_va = 0;
-        LOG(Boot, "RomParser %s: NB0 flat %zu KB\n",
-            rom.filename.c_str(), rom.flat.size() / 1024);
+        SymbolFlashOsXip sym;
+        if (SymbolFlashLocateOsXip(rom.raw, sym)) {
+            rom.is_symbol_flash = true;
+            rom.flat            = std::span<const uint8_t>(rom.raw)
+                                      .subspan(sym.data_off, sym.flat_size);
+            rom.flat_base_va    = sym.base_va;
+            rom.whole_flash_va  = sym.flash_va;
+            LOG(Boot, "RomParser %s: Symbol whole-flash dump - part table @ "
+                      "file 0x%zX, OS XIP @ file 0x%zX (%u blocks) base=0x%08X "
+                      "flash kva=0x%08X span=%.1f MB\n",
+                rom.filename.c_str(), sym.table_off, sym.data_off,
+                sym.part_blocks, sym.base_va, sym.flash_va,
+                double(sym.flat_size) / 1024.0 / 1024.0);
+        } else {
+            rom.flat = std::span<const uint8_t>(rom.raw);
+            rom.flat_base_va = 0;
+            LOG(Boot, "RomParser %s: NB0 flat %zu KB\n",
+                rom.filename.c_str(), rom.flat.size() / 1024);
+        }
     }
 
     const auto ececs = FindAllEcec(rom.flat);
@@ -420,70 +424,4 @@ void RomParserService::OnReady() {
             ce_major, ce_minor);
 
     ok_ = true;
-}
-
-const ParsedTOCentry* RomParserService::KernelModule() const {
-    if (loaded_.empty()) return nullptr;
-    for (const auto& xip : loaded_[0].xips) {
-        for (const auto& m : xip.toc.modules) {
-            if (EqualIgnoreCase(m.lpszFileName, "nk.exe")) return &m;
-        }
-    }
-    return nullptr;
-}
-
-std::span<const uint8_t>
-RomParserService::ReadVa(uint32_t va, uint32_t len) const {
-    for (const auto& rom : loaded_) {
-        for (const auto& xip : rom.xips) {
-            if (va < xip.load_offset) continue;
-            const size_t off = size_t(va - xip.load_offset);
-            if (off + len <= rom.flat.size())
-                return rom.flat.subspan(off, len);
-        }
-    }
-    return {};
-}
-
-std::span<const uint8_t>
-RomParserService::ModuleBytesByName(const char* name) const {
-    for (const auto& rom : loaded_) {
-        if (rom.is_ce1) {
-            LOG(Caution, "RomParser: ModuleBytesByName('%s') on a CE 1.0 image "
-                         "is not implemented\n", name);
-            CerfFatalExit(CERF_FATAL_RUNTIME_ERROR);
-        }
-        for (const auto& xip : rom.xips) {
-            for (const auto& m : xip.toc.modules) {
-                if (!EqualIgnoreCase(m.lpszFileName, name)) continue;
-                if (m.ulE32Offset < xip.load_offset) return {};
-                const size_t e32_off =
-                    size_t(m.ulE32Offset - xip.load_offset);
-                if (e32_off + 0x18 > rom.flat.size()) return {};
-                const uint32_t vsize = U32(rom.flat.data(), e32_off + 0x14);
-                return ReadVa(m.ulLoadOffset, vsize);
-            }
-        }
-    }
-    return {};
-}
-
-bool RomParserService::KernelSubsystemVersion(uint16_t& major,
-                                              uint16_t& minor) const {
-    for (const auto& rom : loaded_) {
-        if (rom.is_ce1) return false;
-        for (const auto& xip : rom.xips) {
-            for (const auto& m : xip.toc.modules) {
-                if (!EqualIgnoreCase(m.lpszFileName, "nk.exe")) continue;
-                if (m.ulE32Offset < xip.load_offset) return false;
-                const size_t e32_off = size_t(m.ulE32Offset - xip.load_offset);
-                if (e32_off + 0x10 > rom.flat.size()) return false;
-                const uint8_t* p = rom.flat.data() + e32_off;
-                major = uint16_t(p[0x0C] | (p[0x0D] << 8));
-                minor = uint16_t(p[0x0E] | (p[0x0F] << 8));
-                return true;
-            }
-        }
-    }
-    return false;
 }

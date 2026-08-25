@@ -22,53 +22,65 @@ std::string ReadAsciiZ(std::span<const uint8_t> flat, size_t off) {
 
 }  /* namespace */
 
+bool B000FFSectionTable(std::span<const uint8_t>    raw,
+                        std::vector<B000FFSection>& out_sections,
+                        uint32_t&                   out_image_start,
+                        uint32_t&                   out_image_length,
+                        uint32_t&                   out_terminator) {
+    if (raw.size() < 15) return false;
+    if (std::memcmp(raw.data(), kB000FFSignature, 7) != 0) return false;
+
+    out_sections.clear();
+    out_image_start  = U32(raw.data(), 7);
+    out_image_length = U32(raw.data(), 11);
+    out_terminator   = 0;
+
+    size_t off = 15;
+    while (off + kB000FFSectionHeaderSize <= raw.size()) {
+        const uint32_t base = U32(raw.data(), off);
+        const uint32_t size = U32(raw.data(), off + 4);
+        if (base == 0) {
+            out_terminator = size;
+            break;
+        }
+        const size_t data_off = off + kB000FFSectionHeaderSize;
+        if (data_off + size > raw.size() || size > 0x10000000u) break;
+        out_sections.push_back({base, size, data_off});
+        off = data_off + size;
+    }
+    return !out_sections.empty();
+}
+
 bool AssembleB000FFFlat(const std::vector<uint8_t>&  raw,
                         std::vector<uint8_t>&       out_flat,
                         uint32_t&                   out_base_va,
                         uint32_t&                   out_entry_va,
                         std::vector<B000FFSection>& out_sections) {
-    if (raw.size() < 15) return false;
-    if (std::memcmp(raw.data(), kB000FFSignature, 7) != 0) return false;
-
-    std::vector<B000FFSection>& sections = out_sections;
-    sections.clear();
-    out_entry_va = 0;
-
-    size_t off = 15;  /* sig (7) + image start (4) + image length (4) */
-    while (off + kB000FFSectionHeaderSize <= raw.size()) {
-        uint32_t base = U32(raw.data(), off);
-        uint32_t size = U32(raw.data(), off + 4);
-        /* checksum at off+8 - ignored. */
-        if (base == 0) {
-            /* Terminator section (base=0): the loader convention
-               reuses the section header's 'size' field as the kernel
-               entry-point VA - the only place B000FF encodes where
-               execution begins. */
-            out_entry_va = size;
-            break;
-        }
-        size_t data_off = off + kB000FFSectionHeaderSize;
-        if (data_off + size > raw.size() || size > 0x10000000u) break;
-        sections.push_back({base, size, data_off});
-        off = data_off + size;
+    uint32_t image_start  = 0;
+    uint32_t image_length = 0;
+    if (!B000FFSectionTable(std::span<const uint8_t>(raw), out_sections,
+                            image_start, image_length, out_entry_va)) {
+        return false;
     }
-    if (sections.empty()) return false;
+    if (out_sections.empty()) return false;
 
-    uint32_t min_va  = sections[0].base;
-    uint32_t max_end = sections[0].base + sections[0].size;
-    for (const auto& s : sections) {
+    uint32_t min_va  = out_sections[0].base;
+    uint32_t max_end = out_sections[0].base + out_sections[0].size;
+    for (const auto& s : out_sections) {
         min_va  = std::min(min_va,  s.base);
         max_end = std::max(max_end, s.base + s.size);
     }
 
     out_flat.assign(size_t(max_end - min_va), 0);
-    for (const auto& s : sections) {
+    for (const auto& s : out_sections) {
         std::memcpy(out_flat.data() + (s.base - min_va),
                     raw.data() + s.data_off, s.size);
     }
     out_base_va = min_va;
-    LOG(Boot, "RomImageParse: B000FF sections=%zu va=0x%08X..0x%08X (%zu KB)\n",
-        sections.size(), min_va, max_end, out_flat.size() / 1024);
+    LOG(Boot, "RomImageParse: B000FF sections=%zu va=0x%08X..0x%08X (%zu KB)  "
+              "hdr image_start=0x%08X len=0x%08X\n",
+        out_sections.size(), min_va, max_end, out_flat.size() / 1024,
+        image_start, image_length);
     return true;
 }
 

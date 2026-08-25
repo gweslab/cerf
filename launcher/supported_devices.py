@@ -489,20 +489,19 @@ BOARDS_INFORMATION = [
     {
         "name": "Symbol MK500",
         "board_id": "symbol_mk500",
-        "supported": False,
+        "supported": True,
         "soc": SOC_PXA270,
         "operating_systems": [WINDOWS_CE_5],
         "features": {
             "display": True,
-            "touch": False,
+            "touch": True,
             "keyboard": True,
-            "sound": False,
+            "sound": True,
             "network": False,
             "guest_additions": True,
         },
         "notes": [
-            "Bring-up in progress: the shell comes up only with guest additions loaded.",
-            "Stylus input is not working yet.",
+            "Stylus input goes through the WM9713 digitiser; audio output through the WM9713 AC97 codec.",
         ],
     },
 ]

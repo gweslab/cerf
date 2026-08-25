@@ -203,9 +203,15 @@ void RomPlacer::OnReady() {
                 const uint32_t bank_va_base =
                     flash_va_base - (page_tables.VaToPa(flash_va_base)
                                      - flash_pa_base);
-                const size_t file_len =
-                    std::min<size_t>(rom.flat.size(), flash_size);
-                mem.CopyIn(flash_pa_base, rom.flat.data(), file_len);
+                const bool whole_flash =
+                    rom.is_symbol_flash
+                    && page_tables.VaToPa(rom.whole_flash_va) == flash_pa_base;
+                const uint8_t* src =
+                    whole_flash ? rom.raw.data() : rom.flat.data();
+                const size_t   len =
+                    whole_flash ? rom.raw.size() : rom.flat.size();
+                const size_t file_len = std::min<size_t>(len, flash_size);
+                mem.CopyIn(flash_pa_base, src, file_len);
                 LOG(Boot,
                     "RomPlacer %s: full flash image %zu bytes placed at "
                     "kva=0x%08X..0x%08X  pa=0x%08X..0x%08X  "

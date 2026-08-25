@@ -122,5 +122,4 @@ private:
        bits 5:0 PID; Section 25.5.7: at reset these registers are marked
        invalid. */
     uint32_t ipr_[kIprSlots] = {};
-    bool ichp_logged_ = false;
 };

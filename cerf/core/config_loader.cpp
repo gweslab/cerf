@@ -169,6 +169,50 @@ void LoadRom(const json& root, DeviceConfig& config, const std::string& path) {
             CfgFatal(path, "rom.extensions must be a string or array of strings");
         }
     }
+    if (r.contains("volumes")) {
+        const auto& v = r["volumes"];
+        config.rom_volumes.clear();
+        if (v.is_string()) {
+            SplitCommaList(v.get<std::string>(), config.rom_volumes);
+        } else if (v.is_array()) {
+            for (const auto& item : v) {
+                if (!item.is_string())
+                    CfgFatal(path, "rom.volumes[] entries must be strings");
+                config.rom_volumes.push_back(item.get<std::string>());
+            }
+        } else if (!v.is_null()) {
+            CfgFatal(path, "rom.volumes must be a string or array of strings");
+        }
+    }
+    if (r.contains("flash_regions")) {
+        const auto& a = r["flash_regions"];
+        config.rom_flash_regions.clear();
+        if (!a.is_null()) {
+            if (!a.is_array())
+                CfgFatal(path, "rom.flash_regions must be an array of "
+                            "{ \"file\": ..., \"pa\": \"0x...\" } objects");
+            for (const auto& e : a) {
+                if (!e.is_object())
+                    CfgFatal(path, "rom.flash_regions[] entries must be objects");
+                RomFlashRegion reg;
+                reg.file = CfgReadOptString(e, "file", path, "rom.flash_regions");
+                if (reg.file.empty())
+                    CfgFatal(path, "rom.flash_regions[].file is required");
+                const std::string pa =
+                    CfgReadOptString(e, "pa", path, "rom.flash_regions");
+                if (pa.empty())
+                    CfgFatal(path, "rom.flash_regions[].pa is required "
+                                "(\"0x...\" or decimal string)");
+                char* end = nullptr;
+                const unsigned long v = std::strtoul(pa.c_str(), &end, 0);
+                if (!end || *end)
+                    CfgFatal(path, "rom.flash_regions[].pa '" + pa +
+                                "' is not a number");
+                reg.pa = (uint32_t)v;
+                config.rom_flash_regions.push_back(std::move(reg));
+            }
+        }
+    }
 }
 
 /* "additional_packages": { "compact_flash_cards": [{ "file", "name" }] } -

@@ -100,6 +100,8 @@ struct DeviceConfig : public Service {
     bool guest_additions = false;
     std::string guest_additions_color_scheme;
 
+    bool ga_tick_profiler = false;
+
     /* Startup tab. Dev builds default to the hardware console so debug output
        shows instantly; production defaults to the boot screen. --tab overrides. */
     CanvasTab start_tab =

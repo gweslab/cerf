@@ -325,6 +325,8 @@ void ConfigLoader::LoadInto(DeviceConfig& config) {
             config.share_folder = a + sizeof(kArgShareFolder) - 1;
         } else if (strcmp(a, kArgFullScreen) == 0) {
             config.start_fullscreen = true;
+        } else if (strcmp(a, kArgGaTickProfiler) == 0) {
+            config.ga_tick_profiler = true;
         } else if (strcmp(a, kArgAbout) == 0) {
             config.show_about_instead_of_run = true;
         } else if (strncmp(a, kArgBoot, sizeof(kArgBoot) - 1) == 0) {

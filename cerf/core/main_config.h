@@ -24,6 +24,7 @@ inline constexpr char kArgScreenRefreshRate[] = "--screen-refresh-rate=";
 inline constexpr char kArgDisableNetwork[] = "--disable-network";
 inline constexpr char kArgGuestAdditions[] = "--guest-additions";
 inline constexpr char kArgGaColorScheme[]  = "--ga-color-scheme=";
+inline constexpr char kArgGaTickProfiler[] = "--ga-tick-profiler";
 inline constexpr char kArgRecovery[]       = "--recovery";
 inline constexpr char kArgShareFolder[]    = "--share-folder=";
 inline constexpr char kArgBoot[]           = "--boot=";

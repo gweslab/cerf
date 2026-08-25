@@ -26,6 +26,8 @@ void PrintUsage(const char* prog) {
     printf("  --guest-additions        Inject CERF guest-additions DLL into the ROM\n");
     printf("                           (replaces matching modules with CERF-built equivalents)\n");
     printf("  --ga-color-scheme=KEY    Override the guest system colors (needs --guest-additions)\n");
+    printf("  --ga-tick-profiler       Show the guest tick-rate overlay and log tick samples\n");
+    printf("                           (needs --guest-additions)\n");
     printf("  --share-folder=PATH      Pre-enable the guest-additions shared folder on a host\n");
     printf("                           directory at boot (overrides cerf.json share_folder;\n");
     printf("                           relative to the cerf.exe directory; needs --guest-additions)\n");

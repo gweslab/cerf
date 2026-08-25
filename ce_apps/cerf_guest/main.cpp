@@ -228,6 +228,7 @@ extern "C" void CerfStartKeyboardPump(void);
 extern "C" void CerfStartResizePump(void);
 extern "C" void CerfStartTaskManagerPump(void);
 extern "C" void CerfStartCalibWarningPump(void);
+extern "C" void CerfStartTickProfiler(void);
 extern "C" void CerfStartDriverInDriver(void);
 extern "C" void CerfAdvertiseDisplayPower(void);
 extern "C" void CerfStartShellWatch(void);
@@ -244,6 +245,7 @@ static DHPDEV APIENTRY CerfEnablePDEVWrap(
     if (result) CerfStartResizePump();
     if (result) CerfStartTaskManagerPump();
     if (result) CerfStartCalibWarningPump();
+    if (result) CerfStartTickProfiler();
     if (result) CerfStartDriverInDriver();
     if (result) CerfAdvertiseDisplayPower();
     if (result) CerfStartShellWatch();

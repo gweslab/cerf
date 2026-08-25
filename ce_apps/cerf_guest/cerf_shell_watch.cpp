@@ -2,6 +2,7 @@
 #include <tlhelp32.h>
 
 #include "cerf_regs_map.h"
+#include "cerf_shell_watch.h"
 
 #define CERF_SHELLWATCH_MAX_LAUNCH 48
 #define CERF_SHELLWATCH_EXE_WCHARS 64

@@ -16,6 +16,9 @@ const uint32_t kTotalSize = 0x10000000u;
 const uint32_t kRegsOffset = 0u;
 const uint32_t kRegsSize   = 0x10000u;
 
+const uint32_t kTickProfilerOffset = 0x0000u;
+const uint32_t kTickProfilerSize   = 0x1000u;
+
 const uint32_t kFramebufferRegsOffset = 0x1000u;
 const uint32_t kFramebufferRegsSize   = 0x1000u;
 

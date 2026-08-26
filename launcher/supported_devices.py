@@ -500,9 +500,6 @@ BOARDS_INFORMATION = [
             "network": False,
             "guest_additions": True,
         },
-        "notes": [
-            "Stylus input goes through the WM9713 digitiser; audio output through the WM9713 AC97 codec.",
-        ],
     },
 ]
 

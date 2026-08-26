@@ -1,12 +1,12 @@
 #include "guest_additions_ui_policy.h"
 
-#include "../boot/rom_parser_queries.h"
+#include "../boot/rom_parser_service.h"
 #include "../core/cerf_emulator.h"
 
 REGISTER_SERVICE(GuestAdditionsUiPolicy);
 
 bool GuestAdditionsUiPolicy::CeVersion(uint16_t& major, uint16_t& minor) const {
-    auto* rom = emu_.TryGet<RomParserQueries>();
+    auto* rom = emu_.TryGet<RomParserService>();
     return rom && rom->KernelSubsystemVersion(major, minor);
 }
 

@@ -49,12 +49,6 @@ bool AssembleB000FFFlat(const std::vector<uint8_t>&  raw,
                         uint32_t&                   out_entry_va,
                         std::vector<B000FFSection>& out_sections);
 
-bool B000FFSectionTable(std::span<const uint8_t>    raw,
-                        std::vector<B000FFSection>& out_sections,
-                        uint32_t&                   out_image_start,
-                        uint32_t&                   out_image_length,
-                        uint32_t&                   out_terminator);
-
 /* "NOSAJ\0" magic - the SmartBook G138 ".fim" flash-packaging container. */
 constexpr uint8_t kNosajSignature[6] = {'N', 'O', 'S', 'A', 'J', '\0'};
 

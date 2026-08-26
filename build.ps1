@@ -100,7 +100,7 @@ if (-not (Test-Path $vswhere)) {
     Write-Host "[BUILD] FAILED! vswhere.exe not found at $vswhere. Install Visual Studio with the C++ desktop workload."
     Stop-Build 1
 }
-$msbuild = & $vswhere -latest -prerelease -products '*' -requires Microsoft.Component.MSBuild -find 'MSBuild\**\Bin\amd64\MSBuild.exe' | Select-Object -First 1
+$msbuild = & $vswhere -latest -prerelease -requires Microsoft.Component.MSBuild -find 'MSBuild\**\Bin\amd64\MSBuild.exe' | Select-Object -First 1
 if (-not $msbuild -or -not (Test-Path $msbuild)) {
     Write-Host "[BUILD] FAILED! MSBuild.exe not found via vswhere. Ensure Visual Studio's C++ desktop workload is installed."
     Stop-Build 1
@@ -122,7 +122,7 @@ $global:LASTEXITCODE = 0
 # AddressSanitizer does not flag it. Any 14.51.* toolset therefore yields a wrong
 # cerf.exe. It is the default toolset of VS 2026 and of the GitHub Actions
 # windows-latest image, so it must be excluded explicitly on both.
-$vsRoot = & $vswhere -latest -prerelease -products '*' -property installationPath | Select-Object -First 1
+$vsRoot = & $vswhere -latest -prerelease -property installationPath | Select-Object -First 1
 $toolsRoot = Join-Path $vsRoot 'VC\Tools\MSVC'
 if (-not (Test-Path $toolsRoot)) {
     Write-Host "[BUILD] FAILED! No MSVC toolsets found under $toolsRoot."

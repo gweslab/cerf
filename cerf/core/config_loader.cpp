@@ -148,6 +148,10 @@ void LoadRom(const json& root, DeviceConfig& config, const std::string& path) {
 
     if (r.contains("primary"))
         config.rom_primary = CfgReadOptString(r, "primary", path, "rom");
+    if (r.contains("eeprom"))
+        config.rom_eeprom = CfgReadOptString(r, "eeprom", path, "rom");
+    if (r.contains("recovery"))
+        config.rom_recovery = CfgReadOptString(r, "recovery", path, "rom");
     if (r.contains("extensions")) {
         const auto& e = r["extensions"];
         config.rom_extensions.clear();

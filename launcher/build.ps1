@@ -52,32 +52,14 @@ function Get-LauncherPython {
     return $py
 }
 
-function Get-Win10KitRoots {
-    $roots = @()
-    foreach ($key in @("HKLM:\SOFTWARE\WOW6432Node\Microsoft\Windows Kits\Installed Roots",
-                       "HKLM:\SOFTWARE\Microsoft\Windows Kits\Installed Roots")) {
-        try {
-            $v = (Get-ItemProperty $key -ErrorAction Stop).KitsRoot10
-            if ($v) { $roots += $v.TrimEnd('\') }
-        } catch { }
-    }
-    $roots += (Join-Path ${env:ProgramFiles(x86)} "Windows Kits\10")
-    $roots += (Join-Path $env:ProgramFiles "Windows Kits\10")
-    return $roots | Where-Object { $_ } | Select-Object -Unique
-}
-
 function Get-UcrtRedistDir {
-    foreach ($root in Get-Win10KitRoots) {
-        $kits = Join-Path $root "Redist"
-        if (-not (Test-Path $kits)) { continue }
-        $direct = Join-Path $kits "ucrt\DLLs\x86"
-        if (Test-Path $direct) { return $direct }
-        $dirs = Get-ChildItem $kits -Directory -ErrorAction SilentlyContinue |
-                Sort-Object Name -Descending
-        foreach ($d in $dirs) {
-            $ucrt = Join-Path $d.FullName "ucrt\DLLs\x86"
-            if (Test-Path $ucrt) { return $ucrt }
-        }
+    $kits = Join-Path ${env:ProgramFiles(x86)} "Windows Kits\10\Redist"
+    if (-not (Test-Path $kits)) { return $null }
+    $dirs = Get-ChildItem $kits -Directory -ErrorAction SilentlyContinue |
+            Sort-Object Name -Descending
+    foreach ($d in $dirs) {
+        $ucrt = Join-Path $d.FullName "ucrt\DLLs\x86"
+        if (Test-Path $ucrt) { return $ucrt }
     }
     return $null
 }
@@ -91,7 +73,7 @@ $name = "launcher"
 # build ships the redistributable inside the exe and needs no update.
 $ucrt = Get-UcrtRedistDir
 if (-not $ucrt) {
-    Write-Host "[LAUNCHER] FAILED! UCRT redist (<KitsRoot10>\Redist\<ver>\ucrt\DLLs\x86) not found under: $((Get-Win10KitRoots) -join ', '); launcher.exe would not run on a Vista box without KB2999226."
+    Write-Host "[LAUNCHER] FAILED! UCRT redist (Windows Kits\10\Redist\<ver>\ucrt\DLLs\x86) not found; launcher.exe would not run on a Vista box without KB2999226."
     [Environment]::Exit(1)
 }
 $env:CERF_LAUNCHER_UCRT = $ucrt
@@ -99,16 +81,6 @@ $env:CERF_LAUNCHER_NAME = $name
 
 $null = & $python -c "import PyInstaller" 2>$null
 if ($LASTEXITCODE -ne 0) {
-    $env:PIP_CACHE_DIR = Join-Path (Split-Path $PSScriptRoot -Parent) "tmp\pipcache"
-    $null = & $python -m pip --version 2>$null
-    if ($LASTEXITCODE -ne 0) {
-        Write-Host "[LAUNCHER] Cached Python has no pip; bootstrapping via ensurepip..."
-        & $python -m ensurepip --default-pip | Out-Null
-        if ($LASTEXITCODE -ne 0) {
-            Write-Host "[LAUNCHER] FAILED! ensurepip returned $LASTEXITCODE in $python"
-            [Environment]::Exit(1)
-        }
-    }
     Write-Host "[LAUNCHER] PyInstaller not found in cached Python; installing pyinstaller==$PYINSTALLER..."
     & $python -m pip install --quiet --disable-pip-version-check "pyinstaller==$PYINSTALLER"
     if ($LASTEXITCODE -ne 0) {

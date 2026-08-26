@@ -97,8 +97,9 @@ void Wm9713Codec::WriteReg(uint32_t reg, uint16_t value) {
     /* symbol_mk500 touch.dll FUN_02237060 @0x02237060 waits for bit 9 of reg
        0x74 to clear, then takes the one tagged word from reg 0x7A. */
     const uint16_t sel = LowestSel(static_cast<uint16_t>(value & kDig1SelMask));
+    reg_[kRegDigitiser1] = static_cast<uint16_t>(value & ~kDig1Poll);
+    if (sel == 0u) return;
     reg_[kRegDigitiserRd] = MakeWord(sel, pen_down_, raw_x_, raw_y_);
-    reg_[kRegDigitiser1]  = static_cast<uint16_t>(value & ~kDig1Poll);
 }
 
 bool Wm9713Codec::PopModemSlot(uint16_t& word) {
@@ -134,8 +135,8 @@ uint16_t Wm9713Codec::MakeWord(uint16_t sel, bool down, uint16_t raw_x, uint16_t
         case kSelY:        value = static_cast<uint16_t>(raw_y & kAdcMax); break;
         case kSelPressure: break;
         default:
-            LOG(Periph, "[WM9713] unmodeled digitiser channel sel=0x%02X\n", sel);
-            break;
+            LOG(Caution, "[WM9713] unmodeled digitiser channel sel=0x%02X\n", sel);
+            CerfFatalExit(CERF_FATAL_RUNTIME_ERROR);
     }
     const uint16_t tag = static_cast<uint16_t>(SelBitIndex(sel) << 12);
     return static_cast<uint16_t>((down ? kPenDown : 0u) | tag | value);

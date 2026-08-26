@@ -102,8 +102,6 @@ constexpr uint32_t kHieRw = 0x00007D80u;
 /* Table 20-28 (page 20-46) UHCHIT: R/W 16:7; reset 0. */
 constexpr uint32_t kHitRw = 0x0001FF80u;
 
-constexpr uint32_t kTraceLimit = 32u;
-
 class Pxa27xUsbHost : public Peripheral {
 public:
     using Peripheral::Peripheral;
@@ -126,15 +124,12 @@ public:
     uint32_t ReadWord(uint32_t addr) override {
         const uint32_t off = addr - kBase;
         if (off & 3u) HaltUnsupportedAccess("ReadWord(unaligned)", addr, 0);
-        const uint32_t value = ReadReg(off);
-        Trace("r32", off, value);
-        return value;
+        return ReadReg(off);
     }
 
     void WriteWord(uint32_t addr, uint32_t value) override {
         const uint32_t off = addr - kBase;
         if (off & 3u) HaltUnsupportedAccess("WriteWord(unaligned)", addr, value);
-        Trace("w32", off, value);
         WriteReg(off, value);
     }
 
@@ -301,14 +296,7 @@ private:
         Reg(kUHCHR)   = kHrReset;
     }
 
-    void Trace(const char* op, uint32_t off, uint32_t value) {
-        if (++accesses_ <= kTraceLimit) {
-            LOG(Periph, "[PXA27x UHC] %s +0x%02X = 0x%08X\n", op, off, value);
-        }
-    }
-
     uint32_t regs_[kRegCount] = {};
-    uint32_t accesses_        = 0;
 };
 
 }  /* namespace */

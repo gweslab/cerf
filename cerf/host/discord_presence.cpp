@@ -1,7 +1,7 @@
 #define NOMINMAX
 #include <windows.h>
 
-#include "../boot/rom_parser_service.h"
+#include "../boot/rom_parser_queries.h"
 #include "../core/cerf_emulator.h"
 #include "../core/device_config.h"
 #include "../core/log.h"
@@ -62,7 +62,7 @@ public:
 
 private:
     std::string ResolveOsVersion() {
-        auto* rp = emu_.TryGet<RomParserService>();
+        auto* rp = emu_.TryGet<RomParserQueries>();
         if (!rp) return {};
         uint16_t major = 0, minor = 0;
         if (!rp->KernelSubsystemVersion(major, minor)) return {};

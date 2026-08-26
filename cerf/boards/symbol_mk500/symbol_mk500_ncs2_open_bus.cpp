@@ -21,8 +21,7 @@ public:
     uint32_t MmioSize() const override { return 0x04000000u; }
 
 protected:
-    Board       WindowBoard() const override { return Board::SymbolMk500; }
-    const char* WindowName()  const override { return "MK500 nCS2"; }
+    Board WindowBoard() const override { return Board::SymbolMk500; }
 };
 
 }  /* namespace */

@@ -59,21 +59,19 @@ void PointerRouter::RestoreActiveByName(const std::wstring& name) {
 void PointerRouter::CycleNext() {
     std::lock_guard<std::mutex> lk(mtx_);
     if (sources_.size() < 2) return;
-    PointerSource* before = active_;
     user_picked_ = true;
-    active_ = sources_.front();
     for (size_t i = 0; i < sources_.size(); ++i) {
-        if (sources_[i] == before) {
+        if (sources_[i] == active_) {
             active_ = sources_[(i + 1) % sources_.size()];
-            break;
+            return;
         }
     }
+    active_ = sources_.front();
 }
 
 void PointerRouter::ReevaluateAuto() {
     std::lock_guard<std::mutex> lk(mtx_);
-    if (user_picked_) return;
-    SelectAutoLocked();
+    if (!user_picked_) SelectAutoLocked();
 }
 
 bool PointerRouter::UserPicked() const {

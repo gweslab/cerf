@@ -1,12 +1,15 @@
-#include "rom_parser_service.h"
+#include "rom_parser_queries.h"
 
 #include "rom_image_parse.h"
 
+#include "../boards/board_context.h"
 #include "../core/cerf_emulator.h"
 #include "../core/log.h"
 
 #include <cctype>
 #include <cstring>
+
+REGISTER_SERVICE(RomParserQueries);
 
 namespace {
 
@@ -27,9 +30,25 @@ bool EqualIgnoreCase(const std::string& a, const char* b) {
 
 }  /* namespace */
 
-const ParsedTOCentry* RomParserService::KernelModule() const {
-    if (loaded_.empty()) return nullptr;
-    for (const auto& xip : loaded_[0].xips) {
+bool RomParserQueries::ShouldRegister() {
+    return emu_.Get<BoardContext>().GetRomPlacingMode()
+        == RomPlacingMode::FlatContainer;
+}
+
+void RomParserQueries::OnReady() {
+    uint16_t major = 0, minor = 0;
+    if (KernelSubsystemVersion(major, minor))
+        LOG(Boot, "RomParser: kernel subsystem version %u.%u\n", major, minor);
+}
+
+const std::vector<ParsedRom>& RomParserQueries::Loaded() const {
+    return emu_.Get<RomParserService>().Loaded();
+}
+
+const ParsedTOCentry* RomParserQueries::KernelModule() const {
+    const auto& loaded = Loaded();
+    if (loaded.empty()) return nullptr;
+    for (const auto& xip : loaded[0].xips) {
         for (const auto& m : xip.toc.modules) {
             if (EqualIgnoreCase(m.lpszFileName, "nk.exe")) return &m;
         }
@@ -38,8 +57,8 @@ const ParsedTOCentry* RomParserService::KernelModule() const {
 }
 
 std::span<const uint8_t>
-RomParserService::ReadVa(uint32_t va, uint32_t len) const {
-    for (const auto& rom : loaded_) {
+RomParserQueries::ReadVa(uint32_t va, uint32_t len) const {
+    for (const auto& rom : Loaded()) {
         for (const auto& xip : rom.xips) {
             if (va < xip.load_offset) continue;
             const size_t off = size_t(va - xip.load_offset);
@@ -51,8 +70,8 @@ RomParserService::ReadVa(uint32_t va, uint32_t len) const {
 }
 
 std::span<const uint8_t>
-RomParserService::ModuleBytesByName(const char* name) const {
-    for (const auto& rom : loaded_) {
+RomParserQueries::ModuleBytesByName(const char* name) const {
+    for (const auto& rom : Loaded()) {
         if (rom.is_ce1) {
             LOG(Caution, "RomParser: ModuleBytesByName('%s') on a CE 1.0 image "
                          "is not implemented\n", name);
@@ -73,9 +92,9 @@ RomParserService::ModuleBytesByName(const char* name) const {
     return {};
 }
 
-bool RomParserService::KernelSubsystemVersion(uint16_t& major,
+bool RomParserQueries::KernelSubsystemVersion(uint16_t& major,
                                               uint16_t& minor) const {
-    for (const auto& rom : loaded_) {
+    for (const auto& rom : Loaded()) {
         if (rom.is_ce1) return false;
         for (const auto& xip : rom.xips) {
             for (const auto& m : xip.toc.modules) {

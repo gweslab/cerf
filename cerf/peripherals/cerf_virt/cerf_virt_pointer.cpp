@@ -7,7 +7,6 @@
 #include "../../boards/board_context.h"
 #include "../../core/cerf_emulator.h"
 #include "../../core/device_config.h"
-#include "../../core/log.h"
 #include "../../host/host_canvas.h"
 #include "../../host/pointer_input.h"
 #include "../../state/state_stream.h"

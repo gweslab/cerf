@@ -16,8 +16,7 @@ public:
     uint32_t MmioSize() const override { return 0x11C00000u; }
 
 protected:
-    Board       WindowBoard() const override { return Board::Jornada720; }
-    const char* WindowName()  const override { return "J720OpenBus"; }
+    Board WindowBoard() const override { return Board::Jornada720; }
 };
 
 }  /* namespace */

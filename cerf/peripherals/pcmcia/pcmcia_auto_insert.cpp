@@ -1,7 +1,7 @@
 #define NOMINMAX
 #include "pcmcia_auto_insert.h"
 
-#include "../../boot/rom_parser_service.h"
+#include "../../boot/rom_parser_queries.h"
 #include "../../core/cerf_emulator.h"
 #include "../../core/cerf_paths.h"
 #include "../../core/device_config.h"
@@ -20,7 +20,7 @@
 REGISTER_SERVICE(PcmciaAutoInsert);
 
 void PcmciaAutoInsert::InsertDefaultNetworkCard(PcmciaSlot& slot) {
-    auto* rom = emu_.TryGet<RomParserService>();
+    auto* rom = emu_.TryGet<RomParserQueries>();
     uint16_t major = 0, minor = 0;
     if (!rom || !rom->KernelSubsystemVersion(major, minor)) {
         LOG(Net, "PcmciaAutoInsert: guest kernel version unavailable; "

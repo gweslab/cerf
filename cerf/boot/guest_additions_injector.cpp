@@ -9,6 +9,7 @@
 #include "guest_module_placer.h"
 #include "imgfs_injector.h"
 #include "pe_image.h"
+#include "rom_parser_queries.h"
 #include "rom_parser_service.h"
 #include "rom_placer.h"
 
@@ -119,7 +120,7 @@ private:
 
 uint32_t GuestAdditionsInjector::DetectCeMajor() {
     uint16_t major = 0, minor = 0;
-    if (!emu_.Get<RomParserService>().KernelSubsystemVersion(major, minor)) {
+    if (!emu_.Get<RomParserQueries>().KernelSubsystemVersion(major, minor)) {
         LOG(Caution, "nk.exe e32_rom subsystem version not locatable\n");
         CerfFatalExit();
     }

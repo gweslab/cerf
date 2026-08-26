@@ -2,7 +2,7 @@
 
 #include "../board_context.h"
 #include "../../boot/guest_cold_boot.h"
-#include "../../boot/rom_parser_service.h"
+#include "../../boot/rom_parser_queries.h"
 #include "../../core/cerf_emulator.h"
 #include "../../core/device_config.h"
 #include "../../cpu/emulated_memory.h"
@@ -27,6 +27,6 @@ bool NecMobilePro900BootloaderSeeder::BoardMatchesKernelMajor(
     if (!bd || bd->GetBoard() != Board::NecMobilePro900) return false;
     if (emu_.Get<DeviceConfig>().guest_additions) return false;
     uint16_t maj = 0, min = 0;
-    return emu_.Get<RomParserService>().KernelSubsystemVersion(maj, min)
+    return emu_.Get<RomParserQueries>().KernelSubsystemVersion(maj, min)
         && maj == major;
 }

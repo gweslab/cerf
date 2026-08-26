@@ -29,7 +29,6 @@ public:
 private:
     uint16_t MakeWord(uint16_t sel, bool down, uint16_t raw_x, uint16_t raw_y);
     void     PushLocked(uint16_t word);
-    bool     Trace(uint32_t reg);
 
     static constexpr uint32_t kNumRegs = 0x80u;
     /* Intel PXA27x Developer's Manual 280000-001 section 13.6.5 (page 13-18):
@@ -42,6 +41,4 @@ private:
     std::deque<uint16_t> modem_rx_;
     bool                 pen_down_ = false;
     uint16_t             raw_x_ = 0, raw_y_ = 0;
-    uint32_t             traced_ = 0;
-    uint32_t             traced_dig_ = 0;
 };

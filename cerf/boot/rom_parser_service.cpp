@@ -418,10 +418,5 @@ void RomParserService::OnReady() {
         loaded_.size(), loaded_[0].filename.c_str(),
         loaded_.size() > 1 ? ", +extensions" : "");
 
-    uint16_t ce_major = 0, ce_minor = 0;
-    if (KernelSubsystemVersion(ce_major, ce_minor))
-        LOG(Boot, "RomParser: kernel subsystem version %u.%u\n",
-            ce_major, ce_minor);
-
     ok_ = true;
 }

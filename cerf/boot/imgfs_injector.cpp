@@ -6,6 +6,7 @@
 #include "ce_imgfs_patcher.h"
 #include "ce_imgfs_walker.h"
 #include "imgfs_victim_recomposer.h"
+#include "rom_parser_queries.h"
 #include "rom_parser_service.h"
 
 #include "../boards/board_context.h"
@@ -48,7 +49,7 @@ void ImgfsInjector::OnReady() {
     const auto& rom = parser.Primary();
     if (!rom.has_imgfs || rom.imgfs_modules.empty()) return;
 
-    auto* nk = parser.KernelModule();
+    auto* nk = emu_.Get<RomParserQueries>().KernelModule();
     if (nk) {
         auto& pt = emu_.Get<PageTableBuilder>();
         auto& mem = emu_.Get<EmulatedMemory>();

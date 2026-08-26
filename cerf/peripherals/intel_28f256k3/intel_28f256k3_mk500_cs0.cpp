@@ -2,7 +2,6 @@
 
 #include "../../boards/board_context.h"
 #include "../../core/cerf_emulator.h"
-#include "../../core/log.h"
 
 namespace {
 
@@ -22,29 +21,8 @@ public:
     uint32_t MmioBase() const override { return 0x00000000u; }
     uint32_t MmioSize() const override { return 0x04000000u; }
 
-    void WriteByte(uint32_t addr, uint8_t v) override {
-        Trace("w8", addr, v);
-        Intel28F256K3::WriteByte(addr, v);
-    }
-    void WriteHalf(uint32_t addr, uint16_t v) override {
-        Trace("w16", addr, v);
-        Intel28F256K3::WriteHalf(addr, v);
-    }
-    void WriteWord(uint32_t addr, uint32_t v) override {
-        Trace("w32", addr, v);
-        Intel28F256K3::WriteWord(addr, v);
-    }
-
 protected:
     uint32_t Parallel() const override { return 2u; }
-
-private:
-    void Trace(const char* op, uint32_t addr, uint32_t v) {
-        if (++writes_ <= 64u)
-            LOG(Periph, "[MK500 NOR] %s 0x%08X = 0x%08X\n", op, addr, v);
-    }
-
-    uint32_t writes_ = 0;
 };
 
 }  /* namespace */

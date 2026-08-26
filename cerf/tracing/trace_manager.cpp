@@ -28,9 +28,9 @@ uint32_t Crc32Update(uint32_t crc, const uint8_t* data, size_t n) {
 }  /* namespace */
 
 std::optional<uint8_t> TraceContext::ReadVa8(uint32_t va) const {
-    const uint8_t* host = emu.Get<GuestEngine>().ResolveGuestVaToHost(va);
+    auto host = emu.Get<GuestEngine>().PeekGuestVa(va);
     if (!host) return std::nullopt;
-    return *host;
+    return **host;
 }
 
 std::optional<uint16_t> TraceContext::ReadVa16(uint32_t va) const {

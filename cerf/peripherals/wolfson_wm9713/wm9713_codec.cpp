@@ -65,25 +65,13 @@ void Wm9713Codec::OnReady() {
     reg_[kRegRevision] = kRevisionC;
 }
 
-bool Wm9713Codec::Trace(uint32_t reg) {
-    if (reg >= kRegDigitiser1) return ++traced_dig_ <= 512u;
-    return ++traced_ <= 64u;
-}
-
 uint16_t Wm9713Codec::ReadReg(uint32_t reg) {
     std::lock_guard<std::mutex> lock(mutex_);
-    const uint16_t value = reg < kNumRegs ? reg_[reg] : 0u;
-    if (Trace(reg)) {
-        LOG(Periph, "[WM9713] rd  0x%02X -> 0x%04X\n", reg, value);
-    }
-    return value;
+    return reg < kNumRegs ? reg_[reg] : 0u;
 }
 
 void Wm9713Codec::WriteReg(uint32_t reg, uint16_t value) {
     std::lock_guard<std::mutex> lock(mutex_);
-    if (Trace(reg)) {
-        LOG(Periph, "[WM9713] wr  0x%02X <- 0x%04X\n", reg, value);
-    }
     if (reg >= kNumRegs) return;
     reg_[reg] = value;
     if (reg != kRegDigitiser1) return;

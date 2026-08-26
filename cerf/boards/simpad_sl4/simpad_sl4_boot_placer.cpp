@@ -2,6 +2,7 @@
 
 #include "../board_context.h"
 #include "../../boot/board_boot_placer.h"
+#include "../../boot/rom_parser_queries.h"
 #include "../../boot/rom_parser_service.h"
 #include "../../core/cerf_emulator.h"
 #include "../../core/log.h"
@@ -32,7 +33,8 @@ public:
         const uint32_t physfirst =
             parser.Primary().xips[0].toc.romhdr.physfirst;
         std::span<const uint8_t> head =
-            parser.ReadVa(physfirst, simpad_sl4::kHeadLen);
+            emu_.Get<RomParserQueries>().ReadVa(physfirst,
+                                               simpad_sl4::kHeadLen);
         if (head.size() < simpad_sl4::kHeadLen) {
             LOG(Caution, "SimpadSl4BootPlacer: head VA 0x%08X len 0x%X not "
                          "fully in any partition (got 0x%zX)\n",

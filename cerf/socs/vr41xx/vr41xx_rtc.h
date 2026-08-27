@@ -9,8 +9,8 @@
 #include <mutex>
 #include <thread>
 
-/* NEC VR41xx RTC, VR4102 UM ch.16 == VR4121 UM ch.17 (Table 16-1 == Table 17-1);
-   RTC1 block 0x0B0000C0, RTC2 block 0x0B0001C0. */
+/* NEC VR41xx RTC, VR4102 UM ch.16 == VR4111 UM ch.17 == VR4121 UM ch.17 (VR4102 Table 16-1,
+   VR4111 Table 17-1 p372, VR4121 Table 17-1); RTC1 block 0x0B0000C0, RTC2 block 0x0B0001C0. */
 class Vr41xxRtc : public Peripheral {
 public:
     using Peripheral::Peripheral;
@@ -20,7 +20,7 @@ public:
 
     void OnReady() override;
 
-    /* CLKSPEEDREG: VR4102 UM 10.2.8 p245, VR4121 UM 11.2.10 p291. */
+    /* CLKSPEEDREG: VR4102 UM 10.2.8 p245, VR4111 UM 11.2.8 p273, VR4121 UM 11.2.10 p291. */
     virtual uint32_t TClockHz() const = 0;
 
     uint32_t MmioBase() const override { return 0x0B0000C0u; }   /* RTC1 block */
@@ -51,8 +51,9 @@ private:
     static constexpr uint32_t kMask25    = 0x01FFFFFFu;
     static constexpr uint32_t kRtcHz     = 32768u;      /* elapsed + long timers */
 
-    /* RTCINTREG D0-D3 latch bits (VR4102 UM 16.2.9 p353 == VR4121 UM 17.2.9 p437); each
-       comment names the ICU direct source it routes to per SYSINT1REG / SYSINT2REG. */
+    /* RTCINTREG D0-D3 latch bits (VR4102 UM 16.2.9 p353 == VR4111 UM 17.2.9 p389 ==
+       VR4121 UM 17.2.9 p437); each comment names the ICU direct source it routes to
+       per SYSINT1REG / SYSINT2REG. */
     static constexpr uint16_t kIntElapsed = 1u << 0;    /* RTCINTR0 -> SYSINT1 D3 (ETIMERINTR) */
     static constexpr uint16_t kIntLong1   = 1u << 1;    /* RTCINTR1 -> SYSINT1 D2 (RTCL1INTR)  */
     static constexpr uint16_t kIntLong2   = 1u << 2;    /* RTCINTR2 -> SYSINT2 D0 (RTCL2INTR)  */

@@ -22,7 +22,8 @@ public:
         auto* bd = emu_.TryGet<BoardContext>();
         if (!bd) return false;
         const SocFamily soc = bd->GetSoc();
-        return soc == SocFamily::VR4102 || soc == SocFamily::VR4121;
+        return soc == SocFamily::VR4102 || soc == SocFamily::VR4111 ||
+               soc == SocFamily::VR4121;
     }
     void OnReady() override { emu_.Get<PeripheralDispatcher>().Register(this); }
 

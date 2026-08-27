@@ -38,6 +38,10 @@ constexpr uint32_t kOffVdet = 0x12u;
    @0x14E1DA8); nk.exe @0x9E817A44 (in no IDA function) sets it entering hibernate. 3 = no event. */
 constexpr uint16_t kNoVdetEvent = 0x0003u;
 
+/* casio_cassiopeia_e55 nk.exe sub_9E816964 @0x9E816A30 lui $t0, 0xB401 /
+   @0x9E816A34 sh $zero, 0xB400A00E. */
+constexpr uint32_t kOffReg0E = 0x00Eu;
+
 class CasioCassiopeiaE55Asic : public Peripheral {
 public:
     using Peripheral::Peripheral;
@@ -59,6 +63,14 @@ public:
             case kOffStrap:      return kStrapValue;
             default: return Peripheral::ReadHalf(addr);
         }
+    }
+
+    void WriteHalf(uint32_t addr, uint16_t value) override {
+        if (addr - kBase == kOffReg0E) {
+            if (value != 0u) HaltUnsupportedAccess("WriteHalf", addr, value);
+            return;
+        }
+        Peripheral::WriteHalf(addr, value);
     }
 };
 

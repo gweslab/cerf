@@ -82,6 +82,7 @@ from board_catalog_schema import (
     WINDOWS_CE_5,
     WINDOWS_CE_6,
     WINDOWS_CE_7,
+    WINDOWS_CE_8,
     WINDOWS_CE_NET,
     WINDOWS_MOBILE_2003SE,
     WINDOWS_MOBILE_5,
@@ -230,7 +231,7 @@ BOARDS_INFORMATION = [
         "board_id": "omap_3530_evm",
         "supported": True,
         "soc": SOC_OMAP3530,
-        "operating_systems": [WINDOWS_CE_7],
+        "operating_systems": [WINDOWS_CE_7, WINDOWS_CE_8],
         "features": {
             "display": True,
             "sound": True,

@@ -24,6 +24,16 @@
         ]
       },
       {
+        "matcher": "Bash|PowerShell|Glob",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "py -3 ${CLAUDE_PROJECT_DIR}/.claude/hooks/block_references_scan.py",
+            "timeout": 5
+          }
+        ]
+      },
+      {
         "matcher": "AskUserQuestion",
         "hooks": [
           {

@@ -2,6 +2,8 @@
 
 #include "../../peripherals/peripheral_base.h"
 
+#include "../../lcd/display_size_latch.h"
+
 #include <cstdint>
 #include <mutex>
 #include <vector>
@@ -42,7 +44,6 @@ public:
     uint32_t GuestH()      const { return kVisibleH; }
     uint32_t StrideBytes() const { return kPitchBytes; }
     uint32_t FbPa()        const { return kBase + kFbOffset; }
-    uint32_t FbSize()      const { return kFbSize; }
     const uint8_t* FbBytes() const { return fb_.data(); }
 
 private:
@@ -144,7 +145,7 @@ private:
        and 0xA02 (|=1); nk.exe power-down sub_9F0B8720 writes 0xA00=1. Stored R/W. */
     uint16_t reg_0A00_ = 0;
     uint16_t reg_0A02_ = 0;
-    bool     size_published_ = false;
+    DisplaySizeLatch size_latch_;
 
     /* pcmcia.dll card-controller socket-init sub_1355CF0 / deinit sub_1355DC4:
        0x920 |= 3; 0x922 |= 1, |= 2, = 0; 0x1112 |= 1, &= ~1. */

@@ -1,9 +1,9 @@
 #include "casio_cassiopeia_em500_display.h"
 
 #include "../../core/cerf_emulator.h"
+#include "../../core/fatal.h"
 #include "../../core/log.h"
 #include "../../cpu/emulated_memory.h"
-#include "../../host/host_window.h"
 #include "../../state/state_stream.h"
 
 #include <cstring>
@@ -182,9 +182,7 @@ void CasioCassiopeiaEm500Display::RunFill() {
 }
 
 void CasioCassiopeiaEm500Display::MaybePublishDisplaySize() {
-    if (size_published_ || !IsDisplayEnabled()) return;
-    size_published_ = true;
-    emu_->Get<HostWindow>().OnLcdEnabled();
+    size_latch_.PublishOnce(*emu_, IsDisplayEnabled());
 }
 
 void CasioCassiopeiaEm500Display::SaveState(StateWriter& w) const {
@@ -196,21 +194,23 @@ void CasioCassiopeiaEm500Display::SaveState(StateWriter& w) const {
     w.Write(fill_w_); w.Write(fill_h_); w.Write(fill_color_); w.Write(fill_cmd_);
     w.Write(reg_0980_); w.Write(reg_0984_); w.Write(reg_0988_);
     w.Write(reg_098C_); w.Write(reg_0994_); w.Write(reg_099C_);
-    w.Write<uint8_t>(size_published_ ? 1u : 0u);
+    size_latch_.SaveState(w);
 }
 
 void CasioCassiopeiaEm500Display::RestoreState(StateReader& r) {
     uint64_t n = 0;
     r.Read(n);
-    fb_.assign(static_cast<size_t>(n), 0u);
-    if (n) r.ReadBytes(fb_.data(), static_cast<size_t>(n));
+    if (n != kFbSize) {
+        emu_->Get<Fatal>().Die("CasioCassiopeiaEm500Display::RestoreState: framebuffer is %llu "
+                               "bytes, expected %u", static_cast<unsigned long long>(n), kFbSize);
+    }
+    fb_.assign(kFbSize, 0u);
+    r.ReadBytes(fb_.data(), fb_.size());
     r.Read(blit_op_); r.Read(blit_len_words_);
     r.Read(blit_src_); r.Read(blit_dst_);
     r.Read(fill_dst_lo_); r.Read(fill_dst_hi_);
     r.Read(fill_w_); r.Read(fill_h_); r.Read(fill_color_); r.Read(fill_cmd_);
     r.Read(reg_0980_); r.Read(reg_0984_); r.Read(reg_0988_);
     r.Read(reg_098C_); r.Read(reg_0994_); r.Read(reg_099C_);
-    uint8_t pub = 0;
-    r.Read(pub);
-    size_published_ = pub != 0;
+    size_latch_.RestoreState(r);
 }

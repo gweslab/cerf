@@ -2,6 +2,8 @@
 
 #include "../peripheral_base.h"
 
+#include "../../lcd/display_size_latch.h"
+
 #include <cstdint>
 #include <vector>
 
@@ -32,7 +34,6 @@ public:
     uint32_t Bpp()       const { return kSplashBpp; }
     uint32_t StrideBytes() const { return kSplashStride; }
     const uint8_t* FbBytes() const { return fb_.data(); }
-    uint32_t       FbSize()  const { return kVramSize; }
 
 private:
     static constexpr uint32_t kLcdCsBase = 0x0A000000u;
@@ -50,5 +51,5 @@ private:
 
     std::vector<uint8_t> fb_;
     bool     fb_written_      = false;
-    bool     size_published_  = false;
+    DisplaySizeLatch size_latch_;
 };

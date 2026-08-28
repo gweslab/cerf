@@ -45,7 +45,6 @@ public:
     uint32_t GuestH()      const { return display_.GuestH(); }
     uint32_t StrideBytes() const { return display_.StrideBytes(); }
     uint32_t FbPa()        const { return display_.FbPa(); }
-    uint32_t FbSize()      const { return display_.FbSize(); }
     const uint8_t* FbBytes() const { return display_.FbBytes(); }
 
 private:

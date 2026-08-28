@@ -4,7 +4,7 @@
 
 #include "../../boards/board_context.h"
 #include "../../core/cerf_emulator.h"
-#include "../../core/log.h"
+#include "../../core/fatal.h"
 #include "../../peripherals/peripheral_dispatcher.h"
 #include "../../state/state_stream.h"
 #include "../guest_cpu_reset.h"
@@ -74,6 +74,14 @@ public:
     uint32_t MmioBase() const override { return M.base; }
     uint32_t MmioSize() const override { return M.size; }
 
+    bool GetPinLevel(int pin) override {
+        if (pin < 0 || pin > 31) {
+            emu_.Get<Fatal>().Die("Vr41xxGiu::GetPinLevel: pin %d is outside GPIO(31:0)", pin);
+        }
+        std::lock_guard<std::mutex> lk(mtx_);
+        return ((EffectivePinsLocked() >> pin) & 1u) != 0u;
+    }
+
     uint16_t ReadHalf(uint32_t addr) override {
         std::lock_guard<std::mutex> lk(mtx_);
         return ReadHalfLocked(addr - M.base);
@@ -103,8 +111,7 @@ public:
 
     void SetPinLevel(int pin, bool level) override {
         if (pin < 0 || pin > 31) {
-            LOG(Caution, "Vr41xxGiu::SetPinLevel: pin %d is outside GPIO(31:0)\n", pin);
-            CerfFatalExit(CERF_FATAL_RUNTIME_ERROR);
+            emu_.Get<Fatal>().Die("Vr41xxGiu::SetPinLevel: pin %d is outside GPIO(31:0)", pin);
         }
         std::lock_guard<std::mutex> lk(mtx_);
 
@@ -196,22 +203,21 @@ public:
     }
 
 private:
+    /* IOS = 0 reads the pin (VR4111 UM 19.2.3 p401 / 19.2.4 p402, VR4102 UM 18.2.4 p366,
+       VR4121 UM 19.2.4 p450); IOS = 1 reads the driven data (casio_cassiopeia_e55 nk.exe
+       @0x9E816BB8 lhu / ori 0x200 / sh on 0xAB000106). */
+    uint32_t EffectivePinsLocked() const {
+        const uint32_t out = (static_cast<uint32_t>(piod_out_h_) << 16) | piod_out_l_;
+        const uint32_t sel = (static_cast<uint32_t>(iosel_h_) << 16) | iosel_l_;
+        return (out & sel) | (level_ & ~sel);
+    }
+
     uint16_t ReadHalfLocked(uint32_t off) {
         switch (off) {
             case kOffIoSelL: return iosel_l_;
             case kOffIoSelH: return iosel_h_;
-            /* "When the value of the IOS bit in the GIUIOSEL register is '0', reading the
-               PIOD bit enables the corresponding GPIO pin's state to be read"; an output
-               pin reads back the written data (VR4121 UM 19.2.3/19.2.4, VR4102 UM
-               18.2.3/18.2.4). */
-            case kOffPiodL:
-                return static_cast<uint16_t>(
-                    (piod_out_l_ & iosel_l_) |
-                    (static_cast<uint16_t>(level_) & static_cast<uint16_t>(~iosel_l_)));
-            case kOffPiodH:
-                return static_cast<uint16_t>(
-                    (piod_out_h_ & iosel_h_) |
-                    (static_cast<uint16_t>(level_ >> 16) & static_cast<uint16_t>(~iosel_h_)));
+            case kOffPiodL:     return static_cast<uint16_t>(EffectivePinsLocked());
+            case kOffPiodH:     return static_cast<uint16_t>(EffectivePinsLocked() >> 16);
             case kOffIntStatL:  return intstat_l_;
             case kOffIntStatH:  return intstat_h_;
             case kOffIntEnL:    return inten_l_;

@@ -2,8 +2,8 @@
 
 #include "../../boards/board_context.h"
 #include "../../core/cerf_emulator.h"
+#include "../../core/fatal.h"
 #include "../../core/log.h"
-#include "../../host/host_window.h"
 #include "../peripheral_dispatcher.h"
 #include "../../state/state_stream.h"
 
@@ -21,11 +21,10 @@ void IteIt8181::OnReady() {
 
 void IteIt8181::PublishScreenSizeOnWriteEdge() {
     fb_written_ = true;
-    if (size_published_) return;
-    size_published_ = true;
-    LOG(Lcd, "IteIt8181: splash surface %ux%u %ubpp stride=%u\n",
-        GuestW(), GuestH(), Bpp(), StrideBytes());
-    emu_.Get<HostWindow>().OnLcdEnabled();
+    if (size_latch_.PublishOnce(emu_, true)) {
+        LOG(Lcd, "IteIt8181: splash surface %ux%u %ubpp stride=%u\n",
+            GuestW(), GuestH(), Bpp(), StrideBytes());
+    }
 }
 
 uint8_t IteIt8181::ReadByte(uint32_t addr) {
@@ -68,16 +67,20 @@ void IteIt8181::SaveState(StateWriter& w) {
     w.Write<uint64_t>(fb_.size());
     if (!fb_.empty()) w.WriteBytes(fb_.data(), fb_.size());
     w.Write<uint8_t>(fb_written_ ? 1u : 0u);
-    w.Write<uint8_t>(size_published_ ? 1u : 0u);
+    size_latch_.SaveState(w);
 }
 
 void IteIt8181::RestoreState(StateReader& r) {
     uint64_t n = 0; r.Read(n);
-    fb_.assign(static_cast<size_t>(n), 0u);
-    if (n) r.ReadBytes(fb_.data(), static_cast<size_t>(n));
+    if (n != kVramSize) {
+        emu_.Get<Fatal>().Die("IteIt8181::RestoreState: VRAM is %llu bytes, expected %u",
+                              static_cast<unsigned long long>(n), kVramSize);
+    }
+    fb_.assign(kVramSize, 0u);
+    r.ReadBytes(fb_.data(), fb_.size());
     uint8_t b = 0;
     r.Read(b); fb_written_     = (b != 0);
-    r.Read(b); size_published_ = (b != 0);
+    size_latch_.RestoreState(r);
 }
 
 REGISTER_SERVICE(IteIt8181);

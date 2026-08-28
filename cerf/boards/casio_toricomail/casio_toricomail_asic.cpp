@@ -2,9 +2,9 @@
 
 #include "../../boards/board_context.h"
 #include "../../core/cerf_emulator.h"
+#include "../../core/fatal.h"
 #include "../../core/log.h"
 #include "../../cpu/emulated_memory.h"
-#include "../../host/host_window.h"
 #include "../../peripherals/peripheral_dispatcher.h"
 #include "../../socs/guest_cpu_reset.h"
 #include "../../socs/vr41xx/vr41xx_giu.h"
@@ -126,9 +126,7 @@ void CasioToricomailAsic::RunBlit7Locked() {
 }
 
 void CasioToricomailAsic::MaybePublishDisplaySize() {
-    if (size_published_ || !IsDisplayEnabled()) return;
-    size_published_ = true;
-    emu_.Get<HostWindow>().OnLcdEnabled();
+    size_latch_.PublishOnce(emu_, IsDisplayEnabled());
 }
 
 void CasioToricomailAsic::SetSideButton(uint16_t mask, bool pressed) {
@@ -388,7 +386,7 @@ void CasioToricomailAsic::SaveState(StateWriter& w) {
     for (uint16_t v : suspend_save_) w.Write(v);
     w.Write(reg_1130_);
     w.Write(reg_0A00_); w.Write(reg_0A02_);
-    w.Write<uint8_t>(size_published_ ? 1u : 0u);
+    size_latch_.SaveState(w);
     w.Write(reg_1120_);
     w.Write(reg_0920_); w.Write(reg_0922_); w.Write(reg_1112_);
     w.Write(reg_0B00_); w.Write(reg_0B10_); w.Write(reg_0B02_);
@@ -398,8 +396,12 @@ void CasioToricomailAsic::SaveState(StateWriter& w) {
 
 void CasioToricomailAsic::RestoreState(StateReader& r) {
     uint64_t n = 0; r.Read(n);
-    fb_.assign(static_cast<size_t>(n), 0u);
-    if (n) r.ReadBytes(fb_.data(), static_cast<size_t>(n));
+    if (n != kFbSize) {
+        emu_.Get<Fatal>().Die("CasioToricomailAsic::RestoreState: framebuffer is %llu bytes, "
+                              "expected %u", static_cast<unsigned long long>(n), kFbSize);
+    }
+    fb_.assign(kFbSize, 0u);
+    r.ReadBytes(fb_.data(), fb_.size());
     r.Read(fill_value_); r.Read(fill_width_); r.Read(fill_height_);
     r.Read(fill_dst_lo_); r.Read(fill_dst_hi_);
     r.Read(fill_src_lo_); r.Read(fill_src_hi_); r.Read(blit_rop_); r.Read(blit_mode_);
@@ -415,7 +417,7 @@ void CasioToricomailAsic::RestoreState(StateReader& r) {
     for (uint16_t& v : suspend_save_) r.Read(v);
     r.Read(reg_1130_);
     r.Read(reg_0A00_); r.Read(reg_0A02_);
-    uint8_t sp = 0; r.Read(sp); size_published_ = (sp != 0);
+    size_latch_.RestoreState(r);
     r.Read(reg_1120_);
     r.Read(reg_0920_); r.Read(reg_0922_); r.Read(reg_1112_);
     r.Read(reg_0B00_); r.Read(reg_0B10_); r.Read(reg_0B02_);

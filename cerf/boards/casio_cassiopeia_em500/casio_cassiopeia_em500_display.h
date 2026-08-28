@@ -1,5 +1,7 @@
 #pragma once
 
+#include "../../lcd/display_size_latch.h"
+
 #include <cstdint>
 #include <vector>
 
@@ -29,7 +31,6 @@ public:
     uint32_t GuestH()      const { return 320u; }
     uint32_t StrideBytes() const { return 512u; }
     uint32_t FbPa()        const { return kBase + kFbOffset; }
-    uint32_t FbSize()      const { return kFbSize; }
     const uint8_t* FbBytes() const { return fb_.data(); }
 
 private:
@@ -71,5 +72,5 @@ private:
     uint32_t reg_0994_ = 0;
     uint32_t reg_099C_ = 0;
 
-    bool size_published_ = false;
+    DisplaySizeLatch size_latch_;
 };

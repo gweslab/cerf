@@ -63,9 +63,9 @@ constexpr uint16_t kAdcMax = 1023u;
 
 constexpr uint16_t kSyntheticHoldScans = 6u;
 
-/* PIUSTBLREG D5:0 STABLE, both reset rows 0x0007 (VR4121 UM 20.3.4, VR4102 UM 19.3.4);
-   PIUCMDREG D3:0 ADCMD, both reset rows 0x000F = "A/D converter standby mode request"
-   (VR4121 UM 20.3.5, VR4102 UM 19.3.5). */
+/* PIUSTBLREG D5:0 STABLE, both reset rows 0x0007 (VR4111 UM 20.3.4, VR4121 UM 20.3.4,
+   VR4102 UM 19.3.4); PIUCMDREG D3:0 ADCMD, both reset rows 0x000F = "A/D converter standby
+   mode request" (VR4111 UM 20.3.5, VR4121 UM 20.3.5, VR4102 UM 19.3.5). */
 constexpr uint16_t kStblPowerOn = 0x0007u;
 constexpr uint16_t kCmdPowerOn  = 0x000Fu;
 
@@ -77,6 +77,5 @@ struct Vr41xxPiuModel {
     uint16_t sivl_power_on;             /* PIUSIVLREG reset row                        */
     bool     has_penstp;                /* PIUCNTREG D14 PENSTP exists                 */
     bool     penstc_latched_by_penchg;  /* PIUCNTREG D13 PENSTC holds while PENCHGINTR */
-    bool     page_buf_x_minus_first;    /* PIUPBn0 holds X- (VR4121 UM Table 20-4)     */
 };
 }  /* namespace cerf_vr41xx_piu_detail */

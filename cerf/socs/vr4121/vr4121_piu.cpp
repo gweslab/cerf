@@ -22,8 +22,6 @@ constexpr Vr41xxPiuModel kModel = {
     /* "PENSTC does not change while PENCHGINTR is set to 1, even if the touch panel
        contact state changes between release and touch" (UM 20.3.1, 20.3.2). */
     /*penstc_latched_by_penchg=*/true,
-    /* UM Table 20-4: PIUPB00REG holds X-. */
-    /*page_buf_x_minus_first=*/true,
 };
 
 class Vr4121Piu : public Vr41xxPiuBase<SocFamily::VR4121, kModel> {

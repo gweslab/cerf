@@ -11,8 +11,8 @@
 
 namespace {
 
-/* PADDATA(9:0) is the A/D converter's 10-bit sampling data (VR4121 UM 20.3.9,
-   VR4102 UM 19.3.9). */
+/* PADDATA(9:0) is the A/D converter's 10-bit sampling data (VR4111 UM 20.3.9, VR4121 UM
+   20.3.9, VR4102 UM 19.3.9). */
 constexpr uint16_t kAdcMax = 1023u;
 
 uint16_t MapAxis(int v, int v_max, uint16_t adc_max) {
@@ -30,7 +30,8 @@ public:
         auto* bd = emu_.TryGet<BoardContext>();
         if (!bd) return false;
         const SocFamily soc = bd->GetSoc();
-        return soc == SocFamily::VR4102 || soc == SocFamily::VR4121;
+        return soc == SocFamily::VR4102 || soc == SocFamily::VR4111 ||
+               soc == SocFamily::VR4121;
     }
 
     void OnPenDown(int x, int y) override { Drive(true, x, y); }

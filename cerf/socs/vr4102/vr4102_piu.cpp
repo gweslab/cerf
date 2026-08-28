@@ -20,8 +20,6 @@ constexpr Vr41xxPiuModel kModel = {
     /*has_penstp=*/true,
     /* PIUCNTREG D13 PENSTC, R: "Current touch panel contact state" (UM 19.3.1). */
     /*penstc_latched_by_penchg=*/false,
-    /* UM Table 19-4: PIUPB00REG holds X+. */
-    /*page_buf_x_minus_first=*/false,
 };
 
 class Vr4102Piu : public Vr41xxPiuBase<SocFamily::VR4102, kModel> {

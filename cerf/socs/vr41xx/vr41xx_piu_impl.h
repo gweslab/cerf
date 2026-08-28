@@ -331,27 +331,20 @@ private:
     }
 
     void SampleOnceLocked() {
-        /* VR4121 UM Table 20-4: PIUPBn0 = X-, PIUPBn1 = X+, PIUPBn2 = Y-, PIUPBn3 = Y+.
-           VR4102 UM Table 19-4: PIUPBn0 = X+, PIUPBn1 = X-, PIUPBn2 = Y+, PIUPBn3 = Y-.
-           PIUPBn4 = Z (touch pressure) on both. touch.dll sub_15A0BB0 recovers
-           rawX = (X+ - X- + 1023)/2. */
+        /* VR4111 UM Table 20-4 and VR4121 UM Table 20-4 name PIUPBn0 X- and PIUPBn1 X+, VR4102
+           UM Table 19-4 the reverse, yet every driver recovers (PIUPBn0 - PIUPBn1 + 1023) >> 1:
+           nec_mobilepro_700_ce2 touch.dll sub_15A0BB0, casio_toricomail_ce212 touch.dll
+           sub_1370AB0, casio_cassiopeia_e55 touch.dll sub_14D073C. Slot 0 rises. */
         const int page = next_page_;
         uint16_t (&buf)[5] = page_buf_[page];
-        const uint16_t x_plus  = static_cast<uint16_t>(pos_x_ & 0x3FFu);
-        const uint16_t x_minus = static_cast<uint16_t>((kAdcMax - pos_x_) & 0x3FFu);
-        const uint16_t y_plus  = static_cast<uint16_t>(pos_y_ & 0x3FFu);
-        const uint16_t y_minus = static_cast<uint16_t>((kAdcMax - pos_y_) & 0x3FFu);
-        if constexpr (M.page_buf_x_minus_first) {
-            buf[0] = kValid | x_minus;
-            buf[1] = kValid | x_plus;
-            buf[2] = kValid | y_minus;
-            buf[3] = kValid | y_plus;
-        } else {
-            buf[0] = kValid | x_plus;
-            buf[1] = kValid | x_minus;
-            buf[2] = kValid | y_plus;
-            buf[3] = kValid | y_minus;
-        }
+        const uint16_t x_rise = static_cast<uint16_t>(pos_x_ & 0x3FFu);
+        const uint16_t x_fall = static_cast<uint16_t>((kAdcMax - pos_x_) & 0x3FFu);
+        const uint16_t y_rise = static_cast<uint16_t>(pos_y_ & 0x3FFu);
+        const uint16_t y_fall = static_cast<uint16_t>((kAdcMax - pos_y_) & 0x3FFu);
+        buf[0] = kValid | x_rise;
+        buf[1] = kValid | x_fall;
+        buf[2] = kValid | y_rise;
+        buf[3] = kValid | y_fall;
         const std::optional<uint16_t> z = emu_.Get<Vr41xxPiuPanel>().PressureSample();
         buf[4] = z ? static_cast<uint16_t>(kValid | (*z & 0x3FFu)) : 0u;
 

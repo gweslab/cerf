@@ -2,6 +2,8 @@
 
 #include "../../core/cerf_emulator.h"
 #include "../../peripherals/peripheral_dispatcher.h"
+#include "../../socs/guest_cpu_reset.h"
+#include "../../state/state_stream.h"
 #include "../board_context.h"
 
 #include <cstdint>
@@ -42,6 +44,32 @@ constexpr uint16_t kNoVdetEvent = 0x0003u;
    @0x9E816A34 sh $zero, 0xB400A00E. */
 constexpr uint32_t kOffReg0E = 0x00Eu;
 
+/* casio_cassiopeia_e55 pcmcia.dll sub_14C0E8C (+0x02 |= 1, +0x00 |= 1, +0x02 &= ~1,
+   +0x00 |= 2), sub_14C1078 (+0x00 = 0 / = 12, +0x06 &= ~1 / |= 1), sub_14C096C and
+   sub_14C0A70 (+0x02 |= 2 / &= ~2, +0x00 &= ~4 / |= 4). */
+constexpr uint32_t kOffCtrl0 = 0x000u;
+constexpr uint32_t kOffCtrl2 = 0x002u;
+constexpr uint32_t kOffCtrl6 = 0x006u;
+constexpr uint16_t kCtrl0Writable = 0x000Fu;
+constexpr uint16_t kCtrl2Writable = 0x0003u;
+constexpr uint16_t kCtrl6Writable = 0x0001u;
+
+/* casio_cassiopeia_e55 pcmcia.dll: sub_14C0E8C no-card arm on (+0x04 & 6) != 0, poll exit
+   on (+0x04 & 1); sub_14C0B84 card-detect on (+0x04 & 6) == 0. */
+constexpr uint32_t kOffStatus = 0x004u;
+constexpr uint16_t kStatusNoCard = 0x000Eu;
+
+/* casio_cassiopeia_e55 pcmcia.dll sub_14C0728 zeroes +0x0A @0x14C08AC, +0x0C @0x14C08B4,
+   +0x08 @0x14C08C0; no function with an xref to the mapped base reads them. */
+constexpr uint32_t kOffInit08 = 0x008u;
+constexpr uint32_t kOffInit0A = 0x00Au;
+constexpr uint32_t kOffInit0C = 0x00Cu;
+
+/* casio_cassiopeia_e55 pcmcia.dll sub_14C096C / sub_14C0A70 save +0x14, set its D0 for
+   the card access and restore the saved value; sub_14C14C0 clears or sets the same bit
+   per socket. D2:1 are the read-only strap. */
+constexpr uint16_t kStrapWritable = 0x0001u;
+
 class CasioCassiopeiaE55Asic : public Peripheral {
 public:
     using Peripheral::Peripheral;
@@ -51,27 +79,70 @@ public:
         return bd && bd->GetBoard() == Board::CasioCassiopeiaE55;
     }
 
-    void OnReady() override { emu_.Get<PeripheralDispatcher>().Register(this); }
+    void OnReady() override {
+        emu_.Get<PeripheralDispatcher>().Register(this);
+        emu_.Get<GuestCpuReset>().RegisterResetListener([this](ResetLineKind) {
+            ctrl0_ = 0u;
+            ctrl2_ = 0u;
+            ctrl6_ = 0u;
+            card_access_ = 0u;
+        });
+    }
 
     uint32_t MmioBase() const override { return kBase; }
     uint32_t MmioSize() const override { return kSize; }
 
     uint16_t ReadHalf(uint32_t addr) override {
         switch (addr - kBase) {
+            case kOffCtrl0:      return ctrl0_;
+            case kOffCtrl2:      return ctrl2_;
+            case kOffStatus:     return kStatusNoCard;
+            case kOffCtrl6:      return ctrl6_;
             case kOffButtons:    return kButtonsAllReleased;
             case kOffVdet:       return kNoVdetEvent;
-            case kOffStrap:      return kStrapValue;
+            case kOffStrap:      return static_cast<uint16_t>(kStrapValue | card_access_);
             default: return Peripheral::ReadHalf(addr);
         }
     }
 
     void WriteHalf(uint32_t addr, uint16_t value) override {
-        if (addr - kBase == kOffReg0E) {
-            if (value != 0u) HaltUnsupportedAccess("WriteHalf", addr, value);
-            return;
+        switch (addr - kBase) {
+            case kOffCtrl0: ctrl0_ = Accept(addr, value, kCtrl0Writable); return;
+            case kOffCtrl2: ctrl2_ = Accept(addr, value, kCtrl2Writable); return;
+            case kOffCtrl6: ctrl6_ = Accept(addr, value, kCtrl6Writable); return;
+            case kOffInit08:
+            case kOffInit0A:
+            case kOffInit0C:
+            case kOffReg0E:
+                if (value != 0u) HaltUnsupportedAccess("WriteHalf", addr, value);
+                return;
+            case kOffStrap:
+                if ((value & kStrapValue) != kStrapValue) {
+                    HaltUnsupportedAccess("WriteHalf clears the strap", addr, value);
+                }
+                card_access_ = Accept(addr, value, kStrapWritable | kStrapValue) & kStrapWritable;
+                return;
+            default: Peripheral::WriteHalf(addr, value); return;
         }
-        Peripheral::WriteHalf(addr, value);
     }
+
+    void SaveState(StateWriter& w) override {
+        w.Write(ctrl0_); w.Write(ctrl2_); w.Write(ctrl6_); w.Write(card_access_);
+    }
+    void RestoreState(StateReader& r) override {
+        r.Read(ctrl0_); r.Read(ctrl2_); r.Read(ctrl6_); r.Read(card_access_);
+    }
+
+private:
+    uint16_t Accept(uint32_t addr, uint16_t value, uint16_t writable) {
+        if ((value & ~writable) != 0u) HaltUnsupportedAccess("WriteHalf", addr, value);
+        return value;
+    }
+
+    uint16_t ctrl0_ = 0u;
+    uint16_t ctrl2_ = 0u;
+    uint16_t ctrl6_ = 0u;
+    uint16_t card_access_ = 0u;
 };
 
 }  /* namespace */

@@ -33,6 +33,20 @@ constexpr uint16_t kReg0ABit1   = 0x0002u;
 constexpr uint32_t kOffSelect  = 0x000u;
 constexpr uint16_t kSelectIdle = 0x4000u;
 
+/* casio_cassiopeia_e55 nk.exe sub_9E815340 @0x9E815348 lh 4($t0) / andi 0xFFFE / @0x9E815350 sh,
+   sub_9E81535C @0x9E815364 lh / ori 1 / @0x9E81536C sh; socket.dll sub_1480E24 claim arm
+   @0x1480E40 &= ~1 with a 100-iteration settle spin, release arm @0x1480EE8 |= 1. All four are
+   RMW of bit 0 and none branches on the value. */
+constexpr uint32_t kOffClaim  = 0x004u;
+constexpr uint16_t kClaimLine = 0x0001u;
+
+/* casio_cassiopeia_e55 socket.dll sub_1480E0C @0x1480E14 reads +0x08 unmasked, and sub_148091C
+   @0x1480960 restarts unless six reads 50 ms apart agree. nk.exe sub_9E81544C returns
+   (v & 7) == 0, and @0x9E814B28 beqz sends every non-zero id to loc_9E8161FC, the give-up
+   block ending in cop0 0x23. */
+constexpr uint32_t kOffModuleId  = 0x008u;
+constexpr uint16_t kModuleIdNone = 0x0000u;
+
 /* casio_cassiopeia_e55 nk.exe @0x9E818048 lh 0x404($a0) / ori 0x200 / @0x9E818050 sh;
    sub_9E83CA38 @0x9E83CA4C lhu 0xB4008404 / andi 0xFDFF / @0x9E83CA58 sh. */
 constexpr uint32_t kOffReg404   = 0x404u;
@@ -51,6 +65,7 @@ public:
         emu_.Get<PeripheralDispatcher>().Register(this);
         emu_.Get<GuestCpuReset>().RegisterResetListener([this](ResetLineKind) {
             enable_ = 0u;
+            claim_  = 0u;
         });
     }
 
@@ -69,6 +84,12 @@ public:
         }
         if (addr - kBase == kOffSelect) {
             return kSelectIdle;
+        }
+        if (addr - kBase == kOffModuleId) {
+            return kModuleIdNone;
+        }
+        if (addr - kBase == kOffClaim) {
+            return claim_;
         }
         return Peripheral::ReadHalf(addr);
     }
@@ -93,18 +114,28 @@ public:
             }
             return;
         }
+        if (addr - kBase == kOffClaim) {
+            if (value & ~static_cast<uint16_t>(kClaimLine)) {
+                HaltUnsupportedAccess("WriteHalf", addr, value);
+            }
+            claim_ = static_cast<uint16_t>(value & kClaimLine);
+            return;
+        }
         Peripheral::WriteHalf(addr, value);
     }
 
     void SaveState(StateWriter& w) override {
         w.Write(enable_);
+        w.Write(claim_);
     }
     void RestoreState(StateReader& r) override {
         r.Read(enable_);
+        r.Read(claim_);
     }
 
 private:
     uint16_t enable_ = 0u;
+    uint16_t claim_  = 0u;
 };
 
 }  /* namespace */

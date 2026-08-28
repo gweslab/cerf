@@ -28,10 +28,16 @@ constexpr uint32_t kOffReg0A    = 0x00Au;
 constexpr uint16_t kReg0ABit1   = 0x0002u;
 
 /* casio_cassiopeia_e55 nk.exe @0x9E81527C lh 8($t0) / and 7 / @0x9E815288 bnez;
-   @0x9E81528C li 0x4000 / @0x9E8152D4 lh 0($t0) / and 7 / xor / @0x9E8152E4 beqz /
-   @0x9E8152EC sh 0($t0); @0x9E8166A4 andi 3; @0x9E817E54 andi 7; socket.dll sub_1480E24. */
+   @0x9E81528C / @0x9E8152BC / @0x9E8152C8 li 0x4000 / 0x5002 / 0x4007, @0x9E8152D4 lh 0($t0) /
+   and 7 / xor / @0x9E8152E4 beqz / @0x9E8152EC sh 0($t0); @0x9E8166A4 andi 3;
+   @0x9E817E54 andi 7; socket.dll sub_1480E24. */
 constexpr uint32_t kOffSelect  = 0x000u;
 constexpr uint16_t kSelectIdle = 0x4000u;
+
+/* casio_cassiopeia_e55 socket.dll sub_1480E24 claim arm writes (old & 0xE0F8) | id |
+   (a3 & 0x1F00), plus 0x1000 when id == 2; release arm (old & 0xE0F8) | id. nk.exe
+   sub_9E815308 @0x9E815314 ori 7 and sub_9E815324 @0x9E815330 andi 0xFFF8 reach bits 2:0. */
+constexpr uint16_t kSelectDriverOwned = 0x1F07u;
 
 /* casio_cassiopeia_e55 nk.exe sub_9E815340 @0x9E815348 lh 4($t0) / andi 0xFFFE / @0x9E815350 sh,
    sub_9E81535C @0x9E815364 lh / ori 1 / @0x9E81536C sh; socket.dll sub_1480E24 claim arm
@@ -66,6 +72,7 @@ public:
         emu_.Get<GuestCpuReset>().RegisterResetListener([this](ResetLineKind) {
             enable_ = 0u;
             claim_  = 0u;
+            select_ = kSelectIdle;
         });
     }
 
@@ -83,7 +90,7 @@ public:
             return 0u;
         }
         if (addr - kBase == kOffSelect) {
-            return kSelectIdle;
+            return select_;
         }
         if (addr - kBase == kOffModuleId) {
             return kModuleIdNone;
@@ -121,21 +128,33 @@ public:
             claim_ = static_cast<uint16_t>(value & kClaimLine);
             return;
         }
+        if (addr - kBase == kOffSelect) {
+            const uint16_t others = static_cast<uint16_t>(~kSelectDriverOwned);
+            if ((value & others) != (select_ & others)) {
+                HaltUnsupportedAccess("WriteHalf", addr, value);
+            }
+            select_ = static_cast<uint16_t>((select_ & others) |
+                                            (value & kSelectDriverOwned));
+            return;
+        }
         Peripheral::WriteHalf(addr, value);
     }
 
     void SaveState(StateWriter& w) override {
         w.Write(enable_);
         w.Write(claim_);
+        w.Write(select_);
     }
     void RestoreState(StateReader& r) override {
         r.Read(enable_);
         r.Read(claim_);
+        r.Read(select_);
     }
 
 private:
     uint16_t enable_ = 0u;
     uint16_t claim_  = 0u;
+    uint16_t select_ = kSelectIdle;
 };
 
 }  /* namespace */

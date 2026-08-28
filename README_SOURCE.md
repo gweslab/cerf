@@ -118,6 +118,8 @@ The environment includes several contraversional things you need to know before 
 - Thinking is set to *high*; **bypass permissions mode** is set
 - Several own/3rd-party **skills** included
 - Powerful hooks triggering when agent might do something bad to the codebase
+- IDA MCP is ready to be installed at ``tools\ida_server.py`` and ``tools\ida_claude.py``
+- FS Read MCP is a workaround for ``Read()`` tool, useful for ``/tracking restore`` and massive text files (``tools\fs_read_mcp.py``)
 
 The environment gives you the **`/start-board-implementation`** skill. Run the skill and agent will start the new board bring-up on its own. You need experience - the skill won't do all the work instead of you. (Tho honestly speaking, there have been cases where Claude alone brought a board to a bootable state)
 

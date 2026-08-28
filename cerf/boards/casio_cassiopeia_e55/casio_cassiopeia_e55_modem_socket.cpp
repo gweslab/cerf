@@ -27,6 +27,11 @@ constexpr uint16_t kSource0Status = 0x0001u;
 constexpr uint32_t kOffReg0A    = 0x00Au;
 constexpr uint16_t kReg0ABit1   = 0x0002u;
 
+/* casio_cassiopeia_e55 nk.exe @0x9E818048 lh 0x404($a0) / ori 0x200 / @0x9E818050 sh;
+   sub_9E83CA38 @0x9E83CA4C lhu 0xB4008404 / andi 0xFDFF / @0x9E83CA58 sh. */
+constexpr uint32_t kOffReg404   = 0x404u;
+constexpr uint16_t kReg404Bit9  = 0x0200u;
+
 class CasioCassiopeiaE55ModemSocket : public Peripheral {
 public:
     using Peripheral::Peripheral;
@@ -53,6 +58,9 @@ public:
         if (addr - kBase == kOffReg0A) {
             return 0u;
         }
+        if (addr - kBase == kOffReg404) {
+            return 0u;
+        }
         return Peripheral::ReadHalf(addr);
     }
 
@@ -66,6 +74,12 @@ public:
         }
         if (addr - kBase == kOffReg0A) {
             if (value & ~static_cast<uint16_t>(kReg0ABit1)) {
+                HaltUnsupportedAccess("WriteHalf", addr, value);
+            }
+            return;
+        }
+        if (addr - kBase == kOffReg404) {
+            if (value & ~static_cast<uint16_t>(kReg404Bit9)) {
                 HaltUnsupportedAccess("WriteHalf", addr, value);
             }
             return;

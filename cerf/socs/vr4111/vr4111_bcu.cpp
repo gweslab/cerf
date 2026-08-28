@@ -1,5 +1,7 @@
 #include "../vr41xx/vr41xx_reg_window_impl.h"
 
+#include "vr4111_bus_error.h"
+
 #include <cstdint>
 
 namespace {
@@ -47,9 +49,42 @@ static_assert((0x3777u & 0xC888u) == 0u && (0x3777u | 0xC888u) == 0xFFFFu,
 static_assert((0x3FFFu & 0xC000u) == 0u && (0x3FFFu | 0xC000u) == 0xFFFFu,
               "BCURFCNTREG writable and RFU-read-0 bits must partition all 16");
 
+/* UM 11.2.4 p269 BCUERRSTREG (0x0B00 000C): D0 BERRST R/W1C, D[15..1] Reserved R
+   "Write 0 to these bits.  0 is returned after a read." */
+constexpr uint32_t kErrStAddr     = 0x0B00000Cu;
+constexpr uint16_t kErrStReserved = 0xFFFEu;
+
 class Vr4111Bcu : public Vr41xxRegWindowBase<SocFamily::VR4111, kModel> {
 public:
     using Vr41xxRegWindowBase::Vr41xxRegWindowBase;
+
+    uint16_t ReadHalf(uint32_t addr) override {
+        if (addr == kErrStAddr) return emu_.Get<Vr4111BusError>().ReadStatus();
+        return Vr41xxRegWindowBase::ReadHalf(addr);
+    }
+
+    void WriteHalf(uint32_t addr, uint16_t value) override {
+        if (addr != kErrStAddr) {
+            Vr41xxRegWindowBase::WriteHalf(addr, value);
+            return;
+        }
+        if (value & kErrStReserved) {
+            HaltUnsupportedAccess("WriteHalf sets a Reserved bit", addr, value);
+        }
+        emu_.Get<Vr4111BusError>().WriteStatus(value);
+    }
+
+    void SaveState(StateWriter& w) override {
+        Vr41xxRegWindowBase::SaveState(w);
+        emu_.Get<Vr4111BusError>().SaveState(w);
+    }
+
+    void RestoreState(StateReader& r) override {
+        Vr41xxRegWindowBase::RestoreState(r);
+        emu_.Get<Vr4111BusError>().RestoreState(r);
+    }
+
+    void PostRestore() override { emu_.Get<Vr4111BusError>().PostRestore(); }
 };
 
 }

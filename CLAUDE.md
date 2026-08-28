@@ -53,6 +53,7 @@ The following pages are authoritative project knowledge; their full contents are
 - **[agent_docs/deep_sleep.md](agent_docs/deep_sleep.md)** - guest suspend/resume.
 - **[agent_docs/guest_additions.md](agent_docs/guest_additions.md)** - Guest Additions.
 - **[agent_docs/launcher.md](agent_docs/launcher.md)** - launcher, config files, transactional mode.
+- **[agent_docs/leds.md](agent_docs/leds.md)** - LEDs and LED buttons.
 
 ## Build
 

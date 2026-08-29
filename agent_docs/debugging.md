@@ -555,12 +555,19 @@ at a given VA, so the match is unambiguous where a name lookup is not.
    (concatenate every loaded partition in load order if there is more
    than one), or just boot CERF once and read the `[TRACE] bundle
    CRC32 = 0x…` line.
-3. Create a `.cpp` named after the investigation (for example
-   `wm5_msh_handle_corruption.cpp`). If all hooks in the file stay in
-   one guest module, name the file after that module. Examples:
-   `nk.exe` → `nk_trace.cpp`, `coredll.dll` → `coredll_trace.cpp`,
-   `gwes.exe` → `gwes_trace.cpp`. This form is optional. It shows which
-   binary the file hooks. Define one `Service` subclass
+3. Create a `.cpp` named after the guest PE it hooks. A trace file is
+   normally bound to ONE target module, so the usual shape is one file
+   per executable: `nk.exe` → `nk_trace.cpp`, `coredll.dll` →
+   `coredll_trace.cpp`, `gwes.exe` → `gwes_trace.cpp`. When you need
+   more data from an address in a module you already hook, extend the
+   existing hooks in that module's file. Do not open a second file for
+   the same PE. An investigation that crosses several modules - a touch
+   path through the driver, the kernel and gwes - is still one file per
+   module, never one file for the investigation. The module the hook
+   lands in names the file, not the bug you chase. Name a file after the
+   investigation (for example `wm5_msh_handle_corruption.cpp`) only when
+   its hooks belong to no PE at all, for example addresses outside every
+   loaded module. Define one `Service` subclass
    whose `OnReady` calls `emu_.Get<TraceManager>().RegisterForBundle(
    kBundleCrc32, [&]{ ... });`. Inside the lambda, call `OnPc` and
    `OnRunLoopIter` as the investigation requires. Read memory inside

@@ -25,6 +25,13 @@ public:
     void SaveState(StateWriter& w) override;
     void RestoreState(StateReader& r) override;
 
+protected:
+    /* A transport-specific reader may claim a vendor CDB and provide its IN
+       payload. Returning false leaves normal SPC/SBC error handling intact. */
+    virtual bool HandleVendorScsiCommand(const uint8_t* cdb, uint8_t cdb_len,
+                                         bool data_in, uint32_t transfer_len,
+                                         std::vector<uint8_t>& response);
+
 private:
     enum class Phase { AwaitingCbw, DataOut, ReplyReady };
 

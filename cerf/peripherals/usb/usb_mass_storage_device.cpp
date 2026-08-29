@@ -55,6 +55,14 @@ void PutBe32(std::vector<uint8_t>& v, uint32_t x) {
 
 UsbMassStorageDevice::UsbMassStorageDevice(DiskImage& disk) : disk_(disk) {}
 
+bool UsbMassStorageDevice::HandleVendorScsiCommand(const uint8_t* /*cdb*/,
+                                                    uint8_t /*cdb_len*/,
+                                                    bool /*data_in*/,
+                                                    uint32_t /*transfer_len*/,
+                                                    std::vector<uint8_t>& /*response*/) {
+    return false;
+}
+
 std::vector<uint8_t> UsbMassStorageDevice::BuildDeviceDescriptor() const {
     return {
         18u, kDescDevice,
@@ -216,6 +224,15 @@ void UsbMassStorageDevice::ExecuteScsiCommand() {
         d[12] = sense_asc_;
         d[13] = sense_ascq_;
         pending_in_.insert(pending_in_.end(), d.begin(), d.end());
+        QueueCsw(kCswStatusPassed);
+        return;
+    }
+
+    std::vector<uint8_t> vendor_response;
+    if (HandleVendorScsiCommand(cbwcb_, cbwcb_len_, cbw_dir_in_, cbw_data_len_,
+                                vendor_response)) {
+        pending_in_.insert(pending_in_.end(), vendor_response.begin(), vendor_response.end());
+        SetSense(kSenseNoSense, 0u, 0u);
         QueueCsw(kCswStatusPassed);
         return;
     }

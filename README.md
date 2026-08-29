@@ -39,6 +39,14 @@ See ``cerf.exe`` command line usage at [cerf.cx/articles/command-line](https://c
   </thead>
   <tbody>
     <tr>
+      <td align="center"><img src="launcher/assets/icons/badge_mips.png" align="middle" title="MIPS" alt="MIPS"/><br/><b>NEC VR4111</b><br/><sub>MIPS III</sub></td>
+      <td>
+        <img src="cerf/assets/icons_sources/board.svg" width="16" height="16" title="PDA" alt="PDA"/> <b>Casio Cassiopeia E-55</b> <code>casio_cassiopeia_e55</code><br/>
+        Palm-size PC
+      </td>
+      <td><img src="cerf/assets/icons_sources/display.svg" width="32" height="32" title="Display" alt="Display"/> <img src="cerf/assets/icons_sources/stylus.svg" width="32" height="32" title="Touch" alt="Touch"/> <img src="cerf/assets/icons_sources/keyboard.svg" width="32" height="32" title="Keyboard" alt="Keyboard"/> <img src="cerf/assets/icons_sources/ga_autoresize.svg" width="32" height="32" title="Guest Additions" alt="Guest Additions"/> <img src="cerf/assets/icons_sources/pcmcia_enabled.svg" width="32" height="32" title="PCMCIA" alt="PCMCIA"/> <img src="cerf/assets/icons_sources/internet.svg" width="32" height="32" title="Network" alt="Network"/> <img src="cerf/assets/icons_sources/serial_com.svg" width="32" height="32" title="Serial Port" alt="Serial Port"/></td>
+    </tr>
+    <tr>
       <td align="center"><img src="launcher/assets/icons/badge_mips.png" align="middle" title="MIPS" alt="MIPS"/><br/><b>NEC VR4122</b><br/><sub>MIPS III</sub></td>
       <td>
         <img src="cerf/assets/icons_sources/board.svg" width="16" height="16" title="PDA" alt="PDA"/> <b>Casio Cassiopeia EM-500</b> <code>casio_cassiopeia_em500</code><br/>
@@ -147,7 +155,8 @@ See ``cerf.exe`` command line usage at [cerf.cx/articles/command-line](https://c
       <td align="center"><img src="launcher/assets/icons/badge_arm.png" align="middle" title="ARM" alt="ARM"/><br/><b>TI OMAP 3530</b><br/><sub>Cortex-A8</sub></td>
       <td>
         <img src="cerf/assets/icons_sources/board.svg" width="16" height="16" title="PDA" alt="PDA"/> <b>OMAP 3530 EVM</b> <code>omap_3530_evm</code><br/>
-        Windows Embedded Compact 7
+        Windows Embedded Compact 7<br/>
+        Windows Embedded Compact 2013
       </td>
       <td><img src="cerf/assets/icons_sources/display.svg" width="32" height="32" title="Display" alt="Display"/> <img src="cerf/assets/icons_sources/stylus.svg" width="32" height="32" title="Touch" alt="Touch"/> <img src="cerf/assets/icons_sources/ga_autoresize.svg" width="32" height="32" title="Guest Additions" alt="Guest Additions"/> <img src="cerf/assets/icons_sources/speaker_active.svg" width="32" height="32" title="Sound" alt="Sound"/></td>
     </tr>
@@ -295,6 +304,7 @@ This repositroy includes [cerf.cx](https://cerf.cx) source code at ``docs/websit
       <td>TBA</td>
       <td>
         <p><b>📱 Devices</b><br/>
+          🆕 Casio Cassiopeia E-55 support<br/>
           🆕 Casio Toricomail: bezel touch buttons<br/>
           ✅ Philips Velo 1: 16 MB DRAM Miniature Card permanently fitted - 20 MB total for the guest<br/>
           ✅ Device Emulator: keyboard no longer drops or repeats keys while typing<br/>
@@ -379,6 +389,8 @@ The environment includes several contraversional things you need to know before 
 - Thinking is set to *high*; **bypass permissions mode** is set
 - Several own/3rd-party **skills** included
 - Powerful hooks triggering when agent might do something bad to the codebase
+- IDA MCP is ready to be installed at ``tools\ida_server.py`` and ``tools\ida_claude.py``
+- FS Read MCP is a workaround for ``Read()`` tool, useful for ``/tracking restore`` and massive text files (``tools\fs_read_mcp.py``)
 
 The environment gives you the **`/start-board-implementation`** skill. Run the skill and agent will start the new board bring-up on its own. You need experience - the skill won't do all the work instead of you. (Tho honestly speaking, there have been cases where Claude alone brought a board to a bootable state)
 

@@ -2,6 +2,7 @@
   date: TBA
   devices:
     new: |
+      Casio Cassiopeia E-55 support
       Casio Toricomail: bezel touch buttons
     fixed: |
       Philips Velo 1: 16 MB DRAM Miniature Card permanently fitted - 20 MB total for the guest

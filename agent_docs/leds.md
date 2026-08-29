@@ -1,6 +1,8 @@
 # LEDs and LED buttons
 
-An LED is a host widget in the status bar.
+An LED is a host widget in the status bar. It is implemented as a part of
+device's user physical experience. LEDs can display debugging data from guest,
+or important notifications data - for user.
 
 ## The shape
 

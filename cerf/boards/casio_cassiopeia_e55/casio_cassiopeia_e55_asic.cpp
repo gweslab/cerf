@@ -40,6 +40,11 @@ constexpr uint32_t kOffVdet = 0x12u;
    @0x14E1DA8); nk.exe @0x9E817A44 (in no IDA function) sets it entering hibernate. 3 = no event. */
 constexpr uint16_t kNoVdetEvent = 0x0003u;
 
+/* casio_cassiopeia_e55 nk.exe @0x9E817614 reads D1 and on a set bit takes loc_9E817B24, which
+   stores 1 to the 0xA000254C hibernate flag and masks ICU 0x8C, ICU2 0x208 and GIU 0x10E. */
+constexpr uint32_t kOffReg16 = 0x016u;
+constexpr uint16_t kNoPowerEvent = 0x0000u;
+
 /* casio_cassiopeia_e55 nk.exe sub_9E816964 @0x9E816A30 lui $t0, 0xB401 /
    @0x9E816A34 sh $zero, 0xB400A00E. */
 constexpr uint32_t kOffReg0E = 0x00Eu;
@@ -100,6 +105,7 @@ public:
             case kOffCtrl6:      return ctrl6_;
             case kOffButtons:    return kButtonsAllReleased;
             case kOffVdet:       return kNoVdetEvent;
+            case kOffReg16:      return kNoPowerEvent;
             case kOffStrap:      return static_cast<uint16_t>(kStrapValue | card_access_);
             default: return Peripheral::ReadHalf(addr);
         }

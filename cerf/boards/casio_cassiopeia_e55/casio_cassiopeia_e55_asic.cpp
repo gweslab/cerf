@@ -1,5 +1,7 @@
 #include "../../peripherals/peripheral_base.h"
 
+#include "casio_cassiopeia_e55_pccard.h"
+
 #include "../../core/cerf_emulator.h"
 #include "../../peripherals/peripheral_dispatcher.h"
 #include "../../socs/guest_cpu_reset.h"
@@ -49,9 +51,9 @@ constexpr uint16_t kNoPowerEvent = 0x0000u;
    @0x9E816A34 sh $zero, 0xB400A00E. */
 constexpr uint32_t kOffReg0E = 0x00Eu;
 
-/* casio_cassiopeia_e55 pcmcia.dll sub_14C0E8C (+0x02 |= 1, +0x00 |= 1, +0x02 &= ~1,
-   +0x00 |= 2), sub_14C1078 (+0x00 = 0 / = 12, +0x06 &= ~1 / |= 1), sub_14C096C and
-   sub_14C0A70 (+0x02 |= 2 / &= ~2, +0x00 &= ~4 / |= 4). */
+/* casio_cassiopeia_e55 pcmcia.dll sub_14C0E8C @0x14C0E8C (+0x02 |= 1, +0x00 |= 1,
+   +0x02 &= ~1, +0x00 |= 2), sub_14C1078 @0x14C1078 (+0x00 = 0 / = 12, +0x06 &= ~1 / |= 1),
+   sub_14C096C @0x14C096C and sub_14C0A70 @0x14C0A70 (+0x02 |= 2 / &= ~2). */
 constexpr uint32_t kOffCtrl0 = 0x000u;
 constexpr uint32_t kOffCtrl2 = 0x002u;
 constexpr uint32_t kOffCtrl6 = 0x006u;
@@ -59,10 +61,17 @@ constexpr uint16_t kCtrl0Writable = 0x000Fu;
 constexpr uint16_t kCtrl2Writable = 0x0003u;
 constexpr uint16_t kCtrl6Writable = 0x0001u;
 
-/* casio_cassiopeia_e55 pcmcia.dll: sub_14C0E8C no-card arm on (+0x04 & 6) != 0, poll exit
-   on (+0x04 & 1); sub_14C0B84 card-detect on (+0x04 & 6) == 0. */
+/* casio_cassiopeia_e55 pcmcia.dll sub_14C1078 @0x14C1078 writes +0x00 = 12 to bring the
+   socket up and +0x00 = 0 to take it down. */
+constexpr uint16_t kCtrl0Vcc = 0x000Cu;
+
+/* casio_cassiopeia_e55 pcmcia.dll sub_14C0E8C @0x14C0E8C pulses +0x02 D0 around the card
+   reset; sub_14C096C @0x14C096C and sub_14C0A70 @0x14C0A70 hold +0x02 D1 across an
+   attribute-space byte access. */
+constexpr uint16_t kCtrl2Reset   = 0x0001u;
+constexpr uint16_t kCtrl2RegSpace = 0x0002u;
+
 constexpr uint32_t kOffStatus = 0x004u;
-constexpr uint16_t kStatusNoCard = 0x000Eu;
 
 /* casio_cassiopeia_e55 pcmcia.dll sub_14C0728 zeroes +0x0A @0x14C08AC, +0x0C @0x14C08B4,
    +0x08 @0x14C08C0; no function with an xref to the mapped base reads them. */
@@ -101,7 +110,7 @@ public:
         switch (addr - kBase) {
             case kOffCtrl0:      return ctrl0_;
             case kOffCtrl2:      return ctrl2_;
-            case kOffStatus:     return kStatusNoCard;
+            case kOffStatus:     return emu_.Get<CasioCassiopeiaE55PcCard>().StatusReg();
             case kOffCtrl6:      return ctrl6_;
             case kOffButtons:    return kButtonsAllReleased;
             case kOffVdet:       return kNoVdetEvent;
@@ -113,8 +122,18 @@ public:
 
     void WriteHalf(uint32_t addr, uint16_t value) override {
         switch (addr - kBase) {
-            case kOffCtrl0: ctrl0_ = Accept(addr, value, kCtrl0Writable); return;
-            case kOffCtrl2: ctrl2_ = Accept(addr, value, kCtrl2Writable); return;
+            case kOffCtrl0:
+                ctrl0_ = Accept(addr, value, kCtrl0Writable);
+                emu_.Get<CasioCassiopeiaE55PcCard>().SetSocketPower(
+                    (ctrl0_ & kCtrl0Vcc) == kCtrl0Vcc);
+                return;
+            case kOffCtrl2: {
+                ctrl2_ = Accept(addr, value, kCtrl2Writable);
+                auto& card = emu_.Get<CasioCassiopeiaE55PcCard>();
+                card.SetRegSpace((ctrl2_ & kCtrl2RegSpace) != 0u);
+                card.SetResetStrobe((ctrl2_ & kCtrl2Reset) != 0u);
+                return;
+            }
             case kOffCtrl6: ctrl6_ = Accept(addr, value, kCtrl6Writable); return;
             case kOffInit08:
             case kOffInit0A:

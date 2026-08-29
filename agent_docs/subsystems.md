@@ -487,15 +487,26 @@ to add a device trace file.
 Each file is a small `Service` whose `OnReady` calls
 `TraceManager::RegisterForBundle(<expected_crc32>, register_fn)`. The
 closure runs if and only if the CRC32 of the live bundle matches. On a
-mismatch the file silently does nothing at runtime. `<bundle>/bundle.h`
-(or `wm5_bundle.h` and similar) declares
-`constexpr uint32_t kBundleCrc32 = ...;`. Every trace file in that directory
-uses this constant.
+mismatch the file silently does nothing at runtime. A header in that
+directory declares the constant that every trace file in it uses
+(`constexpr uint32_t k<Bundle>Crc32 = ...;`). The location of the header
+decides whether git keeps it:
+
+- **`<bundle>/nkdbg/bundle.h` is the only committed CRC header.** Two
+  conditions admit a bundle to this form. The bundle ships a production
+  kernel-debug hook under `nkdbg/`, and its ROM is a permanent board
+  image.
+- **Every other CRC header in `<bundle>/` is gitignored**, with the rest
+  of the personal trace scaffolding. The convention names it `bundle.h`.
+  A bundle with no `nkdbg/` hook has only this form, so its CRC stays out
+  of the repo. A temporary or work-in-progress ROM is always this form.
+  When one directory holds both headers, the ignored header includes
+  `nkdbg/bundle.h` and does not restate the constant.
 
 `TraceManager::OnReady` computes the bundle CRC32 over the
 concatenated `RomParserService::Loaded()[i].raw` bytes in load order. On
 the first boot of a new bundle, the log line `[TRACE] bundle CRC32 = 0xXXXX`
-gives you the value to paste into the `bundle.h` of that trace file.
+gives you the value to paste into that header.
 
 `build.ps1 -Mode production` excludes the per-device trace files from the
 build with a `<ClCompile Remove="tracing\*\**\*.cpp">` rule in

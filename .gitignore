@@ -310,7 +310,6 @@ third_party/
 cerf/tracing/*/**
 !cerf/tracing/*/nkdbg/
 !cerf/tracing/*/nkdbg/**
-!cerf/tracing/*/*bundle*.h
 .env
 
 .build_lock

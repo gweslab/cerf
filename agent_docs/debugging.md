@@ -549,8 +549,11 @@ at a given VA, so the match is unambiguous where a name lookup is not.
 
 1. Pick a directory: `cerf/tracing/<bundle_human_name>/` (for example
    `cerf/tracing/wm5_smdk2410_devemu/`). If it does not exist, create it.
-2. Add a `bundle.h` (or `<bundle>_bundle.h`) that declares
-   `constexpr uint32_t kBundleCrc32 = 0x<actual>;`. To get the CRC,
+2. Add a `bundle.h` that declares
+   `constexpr uint32_t k<Bundle>Crc32 = 0x<actual>;`. Put it in the
+   bundle directory, where git ignores it. If this bundle ships a
+   production kernel-debug hook, put it in `<bundle>/nkdbg/` instead.
+   That is the only committed CRC header. To get the CRC,
    either run `python -c "import zlib; print(hex(zlib.crc32(open('path-to-rom.bin','rb').read())))"`
    (concatenate every loaded partition in load order if there is more
    than one), or just boot CERF once and read the `[TRACE] bundle
@@ -579,9 +582,10 @@ at a given VA, so the match is unambiguous where a name lookup is not.
 
 Per-device trace files are gitignored - personal debugging
 scaffolding, not committed source. Git tracks only each
-`cerf/tracing/<bundle>/` directory's `nkdbg/` hooks and `*bundle*.h` CRC
-header. The rest stays on your disk and persists across your local
-sessions, but never enters the repo. Verify your existing hooks before
+`cerf/tracing/<bundle>/nkdbg/` directory - its hooks and its `bundle.h`
+CRC header. The rest, every other CRC header included, stays on your
+disk. It persists across your local sessions, and never enters the
+repo. Verify your existing hooks before
 you re-derive a path. The bundle CRC32 gates them (silent no-op on any
 other bundle), and production builds exclude them, so they cost nothing
 at runtime.

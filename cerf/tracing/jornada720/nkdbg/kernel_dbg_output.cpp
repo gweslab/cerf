@@ -1,7 +1,7 @@
 #include "../../kernel_debug_sink.h"
 #include "../../trace_manager.h"
 #include "../../../core/cerf_emulator.h"
-#include "../bundle.h"
+#include "bundle.h"
 
 #include <string>
 

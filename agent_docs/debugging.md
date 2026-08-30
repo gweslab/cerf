@@ -561,7 +561,9 @@ at a given VA, so the match is unambiguous where a name lookup is not.
 3. Create a `.cpp` named after the guest PE it hooks. A trace file is
    normally bound to ONE target module, so the usual shape is one file
    per executable: `nk.exe` → `nk_trace.cpp`, `coredll.dll` →
-   `coredll_trace.cpp`, `gwes.exe` → `gwes_trace.cpp`. When you need
+   `coredll_trace.cpp`, `gwes.exe` → `gwes_trace.cpp`. The class name is
+   the file name: `nk_trace.cpp` holds `class NkTrace`,
+   `coredll_trace.cpp` holds `class CoredllTrace`. When you need
    more data from an address in a module you already hook, extend the
    existing hooks in that module's file. Do not open a second file for
    the same PE. An investigation that crosses several modules - a touch
@@ -575,7 +577,7 @@ at a given VA, so the match is unambiguous where a name lookup is not.
    kBundleCrc32, [&]{ ... });`. Inside the lambda, call `OnPc` and
    `OnRunLoopIter` as the investigation requires. Read memory inside
    handlers via `c.ReadVa8/16/32(va)`.
-4. `REGISTER_SERVICE(YourTraceClass);` at the bottom.
+4. `REGISTER_SERVICE(NkTrace);` at the bottom.
 5. Build with `build.ps1` (default `-Mode dev`). The build includes the
    trace file. `build.ps1 -Mode production` excludes the entire
    `cerf/tracing/<bundle>/` subtree from the build.

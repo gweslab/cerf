@@ -64,12 +64,12 @@ bool ArmMediaSpaceDecoder::Decode(DecodedInsn* insn, ArmOpcode op) {
             if ((op2 & 0x4u) != 0x0u) {
                 return false;
             }
-            return MarkArmUnimplemented(insn, op.word);
+            return DecodeDualMultiply(insn, op, (op1 & 0x7u) == 0x4u);
         case 0x5u:
             if ((op2 & 0x6u) != 0x0u && (op2 & 0x6u) != 0x6u) {
                 return false;
             }
-            return MarkArmUnimplemented(insn, op.word);
+            return DecodeMostSignificantMultiply(insn, op);
         case 0x1u:
         case 0x3u:
             if (op2 != 0x0u || !processor_config_->HasIntegerDivide()) {
@@ -137,6 +137,94 @@ bool ArmMediaSpaceDecoder::DecodeBitfield(DecodedInsn* insn, ArmOpcode op) {
     return false;
 }
 
+/* DDI 0406C.c Table A5-20 (p. A5-213) op1 000 and 100; A1 encodings SMLAD
+   p. A8-622, SMUAD A8-642, SMLSD A8-632, SMUSD A8-650, SMLALD A8-628,
+   SMLSLD A8-634. A == 1111 SEEs SMUAD / SMUSD; the long rows take RdHi from
+   bits[19:16], RdLo from bits[15:12], "if dHi == dLo then UNPREDICTABLE". */
+bool ArmMediaSpaceDecoder::DecodeDualMultiply(DecodedInsn* insn, ArmOpcode op,
+                                              bool is_long) {
+    const uint32_t rd = (op.word >> 16) & 0xFu;
+    const uint32_t ra = (op.word >> 12) & 0xFu;
+    const uint32_t rm = (op.word >>  8) & 0xFu;
+    const uint32_t rn =  op.word        & 0xFu;
+
+    if (rd == ArmGpr::kR15 || rm == ArmGpr::kR15 || rn == ArmGpr::kR15) {
+        return false;
+    }
+    if (is_long && (ra == ArmGpr::kR15 || ra == rd)) {
+        return false;
+    }
+
+    const bool no_acc = !is_long && ra == ArmGpr::kR15;
+
+    insn->op1      = is_long ? 2u : (no_acc ? 0u : 1u);
+    insn->n        = (op.word >> 6) & 0x1u;
+    insn->u        = (op.word >> 5) & 0x1u;
+    insn->rd       = rd;
+    insn->rs       = ra;
+    insn->rm       = rm;
+    insn->rn       = rn;
+    insn->place_fn = &PlaceDualMultiply;
+    return true;
+}
+
+/* DDI 0406C.c Table A5-20 (p. A5-213) op1 101; A1 encodings SMMLA p. A8-636,
+   SMMLS A8-638, SMMUL A8-640: bits[7:4] are sub-sub-R-1, A == 1111 selects
+   SMMUL, and SMMLS adds "|| a == 15 then UNPREDICTABLE" (p. A8-638). */
+bool ArmMediaSpaceDecoder::DecodeMostSignificantMultiply(DecodedInsn* insn,
+                                                         ArmOpcode    op) {
+    const uint32_t rd  = (op.word >> 16) & 0xFu;
+    const uint32_t ra  = (op.word >> 12) & 0xFu;
+    const uint32_t rm  = (op.word >>  8) & 0xFu;
+    const uint32_t rn  =  op.word        & 0xFu;
+    const uint32_t sub = (op.word >>  6) & 0x1u;
+
+    if (rd == ArmGpr::kR15 || rm == ArmGpr::kR15 || rn == ArmGpr::kR15) {
+        return false;
+    }
+    if (sub != 0u && ra == ArmGpr::kR15) {
+        return false;
+    }
+
+    insn->op1      = (ra == ArmGpr::kR15) ? 0u : 1u;
+    insn->n        = sub;
+    insn->u        = (op.word >> 5) & 0x1u;
+    insn->rd       = rd;
+    insn->rs       = ra;
+    insn->rm       = rm;
+    insn->rn       = rn;
+    insn->place_fn = &PlaceMostSignificantMultiply;
+    return true;
+}
+
+/* DDI 0406C.c A8.8.193 SSAT A1 (p. A8-652): "cond 0110101 sat_imm Rd imm5 sh
+   0 1 Rn", saturate_to = UInt(sat_imm)+1, "(shift_t, shift_n) =
+   DecodeImmShift(sh:'0', imm5)", "if d == 15 || n == 15 then UNPREDICTABLE". */
+bool ArmMediaSpaceDecoder::DecodeSignedSaturate(DecodedInsn* insn,
+                                                ArmOpcode    op) {
+    const uint32_t sat_imm = (op.word >> 16) & 0x1Fu;
+    const uint32_t rd      = (op.word >> 12) & 0xFu;
+    const uint32_t imm5    = (op.word >>  7) & 0x1Fu;
+    const uint32_t sh      = (op.word >>  6) & 0x1u;
+    const uint32_t rn      =  op.word        & 0xFu;
+
+    if (rd == ArmGpr::kR15 || rn == ArmGpr::kR15) {
+        return false;
+    }
+
+    uint32_t shift_t = 0;
+    uint32_t shift_n = 0;
+    DecodeImmShift(sh << 1, imm5, &shift_t, &shift_n);
+
+    insn->rd        = rd;
+    insn->rn        = rn;
+    insn->op1       = shift_t;
+    insn->rs        = shift_n;
+    insn->immediate = sat_imm + 1u;
+    insn->place_fn  = &PlaceSsat;
+    return true;
+}
+
 /* DDI 0406C.c Table A5-19 (p. A5-212): op1 = insn[22:20], A = insn[19:16],
    op2 = insn[7:5]; other encodings in this space are UNDEFINED. */
 bool ArmMediaSpaceDecoder::DecodePackSatReverse(DecodedInsn* insn,
@@ -150,7 +238,10 @@ bool ArmMediaSpaceDecoder::DecodePackSatReverse(DecodedInsn* insn,
     if ((fop2 & 0x1u) == 0u) {
         /* PKH (000, xx0), SSAT (01x, xx0), USAT (11x, xx0) rows of
            Table A5-19 (p. A5-212). */
-        if (fop1 == 0x0u || (fop1 & 0x6u) == 0x2u || (fop1 & 0x6u) == 0x6u) {
+        if ((fop1 & 0x6u) == 0x2u) {
+            return DecodeSignedSaturate(insn, op);
+        }
+        if (fop1 == 0x0u || (fop1 & 0x6u) == 0x6u) {
             return MarkArmUnimplemented(insn, op.word);
         }
         return false;

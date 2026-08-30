@@ -19,6 +19,9 @@ public:
 private:
     bool DecodeBitfield(DecodedInsn* insn, ArmOpcode op);
     bool DecodePackSatReverse(DecodedInsn* insn, ArmOpcode op);
+    bool DecodeSignedSaturate(DecodedInsn* insn, ArmOpcode op);
+    bool DecodeDualMultiply(DecodedInsn* insn, ArmOpcode op, bool is_long);
+    bool DecodeMostSignificantMultiply(DecodedInsn* insn, ArmOpcode op);
 
     ArmProcessorConfig* processor_config_ = nullptr;
 };

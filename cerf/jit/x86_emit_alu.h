@@ -428,6 +428,13 @@ inline void EmitNotReg32(uint8_t*& c, uint8_t reg) {
     EmitModRmReg(c, 3, reg, 2);
 }
 
+/* NEG r/m32 - F7 /3, register-direct: "The CF flag set to 0 if the source
+   operand is 0; otherwise it is set to 1" (SDM Vol. 2B 4-167 NEG). */
+inline void EmitNegReg32(uint8_t*& c, uint8_t reg) {
+    Emit8(c, 0xF7);
+    EmitModRmReg(c, 3, reg, 3);
+}
+
 /* MUL r/m32 - F7 /4, register-direct, EDX:EAX := EAX * r/m32 unsigned
    (SDM Vol. 2B 4-150 MUL). */
 inline void EmitMulReg32(uint8_t*& c, uint8_t reg) {

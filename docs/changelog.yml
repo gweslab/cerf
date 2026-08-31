@@ -3,6 +3,7 @@
   devices:
     new: |
       Casio Cassiopeia E-55 support
+      Symbol Mk500 support
       Casio Toricomail: bezel touch buttons
     fixed: |
       Philips Velo 1: 16 MB DRAM Miniature Card permanently fitted - 20 MB total for the guest
@@ -19,6 +20,7 @@
       ARM JIT and JIT core full rewrite. ARM JIT/peripherals massive optimizations. However - this might regress something, the blast radius is whole ARM emulation.
       Wall-clock timer instead of icount. Fixes guest OS clock extreme fast forwarding and consequent lags, bugs. For example, Jornada 720 had whole class of problems. Double clicks wouldn't work because whole days passed in between two clicks. IE would time out on the same reason. Our model is based on QEMU and Dolphin models with own inventions.
       Shutdown dialog now has reboot options
+      Media instructions for Zune 30
   launcher:
     new: |
       Copyright removal dialog listing each bundle repository's abuse contact, reachable from the Download ROMs window and the download confirmation

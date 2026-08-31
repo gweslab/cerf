@@ -121,6 +121,9 @@ def _extract_persist_fields(obj) -> dict:
         cs = ga.get("override_color_scheme")
         if isinstance(cs, str) and cs:
             out["color_scheme"] = cs
+        fs = ga.get("override_font_size")
+        if isinstance(fs, int) and not isinstance(fs, bool):
+            out["font_size"] = fs
     if isinstance(obj.get("full_screen"), bool):
         out["full_screen"] = obj["full_screen"]
     sf = obj.get("share_folder")
@@ -172,11 +175,15 @@ def write_persist_overrides(device_dir: Path, fields: dict) -> None:
         else:
             obj.pop("network", None)
         cs = fields.get("color_scheme")
-        if cs:
+        fs = fields.get("font_size")
+        if cs or fs is not None:
             ga_obj: dict = {}
             if "guest_additions" in fields:
                 ga_obj["enabled"] = fields["guest_additions"]
-            ga_obj["override_color_scheme"] = cs
+            if cs:
+                ga_obj["override_color_scheme"] = cs
+            if fs is not None:
+                ga_obj["override_font_size"] = fs
             obj["guest_additions"] = ga_obj
         elif "guest_additions" in fields:
             obj["guest_additions"] = fields["guest_additions"]

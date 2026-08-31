@@ -9,7 +9,7 @@ from launch_options_presets import (DEFAULT_SCREEN_WIDTH,
 
 
 PERSIST_KEYS = ("network_enabled", "guest_additions", "color_scheme",
-                "full_screen", "width", "height", "dpi", "bpp",
+                "full_screen", "width", "height", "dpi", "font_size", "bpp",
                 "share_folder")
 
 
@@ -36,6 +36,8 @@ def resolve_baseline(base: dict, default_width: Optional[int],
         b["height"] = DEFAULT_SCREEN_HEIGHT
     if "dpi" in base:
         b["dpi"] = base["dpi"]
+    if "font_size" in base:
+        b["font_size"] = base["font_size"]
     if "bpp" in base:
         b["bpp"] = base["bpp"]
     return b

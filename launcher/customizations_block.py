@@ -7,13 +7,15 @@ from typing import Callable, List, Optional, Tuple
 from color_schemes import (COLOR_SCHEMES, CS_KEY_TO_LABEL, CS_LABEL_TO_KEY)
 from launch_options_bpp import BppOptionBlock
 from launch_options_dpi import DpiOptionBlock
+from launch_options_font_size import FontSizeOptionBlock
 from launch_options_presets import (RES_PRESETS, DEFAULT_SCREEN_WIDTH,
                                     DEFAULT_SCREEN_HEIGHT)
 from ui_dialogs import show_color_scheme_help, show_error
 import ui_theme as theme
 
 
-CUSTOMIZATION_FIELDS = ("width", "height", "dpi", "bpp", "color_scheme")
+CUSTOMIZATION_FIELDS = ("width", "height", "dpi", "font_size", "bpp",
+                        "color_scheme")
 
 
 class CustomizationsBlock:
@@ -31,6 +33,8 @@ class CustomizationsBlock:
         self.frame = frame
 
         numeric_vcmd = (window.register(self._is_optional_uint), "%P")
+        signed_vcmd = (window.register(FontSizeOptionBlock.is_optional_int),
+                       "%P")
 
         self.var_width = tk.StringVar(value=str(DEFAULT_SCREEN_WIDTH))
         self.var_height = tk.StringVar(value=str(DEFAULT_SCREEN_HEIGHT))
@@ -76,9 +80,12 @@ class CustomizationsBlock:
                                   row_head=3, row_fields=4, row_sep=5)
         self.dpi = DpiOptionBlock(frame, window, self._on_change, numeric_vcmd,
                                   row_head=6, row_fields=7, row_sep=8)
+        self.font_size = FontSizeOptionBlock(frame, window, self._on_change,
+                                             signed_vcmd, row_head=9,
+                                             row_fields=10, row_sep=11)
 
         cs_row = self.cs_row = ttk.Frame(frame)
-        cs_row.grid(row=9, column=0, sticky="ew")
+        cs_row.grid(row=12, column=0, sticky="ew")
         cs_row.columnconfigure(1, weight=1)
         ttk.Label(cs_row, text="Color scheme:").grid(row=0, column=0,
                                                      sticky="w", padx=(0, 6))
@@ -96,6 +103,7 @@ class CustomizationsBlock:
     def lockables(self) -> List[tk.Widget]:
         return ([self.width_entry, self.height_entry, self.res_slider]
                 + self.bpp.lockables() + self.dpi.lockables()
+                + self.font_size.lockables()
                 + [self.color_scheme_combo, self.cs_help])
 
     def restore(self, eff: dict) -> None:
@@ -105,6 +113,7 @@ class CustomizationsBlock:
             CS_KEY_TO_LABEL.get(eff.get("color_scheme", ""),
                                 COLOR_SCHEMES[0][1]))
         self.dpi.restore(eff)
+        self.font_size.restore(eff)
         self.bpp.restore(eff)
         self._sync_slider_to_text()
 
@@ -120,6 +129,10 @@ class CustomizationsBlock:
             d = self.dpi.optional_value()
             if d is not None:
                 out["dpi"] = d
+        if self._guest_additions and self.font_size.enabled():
+            f = self.font_size.optional_value()
+            if f is not None:
+                out["font_size"] = f
         b = self.bpp.optional_value()
         if b is not None:
             out["bpp"] = b
@@ -142,6 +155,9 @@ class CustomizationsBlock:
         self._set_visible(guest_additions, *self.dpi.blocks())
         self.dpi.refresh_state(locked)
 
+        self._set_visible(guest_additions, *self.font_size.blocks())
+        self.font_size.refresh_state(locked)
+
         self._set_visible(guest_additions and color_scheme_available,
                           self.cs_row)
         self.color_scheme_combo.config(
@@ -160,6 +176,9 @@ class CustomizationsBlock:
         if self._guest_additions and self.dpi.enabled():
             if self.dpi.value_or_error() is None:
                 return False
+        if self._guest_additions and self.font_size.enabled():
+            if self.font_size.value_or_error() is None:
+                return False
         return True
 
     def resolution(self) -> Optional[Tuple[int, int]]:
@@ -176,6 +195,12 @@ class CustomizationsBlock:
 
     def dpi_enabled(self) -> bool:
         return self.dpi.enabled()
+
+    def font_size_value_or_error(self) -> Optional[int]:
+        return self.font_size.value_or_error()
+
+    def font_size_enabled(self) -> bool:
+        return self.font_size.enabled()
 
     def bpp_value(self) -> Optional[int]:
         return self.bpp.optional_value()

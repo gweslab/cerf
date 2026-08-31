@@ -29,6 +29,8 @@ ULONG g_FbBpp     = 0;
 ULONG g_FbStride  = 0;
 ULONG g_FbDpi     = 0;
 ULONG g_FbRefreshRate = 60;
+LONG  g_FbSystemFontHeight = 0;
+ULONG g_FbSystemFontPresent = 0;
 ULONG g_FbMemPa   = 0;
 ULONG g_FbMemTotal = 0;
 
@@ -63,6 +65,8 @@ void CerfReadFbRegs(void) {
     g_FbPrimaryReserve = s_fb_regs[8];
     g_FbDpi      = s_fb_regs[9];
     if (s_fb_regs[10]) g_FbRefreshRate = s_fb_regs[10];
+    g_FbSystemFontHeight  = (LONG)s_fb_regs[11];
+    g_FbSystemFontPresent = s_fb_regs[12];
 }
 
 BOOL CerfMapGpeCmd(void) {
@@ -233,6 +237,7 @@ extern "C" void CerfStartDriverInDriver(void);
 extern "C" void CerfAdvertiseDisplayPower(void);
 extern "C" void CerfStartShellWatch(void);
 extern "C" void CerfStartSync2ShellReplace(void);
+extern "C" void CerfApplySystemFont(void);
 
 static DHPDEV APIENTRY CerfEnablePDEVWrap(
     DEVMODEW* pdm, LPWSTR pwszLogAddress, ULONG cPat, HSURF* phsurfPatterns,
@@ -304,6 +309,7 @@ extern "C" BOOL APIENTRY DrvEnableDriver(ULONG iEngineVersion,
         }
     }
     CerfReadFbRegs();
+    CerfApplySystemFont();
 
     {
         OSVERSIONINFOW ovi;

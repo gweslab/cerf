@@ -12,6 +12,8 @@ inline void CfgResetMutableFields(DeviceConfig& config) {
     config.screen_dpi                         = 0;
     config.board_configurable_screen_bpp      = 0;
     config.guest_additions_color_scheme.clear();
+    config.guest_additions_font_size = 0;
+    config.guest_additions_font_size_set = false;
     config.share_folder.clear();
 }
 
@@ -72,6 +74,16 @@ inline void CfgLoadColorScheme(const nlohmann::json& ga, DeviceConfig& config,
                  "(or null)");
 }
 
+inline void CfgLoadGaFontSize(const nlohmann::json& ga, DeviceConfig& config,
+                              const std::string& path) {
+    if (!ga.contains("override_font_size")) return;
+    if (ga["override_font_size"].is_null()) return;
+    config.guest_additions_font_size =
+        (int32_t)CfgReadOptInt(ga, "override_font_size", path,
+                               "guest_additions");
+    config.guest_additions_font_size_set = true;
+}
+
 inline void CfgLoadMutableFields(const nlohmann::json& root,
                                  DeviceConfig& config,
                                  const std::string& path) {
@@ -83,6 +95,9 @@ inline void CfgLoadMutableFields(const nlohmann::json& root,
     CfgLoadShareFolder(root, config, path);
     if (root.contains("guest_additions")) {
         const auto& ga = root["guest_additions"];
-        if (ga.is_object()) CfgLoadColorScheme(ga, config, path);
+        if (ga.is_object()) {
+            CfgLoadColorScheme(ga, config, path);
+            CfgLoadGaFontSize(ga, config, path);
+        }
     }
 }

@@ -21,6 +21,7 @@ $sources = @("main.cpp","cerf_virt_base.cpp","cerf_regs_map.cpp","cerf_debug_log
              "cerf_power.cpp",
              "cerf_cursor.cpp",
              "cerf_getversionexw.cpp",
+             "cerf_system_font.cpp",
              "cerf_driver_in_driver.cpp","cerf_fs_afs.cpp","cerf_fs_transport.cpp",
              "cerf_fs_vol.cpp","cerf_fs_file.cpp","cerf_fs_find.cpp","cerf_fs_notify.cpp")
 $libs    = @("coredll")

@@ -10,7 +10,8 @@ from persisted_options import persist_subset
 import ui_theme as theme
 
 RESET_NOTE = ("Windows CE 3 and older need at least a soft reset to use the "
-              "new resolution. A DPI or colour-depth change requires a reset.")
+              "new resolution. A DPI, font-size or colour-depth change "
+              "requires a reset.")
 
 _RESET_CHOICES = (("none", "Do not reset"),
                   ("soft", "Soft reset"),
@@ -90,7 +91,10 @@ class _CustomizationsDialog:
 
     def _reset_needing_values(self) -> tuple:
         return (self.block.bpp_value(), self.block.dpi_enabled(),
-                self.block.dpi.optional_value(), self.block.color_scheme_key())
+                self.block.dpi.optional_value(),
+                self.block.font_size_enabled(),
+                self.block.font_size.optional_value(),
+                self.block.color_scheme_key())
 
     def _on_change(self) -> None:
         if self._reset_needing is None:

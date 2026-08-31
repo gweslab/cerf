@@ -100,6 +100,9 @@ struct DeviceConfig : public Service {
     bool guest_additions = false;
     std::string guest_additions_color_scheme;
 
+    int32_t guest_additions_font_size = 0;
+    bool    guest_additions_font_size_set = false;
+
     bool ga_tick_profiler = false;
 
     /* Startup tab. Dev builds default to the hardware console so debug output

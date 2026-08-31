@@ -75,6 +75,7 @@ void LoadFeatures(const json& root, DeviceConfig& config, const std::string& pat
                 config.guest_additions = ga["enabled"].get<bool>();
             }
             CfgLoadColorScheme(ga, config, path);
+            CfgLoadGaFontSize(ga, config, path);
         } else {
             CfgFatal(path, "'guest_additions' must be a boolean or an object");
         }
@@ -294,6 +295,10 @@ void ConfigLoader::LoadInto(DeviceConfig& config) {
             config.guest_additions = true;
         } else if (strncmp(a, kArgGaColorScheme, sizeof(kArgGaColorScheme) - 1) == 0) {
             config.guest_additions_color_scheme = a + sizeof(kArgGaColorScheme) - 1;
+        } else if (strncmp(a, kArgGaFontSize, sizeof(kArgGaFontSize) - 1) == 0) {
+            config.guest_additions_font_size =
+                (int32_t)atoi(a + sizeof(kArgGaFontSize) - 1);
+            config.guest_additions_font_size_set = true;
         } else if (strcmp(a, kArgRecovery) == 0) {
             config.boot_in_recovery = true;
         } else if (strncmp(a, kArgScreenWidth, sizeof(kArgScreenWidth) - 1) == 0) {

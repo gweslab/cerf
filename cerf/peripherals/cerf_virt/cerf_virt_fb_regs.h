@@ -23,4 +23,7 @@ const uint32_t kFbRegLogicalDpi  = 0x24u;
 
 const uint32_t kFbRegRefreshRate = 0x28u;
 
+const uint32_t kFbRegSystemFontHeight  = 0x2Cu;
+const uint32_t kFbRegSystemFontPresent = 0x30u;
+
 }

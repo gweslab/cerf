@@ -38,6 +38,7 @@ ArgParseResult ParseCerfArgs(int argc, char* argv[], CerfConfig& cfg) {
                    strncmp(argv[i], kArgBoot, sizeof(kArgBoot) - 1) == 0 ||
                    strncmp(argv[i], kArgTab, sizeof(kArgTab) - 1) == 0 ||
                    strncmp(argv[i], kArgGaColorScheme, sizeof(kArgGaColorScheme) - 1) == 0 ||
+                   strncmp(argv[i], kArgGaFontSize, sizeof(kArgGaFontSize) - 1) == 0 ||
                    strcmp(argv[i], kArgDisableNetwork) == 0 ||
                    strcmp(argv[i], kArgGuestAdditions) == 0 ||
                    strcmp(argv[i], kArgFullScreen) == 0 ||

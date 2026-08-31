@@ -23,6 +23,8 @@ using CerfVirt::kFbRegMemSizeTotal;
 using CerfVirt::kFbRegPrimaryReserve;
 using CerfVirt::kFbRegLogicalDpi;
 using CerfVirt::kFbRegRefreshRate;
+using CerfVirt::kFbRegSystemFontHeight;
+using CerfVirt::kFbRegSystemFontPresent;
 
 class CerfVirtFramebufferRegs : public Peripheral {
 public:
@@ -58,6 +60,10 @@ public:
             case kFbRegLogicalDpi: return emu_.Get<DeviceConfig>().screen_dpi;
             case kFbRegRefreshRate:
                 return (uint32_t)emu_.Get<RefreshRateService>().GetRefreshRate();
+            case kFbRegSystemFontHeight:
+                return (uint32_t)emu_.Get<DeviceConfig>().guest_additions_font_size;
+            case kFbRegSystemFontPresent:
+                return emu_.Get<DeviceConfig>().guest_additions_font_size_set ? 1u : 0u;
             default:              return 0u;
         }
     }

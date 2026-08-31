@@ -34,6 +34,7 @@
     new: |
       Share folder settings and Guest Additions customizations are now unified with launcher UI and persisted even when changed at runtime
       Windows CE 2013 support
+      Font size override support
     fixed: |
       Splash animations (stock framebuffer) are now displayed under guest additions mode too (stock framebuffer is displayed until GA framebuffer is used). Input source is now stock until user-space library has accessed virtual IO. This fully fixes, for example, the Jornada RAM erase screen. It is now visible, it is now interactable without any additional manipulations.
       Crash when drawing off-screen (GiNi)

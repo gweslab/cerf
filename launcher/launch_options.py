@@ -120,7 +120,7 @@ class LaunchOptionsPanel:
             device is None or color_scheme_supported_for_os(device.meta.os_name))
         if self._guest_additions_locked:
             for k in ("guest_additions", "color_scheme", "width", "height",
-                      "dpi", "bpp", "share_folder"):
+                      "dpi", "font_size", "bpp", "share_folder"):
                 if k in self._baseline:
                     eff[k] = self._baseline[k]
                 else:
@@ -195,6 +195,11 @@ class LaunchOptionsPanel:
             if dpi is None:
                 return None
             argv.append("--screen-dpi={}".format(dpi))
+        if guest_additions and self.custom.font_size_enabled():
+            font_size = self.custom.font_size_value_or_error()
+            if font_size is None:
+                return None
+            argv.append("--ga-font-size={}".format(font_size))
         return argv
 
     def _set_block_visible(self, visible: bool, *widgets: tk.Widget) -> None:

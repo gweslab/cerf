@@ -4,6 +4,7 @@
 #include "cerf_regs_map.h"
 #include "cerf_shell_watch.h"
 #include "cerf_gwes_ready.h"
+#include "cerf_toolhelp.h"
 #include "cerf_window_owner.h"
 
 #define CERF_SHELLWATCH_MAX_LAUNCH 48
@@ -13,16 +14,6 @@
 #define CERF_SHELLWATCH_TIMEOUT_MS 120000u
 
 typedef struct { int ord; WCHAR exe[CERF_SHELLWATCH_EXE_WCHARS]; } CerfLaunchEntry;
-
-typedef HANDLE (WINAPI *PFN_CreateToolhelp32Snapshot)(DWORD, DWORD);
-typedef BOOL   (WINAPI *PFN_CloseToolhelp32Snapshot)(HANDLE);
-typedef BOOL   (WINAPI *PFN_Process32First)(HANDLE, LPPROCESSENTRY32);
-typedef BOOL   (WINAPI *PFN_Process32Next)(HANDLE, LPPROCESSENTRY32);
-
-static PFN_CreateToolhelp32Snapshot s_pfnCreateSnap = NULL;
-static PFN_CloseToolhelp32Snapshot  s_pfnCloseSnap  = NULL;
-static PFN_Process32First           s_pfnProcFirst  = NULL;
-static PFN_Process32Next            s_pfnProcNext   = NULL;
 
 typedef void (*CerfOnShellIsUp)(void);
 static CerfOnShellIsUp s_cbs[CERF_SHELLWATCH_MAX_CB];
@@ -93,23 +84,13 @@ static int CerfReadInitTable(CerfLaunchEntry* tbl, int max) {
     return n;
 }
 
-static BOOL CerfShellWatchResolveToolhelp(void) {
-    HMODULE h = LoadLibraryW(L"toolhelp.dll");
-    if (!h) return FALSE;
-    s_pfnCreateSnap = (PFN_CreateToolhelp32Snapshot)GetProcAddressW(h, L"CreateToolhelp32Snapshot");
-    s_pfnCloseSnap  = (PFN_CloseToolhelp32Snapshot) GetProcAddressW(h, L"CloseToolhelp32Snapshot");
-    s_pfnProcFirst  = (PFN_Process32First)          GetProcAddressW(h, L"Process32First");
-    s_pfnProcNext   = (PFN_Process32Next)           GetProcAddressW(h, L"Process32Next");
-    return s_pfnCreateSnap && s_pfnCloseSnap && s_pfnProcFirst && s_pfnProcNext;
-}
-
 static BOOL CerfShellWatchPollOnce(const CerfLaunchEntry* tbl, int n, int gwes_ord) {
-    HANDLE snap = s_pfnCreateSnap(TH32CS_SNAPPROCESS, 0);
+    HANDLE snap = CerfToolhelpSnapshotProcesses();
     PROCESSENTRY32 pe;
     BOOL ok, hit = FALSE;
     if (snap == INVALID_HANDLE_VALUE) return FALSE;
     pe.dwSize = sizeof(pe);
-    ok = s_pfnProcFirst(snap, &pe);
+    ok = CerfToolhelpProcessFirst(snap, &pe);
     while (ok && !hit) {
         const WCHAR* base = CerfBasenameW(pe.szExeFile);
         int i;
@@ -117,9 +98,9 @@ static BOOL CerfShellWatchPollOnce(const CerfLaunchEntry* tbl, int n, int gwes_o
             if (tbl[i].ord > gwes_ord && CerfEqualsCIW(base, tbl[i].exe)) { hit = TRUE; break; }
         }
         pe.dwSize = sizeof(pe);
-        ok = s_pfnProcNext(snap, &pe);
+        ok = CerfToolhelpProcessNext(snap, &pe);
     }
-    s_pfnCloseSnap(snap);
+    CerfToolhelpCloseSnapshot(snap);
     return hit;
 }
 
@@ -190,7 +171,7 @@ static DWORD WINAPI CerfShellWatchThread(LPVOID) {
         Sleep(CERF_SHELLWATCH_POLL_MS);
         if (!resolved) {
             resolved = TRUE;
-            if (!CerfShellWatchResolveToolhelp()) {
+            if (!CerfToolhelpReady()) {
                 by_window = TRUE;
                 CERF_LOG("cerf_guest: shellwatch no toolhelp - polling window owners");
             }

@@ -3,6 +3,7 @@
 
 #include "cerf_regs_map.h"
 #include "cerf_gwes_ready.h"
+#include "cerf_toolhelp.h"
 
 #include "cerf/peripherals/cerf_virt/cerf_virt_addr_map.h"
 
@@ -54,39 +55,7 @@ typedef struct CerfTmWindowRecord {
 } CerfTmWindowRecord;
 typedef char cerf_tm_winrec_size_check[(sizeof(CerfTmWindowRecord) == 144) ? 1 : -1];
 
-typedef HANDLE (WINAPI *PFN_CreateToolhelp32Snapshot)(DWORD, DWORD);
-typedef BOOL   (WINAPI *PFN_CloseToolhelp32Snapshot)(HANDLE);
-typedef BOOL   (WINAPI *PFN_Process32First)(HANDLE, LPPROCESSENTRY32);
-typedef BOOL   (WINAPI *PFN_Process32Next)(HANDLE, LPPROCESSENTRY32);
-
 static volatile ULONG* s_tm_regs = NULL;
-
-static BOOL s_toolhelp_resolved = FALSE;
-static PFN_CreateToolhelp32Snapshot s_pfnCreateSnap = NULL;
-static PFN_CloseToolhelp32Snapshot  s_pfnCloseSnap  = NULL;
-static PFN_Process32First           s_pfnProcFirst  = NULL;
-static PFN_Process32Next            s_pfnProcNext   = NULL;
-
-static void CerfTmResolveToolhelp(void) {
-    HMODULE h;
-    if (s_toolhelp_resolved) return;
-    s_toolhelp_resolved = TRUE;
-    h = LoadLibraryW(L"toolhelp.dll");
-    if (!h) {
-        CERF_LOG("cerf_guest: tmpump toolhelp.dll missing - LIST disabled");
-        return;
-    }
-    s_pfnCreateSnap = (PFN_CreateToolhelp32Snapshot)
-        GetProcAddressW(h, L"CreateToolhelp32Snapshot");
-    s_pfnCloseSnap = (PFN_CloseToolhelp32Snapshot)
-        GetProcAddressW(h, L"CloseToolhelp32Snapshot");
-    s_pfnProcFirst = (PFN_Process32First)GetProcAddressW(h, L"Process32First");
-    s_pfnProcNext  = (PFN_Process32Next)GetProcAddressW(h, L"Process32Next");
-    if (!s_pfnCreateSnap || !s_pfnCloseSnap || !s_pfnProcFirst || !s_pfnProcNext) {
-        CERF_LOG("cerf_guest: tmpump toolhelp exports incomplete - LIST disabled");
-        s_pfnCreateSnap = NULL;
-    }
-}
 
 static void CerfTmRespond(DWORD gen, DWORD status, DWORD err,
                           DWORD count, DWORD total) {
@@ -113,19 +82,18 @@ static void CerfTmDoList(DWORD gen) {
     DWORD count = 0, total = 0;
     BOOL ok;
 
-    CerfTmResolveToolhelp();
-    if (!s_pfnCreateSnap) {
+    if (!CerfToolhelpReady()) {
         CerfTmRespond(gen, 0, ERROR_NOT_SUPPORTED, 0, 0);
         return;
     }
-    snap = s_pfnCreateSnap(TH32CS_SNAPPROCESS, 0);
+    snap = CerfToolhelpSnapshotProcesses();
     if (snap == INVALID_HANDLE_VALUE) {
         CerfTmRespond(gen, 0, GetLastError(), 0, 0);
         return;
     }
 
     pe.dwSize = sizeof(pe);
-    ok = s_pfnProcFirst(snap, &pe);
+    ok = CerfToolhelpProcessFirst(snap, &pe);
     while (ok) {
         total++;
         if (count < CERF_TM_MAX_RECORDS) {
@@ -143,9 +111,9 @@ static void CerfTmDoList(DWORD gen) {
             count++;
         }
         pe.dwSize = sizeof(pe);
-        ok = s_pfnProcNext(snap, &pe);
+        ok = CerfToolhelpProcessNext(snap, &pe);
     }
-    s_pfnCloseSnap(snap);
+    CerfToolhelpCloseSnapshot(snap);
     CerfTmRespond(gen, 1, 0, count, total);
 }
 
@@ -381,7 +349,7 @@ static DWORD WINAPI CerfTaskManagerPumpThread(LPVOID) {
                     break;
             }
         }
-        Sleep(50);
+        Sleep(250);
     }
 }
 

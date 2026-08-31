@@ -232,6 +232,7 @@ extern "C" void CerfStartTickProfiler(HMODULE self);
 extern "C" void CerfStartDriverInDriver(void);
 extern "C" void CerfAdvertiseDisplayPower(void);
 extern "C" void CerfStartShellWatch(void);
+extern "C" void CerfStartSync2ShellReplace(void);
 
 static DHPDEV APIENTRY CerfEnablePDEVWrap(
     DEVMODEW* pdm, LPWSTR pwszLogAddress, ULONG cPat, HSURF* phsurfPatterns,
@@ -248,6 +249,7 @@ static DHPDEV APIENTRY CerfEnablePDEVWrap(
     if (result) CerfStartTickProfiler(s_hinst);
     if (result) CerfStartDriverInDriver();
     if (result) CerfAdvertiseDisplayPower();
+    if (result) CerfStartSync2ShellReplace();
     if (result) CerfStartShellWatch();
     return result;
 }

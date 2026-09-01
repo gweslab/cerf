@@ -67,6 +67,12 @@ class DpiOptionBlock:
     def enabled(self) -> bool:
         return bool(self.var_override.get())
 
+    def apply_preset(self, value: int) -> None:
+        self.var_override.set(True)
+        self.var_dpi.set(str(value))
+        self.sync_slider_to_text()
+        self.refresh_state(self._locked)
+
     def optional_value(self) -> Optional[int]:
         try:
             v = int(self.var_dpi.get().strip())

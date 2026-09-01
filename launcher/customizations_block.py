@@ -8,7 +8,8 @@ from color_schemes import (COLOR_SCHEMES, CS_KEY_TO_LABEL, CS_LABEL_TO_KEY)
 from launch_options_bpp import BppOptionBlock
 from launch_options_dpi import DpiOptionBlock
 from launch_options_font_size import FontSizeOptionBlock
-from launch_options_presets import (RES_PRESETS, DEFAULT_SCREEN_WIDTH,
+from launch_options_presets import (RES_PRESETS, SCALE_PRESETS,
+                                    DEFAULT_SCREEN_WIDTH,
                                     DEFAULT_SCREEN_HEIGHT)
 from ui_dialogs import show_color_scheme_help, show_error
 import ui_theme as theme
@@ -78,14 +79,29 @@ class CustomizationsBlock:
 
         self.bpp = BppOptionBlock(frame, window, self._on_change,
                                   row_head=3, row_fields=4, row_sep=5)
+        self.scale_label = ttk.Label(frame, text="Adapt DPI and font size:")
+        self.scale_label.grid(row=6, column=0, sticky="w")
+
+        scale_row = self.scale_row = ttk.Frame(frame)
+        scale_row.grid(row=7, column=0, sticky="ew", pady=(2, 0))
+        self.scale_buttons = []
+        for i, (label, dpi, font) in enumerate(SCALE_PRESETS):
+            b = ttk.Button(scale_row, text=label, width=8,
+                           command=lambda d=dpi, f=font: self._apply_scale(d, f))
+            b.grid(row=0, column=i, sticky="w", padx=(0, 4))
+            self.scale_buttons.append(b)
+
+        self.scale_sep = ttk.Separator(frame, orient="horizontal")
+        self.scale_sep.grid(row=8, column=0, sticky="ew", pady=8)
+
         self.dpi = DpiOptionBlock(frame, window, self._on_change, numeric_vcmd,
-                                  row_head=6, row_fields=7, row_sep=8)
+                                  row_head=9, row_fields=10, row_sep=11)
         self.font_size = FontSizeOptionBlock(frame, window, self._on_change,
-                                             signed_vcmd, row_head=9,
-                                             row_fields=10, row_sep=11)
+                                             signed_vcmd, row_head=12,
+                                             row_fields=13, row_sep=14)
 
         cs_row = self.cs_row = ttk.Frame(frame)
-        cs_row.grid(row=12, column=0, sticky="ew")
+        cs_row.grid(row=15, column=0, sticky="ew")
         cs_row.columnconfigure(1, weight=1)
         ttk.Label(cs_row, text="Color scheme:").grid(row=0, column=0,
                                                      sticky="w", padx=(0, 6))
@@ -100,8 +116,14 @@ class CustomizationsBlock:
         self.color_scheme_combo.bind("<<ComboboxSelected>>",
                                      lambda _e: self._on_change())
 
+    def _apply_scale(self, dpi: int, font: int) -> None:
+        self.dpi.apply_preset(dpi)
+        self.font_size.apply_preset(font)
+        self._on_change()
+
     def lockables(self) -> List[tk.Widget]:
         return ([self.width_entry, self.height_entry, self.res_slider]
+                + self.scale_buttons
                 + self.bpp.lockables() + self.dpi.lockables()
                 + self.font_size.lockables()
                 + [self.color_scheme_combo, self.cs_help])
@@ -151,6 +173,11 @@ class CustomizationsBlock:
 
         self._set_visible(res_visible, *self.bpp.blocks())
         self.bpp.refresh_state(locked)
+
+        self._set_visible(guest_additions, self.scale_label, self.scale_row,
+                          self.scale_sep)
+        for b in self.scale_buttons:
+            b.config(state="disabled" if locked else "normal")
 
         self._set_visible(guest_additions, *self.dpi.blocks())
         self.dpi.refresh_state(locked)

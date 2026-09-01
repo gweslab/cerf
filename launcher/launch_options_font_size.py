@@ -71,6 +71,12 @@ class FontSizeOptionBlock:
     def enabled(self) -> bool:
         return bool(self.var_override.get())
 
+    def apply_preset(self, value: int) -> None:
+        self.var_override.set(True)
+        self.var_size.set(str(value))
+        self.sync_slider_to_text()
+        self.refresh_state(self._locked)
+
     def optional_value(self) -> Optional[int]:
         try:
             return int(self.var_size.get().strip(), 10)

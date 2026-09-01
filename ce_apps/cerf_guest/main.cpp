@@ -237,7 +237,7 @@ extern "C" void CerfStartDriverInDriver(void);
 extern "C" void CerfAdvertiseDisplayPower(void);
 extern "C" void CerfStartShellWatch(void);
 extern "C" void CerfStartSync2ShellReplace(void);
-extern "C" void CerfApplySystemFont(void);
+extern "C" void CerfApplyRegistryCustomizations(void);
 
 static DHPDEV APIENTRY CerfEnablePDEVWrap(
     DEVMODEW* pdm, LPWSTR pwszLogAddress, ULONG cPat, HSURF* phsurfPatterns,
@@ -259,31 +259,6 @@ static DHPDEV APIENTRY CerfEnablePDEVWrap(
     return result;
 }
 
-static void CerfApplyColorScheme(void) {
-    volatile ULONG* csc = (volatile ULONG*)CerfMapRegsPage(
-        g_CerfVirtBase + CerfVirt::kColorSchemeOffset, CerfVirt::kColorSchemeSize);
-    if (!csc) return;
-    if (csc[CerfVirt::kCscPresent / 4] != CerfVirt::kCscMagic) return;
-    ULONG count = csc[CerfVirt::kCscCount / 4];
-    if (count == 0 || count > 64) return;
-    DWORD colors[64];
-    ULONG i;
-    for (i = 0; i < count; ++i)
-        colors[i] = csc[(CerfVirt::kCscEntries / 4) + i];
-
-    HKEY hk;
-    if (RegOpenKeyExW(HKEY_LOCAL_MACHINE, L"SYSTEM\\GWE", 0, 0, &hk) == ERROR_SUCCESS) {
-        RegSetValueExW(hk, L"SysColor", 0, REG_BINARY, (LPBYTE)colors, count * 4);
-        RegCloseKey(hk);
-    }
-    HKEY hkApp;
-    if (RegOpenKeyExW(HKEY_CURRENT_USER, L"ControlPanel\\Appearance", 0, 0, &hkApp) == ERROR_SUCCESS) {
-        RegSetValueExW(hkApp, L"Current", 0, REG_SZ, (LPBYTE)L"CERF Theme", sizeof(L"CERF Theme"));
-        RegCloseKey(hkApp);
-    }
-    CERF_LOG_X("cerf_guest: color scheme applied entries", count);
-}
-
 extern "C" BOOL APIENTRY DrvEnableDriver(ULONG iEngineVersion,
                                           ULONG cj,
                                           DRVENABLEDATA* pded,
@@ -292,7 +267,8 @@ extern "C" BOOL APIENTRY DrvEnableDriver(ULONG iEngineVersion,
     CERF_LOG_X("cerf_guest: DrvEnableDriver iEngineVersion", iEngineVersion);
     CERF_LOG_X("cerf_guest: DrvEnableDriver cj", cj);
     CERF_LOG_X("cerf_guest: DrvEnableDriver slots", cj / sizeof(void*));
-    CerfApplyColorScheme();
+    CerfReadFbRegs();
+    CerfApplyRegistryCustomizations();
 
     if (pded == NULL || pCallbacks == NULL || cj < 26 * sizeof(void*)) return FALSE;
 
@@ -308,9 +284,6 @@ extern "C" BOOL APIENTRY DrvEnableDriver(ULONG iEngineVersion,
             s_module_name[i] = L'\0';
         }
     }
-    CerfReadFbRegs();
-    CerfApplySystemFont();
-
     {
         OSVERSIONINFOW ovi;
         ovi.dwOSVersionInfoSize = sizeof(ovi);

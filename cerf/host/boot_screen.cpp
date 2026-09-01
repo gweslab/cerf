@@ -151,8 +151,11 @@ void BootScreen::EnsureFonts() {
 }
 
 std::wstring BootScreen::CurrentLabelText() const {
-    if (fb_latched_)                          return L"LCD is rendering.";
-    if (label_mode_ == LabelMode::Restarting) return L"Rebooting...";
+    if (fb_latched_) return L"LCD is rendering.";
+    if (label_mode_ == LabelMode::Restarting) {
+        const wchar_t* over = restart_label_.load(std::memory_order_acquire);
+        return over ? over : L"Rebooting...";
+    }
     return L"Booting " + short_name_ + L"...";
 }
 
@@ -373,4 +376,10 @@ void BootScreen::DrawWatermark(HDC dc, uint32_t width, uint32_t height) {
 void BootScreen::Restart() {
     restart_req_.store(true, std::memory_order_release);
 }
-void BootScreen::OnFramebufferLatched() { fb_latched_req_.store(true); }
+void BootScreen::SetRestartLabel(const wchar_t* static_text) {
+    restart_label_.store(static_text, std::memory_order_release);
+}
+void BootScreen::OnFramebufferLatched() {
+    restart_label_.store(nullptr, std::memory_order_release);
+    fb_latched_req_.store(true);
+}

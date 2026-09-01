@@ -1,5 +1,6 @@
 #include "cerf_virt_framebuffer.h"
 #include "cerf_virt_addr_map.h"
+#include "cerf_virt_customizations_reset.h"
 #include "cerf_virt_fb_regs.h"
 
 #include "../peripheral_base.h"
@@ -25,6 +26,7 @@ using CerfVirt::kFbRegLogicalDpi;
 using CerfVirt::kFbRegRefreshRate;
 using CerfVirt::kFbRegSystemFontHeight;
 using CerfVirt::kFbRegSystemFontPresent;
+using CerfVirt::kFbRegCustomizationsApplied;
 
 class CerfVirtFramebufferRegs : public Peripheral {
 public:
@@ -71,6 +73,10 @@ public:
     void WriteWord(uint32_t addr, uint32_t value) override {
         const uint32_t off = addr - MmioBase();
         if (off == kFbRegPresent) { fb_->MarkDirty(); return; }
+        if (off == kFbRegCustomizationsApplied) {
+            emu_.Get<CerfVirtCustomizationsReset>().OnCustomizationsApplied();
+            return;
+        }
         LOG(Periph, "[CerfVirtFbRegs] write +0x%X = 0x%08X "
                     "(non-WO register; ignored)\n", off, value);
     }

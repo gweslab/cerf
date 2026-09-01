@@ -37,6 +37,8 @@ public:
 
     void Restart();
 
+    void SetRestartLabel(const wchar_t* static_text);
+
     /* Any thread. The framebuffer tab has taken over; finish the animation and
        switch the held label to "Switched to LCD". */
     void OnFramebufferLatched();
@@ -94,4 +96,5 @@ private:
     /* Cross-thread requests, consumed at the top of Advance. */
     std::atomic<bool> restart_req_{false};
     std::atomic<bool> fb_latched_req_{false};
+    std::atomic<const wchar_t*> restart_label_{nullptr};
 };

@@ -6,6 +6,7 @@
 #include "../core/cerf_emulator.h"
 #include "../core/device_config.h"
 #include "../core/device_config_refresh.h"
+#include "../peripherals/cerf_virt/cerf_virt_customizations_reset.h"
 #include "../peripherals/cerf_virt/cerf_virt_framebuffer.h"
 #include "../peripherals/cerf_virt/cerf_virt_resize.h"
 #include "../socs/guest_cpu_reset.h"
@@ -35,6 +36,8 @@ bool CustomizationsTransaction::Open(HWND owner, bool force_reboot) {
     emu_.Get<DeviceConfigRefresh>().Refresh();
 
     if (!response.is_object() || !response.contains("reboot")) return false;
+
+    emu_.Get<CerfVirtCustomizationsReset>().Invalidate();
 
     std::string reboot;
     if (response["reboot"].is_string())

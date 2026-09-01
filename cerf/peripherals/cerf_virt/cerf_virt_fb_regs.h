@@ -26,4 +26,6 @@ const uint32_t kFbRegRefreshRate = 0x28u;
 const uint32_t kFbRegSystemFontHeight  = 0x2Cu;
 const uint32_t kFbRegSystemFontPresent = 0x30u;
 
+const uint32_t kFbRegCustomizationsApplied = 0x34u;
+
 }

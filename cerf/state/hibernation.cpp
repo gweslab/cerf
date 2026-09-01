@@ -17,6 +17,7 @@
 #include "../host/guest_deep_sleep.h"
 #include "../boot/guest_cold_boot.h"
 #include "../host/host_widget_registry.h"
+#include "../peripherals/cerf_virt/cerf_virt_customizations_reset.h"
 #include "../socs/guest_cpu_reset.h"
 #include "../host/host_window.h"
 #include "../host/hw_screen.h"
@@ -220,6 +221,8 @@ bool Hibernation::Save(const std::wstring& path_in) {
             section(StateSection::Reset, [&] {
                 emu_.Get<GuestCpuReset>().SaveState(w);
                 emu_.Get<GuestColdBoot>().SaveState(w);
+                if (auto* c = emu_.TryGet<CerfVirtCustomizationsReset>())
+                    c->SaveState(w);
             });
             ok = w.Ok() && w.Commit();
         }
@@ -327,6 +330,8 @@ bool Hibernation::Restore(const std::wstring& path_in, bool ram_only,
                     case StateSection::Reset:
                         emu_.Get<GuestCpuReset>().RestoreState(r);
                         emu_.Get<GuestColdBoot>().RestoreState(r);
+                        if (auto* c = emu_.TryGet<CerfVirtCustomizationsReset>())
+                            c->RestoreState(r);
                         break;
                     default: break;
                 }

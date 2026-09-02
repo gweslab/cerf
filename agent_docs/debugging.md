@@ -522,7 +522,11 @@ the same VA halt CERF. Registration is exclusive, and CERF surfaces the
 conflict at startup. CERF never silently stomps a registration.
 `OnPcFiltered` instances at the same VA coexist with each other and with
 one unfiltered handler. Each filtered handler is responsible for its own
-predicate-distinct admission.
+predicate-distinct admission. **The halt is a consolidation order, not an
+address problem** - the remedy is one handler at that VA in the PE-named
+file that absorbs the logging of the other handler. A hook at a
+neighboring instruction slips past the halt and defeats the purpose of
+the gate.
 
 **If a name/slot resolver is not trustworthy, attribute a user-VA fire
 by instruction-byte signature.** A per-process (low) VA hook can fire

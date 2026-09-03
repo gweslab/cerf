@@ -868,7 +868,6 @@ EXPORTS
     InputDebugCharW
     InsertMenuW
     IntChainHandlerIoControl
-    InterlockedCompareExchange
     InterlockedDecrement
     InterlockedExchange
     InterlockedExchangeAdd

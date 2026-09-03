@@ -56,7 +56,7 @@ Resolve the freeform input into a concrete target. Be literal:
 
 - **Quoted claim** - take the claim verbatim. Do NOT rephrase it, summarize it, or soften its tone.
 - **File path** - read the file. For a single function, capture its full body plus enough surrounding context to make it reviewable.
-- **"current diff" / "this diff" / "unstaged"** - run `git diff`. If anything is staged, also run `git diff --cached`. Capture the full patch.
+- **"current diff" / "this diff" / "unstaged"** - run `git diff`. If anything is staged, also run `git diff --cached`. Capture the full patch. **A diff against the last commit absorbs whatever else is uncommitted.** This tree carries the parallel work of other agents and of the user, so scope the target to the files your own change touched. A target that reaches wider spends the verdict of the reviewer on code that is not yours. Its findings then name the in-flight work of somebody else as a defect.
 - **Commit or range** - `git diff <range>`.
 - **Mix** - collect every piece the input references.
 

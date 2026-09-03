@@ -6,8 +6,7 @@
 extern "C" {
 #endif
 
-void CerfShellWatchTick(void);
-void CerfShellWatchRegister(void (*cb)(void));
+void CerfTaskManagerTick(void);
 
 #ifdef __cplusplus
 }

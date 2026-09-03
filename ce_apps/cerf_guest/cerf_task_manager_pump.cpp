@@ -4,6 +4,7 @@
 #include "cerf_regs_map.h"
 #include "cerf_gwes_ready.h"
 #include "cerf_toolhelp.h"
+#include "cerf_task_manager_pump.h"
 
 #include "cerf/peripherals/cerf_virt/cerf_virt_addr_map.h"
 
@@ -311,53 +312,80 @@ static BOOL CerfTmRequireGwes(DWORD gen) {
     return FALSE;
 }
 
-static DWORD WINAPI CerfTaskManagerPumpThread(LPVOID) {
-    ULONG last_gen;
+static BOOL  s_tm_dead     = FALSE;
+static BOOL  s_tm_ready    = FALSE;
+static ULONG s_tm_last_gen = 0;
 
-    s_tm_regs = (volatile ULONG*)CerfMapRegsPage(g_CerfVirtBase + CerfVirt::kTaskManagerOffset,
-                                                 CerfVirt::kTaskManagerSize);
-    if (!s_tm_regs) {
-        CERF_LOG("cerf_guest: tmpump map FAILED");
-        return 0;
-    }
+static volatile LONG s_tm_busy     = 0;
+static ULONG         s_tm_job_gen  = 0;
+static ULONG         s_tm_job_code = 0;
+static ULONG         s_tm_job_pid  = 0;
 
-    CerfTmStartTitleWorker();
-
-    last_gen = s_tm_regs[CERF_TM_CMD_GEN / 4];
-    for (;;) {
-        ULONG gen = s_tm_regs[CERF_TM_CMD_GEN / 4];
-        if (gen != last_gen) {
-            ULONG code = s_tm_regs[CERF_TM_CMD_CODE / 4];
-            ULONG pid  = s_tm_regs[CERF_TM_CMD_PID / 4];
-            last_gen = gen;
-            switch (code) {
-                case CERF_TM_OP_LIST:        CerfTmDoList(gen);            break;
-                case CERF_TM_OP_KILL:        CerfTmDoKill(gen, pid);       break;
-                case CERF_TM_OP_SWITCHTO:
-                    if (CerfTmRequireGwes(gen)) CerfTmDoSwitchTo(gen, pid);
-                    break;
-                case CERF_TM_OP_RUN:         CerfTmDoRun(gen);             break;
-                case CERF_TM_OP_LISTWINDOWS:
-                    if (CerfTmRequireGwes(gen)) CerfTmDoListWindows(gen);
-                    break;
-                case CERF_TM_OP_SWITCHTOWIN:
-                    if (CerfTmRequireGwes(gen)) CerfTmDoSwitchToWin(gen, pid);
-                    break;
-                default:
-                    CERF_LOG_X("cerf_guest: tmpump unknown cmd", code);
-                    CerfTmRespond(gen, 0, ERROR_INVALID_PARAMETER, 0, 0);
-                    break;
-            }
-        }
-        Sleep(250);
+static void CerfTmExecute(ULONG gen, ULONG code, ULONG pid) {
+    switch (code) {
+        case CERF_TM_OP_LIST:        CerfTmDoList(gen);            break;
+        case CERF_TM_OP_KILL:        CerfTmDoKill(gen, pid);       break;
+        case CERF_TM_OP_SWITCHTO:
+            if (CerfTmRequireGwes(gen)) CerfTmDoSwitchTo(gen, pid);
+            break;
+        case CERF_TM_OP_RUN:         CerfTmDoRun(gen);             break;
+        case CERF_TM_OP_LISTWINDOWS:
+            if (CerfTmRequireGwes(gen)) CerfTmDoListWindows(gen);
+            break;
+        case CERF_TM_OP_SWITCHTOWIN:
+            if (CerfTmRequireGwes(gen)) CerfTmDoSwitchToWin(gen, pid);
+            break;
+        default:
+            CERF_LOG_X("cerf_guest: tmpump unknown cmd", code);
+            CerfTmRespond(gen, 0, ERROR_INVALID_PARAMETER, 0, 0);
+            break;
     }
 }
 
-extern "C" void CerfStartTaskManagerPump(void) {
-    static BOOL started = FALSE;
+static DWORD WINAPI CerfTmCommandWorker(LPVOID) {
+    CerfTmExecute(s_tm_job_gen, s_tm_job_code, s_tm_job_pid);
+    s_tm_busy = 0;
+    return 0;
+}
+
+extern "C" void CerfTaskManagerTick(void) {
+    ULONG  gen;
     HANDLE t;
-    if (started) return;
-    started = TRUE;
-    t = CreateThread(NULL, 0, CerfTaskManagerPumpThread, NULL, 0, NULL);
-    if (t) CloseHandle(t);
+
+    if (s_tm_dead) return;
+
+    if (!s_tm_ready) {
+        s_tm_regs = (volatile ULONG*)CerfMapRegsPage(g_CerfVirtBase + CerfVirt::kTaskManagerOffset,
+                                                     CerfVirt::kTaskManagerSize);
+        if (!s_tm_regs) {
+            CERF_LOG("cerf_guest: tmpump map FAILED");
+            s_tm_dead = TRUE;
+            return;
+        }
+        CerfTmStartTitleWorker();
+        s_tm_last_gen = s_tm_regs[CERF_TM_CMD_GEN / 4];
+        s_tm_ready = TRUE;
+        return;
+    }
+
+    if (s_tm_busy) return;
+
+    gen = s_tm_regs[CERF_TM_CMD_GEN / 4];
+    if (gen == s_tm_last_gen) return;
+
+    s_tm_job_gen  = gen;
+    s_tm_job_code = s_tm_regs[CERF_TM_CMD_CODE / 4];
+    s_tm_job_pid  = s_tm_regs[CERF_TM_CMD_PID / 4];
+    s_tm_last_gen = gen;
+
+    s_tm_busy = 1;
+    t = CreateThread(NULL, 0, CerfTmCommandWorker, NULL, 0, NULL);
+    if (t) {
+        CloseHandle(t);
+        return;
+    }
+
+    s_tm_busy = 0;
+    CERF_LOG_X("cerf_guest: tmpump command thread FAILED", s_tm_job_code);
+    CerfTmRespond(gen, 0, GetLastError(), 0, 0);
 }

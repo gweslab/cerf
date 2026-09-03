@@ -3,6 +3,7 @@
 #include "cerf_regs_map.h"
 #include "cerf_gwes_ready.h"
 #include "cerf_window_owner.h"
+#include "cerf_calib_warning_pump.h"
 
 #include "cerf/peripherals/cerf_virt/cerf_virt_addr_map.h"
 
@@ -10,7 +11,6 @@
 #define CERF_CW_APPEARED      1u
 #define CERF_CW_DISAPPEARED   2u
 
-#define CERF_CW_POLL_MS    1000u
 #define CERF_CW_IDLE_POLLS 600u
 
 static volatile ULONG*  s_cw_regs     = NULL;
@@ -46,74 +46,68 @@ static void CerfCwSignal(ULONG event) {
     s_cw_regs[CERF_CW_EVENT / 4] = event;
 }
 
-static DWORD WINAPI CerfCwThread(LPVOID) {
-    DWORD polls = 0;
-    BOOL  present = FALSE;
-    BOOL  cycled = FALSE;
-    int   miss = 0;
-    CERF_LOG("cerf_guest: cwpump thread start");
-    CERF_LOG_X("cerf_guest: cwpump SH_WMGR", CerfShWmgrApiSet());
+static BOOL  s_cw_dead    = FALSE;
+static BOOL  s_cw_ready   = FALSE;
+static BOOL  s_cw_present = FALSE;
+static DWORD s_cw_polls   = 0;
+static int   s_cw_miss    = 0;
 
-    s_cw_regs = (volatile ULONG*)CerfMapRegsPage(
-        g_CerfVirtBase + CerfVirt::kCalibSignalOffset,
-        CerfVirt::kCalibSignalSize);
-    if (!s_cw_regs) {
-        CERF_LOG("cerf_guest: cwpump map FAILED");
-        return 0;
+extern "C" void CerfCalibWarningTick(void) {
+    HWND cal;
+
+    if (s_cw_dead) return;
+
+    if (!s_cw_ready) {
+        CERF_LOG_X("cerf_guest: cwpump SH_WMGR", CerfShWmgrApiSet());
+        s_cw_regs = (volatile ULONG*)CerfMapRegsPage(
+            g_CerfVirtBase + CerfVirt::kCalibSignalOffset,
+            CerfVirt::kCalibSignalSize);
+        if (!s_cw_regs) {
+            CERF_LOG("cerf_guest: cwpump map FAILED");
+            s_cw_dead = TRUE;
+            return;
+        }
+        if (!CerfIsApiReadyAvailable()) {
+            CERF_LOG("cerf_guest: cwpump coredll has no IsAPIReady - teardown");
+            s_cw_dead = TRUE;
+            return;
+        }
+        s_cw_ready = TRUE;
+        return;
     }
 
-    if (!CerfIsApiReadyAvailable()) {
-        CERF_LOG("cerf_guest: cwpump coredll has no IsAPIReady - teardown");
-        return 0;
+    if (!CerfGwesApiSetReady()) {
+        if (++s_cw_polls > CERF_CW_IDLE_POLLS) {
+            CERF_LOG("cerf_guest: cwpump wmgr never ready - teardown");
+            s_cw_dead = TRUE;
+        }
+        return;
     }
 
-    for (;;) {
-        HWND cal;
-        if (!CerfGwesApiSetReady()) {
-            if (++polls > CERF_CW_IDLE_POLLS) {
-                CERF_LOG("cerf_guest: cwpump wmgr never ready - teardown");
-                break;
-            }
-            Sleep(CERF_CW_POLL_MS);
-            continue;
+    cal = CerfCwFindCalibWindow();
+    if (cal) {
+        s_cw_miss = 0;
+        if (!s_cw_present) {
+            s_cw_present = TRUE;
+            CERF_LOG("cerf_guest: cwpump CALIB APPEARED");
+            CerfCwSignal(CERF_CW_APPEARED);
         }
-        cal = CerfCwFindCalibWindow();
-        if (cal) {
-            miss = 0;
-            if (!present) {
-                present = TRUE;
-                CERF_LOG("cerf_guest: cwpump CALIB APPEARED");
-                CerfCwSignal(CERF_CW_APPEARED);
-            }
-        } else if (present) {
-            if (++miss >= 2) {
-                present = FALSE;
-                miss = 0;
-                cycled = TRUE;
-                CERF_LOG("cerf_guest: cwpump CALIB DISAPPEARED");
-                CerfCwSignal(CERF_CW_DISAPPEARED);
-            }
-        }
-        if (cycled) {
+    } else if (s_cw_present) {
+        if (++s_cw_miss >= 2) {
+            s_cw_present = FALSE;
+            s_cw_miss = 0;
+            CERF_LOG("cerf_guest: cwpump CALIB DISAPPEARED");
+            CerfCwSignal(CERF_CW_DISAPPEARED);
             CERF_LOG("cerf_guest: cwpump cycle complete - teardown");
-            break;
+            s_cw_dead = TRUE;
+            return;
         }
-        if (!present) {
-            if (++polls > CERF_CW_IDLE_POLLS) {
-                CERF_LOG("cerf_guest: cwpump idle polls exhausted - teardown");
-                break;
-            }
-        }
-        Sleep(CERF_CW_POLL_MS);
     }
-    return 0;
-}
 
-extern "C" void CerfStartCalibWarningPump(void) {
-    static BOOL started = FALSE;
-    HANDLE t;
-    if (started) return;
-    started = TRUE;
-    t = CreateThread(NULL, 0, CerfCwThread, NULL, 0, NULL);
-    if (t) CloseHandle(t);
+    if (!s_cw_present) {
+        if (++s_cw_polls > CERF_CW_IDLE_POLLS) {
+            CERF_LOG("cerf_guest: cwpump idle polls exhausted - teardown");
+            s_cw_dead = TRUE;
+        }
+    }
 }

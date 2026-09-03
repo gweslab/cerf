@@ -85,6 +85,14 @@ division helper. A CE7 coredll exports all of them. Every target coredll must
 export the name of a coredll import. Verify the oldest target and the newest
 target before you add one.
 
+**A hand-maintained import list is not evidence of what a target exports.** The
+list that builds an import library states what the build assumes. It never
+states what the library of a given ROM exports by name. Two things settle the
+question: the export table of that ROM's own binary, and a failure to resolve
+at run time. A list generated from one CE version holds the facts of that
+version. A later edit that gives the list the name of another version changes
+nothing.
+
 Define such a symbol **locally in cerf_guest**. How that definition binds
 depends on how the compiler references the name.
 
@@ -246,6 +254,41 @@ renderer. With no replaceable driver, the core of GA cannot attach. The CE 1.0
 desktop reaches the host through the native LCD aperture of the board. Do not
 attempt CE 1.0 GA.
 
+## Guest thread topology
+
+The guest side runs two permanent pump threads. `DrvEnablePDEV` starts both.
+
+- **Input pump** (`ce_apps/cerf_guest/cerf_input_pump.cpp`) - one 10 ms thread
+  with the CE priority boost. It carries the pointer and the keyboard. It is
+  the only pump that can block on `CerfWaitGwesApiSet()`, because it shares its
+  thread with nothing.
+- **Service pump** (`ce_apps/cerf_guest/cerf_service_pump.cpp`) - one 250 ms
+  loop that calls each housekeeping task in turn. The tick profiler runs on
+  each tick. The task manager runs on each second tick. The resize, shell watch
+  and calibration watch run on each fourth tick.
+
+Each housekeeping task is a `CerfXxxTick()` function in its own module. The
+header of that module declares it. Three rules hold for every task.
+
+- **A task owns a kill switch.** The first line of the task is
+  `if (s_xxx_dead) return;`. The task sets that flag when it completes its work
+  or when its timeout expires. The task also sets that flag when the coredll of
+  this ROM does not export a necessary function. `CerfResizeTick` is the
+  example, because CE 3 and older have no `ChangeDisplaySettingsEx`. That task
+  resolves the export one time, writes a log line, and never runs again.
+- **A task does not block.** It uses `CerfGwesApiSetReady()`. It does not use
+  `CerfWaitGwesApiSet()`. A task that must do long work gives that work to a
+  one-shot thread and returns. `CerfTaskManagerTick` does this, because its
+  window walk waits as much as 250 ms for each window title.
+- **A task keeps its state in file statics, and its first tick does the lazy
+  init.** That init stays out of a `CerfStart*` function, under the
+  no-user-API-before-full-boot rule in § Task manager.
+
+The folder-share mount watch (`cerf_fs_afs.cpp`) has its own thread, because it
+runs in device.exe and the service pump runs in gwes.exe. `CerfTmTitleWorker`,
+the tick-profiler window and the SYNC 2 shell replacement also own threads.
+`CerfTmTitleWorker` waits on an event. The other two threads are one-shot.
+
 ## Keyboard injection
 
 Host keystrokes reach the guest through the same mechanism as the mouse-pointer
@@ -261,11 +304,11 @@ guest-installed driver.
   last-value-wins registers of the pointer. The host appends one entry per
   host-key transition and increments the write sequence after the entry store.
   The guest drains entries by index.
-- Guest pump: `ce_apps/cerf_guest/cerf_keyboard_pump.cpp`. It is a thread that
-  `DrvEnablePDEV` of the display driver starts, next to the pointer / resize /
-  task pumps. It resolves `keybd_event` through `GetProcAddressW` and replays
-  each ring entry. GWES routes each entry to the focused window. GWES then runs
-  the active keyboard layout to produce WM_KEYDOWN / WM_KEYUP + WM_CHAR.
+- Guest pump: `ce_apps/cerf_guest/cerf_input_pump.cpp`. It carries the keyboard
+  and the pointer on one thread. It resolves `keybd_event` through
+  `GetProcAddressW` and replays each ring entry. GWES routes each entry to the
+  focused window. GWES then runs the active keyboard layout to produce
+  WM_KEYDOWN / WM_KEYUP + WM_CHAR.
 
 The guest-additions keyboard registers as one source in the host
 `KeyboardRouter` (`cerf/host/keyboard_router.{h,cpp}`) with the highest source

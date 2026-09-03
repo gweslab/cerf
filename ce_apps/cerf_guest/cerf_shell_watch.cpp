@@ -10,8 +10,7 @@
 #define CERF_SHELLWATCH_MAX_LAUNCH 48
 #define CERF_SHELLWATCH_EXE_WCHARS 64
 #define CERF_SHELLWATCH_MAX_CB     8
-#define CERF_SHELLWATCH_POLL_MS    250u
-#define CERF_SHELLWATCH_TIMEOUT_MS 120000u
+#define CERF_SHELLWATCH_TIMEOUT_TICKS 120u
 
 typedef struct { int ord; WCHAR exe[CERF_SHELLWATCH_EXE_WCHARS]; } CerfLaunchEntry;
 
@@ -159,42 +158,36 @@ static BOOL CerfShellWatchBuildTargets(void) {
     return FALSE;
 }
 
-static DWORD WINAPI CerfShellWatchThread(LPVOID) {
-    DWORD start, elapsed;
-    BOOL  resolved = FALSE;
-    BOOL  by_window = FALSE;
+static BOOL  s_sw_dead      = FALSE;
+static BOOL  s_sw_built     = FALSE;
+static BOOL  s_sw_by_window = FALSE;
+static DWORD s_sw_ticks     = 0;
 
-    if (!CerfShellWatchBuildTargets()) return 0;
+extern "C" void CerfShellWatchTick(void) {
+    if (s_sw_dead) return;
 
-    start = GetTickCount();
-    for (;;) {
-        Sleep(CERF_SHELLWATCH_POLL_MS);
-        if (!resolved) {
-            resolved = TRUE;
-            if (!CerfToolhelpReady()) {
-                by_window = TRUE;
-                CERF_LOG("cerf_guest: shellwatch no toolhelp - polling window owners");
-            }
+    if (!s_sw_built) {
+        s_sw_built = TRUE;
+        if (!CerfShellWatchBuildTargets()) {
+            s_sw_dead = TRUE;
+            return;
         }
-        if (by_window ? CerfShellWatchPollWindows(s_tbl, s_n, s_gwes_ord)
-                      : CerfShellWatchPollOnce(s_tbl, s_n, s_gwes_ord)) {
-            CERF_LOG("cerf_guest: shellwatch shell is up - firing OnShellIsUp");
-            CerfShellWatchFireCallbacks();
-            return 0;
-        }
-        elapsed = GetTickCount() - start;
-        if (elapsed >= CERF_SHELLWATCH_TIMEOUT_MS) {
-            CERF_LOG("cerf_guest: shellwatch 2-min timeout - OnShellIsUp not fired");
-            return 0;
+        if (!CerfToolhelpReady()) {
+            s_sw_by_window = TRUE;
+            CERF_LOG("cerf_guest: shellwatch no toolhelp - polling window owners");
         }
     }
-}
 
-extern "C" void CerfStartShellWatch(void) {
-    static BOOL started = FALSE;
-    HANDLE t;
-    if (started) return;
-    started = TRUE;
-    t = CreateThread(NULL, 0, CerfShellWatchThread, NULL, 0, NULL);
-    if (t) CloseHandle(t);
+    if (s_sw_by_window ? CerfShellWatchPollWindows(s_tbl, s_n, s_gwes_ord)
+                       : CerfShellWatchPollOnce(s_tbl, s_n, s_gwes_ord)) {
+        CERF_LOG("cerf_guest: shellwatch shell is up - firing OnShellIsUp");
+        s_sw_dead = TRUE;
+        CerfShellWatchFireCallbacks();
+        return;
+    }
+
+    if (++s_sw_ticks >= CERF_SHELLWATCH_TIMEOUT_TICKS) {
+        CERF_LOG("cerf_guest: shellwatch 2-min timeout - OnShellIsUp not fired");
+        s_sw_dead = TRUE;
+    }
 }

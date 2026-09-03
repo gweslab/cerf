@@ -227,15 +227,11 @@ static BOOL CerfNoPoolGetPalette(ULONG, ULONG**, int*)             { return FALS
 static VOID CerfNoPoolAddPalette(ULONG, ULONG*, int)              { }
 static VOID CerfNoPoolReleasePalette(ULONG, ULONG* pPalette, int) { delete[] pPalette; }
 
-extern "C" void CerfStartPointerPump(void);
-extern "C" void CerfStartKeyboardPump(void);
-extern "C" void CerfStartResizePump(void);
-extern "C" void CerfStartTaskManagerPump(void);
-extern "C" void CerfStartCalibWarningPump(void);
+extern "C" void CerfStartInputPump(void);
+extern "C" void CerfStartServicePump(void);
 extern "C" void CerfStartTickProfiler(HMODULE self);
 extern "C" void CerfStartDriverInDriver(void);
 extern "C" void CerfAdvertiseDisplayPower(void);
-extern "C" void CerfStartShellWatch(void);
 extern "C" void CerfStartSync2ShellReplace(void);
 extern "C" void CerfApplyRegistryCustomizations(void);
 
@@ -246,16 +242,12 @@ static DHPDEV APIENTRY CerfEnablePDEVWrap(
     DHPDEV result = DrvEnablePDEV(pdm, pwszLogAddress, cPat, phsurfPatterns,
                                    cjCaps, pdevcaps, cjDevInfo, pdi,
                                    hdev, pwszDeviceName, hDriver);
-    if (result) CerfStartPointerPump();
-    if (result) CerfStartKeyboardPump();
-    if (result) CerfStartResizePump();
-    if (result) CerfStartTaskManagerPump();
-    if (result) CerfStartCalibWarningPump();
+    if (result) CerfStartInputPump();
     if (result) CerfStartTickProfiler(s_hinst);
     if (result) CerfStartDriverInDriver();
     if (result) CerfAdvertiseDisplayPower();
     if (result) CerfStartSync2ShellReplace();
-    if (result) CerfStartShellWatch();
+    if (result) CerfStartServicePump();
     return result;
 }
 

@@ -1,6 +1,7 @@
 #include <windows.h>
 #include "cerf_regs_map.h"
 #include "cerf_gwes_ready.h"
+#include "cerf_resize_pump.h"
 
 #include "cerf/peripherals/cerf_virt/cerf_virt_addr_map.h"
 
@@ -38,80 +39,100 @@ static BOOL CerfMapRszRegs(void) {
     return s_rsz_regs != NULL;
 }
 
-static DWORD WINAPI CerfResizePumpThread(LPVOID) {
+static BOOL  s_rsz_dead     = FALSE;
+static BOOL  s_rsz_resolved = FALSE;
+static BOOL  s_rsz_ready    = FALSE;
+static PFN_ChangeDisplaySettingsExW s_cds = NULL;
+
+static ULONG s_base_bpp  = 0;
+static ULONG s_applied_w = 0;
+static ULONG s_applied_h = 0;
+static ULONG s_last_gen  = 0;
+static int   s_cur       = 0;
+
+static BOOL CerfRszResolve(void) {
     HMODULE h = LoadLibraryW(L"coredll.dll");
-    PFN_ChangeDisplaySettingsExW cds = h
-        ? (PFN_ChangeDisplaySettingsExW)GetProcAddressW(h, L"ChangeDisplaySettingsExW")
-        : NULL;
-    if (!cds && h)
-        cds = (PFN_ChangeDisplaySettingsExW)GetProcAddressW(h, L"ChangeDisplaySettingsEx");
-    CERF_LOG_X("cerf_guest: rszpump CDS proc", (DWORD)cds);
-    if (!cds) {
-        CERF_LOG("cerf_guest: rszpump no ChangeDisplaySettingsEx (CE3) - disabled");
-        return 0;
-    }
-    if (!CerfMapRszRegs()) {
-        CERF_LOG("cerf_guest: rszpump map FAILED");
-        return 0;
-    }
-
-    ULONG base_bpp = g_FbBpp;
-    ULONG applied_w = g_FbWidth, applied_h = g_FbHeight;
-    int   cur = 0;
-    ULONG last_gen;
-
-    if (!CerfWaitGwesApiSet()) {
-        CERF_LOG_X("cerf_guest: rszpump SH_WMGR never registered - no resize",
-                   CerfShWmgrApiSet());
-        return 0;
-    }
-
-    last_gen = s_rsz_regs[CERF_RSZ_WANT_GEN / 4];
-
-    for (;;) {
-        ULONG gen = s_rsz_regs[CERF_RSZ_WANT_GEN / 4];
-        if (gen != last_gen) {
-            last_gen = gen;
-            DWORD tw = s_rsz_regs[CERF_RSZ_WANT_W / 4];
-            DWORD th = s_rsz_regs[CERF_RSZ_WANT_H / 4];
-            if (tw == 0 || th == 0) { Sleep(50); continue; }
-
-            g_FbWidth  = tw;
-            g_FbHeight = th;
-            g_FbStride = tw * (base_bpp >> 3);
-            cur ^= 1;
-
-            BYTE dmbuf[192];
-            memset(dmbuf, 0, sizeof(dmbuf));
-            DEVMODEW* dm = (DEVMODEW*)dmbuf;
-            dm->dmSize   = 192;
-            dm->dmFields = DM_DISPLAYORIENTATION;
-            *(DWORD*)(dmbuf + CERF_DMDO_OFFSET) = (cur == 1) ? CERF_DMDO_270 : CERF_DMDO_90;
-
-            LONG r = cds(NULL, dm, NULL, CDS_RESET, NULL);
-            CERF_LOG_X("cerf_guest: rszpump CDS result", (DWORD)r);
-            if (r == DISP_CHANGE_SUCCESSFUL) {
-                applied_w = tw;
-                applied_h = th;
-                s_rsz_regs[CERF_RSZ_APPLIED_W / 4] = tw;
-                s_rsz_regs[CERF_RSZ_APPLIED_H / 4] = th;
-                s_rsz_regs[CERF_RSZ_APPLIED_GEN / 4] =
-                    s_rsz_regs[CERF_RSZ_APPLIED_GEN / 4] + 1;
-            } else {
-                g_FbWidth  = applied_w;
-                g_FbHeight = applied_h;
-                g_FbStride = applied_w * (base_bpp >> 3);
-                cur ^= 1;
-            }
-        }
-        Sleep(50);
-    }
+    s_cds = h ? (PFN_ChangeDisplaySettingsExW)GetProcAddressW(h, L"ChangeDisplaySettingsExW")
+              : NULL;
+    if (!s_cds && h)
+        s_cds = (PFN_ChangeDisplaySettingsExW)GetProcAddressW(h, L"ChangeDisplaySettingsEx");
+    CERF_LOG_X("cerf_guest: rszpump CDS proc", (DWORD)s_cds);
+    return s_cds != NULL;
 }
 
-extern "C" void CerfStartResizePump(void) {
-    static BOOL started = FALSE;
-    if (started) return;
-    started = TRUE;
-    HANDLE t = CreateThread(NULL, 0, CerfResizePumpThread, NULL, 0, NULL);
-    if (t) CloseHandle(t);
+extern "C" void CerfResizeTick(void) {
+    ULONG gen;
+    DWORD tw, th;
+    BYTE  dmbuf[192];
+    DEVMODEW* dm;
+    LONG r;
+
+    if (s_rsz_dead) return;
+
+    if (!s_rsz_resolved) {
+        s_rsz_resolved = TRUE;
+        if (!CerfRszResolve()) {
+            CERF_LOG("cerf_guest: rszpump no ChangeDisplaySettingsEx (CE3) - disabled");
+            s_rsz_dead = TRUE;
+            return;
+        }
+    }
+
+    if (!CerfIsApiReadyAvailable()) {
+        CERF_LOG_X("cerf_guest: rszpump SH_WMGR never registered - no resize",
+                   CerfShWmgrApiSet());
+        s_rsz_dead = TRUE;
+        return;
+    }
+
+    if (!CerfGwesApiSetReady()) return;
+
+    if (!s_rsz_ready) {
+        if (!CerfMapRszRegs()) {
+            CERF_LOG("cerf_guest: rszpump map FAILED");
+            s_rsz_dead = TRUE;
+            return;
+        }
+        s_base_bpp  = g_FbBpp;
+        s_applied_w = g_FbWidth;
+        s_applied_h = g_FbHeight;
+        s_last_gen  = s_rsz_regs[CERF_RSZ_WANT_GEN / 4];
+        s_rsz_ready = TRUE;
+        return;
+    }
+
+    gen = s_rsz_regs[CERF_RSZ_WANT_GEN / 4];
+    if (gen == s_last_gen) return;
+    s_last_gen = gen;
+
+    tw = s_rsz_regs[CERF_RSZ_WANT_W / 4];
+    th = s_rsz_regs[CERF_RSZ_WANT_H / 4];
+    if (tw == 0 || th == 0) return;
+
+    g_FbWidth  = tw;
+    g_FbHeight = th;
+    g_FbStride = tw * (s_base_bpp >> 3);
+    s_cur ^= 1;
+
+    memset(dmbuf, 0, sizeof(dmbuf));
+    dm = (DEVMODEW*)dmbuf;
+    dm->dmSize   = 192;
+    dm->dmFields = DM_DISPLAYORIENTATION;
+    *(DWORD*)(dmbuf + CERF_DMDO_OFFSET) = (s_cur == 1) ? CERF_DMDO_270 : CERF_DMDO_90;
+
+    r = s_cds(NULL, dm, NULL, CDS_RESET, NULL);
+    CERF_LOG_X("cerf_guest: rszpump CDS result", (DWORD)r);
+    if (r == DISP_CHANGE_SUCCESSFUL) {
+        s_applied_w = tw;
+        s_applied_h = th;
+        s_rsz_regs[CERF_RSZ_APPLIED_W / 4] = tw;
+        s_rsz_regs[CERF_RSZ_APPLIED_H / 4] = th;
+        s_rsz_regs[CERF_RSZ_APPLIED_GEN / 4] =
+            s_rsz_regs[CERF_RSZ_APPLIED_GEN / 4] + 1;
+    } else {
+        g_FbWidth  = s_applied_w;
+        g_FbHeight = s_applied_h;
+        g_FbStride = s_applied_w * (s_base_bpp >> 3);
+        s_cur ^= 1;
+    }
 }

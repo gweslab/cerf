@@ -344,7 +344,7 @@ static DWORD WINAPI CerfFsMountThread(LPVOID unused) {
             CerfUnmount();
             if (ch->Enabled) CerfMount(ch);
         }
-        Sleep(200);
+        Sleep(1000);
     }
 }
 

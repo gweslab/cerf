@@ -2,14 +2,16 @@
 
 #include <cstdint>
 #include <deque>
+#include <vector>
 
 class Sed1356;
 class StateWriter;
 class StateReader;
 
-/* S1D13506 2D BitBLT engine (Technical Manual §8.3.12, Programming Notes
-   §10). Synchronous: CPU-sourced ops buffer data-port words until the op's
-   expected word count arrives. */
+/* S1D13506 2D BitBLT engine (Technical Manual X25B-A-001 §8.3.12, Programming
+   Notes X25B-G-003-04 §10). Of the 13 operations five are CPU-fed a WORD at a
+   time through the 16-word BitBLT FIFO at the blit aperture; the other eight
+   self-complete (§10.2, p. 68). */
 class Sed1356BitBlt {
 public:
     explicit Sed1356BitBlt(Sed1356& owner) : owner_(owner) {}
@@ -57,9 +59,9 @@ private:
     };
 
     void ExecuteDisplayOp();                 /* src+dst both in display memory. */
-    void ExecuteCpuWrite();                  /* buffered CPU-sourced op.        */
+    void ExecuteCpuLine(uint32_t line);
     void RenderReadFifo();                   /* Read BitBLT -> out_fifo_.       */
-    uint32_t ExpectedWriteWords() const;     /* Programming Notes §10.2 formulas. */
+    uint32_t WordsPerLine() const;           /* Programming Notes §10.2.1/§10.2.2. */
     void     ExpandLine(uint32_t line, const uint16_t* words, uint32_t nwords,
                         uint32_t skip, bool transparent);
 
@@ -71,8 +73,10 @@ private:
 
     Sed1356&  owner_;
     Params    p_{};
-    bool      cpu_op_active_ = false;
-    uint32_t  expected_words_ = 0;
-    std::deque<uint16_t> in_fifo_;
-    std::deque<uint16_t> out_fifo_;
+    bool      cpu_op_active_  = false;
+    uint32_t  words_per_line_ = 0;
+    uint32_t  lines_done_     = 0;
+    uint32_t  read_line_      = 0;
+    std::vector<uint16_t> in_fifo_;
+    std::deque<uint16_t>  out_fifo_;
 };

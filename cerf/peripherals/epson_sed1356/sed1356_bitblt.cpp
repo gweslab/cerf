@@ -41,7 +41,10 @@ void Sed1356BitBlt::Start() {
 
     in_fifo_.clear();
     out_fifo_.clear();
-    cpu_op_active_ = false;
+    cpu_op_active_  = false;
+    words_per_line_ = 0;
+    lines_done_     = 0;
+    read_line_      = 0;
 
     switch (p_.op) {
         case kWriteRop:
@@ -49,7 +52,8 @@ void Sed1356BitBlt::Start() {
         case kColorExpand:
         case kColorExpandTransp:
             cpu_op_active_  = true;
-            expected_words_ = ExpectedWriteWords();
+            words_per_line_ = WordsPerLine();
+            in_fifo_.reserve(words_per_line_);
             return;
         case kRead:
             RenderReadFifo();
@@ -70,13 +74,18 @@ void Sed1356BitBlt::Start() {
     }
 }
 
+/* Table 8-30 word count -> depth bits: 0 empty, 1-6 not-empty, 7-14 +half
+   full, 15-16 +full. The count is out_fifo_ alone, per §10.2 (p. 68): "If the
+   S1D13506 empties the FIFO faster than the CPU can fill it, it may not be
+   possible to cause an overflow/underflow." */
 uint8_t Sed1356BitBlt::Status() const {
     uint8_t s = (uint8_t)(owner_.reg_[0x100] & 0x3u);
     if (cpu_op_active_ || !out_fifo_.empty()) s |= 0x80u;   /* busy.      */
-    if (!out_fifo_.empty())                   s |= 0x40u;   /* not empty. */
-    if (out_fifo_.size() >= 8)                s |= 0x20u;   /* half full. */
-    return s;                       /* full (bit 4) never: CERF consumes
-                                       synchronously, the FIFO can't fill. */
+    const size_t n = out_fifo_.size();
+    if (n >= 1u)  s |= 0x40u;
+    if (n >= 7u)  s |= 0x20u;
+    if (n >= 15u) s |= 0x10u;
+    return s;
 }
 
 void Sed1356BitBlt::DataWrite(uint16_t value) {
@@ -85,32 +94,34 @@ void Sed1356BitBlt::DataWrite(uint16_t value) {
                                      "operation active",
                                      owner_.MmioBase() + 0x100000u, value);
     in_fifo_.push_back(value);
-    if (in_fifo_.size() >= expected_words_) {
-        ExecuteCpuWrite();
-        cpu_op_active_ = false;
-        in_fifo_.clear();
-    }
+    /* Programming Notes §10.2 (p. 68): "While the FIFO is being written to by
+       the CPU, it is also being emptied by the S1D13506." */
+    if (in_fifo_.size() < words_per_line_) return;
+    ExecuteCpuLine(lines_done_);
+    in_fifo_.clear();
+    if (++lines_done_ >= p_.height) cpu_op_active_ = false;
 }
 
 uint16_t Sed1356BitBlt::DataRead() {
-    /* Empty FIFO returns undefined bus data, not a fault (spec underflow;
-       Programming Notes §10.2, X25B-G-003-04). The S1D13806 driver relies on
-       it: ddi.dll sub_1C14C78 does a discarded post-blit sync read of it. */
+    /* Programming Notes §10.2 (p. 68): the FIFO "can be read from only when
+       not empty. Failing to monitor the FIFO status can result in a BitBLT
+       FIFO overflow or underflow" - underflow yields bus data, not a fault. */
     if (out_fifo_.empty()) return 0u;
     const uint16_t v = out_fifo_.front();
     out_fifo_.pop_front();
+    if (out_fifo_.empty()) RenderReadFifo();
     return v;
 }
 
 /* Programming Notes word-count formulas: §10.2.1 (write), §10.2.2 (color
    expand). The 8-bpp phase is source-address bit 0. */
-uint32_t Sed1356BitBlt::ExpectedWriteWords() const {
+uint32_t Sed1356BitBlt::WordsPerLine() const {
     if (p_.op == kColorExpand || p_.op == kColorExpandTransp) {
         const uint32_t skip = 8u * (p_.src & 1u) + (7u - (p_.rop & 0x7u));
-        return ((skip + p_.width + 15u) >> 4) * p_.height;
+        return (skip + p_.width + 15u) >> 4;
     }
-    if (p_.bpp16) return p_.width * p_.height;
-    return ((p_.width + (p_.src & 1u) + 1u) >> 1) * p_.height;
+    if (p_.bpp16) return p_.width;
+    return (p_.width + (p_.src & 1u) + 1u) >> 1;
 }
 
 /* AB[20:0] addressing: accesses alias within the populated buffer (TM
@@ -181,66 +192,58 @@ void Sed1356BitBlt::ExpandLine(uint32_t line, const uint16_t* words,
     }
 }
 
-void Sed1356BitBlt::ExecuteCpuWrite() {
-    const std::vector<uint16_t> words(in_fifo_.begin(), in_fifo_.end());
+void Sed1356BitBlt::ExecuteCpuLine(uint32_t y) {
+    const uint16_t* lw = in_fifo_.data();
     const uint16_t cmp_mask = p_.bpp16 ? 0xFFFFu : 0xFFu;
 
     if (p_.op == kColorExpand || p_.op == kColorExpandTransp) {
         const uint32_t skip = 8u * (p_.src & 1u) + (7u - (p_.rop & 0x7u));
-        const uint32_t per_line = (skip + p_.width + 15u) >> 4;
-        for (uint32_t y = 0; y < p_.height; ++y)
-            ExpandLine(y, words.data() + y * per_line, per_line, skip,
-                       p_.op == kColorExpandTransp);
+        ExpandLine(y, lw, words_per_line_, skip, p_.op == kColorExpandTransp);
         return;
     }
 
     /* kWriteRop / kTransparentWrite: §10.2.1/§10.2.7. 8 bpp packs pixel i of
        a line at byte (phase + i) of that line's word run. */
-    const uint32_t phase    = p_.bpp16 ? 0u : (p_.src & 1u);
-    const uint32_t per_line = p_.bpp16 ? p_.width
-                                       : ((p_.width + phase + 1u) >> 1);
-    for (uint32_t y = 0; y < p_.height; ++y) {
-        const uint16_t* lw = words.data() + y * per_line;
-        for (uint32_t x = 0; x < p_.width; ++x) {
-            uint16_t s;
-            if (p_.bpp16) {
-                s = lw[x];
-            } else {
-                const uint32_t b = phase + x;
-                s = (uint8_t)(lw[b >> 1] >> ((b & 1u) * 8u));
-            }
-            const uint32_t at = p_.dst + y * p_.dst_stride + x * p_.px;
-            if (p_.op == kTransparentWrite) {
-                if ((s & cmp_mask) != (p_.bg & cmp_mask)) WritePxAt(at, s);
-            } else {
-                WritePxAt(at, Rop(p_.rop, s, ReadPxAt(at)));
-            }
+    const uint32_t phase = p_.bpp16 ? 0u : (p_.src & 1u);
+    for (uint32_t x = 0; x < p_.width; ++x) {
+        uint16_t s;
+        if (p_.bpp16) {
+            s = lw[x];
+        } else {
+            const uint32_t b = phase + x;
+            s = (uint8_t)(lw[b >> 1] >> ((b & 1u) * 8u));
+        }
+        const uint32_t at = p_.dst + y * p_.dst_stride + x * p_.px;
+        if (p_.op == kTransparentWrite) {
+            if ((s & cmp_mask) != (p_.bg & cmp_mask)) WritePxAt(at, s);
+        } else {
+            WritePxAt(at, Rop(p_.rop, s, ReadPxAt(at)));
         }
     }
 }
 
-/* Read BitBLT (§10.2.13): pre-render the source rect into the out FIFO.
-   8 bpp packs pixel i of a line at byte (phase + i), phase = REG[108h]
-   bit 0; the unused filler byte reads back 0. */
+/* Read BitBLT (§10.2.13). 8 bpp packs pixel i of a line at byte (phase + i),
+   phase = REG[108h] bit 0; the unused filler byte reads back 0. */
 void Sed1356BitBlt::RenderReadFifo() {
+    if (read_line_ >= p_.height) return;
+    const uint32_t base = p_.src + read_line_ * p_.src_stride;
     if (p_.bpp16) {
-        for (uint32_t y = 0; y < p_.height; ++y)
-            for (uint32_t x = 0; x < p_.width; ++x)
-                out_fifo_.push_back(
-                    ReadPxAt(p_.src + y * p_.src_stride + x * 2u));
-        return;
-    }
-    const uint32_t phase    = p_.dst & 1u;
-    const uint32_t per_line = (p_.width + phase + 1u) >> 1;
-    for (uint32_t y = 0; y < p_.height; ++y) {
-        std::vector<uint8_t> line(per_line * 2u, 0u);
         for (uint32_t x = 0; x < p_.width; ++x)
-            line[phase + x] =
-                (uint8_t)ReadPxAt(p_.src + y * p_.src_stride + x);
-        for (uint32_t w = 0; w < per_line; ++w)
-            out_fifo_.push_back(
-                (uint16_t)(line[w * 2u] | line[w * 2u + 1u] << 8));
+            out_fifo_.push_back(ReadPxAt(base + x * 2u));
+    } else {
+        const uint32_t phase    = p_.dst & 1u;
+        const uint32_t per_line = (p_.width + phase + 1u) >> 1;
+        for (uint32_t w = 0; w < per_line; ++w) {
+            uint16_t v = 0;
+            for (uint32_t b = 0; b < 2u; ++b) {
+                const uint32_t i = w * 2u + b;
+                if (i >= phase && i - phase < p_.width)
+                    v |= (uint16_t)(ReadPxAt(base + i - phase) << (b * 8u));
+            }
+            out_fifo_.push_back(v);
+        }
     }
+    ++read_line_;
 }
 
 void Sed1356BitBlt::ExecuteDisplayOp() {
@@ -334,7 +337,9 @@ void Sed1356BitBlt::ExecuteDisplayOp() {
 void Sed1356BitBlt::SaveState(StateWriter& w) const {
     w.Write(p_);
     w.Write<uint8_t>(cpu_op_active_ ? 1u : 0u);
-    w.Write(expected_words_);
+    w.Write(words_per_line_);
+    w.Write(lines_done_);
+    w.Write(read_line_);
     w.Write<uint64_t>(in_fifo_.size());
     for (uint16_t v : in_fifo_) w.Write<uint16_t>(v);
     w.Write<uint64_t>(out_fifo_.size());
@@ -344,7 +349,9 @@ void Sed1356BitBlt::SaveState(StateWriter& w) const {
 void Sed1356BitBlt::RestoreState(StateReader& r) {
     r.Read(p_);
     uint8_t active = 0; r.Read(active); cpu_op_active_ = (active != 0);
-    r.Read(expected_words_);
+    r.Read(words_per_line_);
+    r.Read(lines_done_);
+    r.Read(read_line_);
     uint64_t n = 0;
     r.Read(n); in_fifo_.clear();
     for (uint64_t i = 0; i < n; ++i) { uint16_t v = 0; r.Read(v); in_fifo_.push_back(v); }

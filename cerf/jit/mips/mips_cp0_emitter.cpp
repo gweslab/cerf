@@ -27,22 +27,7 @@ void __fastcall Dmtc0Width64Fatal(uint32_t rd) {
 
 }  // namespace
 
-int32_t MipsCp0Emitter::RegOffset(uint32_t rd) const { return Cp0RegOffset(rd); }
-
 bool MipsCp0Emitter::RegWritable(uint32_t rd) const { return Cp0RegWritable(rd); }
-
-void* MipsCp0Emitter::Mtc0Helper(uint32_t rd) const {
-    if (rd == MipsCp0::kCount) {
-        return reinterpret_cast<void*>(&MipsCp0Ops::Mtc0CountHelper);
-    }
-    if (rd == MipsCp0::kCompare) {
-        return reinterpret_cast<void*>(&MipsCp0Ops::Mtc0CompareHelper);
-    }
-    if (rd == MipsCp0::kEntryHi) {
-        return reinterpret_cast<void*>(&MipsCp0Ops::Mtc0EntryHiHelper);
-    }
-    return nullptr;
-}
 
 uint8_t* MipsCp0Emitter::EmitMfc0(uint8_t* cursor, MipsDecodedInsn* d,
                                   MipsBlockContext* ctx) {
@@ -93,9 +78,6 @@ uint8_t* MipsCp0Emitter::EmitFromCop0(uint8_t* cursor, MipsDecodedInsn* d,
     return cursor;
 }
 
-/* cp0[rd] = gpr[rt][31:0], sel 0 only; a read-only / unmodelled / absent rd
-   routes to the loud stub. Count/Compare carry the in-core-timer side effects
-   and EntryHi the ASID-change jump-cache flush, so they go through helpers. */
 uint8_t* MipsCp0Emitter::EmitToCop0(uint8_t* cursor, MipsDecodedInsn* d,
                                     MipsBlockContext* ctx, bool is_dword) {
     using namespace x86;

@@ -7,10 +7,6 @@
 struct MipsDecodedInsn;
 struct MipsBlockContext;
 
-/* Per-SoC MFC0/MTC0/DMFC0/DMTC0 emit strategy, selected by GetSoc(). The base
-   supplies the generic R4x00 CP0-move implementation (sel-0 32-bit CP0 model,
-   with the Count/Compare/EntryHi side-effect helpers); a SoC whose CP0 moves
-   genuinely differ overrides the relevant method. */
 class MipsCp0Emitter : public Service {
 public:
     using Service::Service;
@@ -35,12 +31,12 @@ public:
 protected:
     /* CP0 register number -> MipsCpuState field offset, or -1 for a register the
        core does not implement. */
-    virtual int32_t RegOffset(uint32_t rd) const;
+    virtual int32_t RegOffset(uint32_t rd) const = 0;
 
     /* True iff MTC0 may write cp0[rd] on this core. */
     virtual bool RegWritable(uint32_t rd) const;
 
-    virtual void* Mtc0Helper(uint32_t rd) const;
+    virtual void* Mtc0Helper(uint32_t rd) const = 0;
 
     /* gpr[rt] = sext32(cp0[rd]), sel 0 only; shared by MFC0 and DMFC0. */
     uint8_t* EmitFromCop0(uint8_t* cursor, MipsDecodedInsn* d,

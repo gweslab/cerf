@@ -133,24 +133,27 @@ Imx51Usboh3::~Imx51Usboh3() { StopAsyncScheduleThread(); }
 void Imx51Usboh3::AsyncScheduleLoop() {
     constexpr auto kSchedulePeriod = std::chrono::milliseconds(1);
     auto& freeze = emu_.Get<EmulationFreeze>();
-    std::unique_lock<std::mutex> lk(async_schedule_mtx_);
     auto last_tick = std::chrono::steady_clock::now();
-    while (!async_schedule_stop_) {
-        lk.unlock();
+    for (;;) {
         {
-            const auto before_freeze = std::chrono::steady_clock::now();
-            auto frozen = freeze.WorkerSection();
-            const auto now = std::chrono::steady_clock::now();
-            // Exclude time blocked by snapshot/restore from peripheral timers.
-            const auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(before_freeze - last_tick).count();
-            last_tick = now;
-            ExecuteAsyncSchedule();
-            ExecutePeriodicSchedule();
-            if (auto* root = otg_host_root_port_.Device())
-                root->Tick(static_cast<uint32_t>(std::min<int64_t>(elapsed, 60000)), host_port_reported_);
+            std::unique_lock<std::mutex> lk(async_schedule_mtx_);
+            async_schedule_cv_.wait_for(lk, kSchedulePeriod,
+                                         [&] { return async_schedule_stop_; });
+            if (async_schedule_stop_) break;
         }
-        lk.lock();
-        async_schedule_cv_.wait_for(lk, kSchedulePeriod, [&] { return async_schedule_stop_; });
+
+        const auto before_freeze = std::chrono::steady_clock::now();
+        auto frozen = freeze.WorkerSection();
+        std::unique_lock<std::mutex> lk(async_schedule_mtx_);
+        if (async_schedule_stop_) break;
+        const auto now = std::chrono::steady_clock::now();
+        // Exclude time blocked by snapshot/restore from peripheral timers.
+        const auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(before_freeze - last_tick).count();
+        last_tick = now;
+        ExecuteAsyncSchedule();
+        ExecutePeriodicSchedule();
+        if (auto* root = otg_host_root_port_.Device())
+            root->Tick(static_cast<uint32_t>(std::min<int64_t>(elapsed, 60000)), host_port_reported_);
     }
 }
 
@@ -158,29 +161,30 @@ uint32_t Imx51Usboh3::MmioBase() const { return kBase; }
 uint32_t Imx51Usboh3::MmioSize() const { return kSize; }
 
 uint8_t Imx51Usboh3::ReadByte(uint32_t addr) {
+    std::lock_guard<std::mutex> lk(async_schedule_mtx_);
     const uint32_t off = addr - kBase;
     return static_cast<uint8_t>(regs_[off >> 2] >> ((off & 3u) * 8u));
 }
 uint16_t Imx51Usboh3::ReadHalf(uint32_t addr) {
+    std::lock_guard<std::mutex> lk(async_schedule_mtx_);
     const uint32_t off = addr - kBase;
     return static_cast<uint16_t>(regs_[off >> 2] >> ((off & 2u) * 8u));
 }
 uint32_t Imx51Usboh3::ReadWord(uint32_t addr) {
+    std::lock_guard<std::mutex> lk(async_schedule_mtx_);
     const uint32_t off = addr - kBase;
     /* Device mode (core0): CERF is the always-present host, so PORTSC1 reflects a
        connected, enabled, high-speed device port (sub_8005D97C polls it). */
     if (off == kOffPortsc && Core0IsDevice())
         return regs_[off >> 2] | kPortscDevAttached;
     const uint32_t coff = off % kCoreSpan;
-    if (off < kCoreSpan && !Core0IsDevice() && (coff == kOffUsbsts || coff == kOffPortsc)) {
-        ExecuteAsyncSchedule();
-    }
     if (coff == kOffPortsc && !Core0IsDevice())
         return regs_[off >> 2] | kPortscPp;
     return regs_[off >> 2];
 }
 
 void Imx51Usboh3::WriteWord(uint32_t addr, uint32_t value) {
+    std::lock_guard<std::mutex> lk(async_schedule_mtx_);
     const uint32_t off = addr - kBase;
     if (off < kNonCore) {
         const uint32_t coff = off % kCoreSpan;
@@ -199,9 +203,7 @@ void Imx51Usboh3::WriteWord(uint32_t addr, uint32_t value) {
             } else {
                 if (off < kCoreSpan && reset_requested) host_port_reported_ = false;
                 ReflectScheduleStatus(off, value);
-                if (off < kCoreSpan && (value & kCmdRs) && (value & kCmdAse)) {
-                    ExecuteAsyncSchedule();
-                }
+                async_schedule_cv_.notify_one();
             }
             return;
         }
@@ -252,7 +254,7 @@ void Imx51Usboh3::WriteWord(uint32_t addr, uint32_t value) {
         }
         if (off < kCoreSpan && !core0_dev && coff == kOffEndptlistaddr) {
             regs_[off >> 2] = value;
-            ExecuteAsyncSchedule();
+            async_schedule_cv_.notify_one();
             return;
         }
         if (off < kCoreSpan && !core0_dev && coff == kOffPortsc) {
@@ -264,6 +266,7 @@ void Imx51Usboh3::WriteWord(uint32_t addr, uint32_t value) {
 }
 
 void Imx51Usboh3::SaveState(StateWriter& w) {
+    std::lock_guard<std::mutex> lk(async_schedule_mtx_);
     w.WriteBytes(regs_.data(), sizeof(regs_));
     w.WriteBytes(phy_.data(), sizeof(phy_));
     w.Write<uint8_t>(reset_seen_ ? 1 : 0);
@@ -274,6 +277,7 @@ void Imx51Usboh3::SaveState(StateWriter& w) {
     otg_host_root_port_.SaveState(w);
 }
 void Imx51Usboh3::RestoreState(StateReader& r) {
+    std::lock_guard<std::mutex> lk(async_schedule_mtx_);
     r.ReadBytes(regs_.data(), sizeof(regs_));
     r.ReadBytes(phy_.data(), sizeof(phy_));
     uint8_t b = 0; r.Read(b); reset_seen_ = b != 0;
@@ -286,6 +290,7 @@ void Imx51Usboh3::RestoreState(StateReader& r) {
 }
 
 void Imx51Usboh3::PostRestore() {
+    std::lock_guard<std::mutex> lk(async_schedule_mtx_);
     otg_host_root_port_.PostRestore();
     RefreshDeviceIrq();
 }
@@ -328,6 +333,7 @@ uint32_t Imx51Usboh3::DqhBase() const {
 }
 
 void Imx51Usboh3::DeliverSetup(const uint8_t setup[8]) {
+    std::lock_guard<std::mutex> lk(async_schedule_mtx_);
     auto& mem = emu_.Get<EmulatedMemory>();
     const uint32_t base = DqhBase();
     if (!base || !mem.TryTranslate(base)) {

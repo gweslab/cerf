@@ -86,6 +86,10 @@ struct DeviceConfig : public Service {
     std::vector<std::string> rom_extensions;
     std::string              rom_recovery;
 
+    /* Optional SYNC2 Media Hub images, relative to the device directory. */
+    std::string sd_card_image;
+    std::string usb_disk_image;
+
     /* Optional serial-config EEPROM image (cerf.json rom.eeprom). A board's
        SSP/SPI EEPROM peripheral loads it from the device directory; empty
        when the device has none. */

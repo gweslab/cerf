@@ -1,5 +1,7 @@
 #include "../../core/cerf_emulator.h"
 #include "../../core/log.h"
+#include "../../core/device_config.h"
+#include "../../core/cerf_paths.h"
 #include "../../core/service.h"
 #include "../../boards/board_context.h"
 #include "../../peripherals/usb/usb_hub.h"
@@ -70,15 +72,21 @@ public:
     }
 
     void OnReady() override {
-        if (!disk_.Open("D:\\Repositories\\cerf\\sdimg\\sdcard_a4.img", 0)) return;
+        const auto& cfg = emu_.Get<DeviceConfig>();
+        const bool card = !cfg.sd_card_image.empty() &&
+            disk_.Open(ResolveDeviceFile(cfg.device_name, cfg.sd_card_image), 0, false);
+        const bool installer = !cfg.usb_disk_image.empty() &&
+            installer_disk_.Open(ResolveDeviceFile(cfg.device_name, cfg.usb_disk_image), 0, false);
+        if (!card && !installer) return;
 
-        auto msc = std::make_unique<FordSync2MediaHubSdReader>(disk_);
         auto hub = std::make_unique<UsbHub>(2);
         hub_ = hub.get();
-        hub_->Port(0).Attach(std::move(msc));
+        if (card)
+            hub_->Port(0).Attach(std::make_unique<FordSync2MediaHubSdReader>(disk_));
+        if (installer)
+            hub_->Port(1).Attach(std::make_unique<UsbMassStorageDevice>(installer_disk_));
         emu_.Get<Imx51Usboh3>().OtgHostRootPort().Attach(std::move(hub));
-
-        debounce_thread_ = std::thread([this] { DebounceLoop(); });
+        if (card) debounce_thread_ = std::thread([this] { DebounceLoop(); });
     }
 
     void OnShutdown() override { StopDebounceThread(); }
@@ -119,6 +127,7 @@ private:
     }
 
     DiskImage                disk_;
+    DiskImage                installer_disk_;
     UsbHub*                  hub_ = nullptr;
     std::thread              debounce_thread_;
     std::mutex                mtx_;

@@ -242,9 +242,11 @@ void UsbMassStorageDevice::ExecuteScsiCommand() {
 }
 
 void UsbMassStorageDevice::HandleCbw(const uint8_t* data, uint32_t len) {
+    if (len != kCbwLength) return;
     const uint32_t signature = data[0] | (static_cast<uint32_t>(data[1]) << 8) |
         (static_cast<uint32_t>(data[2]) << 16) | (static_cast<uint32_t>(data[3]) << 24);
-    if (len != kCbwLength || signature != kCbwSignature) {
+    if (signature != kCbwSignature || data[13] != 0u ||
+        (data[12] & 0x7Fu) != 0u || data[14] == 0u || data[14] > 16u) {
         return;
     }
     cbw_tag_      = data[4] | (data[5] << 8) | (data[6] << 16) | (data[7] << 24);
@@ -256,8 +258,19 @@ void UsbMassStorageDevice::HandleCbw(const uint8_t* data, uint32_t len) {
     pending_in_.clear();
     pending_in_off_ = 0u;
 
+    out_buf_.clear();
+    const uint8_t op = cbwcb_[0];
+    const uint8_t required = (op == kScsiRead10 || op == kScsiWrite10 ||
+        op == kScsiReadCapacity10 || op == kScsiModeSense10) ? 10u : 6u;
+    const uint32_t write_bytes = static_cast<uint32_t>(Be16(&cbwcb_[7])) * DiskImage::kSectorSize;
+    if (cbwcb_len_ < required ||
+        (op == kScsiWrite10 && (cbw_dir_in_ || cbw_data_len_ != write_bytes)) ||
+        (cbw_data_len_ > 0u && !cbw_dir_in_ && op != kScsiWrite10)) {
+        SetSense(kSenseIllegalReq, 0x24u, 0u);
+        QueueCsw(kCswStatusFailed);
+        return;
+    }
     if (cbw_data_len_ > 0u && !cbw_dir_in_) {
-        out_buf_.clear();
         out_buf_.reserve(cbw_data_len_);
         phase_ = Phase::DataOut;
         return;
@@ -271,6 +284,11 @@ void UsbMassStorageDevice::OnBulkOut(uint8_t /*ep*/, const uint8_t* data, uint32
         return;
     }
     if (phase_ == Phase::DataOut) {
+        if (len > cbw_data_len_ - out_buf_.size()) {
+            SetSense(kSenseIllegalReq, 0x24u, 0u);
+            QueueCsw(kCswStatusFailed);
+            return;
+        }
         out_buf_.insert(out_buf_.end(), data, data + len);
         if (out_buf_.size() >= cbw_data_len_) {
             ExecuteScsiCommand();

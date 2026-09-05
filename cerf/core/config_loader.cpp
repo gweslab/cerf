@@ -150,6 +150,12 @@ void LoadRom(const json& root, DeviceConfig& config, const std::string& path) {
         config.rom_primary = CfgReadOptString(r, "primary", path, "rom");
     if (r.contains("sd_card_image"))
         config.sd_card_image = CfgReadOptString(r, "sd_card_image", path, "rom");
+    if (r.contains("sd_card_cid")) {
+        const auto text = CfgReadOptString(r, "sd_card_cid", path, "rom");
+        config.sd_card_cid = ParseSdCardCid(text);
+        if (!config.sd_card_cid)
+            CfgFatal(path, "rom.sd_card_cid must contain exactly 32 hexadecimal digits");
+    }
     if (r.contains("usb_disk_image"))
         config.usb_disk_image = CfgReadOptString(r, "usb_disk_image", path, "rom");
     if (r.contains("eeprom"))

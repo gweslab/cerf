@@ -1,5 +1,6 @@
 #pragma once
 #include "service.h"
+#include "sd_card_cid.h"
 #include <cstdint>
 #include <string>
 #include <utility>
@@ -88,6 +89,7 @@ struct DeviceConfig : public Service {
 
     /* Optional SYNC2 Media Hub images, relative to the device directory. */
     std::string sd_card_image;
+    std::optional<SdCardCid> sd_card_cid;
     std::string usb_disk_image;
 
     /* Optional serial-config EEPROM image (cerf.json rom.eeprom). A board's

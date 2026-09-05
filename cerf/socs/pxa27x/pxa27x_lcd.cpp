@@ -3,6 +3,7 @@
 #include "../../boards/board_context.h"
 #include "../../core/cerf_emulator.h"
 #include "../../cpu/emulated_memory.h"
+#include "../../host/host_window.h"
 #include "../../peripherals/peripheral_dispatcher.h"
 #include "../../state/state_stream.h"
 #include "../irq_controller.h"
@@ -349,12 +350,19 @@ void Pxa27xLcd::WriteWord(uint32_t addr, uint32_t value) {
     const uint32_t off = addr - MmioBase();
     if (!IsKnown(off)) HaltUnsupportedAccess("WriteWord", addr, value);
     bool pending;
+    bool enabled_edge;
     {
         std::lock_guard<std::mutex> lk(state_mtx_);
+        const bool was_enabled = (lccr_[0] & kLccr0Enb) != 0;
         WriteRegLocked(off, value);
+        enabled_edge = !was_enabled && (lccr_[0] & kLccr0Enb) != 0;
         pending = IrqPendingLocked();
     }
     PublishIrq(pending);
+    /* Intel PXA27x Developer's Manual 280000-001 Section 7.5.2 (page 7-55):
+       "in the control registers must be programmed before setting
+       LCCR0[ENB]". */
+    if (enabled_edge) emu_.Get<HostWindow>().OnLcdEnabled();
 }
 
 void Pxa27xLcd::SaveState(StateWriter& w) {

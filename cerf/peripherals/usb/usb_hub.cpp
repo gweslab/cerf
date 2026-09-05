@@ -1,3 +1,4 @@
+#include "usb_state.h"
 #include "usb_hub.h"
 
 #include "../../state/state_stream.h"
@@ -166,12 +167,17 @@ UsbDevice* UsbHub::FindByAddress(uint8_t addr) {
 }
 
 void UsbHub::SaveState(StateWriter& w) {
+    UsbDevice::SaveState(w);
+    w.Write<uint32_t>(static_cast<uint32_t>(ports_.size()));
     for (auto v : port_status_) w.Write(v);
     for (auto v : port_change_) w.Write(v);
     for (auto& p : ports_) p.SaveState(w);
 }
 
 void UsbHub::RestoreState(StateReader& r) {
+    UsbDevice::RestoreState(r);
+    uint32_t ports = 0; r.Read(ports);
+    UsbState::Require(r.Ok() && ports == ports_.size(), "hub topology mismatch");
     for (auto& v : port_status_) r.Read(v);
     for (auto& v : port_change_) r.Read(v);
     for (auto& p : ports_) p.RestoreState(r);

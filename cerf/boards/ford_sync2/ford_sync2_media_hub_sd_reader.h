@@ -3,11 +3,26 @@
 #include "../../core/sd_card_cid.h"
 #include "../../core/log.h"
 #include "../../peripherals/usb/usb_mass_storage_device.h"
+#include "../../peripherals/usb/usb_state.h"
 
 class FordSync2MediaHubSdReader final : public UsbMassStorageDevice {
 public:
-    FordSync2MediaHubSdReader(DiskImage& disk, std::optional<SdCardCid> cid)
-        : UsbMassStorageDevice(disk), cid_(cid) {}
+    explicit FordSync2MediaHubSdReader(std::optional<SdCardCid> cid = {}) : cid_(cid) {}
+    uint32_t StateKind() const override { return 3; }
+    const std::optional<SdCardCid>& Cid() const { return cid_; }
+    void SaveState(StateWriter& w) override {
+        UsbMassStorageDevice::SaveState(w);
+        w.Write<uint8_t>(cid_ ? 1 : 0);
+        if (cid_) w.WriteBytes(cid_->data(), cid_->size());
+    }
+    void RestoreState(StateReader& r) override {
+        UsbMassStorageDevice::RestoreState(r);
+        uint8_t has = 0; r.Read(has);
+        UsbState::Require(r.Ok() && has <= 1, "invalid CID presence");
+        cid_.reset();
+        if (has) { cid_.emplace(); r.ReadBytes(cid_->data(), cid_->size()); }
+        UsbState::Require(r.Ok(), "truncated CID");
+    }
 
 protected:
     bool HandleVendorScsiCommand(const uint8_t* cdb, uint8_t cdb_len,
@@ -37,6 +52,5 @@ protected:
         return false;
     }
 private:
-    const std::optional<SdCardCid> cid_;
+    std::optional<SdCardCid> cid_;
 };
-

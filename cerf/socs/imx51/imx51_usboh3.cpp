@@ -1,3 +1,4 @@
+#include "../../peripherals/usb/usb_state.h"
 #include "imx51_usboh3.h"
 #include "usb_device_host.h"
 
@@ -133,12 +134,20 @@ void Imx51Usboh3::AsyncScheduleLoop() {
     constexpr auto kSchedulePeriod = std::chrono::milliseconds(1);
     auto& freeze = emu_.Get<EmulationFreeze>();
     std::unique_lock<std::mutex> lk(async_schedule_mtx_);
+    auto last_tick = std::chrono::steady_clock::now();
     while (!async_schedule_stop_) {
         lk.unlock();
         {
+            const auto before_freeze = std::chrono::steady_clock::now();
             auto frozen = freeze.WorkerSection();
+            const auto now = std::chrono::steady_clock::now();
+            // Exclude time blocked by snapshot/restore from peripheral timers.
+            const auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(before_freeze - last_tick).count();
+            last_tick = now;
             ExecuteAsyncSchedule();
             ExecutePeriodicSchedule();
+            if (auto* root = otg_host_root_port_.Device())
+                root->Tick(static_cast<uint32_t>(std::min<int64_t>(elapsed, 60000)), host_port_reported_);
         }
         lk.lock();
         async_schedule_cv_.wait_for(lk, kSchedulePeriod, [&] { return async_schedule_stop_; });
@@ -259,12 +268,26 @@ void Imx51Usboh3::SaveState(StateWriter& w) {
     w.WriteBytes(phy_.data(), sizeof(phy_));
     w.Write<uint8_t>(reset_seen_ ? 1 : 0);
     if (host_) host_->SaveState(w);   /* forward to the registered USB host driver */
+    w.Write<uint8_t>(host_port_reported_ ? 1 : 0);
+    UsbState::WriteBuffer(w, ctrl_reply_);
+    w.Write<uint32_t>(static_cast<uint32_t>(ctrl_reply_off_));
+    otg_host_root_port_.SaveState(w);
 }
 void Imx51Usboh3::RestoreState(StateReader& r) {
     r.ReadBytes(regs_.data(), sizeof(regs_));
     r.ReadBytes(phy_.data(), sizeof(phy_));
     uint8_t b = 0; r.Read(b); reset_seen_ = b != 0;
     if (host_) host_->RestoreState(r);
+    uint8_t reported = 0; r.Read(reported); host_port_reported_ = reported != 0;
+    UsbState::ReadBuffer(r, ctrl_reply_, 65535);
+    uint32_t offset = 0; r.Read(offset); ctrl_reply_off_ = offset;
+    UsbState::Require(r.Ok() && reported <= 1 && offset <= ctrl_reply_.size(), "invalid control reply");
+    otg_host_root_port_.RestoreState(r);
+}
+
+void Imx51Usboh3::PostRestore() {
+    otg_host_root_port_.PostRestore();
+    RefreshDeviceIrq();
 }
 
 bool Imx51Usboh3::Core0IsDevice() const {

@@ -70,9 +70,11 @@ public:
         return 0u;
     }
 
-    virtual void SaveState(StateWriter&) {}
-    virtual void RestoreState(StateReader&) {}
+    virtual uint32_t StateKind() const { return 0; }
+    virtual void SaveState(StateWriter&);
+    virtual void RestoreState(StateReader&);
     virtual void PostRestore() {}
+    virtual void Tick(uint32_t /*elapsed_ms*/, bool /*host_ready*/) {}
 
     uint8_t Address()             const { return address_; }
     uint8_t ConfigurationValue()  const { return configuration_; }

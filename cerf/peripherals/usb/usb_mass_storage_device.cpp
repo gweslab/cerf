@@ -1,3 +1,4 @@
+#include "usb_state.h"
 #include "usb_mass_storage_device.h"
 
 #include "../../state/state_stream.h"
@@ -53,7 +54,12 @@ void PutBe32(std::vector<uint8_t>& v, uint32_t x) {
 
 }
 
-UsbMassStorageDevice::UsbMassStorageDevice(DiskImage& disk) : disk_(disk) {}
+bool UsbMassStorageDevice::OpenImage(const std::string& path, const std::string& name) {
+    if (disk_.IsOpen() || !disk_.Open(path, 0, false)) return false;
+    image_path_ = path;
+    image_name_ = name;
+    return true;
+}
 
 bool UsbMassStorageDevice::HandleVendorScsiCommand(const uint8_t* /*cdb*/,
                                                     uint8_t /*cdb_len*/,
@@ -320,28 +326,52 @@ uint32_t UsbMassStorageDevice::OnBulkIn(uint8_t /*ep*/, uint8_t* dst, uint32_t m
 }
 
 void UsbMassStorageDevice::SaveState(StateWriter& w) {
+    UsbDevice::SaveState(w);
+    UsbState::WriteString(w, image_path_);
+    UsbState::WriteString(w, image_name_);
     w.Write(phase_);
     w.Write(cbw_tag_);
     w.Write(cbw_data_len_);
-    w.Write(cbw_dir_in_);
+    w.Write<uint8_t>(cbw_dir_in_ ? 1 : 0);
     w.WriteBytes(cbwcb_, sizeof(cbwcb_));
     w.Write(cbwcb_len_);
     w.Write(sense_key_);
     w.Write(sense_asc_);
     w.Write(sense_ascq_);
+    UsbState::WriteBuffer(w, pending_in_);
+    w.Write<uint32_t>(static_cast<uint32_t>(pending_in_off_));
+    UsbState::WriteBuffer(w, out_buf_);
 }
 
 void UsbMassStorageDevice::RestoreState(StateReader& r) {
+    UsbDevice::RestoreState(r);
+    const auto path = UsbState::ReadString(r);
+    const auto name = UsbState::ReadString(r);
+    if (!OpenImage(path, name)) {
+        LOG(Caution, "USB restore: cannot open saved image '%s'\n", path.c_str());
+        UsbState::Require(false, "saved media is missing or cannot be opened");
+    }
     r.Read(phase_);
     r.Read(cbw_tag_);
     r.Read(cbw_data_len_);
-    r.Read(cbw_dir_in_);
+    uint8_t direction = 0; r.Read(direction); cbw_dir_in_ = direction != 0;
+    UsbState::Require(r.Ok() && direction <= 1, "invalid transfer direction");
     r.ReadBytes(cbwcb_, sizeof(cbwcb_));
     r.Read(cbwcb_len_);
     r.Read(sense_key_);
     r.Read(sense_asc_);
     r.Read(sense_ascq_);
-    pending_in_.clear();
-    pending_in_off_ = 0u;
-    out_buf_.clear();
+    constexpr uint32_t max_write = 65535u * DiskImage::kSectorSize;
+    UsbState::ReadBuffer(r, pending_in_, max_write + 13u);
+    uint32_t offset = 0; r.Read(offset); pending_in_off_ = offset;
+    UsbState::ReadBuffer(r, out_buf_, max_write);
+    UsbState::Require(r.Ok() && cbwcb_len_ <= 16 && offset <= pending_in_.size() &&
+        (phase_ == Phase::AwaitingCbw || phase_ == Phase::DataOut || phase_ == Phase::ReplyReady),
+        "invalid mass storage phase");
+    if (phase_ == Phase::DataOut) {
+        const uint32_t expected = static_cast<uint32_t>(Be16(&cbwcb_[7])) * DiskImage::kSectorSize;
+        UsbState::Require(cbwcb_len_ >= 10 && cbwcb_[0] == kScsiWrite10 &&
+            !cbw_dir_in_ && cbw_data_len_ == expected && out_buf_.size() <= expected,
+            "invalid partial write");
+    }
 }

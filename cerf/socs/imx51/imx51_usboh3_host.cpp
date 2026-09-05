@@ -178,11 +178,6 @@ void Imx51Usboh3::ExecuteQueueHead(uint32_t qh_addr) {
     UsbDevice* dev  = root ? root->FindByAddress(static_cast<uint8_t>(dev_addr)) : nullptr;
     if (!dev) return;
 
-    if (endpt == 0u) {
-        ctrl_reply_.clear();
-        ctrl_reply_off_ = 0u;
-    }
-
     uint32_t next_ptr = mem.ReadWord(qh_addr + kQhOverlayNextOff);
     bool any = false;
     for (int i = 0; i < kQtdChainGuard && !(next_ptr & kQtdTerminate); ++i) {
@@ -251,6 +246,7 @@ bool Imx51Usboh3::ExecuteQtd(uint32_t qtd_addr, UsbDevice* dev, uint32_t endpt) 
         setup.wValue        = static_cast<uint16_t>(raw[2] | (raw[3] << 8));
         setup.wIndex        = static_cast<uint16_t>(raw[4] | (raw[5] << 8));
         setup.wLength        = static_cast<uint16_t>(raw[6] | (raw[7] << 8));
+        ctrl_reply_.clear();
         dev->HandleSetup(setup, ctrl_reply_);
         ctrl_reply_off_ = 0u;
         residual = 0u;

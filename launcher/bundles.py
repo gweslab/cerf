@@ -37,6 +37,8 @@ LARGE_DOWNLOAD_THRESHOLD = 300 * 1024 * 1024
 PACKAGE_CATEGORY_LABELS = {
     "pdbs": "PDBs",
     "compact_flash_cards": "Compact Flash Cards",
+    "sd_cards": "SD Cards",
+    "usb_disks": "USB Disks",
 }
 
 

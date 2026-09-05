@@ -35,6 +35,7 @@ public:
 
     void SaveState(StateWriter& w) override;
     void RestoreState(StateReader& r) override;
+    void PostRestore() override;
 
     void RegisterDeviceHost(UsbDeviceHost* host) { host_ = host; }
 

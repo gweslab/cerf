@@ -1,15 +1,17 @@
 #pragma once
 
 #include "usb_device.h"
+#include "../../storage/disk_image.h"
 
 #include <cstdint>
 #include <vector>
 
-class DiskImage;
-
 class UsbMassStorageDevice : public UsbDevice {
 public:
-    explicit UsbMassStorageDevice(DiskImage& disk);
+    bool OpenImage(const std::string& path, const std::string& name);
+    const std::string& ImagePath() const { return image_path_; }
+    const std::string& ImageName() const { return image_name_; }
+    uint32_t StateKind() const override { return 2; }
 
     /* USB Mass Storage Class Bulk-Only Transport Rev. 1.0, 3.1/3.2 (p6-7). */
     static constexpr uint8_t kBotReqReset     = 0xFFu;
@@ -43,7 +45,9 @@ private:
     void QueueCsw(uint8_t status);
     void SetSense(uint8_t key, uint8_t asc, uint8_t ascq);
 
-    DiskImage& disk_;
+    DiskImage disk_;
+    std::string image_path_;
+    std::string image_name_;
 
     Phase    phase_          = Phase::AwaitingCbw;
     uint32_t cbw_tag_        = 0u;

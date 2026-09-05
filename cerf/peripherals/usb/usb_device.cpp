@@ -1,3 +1,4 @@
+#include "usb_state.h"
 #include "usb_device.h"
 
 namespace {
@@ -68,5 +69,20 @@ bool UsbDevice::HandleSetup(const SetupPacket& setup,
         return !dev2host && setup.wValue == 0u;
     default:
         return false;
+    }
+}
+
+void UsbDevice::SaveState(StateWriter& w) {
+    w.Write(address_); w.Write(configuration_);
+    for (bool stalled : stalled_) w.Write<uint8_t>(stalled ? 1 : 0);
+}
+void UsbDevice::RestoreState(StateReader& r) {
+    r.Read(address_); r.Read(configuration_);
+    UsbState::Require(r.Ok() && address_ <= 127 && configuration_ <= ConfigurationCount(),
+                      "invalid USB address/configuration");
+    for (auto& stalled : stalled_) {
+        uint8_t value = 0; r.Read(value);
+        UsbState::Require(r.Ok() && value <= 1, "invalid endpoint state");
+        stalled = value != 0;
     }
 }

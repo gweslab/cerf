@@ -6,6 +6,13 @@
 #include <utility>
 #include <vector>
 
+struct BundledUsbMedia {
+    std::string file;
+    std::string name;
+    bool insert_on_launch = false;
+    std::optional<SdCardCid> cid;
+};
+
 struct DeviceMeta {
     std::string name;
     std::string device_name;
@@ -87,10 +94,8 @@ struct DeviceConfig : public Service {
     std::vector<std::string> rom_extensions;
     std::string              rom_recovery;
 
-    /* Optional SYNC2 Media Hub images, relative to the device directory. */
-    std::string sd_card_image;
-    std::optional<SdCardCid> sd_card_cid;
-    std::string usb_disk_image;
+    std::vector<BundledUsbMedia> bundled_sd_cards;
+    std::vector<BundledUsbMedia> bundled_usb_disks;
 
     /* Optional serial-config EEPROM image (cerf.json rom.eeprom). A board's
        SSP/SPI EEPROM peripheral loads it from the device directory; empty

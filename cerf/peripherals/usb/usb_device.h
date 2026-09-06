@@ -86,7 +86,7 @@ public:
     /* USB 2.0 Spec 9.1.2 (p242) step 4: after a port reset, "the USB device
        is now in the Default state... All of its registers and state have
        been reset and it answers to the default address." */
-    void ResetToDefault() {
+    virtual void ResetToDefault() {
         address_ = 0u;
         configuration_ = 0u;
         for (bool& s : stalled_) s = false;
@@ -97,7 +97,7 @@ public:
     }
 
 protected:
-    void SetEndpointStalled(uint8_t ep, bool stalled) {
+    virtual void SetEndpointStalled(uint8_t ep, bool stalled) {
         if (ep < kMaxEndpoints) stalled_[ep] = stalled;
     }
 

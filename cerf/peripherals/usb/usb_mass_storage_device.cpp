@@ -112,12 +112,39 @@ bool UsbMassStorageDevice::HandleClassRequest(const SetupPacket& setup,
         return true;
     }
     if (setup.bRequest == kBotReqReset) {
-        phase_ = Phase::AwaitingCbw;
-        pending_in_.clear();
-        pending_in_off_ = 0u;
+        if (setup.bmRequestType != 0x21u || setup.wValue || setup.wIndex || setup.wLength)
+            return false;
+        ResetTransport();
         return true;
     }
     return false;
+}
+
+void UsbMassStorageDevice::ResetTransport() {
+    phase_ = Phase::AwaitingCbw;
+    pending_in_.clear();
+    pending_in_off_ = 0u;
+    out_buf_.clear();
+}
+
+void UsbMassStorageDevice::ResetToDefault() {
+    UsbDevice::ResetToDefault();
+    ResetTransport();
+}
+
+void UsbMassStorageDevice::SetEndpointStalled(uint8_t ep, bool stalled) {
+    /* BOT 6.6.1: maintain the invalid-CBW halt until Reset Recovery. */
+    if (!stalled && phase_ == Phase::ResetRecovery) return;
+    UsbDevice::SetEndpointStalled(ep, stalled);
+}
+
+void UsbMassStorageDevice::RejectCbw(uint32_t len) {
+    /* BOT 6.6.1: invalid CBW stalls Bulk-In and may stall Bulk-Out. */
+    LOG(Caution, "USB MSC: invalid CBW length=%u phase=%u\n", len, static_cast<unsigned>(phase_));
+    ResetTransport();
+    phase_ = Phase::ResetRecovery;
+    SetEndpointStalled(1, true);
+    SetEndpointStalled(2, true);
 }
 
 void UsbMassStorageDevice::SetSense(uint8_t key, uint8_t asc, uint8_t ascq) {
@@ -248,11 +275,12 @@ void UsbMassStorageDevice::ExecuteScsiCommand() {
 }
 
 void UsbMassStorageDevice::HandleCbw(const uint8_t* data, uint32_t len) {
-    if (len != kCbwLength) return;
+    if (len != kCbwLength) { RejectCbw(len); return; }
     const uint32_t signature = data[0] | (static_cast<uint32_t>(data[1]) << 8) |
         (static_cast<uint32_t>(data[2]) << 16) | (static_cast<uint32_t>(data[3]) << 24);
     if (signature != kCbwSignature || data[13] != 0u ||
         (data[12] & 0x7Fu) != 0u || data[14] == 0u || data[14] > 16u) {
+        RejectCbw(len);
         return;
     }
     cbw_tag_      = data[4] | (data[5] << 8) | (data[6] << 16) | (data[7] << 24);
@@ -284,7 +312,9 @@ void UsbMassStorageDevice::HandleCbw(const uint8_t* data, uint32_t len) {
     ExecuteScsiCommand();
 }
 
-void UsbMassStorageDevice::OnBulkOut(uint8_t /*ep*/, const uint8_t* data, uint32_t len) {
+void UsbMassStorageDevice::OnBulkOut(uint8_t ep, const uint8_t* data, uint32_t len) {
+    if (IsEndpointStalled(ep)) return;
+    if (phase_ == Phase::ReplyReady) { RejectCbw(len); return; }
     if (phase_ == Phase::AwaitingCbw) {
         HandleCbw(data, len);
         return;
@@ -302,7 +332,8 @@ void UsbMassStorageDevice::OnBulkOut(uint8_t /*ep*/, const uint8_t* data, uint32
     }
 }
 
-uint32_t UsbMassStorageDevice::OnBulkIn(uint8_t /*ep*/, uint8_t* dst, uint32_t max) {
+uint32_t UsbMassStorageDevice::OnBulkIn(uint8_t ep, uint8_t* dst, uint32_t max) {
+    if (IsEndpointStalled(ep)) return 0u;
     if (pending_in_off_ >= pending_in_.size()) {
         if (phase_ == Phase::ReplyReady) {
             phase_ = Phase::AwaitingCbw;
@@ -366,8 +397,11 @@ void UsbMassStorageDevice::RestoreState(StateReader& r) {
     uint32_t offset = 0; r.Read(offset); pending_in_off_ = offset;
     UsbState::ReadBuffer(r, out_buf_, max_write);
     UsbState::Require(r.Ok() && cbwcb_len_ <= 16 && offset <= pending_in_.size() &&
-        (phase_ == Phase::AwaitingCbw || phase_ == Phase::DataOut || phase_ == Phase::ReplyReady),
+        (phase_ == Phase::AwaitingCbw || phase_ == Phase::DataOut ||
+         phase_ == Phase::ReplyReady || phase_ == Phase::ResetRecovery),
         "invalid mass storage phase");
+    if (phase_ == Phase::ResetRecovery)
+        UsbState::Require(IsEndpointStalled(1) && IsEndpointStalled(2), "invalid reset recovery");
     if (phase_ == Phase::DataOut) {
         const uint32_t expected = static_cast<uint32_t>(Be16(&cbwcb_[7])) * DiskImage::kSectorSize;
         UsbState::Require(cbwcb_len_ >= 10 && cbwcb_[0] == kScsiWrite10 &&

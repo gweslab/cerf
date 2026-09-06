@@ -26,8 +26,10 @@ public:
 
     void SaveState(StateWriter& w) override;
     void RestoreState(StateReader& r) override;
+    void ResetToDefault() override;
 
 protected:
+    void SetEndpointStalled(uint8_t ep, bool stalled) override;
     /* A transport-specific reader may claim a vendor CDB and provide its IN
        payload. Returning false leaves normal SPC/SBC error handling intact. */
     virtual bool HandleVendorScsiCommand(const uint8_t* cdb, uint8_t cdb_len,
@@ -35,12 +37,14 @@ protected:
                                          std::vector<uint8_t>& response);
 
 private:
-    enum class Phase { AwaitingCbw, DataOut, ReplyReady };
+    enum class Phase { AwaitingCbw, DataOut, ReplyReady, ResetRecovery };
 
     std::vector<uint8_t> BuildDeviceDescriptor() const;
     std::vector<uint8_t> BuildConfigurationDescriptor() const;
 
     void HandleCbw(const uint8_t* data, uint32_t len);
+    void RejectCbw(uint32_t len);
+    void ResetTransport();
     void ExecuteScsiCommand();
     void QueueCsw(uint8_t status);
     void SetSense(uint8_t key, uint8_t asc, uint8_t ascq);

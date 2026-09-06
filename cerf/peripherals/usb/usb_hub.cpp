@@ -118,7 +118,9 @@ bool UsbHub::HandleClassRequest(const SetupPacket& setup,
             }
             return true;
         }
-        return true;
+        /* USB 2.0 9.4: unsupported requests return STALL. */
+        LOG(Caution, "USB hub: unsupported SET_FEATURE selector=%u port=%u\n", setup.wValue, setup.wIndex);
+        return false;
     }
     if (setup.bRequest == kHubReqClearFeature && recip == 3u) {
         const int port = static_cast<int>(setup.wIndex) - 1;
@@ -129,6 +131,10 @@ bool UsbHub::HandleClassRequest(const SetupPacket& setup,
         else if (setup.wValue == kFeaturePortEnable) status &= ~kPortStatusEnable;
         else if (setup.wValue == kFeatureCPortConnection) change &= ~kPortChangeConnection;
         else if (setup.wValue == kFeatureCPortReset)      change &= ~kPortChangeReset;
+        else {
+            LOG(Caution, "USB hub: unsupported CLEAR_FEATURE selector=%u port=%u\n", setup.wValue, setup.wIndex);
+            return false;
+        }
         return true;
     }
     return false;

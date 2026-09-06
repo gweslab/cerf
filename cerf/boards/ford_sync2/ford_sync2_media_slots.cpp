@@ -9,13 +9,14 @@
 #include "../../host/emulation_pause.h"
 #include "../../jit/jit_runner.h"
 #include "ford_sync2_media_hub.h"
+#include "ford_sync2_media_hub_sd_reader.h"
 
 #include <commdlg.h>
 #include <atomic>
 #include <filesystem>
 
 namespace {
-class FordSync2MediaHub : public Service {
+class FordSync2MediaSlots : public Service {
 public:
     using Service::Service;
     bool ShouldRegister() override {
@@ -25,8 +26,8 @@ public:
 
     class SlotWidget final : public HostWidget {
     public:
-        SlotWidget(FordSync2MediaHub& owner, int slot) : owner_(owner), slot_(slot) {}
-        std::wstring WidgetName() const override { return slot_ == 0 ? L"Media Hub SD" : L"Media Hub USB"; }
+        SlotWidget(FordSync2MediaSlots& owner, int slot) : owner_(owner), slot_(slot) {}
+        std::wstring WidgetName() const override { return slot_ == FordSync2MediaHub::kSdPort ? L"Media Hub SD" : L"Media Hub USB"; }
         WidgetGroup Group() const override { return WidgetGroup::Usb; }
         bool PrimaryActionOpensMenu() const override { return true; }
         void DrawIcon(HDC dc, const RECT& box) const override { DrawChipIcon(dc, box); }
@@ -34,7 +35,7 @@ public:
         std::vector<WidgetMenuItem> BuildMenu() override { return owner_.Menu(slot_); }
         void RestoreWidgetState(StateReader&) override { ++owner_.generation_[slot_]; }
     private:
-        FordSync2MediaHub& owner_;
+        FordSync2MediaSlots& owner_;
         int slot_;
     };
 
@@ -42,9 +43,9 @@ public:
         controller_ = &emu_.Get<Imx51Usboh3>();
         auto locked = controller_->LockHostPort();
         controller_->OtgHostRootPort().SetRestoreFactory([](uint32_t kind) -> std::unique_ptr<UsbDevice> {
-            return kind == 4 ? std::make_unique<FordSync2UsbMediaHub>() : nullptr;
+            return kind == FordSync2MediaHub::kStateKind ? std::make_unique<FordSync2MediaHub>() : nullptr;
         });
-        for (int i = 0; i < 2; ++i) {
+        for (int i = 0; i < FordSync2MediaHub::kPortCount; ++i) {
             for (const auto& media : Entries(i)) {
                 if (!media.insert_on_launch) continue;
                 auto device = Open(i, media);
@@ -62,19 +63,19 @@ public:
 private:
     const std::vector<BundledUsbMedia>& Entries(int slot) const {
         const auto& cfg = emu_.Get<DeviceConfig>();
-        return slot == 0 ? cfg.bundled_sd_cards : cfg.bundled_usb_disks;
+        return slot == FordSync2MediaHub::kSdPort ? cfg.bundled_sd_cards : cfg.bundled_usb_disks;
     }
-    FordSync2UsbMediaHub* Hub() const {
+    FordSync2MediaHub* Hub() const {
         auto* device = controller_->OtgHostRootPort().Device();
-        return device && device->StateKind() == 4 ? static_cast<FordSync2UsbMediaHub*>(device) : nullptr;
+        return device && device->StateKind() == FordSync2MediaHub::kStateKind ? static_cast<FordSync2MediaHub*>(device) : nullptr;
     }
-    FordSync2UsbMediaHub& EnsureHub() {
-        if (!Hub()) controller_->OtgHostRootPort().Attach(std::make_unique<FordSync2UsbMediaHub>());
+    FordSync2MediaHub& EnsureHub() {
+        if (!Hub()) controller_->OtgHostRootPort().Attach(std::make_unique<FordSync2MediaHub>());
         return *Hub();
     }
     std::unique_ptr<UsbMassStorageDevice> Open(int slot, const BundledUsbMedia& media) {
         std::unique_ptr<UsbMassStorageDevice> device;
-        if (slot == 0) device = std::make_unique<FordSync2MediaHubSdReader>(media.cid);
+        if (slot == FordSync2MediaHub::kSdPort) device = std::make_unique<FordSync2MediaHubSdReader>(media.cid);
         else device = std::make_unique<UsbMassStorageDevice>();
         const auto& cfg = emu_.Get<DeviceConfig>();
         if (!device->OpenImage(ResolveDeviceFile(cfg.device_name, media.file), media.name)) return {};
@@ -100,7 +101,7 @@ private:
                 bool unchanged = false;
                 if (media && current && current->ImagePath() ==
                     ResolveDeviceFile(emu_.Get<DeviceConfig>().device_name, media->file)) {
-                    unchanged = slot == 1 || static_cast<FordSync2MediaHubSdReader*>(current)->Cid() == media->cid;
+                    unchanged = slot == FordSync2MediaHub::kUsbPort || static_cast<FordSync2MediaHubSdReader*>(current)->Cid() == media->cid;
                     if (!unchanged) hub->SetMedia(slot, {});
                 }
                 if (!unchanged) {
@@ -154,8 +155,8 @@ private:
         return menu;
     }
     Imx51Usboh3* controller_ = nullptr;
-    std::unique_ptr<SlotWidget> widgets_[2];
-    std::atomic<uint64_t> generation_[2]{};
+    std::unique_ptr<SlotWidget> widgets_[FordSync2MediaHub::kPortCount];
+    std::atomic<uint64_t> generation_[FordSync2MediaHub::kPortCount]{};
 };
 }
-REGISTER_SERVICE(FordSync2MediaHub);
+REGISTER_SERVICE(FordSync2MediaSlots);

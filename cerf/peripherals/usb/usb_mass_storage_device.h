@@ -11,7 +11,8 @@ public:
     bool OpenImage(const std::string& path, const std::string& name);
     const std::string& ImagePath() const { return image_path_; }
     const std::string& ImageName() const { return image_name_; }
-    uint32_t StateKind() const override { return 2; }
+    static constexpr uint32_t kStateKind = 2;
+    uint32_t StateKind() const override { return kStateKind; }
 
     /* USB Mass Storage Class Bulk-Only Transport Rev. 1.0, 3.1/3.2 (p6-7). */
     static constexpr uint8_t kBotReqReset     = 0xFFu;

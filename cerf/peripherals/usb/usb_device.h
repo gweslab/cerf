@@ -49,6 +49,9 @@ public:
     static constexpr uint16_t kFeatureEndpointHalt = 0u;
 
     bool HandleSetup(const SetupPacket& setup, std::vector<uint8_t>& data_stage);
+    bool BeginControlTransfer(const SetupPacket& setup);
+    uint32_t ReadControlReply(uint8_t* dst, uint32_t max);
+    void FinishControlTransfer();
 
     /* kDescConfiguration returns the full concatenated
        configuration+interface+endpoint blob (USB 2.0 Spec 9.6.3, p264). */
@@ -90,6 +93,7 @@ public:
         address_ = 0u;
         configuration_ = 0u;
         for (bool& s : stalled_) s = false;
+        FinishControlTransfer();
     }
 
     virtual UsbDevice* FindByAddress(uint8_t addr) {
@@ -109,4 +113,6 @@ protected:
 private:
     static constexpr uint8_t kMaxEndpoints = 16u;
     bool stalled_[kMaxEndpoints] = {};
+    std::vector<uint8_t> control_reply_;
+    uint32_t control_reply_offset_ = 0;
 };

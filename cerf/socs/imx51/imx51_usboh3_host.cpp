@@ -261,21 +261,19 @@ bool Imx51Usboh3::ExecuteQtd(uint32_t qtd_addr, UsbDevice* dev, uint32_t endpt) 
         setup.wValue        = static_cast<uint16_t>(raw[2] | (raw[3] << 8));
         setup.wIndex        = static_cast<uint16_t>(raw[4] | (raw[5] << 8));
         setup.wLength        = static_cast<uint16_t>(raw[6] | (raw[7] << 8));
-        ctrl_reply_.clear();
-        ctrl_reply_off_ = 0u;
-        if (!dev->HandleSetup(setup, ctrl_reply_)) return retire(total, true);
+        if (!dev->BeginControlTransfer(setup)) return retire(total, true);
         residual = 0u;
     } else if (endpt == 0u && pid == kQtdPidIn) {
-        const uint32_t remain = static_cast<uint32_t>(ctrl_reply_.size() - ctrl_reply_off_);
-        const uint32_t n = remain < total ? remain : total;
-        if (n > 0u) scatter(ctrl_reply_.data() + ctrl_reply_off_, n);
-        ctrl_reply_off_ += n;
+        std::vector<uint8_t> data(total);
+        const uint32_t n = dev->ReadControlReply(data.data(), total);
+        if (n > 0u) scatter(data.data(), n);
         residual = total - n;
     } else if (endpt == 0u && pid == kQtdPidOut) {
         if (total != 0u) {
             LOG(Caution, "USB: unsupported control OUT data length=%u\n", total);
             return retire(total, true);
         }
+        dev->FinishControlTransfer();
         residual = 0u;
     } else if (pid == kQtdPidOut) {
         std::vector<uint8_t> data(total);

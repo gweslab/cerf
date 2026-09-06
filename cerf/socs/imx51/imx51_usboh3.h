@@ -79,9 +79,6 @@ private:
 
     UsbHostPort otg_host_root_port_{*this, 0};
 
-    std::vector<uint8_t> ctrl_reply_;
-    size_t                ctrl_reply_off_ = 0u;
-
     std::array<uint32_t, kSize / 4> regs_{};
     std::array<std::array<uint8_t, kPhyRegCount>, kCores> phy_{};
 

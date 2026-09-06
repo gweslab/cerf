@@ -253,8 +253,6 @@ void Imx51Usboh3::SaveState(StateWriter& w) {
     w.WriteBytes(phy_.data(), sizeof(phy_));
     w.Write<uint8_t>(reset_seen_ ? 1 : 0);
     if (host_) host_->SaveState(w);   /* forward to the registered USB host driver */
-    UsbState::WriteBuffer(w, ctrl_reply_);
-    w.Write<uint32_t>(static_cast<uint32_t>(ctrl_reply_off_));
     otg_host_root_port_.SaveState(w);
 }
 void Imx51Usboh3::RestoreState(StateReader& r) {
@@ -263,9 +261,6 @@ void Imx51Usboh3::RestoreState(StateReader& r) {
     r.ReadBytes(phy_.data(), sizeof(phy_));
     uint8_t b = 0; r.Read(b); reset_seen_ = b != 0;
     if (host_) host_->RestoreState(r);
-    UsbState::ReadBuffer(r, ctrl_reply_, 65535);
-    uint32_t offset = 0; r.Read(offset); ctrl_reply_off_ = offset;
-    UsbState::Require(r.Ok() && offset <= ctrl_reply_.size(), "invalid control reply");
     otg_host_root_port_.RestoreState(r);
 }
 

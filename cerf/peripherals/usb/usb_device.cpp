@@ -1,11 +1,37 @@
 #include "usb_state.h"
 #include "usb_device.h"
 
+#include <algorithm>
+#include <cstring>
+
 namespace {
 
 /* USB 2.0 Spec Figure 9-4 (p254): D0 Self Powered, D1 Remote Wakeup. */
 uint16_t DeviceStatusBits() { return 0u; }
 
+}
+
+/* USB 2.0 5.3.2.2: one outstanding request per device's default control pipe. */
+bool UsbDevice::BeginControlTransfer(const SetupPacket& setup) {
+    FinishControlTransfer();
+    if (!HandleSetup(setup, control_reply_)) {
+        FinishControlTransfer();
+        return false;
+    }
+    if (control_reply_.size() > setup.wLength) control_reply_.resize(setup.wLength);
+    return true;
+}
+
+uint32_t UsbDevice::ReadControlReply(uint8_t* dst, uint32_t max) {
+    const auto count = std::min(max, static_cast<uint32_t>(control_reply_.size()) - control_reply_offset_);
+    if (count) std::memcpy(dst, control_reply_.data() + control_reply_offset_, count);
+    control_reply_offset_ += count;
+    return count;
+}
+
+void UsbDevice::FinishControlTransfer() {
+    control_reply_.clear();
+    control_reply_offset_ = 0;
 }
 
 bool UsbDevice::HandleSetup(const SetupPacket& setup,
@@ -75,6 +101,8 @@ bool UsbDevice::HandleSetup(const SetupPacket& setup,
 void UsbDevice::SaveState(StateWriter& w) {
     w.Write(address_); w.Write(configuration_);
     for (bool stalled : stalled_) w.Write<uint8_t>(stalled ? 1 : 0);
+    UsbState::WriteBuffer(w, control_reply_);
+    w.Write(control_reply_offset_);
 }
 void UsbDevice::RestoreState(StateReader& r) {
     r.Read(address_); r.Read(configuration_);
@@ -85,4 +113,7 @@ void UsbDevice::RestoreState(StateReader& r) {
         UsbState::Require(r.Ok() && value <= 1, "invalid endpoint state");
         stalled = value != 0;
     }
+    UsbState::ReadBuffer(r, control_reply_, 65535);
+    r.Read(control_reply_offset_);
+    UsbState::Require(r.Ok() && control_reply_offset_ <= control_reply_.size(), "invalid control reply");
 }

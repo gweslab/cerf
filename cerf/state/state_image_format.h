@@ -6,7 +6,7 @@
    validated by the Hibernation orchestrator via StateWriter/StateReader. */
 
 inline constexpr char     kStateMagic[8]      = {'C','E','R','F','I','M','G','1'};
-inline constexpr uint32_t kStateFormatVersion = 16;
+inline constexpr uint32_t kStateFormatVersion = 17;
 
 inline constexpr wchar_t  kDefaultStateFile[] = L"state.img";
 

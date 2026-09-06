@@ -6,6 +6,7 @@
 #include "../../boards/board_context.h"
 #include "../../core/cerf_emulator.h"
 #include "../../core/device_config.h"
+#include "../../core/virtual_clock.h"
 
 namespace {
 
@@ -28,8 +29,13 @@ public:
     uint32_t MmioSize() const override { return CerfVirt::kTickProfilerSize; }
 
     uint32_t ReadWord(uint32_t addr) override {
-        if (addr - MmioBase() == CerfVirt::kTickProfEnable)
+        const uint32_t off = addr - MmioBase();
+        if (off == CerfVirt::kTickProfEnable)
             return emu_.Get<DeviceConfig>().ga_tick_profiler ? 1u : 0u;
+        if (off == CerfVirt::kTickProfHostMs) {
+            return static_cast<uint32_t>(
+                emu_.Get<VirtualClock>().NowNs() / 1000000ll);
+        }
         HaltUnsupportedAccess("ReadWord", addr, 0);
     }
 };

@@ -9,5 +9,6 @@ typedef unsigned int uint32_t;
 namespace CerfVirt {
 
 const uint32_t kTickProfEnable = 0x00u;
+const uint32_t kTickProfHostMs = 0x04u;
 
 }

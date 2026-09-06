@@ -23,12 +23,9 @@ public:
 
     void Attach(std::unique_ptr<UsbDevice> device);
     void Detach();
-    void ForceReattachCycle();
-    void BeginForceDetach();
-    void EndForceDetach();
     void SetRestoreFactory(Factory factory) { factory_ = std::move(factory); }
 
-    bool       IsConnected() const { return device_ != nullptr && !force_detached_; }
+    bool       IsConnected() const { return device_ != nullptr; }
     UsbDevice* Device() const { return device_.get(); }
 
     void SaveState(StateWriter& w);
@@ -39,6 +36,5 @@ private:
     UsbHostPortHost&          host_;
     int                       port_index_;
     std::unique_ptr<UsbDevice> device_;
-    bool                      force_detached_ = false;
     Factory                   factory_;
 };

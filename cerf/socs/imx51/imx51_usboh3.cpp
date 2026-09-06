@@ -7,7 +7,7 @@
 #include "../../boards/board_context.h"
 #include "../../cpu/emulated_memory.h"
 #include "../../peripherals/peripheral_dispatcher.h"
-#include "../../state/emulation_freeze.h"
+#include "../../core/virtual_clock.h"
 #include "../../state/state_stream.h"
 #include "../irq_controller.h"
 
@@ -110,51 +110,39 @@ void Imx51Usboh3::OnReady() {
     for (auto& phy : phy_)
         for (uint8_t i = 0; i < 4; ++i) phy[i] = kUsb3317Id[i];
     emu_.Get<PeripheralDispatcher>().Register(this);
-    async_schedule_thread_ = std::thread([this] { AsyncScheduleLoop(); });
+    schedule_timer_ = emu_.Get<VirtualTimerList>().Add([this] { OnScheduleTimer(); });
+    UpdateScheduleTimer();
 }
 
-void Imx51Usboh3::StopAsyncScheduleThread() {
-    {
-        std::lock_guard<std::mutex> lk(async_schedule_mtx_);
-        async_schedule_stop_ = true;
+void Imx51Usboh3::OnShutdown() {
+    std::lock_guard<std::mutex> lk(async_schedule_mtx_);
+    if (schedule_timer_) schedule_timer_->Arm(VirtualTimerList::kNoDeadline);
+    schedule_timer_ = nullptr;
+}
+
+Imx51Usboh3::~Imx51Usboh3() { OnShutdown(); }
+
+void Imx51Usboh3::UpdateScheduleTimer() {
+    if (!schedule_timer_) return;
+    const auto cmd = regs_[kOffUsbcmd >> 2];
+    if (Core0IsDevice() || !otg_host_root_port_.IsConnected() ||
+        !(cmd & kCmdRs) || !(cmd & (kCmdAse | kCmdPse))) {
+        schedule_timer_->Arm(VirtualTimerList::kNoDeadline);
+    } else if (schedule_timer_->DeadlineNs() == VirtualTimerList::kNoDeadline) {
+        /* USB 2.0 5.10: one full-speed frame is 1 ms. */
+        constexpr int64_t kFrameNs = 1000000;
+        schedule_timer_->Arm(emu_.Get<VirtualClock>().NowNs() + kFrameNs);
     }
-    async_schedule_cv_.notify_all();
-    if (async_schedule_thread_.joinable()) async_schedule_thread_.join();
 }
 
-void Imx51Usboh3::OnShutdown() { StopAsyncScheduleThread(); }
-
-Imx51Usboh3::~Imx51Usboh3() { StopAsyncScheduleThread(); }
-
-/* EHCI 1.0 Spec 4.8 (p71): the host controller "completes" (and restarts)
-   async-schedule processing at the end of each micro-frame - a continuous,
-   hardware-driven walk, not something only triggered by software polling
-   status registers. */
-void Imx51Usboh3::AsyncScheduleLoop() {
-    constexpr auto kSchedulePeriod = std::chrono::milliseconds(1);
-    auto& freeze = emu_.Get<EmulationFreeze>();
-    auto last_tick = std::chrono::steady_clock::now();
-    for (;;) {
-        {
-            std::unique_lock<std::mutex> lk(async_schedule_mtx_);
-            async_schedule_cv_.wait_for(lk, kSchedulePeriod,
-                                         [&] { return async_schedule_stop_; });
-            if (async_schedule_stop_) break;
-        }
-
-        const auto before_freeze = std::chrono::steady_clock::now();
-        auto frozen = freeze.WorkerSection();
-        std::unique_lock<std::mutex> lk(async_schedule_mtx_);
-        if (async_schedule_stop_) break;
-        const auto now = std::chrono::steady_clock::now();
-        // Exclude time blocked by snapshot/restore from peripheral timers.
-        const auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(before_freeze - last_tick).count();
-        last_tick = now;
+void Imx51Usboh3::OnScheduleTimer() {
+    std::lock_guard<std::mutex> lk(async_schedule_mtx_);
+    if (!schedule_timer_) return;
+    if (!Core0IsDevice() && otg_host_root_port_.IsConnected()) {
         ExecuteAsyncSchedule();
         ExecutePeriodicSchedule();
-        if (auto* root = otg_host_root_port_.Device())
-            root->Tick(static_cast<uint32_t>(std::min<int64_t>(elapsed, 60000)), host_port_reported_);
     }
+    UpdateScheduleTimer();
 }
 
 uint32_t Imx51Usboh3::MmioBase() const { return kBase; }
@@ -190,7 +178,6 @@ void Imx51Usboh3::WriteWord(uint32_t addr, uint32_t value) {
         const uint32_t coff = off % kCoreSpan;
         const bool core0_dev = off < kCoreSpan && Core0IsDevice();
         if (coff == kOffUsbcmd) {
-            const bool reset_requested = (value & kUsbcmdReset) != 0u;
             value &= ~kUsbcmdReset;   /* RST self-clears at reset completion */
             const uint32_t old = regs_[off >> 2];
             regs_[off >> 2] = value;
@@ -201,10 +188,9 @@ void Imx51Usboh3::WriteWord(uint32_t addr, uint32_t value) {
                     regs_[kOffUsbsts >> 2] |= kStsUri | kStsPci;
                 RefreshDeviceIrq();
             } else {
-                if (off < kCoreSpan && reset_requested) host_port_reported_ = false;
                 ReflectScheduleStatus(off, value);
-                async_schedule_cv_.notify_one();
             }
+            if (off < kCoreSpan) UpdateScheduleTimer();
             return;
         }
         if (coff == kOffUsbsts) {
@@ -252,17 +238,13 @@ void Imx51Usboh3::WriteWord(uint32_t addr, uint32_t value) {
             regs_[off >> 2] = UlpiTransfer(off / kCoreSpan, value);
             return;
         }
-        if (off < kCoreSpan && !core0_dev && coff == kOffEndptlistaddr) {
-            regs_[off >> 2] = value;
-            async_schedule_cv_.notify_one();
-            return;
-        }
         if (off < kCoreSpan && !core0_dev && coff == kOffPortsc) {
             WriteOtgHostPortsc(value);
             return;
         }
     }
     regs_[off >> 2] = value;
+    if (off == kOffUsbmode) UpdateScheduleTimer();
 }
 
 void Imx51Usboh3::SaveState(StateWriter& w) {
@@ -271,7 +253,6 @@ void Imx51Usboh3::SaveState(StateWriter& w) {
     w.WriteBytes(phy_.data(), sizeof(phy_));
     w.Write<uint8_t>(reset_seen_ ? 1 : 0);
     if (host_) host_->SaveState(w);   /* forward to the registered USB host driver */
-    w.Write<uint8_t>(host_port_reported_ ? 1 : 0);
     UsbState::WriteBuffer(w, ctrl_reply_);
     w.Write<uint32_t>(static_cast<uint32_t>(ctrl_reply_off_));
     otg_host_root_port_.SaveState(w);
@@ -282,10 +263,9 @@ void Imx51Usboh3::RestoreState(StateReader& r) {
     r.ReadBytes(phy_.data(), sizeof(phy_));
     uint8_t b = 0; r.Read(b); reset_seen_ = b != 0;
     if (host_) host_->RestoreState(r);
-    uint8_t reported = 0; r.Read(reported); host_port_reported_ = reported != 0;
     UsbState::ReadBuffer(r, ctrl_reply_, 65535);
     uint32_t offset = 0; r.Read(offset); ctrl_reply_off_ = offset;
-    UsbState::Require(r.Ok() && reported <= 1 && offset <= ctrl_reply_.size(), "invalid control reply");
+    UsbState::Require(r.Ok() && offset <= ctrl_reply_.size(), "invalid control reply");
     otg_host_root_port_.RestoreState(r);
 }
 
@@ -293,6 +273,8 @@ void Imx51Usboh3::PostRestore() {
     std::lock_guard<std::mutex> lk(async_schedule_mtx_);
     otg_host_root_port_.PostRestore();
     RefreshDeviceIrq();
+    if (schedule_timer_) schedule_timer_->Arm(VirtualTimerList::kNoDeadline);
+    UpdateScheduleTimer();
 }
 
 bool Imx51Usboh3::Core0IsDevice() const {

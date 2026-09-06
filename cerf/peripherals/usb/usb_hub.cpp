@@ -139,7 +139,9 @@ uint32_t UsbHub::OnBulkIn(uint8_t /*ep*/, uint8_t* dst, uint32_t max) {
     for (size_t i = 0; i < port_change_.size(); ++i) {
         if (port_change_[i] != 0u) bitmap |= static_cast<uint8_t>(1u << (i + 1u));
     }
-    if (bitmap == 0u || max == 0u) return 0u;
+    /* USB 2.0 11.12.1: no status change means NAK, not a zero-length packet. */
+    if (bitmap == 0u) return kNak;
+    if (max == 0u) return 0u;
     dst[0] = bitmap;
     return 1u;
 }

@@ -2,12 +2,11 @@
 
 #include "../../peripherals/peripheral_base.h"
 #include "../../peripherals/usb/usb_host_port.h"
+#include "../../core/virtual_timer_list.h"
 
 #include <array>
-#include <condition_variable>
 #include <cstdint>
 #include <mutex>
-#include <thread>
 #include <vector>
 
 class UsbDeviceHost;
@@ -44,7 +43,6 @@ public:
     void DeliverSetup(const uint8_t setup[8]);
 
     UsbHostPort& OtgHostRootPort() { return otg_host_root_port_; }
-    bool         HostPortReported() const { return host_port_reported_; }
 
     void OnPortConnectChanged(int port_index) override;
 
@@ -72,13 +70,11 @@ private:
     void ExecutePeriodicSchedule();
     void ExecuteQueueHead(uint32_t qh_addr);
     bool ExecuteQtd(uint32_t qtd_addr, UsbDevice* dev, uint32_t endpt);
-    void AsyncScheduleLoop();
-    void StopAsyncScheduleThread();
+    void UpdateScheduleTimer();
+    void OnScheduleTimer();
 
     UsbDeviceHost* host_ = nullptr;
     bool           reset_seen_ = false;   /* URI cleared; await the reset flush */
-    /* EHCI 1.0 Spec 2.3.9 (p25) Note1: port change notification. */
-    bool           host_port_reported_ = false;
 
     UsbHostPort otg_host_root_port_{*this, 0};
 
@@ -88,8 +84,6 @@ private:
     std::array<uint32_t, kSize / 4> regs_{};
     std::array<std::array<uint8_t, kPhyRegCount>, kCores> phy_{};
 
-    std::thread              async_schedule_thread_;
     std::mutex               async_schedule_mtx_;
-    std::condition_variable  async_schedule_cv_;
-    bool                     async_schedule_stop_ = false;
+    VirtualTimerList::Entry* schedule_timer_ = nullptr;
 };

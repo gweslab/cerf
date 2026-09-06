@@ -53,7 +53,7 @@ public:
                     LOG(Caution, "Media Hub: cannot open launch image '%s'\n", media.file.c_str());
                     CerfFatalExit(CERF_FATAL_RUNTIME_ERROR);
                 }
-                EnsureHub().SetMedia(i, std::move(device), true);
+                EnsureHub().SetMedia(i, std::move(device));
             }
             widgets_[i] = std::make_unique<SlotWidget>(*this, i);
             emu_.Get<HostWidgetRegistry>().Register(widgets_[i].get());

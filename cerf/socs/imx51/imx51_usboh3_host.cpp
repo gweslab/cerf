@@ -68,7 +68,7 @@ uint32_t QhEndpointNumber(uint32_t ep_char) { return (ep_char >> 8) & 0xFu; }
 
 void Imx51Usboh3::OnPortConnectChanged(int port_index) {
     if (port_index != 0) return;
-    if (!host_port_reported_) return;
+    /* EHCI 1.0 Table 2-16: CCS reflects the powered port, independently of RS. */
     const uint32_t idx = kOffPortscRel >> 2;
     if (otg_host_root_port_.IsConnected()) {
         regs_[idx] |= kPortscCcs | kPortscCsc;
@@ -78,6 +78,7 @@ void Imx51Usboh3::OnPortConnectChanged(int port_index) {
     }
     regs_[kOffUsbstsRel >> 2] |= kStsPciLocal;
     RefreshDeviceIrq();
+    UpdateScheduleTimer();
 }
 
 void Imx51Usboh3::WriteOtgHostPortsc(uint32_t value) {
@@ -120,15 +121,6 @@ void Imx51Usboh3::ExecuteAsyncSchedule() {
     constexpr uint32_t kCmdAseLocal = 1u << 5;
     if (!(cmd & kCmdRsLocal)) return;
 
-    if (!host_port_reported_) {
-        host_port_reported_ = true;
-        if (otg_host_root_port_.IsConnected()) {
-            regs_[kOffPortscRel >> 2] |= kPortscCcs | kPortscCsc;
-            regs_[kOffUsbstsRel >> 2] |= kStsPciLocal;
-            RefreshDeviceIrq();
-        }
-    }
-
     if (!(cmd & kCmdAseLocal)) return;
     const uint32_t start = regs_[kOffAsyncListRel >> 2] & ~0x1Fu;
     if (start == 0u) return;
@@ -149,7 +141,7 @@ void Imx51Usboh3::ExecuteAsyncSchedule() {
 
 void Imx51Usboh3::ExecutePeriodicSchedule() {
     const uint32_t cmd = regs_[kOffUsbcmdRel >> 2];
-    if (!(cmd & kCmdPseLocal)) return;
+    if (!(cmd & 1u) || !(cmd & kCmdPseLocal)) return;
 
     const uint32_t base = regs_[kOffPeriodicListBaseRel >> 2] & ~0xFFFu;
     if (base == 0u) return;
@@ -188,7 +180,8 @@ void Imx51Usboh3::ExecuteQueueHead(uint32_t qh_addr) {
         if (!(token & kQtdActive)) break;
 
         const bool retired = ExecuteQtd(qtd_addr, dev, endpt);
-        any = any || retired;
+        if (!retired) break;
+        any = true;
 
         const uint32_t new_token = mem.ReadWord(qtd_addr + kQtdTokenOff);
         const uint32_t this_next = mem.ReadWord(qtd_addr + kQtdNextOff);
@@ -267,6 +260,7 @@ bool Imx51Usboh3::ExecuteQtd(uint32_t qtd_addr, UsbDevice* dev, uint32_t endpt) 
     } else if (pid == kQtdPidIn) {
         std::vector<uint8_t> data(total);
         const uint32_t got = dev->OnBulkIn(static_cast<uint8_t>(endpt), data.data(), total);
+        if (got == UsbDevice::kNak) return false;
         if (got > 0u) scatter(data.data(), got);
         residual = total - got;
     }

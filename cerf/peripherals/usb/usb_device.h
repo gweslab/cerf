@@ -65,6 +65,8 @@ public:
         (void)ep; (void)data; (void)len;
     }
 
+    /* USB 2.0 8.4.5: NAK carries no data and leaves the transfer pending. */
+    static constexpr uint32_t kNak = UINT32_MAX;
     virtual uint32_t OnBulkIn(uint8_t ep, uint8_t* dst, uint32_t max) {
         (void)ep; (void)dst; (void)max;
         return 0u;
@@ -74,7 +76,6 @@ public:
     virtual void SaveState(StateWriter&);
     virtual void RestoreState(StateReader&);
     virtual void PostRestore() {}
-    virtual void Tick(uint32_t /*elapsed_ms*/, bool /*host_ready*/) {}
 
     uint8_t Address()             const { return address_; }
     uint8_t ConfigurationValue()  const { return configuration_; }

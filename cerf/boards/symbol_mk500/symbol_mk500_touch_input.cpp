@@ -21,8 +21,9 @@
 
 namespace {
 
-/* symbol_mk500 touch.dll FUN_022379ac @0x022379ac keeps bits [11:0] of the
-   readback word as the channel value. */
+/* WM9713L datasheet (Cirrus Logic, Rev 4.0) page 122, register 7Ah bits 11:0
+   ADCD "Touchpanel ADC Data (Read-only) Bit 0 = LSB, Bit 11 = MSB"; symbol_mk500
+   touch.dll FUN_022379ac @0x022379ac keeps those bits as the channel value. */
 constexpr long kAdcMax = 0x0FFF;
 
 /* symbol_mk500 touch.dll FUN_02237380 @0x02237380 waits 0x32 ms between MODR

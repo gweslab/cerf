@@ -51,8 +51,6 @@ public:
         return bd && bd->GetBoard() == Board::SymbolMk500;
     }
 
-    int SourcePriority() const override { return 200; }
-
     void OnReady() override {
         codec_ = dynamic_cast<Wm9713Codec*>(emu_.TryGet<Ac97Codec>());
         if (!codec_) {

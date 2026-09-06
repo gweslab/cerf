@@ -1,22 +1,4 @@
 #!/usr/bin/env python3
-"""
-PostToolUse hook for Write|Edit. If the edited file is under agent_docs/
-or is the top-level CLAUDE.md, warn that this edit requires explicit user
-authorization.
-
-Per CLAUDE.md: "All `agent_docs/` pages are user-curated. Do NOT edit them
-drive-by because a filename looks like where your note belongs - these
-files land in every future agent's system prompt and a stray edit silently
-reshapes it. Edits happen only when the user directs one or when an
-approved skill (e.g. session-feedback) runs with explicit user sign-off."
-
-CLAUDE.md is the source of truth for the entire project - every edit
-reshapes every future agent's system prompt.
-
-Advisory: the hook cannot tell whether THIS specific edit was authorized.
-It can only flag the edit and let the agent self-check. If the user
-explicitly directed it, ignore the warning and proceed.
-"""
 import json
 import os
 import sys
@@ -26,8 +8,6 @@ import _hookpath
 
 def main() -> int:
     try:
-        # BOM-tolerant: some sessions pipe the payload as UTF-8-with-BOM, which
-        # json.load(sys.stdin) rejects (JSONDecodeError at char 0) -> silent no-op.
         payload = json.loads(sys.stdin.buffer.read().decode("utf-8-sig"))
     except (json.JSONDecodeError, ValueError, UnicodeDecodeError):
         return 0
@@ -43,8 +23,6 @@ def main() -> int:
     except ValueError:
         rel = file_path.replace("\\", "/")
 
-    # Strict: only the repo-root CLAUDE.md and files directly under agent_docs/.
-    # Avoids false positives on .claude/, nested CLAUDE.md, etc.
     if rel == "CLAUDE.md":
         category = "CLAUDE-MD"
         body = (

@@ -1,26 +1,10 @@
 #!/usr/bin/env python3
-"""
-PostToolUse hook for Write|Edit on C/C++ and Python source. Fires when
-the agent AUTHORS a comment, and demands the citation test on it.
-
-Enforces the comment rule in agent_docs/code_style.md § Comments. The
-emitted message carries the test the agent must apply.
-
-Scope is the text the agent authored in this call:
-  - Write: tool_input.content.
-  - Edit:  tool_input.new_string, minus comments that already appear
-           verbatim in tool_input.old_string, so a comment carried
-           through an edit unchanged does not fire.
-
-The scanner is string-literal aware, so "http://x" and '/' inside string
-or char literals are not mistaken for comments, and a `#` inside a Python
-string (triple-quoted ones included) is not a comment.
-"""
 import json
 import os
 import sys
 
 import _hookpath
+import _pyscan
 
 SOURCE_EXTS = (".cpp", ".c", ".h", ".hpp", ".cc", ".cxx", ".py")
 
@@ -28,7 +12,6 @@ PY_EXTS = (".py",)
 
 
 def scan_line(line, in_block):
-    """Return (list of comment fragments on this line, new in_block state)."""
     parts = []
     i, n = 0, len(line)
     in_str = None
@@ -69,60 +52,29 @@ def scan_line(line, in_block):
     return parts, in_block
 
 
-def scan_py_line(line, tq):
-    """Return (list of `#` comment fragments, new triple-quote state).
-
-    `tq` is None, or the delimiter of the open triple-quoted string."""
-    parts = []
-    if tq:
-        close = line.find(tq)
-        if close < 0:
-            return parts, tq
-        line = line[close + 3:]
-        tq = None
-    i, n = 0, len(line)
-    in_str = None
-    while i < n:
-        c = line[i]
-        if in_str:
-            if c == "\\":
-                i += 2
-                continue
-            if c == in_str:
-                in_str = None
-            i += 1
-            continue
-        if line.startswith('"""', i) or line.startswith("'''", i):
-            delim = line[i:i + 3]
-            close = line.find(delim, i + 3)
-            if close < 0:
-                return parts, delim
-            i = close + 3
-            continue
-        if c in ('"', "'"):
-            in_str = c
-            i += 1
-            continue
-        if c == "#":
-            parts.append(line[i + 1:])
-            return parts, None
-        i += 1
-    return parts, tq
-
-
 def extract_comments(src, is_py=False):
-    """Return [(line_no, raw_line, comment_text), ...] for lines carrying
-    comment content."""
     out = []
     state = None if is_py else False
-    for idx, line in enumerate(src.splitlines(), start=1):
+    lines = src.splitlines()
+    for idx, line in enumerate(lines, start=1):
         if is_py:
-            parts, state = scan_py_line(line, state)
+            if idx == 1 and line.startswith("#!"):
+                continue
+            parts, state = _pyscan.scan_hash_comments(line, state)
         else:
             parts, state = scan_line(line, state)
         text = " ".join(p.strip() for p in parts if p.strip())
         if text:
             out.append((idx, line.strip(), text))
+
+    if is_py:
+        for start, _end, body in _pyscan.find_docstrings(src):
+            for offset, text in enumerate(body):
+                if text.strip():
+                    ln = start + offset
+                    raw = lines[ln - 1].strip() if ln <= len(lines) else text
+                    out.append((ln, raw, text.strip()))
+        out.sort()
     return out
 
 

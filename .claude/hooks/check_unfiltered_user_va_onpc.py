@@ -1,28 +1,4 @@
 #!/usr/bin/env python3
-"""
-PostToolUse hook for Write|Edit on cerf/tracing/**/*.cpp files. Detects
-unfiltered `tm.OnPc(VA, ...)` calls where VA is a user-mode address
-(< 0x80000000).
-
-On every Windows CE family CERF supports, every guest process maps its
-EXE image at user-VA 0x10000 and shared user-mode DLLs (coredll,
-ceshell, commctrl, …) at 0x40000000+. Those VAs ALIAS across every
-process running through them - FCSE on CE5/v5, ASID on CE6/CE7/v7, the
-collision shape is the same: a bare `tm.OnPc(<user-VA>, ...)` fires
-for ANY process executing that VA, not just the one the hook's name
-claims. Findings drawn from such fires are unreliable across sessions.
-
-Fix: use `tm.OnPcFiltered(VA, predicate, handler)` where `predicate`
-comes from the device-specific resolver under the same tracing
-subdirectory (e.g. `<bundle>_resolver::PidPredicateForName("<exe>")`),
-so the fire is attributable to one specific process's TTBR0.
-
-Kernel-VA hooks (VA >= 0x80000000) are FCSE/ASID-immune and DO NOT
-need filtering. This hook only flags user-VA bare `OnPc`.
-
-Reads tool I/O JSON from stdin and emits hookSpecificOutput JSON to
-stdout. Silent (exit 0) when the file has no unfiltered user-VA OnPc.
-"""
 import json
 import os
 import re
@@ -31,9 +7,6 @@ import sys
 import _hookpath
 
 
-# Match `tm.OnPc(0x...hex...u?, ...` where the hex address starts with
-# a digit 0-7 (i.e. < 0x80000000 = user-mode). The leading whitespace
-# anchor + `tm.` prefix matches every call site in cerf/tracing/.
 USER_VA_ONPC_RE = re.compile(
     r"^\s*tm\.OnPc\(\s*(0x[0-7][0-9A-Fa-f]+u?)\b",
     re.MULTILINE,
@@ -42,8 +15,6 @@ USER_VA_ONPC_RE = re.compile(
 
 def main() -> int:
     try:
-        # BOM-tolerant: some sessions pipe the payload as UTF-8-with-BOM, which
-        # json.load(sys.stdin) rejects (JSONDecodeError at char 0) -> silent no-op.
         payload = json.loads(sys.stdin.buffer.read().decode("utf-8-sig"))
     except Exception:
         return 0
@@ -51,14 +22,12 @@ def main() -> int:
     tool_input = payload.get("tool_input") or {}
     file_path = _hookpath.normalize(tool_input.get("file_path") or "")
 
-    # Only fire on cerf/tracing/**/*.cpp.
     norm = file_path.replace("\\", "/")
     if "/cerf/tracing/" not in norm:
         return 0
     if not norm.endswith(".cpp"):
         return 0
 
-    # Read current file content.
     try:
         with open(file_path, "r", encoding="utf-8", errors="replace") as f:
             content = f.read()
@@ -67,10 +36,8 @@ def main() -> int:
 
     hits = []
     for m in USER_VA_ONPC_RE.finditer(content):
-        # Locate the line number.
         line_no = content.count("\n", 0, m.start()) + 1
         va = m.group(1)
-        # Recover the matched line (up to newline).
         line_start = content.rfind("\n", 0, m.start()) + 1
         line_end = content.find("\n", m.end())
         if line_end < 0:

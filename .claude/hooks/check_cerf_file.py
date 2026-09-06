@@ -1,71 +1,11 @@
 #!/usr/bin/env python3
-"""
-PostToolUse hook for Write|Edit on C/C++ source files (.cpp/.h/.hpp/.cc/.c)
-and Python source files (.py). Comment checks parse `//` and `/* */` in
-C/C++ and `#` in Python. .claude/hooks/ is exempt from the line cap,
-mirroring the pre-commit hook.
-Warns about:
-  1. LINE-COUNT      - file > 500 lines (the pre-commit hook will reject it).
-  2. BAILOUT-COMMENT - TODO / FIXME / HACK / XXX / "for now" / "temporary" /
-                       "deferred" / "placeholder" / "good enough" /
-                       "clean up later" / "fix later" / etc. - in comments only.
-  4. LEAK-CHECKLIST  - "docs/ai_checklists" path or any *.md filename under
-                       that dir. Checklists are confidential per
-                       agent_docs/code_style.md § Comments and
-                       agent_docs/rules.md.
-  5. REFERENCE-COMMENT - a comment references another `cerf/...path...\.cpp`
-                       (or .h) file. Often dead-weight narration ("Body lives
-                       in X", "moved to Y", "out-of-line in Z") per
-                       agent_docs/code_style.md § Comments. Advisory - agent
-                       must self-check whether the reference adds technical
-                       substance or is pointer-only narration.
-  6. BLOATED-COMMENT - /* ... */ block comments that are ≥5 lines OR contain
-                       internal blank lines (multi-paragraph essays). Forces
-                       the agent to evaluate each block: real technical
-                       comment or rotten yapping. Pre-existing comments are
-                       NOT excluded - touching the file means owning its rot.
-  7. REFERENCE-TREE-PATH - a comment cites a path under references/. That
-                       tree is a gigabytes-scale external reference dump
-                       (chip datasheets, BSP source archives, ARM ARM
-                       excerpts). Pointing to a path in it is dead-weight
-                       narration; the comment should inline the SUBSTANCE
-                       (specific bits, register fields, BSP behaviour) or
-                       not exist.
-  8. DECISION-DEFENSE-COMMENT - comment phrasing that defends the current
-                       approach against an alternative ("Do NOT <X>",
-                       "rather than", "instead of", "we chose",
-                       "originally / previously / used to"). The worst
-                       bloat shape: decision-history disguised as a
-                       caution. Fires by CONTENT regardless of comment
-                       size - the canonical offender is below the bloat
-                       size trigger. Razor test in the message: would a
-                       fresh reader with no knowledge of the alternative
-                       write this warning from the code alone?
-  9. ALWAYS-BAILOUT - scheduling-verb phrasings ("deferred to/until/for",
-                       "placeholder until X", "to/will be implemented",
-                       "TODO: implement X", "implement X later", etc.).
-                       The BAILOUT-COMMENT FP gate does NOT rescue these -
-                       there's no "specific technical mechanism" defence
-                       because the phrasing IS the deferral. Exists to
-                       close the dodge where agents invoke the FP gate
-                       by naming something technical near the matched
-                       word.
-
-Comment extraction is state-aware across lines, so naked-continuation lines
-inside a /* ... */ block (no leading `*`) are still recognised as comment
-text. That matters for Doxygen-light style where the path lands on a
-continuation line below the opener.
-
-Reads tool I/O JSON from stdin and emits hookSpecificOutput JSON to stdout to
-inject the warning back into the model's context for the next turn. Silent
-(no output, exit 0) when the file is clean or the matcher doesn't apply.
-"""
 import json
 import os
 import re
 import sys
 
 import _hookpath
+import _pyscan
 
 CAP = 500
 
@@ -76,13 +16,6 @@ BAILOUT_WORDS_RE = re.compile(
     re.IGNORECASE,
 )
 
-# Scheduling-verb phrasings that document FUTURE WORK in a comment.
-# Unconditional bailouts - the BAILOUT-COMMENT FP gate does NOT apply
-# (there is no "specific technical mechanism" defence because the
-# phrasing itself IS the deferral, not a technical term that happens
-# to share a word). This category exists because agents repeatedly
-# dodged BAILOUT-COMMENT by naming something technical nearby and
-# claiming the matched word referred to that, not to deferral.
 ALWAYS_BAILOUT_RE = re.compile(
     r"\b(?:"
     r"deferred\s+(?:to|until|for|in)\b|"
@@ -97,16 +30,6 @@ ALWAYS_BAILOUT_RE = re.compile(
 
 CHECKLIST_PATH_RE = re.compile(r"docs/ai_checklists\b", re.IGNORECASE)
 
-# Decision-defense phrasing in a comment - the worst bloat shape. A
-# comment whose reason to exist is to warn a reader AWAY from an
-# alternative the author considered / removed, or to justify the
-# current approach by contrast. Fires regardless of comment SIZE (the
-# canonical offender is only 3-4 lines, below the bloat size trigger),
-# so it is detected by content, not structure. "do not" / "don't" are
-# included despite also appearing in legitimate hazard notes - the
-# emitted message carries the razor test (system-invariant a fresh
-# reader would hit, vs defending the author's journey) so a real
-# hazard clears in one step while decision-defense is deleted.
 DECISION_DEFENSE_RE = re.compile(
     r"\bdo\s*not\b|\bdon'?t\b"
     r"|\brather than\b|\binstead of\b"
@@ -115,31 +38,12 @@ DECISION_DEFENSE_RE = re.compile(
     re.IGNORECASE,
 )
 
-# Path under the references/ tree mentioned in a comment. The tree is
-# gitignored and gigabytes-scale (chip datasheets, BSP archives, ARM
-# manual excerpts) - enumerating filenames is impractical, so just
-# match the literal `references/<something>` shape. The substance the
-# referenced doc contains belongs inline; the path itself does not.
 REFERENCES_TREE_RE = re.compile(r"\breferences/[\w./_-]+", re.IGNORECASE)
 
-# Source-file reference in a comment, matched by basename (path prefix
-# optional). Requires at least one underscore in the basename - that's
-# the CERF naming convention (`arm_jit.cpp`, `emit_ldr_word.cpp`,
-# `s3c2410_intc.cpp`, …) and it also automatically excludes common
-# system headers that have no underscore (`windows.h`, `stdio.h`,
-# `commctrl.h`, `aygshell.h`, `ceshell.h`, etc.). Trade-off: misses
-# single-word CERF files like `mmu.cpp` - acceptable, those are rare.
 CERF_FILE_REF_RE = re.compile(r"\b[\w-]*_[\w_-]*\.(?:cpp|h)\b")
 
 
 def extract_comment_text(line: str, in_block: bool) -> tuple:
-    """Return (comment_text_from_this_line, new_in_block_state).
-
-    Handles // line comments, /* ... */ block comments spanning multiple
-    lines, and naked-continuation lines (no leading `*`). When `in_block`
-    is True on entry, the line is treated as comment-continuation until a
-    `*/` is found.
-    """
     parts = []
     pos = 0
     n = len(line)
@@ -168,9 +72,6 @@ def extract_comment_text(line: str, in_block: bool) -> tuple:
 
 
 def find_bloated_blocks(content: str) -> list:
-    """Return [(start_line, num_lines, multi_paragraph), ...] for /* ... */
-    block comments that look like bloat: >=5 lines, or contain at least one
-    internal blank line (multi-paragraph essay structure)."""
     hits = []
     for m in re.finditer(r"/\*.*?\*/", content, re.DOTALL):
         block = m.group(0)
@@ -189,52 +90,27 @@ def find_bloated_blocks(content: str) -> list:
     return hits
 
 
-def extract_py_comment_text(line: str, tq):
-    """Return (comment_text_from_this_line, new_triple_quote_state).
+def extract_py_comment_text(line, tq):
+    parts, tq = _pyscan.scan_hash_comments(line, tq)
+    return " ".join(p.strip() for p in parts if p.strip()), tq
 
-    Handles `#` line comments. A `#` inside a string literal is not a
-    comment, including inside a triple-quoted string that spans lines.
-    `tq` is None, or the delimiter of the open triple-quoted string.
-    """
-    if tq:
-        close = line.find(tq)
-        if close < 0:
-            return "", tq
-        line = line[close + 3:]
-        tq = None
-    i, n = 0, len(line)
-    in_str = None
-    while i < n:
-        c = line[i]
-        if in_str:
-            if c == "\\":
-                i += 2
-                continue
-            if c == in_str:
-                in_str = None
-            i += 1
-            continue
-        if line.startswith('"""', i) or line.startswith("'''", i):
-            delim = line[i:i + 3]
-            close = line.find(delim, i + 3)
-            if close < 0:
-                return "", delim
-            i = close + 3
-            continue
-        if c in ('"', "'"):
-            in_str = c
-            i += 1
-            continue
-        if c == "#":
-            return line[i + 1:], None
-        i += 1
-    return "", tq
+
+def scan_py_docstrings(content):
+    blocks = []
+    text_by_line = {}
+    for start, end, body in _pyscan.find_docstrings(content):
+        for offset, text in enumerate(body):
+            text_by_line[start + offset] = text
+        num_lines = end - start + 1
+        multi_paragraph = (
+            any(not t.strip() for t in body[1:-1]) if len(body) > 2 else False
+        )
+        if num_lines >= 5 or multi_paragraph:
+            blocks.append((start, num_lines, multi_paragraph))
+    return blocks, text_by_line
 
 
 def find_bloated_py_blocks(content: str) -> list:
-    """Return [(start_line, num_lines, multi_paragraph), ...] for runs of
-    consecutive whole-line `#` comments that look like bloat: >=5 lines, or
-    broken by a bare `#` separator (multi-paragraph essay structure)."""
     hits = []
     tq = None
     run_start = None
@@ -267,7 +143,6 @@ def find_bloated_py_blocks(content: str) -> list:
 
 
 def collect_checklist_filenames() -> list:
-    """Enumerate *.md basenames under docs/ai_checklists/, like the pre-commit hook."""
     root = "docs/ai_checklists"
     if not os.path.isdir(root):
         return []
@@ -297,10 +172,6 @@ def emit_warnings(warnings: list, rel_path: str) -> int:
 
 def main() -> int:
     try:
-        # Decode BOM-tolerantly: some Claude Code sessions pipe the hook payload
-        # as UTF-8-with-BOM, and json.load(sys.stdin) raises JSONDecodeError on
-        # the leading BOM (char 0) -> the hook silently no-ops and never fires.
-        # utf-8-sig strips a leading BOM if present and is plain UTF-8 otherwise.
         payload = json.loads(sys.stdin.buffer.read().decode("utf-8-sig"))
     except (json.JSONDecodeError, ValueError, UnicodeDecodeError):
         return 0
@@ -332,8 +203,6 @@ def main() -> int:
 
     warnings = []
 
-    # Check 1: line-count cap. Skip trace files and .claude/hooks/,
-    # mirroring .githooks/pre-commit.
     if "tracing/" not in rel_path and ".claude/hooks/" not in rel_path and "launcher/supported_devices.py" not in rel_path:
         line_count = content.count("\n")
         if content and not content.endswith("\n"):
@@ -362,10 +231,17 @@ def main() -> int:
         else None
     )
 
+    doc_blocks = []
+    doc_text_by_line = {}
+    if is_py:
+        doc_blocks, doc_text_by_line = scan_py_docstrings(content)
+
     state = None if is_py else False
     for ln_idx, line in enumerate(content.splitlines(), start=1):
         if is_py:
             comment_text, state = extract_py_comment_text(line, state)
+            if not comment_text:
+                comment_text = doc_text_by_line.get(ln_idx, "")
         else:
             comment_text, state = extract_comment_text(line, state)
 
@@ -600,9 +476,10 @@ def main() -> int:
             "'rather than <Y>' framing.",
         ))
 
-    bloat_hits = (
-        find_bloated_py_blocks(content) if is_py else find_bloated_blocks(content)
-    )
+    if is_py:
+        bloat_hits = sorted(find_bloated_py_blocks(content) + doc_blocks)
+    else:
+        bloat_hits = find_bloated_blocks(content)
     if bloat_hits:
         sample_lines = [
             f"  {rel_path}:{ln}: {n} lines, multi_paragraph={mp}"

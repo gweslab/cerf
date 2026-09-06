@@ -1,40 +1,4 @@
 #!/usr/bin/env python3
-"""
-PostToolUse hook for Write|Edit on C/C++ source. Fires when the WRITE
-or EDIT introduces a citation trigger word - "ARM ARM" or "§" - and
-demands explicit verification from the agent in their next message.
-
-Scope is the DIFF (the agent's own additions), NOT the whole file:
-  - Write tool: scans `tool_input.content` (full new content the
-    agent is authoring).
-  - Edit tool: scans `tool_input.new_string` (the addition only;
-    `old_string` is what's being removed and is NOT scanned).
-Edits that don't touch citation lines stay silent - only the agent's
-own newly-authored content triggers the verification demand.
-
-Trigger words:
-  - "ARM ARM" - bare reference to the ARM Architecture Reference
-    Manual. Overwhelmingly the training-memory-fabrication shape:
-    real citations name a specific section number.
-  - "§" - section symbol. If the agent is dropping a § into code,
-    they're writing a citation, and must be able to name where they
-    read it.
-  - "Table <n>" - a reference-manual / datasheet table citation
-    ("Table 45-26", "Table 3-1"). Capital "Table" + a number is the
-    RM/datasheet table-reference shape; lowercase "table" in ordinary
-    prose does not fire.
-  - "Fig <n>" / "Figure <n>" - a reference-manual / datasheet figure
-    citation ("Fig 45-41", "Figure 3"). Same shape as Table; capital
-    "Fig"/"Figure" + a number.
-  - manual chapter / page references ("ch.27", "chapter 27", "page 643",
-    "pg 12", "p.643", "p643"). Case-insensitive. The bare "p<n>" page
-    form needs 3+ digits so 1-2 digit GPIO pin names do not fire.
-  - document IDs ("DDI 0406C", "ddi0406c", "IHI 0042F", "JESD79-3") and
-    manual section identifiers ("A8.8.44", "B3.5.1").
-  - named vendor manuals ("Intel SDM", "TRM", "PRM", "datasheet",
-    "user manual", "reference manual") and volume references
-    ("Vol. 2B", "Volume 3").
-"""
 import json
 import os
 import re
@@ -46,33 +10,18 @@ SOURCE_EXTS = (".cpp", ".h", ".hpp", ".cc", ".c")
 
 CITATION_TRIGGER_RE = re.compile(
     r"\bARM ARM\b|§"
-    # Table / Figure references. The identifier may be letter-prefixed
-    # ("Table D15-10", "Figure B3-8") or plain ("Table 45-26").
     r"|\bTable\s+[A-Z]?\d|\bFig(?:ure)?\.?\s+[A-Z]?\d"
-    # Manual chapter / page references ("ch.27", "chapter 27", "p643",
-    # "p.643", "page 643", "pg 12"). Case-insensitive. Page form needs
-    # 3+ bare digits so 1-2 digit GPIO pin names ("p12") do not fire.
     r"|(?i:\bch\.\s*\d|\bchapter\s+\d|\bpage\s+\d|\bpg\.?\s*\d|\bp\.?\s*\d{3,})"
-    # Document IDs: ARM DDI/IHI/DEN/PRD ("DDI 0406C", "ddi0406c"),
-    # JEDEC/JESD, and generic vendor doc numbers.
     r"|(?i:\b(?:ddi|ihi|den|prd|arm)\s*0*\d{3,}|\bjesd\s*\d)"
-    # Manual section identifiers: letter + dotted numbers, 2+ groups
-    # ("A8.8.44", "B3.5.1", "D15-10"). Requires the leading capital
-    # letter so version strings and decimals do not fire.
     r"|\b[A-Z]\d+\.\d+(?:\.\d+)+\b"
-    # Named vendor manuals ("Intel SDM", "SDM Vol. 2B", "TRM", "PRM",
-    # "the RM", "datasheet", "user manual", "reference manual").
     r"|(?i:\bSDM\b|\bTRM\b|\bPRM\b|\bRM\s+(?:Vol|ch|table|section|p)"
     r"|\bdatasheet\b|\buser\s+manual\b|\breference\s+manual\b)"
-    # Volume references ("Vol. 2B", "Volume 3", "vol 1").
     r"|(?i:\bvol(?:ume)?\.?\s*\d)"
 )
 
 
 def main() -> int:
     try:
-        # BOM-tolerant: some sessions pipe the payload as UTF-8-with-BOM, which
-        # json.load(sys.stdin) rejects (JSONDecodeError at char 0) -> silent no-op.
         payload = json.loads(sys.stdin.buffer.read().decode("utf-8-sig"))
     except (json.JSONDecodeError, ValueError, UnicodeDecodeError):
         return 0
@@ -82,7 +31,6 @@ def main() -> int:
     if not file_path.lower().endswith(SOURCE_EXTS):
         return 0
 
-    # Only the agent's own authoring - never pre-existing content.
     blobs = []
     if isinstance(tool_input.get("content"), str):
         blobs.append(tool_input["content"])

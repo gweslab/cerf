@@ -1,31 +1,4 @@
 #!/usr/bin/env python3
-"""
-PreToolUse hook for Write|Edit. Two behaviours, picked by whether the
-target file already exists on disk:
-
-  - File does NOT exist → HARD BLOCK creation. The agent is about to
-    create a new file whose basename contains a grab-bag word.
-  - File ALREADY exists → ADVISORY WARN only. Edits proceed so the
-    agent can read the file, move content out, and ultimately delete
-    it. Blocking edits on legacy grab-bag files traps the cleanup
-    task itself.
-
-Detection is SUBSTRING-based, NOT whole-stem. If the basename
-contains any of these words anywhere, the file is caught:
-
-    misc, helpers, helper, utils, util, extras, extra, others, other
-
-That catches every shape of grab-bag the rule warns against:
-  - misc.cpp / misc2.cpp                       (bare)
-  - cli_helpers.h / foo_utils.cpp              (suffix)
-  - arm_neon_2regmisc.cpp                      (compound - embedded)
-  - arm_neon_2regmisc_decoder.cpp              (compound - embedded)
-  - emit_neon_data_2regmisc_absneg.cpp         (multi-segment)
-
-If your file's name happens to contain one of these words even
-though it describes a single specific responsibility, you still
-have to rename it. The rule is filename-shape, not agent-judgment.
-"""
 import json
 import os
 import re
@@ -35,11 +8,6 @@ import _hookpath
 
 SOURCE_EXTS = (".cpp", ".h", ".hpp", ".cc", ".c")
 
-# Substring match - any of these words anywhere in the basename.
-# `extras?(?!ct)` - match `extra` / `extras` only when NOT followed by
-# `ct`, so `extract` / `extracted` / `extractor` / `extraction` pass
-# through. Those are legitimate technical verbs (the codebase has
-# extract-* scripts and extraction-pipeline names).
 GRAB_BAG_WORD_RE = re.compile(
     r"(misc|helpers?|utils?|extras?(?!ct)|others?)",
     re.IGNORECASE,
@@ -48,8 +16,6 @@ GRAB_BAG_WORD_RE = re.compile(
 
 def main() -> int:
     try:
-        # BOM-tolerant: some sessions pipe the payload as UTF-8-with-BOM, which
-        # json.load(sys.stdin) rejects (JSONDecodeError at char 0) -> silent no-op.
         payload = json.loads(sys.stdin.buffer.read().decode("utf-8-sig"))
     except (json.JSONDecodeError, ValueError, UnicodeDecodeError):
         return 0

@@ -1,20 +1,4 @@
 #!/usr/bin/env python3
-"""
-PostToolUse hook for Write|Edit. If the edited file lives under
-docs/ai_checklists/, warn that this edit requires explicit, per-edit
-user authorization.
-
-Per CLAUDE.md § 'Service Locator & Architecture' / 'NEVER edit the
-checklist without user approval': the checklist is the user's document.
-A prior 'yes, edit X' does NOT carry over to THIS edit. Silent agent
-rewrites of the plan are explicitly named in user memory as how the
-MMU broke.
-
-Advisory: the hook cannot tell whether THIS specific edit was
-authorized. It can only flag every edit under docs/ai_checklists/
-and let the agent self-check. If the edit WAS authorized, ignore the
-warning and proceed.
-"""
 import json
 import os
 import sys
@@ -24,8 +8,6 @@ import _hookpath
 
 def main() -> int:
     try:
-        # BOM-tolerant: some sessions pipe the payload as UTF-8-with-BOM, which
-        # json.load(sys.stdin) rejects (JSONDecodeError at char 0) -> silent no-op.
         payload = json.loads(sys.stdin.buffer.read().decode("utf-8-sig"))
     except (json.JSONDecodeError, ValueError, UnicodeDecodeError):
         return 0

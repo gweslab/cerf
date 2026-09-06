@@ -1,18 +1,4 @@
 #!/usr/bin/env python3
-"""
-PreToolUse hook for Write|Edit on C/C++ source. HARD-BLOCKS any attempt
-to introduce a `#pragma comment(lib, ...)` directive.
-
-Library link dependencies belong in the .vcxproj - concretely in
-cerf/cerf.vcxproj for CERF. Scattering lib pragmas across source makes
-the link surface invisible to the build system, routes dependency
-changes through source edits rather than project metadata, and bypasses
-the per-config / per-platform link selection the .vcxproj provides.
-
-Returns permissionDecision: "deny" on match. Only inspects writes to
-C/C++ source files - documentation files that mention the pragma as an
-example are not affected.
-"""
 import json
 import re
 import sys
@@ -26,8 +12,6 @@ SOURCE_EXTS = (".cpp", ".h", ".hpp", ".cc", ".cxx", ".c")
 
 def main() -> int:
     try:
-        # BOM-tolerant: some sessions pipe the payload as UTF-8-with-BOM, which
-        # json.load(sys.stdin) rejects (JSONDecodeError at char 0) -> silent no-op.
         payload = json.loads(sys.stdin.buffer.read().decode("utf-8-sig"))
     except (json.JSONDecodeError, ValueError, UnicodeDecodeError):
         return 0
@@ -37,9 +21,6 @@ def main() -> int:
     if not file_path.lower().endswith(SOURCE_EXTS):
         return 0
 
-    # Write tool carries the full content; Edit tool carries new_string
-    # as the addition being introduced. Either path can introduce the
-    # forbidden pragma.
     blobs = []
     if isinstance(tool_input.get("content"), str):
         blobs.append(tool_input["content"])

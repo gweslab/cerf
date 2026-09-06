@@ -1,14 +1,4 @@
 #!/usr/bin/env python3
-"""
-PostToolUse hook for Bash (filtered to git *). Advises when the agent runs a
-git command that's commonly a workflow-drift smell — putting current work
-aside or wandering into commit history — instead of continuing the actual
-debugging / implementing task at hand.
-
-Advisory only: NEVER blocks. If the user explicitly asked for the command
-(e.g. "check who wrote this", "stash so I can see X", "show the last
-commit"), the warning is noise — proceed.
-"""
 import json
 import re
 import sys
@@ -16,31 +6,31 @@ import sys
 DRIFT_PATTERNS = [
     (
         re.compile(r"\bgit\s+stash\b"),
-        "git stash — putting work aside. Often 'let me look at something "
+        "git stash - putting work aside. Often 'let me look at something "
         "else first'. If user did NOT ask to stash, return to the current "
         "task instead.",
     ),
     (
         re.compile(r"\bgit\s+log\b"),
-        "git log — inspecting commit history. Often 'who did this change' "
+        "git log - inspecting commit history. Often 'who did this change' "
         "drift. Per CLAUDE.md § 'Communication Patterns': 'you ARE the one "
         "who wrote this code, this is on your responsibility'.",
     ),
     (
         re.compile(r"\bgit\s+show\b"),
-        "git show — inspecting a specific commit. Often drift ('let me see "
+        "git show - inspecting a specific commit. Often drift ('let me see "
         "what this old commit did'). The bug is in current code, not in "
         "history.",
     ),
     (
         re.compile(r"\bgit\s+blame\b"),
-        "git blame — asking 'who wrote this line'. Per CLAUDE.md: 'It "
+        "git blame - asking 'who wrote this line'. Per CLAUDE.md: 'It "
         "doesn't matter if something was written not by you... you ARE "
         "the one who wrote this code'. Debug the current code instead.",
     ),
     (
         re.compile(r"\bgit\s+reflog\b"),
-        "git reflog — exploring repo history beyond the current branch. "
+        "git reflog - exploring repo history beyond the current branch. "
         "Almost always drift unless user explicitly asked.",
     ),
 ]
@@ -48,8 +38,6 @@ DRIFT_PATTERNS = [
 
 def main() -> int:
     try:
-        # BOM-tolerant: some sessions pipe the payload as UTF-8-with-BOM, which
-        # json.load(sys.stdin) rejects (JSONDecodeError at char 0) -> silent no-op.
         payload = json.loads(sys.stdin.buffer.read().decode("utf-8-sig"))
     except (json.JSONDecodeError, ValueError, UnicodeDecodeError):
         return 0
@@ -64,7 +52,7 @@ def main() -> int:
         return 0
 
     msg = (
-        "WORKFLOW-DRIFT POSSIBLE — the bash command just run is a known "
+        "WORKFLOW-DRIFT POSSIBLE - the bash command just run is a known "
         "drift smell. MIGHT be exactly what the user asked for, in which "
         "case ignore this and proceed. Otherwise: stop, return to the "
         "actual task. Per agent_docs/workflow.md § 'When Your Fix Crashes': "

@@ -333,7 +333,6 @@ uint32_t Imx51Usboh3::DqhBase() const {
 }
 
 void Imx51Usboh3::DeliverSetup(const uint8_t setup[8]) {
-    std::lock_guard<std::mutex> lk(async_schedule_mtx_);
     auto& mem = emu_.Get<EmulatedMemory>();
     const uint32_t base = DqhBase();
     if (!base || !mem.TryTranslate(base)) {

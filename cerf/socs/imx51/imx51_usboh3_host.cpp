@@ -101,9 +101,9 @@ void Imx51Usboh3::WriteOtgHostPortsc(uint32_t value) {
     if (value & kPortscPedc) next &= ~kPortscPedc;
 
     if (value & kPortscSuspend) next |= kPortscSuspend;
-    if ((value & kPortscFpr) && !(old & kPortscFpr)) {
-        next |= kPortscFpr;
-    } else if (!(value & kPortscFpr) && (old & kPortscFpr)) {
+    /* MCIMX51RM Table 60-52, FPR: host resume auto-completes; a write of zero
+       has no effect, unlike EHCI. */
+    if (value & kPortscFpr) {
         next &= ~(kPortscFpr | kPortscSuspend);
     }
 
@@ -118,7 +118,7 @@ void Imx51Usboh3::ExecuteAsyncSchedule() {
     const uint32_t cmd = regs_[kOffUsbcmdRel >> 2];
     constexpr uint32_t kCmdRsLocal  = 1u << 0;
     constexpr uint32_t kCmdAseLocal = 1u << 5;
-    if (!(cmd & kCmdRsLocal) || !(cmd & kCmdAseLocal)) return;
+    if (!(cmd & kCmdRsLocal)) return;
 
     if (!host_port_reported_) {
         host_port_reported_ = true;
@@ -129,6 +129,7 @@ void Imx51Usboh3::ExecuteAsyncSchedule() {
         }
     }
 
+    if (!(cmd & kCmdAseLocal)) return;
     const uint32_t start = regs_[kOffAsyncListRel >> 2] & ~0x1Fu;
     if (start == 0u) return;
 

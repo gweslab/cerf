@@ -19,7 +19,8 @@ public:
 
     static constexpr uint32_t kSectorSize = 512u;
 
-    bool Open(const std::string& path, uint64_t size_bytes);
+    /* Removable media can require an existing file instead of creating a blank. */
+    bool Open(const std::string& path, uint64_t size_bytes, bool create_if_missing = true);
 
     bool     IsOpen()      const { return handle_ != INVALID_HANDLE_VALUE; }
     uint64_t SectorCount() const { return sector_count_; }

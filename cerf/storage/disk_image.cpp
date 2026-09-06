@@ -4,14 +4,15 @@
 #include <cstring>
 
 #include "../core/log.h"
+#include "../core/string_utils.h"
 
 DiskImage::~DiskImage() {
     if (handle_ != INVALID_HANDLE_VALUE) CloseHandle(handle_);
 }
 
-bool DiskImage::Open(const std::string& path, uint64_t size_bytes) {
-    HANDLE h = CreateFileA(path.c_str(), GENERIC_READ | GENERIC_WRITE,
-                           FILE_SHARE_READ, nullptr, OPEN_ALWAYS,
+bool DiskImage::Open(const std::string& path, uint64_t size_bytes, bool create_if_missing) {
+    HANDLE h = CreateFileW(Utf8ToWide(path.c_str()).c_str(), GENERIC_READ | GENERIC_WRITE,
+                           FILE_SHARE_READ, nullptr, create_if_missing ? OPEN_ALWAYS : OPEN_EXISTING,
                            FILE_ATTRIBUTE_NORMAL, nullptr);
     if (h == INVALID_HANDLE_VALUE) {
         LOG(Caution, "DiskImage: CreateFile('%s') failed gle=%lu\n",

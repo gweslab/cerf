@@ -1,9 +1,17 @@
 #pragma once
 #include "service.h"
+#include "sd_card_cid.h"
 #include <cstdint>
 #include <string>
 #include <utility>
 #include <vector>
+
+struct BundledUsbMedia {
+    std::string file;
+    std::string name;
+    bool insert_on_launch = false;
+    std::optional<SdCardCid> cid;
+};
 
 struct DeviceMeta {
     std::string name;
@@ -85,6 +93,9 @@ struct DeviceConfig : public Service {
     std::string              rom_primary;
     std::vector<std::string> rom_extensions;
     std::string              rom_recovery;
+
+    std::vector<BundledUsbMedia> bundled_sd_cards;
+    std::vector<BundledUsbMedia> bundled_usb_disks;
 
     /* Optional serial-config EEPROM image (cerf.json rom.eeprom). A board's
        SSP/SPI EEPROM peripheral loads it from the device directory; empty

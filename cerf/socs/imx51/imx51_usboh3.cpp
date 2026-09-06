@@ -1,3 +1,4 @@
+#include "../../peripherals/usb/usb_state.h"
 #include "imx51_usboh3.h"
 #include "usb_device_host.h"
 
@@ -6,6 +7,7 @@
 #include "../../boards/board_context.h"
 #include "../../cpu/emulated_memory.h"
 #include "../../peripherals/peripheral_dispatcher.h"
+#include "../../core/virtual_clock.h"
 #include "../../state/state_stream.h"
 #include "../irq_controller.h"
 
@@ -22,6 +24,9 @@ constexpr uint32_t kUsbcmdReset = 1u << 1;      /* USBCMD.RST */
 constexpr uint32_t kOffCaplen   = 0x00000100u;  /* CAPLENGTH(b0)+HCIVERSION(b16) */
 /* CAPLENGTH 0x40 (operational regs at cap+0x40) | HCIVERSION 0x0100 (EHCI 1.00). */
 constexpr uint32_t kCapReset = 0x01000040u;
+/* EHCI 1.0 Spec Table 2-5 (p13) + Table 2-6 (p14, N_PORTS bits 3:0). */
+constexpr uint32_t kOffHcsparams = kOffCaplen + 0x04u;
+constexpr uint32_t kHcsparamsOnePort = 1u;
 
 constexpr uint32_t kOffUsbsts = 0x00000144u;  /* USBSTS (=USBCMD+4) */
 constexpr uint32_t kCmdRs  = 1u << 0;   /* USBCMD.RS  Run/Stop */
@@ -49,6 +54,12 @@ constexpr uint32_t kPortscPspdShift = 26;
 constexpr uint32_t kPortscPspdHs    = 0x2u << kPortscPspdShift;
 constexpr uint32_t kPortscDevAttached =
     kPortscCcs | kPortscPe | kPortscHsp | kPortscPspdHs;
+
+/* EHCI 1.0 Spec Table 2-16 (p27), PP field: with HCSPARAMS.PPC=0 (no port
+   power switches, kHcsparamsOnePort below) PP is RO and hard-wired to 1 -
+   "port power is always available". Host-mode PORTSC1 must reflect this on
+   every read, or guest port-reset gating that requires PP=1 never opens. */
+constexpr uint32_t kPortscPp = 1u << 12;
 
 constexpr uint32_t kOffUsbintr       = 0x00000148u;
 constexpr uint32_t kOffEndptlistaddr = 0x00000158u;  /* dQH array base (2 KB aligned) */
@@ -95,32 +106,73 @@ void Imx51Usboh3::OnReady() {
         /* Out of reset the host controller is halted (Table 60-40/41). */
         regs_[(core + kOffUsbsts) >> 2] = kStsHch;
     }
+    regs_[kOffHcsparams >> 2] = kHcsparamsOnePort;
     for (auto& phy : phy_)
         for (uint8_t i = 0; i < 4; ++i) phy[i] = kUsb3317Id[i];
     emu_.Get<PeripheralDispatcher>().Register(this);
+    schedule_timer_ = emu_.Get<VirtualTimerList>().Add([this] { OnScheduleTimer(); });
+    UpdateScheduleTimer();
+}
+
+void Imx51Usboh3::OnShutdown() {
+    std::lock_guard<std::mutex> lk(async_schedule_mtx_);
+    if (schedule_timer_) schedule_timer_->Arm(VirtualTimerList::kNoDeadline);
+    schedule_timer_ = nullptr;
+}
+
+Imx51Usboh3::~Imx51Usboh3() { OnShutdown(); }
+
+void Imx51Usboh3::UpdateScheduleTimer() {
+    if (!schedule_timer_) return;
+    const auto cmd = regs_[kOffUsbcmd >> 2];
+    if (Core0IsDevice() || !otg_host_root_port_.IsConnected() ||
+        !(cmd & kCmdRs) || !(cmd & (kCmdAse | kCmdPse))) {
+        schedule_timer_->Arm(VirtualTimerList::kNoDeadline);
+    } else if (schedule_timer_->DeadlineNs() == VirtualTimerList::kNoDeadline) {
+        /* USB 2.0 5.10: one full-speed frame is 1 ms. */
+        constexpr int64_t kFrameNs = 1000000;
+        schedule_timer_->Arm(emu_.Get<VirtualClock>().NowNs() + kFrameNs);
+    }
+}
+
+void Imx51Usboh3::OnScheduleTimer() {
+    std::lock_guard<std::mutex> lk(async_schedule_mtx_);
+    if (!schedule_timer_) return;
+    if (!Core0IsDevice() && otg_host_root_port_.IsConnected()) {
+        ExecuteAsyncSchedule();
+        ExecutePeriodicSchedule();
+    }
+    UpdateScheduleTimer();
 }
 
 uint32_t Imx51Usboh3::MmioBase() const { return kBase; }
 uint32_t Imx51Usboh3::MmioSize() const { return kSize; }
 
 uint8_t Imx51Usboh3::ReadByte(uint32_t addr) {
+    std::lock_guard<std::mutex> lk(async_schedule_mtx_);
     const uint32_t off = addr - kBase;
     return static_cast<uint8_t>(regs_[off >> 2] >> ((off & 3u) * 8u));
 }
 uint16_t Imx51Usboh3::ReadHalf(uint32_t addr) {
+    std::lock_guard<std::mutex> lk(async_schedule_mtx_);
     const uint32_t off = addr - kBase;
     return static_cast<uint16_t>(regs_[off >> 2] >> ((off & 2u) * 8u));
 }
 uint32_t Imx51Usboh3::ReadWord(uint32_t addr) {
+    std::lock_guard<std::mutex> lk(async_schedule_mtx_);
     const uint32_t off = addr - kBase;
     /* Device mode (core0): CERF is the always-present host, so PORTSC1 reflects a
        connected, enabled, high-speed device port (sub_8005D97C polls it). */
     if (off == kOffPortsc && Core0IsDevice())
         return regs_[off >> 2] | kPortscDevAttached;
+    const uint32_t coff = off % kCoreSpan;
+    if (coff == kOffPortsc && !Core0IsDevice())
+        return regs_[off >> 2] | kPortscPp;
     return regs_[off >> 2];
 }
 
 void Imx51Usboh3::WriteWord(uint32_t addr, uint32_t value) {
+    std::lock_guard<std::mutex> lk(async_schedule_mtx_);
     const uint32_t off = addr - kBase;
     if (off < kNonCore) {
         const uint32_t coff = off % kCoreSpan;
@@ -138,6 +190,7 @@ void Imx51Usboh3::WriteWord(uint32_t addr, uint32_t value) {
             } else {
                 ReflectScheduleStatus(off, value);
             }
+            if (off < kCoreSpan) UpdateScheduleTimer();
             return;
         }
         if (coff == kOffUsbsts) {
@@ -151,10 +204,12 @@ void Imx51Usboh3::WriteWord(uint32_t addr, uint32_t value) {
                    delivered here would have its ENDPTSETUPSTAT wiped. */
                 if ((old & kStsUri) && (value & kStsUri))
                     reset_seen_ = true;
+            } else if (off < kCoreSpan) {
+                RefreshDeviceIrq();
             }
             return;
         }
-        if (core0_dev && coff == kOffUsbintr) {
+        if (off < kCoreSpan && coff == kOffUsbintr) {
             regs_[off >> 2] = value;
             RefreshDeviceIrq();
             return;
@@ -183,21 +238,38 @@ void Imx51Usboh3::WriteWord(uint32_t addr, uint32_t value) {
             regs_[off >> 2] = UlpiTransfer(off / kCoreSpan, value);
             return;
         }
+        if (off < kCoreSpan && !core0_dev && coff == kOffPortsc) {
+            WriteOtgHostPortsc(value);
+            return;
+        }
     }
     regs_[off >> 2] = value;
+    if (off == kOffUsbmode) UpdateScheduleTimer();
 }
 
 void Imx51Usboh3::SaveState(StateWriter& w) {
+    std::lock_guard<std::mutex> lk(async_schedule_mtx_);
     w.WriteBytes(regs_.data(), sizeof(regs_));
     w.WriteBytes(phy_.data(), sizeof(phy_));
     w.Write<uint8_t>(reset_seen_ ? 1 : 0);
     if (host_) host_->SaveState(w);   /* forward to the registered USB host driver */
+    otg_host_root_port_.SaveState(w);
 }
 void Imx51Usboh3::RestoreState(StateReader& r) {
+    std::lock_guard<std::mutex> lk(async_schedule_mtx_);
     r.ReadBytes(regs_.data(), sizeof(regs_));
     r.ReadBytes(phy_.data(), sizeof(phy_));
     uint8_t b = 0; r.Read(b); reset_seen_ = b != 0;
     if (host_) host_->RestoreState(r);
+    otg_host_root_port_.RestoreState(r);
+}
+
+void Imx51Usboh3::PostRestore() {
+    std::lock_guard<std::mutex> lk(async_schedule_mtx_);
+    otg_host_root_port_.PostRestore();
+    RefreshDeviceIrq();
+    if (schedule_timer_) schedule_timer_->Arm(VirtualTimerList::kNoDeadline);
+    UpdateScheduleTimer();
 }
 
 bool Imx51Usboh3::Core0IsDevice() const {

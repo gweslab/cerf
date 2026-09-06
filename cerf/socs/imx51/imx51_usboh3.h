@@ -1,9 +1,13 @@
 #pragma once
 
 #include "../../peripherals/peripheral_base.h"
+#include "../../peripherals/usb/usb_host_port.h"
+#include "../../core/virtual_timer_list.h"
 
 #include <array>
 #include <cstdint>
+#include <mutex>
+#include <vector>
 
 class UsbDeviceHost;
 
@@ -11,12 +15,14 @@ class UsbDeviceHost;
    the four ChipIdea/EHCI cores. Core 0 (OTG) runs in device mode for the SBOOT
    flasher; CERF is the always-present host and drives the device controller's
    dQH/dTD engine through a registered UsbDeviceHost. */
-class Imx51Usboh3 : public Peripheral {
+class Imx51Usboh3 : public Peripheral, public UsbHostPortHost {
 public:
     using Peripheral::Peripheral;
 
     bool ShouldRegister() override;
     void OnReady() override;
+    void OnShutdown() override;
+    ~Imx51Usboh3() override;
 
     uint32_t MmioBase() const override;
     uint32_t MmioSize() const override;
@@ -28,12 +34,18 @@ public:
 
     void SaveState(StateWriter& w) override;
     void RestoreState(StateReader& r) override;
+    void PostRestore() override;
 
     void RegisterDeviceHost(UsbDeviceHost* host) { host_ = host; }
 
     /* Host->device EP0 control SETUP: write the 8-byte packet into the EP0-OUT
        dQH set-up buffer and raise the setup interrupt. */
     void DeliverSetup(const uint8_t setup[8]);
+
+    UsbHostPort& OtgHostRootPort() { return otg_host_root_port_; }
+    std::unique_lock<std::mutex> LockHostPort() { return std::unique_lock(async_schedule_mtx_); }
+
+    void OnPortConnectChanged(int port_index) override;
 
 private:
     static constexpr uint32_t kSize        = 0x00004000u;   /* AIPS 16 KB slot */
@@ -54,9 +66,22 @@ private:
     void     TransferDtdBuffers(const uint32_t pages[5], uint8_t* host,
                                 uint32_t n, bool to_host);
 
+    void WriteOtgHostPortsc(uint32_t value);
+    void ExecuteAsyncSchedule();
+    void ExecutePeriodicSchedule();
+    void ExecuteQueueHead(uint32_t qh_addr);
+    bool ExecuteQtd(uint32_t qtd_addr, UsbDevice* dev, uint32_t endpt);
+    void UpdateScheduleTimer();
+    void OnScheduleTimer();
+
     UsbDeviceHost* host_ = nullptr;
     bool           reset_seen_ = false;   /* URI cleared; await the reset flush */
 
+    UsbHostPort otg_host_root_port_{*this, 0};
+
     std::array<uint32_t, kSize / 4> regs_{};
     std::array<std::array<uint8_t, kPhyRegCount>, kCores> phy_{};
+
+    std::mutex               async_schedule_mtx_;
+    VirtualTimerList::Entry* schedule_timer_ = nullptr;
 };

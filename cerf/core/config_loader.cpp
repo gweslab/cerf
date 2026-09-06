@@ -170,6 +170,34 @@ void LoadRom(const json& root, DeviceConfig& config, const std::string& path) {
     }
 }
 
+void LoadUsbMedia(const json& packages, const char* key, bool sd,
+                  std::vector<BundledUsbMedia>& cards, const std::string& path) {
+    if (!packages.contains(key) || packages[key].is_null()) return;
+    const auto& entries = packages[key];
+    const std::string ctx = std::string("additional_packages.") + key;
+    if (!entries.is_array()) CfgFatal(path, ctx + " must be an array");
+    cards.clear();
+    bool launch = false;
+    for (const auto& e : entries) {
+        if (!e.is_object()) CfgFatal(path, ctx + " entries must be objects");
+        BundledUsbMedia card;
+        card.file = CfgReadOptString(e, "file", path, ctx);
+        card.name = CfgReadOptString(e, "name", path, ctx);
+        card.insert_on_launch = CfgReadOptBool(e, "insert_on_launch", path, ctx);
+        if (card.file.empty()) CfgFatal(path, ctx + ".file is required");
+        if (card.name.empty()) card.name = card.file;
+        if (e.contains("cid")) {
+            if (!sd) CfgFatal(path, ctx + ": CID applies only to SD cards");
+            card.cid = ParseSdCardCid(CfgReadOptString(e, "cid", path, ctx));
+            if (!card.cid) CfgFatal(path, ctx + ".cid must contain exactly 32 hexadecimal digits");
+        }
+        if (card.insert_on_launch && launch)
+            CfgFatal(path, ctx + ": only one image can be inserted on launch");
+        launch = launch || card.insert_on_launch;
+        cards.push_back(std::move(card));
+    }
+}
+
 /* "additional_packages": { "compact_flash_cards": [{ "file", "name" }] } -
    every level is optional. */
 void LoadAdditionalPackages(const json& root, DeviceConfig& config,
@@ -179,6 +207,9 @@ void LoadAdditionalPackages(const json& root, DeviceConfig& config,
     if (p.is_null()) return;
     if (!p.is_object())
         CfgFatal(path, "'additional_packages' must be an object");
+
+    LoadUsbMedia(p, "sd_cards", true, config.bundled_sd_cards, path);
+    LoadUsbMedia(p, "usb_disks", false, config.bundled_usb_disks, path);
 
     const char* k = "compact_flash_cards";
     if (!p.contains(k)) return;

@@ -370,6 +370,7 @@ BOARDS_INFORMATION = [
             "display": True,
             "touch": True,
             "keyboard": True,
+            "guest_additions": True,
             "sound": False,
             "network": False,
             "pcmcia": False,

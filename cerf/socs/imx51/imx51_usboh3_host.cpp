@@ -20,6 +20,7 @@ constexpr uint32_t kFrindexMask = 0x00003FFFu;
 constexpr uint32_t kFrameListIndexMask = 0x000003FFu;
 constexpr uint32_t kCmdPseLocal = 1u << 4;
 constexpr uint32_t kStsUiLocal  = 1u << 0;
+constexpr uint32_t kStsUeiLocal = 1u << 1;
 /* EHCI 1.0 Spec Table 2-10 (p22): USBSTS bit 2, Port Change Detect. */
 constexpr uint32_t kStsPciLocal = 1u << 2;
 
@@ -49,6 +50,8 @@ constexpr uint32_t kQtdTokenOff = 0x08u;
 constexpr uint32_t kQtdBuf0Off  = 0x0Cu;
 constexpr uint32_t kQtdTerminate = 1u;
 constexpr uint32_t kQtdActive   = 0x80u;
+constexpr uint32_t kQtdHalted   = 1u << 6;
+constexpr uint32_t kQtdIoc      = 1u << 15;
 constexpr uint32_t kQtdPidShift = 8u;
 constexpr uint32_t kQtdPidMask  = 0x3u;
 constexpr uint32_t kQtdPidOut   = 0u;
@@ -163,6 +166,8 @@ void Imx51Usboh3::ExecutePeriodicSchedule() {
 
 void Imx51Usboh3::ExecuteQueueHead(uint32_t qh_addr) {
     auto& mem = emu_.Get<EmulatedMemory>();
+    /* EHCI 1.0 Figure 4-14: a halted queue advances horizontally. */
+    if (mem.ReadWord(qh_addr + kQhOverlayTokenOff) & kQtdHalted) return;
     const uint32_t ep_char = mem.ReadWord(qh_addr + kQhEpCharOff);
     const uint32_t dev_addr = QhDeviceAddress(ep_char);
     const uint32_t endpt    = QhEndpointNumber(ep_char);
@@ -172,7 +177,7 @@ void Imx51Usboh3::ExecuteQueueHead(uint32_t qh_addr) {
     if (!dev) return;
 
     uint32_t next_ptr = mem.ReadWord(qh_addr + kQhOverlayNextOff);
-    bool any = false;
+    uint32_t interrupts = 0;
     for (int i = 0; i < kQtdChainGuard && !(next_ptr & kQtdTerminate); ++i) {
         const uint32_t qtd_addr = next_ptr & ~0x1Fu;
         if (!mem.TryTranslate(qtd_addr)) break;
@@ -181,18 +186,24 @@ void Imx51Usboh3::ExecuteQueueHead(uint32_t qh_addr) {
 
         const bool retired = ExecuteQtd(qtd_addr, dev, endpt);
         if (!retired) break;
-        any = true;
-
         const uint32_t new_token = mem.ReadWord(qtd_addr + kQtdTokenOff);
-        const uint32_t this_next = mem.ReadWord(qtd_addr + kQtdNextOff);
+        const bool halted = (new_token & kQtdHalted) != 0;
+        const bool short_packet = !halted &&
+            ((token >> kQtdPidShift) & kQtdPidMask) == kQtdPidIn &&
+            ((new_token >> kQtdTotalBytesShift) & kQtdTotalBytesMask) != 0;
+        /* EHCI 1.0 Table 2-10 and Table 3-15. */
+        if (halted) interrupts |= kStsUeiLocal;
+        if ((token & kQtdIoc) || short_packet) interrupts |= kStsUiLocal;
+        const uint32_t this_next = mem.ReadWord(qtd_addr + (short_packet ? 4u : kQtdNextOff));
         mem.WriteWord(qh_addr + kQhCurQtdOff, qtd_addr);
         mem.WriteWord(qh_addr + kQhOverlayNextOff, this_next);
         mem.WriteWord(qh_addr + kQhOverlayTokenOff, new_token);
+        if (halted) break;
         next_ptr = this_next;
     }
 
-    if (any) {
-        regs_[kOffUsbstsRel >> 2] |= kStsUiLocal;
+    if (interrupts) {
+        regs_[kOffUsbstsRel >> 2] |= interrupts;
         RefreshDeviceIrq();
     }
 }
@@ -202,6 +213,15 @@ bool Imx51Usboh3::ExecuteQtd(uint32_t qtd_addr, UsbDevice* dev, uint32_t endpt) 
     const uint32_t token = mem.ReadWord(qtd_addr + kQtdTokenOff);
     const uint32_t pid   = (token >> kQtdPidShift) & kQtdPidMask;
     const uint32_t total = (token >> kQtdTotalBytesShift) & kQtdTotalBytesMask;
+    /* EHCI 1.0 Table 3-16: preserve token controls; STALL halts without consuming data. */
+    auto retire = [&](uint32_t residual, bool halted) {
+        const auto next = (token & ~(kQtdActive | (kQtdTotalBytesMask << kQtdTotalBytesShift))) |
+            (residual << kQtdTotalBytesShift) | (halted ? kQtdHalted : 0u);
+        mem.WriteWord(qtd_addr + kQtdTokenOff, next);
+        return true;
+    };
+    if (pid != kQtdPidSetup && dev->IsEndpointStalled(static_cast<uint8_t>(endpt)))
+        return retire(total, true);
 
     uint32_t pages[5];
     for (int p = 0; p < 5; ++p) pages[p] = mem.ReadWord(qtd_addr + kQtdBuf0Off + p * 4u);
@@ -232,6 +252,7 @@ bool Imx51Usboh3::ExecuteQtd(uint32_t qtd_addr, UsbDevice* dev, uint32_t endpt) 
     uint32_t residual = 0u;
 
     if (endpt == 0u && pid == kQtdPidSetup) {
+        if (total != 8u) return retire(total, true);
         uint8_t raw[8] = {};
         gather(raw, 8u);
         UsbDevice::SetupPacket setup{};
@@ -241,8 +262,8 @@ bool Imx51Usboh3::ExecuteQtd(uint32_t qtd_addr, UsbDevice* dev, uint32_t endpt) 
         setup.wIndex        = static_cast<uint16_t>(raw[4] | (raw[5] << 8));
         setup.wLength        = static_cast<uint16_t>(raw[6] | (raw[7] << 8));
         ctrl_reply_.clear();
-        dev->HandleSetup(setup, ctrl_reply_);
         ctrl_reply_off_ = 0u;
+        if (!dev->HandleSetup(setup, ctrl_reply_)) return retire(total, true);
         residual = 0u;
     } else if (endpt == 0u && pid == kQtdPidIn) {
         const uint32_t remain = static_cast<uint32_t>(ctrl_reply_.size() - ctrl_reply_off_);
@@ -251,11 +272,16 @@ bool Imx51Usboh3::ExecuteQtd(uint32_t qtd_addr, UsbDevice* dev, uint32_t endpt) 
         ctrl_reply_off_ += n;
         residual = total - n;
     } else if (endpt == 0u && pid == kQtdPidOut) {
+        if (total != 0u) {
+            LOG(Caution, "USB: unsupported control OUT data length=%u\n", total);
+            return retire(total, true);
+        }
         residual = 0u;
     } else if (pid == kQtdPidOut) {
         std::vector<uint8_t> data(total);
         gather(data.data(), total);
         dev->OnBulkOut(static_cast<uint8_t>(endpt), data.data(), total);
+        if (dev->IsEndpointStalled(static_cast<uint8_t>(endpt))) return retire(total, true);
         residual = 0u;
     } else if (pid == kQtdPidIn) {
         std::vector<uint8_t> data(total);
@@ -263,8 +289,9 @@ bool Imx51Usboh3::ExecuteQtd(uint32_t qtd_addr, UsbDevice* dev, uint32_t endpt) 
         if (got == UsbDevice::kNak) return false;
         if (got > 0u) scatter(data.data(), got);
         residual = total - got;
+    } else {
+        return retire(total, true);
     }
 
-    mem.WriteWord(qtd_addr + kQtdTokenOff, residual << kQtdTotalBytesShift);
-    return true;
+    return retire(residual, false);
 }

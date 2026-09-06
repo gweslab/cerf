@@ -56,6 +56,12 @@ private:
     static constexpr uint32_t kPitchBytes = 1024u;
     static constexpr uint32_t kVisibleW   = 320u;
     static constexpr uint32_t kVisibleH   = 240u;
+    /* casio_toricomail_ce212 ddi.dll sub_13810E4 @0x13810E4 stages the 1bpp mask in 16-row
+       bands, re-seeding the row pointer per band by 2*((320*(y>>4))>>4) bytes. */
+    static constexpr uint32_t kStageBandBytes = 40u;
+    static uint32_t StageOffset(uint32_t y) {
+        return (y >> 4) * kStageBandBytes + (y & 15u) * kPitchBytes;
+    }
 
     bool     InFb(uint32_t off) const { return off >= kFbOffset && off < kFbOffset + kFbSize; }
     uint16_t ReadReg(uint32_t off);
@@ -85,11 +91,12 @@ private:
     uint16_t fill_dst_lo_ = 0;
     uint16_t fill_dst_hi_ = 0;
 
-    /* ddi.dll blit sub_13810E4 (copy/bitblt): 0x200 low = 2 selects copy (fill = 0);
-       0x210/0x212 = 32-bit source byte-offset; 0x214 = ROP (a2[44][0] & 7, sign-adjusted). */
+    /* casio_toricomail_ce212 ddi.dll sub_13810E4 @0x13810E4: 0x200 low = 2 selects the mono
+       expand (fill = 0); 0x210/0x212 = 32-bit staged source byte-offset; 0x214 = the signed
+       srcX&7 source bit offset. */
     uint16_t fill_src_lo_ = 0;
     uint16_t fill_src_hi_ = 0;
-    uint16_t blit_rop_    = 0;
+    uint16_t blit_src_bit_ = 0;
     uint16_t blit_mode_   = 0;
 
     /* ddi.dll 16bpp copy sub_13812F8 drives a second blit engine at 0x700: 0x700 trigger

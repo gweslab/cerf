@@ -56,12 +56,14 @@ void CasioToricomailAsic::RunFillLocked() {
 void CasioToricomailAsic::RunBlitLocked() {
     if (blit_mode_ != 2u) { RunFillLocked(); return; }
 
-    /* ddi.dll sub_138165C routes ROP 0xAAF0 (masked text) to sub_13810E4, which addresses
-       its source as 1bpp (srcX>>3) and stages the glyph mask at 0x210/0x212; the engine
-       expands the mask to 16bpp - 0x202 foreground colour on set bits, destination left on
-       clear bits (ROP 0xAAF0 background = destination). 0x214 mask-mode 0 is the only form. */
-    if (blit_rop_ != 0u) {
-        LOG(Caution, "CasioToricomailAsic: text blit rop=0x%X not modeled\n", blit_rop_);
+    /* casio_toricomail_ce212 ddi.dll sub_13810E4 @0x13810E4 splits the source X: srcX>>3
+       advances its staging read pointer and the signed remainder srcX&7 goes to 0x214, so
+       the staged mask holds pixel 0 at that bit. Twin sub_1382E78 @0x1382E78 seeds an
+       MSB-first walker at 128>>(srcX&7); set bit = 0x202 colour, clear bit leaves dest. */
+    const int32_t src_bit = static_cast<int16_t>(blit_src_bit_);
+    if (src_bit < 0 || src_bit > 7) {
+        LOG(Caution, "CasioToricomailAsic: text blit source bit offset %d not modeled\n",
+            src_bit);
         CerfFatalExit(CERF_FATAL_RUNTIME_ERROR);
     }
     if (fill_width_ == 0 || fill_height_ == 0) return;
@@ -69,10 +71,15 @@ void CasioToricomailAsic::RunBlitLocked() {
                          (static_cast<uint32_t>(fill_dst_hi_) << 16);
     const uint32_t src = static_cast<uint32_t>(fill_src_lo_) |
                          (static_cast<uint32_t>(fill_src_hi_) << 16);
-    const uint32_t mask_bytes = (fill_width_ + 7u) / 8u;
+    const uint32_t mask_bytes = (static_cast<uint32_t>(src_bit) + fill_width_ + 7u) / 8u;
     const uint64_t dst_span = static_cast<uint64_t>(fill_height_ - 1u) * kPitchBytes +
                               static_cast<uint64_t>(fill_width_) * 2u;
-    const uint64_t src_span = static_cast<uint64_t>(fill_height_ - 1u) * kPitchBytes + mask_bytes;
+    uint32_t max_stage = 0;
+    for (uint32_t y = 0; y < fill_height_; ++y) {
+        const uint32_t s = StageOffset(y);
+        if (s > max_stage) max_stage = s;
+    }
+    const uint64_t src_span = static_cast<uint64_t>(max_stage) + mask_bytes;
     if (static_cast<uint64_t>(dst) + dst_span > kFbSize ||
         static_cast<uint64_t>(src) + src_span > kFbSize) {
         LOG(Caution, "CasioToricomailAsic: text blit dst=0x%X src=0x%X w=%u h=%u exceeds framebuffer\n",
@@ -86,11 +93,13 @@ void CasioToricomailAsic::RunBlitLocked() {
     }
     const uint16_t fg = fill_value_;
     for (uint32_t y = 0; y < fill_height_; ++y) {
-        const uint8_t* mask = fb_.data() + src + static_cast<size_t>(y) * kPitchBytes;
+        const uint8_t* mask = fb_.data() + src + StageOffset(y);
         uint8_t*       row  = fb_.data() + dst + static_cast<size_t>(y) * kPitchBytes;
-        for (uint32_t x = 0; x < fill_width_; ++x)
-            if ((mask[x >> 3] >> (7u - (x & 7u))) & 1u)
+        for (uint32_t x = 0; x < fill_width_; ++x) {
+            const uint32_t bit = static_cast<uint32_t>(src_bit) + x;
+            if ((mask[bit >> 3] >> (7u - (bit & 7u))) & 1u)
                 std::memcpy(row + x * 2u, &fg, sizeof(fg));
+        }
     }
     fill_dst_lo_ = 0; fill_dst_hi_ = 0;
     fill_src_lo_ = 0; fill_src_hi_ = 0;
@@ -225,19 +234,21 @@ void CasioToricomailAsic::WriteReg(uint32_t off, uint16_t value) {
     /* sub_9F0B7D20 fill engine: dst 0x200, value 0x202, width 0x204, height 0x206;
        0x21C=1 / 0x21E=0 are the only config the callers write. */
     switch (off) {
-        /* nk.exe fill sub_9F0B7D20 / ddi.dll fill sub_13815A8 write 0x200 low = 0 (fill);
-           ddi.dll blit sub_13810E4 writes 0x200 low = 2 (copy). */
+        /* casio_toricomail_ce212 nk.exe fill sub_9F0B7D20 / ddi.dll fill sub_13815A8 write
+           0x200 low = 0 (fill); ddi.dll sub_13810E4 @0x13810E4 writes 0x200 low = 2 (mono
+           expand). */
         case 0x200: if (value != 0u && value != 2u) break; blit_mode_ = value; return;
         case 0x202: fill_value_  = value; return;
         case 0x204: fill_width_  = value; return;
         case 0x206: fill_height_ = value; return;
-        /* ddi.dll fill sub_13815A8 writes a 32-bit destination byte-offset at 0x208/0x20A;
-           ddi.dll blit sub_13810E4 writes a 32-bit source at 0x210/0x212 and the ROP at 0x214. */
+        /* casio_toricomail_ce212 ddi.dll fill sub_13815A8 writes a 32-bit destination
+           byte-offset at 0x208/0x20A; blit sub_13810E4 @0x13810E4 writes a 32-bit source at
+           0x210/0x212 and the signed srcX&7 source bit offset at 0x214. */
         case 0x208: fill_dst_lo_ = value; return;
         case 0x20A: fill_dst_hi_ = value; return;
         case 0x210: fill_src_lo_ = value; return;
         case 0x212: fill_src_hi_ = value; return;
-        case 0x214: blit_rop_    = value; return;
+        case 0x214: blit_src_bit_ = value; return;
         /* ddi.dll PDEV-enable sub_1380C50 @0x1380DA8 (and sub_1381C54 @0x1381D88) write 0x216=1. */
         case 0x216: if (value != 1u) break; return;
         case 0x218: if (value & 1u) RunBlitLocked(); return;
@@ -374,7 +385,7 @@ void CasioToricomailAsic::SaveState(StateWriter& w) {
     if (!fb_.empty()) w.WriteBytes(fb_.data(), fb_.size());
     w.Write(fill_value_); w.Write(fill_width_); w.Write(fill_height_);
     w.Write(fill_dst_lo_); w.Write(fill_dst_hi_);
-    w.Write(fill_src_lo_); w.Write(fill_src_hi_); w.Write(blit_rop_); w.Write(blit_mode_);
+    w.Write(fill_src_lo_); w.Write(fill_src_hi_); w.Write(blit_src_bit_); w.Write(blit_mode_);
     w.Write(blit7_ctl_); w.Write(blit7_width_); w.Write(blit7_height_);
     w.Write(blit7_src_lo_); w.Write(blit7_src_hi_); w.Write(blit7_dst_lo_); w.Write(blit7_dst_hi_);
     w.Write(int_status_); w.Write(int_enable_);
@@ -404,7 +415,7 @@ void CasioToricomailAsic::RestoreState(StateReader& r) {
     r.ReadBytes(fb_.data(), fb_.size());
     r.Read(fill_value_); r.Read(fill_width_); r.Read(fill_height_);
     r.Read(fill_dst_lo_); r.Read(fill_dst_hi_);
-    r.Read(fill_src_lo_); r.Read(fill_src_hi_); r.Read(blit_rop_); r.Read(blit_mode_);
+    r.Read(fill_src_lo_); r.Read(fill_src_hi_); r.Read(blit_src_bit_); r.Read(blit_mode_);
     r.Read(blit7_ctl_); r.Read(blit7_width_); r.Read(blit7_height_);
     r.Read(blit7_src_lo_); r.Read(blit7_src_hi_); r.Read(blit7_dst_lo_); r.Read(blit7_dst_hi_);
     r.Read(int_status_); r.Read(int_enable_);

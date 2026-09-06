@@ -310,7 +310,8 @@ This repositroy includes [cerf.cx](https://cerf.cx) source code at ``docs/websit
           ✅ Philips Velo 1: 16 MB DRAM Miniature Card permanently fitted - 20 MB total for the guest<br/>
           ✅ Device Emulator: keyboard no longer drops or repeats keys while typing<br/>
           ✅ Device Emulator: sound no longer stutters<br/>
-          ✅ Device Emulator: Windows Mobile 2003 SE no longer freezes</p>
+          ✅ Device Emulator: Windows Mobile 2003 SE no longer freezes<br/>
+          ✅ Casio Toricomail: fixed rendering crashes</p>
         <p><b>💿 Emulator</b><br/>
           🆕 Configurable display colour depth for Guest Additions and Device Emulator<br/>
           🆕 Bundled CompactFlash cards can be auto-inserted at launch<br/>

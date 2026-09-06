@@ -10,6 +10,7 @@
       Device Emulator: keyboard no longer drops or repeats keys while typing
       Device Emulator: sound no longer stutters
       Device Emulator: Windows Mobile 2003 SE no longer freezes
+      Casio Toricomail: fixed rendering crashes
   emulator:
     new: |
       Configurable display colour depth for Guest Additions and Device Emulator

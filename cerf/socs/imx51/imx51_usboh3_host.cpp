@@ -51,6 +51,7 @@ constexpr uint32_t kQtdBuf0Off  = 0x0Cu;
 constexpr uint32_t kQtdTerminate = 1u;
 constexpr uint32_t kQtdActive   = 0x80u;
 constexpr uint32_t kQtdHalted   = 1u << 6;
+constexpr uint32_t kQtdDataBufferError = 1u << 5;
 constexpr uint32_t kQtdIoc      = 1u << 15;
 constexpr uint32_t kQtdPidShift = 8u;
 constexpr uint32_t kQtdPidMask  = 0x3u;
@@ -214,9 +215,9 @@ bool Imx51Usboh3::ExecuteQtd(uint32_t qtd_addr, UsbDevice* dev, uint32_t endpt) 
     const uint32_t pid   = (token >> kQtdPidShift) & kQtdPidMask;
     const uint32_t total = (token >> kQtdTotalBytesShift) & kQtdTotalBytesMask;
     /* EHCI 1.0 Table 3-16: preserve token controls; STALL halts without consuming data. */
-    auto retire = [&](uint32_t residual, bool halted) {
+    auto retire = [&](uint32_t residual, bool halted, uint32_t error = 0u) {
         const auto next = (token & ~(kQtdActive | (kQtdTotalBytesMask << kQtdTotalBytesShift))) |
-            (residual << kQtdTotalBytesShift) | (halted ? kQtdHalted : 0u);
+            (residual << kQtdTotalBytesShift) | (halted ? kQtdHalted : 0u) | error;
         mem.WriteWord(qtd_addr + kQtdTokenOff, next);
         return true;
     };
@@ -226,24 +227,23 @@ bool Imx51Usboh3::ExecuteQtd(uint32_t qtd_addr, UsbDevice* dev, uint32_t endpt) 
     uint32_t pages[5];
     for (int p = 0; p < 5; ++p) pages[p] = mem.ReadWord(qtd_addr + kQtdBuf0Off + p * 4u);
 
-    auto scatter = [&](const uint8_t* src, uint32_t n) {
+    /* EHCI 1.0 Table 3-17 and 4.10.6: page-zero low bits offset C_Page. */
+    const uint32_t current_page = (token >> 12) & 7u;
+    const uint32_t offset = pages[0] & (kPageSizeLocal - 1u);
+    if (current_page >= 5 || total > (5u - current_page) * kPageSizeLocal - offset) {
+        LOG(Caution, "USB: invalid qTD buffer span qtd=%08X page=%u offset=%u bytes=%u\n",
+            qtd_addr, current_page, offset, total);
+        return retire(total, true, kQtdDataBufferError);
+    }
+    auto transfer = [&](uint8_t* data, uint32_t n, bool to_guest) {
         uint32_t left = n, cursor = 0u;
-        for (int p = 0; p < 5 && left; ++p) {
-            const uint32_t pa   = (p == 0) ? pages[0] : (pages[p] & ~0xFFFu);
-            const uint32_t inpg = (p == 0) ? (kPageSizeLocal - (pages[0] & 0xFFFu)) : kPageSizeLocal;
+        for (uint32_t p = current_page; p < 5 && left; ++p) {
+            const uint32_t start = p == current_page ? offset : 0u;
+            const uint32_t pa = (pages[p] & ~(kPageSizeLocal - 1u)) + start;
+            const uint32_t inpg = kPageSizeLocal - start;
             const uint32_t chunk = inpg < left ? inpg : left;
-            mem.CopyIn(pa, src + cursor, chunk);
-            cursor += chunk;
-            left   -= chunk;
-        }
-    };
-    auto gather = [&](uint8_t* dst, uint32_t n) {
-        uint32_t left = n, cursor = 0u;
-        for (int p = 0; p < 5 && left; ++p) {
-            const uint32_t pa   = (p == 0) ? pages[0] : (pages[p] & ~0xFFFu);
-            const uint32_t inpg = (p == 0) ? (kPageSizeLocal - (pages[0] & 0xFFFu)) : kPageSizeLocal;
-            const uint32_t chunk = inpg < left ? inpg : left;
-            mem.CopyOut(pa, dst + cursor, chunk);
+            if (to_guest) mem.CopyIn(pa, data + cursor, chunk);
+            else mem.CopyOut(pa, data + cursor, chunk);
             cursor += chunk;
             left   -= chunk;
         }
@@ -254,7 +254,7 @@ bool Imx51Usboh3::ExecuteQtd(uint32_t qtd_addr, UsbDevice* dev, uint32_t endpt) 
     if (endpt == 0u && pid == kQtdPidSetup) {
         if (total != 8u) return retire(total, true);
         uint8_t raw[8] = {};
-        gather(raw, 8u);
+        transfer(raw, 8u, false);
         UsbDevice::SetupPacket setup{};
         setup.bmRequestType = raw[0];
         setup.bRequest      = raw[1];
@@ -266,7 +266,7 @@ bool Imx51Usboh3::ExecuteQtd(uint32_t qtd_addr, UsbDevice* dev, uint32_t endpt) 
     } else if (endpt == 0u && pid == kQtdPidIn) {
         std::vector<uint8_t> data(total);
         const uint32_t n = dev->ReadControlReply(data.data(), total);
-        if (n > 0u) scatter(data.data(), n);
+        if (n > 0u) transfer(data.data(), n, true);
         residual = total - n;
     } else if (endpt == 0u && pid == kQtdPidOut) {
         if (total != 0u) {
@@ -277,7 +277,7 @@ bool Imx51Usboh3::ExecuteQtd(uint32_t qtd_addr, UsbDevice* dev, uint32_t endpt) 
         residual = 0u;
     } else if (pid == kQtdPidOut) {
         std::vector<uint8_t> data(total);
-        gather(data.data(), total);
+        transfer(data.data(), total, false);
         dev->OnBulkOut(static_cast<uint8_t>(endpt), data.data(), total);
         if (dev->IsEndpointStalled(static_cast<uint8_t>(endpt))) return retire(total, true);
         residual = 0u;
@@ -285,7 +285,7 @@ bool Imx51Usboh3::ExecuteQtd(uint32_t qtd_addr, UsbDevice* dev, uint32_t endpt) 
         std::vector<uint8_t> data(total);
         const uint32_t got = dev->OnBulkIn(static_cast<uint8_t>(endpt), data.data(), total);
         if (got == UsbDevice::kNak) return false;
-        if (got > 0u) scatter(data.data(), got);
+        if (got > 0u) transfer(data.data(), got, true);
         residual = total - got;
     } else {
         return retire(total, true);

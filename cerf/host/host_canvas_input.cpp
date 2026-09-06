@@ -14,7 +14,9 @@
 #include "pointer_input.h"
 #include "pointer_router.h"
 #include "pointer_source.h"
+#include "pointer_stylus_simulation.h"
 #include "relative_mouse_input.h"
+#include "stylus_alt_tap.h"
 #include "touch_input.h"
 
 REGISTER_SERVICE(HostCanvasInput);
@@ -22,6 +24,7 @@ REGISTER_SERVICE(HostCanvasInput);
 namespace { constexpr UINT kLockHintHoldMs = 4500; }
 
 void HostCanvasInput::ReleasePenIfDown() {
+    emu_.Get<StylusAltTap>().Cancel();
     if (!pen_down_) return;
     pen_down_ = false;
     if (GetCapture() == emu_.Get<HostCanvas>().Hwnd()) ReleaseCapture();
@@ -59,7 +62,11 @@ bool HostCanvasInput::RoutePointerInput(HWND hwnd, UINT msg, WPARAM wp, LPARAM l
     if (ks & MK_LBUTTON) mask |= kPointerLeft;
     if (ks & MK_RBUTTON) mask |= kPointerRight;
     if (ks & MK_MBUTTON) mask |= kPointerMiddle;
-    pi->OnMove(sx, sy, mask);
+
+    const bool held   = (mask & (kPointerLeft | kPointerRight)) != 0;
+    const bool report = down || up || held ||
+                        !emu_.Get<PointerStylusSimulation>().Enabled();
+    if (report) pi->OnMove(sx, sy, mask);
 
     if (up && mask == 0) ReleaseCapture();
     return true;
@@ -127,6 +134,8 @@ bool HostCanvasInput::RouteCapturedMouse(HWND hwnd, UINT msg, WPARAM wp,
 bool HostCanvasInput::Handle(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp, LRESULT& out) {
     auto& hc = emu_.Get<HostCanvas>();
     out = 0;
+
+    if (msg == WM_TIMER && emu_.Get<StylusAltTap>().OnTimer(wp)) return true;
 
     const bool framebuffer = hc.CurrentTab() == HostCanvas::Tab::Framebuffer;
 
@@ -203,9 +212,20 @@ bool HostCanvasInput::Handle(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp, LRESULT&
        the mouse abstraction). Only when the stylus source is active. */
     if (stylus_active) {
         switch (msg) {
+            case WM_RBUTTONDOWN: {
+                SetFocus(hwnd);
+                if (!framebuffer || pen_down_) return true;
+                int sx, sy;
+                if (!hc.HostToGuest((int)(short)LOWORD(lp), (int)(short)HIWORD(lp), sx, sy))
+                    return true;
+                emu_.Get<StylusAltTap>().Begin(sx, sy);
+                return true;
+            }
+            case WM_RBUTTONUP:
+                return true;
             case WM_LBUTTONDOWN: {
                 SetFocus(hwnd);
-                if (!framebuffer) return true;
+                if (!framebuffer || emu_.Get<StylusAltTap>().Running()) return true;
                 int sx, sy;
                 if (!hc.HostToGuest((int)(short)LOWORD(lp), (int)(short)HIWORD(lp), sx, sy))
                     return true;

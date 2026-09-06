@@ -11,9 +11,6 @@
 
 class PointerSource;
 
-/* Status-bar widget to pick the active pointing device (mirror of
-   KeyboardWidget). Left-click cycles sources; right-click lists them as radios;
-   the icon and tooltip reflect the active source. */
 class PointerWidget : public Service, public HostWidget {
 public:
     using Service::Service;
@@ -25,6 +22,7 @@ public:
     WidgetGroup  Group() const override { return WidgetGroup::InputControl; }
     std::wstring Tooltip() const override;
     void OnPrimaryAction() override;
+    bool PrimaryActionOpensMenu() const override;
     std::vector<WidgetMenuItem> BuildMenu() override;
     void DrawIcon(HDC dc, const RECT& box) const override;
     bool PollDirty() override;
@@ -32,5 +30,8 @@ public:
     void RestoreWidgetState(StateReader& r) override;
 
 private:
+    bool AltTapItemVisible() const;
+    bool StylusSimItemVisible() const;
+
     const PointerSource* drawn_source_ = nullptr;  /* UI-thread only */
 };

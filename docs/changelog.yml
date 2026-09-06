@@ -18,6 +18,7 @@
       Build number shown in the window title and the About box
       Thumb32 support. Windows Embedded Compact 2013 is now supported
       Host key is now reassignable
+      Right Click simulation mode for the stock stylus (synths LAlt+Tap)
     fixed: |
       ARM JIT and JIT core full rewrite. ARM JIT/peripherals massive optimizations. However - this might regress something, the blast radius is whole ARM emulation.
       Wall-clock timer instead of icount. Fixes guest OS clock extreme fast forwarding and consequent lags, bugs. For example, Jornada 720 had whole class of problems. Double clicks wouldn't work because whole days passed in between two clicks. IE would time out on the same reason. Our model is based on QEMU and Dolphin models with own inventions.
@@ -37,6 +38,7 @@
       Share folder settings and Guest Additions customizations are now unified with launcher UI and persisted even when changed at runtime
       Windows CE 2013 support
       Font size override support
+      Stylus simulation mode for the mouse pointer
     fixed: |
       Splash animations (stock framebuffer) are now displayed under guest additions mode too (stock framebuffer is displayed until GA framebuffer is used). Input source is now stock until user-space library has accessed virtual IO. This fully fixes, for example, the Jornada RAM erase screen. It is now visible, it is now interactable without any additional manipulations.
       Crash when drawing off-screen (GiNi)

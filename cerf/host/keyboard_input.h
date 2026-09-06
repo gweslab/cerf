@@ -15,6 +15,8 @@ public:
 
     virtual void OnHostKey(uint8_t vk, bool key_up) = 0;
 
+    virtual bool CanDeliverVk(uint8_t vk) const;
+
     virtual std::wstring SourceName() const { return L"Stock keyboard"; }
     virtual int SourcePriority() const { return 0; }
     virtual bool SourceReady() const { return true; }

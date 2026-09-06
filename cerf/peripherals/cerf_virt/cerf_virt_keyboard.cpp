@@ -84,6 +84,8 @@ public:
     void OnHostKey(uint8_t vk, bool key_up) override {
         emu_.Get<CerfVirtKeyboard>().PushKey(vk, key_up);
     }
+
+    bool CanDeliverVk(uint8_t /*vk*/) const override { return true; }
 };
 
 REGISTER_SERVICE(CerfVirtKeyboardInput);

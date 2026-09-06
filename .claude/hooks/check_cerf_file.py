@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """
-PostToolUse hook for Write|Edit on C/C++ source files (.cpp/.h/.hpp/.cc/.c).
-Python files (.py) get check 1 (LINE-COUNT) only - every other check parses
-C/C++ comment syntax. .claude/hooks/ is exempt from the line cap, mirroring
-the pre-commit hook.
+PostToolUse hook for Write|Edit on C/C++ source files (.cpp/.h/.hpp/.cc/.c)
+and Python source files (.py). Comment checks parse `//` and `/* */` in
+C/C++ and `#` in Python. .claude/hooks/ is exempt from the line cap,
+mirroring the pre-commit hook.
 Warns about:
   1. LINE-COUNT      - file > 500 lines (the pre-commit hook will reject it).
   2. BAILOUT-COMMENT - TODO / FIXME / HACK / XXX / "for now" / "temporary" /
@@ -189,6 +189,83 @@ def find_bloated_blocks(content: str) -> list:
     return hits
 
 
+def extract_py_comment_text(line: str, tq):
+    """Return (comment_text_from_this_line, new_triple_quote_state).
+
+    Handles `#` line comments. A `#` inside a string literal is not a
+    comment, including inside a triple-quoted string that spans lines.
+    `tq` is None, or the delimiter of the open triple-quoted string.
+    """
+    if tq:
+        close = line.find(tq)
+        if close < 0:
+            return "", tq
+        line = line[close + 3:]
+        tq = None
+    i, n = 0, len(line)
+    in_str = None
+    while i < n:
+        c = line[i]
+        if in_str:
+            if c == "\\":
+                i += 2
+                continue
+            if c == in_str:
+                in_str = None
+            i += 1
+            continue
+        if line.startswith('"""', i) or line.startswith("'''", i):
+            delim = line[i:i + 3]
+            close = line.find(delim, i + 3)
+            if close < 0:
+                return "", delim
+            i = close + 3
+            continue
+        if c in ('"', "'"):
+            in_str = c
+            i += 1
+            continue
+        if c == "#":
+            return line[i + 1:], None
+        i += 1
+    return "", tq
+
+
+def find_bloated_py_blocks(content: str) -> list:
+    """Return [(start_line, num_lines, multi_paragraph), ...] for runs of
+    consecutive whole-line `#` comments that look like bloat: >=5 lines, or
+    broken by a bare `#` separator (multi-paragraph essay structure)."""
+    hits = []
+    tq = None
+    run_start = None
+    run_texts = []
+
+    def close_run():
+        if run_start is None:
+            return
+        num = len(run_texts)
+        multi = (
+            any(not t.strip() for t in run_texts[1:-1]) if num > 2 else False
+        )
+        if num >= 5 or multi:
+            hits.append((run_start, num, multi))
+
+    for idx, line in enumerate(content.splitlines(), start=1):
+        inside_string = tq is not None
+        text, tq = extract_py_comment_text(line, tq)
+        if not inside_string and line.strip().startswith("#"):
+            if run_start is None:
+                run_start = idx
+                run_texts = []
+            run_texts.append(text)
+        else:
+            close_run()
+            run_start = None
+            run_texts = []
+    close_run()
+    return hits
+
+
 def collect_checklist_filenames() -> list:
     """Enumerate *.md basenames under docs/ai_checklists/, like the pre-commit hook."""
     root = "docs/ai_checklists"
@@ -270,11 +347,6 @@ def main() -> int:
                 f'"File & Symbol Style".'
             )
 
-    # Python files get only the line-cap check - every other check below
-    # parses C/C++ comment syntax.
-    if is_py:
-        return emit_warnings(warnings, rel_path)
-
     bailout_hits = []
     checklist_path_hits = []
     checklist_name_hits = []
@@ -290,9 +362,12 @@ def main() -> int:
         else None
     )
 
-    in_block = False
+    state = None if is_py else False
     for ln_idx, line in enumerate(content.splitlines(), start=1):
-        comment_text, in_block = extract_comment_text(line, in_block)
+        if is_py:
+            comment_text, state = extract_py_comment_text(line, state)
+        else:
+            comment_text, state = extract_comment_text(line, state)
 
         if comment_text and BAILOUT_WORDS_RE.search(comment_text):
             bailout_hits.append(f"  {rel_path}:{ln_idx}: {line.strip()}")
@@ -525,7 +600,9 @@ def main() -> int:
             "'rather than <Y>' framing.",
         ))
 
-    bloat_hits = find_bloated_blocks(content)
+    bloat_hits = (
+        find_bloated_py_blocks(content) if is_py else find_bloated_blocks(content)
+    )
     if bloat_hits:
         sample_lines = [
             f"  {rel_path}:{ln}: {n} lines, multi_paragraph={mp}"

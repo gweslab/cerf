@@ -13,6 +13,10 @@ public:
     CpuArch     GetCpuArch() const override { return CpuArch::Arm; }
     RomPlacingMode GetRomPlacingMode() const override { return RomPlacingMode::FlatContainer; }
 
+    std::optional<PreferredWindowSize> GetPreferredWindowSize() const override {
+        return PreferredWindowSize{ 320, 240 };
+    }
+
     uint32_t GetGuestAdditionsColorDepth() const override { return 32u; }
 };
 

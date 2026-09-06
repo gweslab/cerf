@@ -8,6 +8,7 @@
 
 class UsbMassStorageDevice : public UsbDevice {
 public:
+    UsbMassStorageDevice();
     bool OpenImage(const std::string& path, const std::string& name);
     const std::string& ImagePath() const { return image_path_; }
     const std::string& ImageName() const { return image_name_; }
@@ -30,6 +31,7 @@ public:
     void ResetToDefault() override;
 
 protected:
+    UsbMassStorageDevice(uint16_t vendor, uint16_t product, uint16_t revision);
     void SetEndpointStalled(uint8_t ep, bool stalled) override;
     /* A transport-specific reader may claim a vendor CDB and provide its IN
        payload. Returning false leaves normal SPC/SBC error handling intact. */
@@ -50,6 +52,9 @@ private:
     void QueueCsw(uint8_t status);
     void SetSense(uint8_t key, uint8_t asc, uint8_t ascq);
 
+    const uint16_t id_vendor_;
+    const uint16_t id_product_;
+    const uint16_t bcd_device_;
     DiskImage disk_;
     std::string image_path_;
     std::string image_name_;

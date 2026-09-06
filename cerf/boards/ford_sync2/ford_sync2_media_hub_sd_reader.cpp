@@ -2,8 +2,9 @@
 #include "../../core/log.h"
 #include "../../peripherals/usb/usb_state.h"
 
+/* SYNC 2 hardware MsgLog2.txt, t=145536: USB!AttachDevice 0424:4040:0203. */
 FordSync2MediaHubSdReader::FordSync2MediaHubSdReader(std::optional<SdCardCid> cid)
-    : cid_(cid) {}
+    : UsbMassStorageDevice(0x0424u, 0x4040u, 0x0203u), cid_(cid) {}
 
 void FordSync2MediaHubSdReader::SaveState(StateWriter& w) {
     UsbMassStorageDevice::SaveState(w);

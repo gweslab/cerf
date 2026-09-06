@@ -8,6 +8,7 @@ namespace {
 /* USB 2.0 Spec 11.23.1 (p408): Full-/Low-speed Operating Hub Device
    Descriptor template. */
 constexpr uint8_t  kHubClassCode  = 0x09u;
+/* SYNC 2 hardware MsgLog2.txt, t=144941: USB!AttachDevice 0424:2640:08a2. */
 constexpr uint16_t kHubIdVendor   = 0x0424u;
 constexpr uint16_t kHubIdProduct  = 0x2640u;
 constexpr uint16_t kHubBcdDevice  = 0x08A2u;

@@ -11,8 +11,6 @@ namespace {
 constexpr uint8_t  kMscClass    = 0x08u;
 constexpr uint8_t  kMscSubClass = 0x06u;
 constexpr uint8_t  kMscProtocol = 0x50u;
-constexpr uint16_t kMscIdVendor  = 0x0424u;
-constexpr uint16_t kMscIdProduct = 0x4040u;
 
 /* USB Mass Storage Class Bulk-Only Transport Rev. 1.0, Table 5.1 (p13). */
 constexpr uint32_t kCbwSignature = 0x43425355u;
@@ -54,6 +52,13 @@ void PutBe32(std::vector<uint8_t>& v, uint32_t x) {
 
 }
 
+/* SYNC 2 hardware MsgLog2.txt, t=163848: USB!AttachDevice 13fe:6400:0100. */
+UsbMassStorageDevice::UsbMassStorageDevice()
+    : UsbMassStorageDevice(0x13FEu, 0x6400u, 0x0100u) {}
+
+UsbMassStorageDevice::UsbMassStorageDevice(uint16_t vendor, uint16_t product, uint16_t revision)
+    : id_vendor_(vendor), id_product_(product), bcd_device_(revision) {}
+
 bool UsbMassStorageDevice::OpenImage(const std::string& path, const std::string& name) {
     if (disk_.IsOpen() || !disk_.Open(path, 0, false)) return false;
     image_path_ = path;
@@ -75,9 +80,9 @@ std::vector<uint8_t> UsbMassStorageDevice::BuildDeviceDescriptor() const {
         0x00u, 0x02u,
         0u, 0u, 0u,
         64u,
-        static_cast<uint8_t>(kMscIdVendor & 0xFFu), static_cast<uint8_t>(kMscIdVendor >> 8),
-        static_cast<uint8_t>(kMscIdProduct & 0xFFu), static_cast<uint8_t>(kMscIdProduct >> 8),
-        0u, 0u,
+        static_cast<uint8_t>(id_vendor_ & 0xFFu), static_cast<uint8_t>(id_vendor_ >> 8),
+        static_cast<uint8_t>(id_product_ & 0xFFu), static_cast<uint8_t>(id_product_ >> 8),
+        static_cast<uint8_t>(bcd_device_ & 0xFFu), static_cast<uint8_t>(bcd_device_ >> 8),
         0u, 0u, 0u,
         1u,
     };
@@ -190,6 +195,8 @@ void UsbMassStorageDevice::ExecuteScsiCommand() {
         d[2] = 0x04u;
         d[3] = 0x02u;
         d[4] = 31u;
+        /* SYNC 2 AUTOUSBDISK6.DLL, MD5 06d916866a1b3097e6ba3855073cfdf8,
+           0xC05E5ADC: INQUIRY response bytes 0-1. */
         std::memcpy(&d[8], "CERF    ", 8);
         std::memcpy(&d[16], "SD Card Reader  ", 16);
         std::memcpy(&d[32], "1.0 ", 4);

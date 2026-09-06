@@ -396,10 +396,8 @@ LRESULT HostWindow::WndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
             break;
 
         case WM_ACTIVATE:
-            /* Lost focus while the mouse is locked -> release it; the user can't
-               reach Right Ctrl from another app to unlock. */
             if (LOWORD(wp) == WA_INACTIVE)
-                if (auto* cap = emu_.TryGet<HostInputCapture>()) cap->SetCaptured(false);
+                if (auto* cap = emu_.TryGet<HostInputCapture>()) cap->OnFocusLost();
             break;
 
         case WM_TIMER:

@@ -31,7 +31,8 @@ def _ask_large(parent: tk.Misc, *, headline: str, link_url: str,
     dlg = tk.Toplevel(parent)
     dlg.title("Large download")
     dlg.configure(bg=theme.BG)
-    dlg.transient(parent)
+    if parent.winfo_viewable():
+        dlg.transient(parent)
     dlg.resizable(False, False)
     result = {"value": _CANCEL}
 

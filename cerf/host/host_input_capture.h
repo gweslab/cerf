@@ -20,7 +20,8 @@ public:
 
     bool IsCaptured() const { return captured_.load(std::memory_order_acquire); }
     void Toggle();
-    void SetCaptured(bool on);   /* programmatic lock (click-to-lock) / unlock (focus loss) */
+    void SetCaptured(bool on);
+    void OnFocusLost();
     void SendCtrlAltDel();
 
     /* Called from the LL hook proc; returns true to swallow the key. */
@@ -33,6 +34,8 @@ private:
     HHOOK hook_      = nullptr;
     HWND  host_hwnd_ = nullptr;
     std::atomic<bool> captured_{false};
-    bool  rctrl_down_ = false;
-    bool  rctrl_used_ = false;  /* Right Ctrl used as a modifier this press */
+    uint32_t host_key_down_mask_ = 0;
+    uint32_t host_key_swallow_mask_ = 0;
+    bool     host_key_held_ = false;
+    bool     host_key_used_ = false;
 };

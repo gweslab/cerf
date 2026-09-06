@@ -38,7 +38,7 @@ void PrintUsage(const char* prog) {
     printf("                           (resume=full restore, warm=RAM+flash only, cold=ignore)\n");
     printf("  --tab=boot|hw|fb         Startup tab: boot screen, hardware console, or framebuffer\n");
     printf("                           (default: hw in dev, boot in release)\n");
-    printf("  --full-screen            Enter borderless fullscreen (Right Ctrl+F) once the window is shown\n");
+    printf("  --full-screen            Enter borderless fullscreen (host key + F) once the window is shown\n");
     printf("  --about                  Show the About CERF dialog and exit without emulating\n");
     printf("  --help                   Show this help\n");
     printf("\n");

@@ -9,6 +9,7 @@
 #include "frame_source.h"
 #include "host_dark_mode.h"
 #include "host_dpi.h"
+#include "host_key_binding.h"
 #include "host_screenshot.h"
 #include "host_window.h"
 
@@ -84,7 +85,9 @@ HMENU ExternalDisplayWindow::BuildMenu() {
     AppendMenuW(view, MF_STRING, kIdVpInteger5, L"Integer scale 5x");
     AppendMenuW(view, MF_STRING, kIdAliasing,   L"Apply aliasing");
     AppendMenuW(view, MF_SEPARATOR, 0, nullptr);
-    AppendMenuW(view, MF_STRING, kIdFullscreen, L"Full screen\tRight Ctrl+F");
+    AppendMenuW(view, MF_STRING, kIdFullscreen,
+                (L"Full screen\t" +
+                 emu_.Get<HostKeyBinding>().LabelWith(L"F")).c_str());
     AppendMenuW(view, MF_SEPARATOR, 0, nullptr);
     AppendMenuW(view, MF_STRING, kIdSaveShot,   L"Save screenshot");
     AppendMenuW(view, MF_STRING, kIdCopyShot,   L"Copy screenshot");
@@ -194,13 +197,11 @@ void ExternalDisplayWindow::UiThreadMain(uint32_t surf_w, uint32_t surf_h) {
     }
     ui_ready_cv_.notify_all();
 
-    /* Right Ctrl+F toggles fullscreen, matching the main window's host shortcut.
-       Caught in the loop, not WndProc: the canvas child may hold keyboard focus,
-       so the key would never reach this top-level proc. */
     MSG msg;
     while (GetMessageW(&msg, nullptr, 0, 0) > 0) {
-        if (msg.message == WM_KEYDOWN && msg.wParam == 'F' &&
-            (GetKeyState(VK_RCONTROL) & 0x8000)) {
+        if ((msg.message == WM_KEYDOWN || msg.message == WM_SYSKEYDOWN) &&
+            msg.wParam == 'F' &&
+            emu_.Get<HostKeyBinding>().AllMembersDownNow()) {
             fullscreen_.Toggle(hwnd_);
             continue;
         }

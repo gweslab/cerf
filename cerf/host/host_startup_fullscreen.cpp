@@ -3,8 +3,6 @@
 #include "../core/device_config.h"
 #include "host_window.h"
 
-/* Applies the --full-screen launch preference: once the host window is up,
-   enter the borderless-fullscreen mode (the Right Ctrl+F / View-menu toggle). */
 namespace {
 class HostStartupFullscreen : public Service {
 public:

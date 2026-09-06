@@ -125,8 +125,6 @@ struct DeviceConfig : public Service {
 
     std::string share_folder;
 
-    /* --full-screen: enter borderless fullscreen (the Right Ctrl+F toggle) right
-       after the host window is shown. CLI-only launch preference, default off. */
     bool start_fullscreen = false;
 
     bool show_about_instead_of_run = false;
@@ -149,4 +147,6 @@ struct DeviceConfig : public Service {
     bool last_save_state_mode = false;
 
     bool discord_rich_presence = false;
+
+    std::vector<uint8_t> host_key_vks;
 };

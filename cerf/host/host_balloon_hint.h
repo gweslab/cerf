@@ -5,6 +5,8 @@
 #define NOMINMAX
 #include <windows.h>
 
+#include <string>
+
 class HostWidget;
 
 class HostBalloonHint : public Service {
@@ -26,4 +28,5 @@ private:
 
     HWND host_ = nullptr;
     HWND tip_  = nullptr;
+    std::wstring shown_text_;
 };

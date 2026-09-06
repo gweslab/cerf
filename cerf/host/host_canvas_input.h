@@ -28,7 +28,7 @@ private:
        stops generating motion. */
     bool RouteCapturedMouse(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp, LRESULT& out);
     void WarpToCentre(HWND hwnd);
-    void ShowLockHintOnce();   /* one-time "Right Ctrl to release" balloon */
+    void ShowLockHintOnce();
 
     bool pen_down_            = false;
     bool mouse_locked_active_ = false;

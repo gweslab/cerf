@@ -316,6 +316,7 @@ This repositroy includes [cerf.cx](https://cerf.cx) source code at ``docs/websit
           🆕 Bundled CompactFlash cards can be auto-inserted at launch<br/>
           🆕 Build number shown in the window title and the About box<br/>
           🆕 Thumb32 support. Windows Embedded Compact 2013 is now supported<br/>
+          🆕 Host key is now reassignable<br/>
           ✅ ARM JIT and JIT core full rewrite. ARM JIT/peripherals massive optimizations. However - this might regress something, the blast radius is whole ARM emulation.<br/>
           ✅ Wall-clock timer instead of icount. Fixes guest OS clock extreme fast forwarding and consequent lags, bugs. For example, Jornada 720 had whole class of problems. Double clicks wouldn&#x27;t work because whole days passed in between two clicks. IE would time out on the same reason. Our model is based on QEMU and Dolphin models with own inventions.<br/>
           ✅ Shutdown dialog now has reboot options<br/>

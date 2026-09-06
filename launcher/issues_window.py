@@ -28,7 +28,8 @@ class IssuesWindow:
         self._dlg = dlg
         dlg.title("Bugs & Requests")
         dlg.configure(bg=theme.BG)
-        dlg.transient(app)
+        if app.winfo_viewable():
+            dlg.transient(app)
 
         body = ttk.Frame(dlg, padding=BODY_PAD)
         body.pack(fill="both", expand=True)

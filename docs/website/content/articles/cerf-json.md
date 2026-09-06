@@ -34,7 +34,8 @@ values into each device's configuration before it reads that device's own file.
     { "url": "https://cerf-bundles.dz3n.net/cerf-bundles", "enabled": true }
   ],
   "last_save_state_mode": false,
-  "discord_rich_presence": false
+  "discord_rich_presence": false,
+  "host_key": [162, 164]
 }
 ```
 
@@ -44,7 +45,9 @@ values into each device's configuration before it reads that device's own file.
 | `video_driver_names_for_guest_additions` | array of strings | The ROM display-driver module names that [Guest Additions](features.md#guest-additions) can replace with the CERF driver. |
 | `bundle_repositories` | array of `{ url, enabled }` | The [ROM bundle repositories](bundle-repositories.md) that the launcher installs and updates from. Launcher only - `cerf.exe` does not read it. |
 | `last_save_state_mode` | boolean | The default state of **Save the state** in the shutdown dialog. |
+| `update_channel` | string | Which CERF builds the launcher offers you: `disabled`, `stable`, or `unstable`. Launcher only - `cerf.exe` does not read it. |
 | `discord_rich_presence` | boolean | Publish the device that you run to Discord. Read by both the launcher and `cerf.exe`. |
+| `host_key` | integer, or array of integers | The host key: one virtual-key code, or up to eight of them that you press together. Absent, the host key is Right Ctrl (`163`). |
 
 !!! tip "Adding your own display driver name"
 

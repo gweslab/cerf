@@ -95,7 +95,8 @@ void HostBalloonHint::Show(const RECT* anchor, const wchar_t* text,
     ti.uFlags   = TTF_TRACK | TTF_IDISHWND;
     ti.hwnd     = canvas;
     ti.uId      = reinterpret_cast<UINT_PTR>(canvas);
-    ti.lpszText = const_cast<wchar_t*>(text);
+    shown_text_ = text ? text : L"";
+    ti.lpszText = const_cast<wchar_t*>(shown_text_.c_str());
     SendMessageW(tip_, TTM_ADDTOOLW, 0, reinterpret_cast<LPARAM>(&ti));
 
     POINT p;

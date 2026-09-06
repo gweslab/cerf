@@ -72,7 +72,8 @@ class NewDeviceWizard:
         self._dlg = dlg
         dlg.title("New")
         dlg.configure(bg=theme.BG)
-        dlg.transient(parent)
+        if parent.winfo_viewable():
+            dlg.transient(parent)
 
         self._step1 = ttk.Frame(dlg, padding=12)
         self._step2 = ttk.Frame(dlg, padding=12)

@@ -7,6 +7,8 @@ from typing import Callable, Optional
 from app_settings import (CHANNEL_DISABLED, CHANNEL_STABLE, CHANNEL_UNSTABLE,
                           read_discord_rich_presence, read_update_channel,
                           write_discord_rich_presence, write_update_channel)
+from host_key import write_host_key
+from host_key_block import HostKeyBlock
 from screen_geometry import fit_geometry
 from ui_dialogs import show_info
 import ui_theme as theme
@@ -33,8 +35,8 @@ CHANNEL_HINTS = {
 
 class SettingsDialog:
     def __init__(self, parent: tk.Misc,
-                 on_update_channel_changed: Optional[Callable[[], None]] = None
-                 ) -> None:
+                 on_update_channel_changed: Optional[Callable[[], None]] = None,
+                 owner_hwnd: int = 0) -> None:
         self._parent = parent
         self._on_channel_changed = on_update_channel_changed
         self._channel_before = read_update_channel()
@@ -43,7 +45,8 @@ class SettingsDialog:
         self._dlg = dlg
         dlg.title("Settings")
         dlg.configure(bg=theme.BG)
-        dlg.transient(parent)
+        if parent.winfo_viewable():
+            dlg.transient(parent)
         dlg.resizable(False, False)
 
         body = ttk.Frame(dlg, padding=16)
@@ -55,13 +58,16 @@ class SettingsDialog:
             side="left", padx=(0, 6))
         ttk.Button(actions, text="OK", command=self._ok).pack(side="left")
 
+        ttk.Label(body, text="Host key").pack(anchor="w", pady=(0, 2))
+        self._host_key = HostKeyBlock(body)
+
         self.var_drp = tk.BooleanVar(value=read_discord_rich_presence())
         ttk.Checkbutton(body, text="Discord Rich Presence",
-                        variable=self.var_drp).pack(anchor="w")
+                        variable=self.var_drp).pack(anchor="w", pady=(16, 0))
         ttk.Label(body, style="Hint.TLabel", wraplength=380, justify="left",
                   text="Shows the current device and OS version in your "
                        "Discord profile as an activity.").pack(
-            anchor="w", padx=(22, 0), pady=(2, 0))
+            anchor="w", pady=(2, 0))
 
         ttk.Label(body, text="Update channel").pack(anchor="w", pady=(16, 2))
         self._labels = [label for label, _ in CHANNEL_LABELS]
@@ -82,7 +88,15 @@ class SettingsDialog:
 
         theme.apply_titlebar(dlg)
         fit_geometry(dlg, 440, height, parent=parent)
+        if owner_hwnd:
+            theme.set_owner_window(dlg, owner_hwnd)
+        dlg.deiconify()
+        dlg.lift()
+        dlg.focus_force()
         dlg.grab_set()
+
+    def wait(self) -> None:
+        self._parent.wait_window(self._dlg)
 
     def _label_for(self, channel: str) -> str:
         for label, value in CHANNEL_LABELS:
@@ -102,6 +116,7 @@ class SettingsDialog:
 
     def _ok(self) -> None:
         write_discord_rich_presence(self.var_drp.get())
+        write_host_key(self._host_key.value())
         channel = self._selected_channel()
         write_update_channel(channel)
         self._dlg.destroy()

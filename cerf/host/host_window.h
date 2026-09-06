@@ -61,7 +61,6 @@ public:
     void MatchGuestSize();
     void RefitIfFollowingGuest();
 
-    /* Borderless-fullscreen toggle (View menu + Right Ctrl+F). UI thread. */
     bool IsFullscreen() const  { return fullscreen_.IsActive(); }
     void ToggleFullscreen()    { if (hwnd_) fullscreen_.Toggle(hwnd_); }
 

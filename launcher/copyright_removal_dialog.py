@@ -42,7 +42,8 @@ class CopyrightRemovalDialog:
         self._dlg = dlg
         dlg.title(_TITLE)
         dlg.configure(bg=theme.BG)
-        dlg.transient(parent)
+        if parent.winfo_viewable():
+            dlg.transient(parent)
         dlg.resizable(False, False)
 
         body = ttk.Frame(dlg, padding=16)

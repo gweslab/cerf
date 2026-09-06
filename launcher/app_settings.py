@@ -14,11 +14,19 @@ CHANNEL_DEFAULT = CHANNEL_STABLE
 CHANNELS = (CHANNEL_DISABLED, CHANNEL_STABLE, CHANNEL_UNSTABLE)
 
 
-def _write_key(key: str, value) -> None:
+def _update_config(mutate) -> None:
     path = config_path()
     obj = load_config(path)
-    obj[key] = value
+    mutate(obj)
     path.write_text(json.dumps(obj, indent=2) + "\n", encoding="utf-8")
+
+
+def write_key(key: str, value) -> None:
+    _update_config(lambda obj: obj.__setitem__(key, value))
+
+
+def remove_key(key: str) -> None:
+    _update_config(lambda obj: obj.pop(key, None))
 
 
 def read_discord_rich_presence() -> bool:
@@ -26,7 +34,7 @@ def read_discord_rich_presence() -> bool:
 
 
 def write_discord_rich_presence(enabled: bool) -> None:
-    _write_key(DISCORD_RICH_PRESENCE_KEY, enabled)
+    write_key(DISCORD_RICH_PRESENCE_KEY, enabled)
 
 
 def read_update_channel() -> str:
@@ -35,5 +43,5 @@ def read_update_channel() -> str:
 
 
 def write_update_channel(channel: str) -> None:
-    _write_key(UPDATE_CHANNEL_KEY,
-               channel if channel in CHANNELS else CHANNEL_DEFAULT)
+    write_key(UPDATE_CHANNEL_KEY,
+              channel if channel in CHANNELS else CHANNEL_DEFAULT)

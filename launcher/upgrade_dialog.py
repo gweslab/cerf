@@ -16,7 +16,8 @@ def show_release_available(parent: tk.Misc, release: AvailableUpdate) -> str:
     dlg = tk.Toplevel(parent)
     dlg.title("A new CERF version is available")
     dlg.configure(bg=theme.BG)
-    dlg.transient(parent)
+    if parent.winfo_viewable():
+        dlg.transient(parent)
     dlg.resizable(False, False)
     choice = {"value": CANCEL}
 

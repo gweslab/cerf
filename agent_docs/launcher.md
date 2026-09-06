@@ -34,7 +34,10 @@ The launcher owns three jobs:
 |---|---|---|
 | `devices/<name>/cerf.json` | The launcher, from the remote manifest | The truth about the device: `meta`, `board.id`, `rom.primary`. Never edited by hand. A bundle update replaces it. |
 | `devices/<name>/cerf-user.json` | The launcher (and the user) | Every user setting. It survives a bundle update. It wins over `cerf.json`. |
-| `<exe dir>/cerf.json` | Shipped, then the launcher | Global keys: the default `device`, `bundle_repositories`, `update_channel`, `discord_rich_presence`. |
+| `<exe dir>/cerf.json` | Shipped, then the launcher | The keys that belong to the installation, not to one device. |
+
+`docs/website/content/articles/cerf-json.md` is the schema. It owns what each of
+these files can contain.
 
 `cerf-user.json` holds the launcher link (`launcher.repository_url` +
 `name_on_repository`), the display-name override (`meta.name`), and the
@@ -110,14 +113,15 @@ manual work to stay in step with the side panel.
 
    `reboot` is `null`, `"soft"` or `"hard"`.
 
-5. `cerf.exe` reads the response, deletes the file, and then calls
-   `DeviceConfigRefresh::Refresh()`.
+5. `cerf.exe` reads the response and deletes the file.
 
 ### What the refresh does
 
-`DeviceConfigRefresh` re-reads `cerf.json` and then `cerf-user.json`. It writes a
-fixed set of fields into the live `DeviceConfig`: the four screen fields, the
-color scheme, and the shared folder. It then calls its listeners.
+Each caller decides whether to run the refresh. `LauncherTransaction` never runs
+it.
+
+`DeviceConfigRefresh` re-reads `cerf.json` and then `cerf-user.json`. It writes
+the mutable fields into the live `DeviceConfig`. It then calls its listeners.
 
 **The refresh must never replay the command line.** `ConfigLoader` applies CLI
 arguments last at boot. A replay puts the old `--screen-width` back over the
@@ -134,14 +138,6 @@ listener:
 Nothing else needs a listener. The guest reads the DPI and the screen size from
 `DeviceConfig` at the moment it asks for them. The color depth already re-applies
 on the reset line.
-
-### The two dialogs today
-
-- `customizations` - the shared Customizations block plus a **Reset device**
-  group. `force_reboot` locks that group to *Soft reset*. `cerf.exe` performs
-  the reset after it reads the response.
-- `share_folder` - the shared Share-folder block. It sends no response, because
-  the shared folder applies live.
 
 ### The exception: the window resize
 

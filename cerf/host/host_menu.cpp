@@ -8,9 +8,11 @@
 #include "about_dialog.h"
 #include "host_canvas.h"
 #include "host_input_capture.h"
+#include "host_key_binding.h"
 #include "host_link_opener.h"
 #include "host_screenshot.h"
 #include "host_widget_registry.h"
+#include "settings_transaction.h"
 #include "host_window.h"
 #include "memory_visualizer.h"
 #include "emulation_pause.h"
@@ -29,6 +31,7 @@ enum MenuId : int {
     kIdSaveState   = 204,
     kIdLoadState   = 205,
     kIdPause       = 206,
+    kIdSettings    = 207,
     kIdViewBoot    = 100,
     kIdViewHw      = 101,
     kIdViewFb      = 102,
@@ -55,8 +58,6 @@ constexpr const wchar_t* kArticlesUrl = L"https://cerf.cx/articles/";
 HMENU HostMenu::Build() {
     HMENU bar = CreateMenu();
 
-    /* Filled on demand in OnInitMenuPopup: the widget block (capture lock
-       first) then the static commands. */
     HMENU actions = CreatePopupMenu();
     AppendMenuW(bar, MF_POPUP, (UINT_PTR)actions, L"Actions");
 
@@ -75,7 +76,9 @@ HMENU HostMenu::Build() {
     AppendMenuW(view, MF_STRING, kIdVpInteger5, L"Integer scale 5x");
     AppendMenuW(view, MF_STRING, kIdAliasing,   L"Apply aliasing");
     AppendMenuW(view, MF_SEPARATOR, 0, nullptr);
-    AppendMenuW(view, MF_STRING, kIdFullscreen, L"Full screen\tRight Ctrl+F");
+    AppendMenuW(view, MF_STRING, kIdFullscreen,
+                (L"Full screen\t" +
+                 emu_.Get<HostKeyBinding>().LabelWith(L"F")).c_str());
     AppendMenuW(view, MF_SEPARATOR, 0, nullptr);
     AppendMenuW(view, MF_STRING, kIdSaveShot,   L"Save screenshot");
     AppendMenuW(view, MF_STRING, kIdCopyShot,   L"Copy screenshot");
@@ -133,25 +136,26 @@ void HostMenu::OnInitMenuPopup(HMENU popup) {
     Sync();
     HMENU actions = bar_ ? GetSubMenu(bar_, 0) : nullptr;
     if (popup == actions && actions) {
-        /* Rebuilt each popup: widget block (capture lock first), then the
-           static commands. DeleteMenu also frees the per-widget submenus
-           it created last time. */
         while (GetMenuItemCount(actions) > 0)
             DeleteMenu(actions, 0, MF_BYPOSITION);
         AppendMenuW(actions, MF_STRING, kIdSaveState, L"Save state...");
         AppendMenuW(actions, MF_STRING, kIdLoadState, L"Load state...");
         AppendMenuW(actions, MF_SEPARATOR, 0, nullptr);
+        auto& host_key = emu_.Get<HostKeyBinding>();
         AppendMenuW(actions, MF_STRING, kIdPause,
-                    emu_.Get<EmulationPause>().IsPaused()
-                        ? L"Resume\tRight Ctrl+P" : L"Pause\tRight Ctrl+P");
-        AppendMenuW(actions, MF_SEPARATOR, 0, nullptr);
-        emu_.Get<HostWidgetRegistry>().AppendAllToMenu(actions);
-        AppendMenuW(actions, MF_SEPARATOR, 0, nullptr);
+                    ((emu_.Get<EmulationPause>().IsPaused()
+                          ? std::wstring(L"Resume\t") : std::wstring(L"Pause\t")) +
+                     host_key.LabelWith(L"P")).c_str());
         AppendMenuW(actions, MF_STRING, kIdCtrlAltDel,
-                    L"Send Ctrl+Alt+Del\tRight Ctrl+Del");
+                    (L"Send Ctrl+Alt+Del\t" +
+                     host_key.LabelWith(L"Del")).c_str());
         AppendMenuW(actions, MF_SEPARATOR, 0, nullptr);
         AppendMenuW(actions, MF_STRING, kIdSoftReset, L"Soft reset");
         AppendMenuW(actions, MF_STRING, kIdHardReset, L"Hard reset...");
+        AppendMenuW(actions, MF_SEPARATOR, 0, nullptr);
+        AppendMenuW(actions, MF_STRING, kIdSettings, L"Settings...");
+        AppendMenuW(actions, MF_SEPARATOR, 0, nullptr);
+        emu_.Get<HostWidgetRegistry>().AppendAllToMenu(actions);
     }
 }
 
@@ -186,6 +190,9 @@ void HostMenu::HandleCommand(int id) {
             break;
         }
         case kIdPause:      emu_.Get<EmulationPause>().Toggle(); break;
+        case kIdSettings:
+            emu_.Get<SettingsTransaction>().Open(emu_.Get<HostWindow>().Hwnd());
+            break;
         case kIdCtrlAltDel: emu_.Get<HostInputCapture>().SendCtrlAltDel(); break;
         case kIdSoftReset:  emu_.Get<GuestCpuReset>().WarmReset(); break;
         case kIdHardReset:

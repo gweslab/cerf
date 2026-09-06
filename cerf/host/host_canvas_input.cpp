@@ -8,6 +8,7 @@
 #include "host_canvas.h"
 #include "host_guest_cursor.h"
 #include "host_input_capture.h"
+#include "host_key_binding.h"
 #include "keyboard_router.h"
 #include "memory_visualizer.h"
 #include "pointer_input.h"
@@ -75,8 +76,11 @@ void HostCanvasInput::WarpToCentre(HWND hwnd) {
 void HostCanvasInput::ShowLockHintOnce() {
     if (lock_hint_shown_) return;
     lock_hint_shown_ = true;
-    emu_.Get<HostBalloonHint>().ShowUnderCaptureWidget(
-        L"Mouse locked - press Right Ctrl to release", kLockHintHoldMs);
+    const std::wstring hint = L"Mouse locked - press " +
+                              emu_.Get<HostKeyBinding>().Label() +
+                              L" to release";
+    emu_.Get<HostBalloonHint>().ShowUnderCaptureWidget(hint.c_str(),
+                                                       kLockHintHoldMs);
 }
 
 bool HostCanvasInput::RouteCapturedMouse(HWND hwnd, UINT msg, WPARAM wp,

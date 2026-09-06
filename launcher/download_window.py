@@ -47,7 +47,8 @@ class DownloadWindow:
         dlg = tk.Toplevel(parent)
         self._dlg = dlg
         dlg.title("Download ROMs")
-        dlg.transient(parent)
+        if parent.winfo_viewable():
+            dlg.transient(parent)
         body = ttk.Frame(dlg, padding=8)
         body.pack(fill="both", expand=True)
         body.rowconfigure(1, weight=1)

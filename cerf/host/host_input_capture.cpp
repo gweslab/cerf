@@ -6,6 +6,7 @@
 #include "../core/log.h"
 #include "emulation_pause.h"
 #include "host_canvas.h"
+#include "host_key_binding.h"
 #include "host_key_prompt.h"
 #include "host_window.h"
 #include "keyboard_router.h"
@@ -32,7 +33,8 @@ uint32_t NormalizeVk(uint32_t vk) {
     switch (vk) {
         case VK_LSHIFT:
         case VK_RSHIFT:   return VK_SHIFT;
-        case VK_LCONTROL: return VK_CONTROL;  /* RCONTROL is the host key */
+        case VK_LCONTROL:
+        case VK_RCONTROL: return VK_CONTROL;
         case VK_LMENU:
         case VK_RMENU:    return VK_MENU;
         default:          return vk;
@@ -76,6 +78,14 @@ void HostInputCapture::SetCaptured(bool on) {
        UI tick - no direct poke needed. */
 }
 
+void HostInputCapture::OnFocusLost() {
+    host_key_down_mask_ = 0;
+    host_key_swallow_mask_ = 0;
+    host_key_held_ = false;
+    host_key_used_ = false;
+    SetCaptured(false);
+}
+
 void HostInputCapture::SendCtrlAltDel() {
     auto& k = emu_.Get<KeyboardRouter>();
     k.OnHostKey(VK_CONTROL, false);
@@ -87,8 +97,6 @@ void HostInputCapture::SendCtrlAltDel() {
 }
 
 bool HostInputCapture::OnHookKey(WPARAM wParam, const KBDLLHOOKSTRUCT* k) {
-    /* Only ever act while our window is foreground - otherwise the global
-       hook would steal Right Ctrl (and captured keys) from other apps. */
     if (!IsForeground()) return false;
 
     const bool  key_up = (wParam == WM_KEYUP || wParam == WM_SYSKEYUP);
@@ -103,31 +111,50 @@ bool HostInputCapture::OnHookKey(WPARAM wParam, const KBDLLHOOKSTRUCT* k) {
         }
     }
 
-    if (vk == VK_RCONTROL) {
+    auto& host_key = emu_.Get<HostKeyBinding>();
+    const int member = host_key.IndexOf(vk);
+    if (member >= 0) {
+        const uint32_t bit = 1u << member;
+        bool swallow_from_host;
         if (!key_up) {
-            rctrl_down_ = true;
-            rctrl_used_ = false;
+            if (host_key_down_mask_ & bit) {
+                swallow_from_host = (host_key_swallow_mask_ & bit) != 0;
+            } else {
+                swallow_from_host = captured_.load(std::memory_order_acquire);
+                host_key_down_mask_ |= bit;
+                if (swallow_from_host) host_key_swallow_mask_ |= bit;
+                else                   host_key_swallow_mask_ &= ~bit;
+            }
+            if (!host_key_held_ &&
+                host_key_down_mask_ == host_key.AllMembersDownMask()) {
+                host_key_held_ = true;
+                host_key_used_ = false;
+            }
         } else {
-            const bool used = rctrl_used_;
-            rctrl_down_ = false;
-            if (!used) Toggle();      /* a clean tap toggles capture */
+            swallow_from_host = (host_key_swallow_mask_ & bit) != 0;
+            host_key_down_mask_ &= ~bit;
+            host_key_swallow_mask_ &= ~bit;
+            const bool used = host_key_used_;
+            const bool held = host_key_held_;
+            host_key_held_ = false;
+            if (held && !used) Toggle();
         }
-        return true;                  /* host key reserved, never to guest */
+        return swallow_from_host;
     }
 
-    if (rctrl_down_ && !key_up) rctrl_used_ = true;
+    if (host_key_held_ && !key_up) host_key_used_ = true;
 
-    if (rctrl_down_ && vk == VK_DELETE) {
+    if (host_key_held_ && vk == VK_DELETE) {
         if (!key_up) SendCtrlAltDel();
         return true;
     }
 
-    if (rctrl_down_ && vk == 'P') {
+    if (host_key_held_ && vk == 'P') {
         if (!key_up) emu_.Get<EmulationPause>().Toggle();
         return true;
     }
 
-    if (rctrl_down_ && vk == 'F') {
+    if (host_key_held_ && vk == 'F') {
         if (!key_up) emu_.Get<HostWindow>().ToggleFullscreen();
         return true;
     }

@@ -36,7 +36,8 @@ def show_dialog(parent: tk.Misc, title: str, message: str,
     dlg = tk.Toplevel(parent)
     dlg.title(title)
     dlg.configure(bg=theme.BG)
-    dlg.transient(parent)
+    if parent.winfo_viewable():
+        dlg.transient(parent)
     dlg.resizable(False, False)
     result = {"value": default if default is not None else buttons[-1]}
 
@@ -73,6 +74,8 @@ def show_dialog(parent: tk.Misc, title: str, message: str,
     y = parent.winfo_rooty() + (parent.winfo_height() - h) // 2
     dlg.geometry(f"+{max(0, x)}+{max(0, y)}")
 
+    dlg.lift()
+    dlg.focus_force()
     dlg.grab_set()
     parent.wait_window(dlg)
     return result["value"]
@@ -83,7 +86,8 @@ def ask_text(parent: tk.Misc, title: str, prompt: str,
     dlg = tk.Toplevel(parent)
     dlg.title(title)
     dlg.configure(bg=theme.BG)
-    dlg.transient(parent)
+    if parent.winfo_viewable():
+        dlg.transient(parent)
     dlg.resizable(False, False)
     result: Dict[str, Optional[str]] = {"value": None}
 
@@ -115,6 +119,8 @@ def ask_text(parent: tk.Misc, title: str, prompt: str,
     y = parent.winfo_rooty() + (parent.winfo_height() - h) // 2
     dlg.geometry(f"+{max(0, x)}+{max(0, y)}")
 
+    dlg.lift()
+    dlg.focus_force()
     dlg.grab_set()
     parent.wait_window(dlg)
     return result["value"]
@@ -232,7 +238,8 @@ def show_sources_thanks(parent: tk.Misc, sources) -> None:
     dlg = tk.Toplevel(parent)
     dlg.title("ROM preservation")
     dlg.configure(bg=theme.BG)
-    dlg.transient(parent)
+    if parent.winfo_viewable():
+        dlg.transient(parent)
     dlg.resizable(False, False)
 
     body = ttk.Frame(dlg, padding=16)

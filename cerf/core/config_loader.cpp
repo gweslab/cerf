@@ -203,6 +203,52 @@ void LoadAdditionalPackages(const json& root, DeviceConfig& config,
     }
 }
 
+void LoadHostKey(const json& root, DeviceConfig& config,
+                 const std::string& path) {
+    const char* k = "host_key";
+    if (!root.contains(k)) return;
+    const auto& v = root[k];
+    if (v.is_null()) return;
+
+    std::vector<uint8_t> vks;
+    auto add = [&](const json& e) {
+        if (!e.is_number_integer())
+            CfgFatal(path, "'host_key' entries must be virtual-key code integers");
+        const int n = e.get<int>();
+        if (n < 1 || n > 255)
+            CfgFatal(path, "'host_key' virtual-key code out of range (1..255)");
+        if (n == 0x01 || n == 0x02 || n == 0x04 || n == 0x05 || n == 0x06)
+            CfgFatal(path, "'host_key' mouse buttons never reach the keyboard "
+                           "hook; name a keyboard virtual-key code");
+        if (n == 0x10)
+            CfgFatal(path, "'host_key' 16 (Shift) never reaches the keyboard "
+                           "hook; name 160 (left Shift) or 161 (right Shift)");
+        if (n == 0x11)
+            CfgFatal(path, "'host_key' 17 (Ctrl) never reaches the keyboard "
+                           "hook; name 162 (left Ctrl) or 163 (right Ctrl)");
+        if (n == 0x12)
+            CfgFatal(path, "'host_key' 18 (Alt) never reaches the keyboard "
+                           "hook; name 164 (left Alt) or 165 (right Alt)");
+        for (uint8_t have : vks)
+            if (have == (uint8_t)n) return;
+        vks.push_back((uint8_t)n);
+    };
+
+    if (v.is_number_integer()) {
+        add(v);
+    } else if (v.is_array()) {
+        for (const auto& e : v) add(e);
+    } else {
+        CfgFatal(path, "'host_key' must be a virtual-key code integer or an "
+                       "array of them");
+    }
+    if (vks.empty())
+        CfgFatal(path, "'host_key' must name at least one virtual-key code");
+    if (vks.size() > 8)
+        CfgFatal(path, "'host_key' must name at most 8 virtual-key codes");
+    config.host_key_vks = std::move(vks);
+}
+
 void LoadGlobalSubstitutions(const json& root, DeviceConfig& config,
                              const std::string& path) {
     const char* k = "video_driver_names_for_guest_additions";
@@ -247,6 +293,7 @@ void ConfigLoader::LoadInto(DeviceConfig& config) {
                     CfgFatal(top_path, "'discord_rich_presence' must be a boolean");
                 config.discord_rich_presence = j["discord_rich_presence"].get<bool>();
             }
+            LoadHostKey(j, config, top_path);
             LoadGlobalSubstitutions(j, config, top_path);
         }
     }

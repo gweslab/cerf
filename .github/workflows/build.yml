@@ -35,16 +35,18 @@ jobs:
       - name: Add MSBuild to PATH
         uses: microsoft/setup-msbuild@v2
 
-      - name: Cache vcpkg deps
-        uses: actions/cache@v4
+      - name: Restore vcpkg deps
+        id: cache-deps
+        uses: actions/cache/restore@v4
         with:
           path: vcpkg_installed
           key: vcpkg-${{ runner.os }}-x86-windows-static-${{ hashFiles('vcpkg.json', 'vcpkg-configuration.json') }}
           restore-keys: |
             vcpkg-${{ runner.os }}-x86-windows-static-
 
-      - name: Cache vcpkg source downloads
-        uses: actions/cache@v4
+      - name: Restore vcpkg source downloads
+        id: cache-downloads
+        uses: actions/cache/restore@v4
         with:
           path: C:\vcpkg\downloads
           key: vcpkg-downloads-${{ runner.os }}-${{ hashFiles('vcpkg.json', 'vcpkg-configuration.json') }}
@@ -55,6 +57,26 @@ jobs:
         shell: pwsh
         run: |
           & "$env:VCPKG_INSTALLATION_ROOT\vcpkg.exe" integrate install
+
+      - name: Install vcpkg dependencies
+        id: vcpkg
+        shell: pwsh
+        run: |
+          $vcpkg = "$env:VCPKG_INSTALLATION_ROOT\vcpkg.exe"
+          $opts = @(
+            'install', '--x-wait-for-lock',
+            '--triplet', 'x86-windows-static',
+            "--vcpkg-root=$env:VCPKG_INSTALLATION_ROOT",
+            "--x-manifest-root=$PWD",
+            "--x-install-root=$PWD\vcpkg_installed\x86-windows-static"
+          )
+          for ($i = 1; $i -le 3; $i++) {
+            & $vcpkg @opts
+            if ($LASTEXITCODE -eq 0) { exit 0 }
+            Write-Host "vcpkg install attempt $i failed with exit $LASTEXITCODE"
+            Start-Sleep -Seconds 30
+          }
+          exit 1
 
       - name: Stamp version.h with CI build info
         id: version
@@ -89,6 +111,20 @@ jobs:
           if (Test-Path third_party\wince) { Remove-Item third_party\wince -Recurse -Force }
           Move-Item $sdk.Parent.FullName third_party\wince
           Write-Host "CE toolchain ready at third_party/wince"
+
+      - name: Save vcpkg source downloads
+        if: always() && steps.cache-downloads.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: C:\vcpkg\downloads
+          key: vcpkg-downloads-${{ runner.os }}-${{ hashFiles('vcpkg.json', 'vcpkg-configuration.json') }}
+
+      - name: Save vcpkg deps
+        if: always() && steps.vcpkg.outcome == 'success' && steps.cache-deps.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: vcpkg_installed
+          key: vcpkg-${{ runner.os }}-x86-windows-static-${{ hashFiles('vcpkg.json', 'vcpkg-configuration.json') }}
 
       - name: Build
         shell: pwsh

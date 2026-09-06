@@ -167,8 +167,10 @@ void UsbHub::OnPortConnectChanged(int port_index) {
 
 UsbDevice* UsbHub::FindByAddress(uint8_t addr) {
     if (address_ == addr) return this;
-    for (auto& p : ports_) {
-        if (UsbDevice* dev = p.Device()) {
+    /* USB 2.0 9.1.2: attached ports are disabled until reset enables them. */
+    for (size_t i = 0; i < ports_.size(); ++i) {
+        if (!(port_status_[i] & kPortStatusEnable)) continue;
+        if (UsbDevice* dev = ports_[i].Device()) {
             if (UsbDevice* found = dev->FindByAddress(addr)) return found;
         }
     }

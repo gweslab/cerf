@@ -5,6 +5,7 @@
 #include "../../storage/disk_image.h"
 
 #include <cstring>
+#include <algorithm>
 
 namespace {
 
@@ -16,10 +17,12 @@ constexpr uint8_t  kMscProtocol = 0x50u;
 constexpr uint32_t kCbwSignature = 0x43425355u;
 constexpr uint32_t kCswSignature = 0x53425355u;
 constexpr uint32_t kCbwLength    = 31u;
+constexpr uint32_t kCswLength    = 13u;
 
 /* USB Mass Storage Class Bulk-Only Transport Rev. 1.0, Table 5.3 (p14). */
 constexpr uint8_t kCswStatusPassed = 0x00u;
 constexpr uint8_t kCswStatusFailed = 0x01u;
+constexpr uint8_t kCswStatusPhaseError = 0x02u;
 
 /* T10 SPC-3 (spc3r23.pdf) 6.4/6.27/6.33; T10 SBC-3 (sbc3r25.pdf) 5.11/5.15/5.32. */
 constexpr uint8_t kScsiTestUnitReady   = 0x00u;
@@ -159,6 +162,12 @@ void UsbMassStorageDevice::SetSense(uint8_t key, uint8_t asc, uint8_t ascq) {
 }
 
 void UsbMassStorageDevice::QueueCsw(uint8_t status) {
+    /* BOT 6.7.1/6.7.2: a device response larger than the host budget is a phase error. */
+    const uint32_t budget = cbw_dir_in_ ? cbw_data_len_ : 0u;
+    if (pending_in_.size() > budget) {
+        pending_in_.resize(budget);
+        status = kCswStatusPhaseError;
+    }
     const uint32_t transferred = cbw_dir_in_
         ? static_cast<uint32_t>(pending_in_.size())
         : static_cast<uint32_t>(out_buf_.size());
@@ -176,7 +185,7 @@ void UsbMassStorageDevice::QueueCsw(uint8_t status) {
     pending_in_.push_back(static_cast<uint8_t>((residue >> 16) & 0xFFu));
     pending_in_.push_back(static_cast<uint8_t>((residue >> 24) & 0xFFu));
     pending_in_.push_back(status);
-    phase_ = Phase::ReplyReady;
+    phase_ = cbw_dir_in_ && cbw_data_len_ ? Phase::DataIn : Phase::ReplyReady;
 }
 
 void UsbMassStorageDevice::ExecuteScsiCommand() {
@@ -184,7 +193,6 @@ void UsbMassStorageDevice::ExecuteScsiCommand() {
 
     if (op == kScsiTestUnitReady) {
         SetSense(kSenseNoSense, 0u, 0u);
-        cbw_data_len_ = 0u;
         QueueCsw(kCswStatusPassed);
         return;
     }
@@ -200,6 +208,8 @@ void UsbMassStorageDevice::ExecuteScsiCommand() {
         std::memcpy(&d[8], "CERF    ", 8);
         std::memcpy(&d[16], "SD Card Reader  ", 16);
         std::memcpy(&d[32], "1.0 ", 4);
+        /* SPC-3 Table 80 and 4.3.4.6: two-byte INQUIRY allocation length. */
+        d.resize(std::min(d.size(), static_cast<size_t>(Be16(&cbwcb_[3]))));
         pending_in_.insert(pending_in_.end(), d.begin(), d.end());
         SetSense(kSenseNoSense, 0u, 0u);
         QueueCsw(kCswStatusPassed);
@@ -224,6 +234,8 @@ void UsbMassStorageDevice::ExecuteScsiCommand() {
            zero block descriptors, no mode pages. */
         std::vector<uint8_t> d(8u, 0u);
         d[1] = 6u;
+        /* SPC-3 MODE SENSE(10), 4.3.4.6: allocation bounds the response. */
+        d.resize(std::min(d.size(), static_cast<size_t>(Be16(&cbwcb_[7]))));
         pending_in_.insert(pending_in_.end(), d.begin(), d.end());
         SetSense(kSenseNoSense, 0u, 0u);
         QueueCsw(kCswStatusPassed);
@@ -263,6 +275,8 @@ void UsbMassStorageDevice::ExecuteScsiCommand() {
         d[7] = 10u;
         d[12] = sense_asc_;
         d[13] = sense_ascq_;
+        /* SPC-3 REQUEST SENSE, 4.3.4.6: allocation bounds the response. */
+        d.resize(std::min(d.size(), static_cast<size_t>(cbwcb_[4])));
         pending_in_.insert(pending_in_.end(), d.begin(), d.end());
         QueueCsw(kCswStatusPassed);
         return;
@@ -321,7 +335,7 @@ void UsbMassStorageDevice::HandleCbw(const uint8_t* data, uint32_t len) {
 
 void UsbMassStorageDevice::OnBulkOut(uint8_t ep, const uint8_t* data, uint32_t len) {
     if (IsEndpointStalled(ep)) return;
-    if (phase_ == Phase::ReplyReady) { RejectCbw(len); return; }
+    if (phase_ == Phase::DataIn || phase_ == Phase::ReplyReady) { RejectCbw(len); return; }
     if (phase_ == Phase::AwaitingCbw) {
         HandleCbw(data, len);
         return;
@@ -341,24 +355,27 @@ void UsbMassStorageDevice::OnBulkOut(uint8_t ep, const uint8_t* data, uint32_t l
 
 uint32_t UsbMassStorageDevice::OnBulkIn(uint8_t ep, uint8_t* dst, uint32_t max) {
     if (IsEndpointStalled(ep)) return 0u;
-    if (pending_in_off_ >= pending_in_.size()) {
-        if (phase_ == Phase::ReplyReady) {
-            phase_ = Phase::AwaitingCbw;
-            pending_in_.clear();
-            pending_in_off_ = 0u;
-        }
-        return 0u;
-    }
-    const uint32_t remain = static_cast<uint32_t>(pending_in_.size() - pending_in_off_);
+    if (phase_ != Phase::DataIn && phase_ != Phase::ReplyReady) return kNak;
+    if (max == 0u) return 0u;
+    /* BOT 5.2/6.7.2: data and CSW start on separate packet boundaries. */
+    const size_t end = phase_ == Phase::DataIn ? pending_in_.size() - kCswLength : pending_in_.size();
+    const uint32_t remain = static_cast<uint32_t>(end - pending_in_off_);
     const uint32_t n = remain < max ? remain : max;
-    std::memcpy(dst, pending_in_.data() + pending_in_off_, n);
+    if (n) std::memcpy(dst, pending_in_.data() + pending_in_off_, n);
     pending_in_off_ += n;
-    /* USB Mass Storage Class BOT Rev. 1.0, 5.1 (p6): next CBW may follow
-       this CSW with no intervening IN poll - flip phase here, not lazily. */
-    if (phase_ == Phase::ReplyReady && pending_in_off_ >= pending_in_.size()) {
-        phase_ = Phase::AwaitingCbw;
-        pending_in_.clear();
-        pending_in_off_ = 0u;
+    if (pending_in_off_ == end) {
+        if (phase_ == Phase::DataIn) {
+            phase_ = Phase::ReplyReady;
+            if (end < cbw_data_len_) SetEndpointStalled(1, true);
+        } else {
+            const bool phase_error = pending_in_.back() == kCswStatusPhaseError;
+            ResetTransport();
+            if (phase_error) {
+                phase_ = Phase::ResetRecovery;
+                SetEndpointStalled(1, true);
+                SetEndpointStalled(2, true);
+            }
+        }
     }
     return n;
 }
@@ -405,8 +422,15 @@ void UsbMassStorageDevice::RestoreState(StateReader& r) {
     UsbState::ReadBuffer(r, out_buf_, max_write);
     UsbState::Require(r.Ok() && cbwcb_len_ <= 16 && offset <= pending_in_.size() &&
         (phase_ == Phase::AwaitingCbw || phase_ == Phase::DataOut ||
-         phase_ == Phase::ReplyReady || phase_ == Phase::ResetRecovery),
+         phase_ == Phase::DataIn || phase_ == Phase::ReplyReady || phase_ == Phase::ResetRecovery),
         "invalid mass storage phase");
+    if (phase_ == Phase::DataIn || phase_ == Phase::ReplyReady) {
+        UsbState::Require(pending_in_.size() >= kCswLength, "missing command status");
+        const size_t data_end = pending_in_.size() - kCswLength;
+        UsbState::Require(phase_ == Phase::DataIn
+            ? cbw_dir_in_ && cbw_data_len_ && offset <= data_end && data_end <= cbw_data_len_
+            : offset >= data_end, "invalid data/status boundary");
+    }
     if (phase_ == Phase::ResetRecovery)
         UsbState::Require(IsEndpointStalled(1) && IsEndpointStalled(2), "invalid reset recovery");
     if (phase_ == Phase::DataOut) {

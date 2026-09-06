@@ -285,6 +285,8 @@ bool Imx51Usboh3::ExecuteQtd(uint32_t qtd_addr, UsbDevice* dev, uint32_t endpt) 
         std::vector<uint8_t> data(total);
         const uint32_t got = dev->OnBulkIn(static_cast<uint8_t>(endpt), data.data(), total);
         if (got == UsbDevice::kNak) return false;
+        if (got == 0u && dev->IsEndpointStalled(static_cast<uint8_t>(endpt)))
+            return retire(total, true);
         if (got > 0u) transfer(data.data(), got, true);
         residual = total - got;
     } else {

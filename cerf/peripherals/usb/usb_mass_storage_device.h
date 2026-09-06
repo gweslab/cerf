@@ -40,7 +40,7 @@ protected:
                                          std::vector<uint8_t>& response);
 
 private:
-    enum class Phase { AwaitingCbw, DataOut, ReplyReady, ResetRecovery };
+    enum class Phase { AwaitingCbw, DataOut, DataIn, ReplyReady, ResetRecovery };
 
     std::vector<uint8_t> BuildDeviceDescriptor() const;
     std::vector<uint8_t> BuildConfigurationDescriptor() const;

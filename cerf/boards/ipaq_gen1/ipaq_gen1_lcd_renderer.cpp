@@ -1,13 +1,14 @@
 #define NOMINMAX
 
-#include "sa11xx_lcd.h"
+#include "../../socs/sa11xx/sa11xx_lcd.h"
 
-#include "../../boards/board_context.h"
+#include "../board_context.h"
 #include "../../core/cerf_emulator.h"
 #include "../../core/log.h"
 #include "../../cpu/emulated_memory.h"
 #include "../../host/panel_frame_renderer.h"
 
+#include <algorithm>
 #include <cstring>
 
 namespace {
@@ -20,6 +21,10 @@ namespace {
 constexpr uint32_t kDummyPaletteBytes  = 32;
 constexpr uint32_t kBytesPerGuestPixel = 2;
 constexpr size_t   kContentProbeStride = 251;
+
+/* Panel is 320x240: Linux arch/arm/mach-sa1100/h3600.c h3600_lcd_info and
+   h3100.c h3100_lcd_info, both .xres = 320, .yres = 240. */
+constexpr uint32_t kPanelLines = 240;
 
 /* SA-1110 §11.7.1.5 Table 11-7: dither value -> pixel-ON duty. The H31xx
    STN glass darkens when driven (Linux h3100_lcd_info: cmap_inverse=1;
@@ -37,23 +42,18 @@ struct MonoLayout {
     uint32_t pal_entries;
 };
 
-class Sa11xxLcdRenderer : public PanelFrameRenderer {
+class IpaqGen1LcdRenderer : public PanelFrameRenderer {
 public:
     using PanelFrameRenderer::PanelFrameRenderer;
 
     bool ShouldRegister() override {
-        /* Board-gated, not SoC-gated: the frame source is board wiring.
-           The Jornada 720 panel hangs off the external SED1356; its OAL
-           writes LCCR0=0 and this renderer must not win PanelFrameRenderer
-           there. */
         auto* bd = emu_.TryGet<BoardContext>();
         return bd && bd->GetBoard() == Board::IpaqGen1;
     }
 
     void PresentedSize(uint32_t& w, uint32_t& h) override {
-        auto& lcd = emu_.Get<Sa11xxLcd>();
-        w = lcd.GetGuestH();
-        h = lcd.GetGuestW();
+        w = PanelH();
+        h = emu_.Get<Sa11xxLcd>().GetGuestW();
     }
 
     bool HasFrame() override {
@@ -62,7 +62,7 @@ public:
         if (latch_.Latched())              return true;
         const uint32_t fb_pa   = lcd.GetFbPa();
         const uint32_t guest_w = lcd.GetGuestW();
-        const uint32_t guest_h = lcd.GetGuestH();
+        const uint32_t guest_h = PanelH();
         if (fb_pa == 0 || guest_w == 0 || guest_h == 0) return false;
 
         uint32_t data_off    = kDummyPaletteBytes;
@@ -89,7 +89,7 @@ public:
         auto& lcd = emu_.Get<Sa11xxLcd>();
         const uint32_t fb_pa   = lcd.GetFbPa();
         const uint32_t guest_w = lcd.GetGuestW();
-        const uint32_t guest_h = lcd.GetGuestH();
+        const uint32_t guest_h = PanelH();
 
         std::memset(dib_bgra32, 0, (size_t)host_w * host_h * 4u);
         if (guest_w == 0 || guest_h == 0) return;
@@ -125,6 +125,10 @@ public:
     }
 
 private:
+    uint32_t PanelH() {
+        return std::min(emu_.Get<Sa11xxLcd>().GetGuestH(), kPanelLines);
+    }
+
     MonoLayout ResolveMonoLayout(const uint8_t* fb_base) {
         const uint16_t entry0 =
             (uint16_t)(fb_base[0] | ((uint16_t)fb_base[1] << 8));
@@ -137,7 +141,7 @@ private:
         /* PBS=10 bypasses the palette with 12-bit RGB pixels (p.11-19) -
            contradicts CMS=1's 4-bit gray palette path; PBS=11 reserved.
            Neither has defined mono behavior. */
-        LOG(Lcd, "Sa11xxLcdRenderer: FATAL mono frame with PBS=%u "
+        LOG(Lcd, "IpaqGen1LcdRenderer: FATAL mono frame with PBS=%u "
                  "(palette entry0=0x%04X) - undefined combination\n",
             pbs, entry0);
         CerfFatalExit(CERF_FATAL_RUNTIME_ERROR);
@@ -193,7 +197,7 @@ private:
         }
         if (!mono_palette_logged_) {
             mono_palette_logged_ = true;
-            LOG(Lcd, "Sa11xxLcdRenderer: mono frame %ubpp, palette "
+            LOG(Lcd, "IpaqGen1LcdRenderer: mono frame %ubpp, palette "
                      "%04X %04X %04X %04X %04X %04X %04X %04X "
                      "%04X %04X %04X %04X %04X %04X %04X %04X\n",
                 ml.bits_per_px,
@@ -239,4 +243,4 @@ private:
 
 }  /* namespace */
 
-REGISTER_SERVICE_AS(Sa11xxLcdRenderer, PanelFrameRenderer);
+REGISTER_SERVICE_AS(IpaqGen1LcdRenderer, PanelFrameRenderer);

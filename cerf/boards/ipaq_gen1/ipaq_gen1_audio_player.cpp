@@ -32,10 +32,8 @@ protected:
     }
     uint32_t SampleRateHz() override { return 22050u; }
 
-    /* EGPIO 0x400 set = audio output driven (chime/beep/call audible), clear =
-       SSP clocking-only with no output (full-duplex record). Verified from the
-       runtime: the boot chime and the record-start beep both load while 0x400
-       is set; the record loop buffers load while it is clear. */
+    /* Bit 10 (0x400) AUD_ON "Enables power to audio output amp", O(H): NetBSD
+       sys/arch/hpcarm/dev/ipaq_gpioreg.h. */
     bool OutputMuted() const override {
         return (emu_.Get<IpaqGen1Egpio>().Latched() &
                 IpaqGen1Egpio::kAudioOutputEnable) == 0;

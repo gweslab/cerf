@@ -24,7 +24,6 @@ public:
     void     WriteByte(uint32_t addr, uint8_t  value) override;
     void     WriteWord(uint32_t addr, uint32_t value) override;
 
-    /* Getters consumed by Sa11xxLcdRenderer. */
     bool     IsEnabled() const { return (lccr0_ & 0x1u) != 0; }    /* LCCR0.LEN */
     bool     IsColor()   const { return (lccr0_ & 0x2u) == 0; }    /* LCCR0.CMS=0 */
     uint32_t GetFbPa()   const { return dbar1_; }

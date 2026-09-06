@@ -22,33 +22,36 @@ void IpaqGen1Egpio::NotifySink() {
     }
 }
 
-uint8_t IpaqGen1Egpio::ReadByte(uint32_t addr) {
-    const uint32_t off = addr - MmioBase();
-    return static_cast<uint8_t>((latched_.load(std::memory_order_acquire) >> (8 * off)) & 0xFFu);
-}
-
-uint32_t IpaqGen1Egpio::ReadWord(uint32_t addr) {
-    if (addr != MmioBase()) HaltUnsupportedAccess("ReadWord", addr, 0);
-    return latched_.load(std::memory_order_acquire);
-}
-
 void IpaqGen1Egpio::WriteByte(uint32_t addr, uint8_t value) {
-    const uint32_t off    = addr - MmioBase();
-    const uint32_t shift  = 8 * off;
-    const uint32_t mask   = 0xFFu << shift;
-    const uint32_t before = latched_.load(std::memory_order_acquire);
-    const uint32_t after  = (before & ~mask) | (static_cast<uint32_t>(value) << shift);
+    const uint32_t off = addr - MmioBase();
+    if (off > 1u) HaltUnsupportedAccess("WriteByte", addr, value);
+    const uint32_t shift  = 8u * off;
+    const uint16_t mask   = static_cast<uint16_t>(0xFFu << shift);
+    const uint16_t before = latched_.load(std::memory_order_acquire);
+    const uint16_t after  =
+        static_cast<uint16_t>((before & ~mask) | (static_cast<uint32_t>(value) << shift));
     latched_.store(after, std::memory_order_release);
-    LOG(Periph, "[IpaqGen1Egpio] W8 +%u = 0x%02X -> latch 0x%08X (audio output %s)\n",
-        off, value, after, (after & kAudioOutputEnable) ? "on" : "silenced");
+    LOG(Periph, "[IpaqGen1Egpio] W8 +%u = 0x%02X -> latch 0x%04X (audio amp %s)\n",
+        off, value, after, (after & kAudioOutputEnable) ? "powered" : "off");
     NotifySink();
 }
 
+/* Halfword store of a uint16_t shadow: NetBSD
+   sys/arch/hpcarm/dev/ipaq_saip.c ipaq_attach. */
+void IpaqGen1Egpio::WriteHalf(uint32_t addr, uint16_t value) {
+    StoreLatch("WriteHalf", addr, value);
+}
+
 void IpaqGen1Egpio::WriteWord(uint32_t addr, uint32_t value) {
-    if (addr != MmioBase()) HaltUnsupportedAccess("WriteWord", addr, value);
-    latched_.store(value, std::memory_order_release);
-    LOG(Periph, "[IpaqGen1Egpio] W32 = 0x%08X (audio output %s)\n",
-        value, (value & kAudioOutputEnable) ? "on" : "silenced");
+    StoreLatch("WriteWord", addr, value);
+}
+
+void IpaqGen1Egpio::StoreLatch(const char* op, uint32_t addr, uint32_t value) {
+    if (addr != MmioBase()) HaltUnsupportedAccess(op, addr, value);
+    const uint16_t latched = static_cast<uint16_t>(value);
+    latched_.store(latched, std::memory_order_release);
+    LOG(Periph, "[IpaqGen1Egpio] %s = 0x%04X (audio amp %s)\n",
+        op, latched, (latched & kAudioOutputEnable) ? "powered" : "off");
     NotifySink();
 }
 
@@ -57,7 +60,7 @@ void IpaqGen1Egpio::SaveState(StateWriter& w) {
 }
 
 void IpaqGen1Egpio::RestoreState(StateReader& r) {
-    uint32_t v = 0;
+    uint16_t v = 0;
     r.Read(v);
     latched_.store(v, std::memory_order_release);
 }

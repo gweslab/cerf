@@ -4,7 +4,6 @@
 #include "../../core/string_utils.h"
 #include "../../boards/board_context.h"
 #include "../../socs/imx51/imx51_usboh3.h"
-#include "../../state/emulation_freeze.h"
 #include "../../host/host_widget_registry.h"
 #include "../../host/host_window.h"
 #include "../../host/emulation_pause.h"
@@ -41,7 +40,7 @@ public:
 
     void OnReady() override {
         controller_ = &emu_.Get<Imx51Usboh3>();
-        auto frozen = emu_.Get<EmulationFreeze>().SnapshotSection();
+        auto locked = controller_->LockHostPort();
         controller_->OtgHostRootPort().SetRestoreFactory([](uint32_t kind) -> std::unique_ptr<UsbDevice> {
             return kind == 4 ? std::make_unique<FordSync2UsbMediaHub>() : nullptr;
         });
@@ -51,7 +50,7 @@ public:
                 auto device = Open(i, media);
                 if (!device) {
                     LOG(Caution, "Media Hub: cannot open launch image '%s'\n", media.file.c_str());
-                    CerfFatalExit(CERF_FATAL_RUNTIME_ERROR);
+                    continue;
                 }
                 EnsureHub().SetMedia(i, std::move(device));
             }
@@ -82,7 +81,7 @@ private:
         return device;
     }
     std::wstring MediaName(int slot) const {
-        auto frozen = emu_.Get<EmulationFreeze>().SnapshotSection();
+        auto locked = controller_->LockHostPort();
         auto* hub = Hub();
         auto* device = hub ? hub->Port(slot).Device() : nullptr;
         if (!device) return L"Empty";
@@ -94,7 +93,7 @@ private:
         const bool was_paused = emu_.Get<EmulationPause>().IsPaused();
         runner.Pause();
         {
-            auto frozen = emu_.Get<EmulationFreeze>().SnapshotSection();
+            auto locked = controller_->LockHostPort();
             if (generation_[slot] == generation) {
                 auto* hub = Hub();
                 auto* current = hub ? static_cast<UsbMassStorageDevice*>(hub->Port(slot).Device()) : nullptr;
@@ -102,7 +101,6 @@ private:
                 if (media && current && current->ImagePath() ==
                     ResolveDeviceFile(emu_.Get<DeviceConfig>().device_name, media->file)) {
                     unchanged = slot == 1 || static_cast<FordSync2MediaHubSdReader*>(current)->Cid() == media->cid;
-                    // Changing identity for the same exclusively opened image needs a reopen.
                     if (!unchanged) hub->SetMedia(slot, {});
                 }
                 if (!unchanged) {

@@ -43,6 +43,7 @@ public:
     void DeliverSetup(const uint8_t setup[8]);
 
     UsbHostPort& OtgHostRootPort() { return otg_host_root_port_; }
+    std::unique_lock<std::mutex> LockHostPort() { return std::unique_lock(async_schedule_mtx_); }
 
     void OnPortConnectChanged(int port_index) override;
 

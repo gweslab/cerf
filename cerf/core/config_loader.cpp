@@ -148,8 +148,6 @@ void LoadRom(const json& root, DeviceConfig& config, const std::string& path) {
 
     if (r.contains("primary"))
         config.rom_primary = CfgReadOptString(r, "primary", path, "rom");
-    if (r.contains("sd_card_image") || r.contains("sd_card_cid") || r.contains("usb_disk_image"))
-        CfgFatal(path, "move SD/USB media to additional_packages.sd_cards / usb_disks");
     if (r.contains("eeprom"))
         config.rom_eeprom = CfgReadOptString(r, "eeprom", path, "rom");
     if (r.contains("recovery"))

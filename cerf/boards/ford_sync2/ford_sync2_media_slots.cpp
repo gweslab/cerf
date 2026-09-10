@@ -5,6 +5,7 @@
 #include "../../boards/board_context.h"
 #include "../../socs/imx51/imx51_usboh3.h"
 #include "../../host/host_widget_registry.h"
+#include "../../host/host_icon_cache.h"
 #include "../../host/host_window.h"
 #include "../../host/emulation_pause.h"
 #include "../../jit/jit_runner.h"
@@ -30,7 +31,10 @@ public:
         std::wstring WidgetName() const override { return slot_ == FordSync2MediaHub::kSdPort ? L"Media Hub SD" : L"Media Hub USB"; }
         WidgetGroup Group() const override { return WidgetGroup::Usb; }
         bool PrimaryActionOpensMenu() const override { return true; }
-        void DrawIcon(HDC dc, const RECT& box) const override { DrawChipIcon(dc, box); }
+        void DrawIcon(HDC dc, const RECT& box) const override {
+            owner_.emu_.Get<HostIconCache>().DrawCentered(dc, box,
+                slot_ == FordSync2MediaHub::kSdPort ? L"ICON_SD_MAP" : L"ICON_USB");
+        }
         std::wstring Tooltip() const override { return WidgetName() + L": " + owner_.MediaName(slot_); }
         std::vector<WidgetMenuItem> BuildMenu() override { return owner_.Menu(slot_); }
         void RestoreWidgetState(StateReader&) override { ++owner_.generation_[slot_]; }

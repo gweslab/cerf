@@ -1,0 +1,31 @@
+<svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+<g transform="rotate(-90 8 8)">
+<path d="M5.5 0.5H12.5C13.0523 0.5 13.5 0.947715 13.5 1.5V14.5C13.5 15.0523 13.0523 15.5 12.5 15.5H3.5C2.94772 15.5 2.5 15.0523 2.5 14.5V3.5L5.5 0.5Z" fill="#24282B" stroke="#C4C4C4" stroke-linejoin="round"/>
+<g fill="#E8BF65" clip-path="url(#card_interior)">
+<rect x="3.75" y="1.1" width="1" height="3.9"/>
+<rect x="5.25" y="1.1" width="1" height="3.9"/>
+<rect x="6.75" y="1.1" width="1" height="3.9"/>
+<rect x="8.25" y="1.1" width="1" height="3.9"/>
+<rect x="9.75" y="1.1" width="1" height="3.9"/>
+<rect x="11.25" y="1.1" width="1" height="3.9"/>
+</g>
+<g clip-path="url(#map_label)">
+<rect x="4" y="6.5" width="8" height="7" rx="0.5" fill="#B6D59C"/>
+<path d="M4 11L7 9L9 10L12 8V13H4V11Z" fill="#78AB79"/>
+<path d="M5.5 5.5L7 8.5L6 11L8.1 14.5" stroke="#529FC4" stroke-width="1.2"/>
+<path d="M2.25 7.5L7.5 10.5L14.25 12M7.5 15L9 10.5L12 5.5" stroke="#FFF4D7" stroke-linejoin="round"/>
+<g transform="translate(-1 3.5) rotate(90 10.5 8)">
+<path d="M12 8C12 9 10.5 10.5 10.5 10.5C10.5 10.5 9 9 9 8C9 7.17157 9.67157 6.5 10.5 6.5C11.3284 6.5 12 7.17157 12 8Z" fill="#C95045"/>
+<circle cx="10.5" cy="8" r="0.5" fill="#FFF4D7"/>
+</g>
+</g>
+</g>
+<defs>
+<clipPath id="card_interior">
+<path d="M5.70711 1H12.5A0.5 0.5 0 0 1 13 1.5V14.5A0.5 0.5 0 0 1 12.5 15H3.5A0.5 0.5 0 0 1 3 14.5V3.70711L5.70711 1Z"/>
+</clipPath>
+<clipPath id="map_label">
+<rect x="4" y="6.5" width="8" height="7" rx="0.5"/>
+</clipPath>
+</defs>
+</svg>

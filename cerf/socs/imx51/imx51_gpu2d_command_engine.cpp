@@ -247,11 +247,9 @@ void Imx51Gpu2dCommandEngine::StoreReg(uint32_t reg, uint32_t data) {
             if (data == 3u) return;
             Halt("G2D_IDLE mode (not modeled)", reg, data);
         case kAddrG2dSxy:
-            /* SXY fires the SCOORD1 copy only under INPUT=2 (sub_41C6C448 sets INPUT=2
-               then writes SXY last as the trigger). Any other INPUT = a plain coord
-               write, not a copy: sub_41C6B2FC clears SXY=0 mid-setup (INPUT=0) with its
-               op firing later at FLUSH; firing Copy there would Halt on unbound bases. */
-            if (vg_regs_[kAddrG2dInput] == 2u) {
+            /* SXY fires the source->dest copy under INPUT=0 (sub_41C6B2FC) or
+               INPUT=2 (sub_41C6C448); both write SXY last as the trigger. */
+            if (vg_regs_[kAddrG2dInput] == 0u || vg_regs_[kAddrG2dInput] == 2u) {
                 emu_.Get<Imx51Gpu2dDirect2d>().Copy(vg_regs_, data);
                 return;
             }

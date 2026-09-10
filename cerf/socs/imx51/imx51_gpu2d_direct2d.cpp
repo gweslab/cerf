@@ -7,6 +7,7 @@
 #include "../../cpu/emulated_memory.h"
 #include "imx51_gpu2d_rasterizer.h"
 #include "imx51_gpu2d_regfile.h"
+#include "imx51_gpu2d_blend.h"
 
 namespace {
 
@@ -34,14 +35,12 @@ void Imx51Gpu2dDirect2d::Halt(const uint32_t (&regs)[0x100], const char* why,
     CerfFatalExit(CERF_FATAL_RUNTIME_ERROR);
 }
 
-/* Blender gated off above -> ALPHABLEND is inert; admit its two ambient defaults
-   OBS_ENABLE[8] (surface-init) and PREMULTIPLYDST[14] (copy emitter sub_41C6C448
-   sets it blend-off), FATAL deliberate modulation. ROP 0x404 = surface-init
-   default (sub_41C61DB4), admitted as the ops' undecoded constant. */
+/* Admit ALPHABLEND's two ambient defaults: OBS_ENABLE[8] (surface-init) and
+   PREMULTIPLYDST[14] (copy emitter sub_41C6C448 sets it blend-off); Copy separately
+   gates PREMULTIPLYDST when blending. ROP 0x404 = surface-init default
+   (sub_41C61DB4), admitted as the ops' undecoded constant. */
 void Imx51Gpu2dDirect2d::CheckCommonGates(const uint32_t (&regs)[0x100]) const {
-    if (regs[0x11] & (1u << 5))  /* G2D_BLENDERCFG.ENABLE */
-        Halt(regs, "direct-2D op with blender enabled (not modeled)", 0x11u, regs[0x11]);
-    if (regs[0xC] & ~0x4100u)  /* ALPHABLEND OBS_ENABLE[8] | PREMULTIPLYDST[14], both inert */
+    if (regs[0xC] & ~0x4100u)  /* ALPHABLEND OBS_ENABLE[8] | PREMULTIPLYDST[14] */
         Halt(regs, "direct-2D op ALPHABLEND modulation (not modeled)", 0xCu, regs[0xC]);
     if (regs[0xD] != 0x404u)
         Halt(regs, "direct-2D op ROP (not modeled)", 0xDu, regs[0xD]);
@@ -60,6 +59,8 @@ void Imx51Gpu2dDirect2d::CheckCommonGates(const uint32_t (&regs)[0x100]) const {
 /* Direct-2D solid rect fill (fast path sub_41C6C6DC -> emitter sub_41C620DC:
    SCISSOR+XY+WIDTHHEIGHT+COLOR under INPUT=1, blender force-disabled). */
 void Imx51Gpu2dDirect2d::Fill(const uint32_t (&regs)[0x100]) {
+    if (regs[0x11] & (1u << 5))
+        Halt(regs, "direct-2D fill with blender enabled (not modeled)", 0x11u, regs[0x11]);
     CheckCommonGates(regs);
     if (regs[0xE] != 0u && regs[0xE] != 0xF000u)  /* G2D_CONFIG: ARGBMASK-all fill only */
         Halt(regs, "direct-2D fill CONFIG mode (not modeled)", 0xEu, regs[0xE]);
@@ -89,13 +90,17 @@ void Imx51Gpu2dDirect2d::Fill(const uint32_t (&regs)[0x100]) {
         static_cast<int32_t>(wh << 4) >> 20, static_cast<int32_t>(wh << 20) >> 20);
 }
 
-/* SCOORD1 source->dest copy (emitter sub_41C6C448, the EGL swap-buffer preserve
-   copy). Both CFG0/CFG1 = STRIDE|0x7000 (FORMAT 7, all swap fields 0), so it is a
-   byte-identical fmt7 copy - CopyRect must NOT permute channels despite CFG having
-   SWAPRB/SWAPBYTES fields. */
+/* Source->dest copy (sub_41C6C448 EGL swap-buffer preserve, sub_41C6B2FC texture
+   preparation). Both CFG0/CFG1 = STRIDE|0x7000 (FORMAT 7, all swap fields 0), so
+   the copy must NOT permute channels; the texture copy additionally un-premultiplies. */
 void Imx51Gpu2dDirect2d::Copy(const uint32_t (&regs)[0x100], uint32_t sxy) {
-    if (regs[kInput] != 2u)  /* G2D_INPUT SCOORD1 (sub_41C6C448 sets 2) */
+    if (regs[kInput] != 0u && regs[kInput] != 2u)
         Halt(regs, "SXY copy under unmodeled G2D_INPUT", kInput, regs[kInput]);
+    const bool unpremultiply = (regs[0x11] & (1u << 5)) != 0u;
+    /* sync_2 libOpenVG.dll FUN_41c58bd4: TEMP0=SOURCE*1, OOALPHA. */
+    if (unpremultiply && (regs[0x11] != 0x60u || regs[0x14] != 0x00012010u ||
+                         regs[0x18] != 0x00012010u || (regs[0xC] & 0x4000u)))
+        Halt(regs, "SXY copy blend program (not SOURCE with OOALPHA)", 0x11u, regs[0x11]);
     if (regs[0xE] != 2u)  /* G2D_CONFIG SRC1-only: DST[0]=0/SRC1[1]=1, no SRC2/SRC3/
                              colorkey/rotate/argbmask (vgregs_z160.h:2636-2655) */
         Halt(regs, "SXY copy CONFIG mode (not SRC1-only)", 0xEu, regs[0xE]);
@@ -125,6 +130,7 @@ void Imx51Gpu2dDirect2d::Copy(const uint32_t (&regs)[0x100], uint32_t sxy) {
     c.src_x = static_cast<int32_t>((sxy >> 16) & 0x7FFu);  /* G2D_SXY.X[26:16] unsigned 11 */
     c.src_y = static_cast<int32_t>(sxy & 0x7FFu);          /* G2D_SXY.Y[10:0] unsigned 11 */
     CopyRect(c);
+    if (unpremultiply) UnpremultiplyRect(c);
 }
 
 /* Both CFG0 (dest) and CFG1 (src) are STRIDE|0x7000 (FORMAT 7, all swap fields 0),
@@ -157,6 +163,37 @@ void Imx51Gpu2dDirect2d::CopyRect(const Gpu2dCopySpec& c) {
                 CerfFatalExit(CERF_FATAL_RUNTIME_ERROR);
             }
             *reinterpret_cast<uint32_t*>(dhp) = *reinterpret_cast<const uint32_t*>(shp);
+        }
+    }
+}
+
+void Imx51Gpu2dDirect2d::UnpremultiplyRect(const Gpu2dCopySpec& c) {
+    auto& mem = emu_.Get<EmulatedMemory>();
+    for (int32_t row = 0; row < c.h; ++row) {
+        const int32_t dy = c.dst_y + row;
+        if (dy < c.clip_t || dy > c.clip_b) continue;
+        for (int32_t col = 0; col < c.w; ++col) {
+            const int32_t dx = c.dst_x + col;
+            if (dx < c.clip_l || dx > c.clip_r) continue;
+            const uint32_t dpa = c.dst_pa + static_cast<uint32_t>((dy * c.dst_stride_dw
+                                                                   + dx) * 4);
+            uint8_t* dhp = mem.TryTranslateWrite(dpa);
+            if (!dhp) {
+                LOG(Caution, "[GPU2D-D2D] un-premultiply dest pixel unbacked pa=0x%08X (x=%d y=%d)\n",
+                    dpa, dx, dy);
+                CerfFatalExit(CERF_FATAL_RUNTIME_ERROR);
+            }
+            auto* pixel = reinterpret_cast<uint32_t*>(dhp);
+            const uint32_t alpha = *pixel >> 24;
+            if (alpha == 0u) {
+                *pixel = 0u;
+                continue;
+            }
+            if (alpha == 255u) continue;
+            using imx51_g2d_blend::UnpremultChannel;
+            *pixel = (alpha << 24) | (UnpremultChannel((*pixel >> 16) & 0xFFu, alpha) << 16)
+                | (UnpremultChannel((*pixel >> 8) & 0xFFu, alpha) << 8)
+                | UnpremultChannel(*pixel & 0xFFu, alpha);
         }
     }
 }

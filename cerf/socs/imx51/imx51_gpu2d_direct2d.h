@@ -18,16 +18,17 @@ public:
 
     /* Solid rect fill under G2D_INPUT 0x01/0x09 (fires on the G2D_COLOR latch). */
     void Fill(const uint32_t (&regs)[0x100]);
-    /* SCOORD1 source->dest rect copy under G2D_INPUT 0x02 (fires on the G2D_SXY
+    /* SCOORD1 source->dest rect copy under G2D_INPUT 0x00/0x02 (fires on the G2D_SXY
        write); `sxy` is the transient trigger value (source origin). */
     void Copy(const uint32_t (&regs)[0x100], uint32_t sxy);
 
 private:
-    /* Gates shared by Fill and Copy (blender/ALPHABLEND/ROP/gradient/MASK/dest
+    /* Gates shared by Fill and Copy (ALPHABLEND/ROP/gradient/MASK/dest
        format/BASE0); each op adds its own distinct gates on top. */
     void CheckCommonGates(const uint32_t (&regs)[0x100]) const;
     /* Byte-identical fmt7->fmt7 rect copy (SCOORD1 source-sample), dest-clipped. */
     void CopyRect(const Gpu2dCopySpec& c);
+    void UnpremultiplyRect(const Gpu2dCopySpec& c);
     [[noreturn]] void Halt(const uint32_t (&regs)[0x100], const char* why,
                            uint32_t addr, uint32_t data) const;
 };

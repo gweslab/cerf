@@ -33,6 +33,7 @@ void Imx51Gpu3dShader::Run(std::span<const uint32_t> program, bool pixel,
     state.export_mask = 0;
     state.memory_exports.clear();
     state.killed = false;
+    state.texture_lod = 0;
     auto control = [&](uint32_t pc) {
         if (uint64_t(pc) * 3u + 2u >= uint64_t(program.size()) * 2u) Reject("control address", pc);
         const size_t offset = size_t(pc / 2u) * 3u;
@@ -139,7 +140,6 @@ void Imx51Gpu3dShader::Alu(std::array<uint32_t, 3> w, bool pixel,
     if (vm) {
         if (vector_op == 31u) Reject("active VECTOR_NONE", vector_op);
         if (vector_op == 30u) Reject("reserved vector opcode", vector_op);
-        if (vector_op == 18u) Reject("unsupported vector opcode", vector_op);
     }
     if (sm) {
         if (scalar_op == 63u) Reject("active SCALAR_NONE", scalar_op);
@@ -164,6 +164,23 @@ void Imx51Gpu3dShader::Alu(std::array<uint32_t, 3> w, bool pixel,
         const uint32_t op = (w[2] >> 24) & 31u;
         Imx51Gpu3dVec4 c{};
         if ((op >= 11u && op <= 14u) || op == 17u) c = source(3u);
+        if (op == 18u) {
+            // Mesa ir2_nir.c emits direction.zzxy, direction.yxzz and consumes
+            // (T, S, 2*major, face). The axis/tie formula follows Xenia kCube;
+            // arbitrary operand pairs and nonfinite directions remain unsupported.
+            const float x = a[2], y = a[3], z = a[0];
+            if (a[1] != z || b[0] != y || b[1] != x || b[2] != z || b[3] != z)
+                Reject("cube operand layout", w[1]);
+            if (!std::isfinite(x) || !std::isfinite(y) || !std::isfinite(z) ||
+                (x == 0.0f && y == 0.0f && z == 0.0f))
+                Reject("cube direction", w[1]);
+            if (std::abs(z) >= std::abs(x) && std::abs(z) >= std::abs(y))
+                vector = {-y, z < 0.0f ? -x : x, 2.0f * z, z < 0.0f ? 5.0f : 4.0f};
+            else if (std::abs(y) >= std::abs(x))
+                vector = {y < 0.0f ? -z : z, x, 2.0f * y, y < 0.0f ? 3.0f : 2.0f};
+            else
+                vector = {-y, x < 0.0f ? z : -z, 2.0f * x, x < 0.0f ? 1.0f : 0.0f};
+        }
         float dot = 0;
         if (op == 15u || op == 16u || op == 17u) {
             const uint32_t count = op == 15u ? 4u : op == 16u ? 3u : 2u;
@@ -188,6 +205,7 @@ void Imx51Gpu3dShader::Alu(std::array<uint32_t, 3> w, bool pixel,
             case 13: vector[i] = a[i] >= 0 ? b[i] : c[i]; break;
             case 14: vector[i] = a[i] > 0 ? b[i] : c[i]; break;
             case 15: case 16: case 17: vector[i] = dot; break;
+            case 18: break;
             /* NXP yamato_enum.h: MAX4v; Xenia ucode.h: AluVectorOpcode::kMax4. */
             case 19:
                 vector[i] = a[0] > a[1] && a[0] > a[2] && a[0] > a[3] ? a[0]
@@ -297,6 +315,13 @@ void Imx51Gpu3dShader::Fetch(std::array<uint32_t, 3> w,
     const auto& input = state.registers[(w[0] >> 5) & 63u];
     Imx51Gpu3dVec4 value{};
     const uint32_t op = w[0] & 31u;
+    if (op == 24u) {
+        // Mesa ir2.c schedule_instrs / ir2_assemble.c: the setter selects one
+        // source component and preserves all ordinary destination components.
+        // Keep its value for subsequent samples; zero is our invocation default.
+        state.texture_lod = input[(w[0] >> 26) & 3u];
+        return;
+    }
     if (op == 1u) {
         Imx51Gpu3dVec4 coords{}, dx{}, dy{};
         const uint32_t source = (w[0] >> 5) & 63u;
@@ -308,7 +333,7 @@ void Imx51Gpu3dShader::Fetch(std::array<uint32_t, 3> w,
         }
         const bool gradients = (state.gradient_mask & (uint64_t{1} << source)) != 0;
         value = emu_.Get<Imx51Gpu3dTexture>().Sample(regs, config, (w[0] >> 20) & 31u, coords, w,
-            gradients ? &dx : nullptr, gradients ? &dy : nullptr);
+            gradients ? &dx : nullptr, gradients ? &dy : nullptr, state.texture_lod);
     } else if (op == 0u) {
         const uint32_t slot = (w[0] >> 20) & 31u, select = (w[0] >> 25) & 3u;
         if (select == 3u) Reject("vertex constant selector", select);

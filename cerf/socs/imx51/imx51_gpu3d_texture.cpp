@@ -18,7 +18,7 @@ bool Imx51Gpu3dTexture::ShouldRegister() {
    fd2_gmem.c: emit_mem2gmem_surf. */
 Imx51Gpu3dVec4 Imx51Gpu3dTexture::Sample(const std::unordered_map<uint32_t,uint32_t>& registers,
     uint32_t mmu_config, uint32_t slot, const Imx51Gpu3dVec4& coordinates,
-    std::array<uint32_t,3> instruction, const Imx51Gpu3dVec4* dx, const Imx51Gpu3dVec4* dy) {
+    std::array<uint32_t,3> instruction, const Imx51Gpu3dVec4* dx, const Imx51Gpu3dVec4* dy, float register_lod) {
 
     auto fail = [&](const char* reason, uint32_t value) {
         emu_.Get<Fatal>().Die("GPU texture %s slot=%u value=%08X", reason, slot, value);
@@ -43,14 +43,17 @@ Imx51Gpu3dVec4 Imx51Gpu3dTexture::Sample(const std::unordered_map<uint32_t,uint3
     if ((state[4] & 0x003FFC3Cu) != 0 || (state[3] & 0xFE07E000u) != 0 ||
         (instruction[2] & 0x7FFFFFFDu) != 0) fail("unsupported LOD/offset", state[4]);
     const uint32_t aniso = (instruction[1] >> 18) & 7u, arbitrary = (instruction[1] >> 21) & 7u;
+    const uint32_t reg_lod = (instruction[1] >> 29) & 3u;
+    const bool computed_lod = (instruction[1] & (1u << 28)) != 0;
     if ((aniso != 0u && aniso != 7u) || (arbitrary != 0u && arbitrary != 7u) ||
-        (instruction[1] & 0x60000000u) != 0) fail("unsupported anisotropy/register LOD",instruction[1]);
+        reg_lod > 1u) fail("unsupported anisotropy/register LOD",instruction[1]);
+    if (reg_lod && !std::isfinite(register_lod)) fail("nonfinite register LOD",instruction[1]);
     auto filter = [&](uint32_t shift, uint32_t constant_shift) {
         const uint32_t selected = (instruction[1] >> shift) & 3u;
         return selected == 3u ? (state[3] >> constant_shift) & 3u : selected;
     };
     const uint32_t mag = filter(12u,19u), min = filter(14u,21u), mip = filter(16u,23u);
-    const bool mipmapped = mip == 1u;
+    const bool mipmapped = mip <= 1u;
     if (mag > 1u || mag != min || (mip != 2u && !mipmapped)) fail("unsupported filter",instruction[1]);
     if (format != 6u && format != 4u && format != 2u && format != 15u && format != 10u) fail("unsupported format", format);
     const uint32_t bytes = format == 6u ? 4u : (format == 4u || format == 15u || format == 10u) ? 2u : 1u;
@@ -63,15 +66,21 @@ Imx51Gpu3dVec4 Imx51Gpu3dTexture::Sample(const std::unordered_map<uint32_t,uint3
 
             (width < 32u || width != height || !std::has_single_bit(width)) ? "mip dimensions" : pitch != width ? "mip pitch" :
             state[4] != (last_level << 6) ? "mip levels/LOD state" : (state[5] & 0xFFFu) != 0xA00u ? "mip packing controls" :
-            mag != 1u ? "mip spatial filter" : (instruction[0] & (1u << 25)) ? "mip denormalized coordinates" :
-            !(instruction[1] & (1u << 28)) ? "mip computed LOD disabled" : nullptr;
+            (instruction[0] & (1u << 25)) ? "mip denormalized coordinates" : nullptr;
         if (invalid) fail(invalid,state[5]);
-        if (!dx || !dy) fail("unavailable texture gradients",instruction[0]);
-        /* Khronos GLES 2.0.25 section 3.7.7, equations 3.12-3.16. */
-        const double rho = (std::max)(std::hypot((*dx)[0]*width,(*dx)[1]*height),
-                                     std::hypot((*dy)[0]*width,(*dy)[1]*height));
-        if (!std::isfinite(rho)) fail("nonfinite texture gradients",slot);
-        lod = rho > 1.0 ? (std::min)(double(last_level),std::log2(rho)) : 0.0;
+        if (computed_lod) {
+            if (!dx || !dy) fail("unavailable texture gradients",instruction[0]);
+            /* Khronos GLES 2.0.25 section 3.7.7, equations 3.12-3.16. */
+            const double rho = (std::max)(std::hypot(double((*dx)[0])*width,double((*dx)[1])*height),
+                                         std::hypot(double((*dy)[0])*width,double((*dy)[1])*height));
+            if (!std::isfinite(rho)) fail("nonfinite texture gradients",slot);
+            lod = rho > 0.0 ? std::log2(rho) : -INFINITY;
+        }
+        // Mesa emits register mode 1 for its extra LOD/bias source, with
+        // computed LOD enabled in fragment shaders and disabled in vertex shaders.
+        // Model it as a bias to computed LOD, or an explicit LOD when disabled.
+        if (reg_lod) lod += register_lod;
+        lod = std::clamp(lod, 0.0, double(last_level));
     }
     auto sample_level = [&](uint32_t level) {
     const uint32_t level_width = (std::max)(1u,width >> level), level_height = (std::max)(1u,height >> level);
@@ -143,6 +152,9 @@ Imx51Gpu3dVec4 Imx51Gpu3dTexture::Sample(const std::unordered_map<uint32_t,uint3
     for (unsigned k = 0; k < 4; ++k) result[k] = std::lerp(std::lerp(a[k],b[k],fx),std::lerp(c[k],d[k],fx),fy);
     return result;
     };
+    // Mesa instr-a2xx.h TEX_FILTER_POINT; GLES 2.0 equation 3.17:
+    // nearest-mipmap filters select the closest level, with ties going lower.
+    if (mip == 0u) lod = (std::max)(0.0, std::ceil(lod + 0.5) - 1.0);
     const uint32_t lower = static_cast<uint32_t>(std::floor(lod));
     auto result = sample_level(lower);
     if (lod > lower) {

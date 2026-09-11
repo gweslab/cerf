@@ -14,6 +14,7 @@ struct Imx51Gpu3dShaderState {
     std::array<Imx51Gpu3dVec4, 64> gradients_x{}, gradients_y{};
     uint64_t gradient_mask = 0;
     uint64_t export_mask = 0;
+    float texture_lod = 0;
     bool killed = false;
 };
 class Imx51Gpu3dShader : public Service {

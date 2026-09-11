@@ -82,8 +82,8 @@ void Imx51Gpu3dShader::Alu(std::array<uint32_t, 3> w, bool pixel,
         Reject("simultaneous address writes", scalar_op);
     if (!pixel && ((vector_op >= 24u && vector_op <= 27u) || (scalar_op >= 35u && scalar_op <= 39u)))
         Reject("vertex kill opcode", vector_op >= 24u && vector_op <= 27u ? vector_op : scalar_op);
-    if (vector_op >= 20u && vector_op <= 23u && scalar_op >= 27u && scalar_op <= 34u)
-        Reject("simultaneous predicate writes", scalar_op);
+    // Match Xenia ProcessAluInstruction: both slots use entry predication;
+    // scalar predicate writes follow vector writes and win when both are present.
     auto compare = [](uint32_t op, float a, float b) {
         return op == 0u ? a == b : op == 1u ? a != b : op == 2u ? a > b : a >= b;
     };
@@ -92,6 +92,13 @@ void Imx51Gpu3dShader::Alu(std::array<uint32_t, 3> w, bool pixel,
         // Saturate before casting, including NaN, to avoid host conversion UB.
         const float integral = std::floor(value + (round ? 0.5f : 0.0f));
         return !(integral >= -256.0f) ? -256 : integral > 255.0f ? 255 : static_cast<int32_t>(integral);
+    };
+    auto multiply = [](float a, float b) {
+        // Xenia ucode.h: legacy multiply, citing R5xx 8.7.5 and Adreno 200 tests.
+        // Zero/subnormal inputs produce +0 even when the other input is NaN/Inf.
+        if (std::abs(a) < std::numeric_limits<float>::min() ||
+            std::abs(b) < std::numeric_limits<float>::min()) return 0.0f;
+        return a * b;
     };
     Imx51Gpu3dVec4 vector{};
     float scalar = previous;
@@ -122,13 +129,15 @@ void Imx51Gpu3dShader::Alu(std::array<uint32_t, 3> w, bool pixel,
         float dot = 0;
         if (op == 15u || op == 16u || op == 17u) {
             const uint32_t count = op == 15u ? 4u : op == 16u ? 3u : 2u;
-            for (uint32_t i = 0; i < count; ++i) dot += a[i] * b[i];
+            for (uint32_t i = 0; i < count; ++i) dot += multiply(a[i], b[i]);
+            // Xenia kDp2Add/MSDN model: XY dot plus post-swizzle C.x.
+            // Mesa fdot2 uses a zero addend, which alone cannot distinguish lanes.
             if (op == 17u) dot += c[0];
         }
         for (uint32_t i = 0; i < 4u; ++i) {
             switch (op) {
             case 0: vector[i] = a[i] + b[i]; break;
-            case 1: vector[i] = a[i] * b[i]; break;
+            case 1: vector[i] = multiply(a[i], b[i]); break;
             case 2: vector[i] = std::fmax(a[i], b[i]); break;
             case 3: vector[i] = std::fmin(a[i], b[i]); break;
             case 4: vector[i] = a[i] == b[i] ? 1.0f : 0.0f; break;
@@ -138,7 +147,7 @@ void Imx51Gpu3dShader::Alu(std::array<uint32_t, 3> w, bool pixel,
             case 8: vector[i] = a[i] - std::floor(a[i]); break;
             case 9: vector[i] = std::trunc(a[i]); break;
             case 10: vector[i] = std::floor(a[i]); break;
-            case 11: vector[i] = a[i] * b[i] + c[i]; break;
+            case 11: vector[i] = multiply(a[i], b[i]) + c[i]; break;
             case 12: vector[i] = a[i] == 0 ? b[i] : c[i]; break;
             case 13: vector[i] = a[i] >= 0 ? b[i] : c[i]; break;
             case 14: vector[i] = a[i] > 0 ? b[i] : c[i]; break;
@@ -161,7 +170,7 @@ void Imx51Gpu3dShader::Alu(std::array<uint32_t, 3> w, bool pixel,
                 break;
             }
             /* NXP yamato_enum.h: DSTv; Xenia ucode.h: AluVectorOpcode::kDst. */
-            case 28: vector[i] = i == 0u ? 1.0f : i == 1u ? a[1] * b[1] : i == 2u ? a[2] : b[3]; break;
+            case 28: vector[i] = i == 0u ? 1.0f : i == 1u ? multiply(a[1], b[1]) : i == 2u ? a[2] : b[3]; break;
             // Mesa names MOVAv but does not lower it. Use the related Xenia
             // MAXA model: a0 comes from A.w, result is per-lane max(A, B).
             case 29: state.address_register = address(a[3], true); vector[i] = std::fmax(a[i], b[i]); break;
@@ -189,12 +198,12 @@ void Imx51Gpu3dShader::Alu(std::array<uint32_t, 3> w, bool pixel,
         switch (op) {
         case 0: scalar = a + b; break;
         case 1: scalar = a + previous; break;
-        case 2: scalar = a * b; break;
-        case 3: scalar = a * previous; break;
+        case 2: scalar = multiply(a, b); break;
+        case 3: scalar = multiply(a, previous); break;
         /* NXP yamato_enum.h: MUL_PREV2s; Xenia ucode.h: AluScalarOpcode::kMulsPrev2. */
         case 4:
             scalar = previous == -std::numeric_limits<float>::max() || !std::isfinite(previous) || !std::isfinite(b) || b <= 0.0f
-                ? -std::numeric_limits<float>::max() : a * previous; break;
+                ? -std::numeric_limits<float>::max() : multiply(a, previous); break;
         case 5: scalar = std::fmax(a, b); break;
         case 6: scalar = std::fmin(a, b); break;
         /* NXP yamato_enum.h: SETEs..SETNEs; Xenia ucode.h: AluScalarOpcode::kSeqs..kSnes. */
@@ -233,7 +242,7 @@ void Imx51Gpu3dShader::Alu(std::array<uint32_t, 3> w, bool pixel,
             state.killed |= kill; scalar = kill ? 1.0f : 0.0f; break;
         }
         case 40: scalar = std::sqrt(a); break;
-        case 42: case 43: scalar = a * b; break;
+        case 42: case 43: scalar = multiply(a, b); break;
         case 44: case 45: scalar = a + b; break;
         case 46: case 47: scalar = a - b; break;
         /* Mesa ir2_nir.c: nir_op_fsin, nir_op_fcos; Xenia ucode.h: kSin, kCos. */

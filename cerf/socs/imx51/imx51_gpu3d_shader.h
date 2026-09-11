@@ -18,6 +18,7 @@ struct Imx51Gpu3dShaderState {
     int32_t loop_address = 0;
     Imx51Gpu3dVec4 texture_gradients_x{}, texture_gradients_y{};
     bool killed = false;
+    int32_t address_register = 0;
 };
 class Imx51Gpu3dShader : public Service {
 public:

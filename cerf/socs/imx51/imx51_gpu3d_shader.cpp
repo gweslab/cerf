@@ -23,26 +23,43 @@ uint32_t Imx51Gpu3dShader::Register(const std::unordered_map<uint32_t, uint32_t>
     return it->second;
 }
 
+/* Mesa e97ad748 instr-a2xx.h: instr_alu_t; disasm-a2xx.c: print_srcreg;
+   ir2_assemble.c: alu_swizzle_scalar, alu_swizzle_scalar2, src_reg_byte;
+   ir2_nir.c: emit_alu, store_output, extra_position_exports;
+   ir2_assemble.c: relative_addr on export32; fd2_gmem.c: binning export constants. */
 void Imx51Gpu3dShader::Alu(std::array<uint32_t, 3> w, bool pixel,
                           const std::unordered_map<uint32_t, uint32_t>& regs,
                           Imx51Gpu3dShaderState& state, bool& predicate, float& previous) {
     const uint32_t pred = (w[1] >> 27) & 3u;
     if (pred == 1u) Reject("ALU predicate selection", pred);
     if (pred && predicate != ((pred & 1u) != 0)) return;
-    if ((w[0] & 0x4040u) || (w[1] & 0xC0000000u)) Reject("relative ALU addressing", w[1]);
+    // Snapshot addressing before either paired slot can update MOVA state.
+    const int32_t old_address = state.address_register, loop_address = state.loop_address;
+    auto temporary_index = [&](uint32_t index, bool relative) {
+        const int64_t effective = int64_t(index) + (relative ? loop_address : 0);
+        if (effective < 0 || effective >= 64) Reject("ALU register extent", static_cast<uint32_t>(effective));
+        return static_cast<uint32_t>(effective);
+    };
     auto source = [&](uint32_t which, bool force_constant = false) {
         const uint32_t shift = (3u - which) * 8u;
         const uint32_t index = (w[2] >> shift) & 255u;
         const bool temporary = !force_constant && ((w[2] >> (32u - which)) & 1u) != 0;
         Imx51Gpu3dVec4 raw{}, result{};
         if (temporary) {
-            if (index & 64u) Reject("ALU register bank", index);
-            raw = state.registers[index & 63u];
+            raw = state.registers[temporary_index(index & 63u, (index & 64u) != 0)];
             if (index & 128u) for (auto& value : raw) value = std::abs(value);
         } else {
-            const uint32_t base = (w[1] & 0x20000000u) ? 0u : Register(regs, pixel ? 0x2308u : 0x2307u) & 511u;
-            if (base + index >= 512u) Reject("constant extent", base + index);
-            for (uint32_t i = 0; i < 4u; ++i) raw[i] = std::bit_cast<float>(Register(regs, 0x4000u + (base + index) * 4u + i));
+            // Related Xenia model: first constant uses const_0_rel_abs; later
+            // constant operands share const_1_rel_abs. A2xx has the same fields.
+            const bool first = which == 1u || (which == 2u ? (w[2] & 0x80000000u) != 0 : (w[2] & 0xC0000000u) == 0xC0000000u);
+            const bool relative = ((w[1] >> (first ? 31u : 30u)) & 1u) != 0;
+            const bool use_address = (w[1] & 0x20000000u) != 0;
+            // Keep Mesa's special absolute export32 constant base workaround.
+            const bool export32 = (w[0] & 0x803Fu) == 0x8020u && use_address && !relative;
+            const uint32_t base = export32 ? 0u : Register(regs, pixel ? 0x2308u : 0x2307u) & 511u;
+            const int64_t effective = int64_t(base) + index + (relative ? (use_address ? old_address : loop_address) : 0);
+            if (effective < 0 || effective >= 512) Reject("constant extent", static_cast<uint32_t>(effective));
+            for (uint32_t i = 0; i < 4u; ++i) raw[i] = std::bit_cast<float>(Register(regs, 0x4000u + static_cast<uint32_t>(effective) * 4u + i));
         }
         const uint32_t swizzle = (w[1] >> shift) & 255u;
         const bool negate = ((w[1] >> (27u - which)) & 1u) != 0;
@@ -60,10 +77,9 @@ void Imx51Gpu3dShader::Alu(std::array<uint32_t, 3> w, bool pixel,
     if (sm) {
         if (scalar_op == 63u) Reject("active SCALAR_NONE", scalar_op);
         if (scalar_op == 41u || scalar_op > 50u) Reject("reserved scalar opcode", scalar_op);
-        if (scalar_op == 23u || scalar_op == 24u)
-            Reject("unsupported scalar opcode", scalar_op);
     }
-    if (vector_op == 29u) Reject("vector side effects", vector_op);
+    if (vector_op == 29u && (scalar_op == 23u || scalar_op == 24u))
+        Reject("simultaneous address writes", scalar_op);
     if (!pixel && ((vector_op >= 24u && vector_op <= 27u) || (scalar_op >= 35u && scalar_op <= 39u)))
         Reject("vertex kill opcode", vector_op >= 24u && vector_op <= 27u ? vector_op : scalar_op);
     if (vector_op >= 20u && vector_op <= 23u && scalar_op >= 27u && scalar_op <= 34u)
@@ -71,12 +87,18 @@ void Imx51Gpu3dShader::Alu(std::array<uint32_t, 3> w, bool pixel,
     auto compare = [](uint32_t op, float a, float b) {
         return op == 0u ? a == b : op == 1u ? a != b : op == 2u ? a > b : a >= b;
     };
+    auto address = [](float value, bool round) {
+        // MOVA conversion follows the related Xenia kMaxAs/kMaxAsf model.
+        // Saturate before casting, including NaN, to avoid host conversion UB.
+        const float integral = std::floor(value + (round ? 0.5f : 0.0f));
+        return !(integral >= -256.0f) ? -256 : integral > 255.0f ? 255 : static_cast<int32_t>(integral);
+    };
     Imx51Gpu3dVec4 vector{};
     float scalar = previous;
     /* NXP yamato_enum.h: PRED_SETE_PUSHv..KILLNEv; Mesa ir2_ra.c: has_side_effects;
        Xenia ucode.h: AluVectorOpcode::kSetpEqPush..kKillNe. */
-    if (vm || (vector_op >= 20u && vector_op <= 27u)) {
-        const auto a = source(1u), b = (vector_op >= 8u && vector_op <= 10u) || vector_op == 19u ? Imx51Gpu3dVec4{} : source(2u);
+    if (vm || vector_op == 29u || (vector_op >= 20u && vector_op <= 27u)) {
+        const auto a = source(1u), b = (vector_op >= 8u && vector_op <= 10u) || vector_op == 19u || (vector_op == 29u && !vm) ? Imx51Gpu3dVec4{} : source(2u);
         const uint32_t op = (w[2] >> 24) & 31u;
         Imx51Gpu3dVec4 c{};
         if ((op >= 11u && op <= 14u) || op == 17u) c = source(3u);
@@ -140,12 +162,15 @@ void Imx51Gpu3dShader::Alu(std::array<uint32_t, 3> w, bool pixel,
             }
             /* NXP yamato_enum.h: DSTv; Xenia ucode.h: AluVectorOpcode::kDst. */
             case 28: vector[i] = i == 0u ? 1.0f : i == 1u ? a[1] * b[1] : i == 2u ? a[2] : b[3]; break;
+            // Mesa names MOVAv but does not lower it. Use the related Xenia
+            // MAXA model: a0 comes from A.w, result is per-lane max(A, B).
+            case 29: state.address_register = address(a[3], true); vector[i] = std::fmax(a[i], b[i]); break;
             default: Reject("vector opcode", op);
             }
         }
     }
     /* Mesa ir2_ra.c: has_side_effects; Xenia ucode.h: AluScalarOpcodeInfo. */
-    if (sm || (scalar_op >= 27u && scalar_op <= 39u)) {
+    if (sm || scalar_op == 23u || scalar_op == 24u || (scalar_op >= 27u && scalar_op <= 39u)) {
         const bool constant_op = scalar_op >= 42u && scalar_op <= 47u;
         const auto c = scalar_op == 33u || scalar_op == 50u ? Imx51Gpu3dVec4{} : source(3u, constant_op);
         const float a = c[3];
@@ -191,6 +216,8 @@ void Imx51Gpu3dShader::Alu(std::array<uint32_t, 3> w, bool pixel,
         case 20: scalar = std::clamp(1.0f / std::sqrt(a), -std::numeric_limits<float>::max(), std::numeric_limits<float>::max()); break;
         case 21: scalar = 1.0f / std::sqrt(a); if (std::isinf(scalar)) scalar = std::copysign(0.0f, scalar); break;
         case 22: scalar = 1.0f / std::sqrt(a); break;
+        case 23: state.address_register = address(a, true); scalar = std::fmax(a, b); break;
+        case 24: state.address_register = address(a, false); scalar = std::fmax(a, b); break;
         case 25: scalar = a - b; break;
         case 26: scalar = a - previous; break;
         /* NXP yamato_enum.h: PRED_SETEs..KILLONEs; Mesa ir2_nir.c: emit_if;
@@ -217,10 +244,12 @@ void Imx51Gpu3dShader::Alu(std::array<uint32_t, 3> w, bool pixel,
         }
         previous = scalar;
     }
-    auto write = [&](uint32_t index, uint32_t mask, const Imx51Gpu3dVec4& values, bool clamp) {
+    auto write = [&](uint32_t index, uint32_t mask, const Imx51Gpu3dVec4& values, bool clamp, bool relative) {
         if (!mask) return;
         const bool output = (w[0] & 0x8000u) != 0;
         if (output && state.killed) return;
+        if (output && relative) Reject("relative ALU export", index);
+        if (!output) index = temporary_index(index, relative);
         if (output && index >= 34u && index < 62u) Reject("memory export register", index);
         if (!output) state.gradient_mask &= ~(uint64_t{1} << index);
         auto& target = output ? state.exports[index] : state.registers[index];
@@ -231,8 +260,8 @@ void Imx51Gpu3dShader::Alu(std::array<uint32_t, 3> w, bool pixel,
             state.memory_exports.push_back({state.exports[32], state.exports[33]});
         }
     };
-    write(w[0] & 63u, vm, vector, ((w[0] >> 24) & 1u) != 0);
-    write((w[0] >> 8) & 63u, sm, {scalar, scalar, scalar, scalar}, ((w[0] >> 25) & 1u) != 0);
+    write(w[0] & 63u, vm, vector, ((w[0] >> 24) & 1u) != 0, (w[0] & 64u) != 0);
+    write((w[0] >> 8) & 63u, sm, {scalar, scalar, scalar, scalar}, ((w[0] >> 25) & 1u) != 0, (w[0] & 0x4000u) != 0);
 }
 
 /* Mesa e97ad748 instr-a2xx.h: instr_fetch_vtx_t, instr_fetch_tex_t;
@@ -243,8 +272,13 @@ void Imx51Gpu3dShader::Fetch(std::array<uint32_t, 3> w,
                             const std::unordered_map<uint32_t, uint32_t>& regs,
                             uint32_t config, Imx51Gpu3dShaderState& state, bool predicate) {
     if ((w[1] >> 31) && predicate != ((w[2] >> 31) != 0)) return;
-    if (w[0] & 0x40800u) Reject("relative fetch addressing", w[0]);
-    const auto& input = state.registers[(w[0] >> 5) & 63u];
+    auto fetch_index = [&](uint32_t shift) {
+        const int64_t index = int64_t((w[0] >> shift) & 63u) + (((w[0] >> (shift + 6u)) & 1u) ? state.loop_address : 0);
+        if (index < 0 || index >= 64) Reject("fetch register extent", static_cast<uint32_t>(index));
+        return static_cast<uint32_t>(index);
+    };
+    const uint32_t source = fetch_index(5u), destination = fetch_index(12u);
+    const auto& input = state.registers[source];
     Imx51Gpu3dVec4 value{};
     const uint32_t op = w[0] & 31u;
     if (op == 24u) {
@@ -264,7 +298,6 @@ void Imx51Gpu3dShader::Fetch(std::array<uint32_t, 3> w,
     }
     if (op == 18u) {
         if ((w[2] & 0x7FFFFFFDu) || (w[1] & 0x60000000u)) Reject("gradient query controls", w[1]);
-        const uint32_t source = (w[0] >> 5) & 63u;
         if (!(state.gradient_mask & (uint64_t{1} << source))) Reject("unavailable query gradients", w[0]);
         // Provisional Xenos layout: XZ=ddx(source.xy), YW=ddy(source.xy).
         // The quad executor supplies finite differences after coordinate ALU.
@@ -275,7 +308,6 @@ void Imx51Gpu3dShader::Fetch(std::array<uint32_t, 3> w,
         }
     } else if (op == 1u) {
         Imx51Gpu3dVec4 coords{}, dx{}, dy{};
-        const uint32_t source = (w[0] >> 5) & 63u;
         for (uint32_t i = 0; i < 3u; ++i) {
             const uint32_t component = (w[0] >> (26u + i * 2u)) & 3u;
             coords[i] = input[component];
@@ -348,8 +380,8 @@ void Imx51Gpu3dShader::Fetch(std::array<uint32_t, 3> w,
             value[i] = std::ldexp(value[i], exponent);
         }
     } else Reject("fetch opcode", op);
-    state.gradient_mask &= ~(uint64_t{1} << ((w[0] >> 12) & 63u));
-    auto& dest = state.registers[(w[0] >> 12) & 63u];
+    state.gradient_mask &= ~(uint64_t{1} << destination);
+    auto& dest = state.registers[destination];
     for (uint32_t i = 0; i < 4u; ++i) {
         const uint32_t swizzle = (w[1] >> (i * 3u)) & 7u;
         if (swizzle < 4u) dest[i] = value[swizzle];

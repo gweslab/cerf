@@ -55,6 +55,7 @@ void Imx51Gpu3dShader::RunInvocations(std::span<const uint32_t> program, bool pi
         state.export_mask = 0;
         state.memory_exports.clear();
         state.killed = false;
+        state.address_register = 0;
         state.texture_lod = 0;
         state.texture_gradients_x = {};
         state.texture_gradients_y = {};
@@ -208,23 +209,35 @@ void Imx51Gpu3dShader::RunInvocations(std::span<const uint32_t> program, bool pi
         bool aligned = quad;
         for (size_t lane = 0; lane < states.size(); ++lane)
             aligned &= ready[lane] && cursors[lane].address == cursors[0].address;
-        // Snapshot all source values before any FETCH can overwrite a register.
+        // Resolve each lane separately: loop-relative operands may name different registers.
+        std::array<uint32_t, 4> sources{};
+        std::array<bool, 4> source_valid{};
         for (size_t lane = 0; quad && lane < states.size(); ++lane) if (ready[lane]) {
-            const uint32_t word = program[size_t(cursors[lane].address) * 3u];
-            const uint32_t source = (word >> 5) & 63u;
-            states[lane].gradient_mask &= ~(uint64_t{1} << source);
-            if (aligned) {
-                for (unsigned component = 0; component < 4u; ++component) {
-                    states[lane].gradients_x[source][component] = states[lane | 1u].registers[source][component]
-                        - states[lane & ~size_t{1}].registers[source][component];
-                    states[lane].gradients_y[source][component] = states[lane | 2u].registers[source][component]
-                        - states[lane & ~size_t{2}].registers[source][component];
-                }
-                states[lane].gradient_mask |= uint64_t{1} << source;
+            const size_t offset = size_t(cursors[lane].address) * 3u;
+            const uint32_t word = program[offset];
+            const bool active = !(program[offset + 1u] >> 31) ||
+                cursors[lane].predicate == ((program[offset + 2u] >> 31) != 0);
+            const int64_t index = int64_t((word >> 5) & 63u) +
+                ((word & (1u << 11)) ? states[lane].loop_address : 0);
+            source_valid[lane] = active && index >= 0 && index < 64;
+            aligned &= source_valid[lane];
+            if (source_valid[lane]) {
+                sources[lane] = static_cast<uint32_t>(index);
+                states[lane].gradient_mask &= ~(uint64_t{1} << sources[lane]);
             }
-            // Divergent fetch sites retain unavailable gradients. Explicit-LOD
-            // samples remain usable; implicit derivatives there are undefined
-            // by GLSL ES 1.00 Appendix A, section 6.
+        }
+        // Snapshot before any FETCH overwrites its source; divergent sites stay unavailable.
+        for (size_t lane = 0; aligned && lane < states.size(); ++lane) {
+            const uint32_t source = sources[lane];
+            for (unsigned component = 0; component < 4u; ++component) {
+                states[lane].gradients_x[source][component] =
+                    states[lane | 1u].registers[sources[lane | 1u]][component] -
+                    states[lane & ~size_t{1}].registers[sources[lane & ~size_t{1}]][component];
+                states[lane].gradients_y[source][component] =
+                    states[lane | 2u].registers[sources[lane | 2u]][component] -
+                    states[lane & ~size_t{2}].registers[sources[lane & ~size_t{2}]][component];
+            }
+            states[lane].gradient_mask |= uint64_t{1} << source;
         }
         for (size_t lane = 0; lane < states.size(); ++lane) if (ready[lane]) {
             auto& cursor = cursors[lane];
@@ -237,7 +250,3 @@ void Imx51Gpu3dShader::RunInvocations(std::span<const uint32_t> program, bool pi
         }
     }
 }
-/* Mesa e97ad748 instr-a2xx.h: instr_alu_t; disasm-a2xx.c: print_srcreg;
-   ir2_assemble.c: alu_swizzle_scalar, alu_swizzle_scalar2, src_reg_byte;
-   ir2_nir.c: emit_alu, store_output, extra_position_exports;
-   ir2_assemble.c: relative_addr on export32; fd2_gmem.c: binning export constants. */

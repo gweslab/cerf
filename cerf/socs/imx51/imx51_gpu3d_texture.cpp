@@ -34,9 +34,11 @@ Imx51Gpu3dVec4 Imx51Gpu3dTexture::Sample(const std::unordered_map<uint32_t,uint3
     const uint32_t width = (state[2] & 8191u) + 1u, height = ((state[2] >> 13) & 8191u) + 1u;
     const uint32_t clamp_x = (state[0] >> 10) & 7u, clamp_y = (state[0] >> 13) & 7u;
     const bool tiled = (state[0] & 0x80000000u) != 0;
+    const uint32_t dimension = (state[5] >> 9) & 3u;
+    const bool cube = dimension == 3u;
     if ((state[0] & 0x000003FDu) != 0 || ((state[1] >> 6) & 15u) != 0 || (state[3] & 1u) != 0)
         fail("unsupported type/sign/endian", state[0]);
-    if (((state[5] >> 9) & 3u) != 1u || (state[2] >> 26) != 0 || pitch < width)
+    if ((dimension != 1u && !cube) || (state[2] >> 26) != 0 || pitch < width)
         fail("unsupported dimension/pitch", state[5]);
     if ((clamp_x != 0u && clamp_x != 1u && clamp_x != 2u) ||
         (clamp_y != 0u && clamp_y != 1u && clamp_y != 2u)) fail("unsupported clamp", state[0]);
@@ -57,6 +59,18 @@ Imx51Gpu3dVec4 Imx51Gpu3dTexture::Sample(const std::unordered_map<uint32_t,uint3
     if (mag > 1u || mag != min || (mip != 2u && !mipmapped)) fail("unsupported filter",instruction[1]);
     if (format != 6u && format != 4u && format != 2u && format != 15u && format != 10u) fail("unsupported format", format);
     const uint32_t bytes = format == 6u ? 4u : (format == 4u || format == 15u || format == 10u) ? 2u : 1u;
+    uint32_t face = 0;
+    if (cube) {
+        // Mesa fd2_layout_resource allocates each linear face with a 32-row
+        // padded height and 4096-byte size alignment; fd2_tile_mode disables tiling.
+        if (tiled || mipmapped || width != height || (state[5] & 0xFFFu) != 0x600u ||
+            clamp_x != 2u || clamp_y != 2u || (instruction[0] & (1u << 25)))
+            fail("unsupported cube layout/filter",state[5]);
+        const float selected = coordinates[2];
+        if (!std::isfinite(selected) || selected < 0 || selected > 5 || selected != std::floor(selected))
+            fail("cube face",slot);
+        face = static_cast<uint32_t>(selected);
+    }
     double lod = 0;
     const uint32_t last_level = std::bit_width(width)-1u;
     if (mipmapped) {
@@ -89,6 +103,7 @@ Imx51Gpu3dVec4 Imx51Gpu3dTexture::Sample(const std::unordered_map<uint32_t,uint3
     const uint32_t level_pitch = level ? (std::max)(32u,pitch >> level) : pitch;
     uint32_t mip_x = 0, mip_y = 0;
     uint64_t base = (level ? state[5] : state[1]) & 0xFFFFF000u;
+    if (cube) base += face * ((uint64_t(pitch) * ((height + 31u) & ~31u) * bytes + 4095u) & ~uint64_t{4095u});
     if (level) {
         for (uint32_t preceding = 1; preceding < (std::min)(level,tail_level); ++preceding) {
             const uint64_t side = (std::max)(32u,width >> preceding);
@@ -106,6 +121,8 @@ Imx51Gpu3dVec4 Imx51Gpu3dTexture::Sample(const std::unordered_map<uint32_t,uint3
         uint64_t(height - 1u) * pitch * bytes + uint64_t(width) * bytes, mmu_config);
     double u = coordinates[0], v = coordinates[1];
     if (!std::isfinite(u) || !std::isfinite(v)) fail("nonfinite coordinate", instruction[0]);
+    // Mesa ir2_nir emits CUBE, reciprocal major axis, +1.5, then YXW fetch.
+    if (cube) { u -= 1.0; v -= 1.0; }
     if ((instruction[0] & (1u << 25)) == 0) { u *= level_width; v *= level_height; }
     auto reduce = [](double x, uint32_t size, uint32_t clamp) {
         if (clamp == 2u) return std::clamp(x, 0.0, double(size));

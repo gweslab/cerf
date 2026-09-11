@@ -136,10 +136,10 @@ void Imx51Gpu3dShader::Alu(std::array<uint32_t, 3> w, bool pixel,
     if (pred == 1u) Reject("ALU predicate selection", pred);
     if (pred && predicate != ((pred & 1u) != 0)) return;
     if ((w[0] & 0x4040u) || (w[1] & 0xC0000000u)) Reject("relative ALU addressing", w[1]);
-    auto source = [&](uint32_t which) {
+    auto source = [&](uint32_t which, bool force_constant = false) {
         const uint32_t shift = (3u - which) * 8u;
         const uint32_t index = (w[2] >> shift) & 255u;
-        const bool temporary = ((w[2] >> (32u - which)) & 1u) != 0;
+        const bool temporary = !force_constant && ((w[2] >> (32u - which)) & 1u) != 0;
         Imx51Gpu3dVec4 raw{}, result{};
         if (temporary) {
             if (index & 64u) Reject("ALU register bank", index);
@@ -166,7 +166,7 @@ void Imx51Gpu3dShader::Alu(std::array<uint32_t, 3> w, bool pixel,
     if (sm) {
         if (scalar_op == 63u) Reject("active SCALAR_NONE", scalar_op);
         if (scalar_op == 41u || scalar_op > 50u) Reject("reserved scalar opcode", scalar_op);
-        if (scalar_op == 23u || scalar_op == 24u || (scalar_op >= 42u && scalar_op <= 47u))
+        if (scalar_op == 23u || scalar_op == 24u)
             Reject("unsupported scalar opcode", scalar_op);
     }
     if (vector_op == 29u) Reject("vector side effects", vector_op);
@@ -252,8 +252,20 @@ void Imx51Gpu3dShader::Alu(std::array<uint32_t, 3> w, bool pixel,
     }
     /* Mesa ir2_ra.c: has_side_effects; Xenia ucode.h: AluScalarOpcodeInfo. */
     if (sm || (scalar_op >= 27u && scalar_op <= 39u)) {
-        const auto c = scalar_op == 33u || scalar_op == 50u ? Imx51Gpu3dVec4{} : source(3u);
-        const float a = c[3], b = c[2];
+        const bool constant_op = scalar_op >= 42u && scalar_op <= 47u;
+        const auto c = scalar_op == 33u || scalar_op == 50u ? Imx51Gpu3dVec4{} : source(3u, constant_op);
+        const float a = c[3];
+        float b = c[2];
+        if (constant_op) {
+            // Xenia scalar_const_reg_op_src_temp_reg / ParseAluInstruction:
+            // A2xx shares these opcode/operand fields. Source 3 is the full-byte
+            // constant index; opcode bit 0, src3_sel and swizzle bits 2..5 name R.
+            // This special form uses constant W and temporary X swizzle fields.
+            const uint32_t swizzle = w[1] & 255u;
+            const uint32_t index = (scalar_op & 1u) | (((w[2] >> 29) & 1u) << 1) | (swizzle & 60u);
+            b = state.registers[index][swizzle & 3u];
+            if (w[1] & 0x1000000u) b = -b;
+        }
         const uint32_t op = w[0] >> 26;
         switch (op) {
         case 0: scalar = a + b; break;
@@ -300,6 +312,9 @@ void Imx51Gpu3dShader::Alu(std::array<uint32_t, 3> w, bool pixel,
             state.killed |= kill; scalar = kill ? 1.0f : 0.0f; break;
         }
         case 40: scalar = std::sqrt(a); break;
+        case 42: case 43: scalar = a * b; break;
+        case 44: case 45: scalar = a + b; break;
+        case 46: case 47: scalar = a - b; break;
         /* Mesa ir2_nir.c: nir_op_fsin, nir_op_fcos; Xenia ucode.h: kSin, kCos. */
         case 48: scalar = std::sin(a); break;
         case 49: scalar = std::cos(a); break;

@@ -320,22 +320,54 @@ void Imx51Gpu3dShader::Fetch(std::array<uint32_t, 3> w,
         const uint32_t unit = (Register(regs, 0x0E1Eu) & 2u) ? 1u : 4u;
         const uint64_t offset = (uint64_t(static_cast<uint32_t>(index)) * (w[2] & 255u) + ((w[2] >> 8) & 0x3FFFFFu)) * unit;
         const uint32_t format = (w[1] >> 16) & 63u;
-        uint32_t count = 0, bytes = 0;
-        if (format == 36u || format == 37u || format == 38u || format == 57u) {
-            count = format == 36u ? 1u : format == 37u ? 2u : format == 57u ? 3u : 4u; bytes = count * 4u;
-        } else if (format == 6u) { count = 4u; bytes = 4u; }
-        else Reject("vertex format", format);
+        // Mesa fd2_pipe2surface / patch_vtx_fetch: component widths and signed,
+        // normalized and fixed-point controls are independent of the surface format.
+        uint32_t count = 0, component_bytes = 0;
+        bool floating = false;
+        switch (format) {
+        case 2: count = 1; component_bytes = 1; break;
+        case 10: count = 2; component_bytes = 1; break;
+        case 6: count = 4; component_bytes = 1; break;
+        case 24: case 25: case 26:
+            count = 1u << (format - 24u); component_bytes = 2; break;
+        case 30: case 31: case 32:
+            count = 1u << (format - 30u); component_bytes = 2; floating = true; break;
+        case 33: case 34: case 35:
+            count = 1u << (format - 33u); component_bytes = 4; break;
+        case 36: case 37: case 38: case 57:
+            count = format == 57u ? 3u : 1u << (format - 36u);
+            component_bytes = 4; floating = true; break;
+        default: Reject("vertex format", format);
+        }
+        const uint32_t bytes = count * component_bytes;
         if (offset + bytes > size) Reject("vertex buffer extent", size);
-        if ((w[1] >> 24) & 63u) Reject("vertex exponent adjustment", w[1]);
+        const bool signed_components = (w[1] & 0x1000u) != 0;
+        const bool normalized = (w[1] & 0x2000u) == 0;
+        if (!floating && signed_components && normalized && (w[1] & 0x4000u))
+            Reject("vertex signed repeating fraction mode", w[1]);
+        const int exponent = int((w[1] >> 24) & 31u) - int((w[1] >> 24) & 32u);
         const uint8_t* data = emu_.Get<Imx51Gpu3dMemory>().ReadSpan(uint64_t(base & ~3u) + offset, bytes, config);
         for (uint32_t i = 0; i < count; ++i) {
-            if (format == 6u) {
-                if (w[1] & 0x1000u) Reject("signed vertex byte format", w[1]);
-                value[i] = float(data[i]) / ((w[1] & 0x2000u) ? 1.0f : 255.0f);
+            uint32_t packed = 0;
+            for (uint32_t j = 0; j < component_bytes; ++j)
+                packed |= uint32_t(data[i * component_bytes + j]) << (j * 8u);
+            if (floating && component_bytes == 4u) value[i] = std::bit_cast<float>(packed);
+            else if (floating) {
+                const uint32_t exp = (packed >> 10) & 31u, fraction = packed & 1023u;
+                if (exp == 31u) value[i] = std::bit_cast<float>(0x7F800000u | (fraction << 13));
+                else value[i] = std::ldexp(float(exp ? fraction + 1024u : fraction), exp ? int(exp) - 25 : -24);
+                if (packed & 0x8000u) value[i] = -value[i];
             } else {
-                const auto* p = data + i * 4u;
-                value[i] = std::bit_cast<float>(uint32_t(p[0]) | (uint32_t(p[1]) << 8) | (uint32_t(p[2]) << 16) | (uint32_t(p[3]) << 24));
+                const uint32_t bits = component_bytes * 8u;
+                const uint64_t range = uint64_t{1} << bits;
+                const int64_t integer = signed_components && (packed & (range >> 1)) ?
+                    int64_t(packed) - int64_t(range) : int64_t(packed);
+                double converted = double(integer);
+                if (normalized) converted = signed_components ?
+                    (std::max)(-1.0, converted / double((range >> 1) - 1u)) : converted / double(range - 1u);
+                value[i] = static_cast<float>(converted);
             }
+            value[i] = std::ldexp(value[i], exponent);
         }
     } else Reject("fetch opcode", op);
     state.gradient_mask &= ~(uint64_t{1} << ((w[0] >> 12) & 63u));

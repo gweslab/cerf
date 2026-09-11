@@ -34,6 +34,7 @@ void Imx51Gpu3dShader::Run(std::span<const uint32_t> program, bool pixel,
     state.memory_exports.clear();
     state.killed = false;
     state.texture_lod = 0;
+    state.loop_address = 0;
     auto control = [&](uint32_t pc) {
         if (uint64_t(pc) * 3u + 2u >= uint64_t(program.size()) * 2u) Reject("control address", pc);
         const size_t offset = size_t(pc / 2u) * 3u;
@@ -56,6 +57,8 @@ void Imx51Gpu3dShader::Run(std::span<const uint32_t> program, bool pixel,
         }
     }
     std::vector<uint32_t> return_stack;
+    struct Loop { uint32_t remaining, id; int32_t step, saved_address; };
+    std::vector<Loop> loops;
     bool predicate = false;
     float previous = 0;
     for (uint32_t pc = 0, steps = 0; steps < 4096u; ++steps) {
@@ -63,6 +66,34 @@ void Imx51Gpu3dShader::Run(std::span<const uint32_t> program, bool pixel,
         const uint64_t cf = control(pc++);
         const uint32_t op = static_cast<uint32_t>(cf >> 44);
         if (op == 0u || op == 12u || op == 15u) continue;
+        if (op == 7u || op == 8u) {
+            // Mesa's A2xx loop layout has no Xenos repeat/predicated-break bits.
+            if (cf & 0x7FFFFE0FC00ull) Reject("loop reserved fields", static_cast<uint32_t>(cf));
+            const uint32_t target = static_cast<uint32_t>(cf & 1023u);
+            if (target >= limit) Reject("loop target", target);
+            const uint32_t id = static_cast<uint32_t>((cf >> 16) & 31u);
+            if (op == 8u) {
+                if (loops.empty() || loops.back().id != id) Reject("unmatched loop end", id);
+                auto& loop = loops.back();
+                if (--loop.remaining) {
+                    state.loop_address += loop.step;
+                    pc = target;
+                } else {
+                    state.loop_address = loop.saved_address;
+                    loops.pop_back();
+                }
+                continue;
+            }
+            // NXP SQ_CF_LOOP: 8-bit count/start/step; signed step follows Xenia's model.
+            const uint32_t value = Register(regs, 0x4908u + id);
+            const uint32_t count = value & 255u;
+            if (!count) { pc = target; continue; }
+            if (loops.size() == 64u) Reject("loop stack budget", 64u);
+            const uint32_t step = (value >> 16) & 255u;
+            loops.push_back({count, id, step < 128u ? int32_t(step) : int32_t(step) - 256, state.loop_address});
+            state.loop_address = static_cast<int32_t>((value >> 8) & 255u);
+            continue;
+        }
         if (op == 10u) {
             // Xenia sequencer model: an empty RETURN falls through.
             if (!return_stack.empty()) {

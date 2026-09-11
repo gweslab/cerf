@@ -15,6 +15,7 @@ struct Imx51Gpu3dShaderState {
     uint64_t gradient_mask = 0;
     uint64_t export_mask = 0;
     float texture_lod = 0;
+    int32_t loop_address = 0;
     bool killed = false;
 };
 class Imx51Gpu3dShader : public Service {

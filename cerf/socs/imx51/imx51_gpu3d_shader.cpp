@@ -55,6 +55,7 @@ void Imx51Gpu3dShader::Run(std::span<const uint32_t> program, bool pixel,
             limit = std::min(limit, address * 2u);
         }
     }
+    std::vector<uint32_t> return_stack;
     bool predicate = false;
     float previous = 0;
     for (uint32_t pc = 0, steps = 0; steps < 4096u; ++steps) {
@@ -62,12 +63,20 @@ void Imx51Gpu3dShader::Run(std::span<const uint32_t> program, bool pixel,
         const uint64_t cf = control(pc++);
         const uint32_t op = static_cast<uint32_t>(cf >> 44);
         if (op == 0u || op == 12u || op == 15u) continue;
+        if (op == 10u) {
+            // Xenia sequencer model: an empty RETURN falls through.
+            if (!return_stack.empty()) {
+                pc = return_stack.back();
+                return_stack.pop_back();
+            }
+            continue;
+        }
         auto boolean = [&] {
             const uint32_t index = static_cast<uint32_t>((cf >> 34) & 255u);
             return ((Register(regs, 0x4900u + index / 32u) >> (index % 32u)) & 1u) != 0;
         };
         const bool condition = ((cf >> 42) & 1u) != 0;
-        if (op == 11u) {
+        if (op == 9u || op == 11u) {
             // Mesa emits mode zero with a CF-entry target and a direction hint.
             // The alternate address mode has no established A2xx execution rule.
             if ((cf >> 43) & 1u) Reject("jump address mode", 1u);
@@ -77,13 +86,19 @@ void Imx51Gpu3dShader::Run(std::span<const uint32_t> program, bool pixel,
                 const uint32_t target = static_cast<uint32_t>(cf & 1023u);
                 if (target >= limit) Reject("jump target", target);
                 const bool forward = ((cf >> 33) & 1u) != 0;
-                if (forward != (target > pc - 1u)) Reject("jump direction", target);
+                if (op == 11u && forward != (target > pc - 1u)) Reject("jump direction", target);
+                if (op == 9u) {
+                    // Emulator safety bound, not a claim about hardware stack depth.
+                    if (return_stack.size() == 64u) Reject("call stack budget", 64u);
+                    return_stack.push_back(pc);
+                }
                 pc = target;
             }
             continue;
         }
         if (!((op >= 1u && op <= 6u) || op == 13u || op == 14u)) Reject("control opcode", op);
-        if (op == 13u || op == 14u) Reject("predicate clean control", op);
+        // CLEAN avoids a hardware predicate stall; clauses execute synchronously here.
+        // Xenia ucode.h models CLEAN as boolean-conditioned, without clearing P.
         bool execute = true;
         if (op == 3u || op == 4u || op == 13u || op == 14u) execute = boolean() == condition;
         if (op == 5u || op == 6u) execute = predicate == condition;
@@ -98,7 +113,14 @@ void Imx51Gpu3dShader::Run(std::span<const uint32_t> program, bool pixel,
                 else Alu(words, pixel, regs, state, predicate, previous);
             }
         }
-        if (state.killed || op == 2u || op == 4u || op == 6u || op == 14u) return;
+        if (state.killed) {
+            // Fragment discard also cancels exports buffered before the kill.
+            state.export_mask = 0;
+            state.memory_exports.clear();
+            return;
+        }
+        // Conditional END uses clause-entry eligibility (Xenia ucode.h sequencer model).
+        if (op == 2u || ((op == 4u || op == 6u || op == 14u) && execute)) return;
     }
     Reject("instruction budget", 4096u);
 }

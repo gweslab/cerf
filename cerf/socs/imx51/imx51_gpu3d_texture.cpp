@@ -24,6 +24,8 @@ Imx51Gpu3dVec4 Imx51Gpu3dTexture::Sample(const std::unordered_map<uint32_t,uint3
         emu_.Get<Fatal>().Die("GPU texture %s slot=%u value=%08X", reason, slot, value);
     };
     if (slot >= 32u) fail("slot", slot);
+    const bool query_weights = (instruction[0] & 31u) == 19u;
+    const bool query_border = (instruction[0] & 31u) == 16u;
     std::array<uint32_t,6> state{};
     for (uint32_t i = 0; i < state.size(); ++i) {
         const auto found = registers.find(0x4800u + slot * 6u + i);
@@ -40,6 +42,25 @@ Imx51Gpu3dVec4 Imx51Gpu3dTexture::Sample(const std::unordered_map<uint32_t,uint3
         fail("unsupported type/sign/endian", state[0]);
     if ((dimension != 1u && !cube) || (state[2] >> 26) != 0 || pitch < width)
         fail("unsupported dimension/pitch", state[5]);
+    auto compute_lod = [&] {
+        if (!dx || !dy) fail("unavailable texture gradients",instruction[0]);
+        for (unsigned i = 0; i < 2u; ++i)
+            if (!std::isfinite((*dx)[i]) || !std::isfinite((*dy)[i])) fail("nonfinite texture gradients",slot);
+        const double sx = (instruction[0] & (1u << 25)) ? 1.0 : double(width);
+        const double sy = (instruction[0] & (1u << 25)) ? 1.0 : double(height);
+        /* Khronos GLES 2.0.25 section 3.7.7, equation 3.12. */
+        const double rho = (std::max)(std::hypot((*dx)[0]*sx,(*dx)[1]*sy),
+                                     std::hypot((*dy)[0]*sx,(*dy)[1]*sy));
+        return rho > 0.0 ? std::log2(rho) : -INFINITY;
+    };
+    if ((instruction[0] & 31u) == 17u) {
+        const uint32_t aniso = (instruction[1] >> 18) & 7u;
+        if (cube || (instruction[2] & 0x7FFFFFFDu) || (instruction[1] & 0x60000000u) ||
+            (aniso != 0u && aniso != 7u)) fail("unsupported LOD query controls",instruction[1]);
+        // Provisional Xenos query model: implicit, unbiased/unclamped LOD in X.
+        // Leave YZW zero; ordinary fetch swizzles can retain destination lanes.
+        return {static_cast<float>(compute_lod()),0,0,0};
+    }
     if ((clamp_x != 0u && clamp_x != 1u && clamp_x != 2u) ||
         (clamp_y != 0u && clamp_y != 1u && clamp_y != 2u)) fail("unsupported clamp", state[0]);
     if ((state[4] & 0x003FFC3Cu) != 0 || (state[3] & 0xFE07E000u) != 0 ||
@@ -49,7 +70,7 @@ Imx51Gpu3dVec4 Imx51Gpu3dTexture::Sample(const std::unordered_map<uint32_t,uint3
     const bool computed_lod = (instruction[1] & (1u << 28)) != 0 || (instruction[2] & 1u) != 0;
     if ((aniso != 0u && aniso != 7u) || (arbitrary != 0u && arbitrary != 7u) ||
         reg_lod > 1u) fail("unsupported anisotropy/register LOD",instruction[1]);
-    if (reg_lod && !std::isfinite(register_lod)) fail("nonfinite register LOD",instruction[1]);
+    if (reg_lod && std::isnan(register_lod)) fail("NaN register LOD",instruction[1]);
     auto filter = [&](uint32_t shift, uint32_t constant_shift) {
         const uint32_t selected = (instruction[1] >> shift) & 3u;
         return selected == 3u ? (state[3] >> constant_shift) & 3u : selected;
@@ -82,18 +103,12 @@ Imx51Gpu3dVec4 Imx51Gpu3dTexture::Sample(const std::unordered_map<uint32_t,uint3
             state[4] != (last_level << 6) ? "mip levels/LOD state" : (state[5] & 0xFFFu) != 0xA00u ? "mip packing controls" :
             (instruction[0] & (1u << 25)) ? "mip denormalized coordinates" : nullptr;
         if (invalid) fail(invalid,state[5]);
-        if (computed_lod) {
-            if (!dx || !dy) fail("unavailable texture gradients",instruction[0]);
-            /* Khronos GLES 2.0.25 section 3.7.7, equations 3.12-3.16. */
-            const double rho = (std::max)(std::hypot(double((*dx)[0])*width,double((*dx)[1])*height),
-                                         std::hypot(double((*dy)[0])*width,double((*dy)[1])*height));
-            if (!std::isfinite(rho)) fail("nonfinite texture gradients",slot);
-            lod = rho > 0.0 ? std::log2(rho) : -INFINITY;
-        }
+        if (computed_lod) lod = compute_lod();
         // Mesa emits register mode 1 for its extra LOD/bias source, with
         // computed LOD enabled in fragment shaders and disabled in vertex shaders.
         // Model it as a bias to computed LOD, or an explicit LOD when disabled.
         if (reg_lod) lod += register_lod;
+        if (std::isnan(lod)) fail("indeterminate combined LOD",instruction[1]);
         lod = std::clamp(lod, 0.0, double(last_level));
     }
     auto sample_level = [&](uint32_t level) {
@@ -116,9 +131,6 @@ Imx51Gpu3dVec4 Imx51Gpu3dTexture::Sample(const std::unordered_map<uint32_t,uint3
         }
     }
     if (base > UINT32_MAX) fail("mip address overflow",level);
-    auto& memory = emu_.Get<Imx51Gpu3dMemory>();
-    const auto* data = tiled ? nullptr : memory.ReadSpan(base,
-        uint64_t(height - 1u) * pitch * bytes + uint64_t(width) * bytes, mmu_config);
     double u = coordinates[0], v = coordinates[1];
     if (!std::isfinite(u) || !std::isfinite(v)) fail("nonfinite coordinate", instruction[0]);
     // Mesa ir2_nir emits CUBE, reciprocal major axis, +1.5, then YXW fetch.
@@ -130,6 +142,19 @@ Imx51Gpu3dVec4 Imx51Gpu3dTexture::Sample(const std::unordered_map<uint32_t,uint3
         return x - std::floor(x / period) * period;
     };
     u = reduce(u,level_width,clamp_x); v = reduce(v,level_height,clamp_y);
+    // Provisional Xenos query model: border contribution in X. The accepted
+    // repeat/mirror/edge modes never sample border; border clamp modes still reject.
+    if (query_border) return Imx51Gpu3dVec4{};
+    if (query_weights) {
+        // Provisional Xenos layout: XY spatial factors at the lower mip, Z=0
+        // for 2D/cube, W mip factor. Point filtering has no interpolation.
+        const float fx = mag ? static_cast<float>(u - 0.5 - std::floor(u - 0.5)) : 0.0f;
+        const float fy = mag ? static_cast<float>(v - 0.5 - std::floor(v - 0.5)) : 0.0f;
+        return Imx51Gpu3dVec4{fx,fy,0,static_cast<float>(lod - std::floor(lod))};
+    }
+    auto& memory = emu_.Get<Imx51Gpu3dMemory>();
+    const auto* data = tiled ? nullptr : memory.ReadSpan(base,
+        uint64_t(height - 1u) * pitch * bytes + uint64_t(width) * bytes, mmu_config);
     auto index = [](int value, uint32_t size, uint32_t clamp) {
         const int n = static_cast<int>(size);
         if (clamp == 2u) return std::clamp(value, 0, n - 1);
@@ -174,7 +199,7 @@ Imx51Gpu3dVec4 Imx51Gpu3dTexture::Sample(const std::unordered_map<uint32_t,uint3
     if (mip == 0u) lod = (std::max)(0.0, std::ceil(lod + 0.5) - 1.0);
     const uint32_t lower = static_cast<uint32_t>(std::floor(lod));
     auto result = sample_level(lower);
-    if (lod > lower) {
+    if (!query_weights && !query_border && lod > lower) {
         const auto upper = sample_level(lower+1u);
         for (unsigned c = 0; c < 4u; ++c) result[c] = std::lerp(result[c],upper[c],static_cast<float>(lod-lower));
     }

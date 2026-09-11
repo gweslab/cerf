@@ -306,7 +306,7 @@ void Imx51Gpu3dShader::Fetch(std::array<uint32_t, 3> w,
             value[i * 2u] = state.gradients_x[source][component];
             value[i * 2u + 1u] = state.gradients_y[source][component];
         }
-    } else if (op == 1u) {
+    } else if (op == 1u || op == 16u || op == 17u || op == 19u) {
         Imx51Gpu3dVec4 coords{}, dx{}, dy{};
         for (uint32_t i = 0; i < 3u; ++i) {
             const uint32_t component = (w[0] >> (26u + i * 2u)) & 3u;

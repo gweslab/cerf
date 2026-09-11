@@ -25,7 +25,13 @@ public:
     void Run(std::span<const uint32_t> program, bool pixel,
              const std::unordered_map<uint32_t, uint32_t>& registers,
              uint32_t mmu_config, Imx51Gpu3dShaderState& state);
+    void RunQuad(std::span<const uint32_t> program,
+                 const std::unordered_map<uint32_t, uint32_t>& registers,
+                 uint32_t mmu_config, std::array<Imx51Gpu3dShaderState, 4>& states);
 private:
+    void RunInvocations(std::span<const uint32_t> program, bool pixel,
+                        const std::unordered_map<uint32_t, uint32_t>& registers,
+                        uint32_t mmu_config, std::span<Imx51Gpu3dShaderState> states);
     void Alu(std::array<uint32_t, 3> words, bool pixel,
              const std::unordered_map<uint32_t, uint32_t>& registers,
              Imx51Gpu3dShaderState& state, bool& predicate, float& previous);

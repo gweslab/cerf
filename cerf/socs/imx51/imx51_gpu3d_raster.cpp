@@ -314,7 +314,9 @@ void Imx51Gpu3dRaster::RasterizeTriangle(const std::array<Imx51Gpu3dShaderState,
             /* Mesa e97ad748 a2xx.xml: RB_COLOR_INFO.SWAP; Navigation20260906_235040 source_info=202. */
             if (swap == 1u) std::swap(color[0],color[2]);
         } else {
-            Imx51Gpu3dShaderState fragment{};
+            std::array<Imx51Gpu3dShaderState, 4> fragments{};
+            const unsigned pixel_lane = unsigned(y & 1) * 2u + unsigned(x & 1);
+            auto& fragment = fragments[pixel_lane];
             const uint64_t varyings = vertices[0].export_mask & vertices[1].export_mask & vertices[2].export_mask;
             for (unsigned slot = 0; slot < 32; ++slot) if (varyings & (uint64_t{1} << slot))
                 for (unsigned component = 0; component < 4; ++component)
@@ -344,10 +346,16 @@ void Imx51Gpu3dRaster::RasterizeTriangle(const std::array<Imx51Gpu3dShaderState,
                     for (unsigned lane = 0; lane < 4u; ++lane)
                         for (unsigned i = 0; i < 3u; ++i)
                             q[lane] += static_cast<float>(quad_weights[lane][i]*vertices[i].exports[slot][component]);
+                    for (unsigned lane = 0; lane < 4u; ++lane)
+                        if (lane != pixel_lane) fragments[lane].registers[slot][component] = q[lane];
                     fragment.gradients_x[slot][component] = q[(y & 1)*2+1] - q[(y & 1)*2];
                     fragment.gradients_y[slot][component] = q[(x & 1)+2] - q[x & 1];
                 }
-            emu_.Get<Imx51Gpu3dShader>().Run(pixel_program,true,registers,mmu_config,fragment);
+            // Extrapolated lanes are helpers only: only pixel_lane is committed below.
+            if (gradients_valid)
+                emu_.Get<Imx51Gpu3dShader>().RunQuad(pixel_program,registers,mmu_config,fragments);
+            else
+                emu_.Get<Imx51Gpu3dShader>().Run(pixel_program,true,registers,mmu_config,fragment);
             if (!fragment.memory_exports.empty()) fail("pixel memory export",0);
             if (fragment.killed) continue;
             if (depth_enabled && (fragment.export_mask & ~uint64_t{1}))

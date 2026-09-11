@@ -34,11 +34,7 @@ public:
         blocks_thumb_.JumpCacheFlush();
     }
 
-    /* QEMU tlb_flush_page -> tb_jmp_cache_clear_page (accel/tcg/cputlb.c:157). */
-    void InvalidateVaCachesPage(uint32_t folded_va) {
-        blocks_arm_.JumpCacheClearPage(folded_va);
-        blocks_thumb_.JumpCacheClearPage(folded_va);
-    }
+    void InvalidateVaCachesRange(uint32_t folded_va, uint32_t span_bytes);
 
     void ContextSwitchFlush();
     void InvalidateDirtyCodePages();

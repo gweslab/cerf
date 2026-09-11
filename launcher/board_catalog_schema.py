@@ -54,6 +54,7 @@ SOC_VR4121 = Soc("NEC VR4121", "MIPS III", "MIPS")
 SOC_VR4122 = Soc("NEC VR4122", "MIPS III", "MIPS")
 SOC_PR31700 = Soc("Philips PR31700", "MIPS I", "MIPS")
 SOC_PR31500 = Soc("Philips PR31500", "MIPS I", "MIPS")
+SOC_IOP13XX = Soc("Intel IOP13xx", "XScale (ARMv5TE)", "ARM")
 
 # Feature icons in display order, shared by the launcher side panel and
 # compile_readme.py. (features key, icon stem, label). The stem names an SVG

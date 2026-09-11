@@ -109,6 +109,10 @@ The file [`licenses/OFL-1.1.txt`](licenses/OFL-1.1.txt) contains the full licens
 - **[NetBSD](https://www.netbsd.org/)**
 - **[Dolphin](https://dolphin-emu.org/)**
 - **[MAME](https://www.mamedev.org/)**
+- **Intel 81341 and 81342 I/O Processors Developer's Manual** - Intel IOP13xx
+  I2C register map and transfer semantics.
+- **Siemens ASPC 2 Hardware User Description** - ASPC2 register window and
+  release-status register.
 
 ## Trademarks
 

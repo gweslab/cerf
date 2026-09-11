@@ -8,7 +8,8 @@
     "ddraw_ipu_sdc.dll",
     "ddi_mq200.dll",
     "ddi_ragexl.dll",
-    "ddraw_ipu.dll"
+    "ddraw_ipu.dll",
+    "ddi_vgx.dll"
   ],
   "bundle_repositories": [
     {

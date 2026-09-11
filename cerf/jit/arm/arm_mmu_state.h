@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <vector>
 
 enum class ArmMmuAccess : uint32_t {
     kRead,
@@ -81,6 +82,8 @@ struct ArmTtbr0 {
 /* ARM DDI 0406C.c Table B3-23, Short-descriptor FS encodings. Every
    value used here has FS[4] = 0, so ArmDfsr.bits.status holds it whole. */
 namespace ArmFaultStatus {
+    /* ARM DDI 0406C.c Table B3-23: synchronous external abort. */
+    constexpr uint32_t kExternalAbort               = 0b01000;
     constexpr uint32_t kAlignment                   = 0b00001;
     constexpr uint32_t kTranslationSection          = 0b00101;
     constexpr uint32_t kTranslationPage             = 0b00111;
@@ -99,6 +102,7 @@ struct ArmTlbEntry {
     uint8_t  asid;        /* CONTEXTIDR[7:0] (ARM DDI 0406C.c B4.1.36) */
     uint8_t  global;
     uint8_t  writable;
+    uint8_t  span_shift;
 };
 static_assert(sizeof(ArmTlbEntry) == 16,
               "emit_tlb_fast_path.cpp addresses ways at stride 16");
@@ -109,12 +113,26 @@ constexpr uint32_t kArmTlbSetMask    = kArmTlbSets - 1u;
 constexpr uint32_t kArmTlbSetShift   = 6;
 constexpr uint32_t kArmTlbIoTagBit   = 1u;
 constexpr uint32_t kArmTlbInvalidTag = 0xFFFFFFFFu;
+constexpr uint32_t kArmSectionShift  = 20u;
+constexpr uint32_t kArmSectionCount  = 1u << (32u - kArmSectionShift);
 static_assert((kArmTlbWays * sizeof(ArmTlbEntry)) == (1u << kArmTlbSetShift),
               "emit_tlb_fast_path.cpp computes a set's byte offset as "
               "set << kArmTlbSetShift");
 
+constexpr uint32_t kArmTlbEntryCount = kArmTlbSets * kArmTlbWays;
+constexpr uint32_t kArmTlbSpanBitWords = kArmTlbEntryCount / 32u;
+constexpr uint32_t kArmTlbRegionBitWords = kArmSectionCount / 32u;
+
+struct ArmTlbSpanTracker {
+    uint16_t region_refs[kArmSectionCount]{};
+    uint32_t entry_bits[kArmTlbSpanBitWords]{};
+    uint32_t active_region_bits[kArmTlbRegionBitWords]{};
+    std::vector<uint16_t> active_regions;
+};
+
 struct ArmTlbUnit {
     ArmTlbEntry entries[kArmTlbSets * kArmTlbWays];
+    ArmTlbSpanTracker* span_tracker = nullptr;
 };
 
 inline uint32_t ArmTlbSetBase(uint32_t va) {
@@ -148,6 +166,18 @@ inline void ArmTlbPromote(ArmTlbUnit* unit, uint32_t base, int way) {
             unit->entries[base + static_cast<uint32_t>(w - 1)];
     }
     unit->entries[base] = hit;
+    if (ArmTlbSpanTracker* tracker = unit->span_tracker) {
+        for (uint32_t w = 0; w < kArmTlbWays; ++w) {
+            const uint32_t slot = base + w;
+            const uint32_t mask = 1u << (slot & 31u);
+            uint32_t& bits = tracker->entry_bits[slot >> 5];
+            const ArmTlbEntry& entry = unit->entries[slot];
+            if (entry.tag != kArmTlbInvalidTag && entry.span_shift > 12u)
+                bits |= mask;
+            else
+                bits &= ~mask;
+        }
+    }
 }
 
 inline ArmTlbEntry& ArmTlbInsertSlot(ArmTlbUnit* unit, uint32_t base) {

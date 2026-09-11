@@ -7,6 +7,7 @@
 #include "../../core/cerf_emulator.h"
 #include "../../cpu/arm_processor_config.h"
 #include "../../cpu/emulated_memory.h"
+#include "../../cpu/physical_address_mapper.h"
 #include "arm_cpu.h"
 #include "arm_page_walker.h"
 #include "arm_tlb_ops.h"
@@ -164,7 +165,10 @@ uint8_t* __fastcall ArmMmu::TranslateUserWriteHelper(uint32_t va, ArmMmu* mmu) {
 void ArmMmu::OnReady() {
     memory_           = &emu_.Get<EmulatedMemory>();
     processor_config_ = &emu_.Get<ArmProcessorConfig>();
+    address_mapper_   = &emu_.Get<PhysicalAddressMapper>();
     cpu_state_        = emu_.Get<ArmCpu>().State();
+    state_.data_tlb.span_tracker = &data_tlb_span_tracker_;
+    state_.instruction_tlb.span_tracker = &instruction_tlb_span_tracker_;
 
     /* SMC word-bitmap spans the board's DRAM PA extent only: code is
        writable (hence self-modifiable) solely in DRAM, so a write outside
@@ -313,6 +317,14 @@ uint32_t __cdecl ArmMmu::UnalignedWordStoreHelper(ArmMmu* mmu, uint32_t va,
 void ArmMmu::SetIoPending(uint32_t pa) {
     io_pending_address_ = pa;
     io_pending_valid_   = 1u;
+}
+
+bool ArmMmu::MapPhysicalAddress(uint64_t cpu_pa, uint32_t va,
+                                uint32_t domain, ArmMmuAccess access,
+                                uint32_t& system_pa) {
+    if (address_mapper_->Map(cpu_pa, 1u, system_pa)) return true;
+    RaiseAbort(va, ArmFaultStatus::kExternalAbort, domain, access);
+    return false;
 }
 
 bool ArmMmu::AccessPaged(ArmCpuState* cpu_state, uint32_t va,

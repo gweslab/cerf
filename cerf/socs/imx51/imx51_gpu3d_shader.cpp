@@ -254,7 +254,26 @@ void Imx51Gpu3dShader::Fetch(std::array<uint32_t, 3> w,
         state.texture_lod = input[(w[0] >> 26) & 3u];
         return;
     }
-    if (op == 1u) {
+    if (op == 25u || op == 26u) {
+        // Provisional Xenos-compatible XYZ gradient register layout; A2xx
+        // shares the setter encodings. Missing components begin at zero.
+        auto& gradient = op == 25u ? state.texture_gradients_x : state.texture_gradients_y;
+        for (uint32_t i = 0; i < 3u; ++i)
+            gradient[i] = input[(w[0] >> (26u + i * 2u)) & 3u];
+        return;
+    }
+    if (op == 18u) {
+        if ((w[2] & 0x7FFFFFFDu) || (w[1] & 0x60000000u)) Reject("gradient query controls", w[1]);
+        const uint32_t source = (w[0] >> 5) & 63u;
+        if (!(state.gradient_mask & (uint64_t{1} << source))) Reject("unavailable query gradients", w[0]);
+        // Provisional Xenos layout: XZ=ddx(source.xy), YW=ddy(source.xy).
+        // The quad executor supplies finite differences after coordinate ALU.
+        for (uint32_t i = 0; i < 2u; ++i) {
+            const uint32_t component = (w[0] >> (26u + i * 2u)) & 3u;
+            value[i * 2u] = state.gradients_x[source][component];
+            value[i * 2u + 1u] = state.gradients_y[source][component];
+        }
+    } else if (op == 1u) {
         Imx51Gpu3dVec4 coords{}, dx{}, dy{};
         const uint32_t source = (w[0] >> 5) & 63u;
         for (uint32_t i = 0; i < 3u; ++i) {
@@ -263,7 +282,9 @@ void Imx51Gpu3dShader::Fetch(std::array<uint32_t, 3> w,
             dx[i] = state.gradients_x[source][component];
             dy[i] = state.gradients_y[source][component];
         }
-        const bool gradients = (state.gradient_mask & (uint64_t{1} << source)) != 0;
+        const bool explicit_gradients = (w[2] & 1u) != 0;
+        if (explicit_gradients) { dx = state.texture_gradients_x; dy = state.texture_gradients_y; }
+        const bool gradients = explicit_gradients || (state.gradient_mask & (uint64_t{1} << source)) != 0;
         value = emu_.Get<Imx51Gpu3dTexture>().Sample(regs, config, (w[0] >> 20) & 31u, coords, w,
             gradients ? &dx : nullptr, gradients ? &dy : nullptr, state.texture_lod);
     } else if (op == 0u) {

@@ -56,6 +56,8 @@ void Imx51Gpu3dShader::RunInvocations(std::span<const uint32_t> program, bool pi
         state.memory_exports.clear();
         state.killed = false;
         state.texture_lod = 0;
+        state.texture_gradients_x = {};
+        state.texture_gradients_y = {};
         state.loop_address = 0;
     }
     auto finish = [&](size_t lane) {

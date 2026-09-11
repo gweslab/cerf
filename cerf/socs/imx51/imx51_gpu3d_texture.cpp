@@ -43,10 +43,10 @@ Imx51Gpu3dVec4 Imx51Gpu3dTexture::Sample(const std::unordered_map<uint32_t,uint3
     if ((clamp_x != 0u && clamp_x != 1u && clamp_x != 2u) ||
         (clamp_y != 0u && clamp_y != 1u && clamp_y != 2u)) fail("unsupported clamp", state[0]);
     if ((state[4] & 0x003FFC3Cu) != 0 || (state[3] & 0xFE07E000u) != 0 ||
-        (instruction[2] & 0x7FFFFFFDu) != 0) fail("unsupported LOD/offset", state[4]);
+        (instruction[2] & 0x7FFFFFFCu) != 0) fail("unsupported LOD/offset", state[4]);
     const uint32_t aniso = (instruction[1] >> 18) & 7u, arbitrary = (instruction[1] >> 21) & 7u;
     const uint32_t reg_lod = (instruction[1] >> 29) & 3u;
-    const bool computed_lod = (instruction[1] & (1u << 28)) != 0;
+    const bool computed_lod = (instruction[1] & (1u << 28)) != 0 || (instruction[2] & 1u) != 0;
     if ((aniso != 0u && aniso != 7u) || (arbitrary != 0u && arbitrary != 7u) ||
         reg_lod > 1u) fail("unsupported anisotropy/register LOD",instruction[1]);
     if (reg_lod && !std::isfinite(register_lod)) fail("nonfinite register LOD",instruction[1]);

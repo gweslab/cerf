@@ -6,6 +6,13 @@
 
 struct DecodedInsn;
 
+enum class ArmSupersectionFormat : uint8_t {
+    kNone,
+    kArmV6,
+    kArmV7,
+    kXScale,
+};
+
 class ArmProcessorConfig : public Service {
 public:
     using Service::Service;
@@ -95,6 +102,7 @@ public:
     virtual bool     HasCp15V6()                  const { return false; }
     virtual bool     HasCp15V7()                  const { return false; }
     virtual bool     HasVmsav7()                  const { return false; }
+    virtual ArmSupersectionFormat SupersectionFormat() const { return ArmSupersectionFormat::kNone; }
     virtual bool     HasSecurityExtensions()      const { return false; }
 
     /* c9,c0,2 op1=1 L2 Cache Auxiliary Control Register present (Cortex-A8). */

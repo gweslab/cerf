@@ -1,12 +1,23 @@
 articles:
   - title: Running CERF from the command line
     text: The CLI, the log channels, and the files a bug report needs.
+    image: command-line/cerf-help.png
     link: articles/command-line.md
 
   - title: Getting the guest online
     text: Put a network card in the slot and browse the web from Windows CE.
+    image:
+      - networking/setup-dialup-ce2.png
+      - networking/modems-ppc2000.png
+      - networking/setup-dialup-ppc2000.png
+      - networking/setup-dialup-wm6.png
     link: articles/networking.md
 
   - title: Connecting to ActiveSync
     text: Connect a guest handheld to a desktop ActiveSync and move files both ways.
+    image:
+      - activesync/activesync-config-1.png
+      - activesync/guest-connected.png
+      - activesync/guest-pc-card-7.png
+      - activesync/guest-pc-card-6.png
     link: articles/activesync.md

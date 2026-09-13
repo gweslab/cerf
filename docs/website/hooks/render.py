@@ -94,10 +94,11 @@ def _slides(entry, assets_dir, assets_url, single_key):
                        if n.lower().endswith(('.png', '.jpg', '.jpeg', '.gif', '.webp')))
         return [f'{assets_url}/{folder}/{n}' for n in names]
 
-    name = entry.get(single_key)
-    if name and os.path.isfile(os.path.join(assets_dir, name)):
-        return [f'{assets_url}/{name}']
-    return []
+    names = entry.get(single_key)
+    if isinstance(names, str):
+        names = [names]
+    return [f'{assets_url}/{n}' for n in names or []
+            if os.path.isfile(os.path.join(assets_dir, n))]
 
 
 def _slide_attrs(slides, index):

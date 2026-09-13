@@ -1,6 +1,7 @@
 #include "msm8255_oncrpc_codec.h"
 
 #include "msm8255_rpc_router_peer.h"
+#include "msm8255_rpc_server.h"
 #include "msm8255_rpcrouter_wire.h"
 
 #include "../../boards/board_context.h"
@@ -9,10 +10,72 @@
 #include "../../cpu/emulated_memory.h"
 
 #include <cstdint>
+#include <typeinfo>
 
 bool Msm8255OncrpcCodec::ShouldRegister() {
     auto* bd = emu_.TryGet<BoardContext>();
     return bd && bd->GetSoc() == SocFamily::MSM8255;
+}
+
+Msm8255OncrpcCall Msm8255OncrpcCodec::ParseCall(const Msm8255RpcServer& server,
+                                                uint32_t in_pa, uint32_t size) {
+    auto& mem = emu_.Get<EmulatedMemory>();
+
+    if (size < kPacmarkBytes + kCallArgsOff) {
+        emu_.Get<Fatal>().Die(
+            "Service '%s': rpc payload is %u bytes, which is short of the "
+            "%u-byte call header",
+            typeid(server).name(), size, kPacmarkBytes + kCallArgsOff);
+    }
+
+    emu_.Get<Msm8255RpcRouterPeer>().ValidatePacmark(
+        mem.ReadWord(in_pa + kHdrBytes), size - kPacmarkBytes);
+
+    const uint32_t body = in_pa + kHdrBytes + kPacmarkBytes;
+    const uint32_t xid  = Be32(mem.ReadWord(body + kCallXidOff));
+    const uint32_t type = Be32(mem.ReadWord(body + kCallTypeOff));
+    const uint32_t rpcv = Be32(mem.ReadWord(body + kCallRpcVersOff));
+    const uint32_t prog = Be32(mem.ReadWord(body + kCallProgOff));
+    const uint32_t vers = Be32(mem.ReadWord(body + kCallVersOff));
+    const uint32_t proc = Be32(mem.ReadWord(body + kCallProcOff));
+
+    if (type != kOncrpcCall || rpcv != kOncrpcVersion) {
+        emu_.Get<Fatal>().Die(
+            "Service '%s': rpc message type %u version %u is not modeled",
+            typeid(server).name(), type, rpcv);
+    }
+    if (prog != server.ServerProg() || vers != server.ServerVers()) {
+        emu_.Get<Fatal>().Die(
+            "Service '%s': rpc call prog 0x%08X vers 0x%08X is not modeled",
+            typeid(server).name(), prog, vers);
+    }
+
+    const uint32_t cred_flavor = Be32(mem.ReadWord(body + kCallCredFlavorOff));
+    const uint32_t cred_len    = Be32(mem.ReadWord(body + kCallCredLenOff));
+    const uint32_t verf_flavor = Be32(mem.ReadWord(body + kCallVerfFlavorOff));
+    const uint32_t verf_len    = Be32(mem.ReadWord(body + kCallVerfLenOff));
+    if (cred_flavor != kAuthNone || cred_len != 0u ||
+        verf_flavor != kAuthNone || verf_len != 0u) {
+        emu_.Get<Fatal>().Die(
+            "Service '%s': rpc call carries cred flavor %u length %u and verf "
+            "flavor %u length %u, and only an unauthenticated call is modeled",
+            typeid(server).name(), cred_flavor, cred_len, verf_flavor,
+            verf_len);
+    }
+
+    return {body, xid, proc};
+}
+
+void Msm8255OncrpcCodec::RequireCallBytes(const Msm8255RpcServer& server,
+                                          uint32_t proc, uint32_t size,
+                                          uint32_t want) {
+    if (size == want) {
+        return;
+    }
+    emu_.Get<Fatal>().Die(
+        "Service '%s': procedure %u carries %u payload bytes and the modeled "
+        "argument list is %u",
+        typeid(server).name(), proc, size, want);
 }
 
 /* RFC 4506 section 4.11: a string is its byte count as an unsigned integer,

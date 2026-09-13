@@ -1,5 +1,7 @@
 #pragma once
 
+#include "../../cpu/arm_processor_config.h"
+
 #include <cstdint>
 
 /* L1 PTE type values (bits[1:0] of the PTE word). */
@@ -123,6 +125,52 @@ union ArmL2Pte {
     } tiny_page;
 };
 static_assert(sizeof(ArmL2Pte) == 4, "L2 PTE must be 32 bits");
+
+struct ArmSectionTranslation {
+    uint64_t physical_address;
+    uint32_t span_bytes;
+    uint32_t domain;
+};
+
+/* ARM DDI 0100I B4.7.5 and Table B4-2. */
+inline ArmSupersectionFormat ArmEffectiveSupersectionFormat(ArmSupersectionFormat format,
+                                                            bool extended_format) {
+    return format == ArmSupersectionFormat::kArmV6 && !extended_format
+        ? ArmSupersectionFormat::kNone
+        : format;
+}
+
+/* ARM DDI 0406C.c B3.5.4 and B4.1.154: TTBR selection and L1 index. */
+inline uint32_t ArmL1DescriptorAddress(uint32_t va, uint32_t ttbcr,
+                                       uint32_t ttbr0, uint32_t ttbr1) {
+    const uint32_t n = ttbcr & 7u;
+    const uint32_t ttbr0_mask = ~((1u << (14u - n)) - 1u);
+    const bool use_ttbr1 = n != 0u && (va >> (32u - n)) != 0u;
+    const uint32_t base = use_ttbr1 ? (ttbr1 & 0xFFFFC000u)
+                                    : (ttbr0 & ttbr0_mask);
+    return base | ((va >> 20) << 2);
+}
+
+/* Intel Third Generation XScale Microarchitecture Developer's Manual
+   section 3.2.2.1, Table 14 and Figure 2; ARM DDI 0406C.d Figure B3-4. */
+inline ArmSectionTranslation ArmTranslateSection(uint32_t pte_word, uint32_t va,
+                                                 ArmSupersectionFormat format) {
+    const bool supersection = format != ArmSupersectionFormat::kNone && ((pte_word >> 18) & 1u) != 0u;
+    if (supersection) {
+        uint64_t high = static_cast<uint64_t>(pte_word & 0x00F00000u) << 12;
+        if (format == ArmSupersectionFormat::kArmV6 ||
+            format == ArmSupersectionFormat::kArmV7) {
+            high |= static_cast<uint64_t>(pte_word & 0x000001E0u) << 31;
+        }
+        const uint64_t low = static_cast<uint64_t>((pte_word & 0xFF000000u) |
+                                                   (va & 0x00FFFFFFu));
+        return {high | low, 0x01000000u, 0u};
+    }
+    return {static_cast<uint64_t>((pte_word & 0xFFF00000u) |
+                                  (va & 0x000FFFFFu)),
+            0x00100000u,
+            (pte_word >> 5) & 0x0Fu};
+}
 
 /* ARM1136 TRM Table 6-16 / Fig 6-5: 4 KB extended small page (coarse-L2
    type=3 with SCTLR.XP=0) - PA = base[31:12] | VA[11:0]. */

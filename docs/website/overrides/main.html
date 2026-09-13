@@ -7,7 +7,8 @@
 {% block hero %}
   {% if page.is_homepage %}
     <div class="cerf-scene" aria-hidden="true">
-      <img src="{{ 'assets/img/cerf.svg' | url }}" alt="" />
+      <img class="cerf-scene-light" src="{{ 'assets/img/cerf-light.svg' | url }}" alt="" />
+      <img class="cerf-scene-dark" src="{{ 'assets/img/cerf.svg' | url }}" alt="" />
     </div>
     <div class="cerf-scene-overlay" aria-hidden="true"></div>
   {% endif %}

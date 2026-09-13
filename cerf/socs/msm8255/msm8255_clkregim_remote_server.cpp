@@ -1,5 +1,4 @@
 #include "msm8255_oncrpc_codec.h"
-#include "msm8255_rpc_router_peer.h"
 #include "msm8255_rpc_server.h"
 #include "msm8255_rpc_server_registry.h"
 #include "msm8255_rpcrouter_wire.h"
@@ -17,7 +16,12 @@ constexpr uint32_t kClkProg = 0x3000000Fu;
 constexpr uint32_t kClkVers = 0x00030001u;
 constexpr uint32_t kClkCid  = 3u;
 
-constexpr uint32_t kProcConfigMdhClk = 24u;
+constexpr uint32_t kProcClockEnable   = 5u;
+constexpr uint32_t kProcClockDisable  = 6u;
+constexpr uint32_t kProcConfigMdhClk  = 24u;
+
+constexpr uint32_t kClockPayloadBytes = kPacmarkBytes + kCallArgsOff + 4u;
+constexpr uint32_t kClockResultWords  = 0u;
 
 constexpr uint32_t kArgIndexOff = kCallArgsOff + 0u;
 constexpr uint32_t kArgMinOff   = kCallArgsOff + 4u;
@@ -89,72 +93,34 @@ uint32_t Msm8255ClkregimRemoteServer::GrantMdhRateKhz(uint32_t index,
 uint32_t Msm8255ClkregimRemoteServer::AnswerCall(
     uint32_t in_pa, uint32_t size, uint32_t out_pa, uint32_t out_cap,
     uint32_t self_pid, uint32_t peer_pid, uint32_t peer_cid) {
-    auto& mem    = emu_.Get<EmulatedMemory>();
-    auto& router = emu_.Get<Msm8255RpcRouterPeer>();
+    auto& mem   = emu_.Get<EmulatedMemory>();
+    auto& codec = emu_.Get<Msm8255OncrpcCodec>();
 
-    if (size < kPacmarkBytes + kCallArgsOff) {
-        emu_.Get<Fatal>().Die(
-            "msm8255 clkregim remote server: rpc payload is %u bytes, which is "
-            "short of the %u-byte call header",
-            size, kPacmarkBytes + kCallArgsOff);
+    const Msm8255OncrpcCall call = codec.ParseCall(*this, in_pa, size);
+
+    if (call.proc == kProcClockEnable || call.proc == kProcClockDisable) {
+        codec.RequireCallBytes(*this, call.proc, size, kClockPayloadBytes);
+        return codec.WriteAcceptedReply(out_pa, out_cap, self_pid, kClkCid,
+                                        peer_pid, peer_cid, call.xid, nullptr,
+                                        kClockResultWords);
     }
 
-    router.ValidatePacmark(mem.ReadWord(in_pa + kHdrBytes),
-                           size - kPacmarkBytes);
-
-    const uint32_t body = in_pa + kHdrBytes + kPacmarkBytes;
-    const uint32_t xid  = Be32(mem.ReadWord(body + kCallXidOff));
-    const uint32_t type = Be32(mem.ReadWord(body + kCallTypeOff));
-    const uint32_t rpcv = Be32(mem.ReadWord(body + kCallRpcVersOff));
-    const uint32_t prog = Be32(mem.ReadWord(body + kCallProgOff));
-    const uint32_t vers = Be32(mem.ReadWord(body + kCallVersOff));
-    const uint32_t proc = Be32(mem.ReadWord(body + kCallProcOff));
-
-    if (type != kOncrpcCall || rpcv != kOncrpcVersion) {
-        emu_.Get<Fatal>().Die(
-            "msm8255 clkregim remote server: rpc message type %u version %u is "
-            "not modeled", type, rpcv);
-    }
-    if (prog != kClkProg || vers != kClkVers) {
-        emu_.Get<Fatal>().Die(
-            "msm8255 clkregim remote server: rpc call prog 0x%08X vers 0x%08X "
-            "is not modeled", prog, vers);
-    }
-    if (proc != kProcConfigMdhClk) {
+    if (call.proc != kProcConfigMdhClk) {
         emu_.Get<Fatal>().Die(
             "msm8255 clkregim remote server: rpc procedure %u with a %u-byte "
-            "payload is not modeled", proc, size);
+            "payload is not modeled", call.proc, size);
     }
+    codec.RequireCallBytes(*this, call.proc, size, kConfigMdhPayloadBytes);
 
-    const uint32_t cred_flavor = Be32(mem.ReadWord(body + kCallCredFlavorOff));
-    const uint32_t cred_len    = Be32(mem.ReadWord(body + kCallCredLenOff));
-    const uint32_t verf_flavor = Be32(mem.ReadWord(body + kCallVerfFlavorOff));
-    const uint32_t verf_len    = Be32(mem.ReadWord(body + kCallVerfLenOff));
-    if (cred_flavor != kAuthNone || cred_len != 0u ||
-        verf_flavor != kAuthNone || verf_len != 0u) {
-        emu_.Get<Fatal>().Die(
-            "msm8255 clkregim remote server: rpc call carries cred flavor %u "
-            "length %u and verf flavor %u length %u, and only an "
-            "unauthenticated call is modeled",
-            cred_flavor, cred_len, verf_flavor, verf_len);
-    }
-
-    if (size != kConfigMdhPayloadBytes) {
-        emu_.Get<Fatal>().Die(
-            "msm8255 clkregim remote server: procedure %u carries %u payload "
-            "bytes and the modeled argument list is %u",
-            proc, size, kConfigMdhPayloadBytes);
-    }
-
-    const uint32_t index   = Be32(mem.ReadWord(body + kArgIndexOff));
-    const uint32_t min_khz = Be32(mem.ReadWord(body + kArgMinOff));
-    const uint32_t max_khz = Be32(mem.ReadWord(body + kArgMaxOff));
+    const uint32_t index   = Be32(mem.ReadWord(call.body + kArgIndexOff));
+    const uint32_t min_khz = Be32(mem.ReadWord(call.body + kArgMinOff));
+    const uint32_t max_khz = Be32(mem.ReadWord(call.body + kArgMaxOff));
 
     const uint32_t results[kResultWords] = {
         GrantMdhRateKhz(index, min_khz, max_khz)};
-    return emu_.Get<Msm8255OncrpcCodec>().WriteAcceptedReply(
-        out_pa, out_cap, self_pid, kClkCid, peer_pid, peer_cid, xid, results,
-        kResultWords);
+    return codec.WriteAcceptedReply(out_pa, out_cap, self_pid, kClkCid,
+                                    peer_pid, peer_cid, call.xid, results,
+                                    kResultWords);
 }
 
 }

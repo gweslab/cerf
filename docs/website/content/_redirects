@@ -5,9 +5,6 @@
 /guides/*       /articles/:splat           301
 /assets/guides/*  /assets/articles/:splat  301
 
-/articles/guest-additions   /articles/features/#guest-additions  302
-/articles/guest-additions/  /articles/features/#guest-additions  302
-
 /getting-online   /articles/networking/   302
 /getting-online/  /articles/networking/   302
 /activesync       /articles/activesync/   302

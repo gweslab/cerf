@@ -9,13 +9,13 @@
   var ZOOM     = 0.5;    /* the logo grows by this fraction across the scroll */
   var DRIFT    = 18;     /* px the logo travels across the viewport */
 
-  var scene, overlay, img;
+  var scene, overlay, imgs;
   var progress = 0, driftX = 0, driftY = 0;
 
   function apply() {
-    img.style.transform =
-      'translate3d(' + driftX.toFixed(1) + 'px,' + driftY.toFixed(1) + 'px, 0) ' +
-      'scale(' + (1 + progress * ZOOM).toFixed(3) + ')';
+    var t = 'translate3d(' + driftX.toFixed(1) + 'px,' + driftY.toFixed(1) + 'px, 0) ' +
+            'scale(' + (1 + progress * ZOOM).toFixed(3) + ')';
+    for (var n = 0; n < imgs.length; n++) imgs[n].style.transform = t;
   }
 
   function onScroll() {
@@ -36,8 +36,8 @@
   function arm() {
     scene   = document.querySelector('.cerf-scene');
     overlay = document.querySelector('.cerf-scene-overlay');
-    img     = scene && scene.querySelector('img');
-    if (!scene || !overlay || !img) return;   /* not the home page */
+    imgs    = scene ? scene.querySelectorAll('img') : [];
+    if (!scene || !overlay || !imgs.length) return;   /* not the home page */
 
     progress = 0;
     driftX = driftY = 0;

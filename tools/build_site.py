@@ -30,6 +30,7 @@ IMAGES = [
     (os.path.join('docs', 'launcher.png'),               'launcher.png'),
     (os.path.join('cerf', 'assets', 'cerf.ico'),         'cerf.ico'),
     (os.path.join('cerf', 'assets', 'icons_sources', 'cerf.svg'), 'cerf.svg'),
+    (os.path.join('cerf', 'assets', 'icons_sources', 'cerf-light.svg'), 'cerf-light.svg'),
 ]
 
 

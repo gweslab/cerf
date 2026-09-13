@@ -1,33 +1,79 @@
 /* Design tokens shared with yaroslavkibysh.com (src/scss/styles.scss). */
 :root {
-  --cerf-bg: #19171c;
-  --cerf-text: #e1e0ff;
   --cerf-primary: #6554af;
   --cerf-secondary: #e966a0;
+  --cerf-ease: cubic-bezier(0.16, 1, 0.3, 1);
+
+  --cerf-bg: #f3f1f7;
+  --cerf-text: #1b1922;
+  --cerf-text-muted: rgba(27, 25, 34, 0.6);
+  --cerf-text-faint: rgba(27, 25, 34, 0.32);
+  --cerf-text-soft: rgba(27, 25, 34, 0.85);
+  --cerf-hairline: rgba(27, 25, 34, 0.1);
+
+  --cerf-glass-bg: rgba(255, 255, 255, 0.55);
+  --cerf-glass-bg-hover: rgba(255, 255, 255, 0.82);
+  --cerf-glass-border: rgba(27, 25, 34, 0.1);
+  --cerf-glass-border-strong: rgba(27, 25, 34, 0.18);
+  --cerf-glass-shadow: 0 8px 32px rgba(60, 50, 90, 0.12);
+  --cerf-lift-shadow: 0 4px 20px rgba(60, 50, 90, 0.18);
+  --cerf-border-hover: rgba(27, 25, 34, 0.16);
+
+  --cerf-header-bg: rgba(255, 255, 255, 0.72);
+  --cerf-tabs-bg: rgba(255, 255, 255, 0.45);
+  --cerf-code-bg: rgba(27, 25, 34, 0.06);
+  --cerf-footer-bg: rgba(27, 25, 34, 0.88);
+  --cerf-footer-bg-dark: rgba(27, 25, 34, 0.95);
+
+  --cerf-scene-overlay: #fff;
+  --cerf-scene-opacity: 0.42;
+  --cerf-hero-shadow: 0 2px 24px rgba(255, 255, 255, 0.75);
+  --cerf-media-bg: rgba(27, 25, 34, 0.06);
+}
+
+[data-md-color-scheme="slate"] {
+  --cerf-bg: #19171c;
+  --cerf-text: #e1e0ff;
+  --cerf-text-muted: rgba(225, 224, 255, 0.65);
+  --cerf-text-faint: rgba(225, 224, 255, 0.3);
+  --cerf-text-soft: rgba(225, 224, 255, 0.85);
+  --cerf-hairline: rgba(255, 255, 255, 0.08);
 
   --cerf-glass-bg: rgba(0, 0, 0, 0.06);
   --cerf-glass-bg-hover: rgba(0, 0, 0, 0.25);
   --cerf-glass-border: rgba(255, 255, 255, 0.08);
   --cerf-glass-border-strong: rgba(255, 255, 255, 0.15);
   --cerf-glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
-  --cerf-ease: cubic-bezier(0.16, 1, 0.3, 1);
+  --cerf-lift-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+  --cerf-border-hover: rgba(255, 255, 255, 0.1);
+
+  --cerf-header-bg: #0000008f;
+  --cerf-tabs-bg: #00000054;
+  --cerf-code-bg: rgba(0, 0, 0, 0.25);
+  --cerf-footer-bg: rgba(0, 0, 0, 0.35);
+  --cerf-footer-bg-dark: rgba(0, 0, 0, 0.45);
+
+  --cerf-scene-overlay: #000;
+  --cerf-scene-opacity: 0.5;
+  --cerf-hero-shadow: 0 2px 24px rgba(0, 0, 0, 0.5);
+  --cerf-media-bg: rgba(0, 0, 0, 0.25);
 }
 
-[data-md-color-scheme="slate"] {
+[data-md-color-scheme] {
   --md-default-bg-color: var(--cerf-bg);
   --md-default-fg-color: var(--cerf-text);
-  --md-default-fg-color--light: rgba(225, 224, 255, 0.65);
-  --md-default-fg-color--lighter: rgba(225, 224, 255, 0.3);
-  --md-default-fg-color--lightest: rgba(255, 255, 255, 0.08);
+  --md-default-fg-color--light: var(--cerf-text-muted);
+  --md-default-fg-color--lighter: var(--cerf-text-faint);
+  --md-default-fg-color--lightest: var(--cerf-hairline);
 
   --md-primary-fg-color: var(--cerf-bg);
   --md-primary-bg-color: var(--cerf-text);
   --md-accent-fg-color: var(--cerf-secondary);
   --md-typeset-a-color: var(--cerf-secondary);
 
-  --md-code-bg-color: rgba(0, 0, 0, 0.25);
-  --md-footer-bg-color: rgba(0, 0, 0, 0.35);
-  --md-footer-bg-color--dark: rgba(0, 0, 0, 0.45);
+  --md-code-bg-color: var(--cerf-code-bg);
+  --md-footer-bg-color: var(--cerf-footer-bg);
+  --md-footer-bg-color--dark: var(--cerf-footer-bg-dark);
 }
 
 [data-md-color-primary] .md-header,
@@ -39,11 +85,11 @@
 }
 
 [data-md-color-primary] .md-header {
-  background: #0000008f;
+  background: var(--cerf-header-bg);
 }
 
 [data-md-color-primary] .md-tabs {
-  background: #00000054;
+  background: var(--cerf-tabs-bg);
 }
 
 .md-search__form {
@@ -107,7 +153,7 @@
   gap: 8px;
   padding: 10px 20px;
   border-radius: 100px;
-  background: rgba(0, 0, 0, 0.06);
+  background: var(--cerf-glass-bg);
   backdrop-filter: blur(40px);
   -webkit-backdrop-filter: blur(40px);
   border: 1px solid var(--cerf-glass-border-strong);
@@ -123,7 +169,7 @@
   background: var(--cerf-glass-bg-hover);
   color: var(--cerf-text);
   transform: translateY(-2px);
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+  box-shadow: var(--cerf-lift-shadow);
 }
 
 .md-typeset .cerf-pill .twemoji {
@@ -159,11 +205,23 @@
   pointer-events: none;
 }
 
+.cerf-scene .cerf-scene-dark {
+  display: none;
+}
+
+[data-md-color-scheme="slate"] .cerf-scene .cerf-scene-light {
+  display: none;
+}
+
+[data-md-color-scheme="slate"] .cerf-scene .cerf-scene-dark {
+  display: block;
+}
+
 .cerf-scene img {
   width: 145vmin;
   height: 145vmin;
   flex: none;
-  opacity: 0.5;
+  opacity: var(--cerf-scene-opacity);
   filter: drop-shadow(0 0 120px rgba(101, 84, 175, 0.55));
   transform: translate3d(0, 0, 0);
   transition: transform 600ms cubic-bezier(0.16, 1, 0.3, 1);
@@ -173,7 +231,7 @@
 .cerf-scene-overlay {
   position: fixed;
   inset: 0;
-  background: #000;
+  background: var(--cerf-scene-overlay);
   opacity: 0;
   pointer-events: none;
 }
@@ -209,12 +267,12 @@
 .md-typeset .cerf-hero-sub {
   max-width: 40rem;
   margin: 1.1rem auto 2rem;
-  color: rgba(225, 224, 255, 0.85);
+  color: var(--cerf-text-soft);
 }
 
 .md-typeset .cerf-hero h1,
 .md-typeset .cerf-hero-line {
-  text-shadow: 0 2px 24px rgba(0, 0, 0, 0.5);
+  text-shadow: var(--cerf-hero-shadow);
 }
 
 @media (max-width: 768px) {
@@ -244,7 +302,7 @@
   padding: 10px 22px;
   border-radius: 100px;
   border: 1px solid var(--cerf-glass-border-strong);
-  background: rgba(0, 0, 0, 0.06);
+  background: var(--cerf-glass-bg);
   backdrop-filter: blur(40px);
   -webkit-backdrop-filter: blur(40px);
   box-shadow: var(--cerf-glass-shadow);
@@ -259,7 +317,7 @@
   border-color: var(--cerf-glass-border-strong);
   color: var(--cerf-text);
   transform: translateY(-2px);
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+  box-shadow: var(--cerf-lift-shadow);
 }
 
 /* The primary button carries its own colour, so its border is a lighter tint of
@@ -283,7 +341,7 @@
   margin: 2.2rem auto 0;
   font-size: 0.68rem;
   line-height: 1.6;
-  color: rgba(225, 224, 255, 0.45);
+  color: var(--cerf-text-faint);
 }
 
 /* Stats strip */
@@ -319,7 +377,7 @@
   font-weight: 900;
   line-height: 1;
   color: var(--cerf-text);
-  text-shadow: 0 2px 24px rgba(0, 0, 0, 0.5);
+  text-shadow: var(--cerf-hero-shadow);
 }
 
 .cerf-stat-label {
@@ -335,8 +393,12 @@
    than columns stretches them instead of leaving gaps. */
 .cerf-wall {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(17rem, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(var(--cerf-wall-min, 17rem), 1fr));
   gap: 1.2rem;
+}
+
+.cerf-wall--pair {
+  --cerf-wall-min: 12rem;
 }
 
 /* Material styles every figure as width: fit-content, which shrinks the tile to
@@ -352,7 +414,7 @@
 .md-typeset .cerf-card:hover {
   transform: translateY(-4px);
   background: var(--cerf-glass-bg-hover);
-  border-color: rgba(255, 255, 255, 0.1);
+  border-color: var(--cerf-border-hover);
   color: var(--cerf-text);
 }
 
@@ -369,7 +431,7 @@
   width: 100%;
   height: 350px;
   object-fit: contain;
-  background: rgba(0, 0, 0, 0.25);
+  background: var(--cerf-media-bg);
 }
 
 .md-typeset .cerf-device figcaption {

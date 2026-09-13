@@ -8,6 +8,7 @@
 
 class ArmProcessorConfig;
 class EmulatedMemory;
+class PhysicalAddressMapper;
 
 class ArmMmuProbe : public Service {
 public:
@@ -31,4 +32,5 @@ private:
     ArmMmuState*        state_p_          = nullptr;
     EmulatedMemory*     memory_           = nullptr;
     ArmProcessorConfig* processor_config_ = nullptr;
+    PhysicalAddressMapper* address_mapper_ = nullptr;
 };

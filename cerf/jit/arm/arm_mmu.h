@@ -10,6 +10,7 @@
 class ArmPageWalker;
 class ArmProcessorConfig;
 class EmulatedMemory;
+class PhysicalAddressMapper;
 class StateWriter;
 class StateReader;
 
@@ -111,6 +112,9 @@ public:
     void RaiseAbort(uint32_t va, uint32_t fault_status, uint32_t domain,
                     ArmMmuAccess access);
 
+    bool MapPhysicalAddress(uint64_t cpu_pa, uint32_t va, uint32_t domain,
+                            ArmMmuAccess access, uint32_t& system_pa);
+
     void SetIoPending(uint32_t pa);
 
 private:
@@ -118,6 +122,7 @@ private:
     ArmPageWalker*      walker_           = nullptr;
     EmulatedMemory*     memory_           = nullptr;
     ArmProcessorConfig* processor_config_ = nullptr;
+    PhysicalAddressMapper* address_mapper_ = nullptr;
     ArmCpuState*        cpu_state_        = nullptr;
 
     uint32_t io_pending_address_ = 0;
@@ -128,4 +133,6 @@ private:
        the data() pointers stay stable for the JIT/MMU bitmap accesses. */
     std::vector<uint8_t> code_xlat_bitmap_storage_;
     std::vector<uint8_t> code_page_dirty_storage_;
+    ArmTlbSpanTracker data_tlb_span_tracker_;
+    ArmTlbSpanTracker instruction_tlb_span_tracker_;
 };

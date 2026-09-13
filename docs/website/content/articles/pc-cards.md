@@ -46,9 +46,13 @@ An external display card. Its monitor output arrives as a window on the host.
 It works on the HP Jornada series, and is verified on the Jornada 720. There, the stock ROM detects
 the card and loads its own driver for it. The guest gets HP's own control panel with it.
 
+<div class="cerf-wall cerf-wall--pair" markdown>
+
 ![The HP VGA control panel on a Jornada 720](/assets/articles/pc-cards/hp-vga-control-panel.png)
 
 ![The external VGA output in its own host window](/assets/articles/pc-cards/hp-vga-output.png)
+
+</div>
 
 ## Built-in serial ports
 

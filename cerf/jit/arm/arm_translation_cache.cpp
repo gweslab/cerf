@@ -59,6 +59,12 @@ void ArmTranslationCache::ContextSwitchFlush() {
     InvalidateVaCachesAll();
 }
 
+void ArmTranslationCache::InvalidateVaCachesRange(uint32_t folded_va,
+                                                   uint32_t span_bytes) {
+    blocks_arm_.JumpCacheClearRange(folded_va, span_bytes);
+    blocks_thumb_.JumpCacheClearRange(folded_va, span_bytes);
+}
+
 void __fastcall ArmTranslationCache::ContextSwitchFlushHelper(
     ArmTranslationCache* tc) {
     tc->ContextSwitchFlush();
@@ -116,8 +122,9 @@ void __fastcall ArmTranslationCache::UtlbInvalidateAllHelper(
 void __fastcall ArmTranslationCache::ItlbInvalidateMvaHelper(
     uint32_t mva, ArmTranslationCache* tc) {
     ArmMmuState* st = tc->mmu_->State();
-    tc->InvalidateVaCachesPage(
-        ArmTlbInvalidateByVa(&st->instruction_tlb, st->process_id, mva));
+    const ArmTlbInvalidation invalidation =
+        ArmTlbInvalidateByVa(&st->instruction_tlb, st->process_id, mva);
+    tc->InvalidateVaCachesRange(invalidation.base, invalidation.span_bytes);
 }
 
 void __fastcall ArmTranslationCache::DtlbInvalidateMvaHelper(
@@ -130,6 +137,7 @@ void __fastcall ArmTranslationCache::UtlbInvalidateMvaHelper(
     uint32_t mva, ArmTranslationCache* tc) {
     ArmMmuState* st = tc->mmu_->State();
     ArmTlbInvalidateByVa(&st->data_tlb, st->process_id, mva);
-    tc->InvalidateVaCachesPage(
-        ArmTlbInvalidateByVa(&st->instruction_tlb, st->process_id, mva));
+    const ArmTlbInvalidation invalidation =
+        ArmTlbInvalidateByVa(&st->instruction_tlb, st->process_id, mva);
+    tc->InvalidateVaCachesRange(invalidation.base, invalidation.span_bytes);
 }

@@ -56,6 +56,8 @@ struct IsaBlockSpace {
         }
     }
 
+    void JumpCacheClearRange(uint32_t base_va, uint32_t span_bytes);
+
     void* JumpCacheLookup(uint32_t folded_va) const {
         const JumpCacheEntry& e = jump_cache[(folded_va >> 2) & (kJumpCacheSize - 1u)];
         return e.folded_va == folded_va ? e.native : nullptr;

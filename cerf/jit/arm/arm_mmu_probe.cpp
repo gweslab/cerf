@@ -4,6 +4,7 @@
 #include "../../core/cerf_emulator.h"
 #include "../../cpu/arm_processor_config.h"
 #include "../../cpu/emulated_memory.h"
+#include "../../cpu/physical_address_mapper.h"
 #include "arm_mmu.h"
 #include "arm_pte.h"
 
@@ -17,28 +18,31 @@ void ArmMmuProbe::OnReady() {
     state_p_          = emu_.Get<ArmMmu>().State();
     memory_           = &emu_.Get<EmulatedMemory>();
     processor_config_ = &emu_.Get<ArmProcessorConfig>();
+    address_mapper_   = &emu_.Get<PhysicalAddressMapper>();
 }
 
 std::optional<uint32_t> ArmMmuProbe::WalkVaToPa(uint32_t va) {
     const ArmMmuState& state_ = *state_p_;
     const uint32_t p = ArmFcseFold(va, state_.process_id);
 
-    const uint32_t ttbcr_n    = state_.ttbcr & 7u;
-    const uint32_t ttbr0_mask = ~((1u << (14u - ttbcr_n)) - 1u);
-    const bool use_ttbr1 = ttbcr_n != 0u && (p >> (32u - ttbcr_n)) != 0u;
-    const uint32_t l1_base = use_ttbr1
-        ? (state_.ttbr1 & 0xFFFFC000u)
-        : (state_.translation_table_base.word & ttbr0_mask);
-
-    const uint32_t l1_pa = l1_base | ((p >> 20) << 2);
+    const uint32_t l1_pa = ArmL1DescriptorAddress(
+        p, state_.ttbcr, state_.translation_table_base.word, state_.ttbr1);
     uint8_t* l1_host = memory_->TryTranslateWrite(l1_pa);
     if (!l1_host) return std::nullopt;
     ArmL1Pte l1_pte;
     l1_pte.word = *reinterpret_cast<uint32_t*>(l1_host);
 
     switch (l1_pte.fault.type) {
-    case ArmL1PteType::kSection:
-        return (l1_pte.section.section_base << 20) | (p & 0x000FFFFFu);
+    case ArmL1PteType::kSection: {
+        const ArmSupersectionFormat format = ArmEffectiveSupersectionFormat(
+            processor_config_->SupersectionFormat(), state_.effective_control_register.bits.xp);
+        const ArmSectionTranslation translation =
+            ArmTranslateSection(l1_pte.word, p, format);
+        uint32_t system_pa = 0;
+        if (!address_mapper_->Map(translation.physical_address, 1u, system_pa))
+            return std::nullopt;
+        return system_pa;
+    }
 
     case ArmL1PteType::kCoarse: {
         const uint32_t l2_pa = (l1_pte.coarse.page_table_base << 10)
@@ -50,13 +54,17 @@ std::optional<uint32_t> ArmMmuProbe::WalkVaToPa(uint32_t va) {
 
         const bool v6_ext_small = processor_config_->HasCp15V6() &&
                                   !state_.effective_control_register.bits.xp;
+        uint32_t cpu_pa = 0;
         if (l2_pte.fault.type == ArmL2PteType::kSmallPage) {
-            return (l2_pte.small_page.small_page_base << 12) | (p & 0x0FFFu);
+            cpu_pa = (l2_pte.small_page.small_page_base << 12) | (p & 0x0FFFu);
+        } else if (l2_pte.fault.type == ArmL2PteType::kExtendedSmallPage && v6_ext_small) {
+            cpu_pa = ArmExtSmallPagePa(l2_pte.word, p);
+        } else {
+            return std::nullopt;
         }
-        if (l2_pte.fault.type == ArmL2PteType::kExtendedSmallPage && v6_ext_small) {
-            return ArmExtSmallPagePa(l2_pte.word, p);
-        }
-        return std::nullopt;
+        uint32_t system_pa = 0;
+        if (!address_mapper_->Map(cpu_pa, 1u, system_pa)) return std::nullopt;
+        return system_pa;
     }
 
     default:

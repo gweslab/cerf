@@ -20,6 +20,8 @@ constexpr BoardIdEntry kBoardIds[] = {
     {"ford_sync_2",       Board::FordSyncGen2},
     {"siemens_p177",      Board::SiemensP177},
     {"smartbook_g138",    Board::SmartBookG138},
+    {"siemens_mp377",     Board::SiemensMP377},
+    {"siemens_mp377_v1040", Board::SiemensMP377},
     {"nec_rockhopper",    Board::NecRockhopper},
     {"nec_mobilepro_700", Board::NecMobilePro700},
     {"casio_toricomail",  Board::CasioToricomail},
@@ -70,6 +72,7 @@ const char* BoardContext::BoardName(Board b) {
         case Board::FordSyncGen2:     return "Ford SYNC 2";
         case Board::SiemensP177:      return "Siemens SIMATIC TP177B 4\"";
         case Board::SmartBookG138:    return "SmartBook G138";
+        case Board::SiemensMP377:     return "Siemens SIMATIC MP 377";
         case Board::NecRockhopper:    return "NEC Rockhopper (DDB-VR5500A)";
         case Board::NecMobilePro700:  return "NEC MobilePro 700";
         case Board::CasioToricomail:  return "Casio Toricomail";
@@ -100,6 +103,7 @@ const char* BoardContext::ShortBoardName(Board b) {
         case Board::FordSyncGen2:     return "Ford SYNC 2";
         case Board::SiemensP177:      return "SIMATIC TP177B";
         case Board::SmartBookG138:    return "SmartBook G138";
+        case Board::SiemensMP377:     return "SIMATIC MP 377";
         case Board::NecRockhopper:    return "Rockhopper";
         case Board::NecMobilePro700:  return "MobilePro 700";
         case Board::CasioToricomail:  return "Toricomail";
@@ -122,6 +126,7 @@ const char* BoardContext::SocFamilyName(SocFamily f) {
         case SocFamily::SA1100:    return "SA1100";
         case SocFamily::PXA25x:    return "PXA25x";
         case SocFamily::PXA27x:    return "PXA27x";
+        case SocFamily::IOP13xx:   return "IOP13xx";
         case SocFamily::OMAP3530:  return "OMAP3530";
         case SocFamily::Poseidon:  return "Poseidon";
         case SocFamily::iMX31:     return "iMX31";

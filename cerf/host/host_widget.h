@@ -40,6 +40,18 @@ struct WidgetMenuItem {
     std::vector<WidgetMenuItem> submenu;
 };
 
+/* One top-level entry in a widget's menu, owning its own items and dirty-poll
+   - a sub-widget without an icon. */
+class HostMenuSection {
+public:
+    virtual ~HostMenuSection() = default;
+    virtual std::wstring Label() const = 0;
+    virtual std::vector<WidgetMenuItem> BuildItems() { return {}; }
+    virtual bool PollDirty() { return false; }
+    virtual void SaveState(StateWriter&) const {}
+    virtual void RestoreState(StateReader&) {}
+};
+
 class HostWidget {
 public:
     virtual ~HostWidget() = default;

@@ -59,9 +59,10 @@ void FordSync2IlpChannel::Send(const uint8_t* data, std::size_t n) {
 }
 
 void FordSync2IlpChannel::Complete(uint8_t type, uint16_t tid, bool accepted) {
-    /* EA5T-14D544-BA.sec, ipc_ilprot.dll sub_C08DC334, sub_C08DD9A0.
-       CERF policy: failure byte 1 is emulator-defined, not a named physical VMCU code.
-       https://github.com/cavenderbi/cerf/wiki/SYNC-2-component-split-and-command-handling */
+    /* EA5T-14D544-BA.sec, ipc_ilprot.dll sub_C08DC334, sub_C08DD9A0:
+       the guest treats any nonzero Set completion as failure. CERF uses byte 1
+       as a generic failure; no named physical VMCU rejection code is established.
+       This application completion is separate from the transport ACK and status indications. */
     const uint8_t reply[] = {static_cast<uint8_t>(type | 0x80),
         static_cast<uint8_t>(accepted ? 0 : 1), static_cast<uint8_t>(tid),
         static_cast<uint8_t>(tid >> 8), 0, 0};
@@ -222,7 +223,10 @@ void FordSync2IlpChannel::Refresh(bool force) {
     for (const auto& device : devices_) device.refresh(force);
 }
 
-/* https://github.com/cavenderbi/cerf/wiki/SYNC-2-ILP-stacked-PR-plan#persistence-boundary */
+/* Frame device payloads by stable key, version and length, independently of widgets.
+   Restore skips unknown keys/versions and leaves missing devices at startup defaults.
+   Device snapshots are authoritative: rebuild reported values from registered owners
+   while retaining subscriptions, so absent devices cannot leave stale reported values. */
 void FordSync2IlpChannel::SaveState(StateWriter& w) const {
     w.Write(tx_seq_); w.Write(watchdog_pets_);
     emu_.Get<FordSync2IlpSignals>().SaveState(w);

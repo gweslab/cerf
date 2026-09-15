@@ -19,7 +19,9 @@ public:
     std::wstring WidgetName() const override { return L"ILP diagnostics"; }
     WidgetGroup Group() const override { return WidgetGroup::Debug; }
     bool PrimaryActionOpensMenu() const override { return true; }
-    /* https://github.com/cavenderbi/cerf/wiki/SYNC-2-component-split-and-command-handling#state-aware-widget-icons */
+    /* Latch the rejection badge after unsupported, invalid, unavailable or malformed
+       requests. Dismissal acknowledges the menu's captured failure count without
+       clearing counters; any later failure lights the badge again. */
     void DrawIcon(HDC dc, const RECT& box) const override {
         const bool rejected = Failures(emu_.Get<FordSync2IlpChannel>().ReadCounters()) > dismissed_failures_;
         emu_.Get<HostIconCache>().DrawCentered(dc, box,

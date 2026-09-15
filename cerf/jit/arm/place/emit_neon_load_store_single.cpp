@@ -6,6 +6,21 @@
 #include "../place_fns.h"
 #include "../../x86_emit_alu.h"
 
+uint8_t* PlaceNeonLoadAllLanes(uint8_t* cursor, DecodedInsn* d, BlockContext* ctx) {
+    using namespace x86;
+    EmitPush32(cursor, d->immediate);
+    EmitPush32(cursor, d->guest_address);
+    EmitPush32(cursor, static_cast<uint32_t>(
+        reinterpret_cast<uintptr_t>(ctx->emit->Neon())));
+    EmitCall(cursor, reinterpret_cast<void*>(&ArmNeon::LoadAllLanesHelper));
+    EmitAddRegImm32(cursor, kEsp, 12);
+    EmitTestRegReg(cursor, kEax, kEax);
+    uint8_t* next = EmitJzLabel(cursor);
+    EmitRet(cursor);
+    FixupLabel(next, cursor);
+    return cursor;
+}
+
 /* VLD1/2/3/4 + VST1/2/3/4 (single element to one lane), DDI0406C
    A8.8.321/324/327/330 (load), A8.8.405/407/409/411 (store). Decoder
    packs: rn=Rn, rm=Rm, crn=Vd, n=D, l=L, cp=size, op1=N-1,

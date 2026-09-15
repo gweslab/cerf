@@ -414,7 +414,9 @@ bool ArmNeon3RegSameDecoder::Decode(DecodedInsn* insn, ArmOpcode op) {
     if (op.neon_data_3reg.opc == 0xBu && op.neon_data_3reg.c == 0u) {
         insn->cond      = 14;
         insn->immediate = op.word;
-        insn->place_fn  = &PlaceNeonUnimplemented;
+        insn->op1       = op.neon_data_3reg.u ? ArmNeonSimd3Same::kS3Qrdmulh
+                                             : ArmNeonSimd3Same::kS3Qdmulh;
+        insn->place_fn  = &PlaceNeonData3Same;
         return true;
     }
 

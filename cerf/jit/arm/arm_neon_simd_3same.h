@@ -57,6 +57,8 @@ public:
     static constexpr uint32_t kS3Bsl = 31u;
     static constexpr uint32_t kS3Bit = 32u;
     static constexpr uint32_t kS3Bif = 33u;
+    static constexpr uint32_t kS3Qdmulh  = 34u;
+    static constexpr uint32_t kS3Qrdmulh = 35u;
 
     void HandleSimd3Same(uint32_t op, uint32_t d_idx, uint32_t n_idx,
                          uint32_t m_idx, uint32_t esize, uint32_t regs);

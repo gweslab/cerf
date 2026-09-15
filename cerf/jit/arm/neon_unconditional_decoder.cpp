@@ -63,6 +63,12 @@ bool NeonUnconditionalDecoder::DecodeData3reg(DecodedInsn* insn, ArmOpcode op) {
                 insn->place_fn  = &PlaceNeonDataVtbl;
                 return true;
             }
+            if ((op.word & 0x00000F90u) == 0x00000C00u) {
+                insn->cond = 14;
+                insn->immediate = op.word;
+                insn->place_fn = &EmitNeonVdupScalar;
+                return true;
+            }
             if (two_reg_unary_decoder_->Decode(insn, op)) {
                 return true;
             }

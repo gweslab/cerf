@@ -16,9 +16,10 @@ public:
     static constexpr uint32_t kFpToIntU = 3u;  /* op=11 - .U32.F32 (fp→int u) */
 
     void HandleCvtIntFp(uint32_t op_sel, uint32_t d_idx, uint32_t m_idx,
-                        uint32_t regs);
+                        uint32_t regs, uint32_t frac_bits = 0u);
 
     static void __cdecl HandleCvtIntFpHelper(ArmNeon2RegCvtIntFp* svc,
                                              uint32_t op_sel, uint32_t d_idx,
-                                             uint32_t m_idx, uint32_t regs);
+                                             uint32_t m_idx, uint32_t regs,
+                                             uint32_t frac_bits);
 };

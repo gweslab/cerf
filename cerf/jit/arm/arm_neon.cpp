@@ -12,6 +12,63 @@
 
 REGISTER_SERVICE(ArmNeon);
 
+/* DDI 0406C.c A8.8.322/326/329/332: VLD1/2/3/4 to all lanes. */
+uint32_t __cdecl ArmNeon::LoadAllLanesHelper(ArmNeon* neon, uint32_t pc,
+                                            uint32_t w) {
+    auto& cpu = neon->emu_.Get<ArmCpu>();
+    auto& mmu = neon->emu_.Get<ArmMmu>();
+    auto* state = cpu.State();
+    const uint32_t size = (w >> 6) & 3u;
+    const uint32_t aligned = (w >> 4) & 1u;
+    const uint32_t count = ((w >> 8) & 3u) + 1u;
+    const uint32_t stride = ((w >> 5) & 1u) + 1u;
+    const uint32_t regs = count == 1u ? stride : count;
+    const uint32_t step = count == 1u ? 1u : stride;
+    const uint32_t d = ((w >> 18) & 16u) | ((w >> 12) & 15u);
+    const uint32_t rn = (w >> 16) & 15u;
+    const uint32_t rm = w & 15u;
+    if ((size == 3u && (count != 4u || !aligned)) ||
+        (count == 1u && size == 0u && aligned) ||
+        (count == 3u && aligned) || rn == 15u || d + (regs - 1u) * step > 31u) {
+        cpu.RaiseUndefinedException(pc);
+        return 1;
+    }
+    const uint32_t bytes = size == 3u ? 4u : 1u << size;
+    const uint32_t length = count * bytes;
+    const uint32_t alignment = !aligned ? 1u :
+        (count == 4u && size == 2u) ? 8u : length;
+    const uint32_t base = state->gprs[rn];
+    if (neon->AlignmentFaults(mmu, base, alignment, bytes, true)) {
+        cpu.RaiseAbortDataException(pc);
+        return 1;
+    }
+    uint8_t data[16]{};
+    for (uint32_t offset = 0; offset < length; offset += bytes) {
+        uint32_t done = 0;
+        if (!mmu.AccessPaged(state, base + offset, data + offset, bytes,
+                             true, false, &done)) {
+            if (mmu.io_pending() && offset == 0u && done == 0u &&
+                neon->emu_.Get<ArmInterruptChannel>().BackOutForIrq(pc)) {
+                mmu.ClearIoPending();
+                return 1;
+            }
+            if (!mmu.io_pending() || !neon->emu_.Get<ArmRoutedAccess>().WideAccess(
+                    state, pc, base + offset + done, bytes - done,
+                    data + offset + done, true)) {
+                cpu.RaiseAbortDataException(pc);
+                return 1;
+            }
+        }
+    }
+    for (uint32_t r = 0; r < regs; ++r) {
+        auto* dst = reinterpret_cast<uint8_t*>(&state->vfp_d[d + r * step]);
+        for (uint32_t lane = 0; lane < 8u; lane += bytes)
+            std::memcpy(dst + lane, data + (count == 1u ? 0u : r * bytes), bytes);
+    }
+    if (rm != 15u) state->gprs[rn] = base + (rm == 13u ? length : state->gprs[rm]);
+    return 0;
+}
+
 bool ArmNeon::AlignmentFaults(ArmMmu& mmu, uint32_t base, uint32_t alignment,
                               uint32_t ebytes, bool is_load) {
     const uint32_t required =

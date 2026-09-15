@@ -26,6 +26,9 @@ public:
 
     static constexpr uint32_t kLsLoad = 1u << 0;  /* flags bit0: 1=VLD1, 0=VST1 */
 
+    static uint32_t __cdecl LoadAllLanesHelper(ArmNeon* neon, uint32_t pc,
+                                              uint32_t instruction);
+
     /* VLD1 / VST1 (multiple single elements),
        DDI0406C A8.8.320 / A8.8.404. */
     uint32_t HandleLoadStoreMultiple(uint32_t pc, uint32_t d_idx, uint32_t rn_idx,

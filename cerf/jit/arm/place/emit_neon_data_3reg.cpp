@@ -35,6 +35,12 @@ uint8_t* PlaceNeonData3Same(uint8_t*      cursor,
         return EmitRaiseUndAndReturn(cursor, d, ctx);
     }
 
+    /* VQ{R}DMULH A8.8.372/376: only signed 16/32-bit elements. */
+    if ((op == ArmNeonSimd3Same::kS3Qdmulh ||
+         op == ArmNeonSimd3Same::kS3Qrdmulh) && (size == 0u || size == 3u)) {
+        return EmitRaiseUndAndReturn(cursor, d, ctx);
+    }
+
     /* These element ops have no 64-bit (size==11) form: VMUL (A8.8.350),
        VCEQ/VTST/VCGT/VCGE (A8.8.291/421/295/293), VMAX/VMIN (A8.8.334),
        VHADD/VHSUB (A8.8.319), VRHADD (A8.8.387), VABD (A8.8.278). VADD/VSUB

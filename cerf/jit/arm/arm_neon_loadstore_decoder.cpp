@@ -63,8 +63,7 @@ bool ArmNeonLoadStoreDecoder::Decode(DecodedInsn* insn, ArmOpcode op) {
        (p. A7-275): "Other encodings in this space are UNDEFINED." */
     insn->cond      = 14;
     insn->immediate = op.word;
-    insn->place_fn  = op.neon_load_store_single.l != 0u
-                          ? &PlaceNeonUnimplemented
-                          : &EmitRaiseUndAndReturn;
+    insn->place_fn = op.neon_load_store_single.l == 0u ? &EmitRaiseUndAndReturn
+        : &PlaceNeonLoadAllLanes;
     return true;
 }

@@ -38,6 +38,27 @@ void ArmNeonSimd3Same::HandleSimd3Same(uint32_t op, uint32_t d_idx, uint32_t n_i
                    (a*b) mod 2^esize. Signedness don't-care (A8.8.350 line
                    45829). size==11 UND'd by the place_fn. */
                 case kS3Mul: s = a * b;  break;
+                case kS3Qdmulh:
+                case kS3Qrdmulh: {
+                    /* DDI 0406C.c A8.8.372/376: signed saturating doubling
+                       multiply high, optionally rounded toward +infinity
+                       at ties. Only 16/32-bit lanes reach this handler. */
+                    const uint32_t sh = 64u - esize;
+                    const int64_t sa = static_cast<int64_t>(a << sh) >> sh;
+                    const int64_t sb = static_cast<int64_t>(b << sh) >> sh;
+                    const int64_t bias = op == kS3Qrdmulh
+                        ? (int64_t{1} << (esize - 2u)) : 0;
+                    /* Shift one bit less instead of doubling: even MIN*MIN
+                       plus the rounding bias fits in signed 64 bits. */
+                    int64_t result = (sa * sb + bias) >> (esize - 1u);
+                    const int64_t limit = (int64_t{1} << (esize - 1u)) - 1;
+                    if (result > limit) {
+                        result = limit;
+                        state->fpscr |= 1u << 27; // cumulative saturation QC
+                    }
+                    s = static_cast<uint64_t>(result);
+                    break;
+                }
                 /* VMUL.P8 polynomial (A8.8.350, op=1): carry-less multiply
                    over GF(2). place_fn enforces esize=8, so a/b are in
                    [0,255] and the inner loop walks bits 0..7 of a. result

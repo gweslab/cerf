@@ -157,7 +157,8 @@ bool ArmNeonShiftImmDecoder::Decode(DecodedInsn* insn, ArmOpcode op) {
     if ((opc & 0xEu) == 0xEu && L_ == 0u && (imm6 & 0x20u) != 0u) {
         insn->cond      = 14;
         insn->immediate = op.word;
-        insn->place_fn  = &PlaceNeonUnimplemented;
+        insn->op1       = ((opc & 1u) << 1) | op.neon_data_3reg.u;
+        insn->place_fn  = &PlaceNeonData2RegCvtIntFp;
         return true;
     }
     /* ARM DDI 0406C.c A7.4.4 (p. A7-266): "Other encodings in this space are

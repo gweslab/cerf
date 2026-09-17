@@ -70,6 +70,7 @@ private:
     bool OnHeadData(uint8_t cid, uint8_t rx_seq, bool reliable = true);
     std::vector<uint8_t> BuildLinkFrame(uint8_t type, uint8_t tid, uint16_t token);
     std::vector<uint8_t> BuildAckFrame(uint8_t cid, uint8_t ack_seq);
+    std::vector<uint8_t> BuildWindowUpdateFrame(uint8_t cid);
     /* SET_PM_STATE push (msg 0x02); pm.dll HandleSetPMState sub_C028ABD4. */
     void HandlePmRequest();
     /* pm Cid-8 inbound dispatch; pm.dll HandleIPCRx sub_C028AEC0. */

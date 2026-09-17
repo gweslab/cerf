@@ -113,6 +113,16 @@ std::vector<uint8_t> FordSync2VmcuPeer::BuildAckFrame(uint8_t cid, uint8_t ack_s
     return EncodeFrame(pkt, sizeof(pkt));
 }
 
+std::vector<uint8_t> FordSync2VmcuPeer::BuildWindowUpdateFrame(uint8_t cid) {
+    /* EA5T-14D544-BA.sec, ipc.dll C0938180 (window update), C093D3E0 (receive). */
+    const uint8_t pkt[4] = {
+        static_cast<uint8_t>((cid << 2) | 0x02u), 1u,
+        static_cast<uint8_t>(kAckWindow & 0xFFu),
+        static_cast<uint8_t>(kAckWindow >> 8),
+    };
+    return EncodeFrame(pkt, sizeof(pkt));
+}
+
 void FordSync2VmcuPeer::SendPm(const uint8_t* payload6) {
     /* ford_sync_2 pm.dll HandleIPCRx sub_C028AEC0 deframes a 6-byte Cid-8 payload. */
     SendOnCid(kPmCid, pm_tx_seq_, payload6, 6u);
@@ -299,8 +309,7 @@ bool FordSync2VmcuPeer::OnHeadData(uint8_t cid, uint8_t rx_seq, bool reliable) {
     /* EA5T-14D544-BA.sec, ipc.dll sub_C093D258 (RX sequence), sub_C093B890 (ACK). */
     const bool accepted = !reliable || rx_seq == next_rx_[cid];
     if (accepted && reliable) next_rx_[cid] = static_cast<uint8_t>((rx_seq + 1u) & 0x7Fu);
-    const uint8_t ack_seq = reliable ? next_rx_[cid] : static_cast<uint8_t>((rx_seq + 1u) & 0x7Fu);
-    const auto frame = BuildAckFrame(cid, ack_seq);
+    const auto frame = reliable ? BuildAckFrame(cid, next_rx_[cid]) : BuildWindowUpdateFrame(cid);
     uart_->InjectRx(frame.data(), frame.size());
     return accepted;
 }

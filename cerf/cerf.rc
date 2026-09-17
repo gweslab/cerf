@@ -32,6 +32,7 @@ ICON_SERIAL_MODEM        ICON "assets/serial_modem.ico"
 ICON_USB                 ICON "assets/usb.ico"
 ICON_USB_FORD_FLASHER    ICON "assets/usb_ford_flasher.ico"
 ICON_SD_MAP              ICON "assets/sd_map.ico"
+ICON_CAR                 ICON "assets/car.ico"
 ICON_ILP_DIAGNOSTICS     ICON "assets/ilp_diagnostics.ico"
 ICON_ILP_DIAGNOSTICS_REJECTED ICON "assets/ilp_diagnostics_rejected.ico"
 

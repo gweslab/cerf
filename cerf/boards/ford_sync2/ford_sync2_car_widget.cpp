@@ -1,6 +1,7 @@
 #include "../board_context.h"
 #include "../../core/cerf_emulator.h"
 #include "../../core/service.h"
+#include "../../host/host_icon_cache.h"
 #include "../../host/host_widget.h"
 #include "../../host/host_widget_registry.h"
 
@@ -22,7 +23,9 @@ public:
     std::wstring Tooltip() const override { return L"SYNC 2 car controls"; }
     bool PrimaryActionOpensMenu() const override { return true; }
 
-    void DrawIcon(HDC dc, const RECT& box) const override { DrawChipIcon(dc, box); }
+    void DrawIcon(HDC dc, const RECT& box) const override {
+        emu_.Get<HostIconCache>().DrawCentered(dc, box, L"ICON_CAR");
+    }
 
     std::vector<WidgetMenuItem> BuildMenu() override {
         return {

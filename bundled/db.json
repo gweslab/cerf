@@ -904,6 +904,23 @@
       "rom_placing_mode": "flat_container"
     },
     {
+      "id": "nec_mobilepro_790",
+      "name": "NEC MobilePro 790",
+      "short_name": "MobilePro 790",
+      "supported": false,
+      "soc_id": "vr4121",
+      "operating_system_ids": [
+        "handheld_pc_2000"
+      ],
+      "device_features": [],
+      "notes": [],
+      "lcd_panel_size": {
+        "width": 640,
+        "height": 240
+      },
+      "rom_placing_mode": "flat_container"
+    },
+    {
       "id": "casio_cassiopeia_e55",
       "name": "Casio Cassiopeia E-55",
       "short_name": "E-55",

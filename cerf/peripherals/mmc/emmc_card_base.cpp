@@ -92,6 +92,7 @@ MmcCommandResult EmmcCardBase::Command(uint8_t index, uint32_t argument,
     switch (index) {
     case kCmdGoIdleState:
         if (argument != kGoIdleArgument) break;
+        multi_read_ = false;
         state_     = MmcState::Idle;
         rca_       = 0u;
         hs_timing_ = 0u;
@@ -172,11 +173,13 @@ MmcCommandResult EmmcCardBase::Command(uint8_t index, uint32_t argument,
         if (before == MmcState::Idle) return MmcCommandResult::NoResponse;
         if (before != MmcState::Tran) break;
         BuildExtCsd();
+        multi_read_ = false;
         state_      = MmcState::Data;
         response[0] = StatusWord(before);
         return MmcCommandResult::Short;
 
     case kCmdReadSingleBlock:
+    case kCmdReadMultiBlock:
         if (before != MmcState::Tran) break;
         if (argument >= SectorCount()) {
             response[0] = StatusWord(before) | kR1AddressOutOfRange;
@@ -184,7 +187,22 @@ MmcCommandResult EmmcCardBase::Command(uint8_t index, uint32_t argument,
         }
         read_data_.resize(kBlockBytes);
         ReadBlock(argument, read_data_.data());
-        state_      = MmcState::Data;
+        multi_read_  = (index == kCmdReadMultiBlock);
+        next_sector_ = argument + 1u;
+        state_       = MmcState::Data;
+        response[0]  = StatusWord(before);
+        return MmcCommandResult::Short;
+
+    case kCmdStopTransmission:
+        if (before != MmcState::Data) break;
+        if ((argument & kStopHpi) != 0u) {
+            emu_.Get<Fatal>().Die(
+                "eMMC card in slot %u: STOP_TRANSMISSION argument 0x%08X sets "
+                "the high priority interrupt bit, which is not modeled",
+                SlotIndex(), argument);
+        }
+        multi_read_ = false;
+        state_      = MmcState::Tran;
         response[0] = StatusWord(before);
         return MmcCommandResult::Short;
 
@@ -212,7 +230,25 @@ void EmmcCardBase::EndDataPhase() {
             "card is in state %u", SlotIndex(),
             static_cast<unsigned>(state_));
     }
-    state_ = MmcState::Tran;
+    if (!multi_read_) state_ = MmcState::Tran;
+}
+
+void EmmcCardBase::NextBlock() {
+    if (state_ != MmcState::Data || !multi_read_) {
+        emu_.Get<Fatal>().Die(
+            "eMMC card in slot %u: the host asked for another block while the "
+            "card is in state %u with no multiple block read open", SlotIndex(),
+            static_cast<unsigned>(state_));
+    }
+    if (next_sector_ >= SectorCount()) {
+        emu_.Get<Fatal>().Die(
+            "eMMC card in slot %u: a multiple block read runs past the last "
+            "sector into sector %u, and the error reported to the stop command "
+            "is not modeled", SlotIndex(), next_sector_);
+    }
+    read_data_.resize(kBlockBytes);
+    ReadBlock(next_sector_, read_data_.data());
+    ++next_sector_;
 }
 
 void EmmcCardBase::Reset() {
@@ -220,6 +256,8 @@ void EmmcCardBase::Reset() {
     rca_       = 0u;
     hs_timing_ = 0u;
     user_wp_   = 0u;
+    multi_read_  = false;
+    next_sector_ = 0u;
     power_on_wp_.assign(power_on_wp_.size(), 0u);
     read_data_.clear();
 }
@@ -361,6 +399,8 @@ void EmmcCardBase::SaveState(StateWriter& w) {
     w.Write<uint32_t>(rca_);
     w.Write<uint32_t>(hs_timing_);
     w.Write<uint32_t>(user_wp_);
+    w.Write<uint32_t>(multi_read_ ? 1u : 0u);
+    w.Write<uint32_t>(next_sector_);
     w.Write<uint32_t>(static_cast<uint32_t>(power_on_wp_.size()));
     w.WriteBytes(power_on_wp_.data(), power_on_wp_.size());
 }
@@ -370,12 +410,25 @@ void EmmcCardBase::RestoreState(StateReader& r) {
     uint32_t rca       = 0u;
     uint32_t hs_timing = 0u;
     uint32_t user_wp   = 0u;
+    uint32_t multi     = 0u;
+    uint32_t next      = 0u;
     uint32_t groups    = 0u;
     r.Read(state);
     r.Read(rca);
     r.Read(hs_timing);
     r.Read(user_wp);
+    r.Read(multi);
+    r.Read(next);
     r.Read(groups);
+    if (multi > 1u || next > SectorCount() ||
+        (multi == 1u && state != static_cast<uint32_t>(MmcState::Data))) {
+        emu_.Get<Fatal>().Die(
+            "eMMC card in slot %u: restored multiple block read %u at sector %u "
+            "in state %u is not a read this card can hold", SlotIndex(), multi,
+            next, state);
+    }
+    multi_read_  = (multi == 1u);
+    next_sector_ = next;
     if (groups != power_on_wp_.size()) {
         emu_.Get<Fatal>().Die(
             "eMMC card in slot %u: restored %u write protect groups where the "

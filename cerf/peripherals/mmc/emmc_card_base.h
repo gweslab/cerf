@@ -18,8 +18,10 @@ constexpr uint8_t kCmdSelectCard       = 7u;
 constexpr uint8_t kCmdSendExtCsd       = 8u;
 constexpr uint8_t kCmdSendCsd          = 9u;
 constexpr uint8_t kCmdSendCid          = 10u;
+constexpr uint8_t kCmdStopTransmission = 12u;
 constexpr uint8_t kCmdSendStatus       = 13u;
 constexpr uint8_t kCmdReadSingleBlock  = 17u;
+constexpr uint8_t kCmdReadMultiBlock   = 18u;
 constexpr uint8_t kCmdSetWriteProt     = 28u;
 constexpr uint8_t kCmdIoRwDirect       = 52u;
 constexpr uint8_t kCmdAppCmd           = 55u;
@@ -27,6 +29,7 @@ constexpr uint8_t kCmdAppCmd           = 55u;
 constexpr uint32_t kBlockBytes = 512u;
 
 constexpr uint32_t kGoIdleArgument = 0u;
+constexpr uint32_t kStopHpi        = 1u << 0;
 
 enum class MmcState : uint32_t {
     Idle  = 0u,
@@ -74,6 +77,8 @@ public:
 
     const std::vector<uint8_t>& ReadData() const override { return read_data_; }
 
+    void NextBlock() override;
+
     void EndDataPhase() override;
 
     void Reset() override;
@@ -97,10 +102,12 @@ private:
     uint32_t WpGroupCount() const;
     [[noreturn]] void HaltUnmodelledCommand(uint8_t index, uint32_t argument);
 
-    cerf_mmc::MmcState   state_      = cerf_mmc::MmcState::Idle;
-    uint16_t             rca_        = 0u;
-    uint8_t              hs_timing_  = 0u;
-    uint8_t              user_wp_    = 0u;
+    cerf_mmc::MmcState   state_       = cerf_mmc::MmcState::Idle;
+    uint16_t             rca_         = 0u;
+    uint8_t              hs_timing_   = 0u;
+    uint8_t              user_wp_     = 0u;
+    bool                 multi_read_  = false;
+    uint32_t             next_sector_ = 0u;
     std::vector<uint8_t> power_on_wp_;
     std::vector<uint8_t> read_data_;
 };

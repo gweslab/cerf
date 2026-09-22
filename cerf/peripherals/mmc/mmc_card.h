@@ -25,6 +25,8 @@ public:
 
     virtual const std::vector<uint8_t>& ReadData() const = 0;
 
+    virtual void NextBlock() = 0;
+
     virtual void EndDataPhase() = 0;
 
     virtual void Reset() = 0;

@@ -4,6 +4,7 @@
 
 #include "msm8255_clock_reset.h"
 #include "msm8255_crci_bus.h"
+#include "msm8255_sdcc_regs.h"
 
 #include "../../boards/board_context.h"
 #include "msm8255_id.h"
@@ -20,68 +21,6 @@
 #include <vector>
 
 namespace cerf_msm8255_sdcc_detail {
-
-constexpr uint32_t kPower     = 0x000u;
-constexpr uint32_t kClock     = 0x004u;
-constexpr uint32_t kArgument  = 0x008u;
-constexpr uint32_t kCommand   = 0x00Cu;
-constexpr uint32_t kResponse0 = 0x014u;
-constexpr uint32_t kResponse1 = 0x018u;
-constexpr uint32_t kResponse2 = 0x01Cu;
-constexpr uint32_t kResponse3 = 0x020u;
-constexpr uint32_t kDataTimer  = 0x024u;
-constexpr uint32_t kDataLength = 0x028u;
-constexpr uint32_t kDataCtrl  = 0x02Cu;
-constexpr uint32_t kFifo      = 0x080u;
-constexpr uint32_t kFifoBytes = 16u * 4u;
-constexpr uint32_t kStatus    = 0x034u;
-constexpr uint32_t kClear     = 0x038u;
-constexpr uint32_t kMask0     = 0x03Cu;
-constexpr uint32_t kMask1     = 0x040u;
-
-constexpr uint32_t kCmdIndex    = 0x0000003Fu;
-constexpr uint32_t kCmdResponse = 1u << 6;
-constexpr uint32_t kCmdLongRsp  = 1u << 7;
-constexpr uint32_t kCmdEnable   = 1u << 10;
-constexpr uint32_t kCmdProgEna  = 1u << 11;
-constexpr uint32_t kCmdDatCmd   = 1u << 12;
-
-constexpr uint32_t kCmdModelled =
-    kCmdIndex | kCmdResponse | kCmdLongRsp | kCmdEnable | kCmdProgEna |
-    kCmdDatCmd;
-
-constexpr uint32_t kStatusCmdTimeout  = 1u << 2;
-constexpr uint32_t kStatusCmdRespEnd  = 1u << 6;
-constexpr uint32_t kStatusCmdSent     = 1u << 7;
-constexpr uint32_t kStatusDataEnd     = 1u << 8;
-constexpr uint32_t kStatusProgDone    = 1u << 23;
-
-constexpr uint32_t kStatusLatchable =
-    kStatusCmdTimeout | kStatusCmdRespEnd | kStatusCmdSent | kStatusProgDone |
-    kStatusDataEnd;
-
-constexpr uint32_t kDataCtrlEnable    = 1u << 0;
-constexpr uint32_t kDataCtrlDirection = 1u << 1;
-constexpr uint32_t kDataCtrlDmaEnable = 1u << 3;
-constexpr uint32_t kDataCtrlBlockSize      = 0xFFF0u;
-constexpr uint32_t kDataCtrlBlockSizeShift = 4u;
-
-constexpr uint32_t kDataCtrlModelled =
-    kDataCtrlEnable | kDataCtrlDirection | kDataCtrlDmaEnable |
-    kDataCtrlBlockSize;
-
-constexpr uint32_t kClearStaticMask =
-    (1u << 0) | (1u << 1) | (1u << 2) | (1u << 3) | (1u << 4) | (1u << 5) |
-    (1u << 6) | (1u << 7) | (1u << 8) | (1u << 9) | (1u << 10) | (1u << 22) |
-    (1u << 23) | (1u << 24) | (1u << 25) | (1u << 26);
-
-constexpr uint32_t kQuiescent = 0u;
-
-constexpr uint32_t kPowerWritable = 0x00000041u;
-constexpr uint32_t kClockWritable = 0x0000FF00u;
-constexpr uint32_t kMaskWritable  = 0x1FFFFFFFu;
-
-constexpr uint32_t kUngroundedPowerOn = 0u;
 
 template <uint32_t kBase, uint32_t kSize, uint32_t kResetClock,
           uint32_t kSlotIndex, uint32_t kIrqSource0, uint32_t kIrqSource1,
@@ -207,6 +146,7 @@ public:
         w.Write<uint32_t>(read_pos_);
         w.Write<uint32_t>(static_cast<uint32_t>(read_data_.size()));
         for (uint8_t b : read_data_) w.Write<uint8_t>(b);
+        w.Write<uint32_t>(data_count_);
         if (auto* card = CardForSlot()) card->SaveState(w);
     }
 
@@ -223,18 +163,17 @@ public:
         RestoreField(r, data_timer_, 0xFFFFFFFFu, kDataTimer);
         RestoreField(r, data_length_, 0xFFFFFFFFu, kDataLength);
         RestoreField(r, data_ctrl_, kDataCtrlModelled, kDataCtrl);
-        uint32_t pos = 0u;
+        uint32_t pos    = 0u;
         uint32_t staged = 0u;
+        uint32_t count  = 0u;
         r.Read(pos);
         r.Read(staged);
         read_data_.resize(staged);
         for (uint32_t i = 0; i < staged; ++i) r.Read(read_data_[i]);
-        if (pos > staged || (pos & 3u) != 0u) {
-            emu_.Get<Fatal>().Die(
-                "Peripheral at 0x%08X: restored fifo cursor %u is not a word "
-                "offset inside the %u staged bytes", kBase, pos, staged);
-        }
-        read_pos_ = pos;
+        r.Read(count);
+        RequireReachableDataPath(pos, staged, count);
+        read_pos_   = pos;
+        data_count_ = count;
         if (auto* card = CardForSlot()) card->RestoreState(r);
     }
 
@@ -278,7 +217,6 @@ private:
             vic.DeAssertIrq(source);
         }
     }
-
 
     void IssueCommand(uint32_t value) {
         const bool wants_response = (value & kCmdResponse) != 0u;
@@ -329,6 +267,10 @@ private:
             static_cast<unsigned>(result), value);
     }
 
+    uint32_t BlockBytes(uint32_t ctrl) const {
+        return (ctrl & kDataCtrlBlockSize) >> kDataCtrlBlockSizeShift;
+    }
+
     void RequireNoTransferInFlight(const char* cause) {
         if (read_pos_ < read_data_.size()) {
             emu_.Get<Fatal>().Die(
@@ -342,9 +284,9 @@ private:
     void StartDataPhase(uint32_t value) {
         RequireNoTransferInFlight("a data control write");
         Store(data_ctrl_, value);
+        read_data_.clear();
+        read_pos_ = 0u;
         if ((value & kDataCtrlEnable) == 0u) {
-            read_data_.clear();
-            read_pos_ = 0u;
             DriveCrci();
             return;
         }
@@ -353,50 +295,60 @@ private:
                 "Peripheral at 0x%08X: data control 0x%08X starts a "
                 "host-to-card data phase, which is not modeled", kBase, value);
         }
+        if ((value & kDataCtrlDmaEnable) == 0u) {
+            emu_.Get<Fatal>().Die(
+                "Peripheral at 0x%08X: data control 0x%08X starts a "
+                "card-to-host data phase without DMA, and the receive FIFO "
+                "status bits are not modeled", kBase, value);
+        }
         if (CardForSlot() == nullptr) {
             emu_.Get<Fatal>().Die(
                 "Peripheral at 0x%08X: data control 0x%08X starts a data phase "
                 "with no card in the slot", kBase, value);
         }
-        const uint32_t block =
-            (value & kDataCtrlBlockSize) >> kDataCtrlBlockSizeShift;
-        const uint32_t want = Load(data_length_);
-        if (block != want) {
+        const uint32_t block  = BlockBytes(value);
+        const uint32_t length = Load(data_length_);
+        if (length > kDataLengthMax) {
+            emu_.Get<Fatal>().Die(
+                "Peripheral at 0x%08X: data length 0x%08X sets bits past the "
+                "%u-bit length field", kBase, length, kDataLengthBits);
+        }
+        if (block == 0u || length == 0u || length % block != 0u) {
             emu_.Get<Fatal>().Die(
                 "Peripheral at 0x%08X: data control 0x%08X carries a %u byte "
-                "block over a %u byte transfer, and the per-block boundary this "
-                "controller reports is not modeled", kBase, value, block, want);
+                "block over a %u byte transfer that is not a whole number of "
+                "blocks, which is not modeled", kBase, value, block, length);
         }
-        read_data_.clear();
-        read_pos_ = 0u;
+        data_count_ = length;
         DriveCrci();
     }
 
     void BindDataPhase(MmcCard& card) {
         const std::vector<uint8_t>& staged = card.ReadData();
-        const bool armed = (Load(data_ctrl_) & kDataCtrlEnable) != 0u;
+        const uint32_t ctrl  = Load(data_ctrl_);
+        const bool     armed = (ctrl & kDataCtrlEnable) != 0u;
         if (staged.empty()) {
             if (armed && read_data_.empty()) {
                 emu_.Get<Fatal>().Die(
                     "Peripheral at 0x%08X: data control 0x%08X arms a data "
                     "phase the card answered with no data, and a data "
-                    "timeout is not modeled",
-                    kBase, Load(data_ctrl_));
+                    "timeout is not modeled", kBase, ctrl);
             }
             return;
         }
-        if (!armed) {
+        if (!armed || data_count_ == 0u || read_pos_ < read_data_.size()) {
             emu_.Get<Fatal>().Die(
-                "Peripheral at 0x%08X: the card answered with %u bytes while no "
-                "data phase is armed",
-                kBase, static_cast<unsigned>(staged.size()));
+                "Peripheral at 0x%08X: the card answered with %u bytes while "
+                "data control 0x%08X has %u bytes left to receive and %u "
+                "bytes undrained", kBase, static_cast<unsigned>(staged.size()),
+                ctrl, data_count_,
+                static_cast<unsigned>(read_data_.size() - read_pos_));
         }
-        const uint32_t want = Load(data_length_);
-        if (staged.size() != want) {
+        if (staged.size() != BlockBytes(ctrl)) {
             emu_.Get<Fatal>().Die(
-                "Peripheral at 0x%08X: data length %u does not match the %u "
-                "bytes the card answered with",
-                kBase, want, static_cast<unsigned>(staged.size()));
+                "Peripheral at 0x%08X: data control carries %u byte blocks and "
+                "the card answered with a %u byte block", kBase,
+                BlockBytes(ctrl), static_cast<unsigned>(staged.size()));
         }
         read_data_ = staged;
         read_pos_  = 0u;
@@ -405,8 +357,7 @@ private:
 
     void DriveCrci() {
         auto& lines = emu_.Get<Msm8255CrciBus>();
-        if (read_pos_ < read_data_.size() &&
-            (Load(data_ctrl_) & kDataCtrlDmaEnable) != 0u) {
+        if (read_pos_ < read_data_.size()) {
             lines.Assert(kCrci);
         } else {
             lines.Deassert(kCrci);
@@ -425,12 +376,57 @@ private:
             v |= static_cast<uint32_t>(read_data_[read_pos_ + i]) << (8u * i);
         }
         read_pos_ += 4u;
-        if (read_pos_ == read_data_.size()) {
-            CardForSlot()->EndDataPhase();
-            DriveCrci();
-            LatchStatus(kStatusDataEnd);
+        if (read_pos_ != read_data_.size()) return v;
+
+        MmcCard* card = CardForSlot();
+        data_count_ -= read_pos_;
+        if (data_count_ != 0u) {
+            card->NextBlock();
+            const std::vector<uint8_t>& next = card->ReadData();
+            if (next.size() != read_data_.size()) {
+                emu_.Get<Fatal>().Die(
+                    "Peripheral at 0x%08X: the card answered the next block "
+                    "with %u bytes where the transfer carries %u byte blocks",
+                    kBase, static_cast<unsigned>(next.size()),
+                    static_cast<unsigned>(read_data_.size()));
+            }
+            read_data_ = next;
+            read_pos_  = 0u;
+            LatchStatus(kStatusDataBlockEnd);
+            return v;
         }
+        card->EndDataPhase();
+        DriveCrci();
+        LatchStatus(kStatusDataBlockEnd | kStatusDataEnd);
         return v;
+    }
+
+    void RequireReachableDataPath(uint32_t pos, uint32_t staged,
+                                  uint32_t count) {
+        const uint32_t ctrl      = Load(data_ctrl_);
+        const uint32_t block     = BlockBytes(ctrl);
+        const bool     armed     = (ctrl & kDataCtrlEnable) != 0u;
+        const bool     receiving = armed &&
+                                   (ctrl & kDataCtrlDirection) != 0u &&
+                                   (ctrl & kDataCtrlDmaEnable) != 0u &&
+                                   CardForSlot() != nullptr;
+        const bool     reachable =
+            count <= kDataLengthMax &&
+            (staged == 0u
+                 ? (pos == 0u &&
+                    (!armed ||
+                     (receiving && block != 0u && count != 0u &&
+                      count % block == 0u)))
+                 : (receiving && (pos & 3u) == 0u && pos <= staged &&
+                    staged == block && count % block == 0u &&
+                    (pos < staged ? count >= block : count == 0u)));
+        if (!reachable) {
+            emu_.Get<Fatal>().Die(
+                "Peripheral at 0x%08X: restored fifo cursor %u over %u staged "
+                "bytes with %u bytes left to receive under data control "
+                "0x%08X is not a state this data path reaches",
+                kBase, pos, staged, count, ctrl);
+        }
     }
 
     [[noreturn]] void HaltProgEnaWithoutResponse(uint32_t value) {
@@ -452,7 +448,8 @@ private:
         Store(data_length_, kUngroundedPowerOn);
         Store(data_ctrl_, kUngroundedPowerOn);
         read_data_.clear();
-        read_pos_ = 0u;
+        read_pos_   = 0u;
+        data_count_ = kUngroundedPowerOn;
         DriveCrci();
         UpdateIrq();
     }
@@ -480,7 +477,8 @@ private:
     std::atomic<uint32_t> data_length_{kUngroundedPowerOn};
     std::atomic<uint32_t> data_ctrl_{kUngroundedPowerOn};
     std::vector<uint8_t>  read_data_;
-    uint32_t              read_pos_ = 0u;
+    uint32_t              read_pos_   = 0u;
+    uint32_t              data_count_ = kUngroundedPowerOn;
 };
 
 }  // namespace cerf_msm8255_sdcc_detail

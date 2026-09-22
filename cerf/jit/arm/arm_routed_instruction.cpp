@@ -474,7 +474,8 @@ ArmRoutedInstruction::Outcome ArmRoutedInstruction::Exclusive(DecodedInsn* d,
 
     if (cpu_state_->ldrex_monitor_armed == 0u ||
         cpu_state_->ldrex_monitor_addr != address) {
-        cpu_state_->gprs[d->rd] = 1u;
+        cpu_state_->gprs[d->rd]         = 1u;
+        cpu_state_->ldrex_monitor_armed = 0u;
         return Outcome::kNextInsn;
     }
     if (!access_->Store(cpu_state_, pc, address, unit,

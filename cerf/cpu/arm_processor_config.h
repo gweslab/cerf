@@ -85,6 +85,7 @@ public:
     virtual bool     HasRev()                     const { return false; }
     virtual bool     HasExtendRotate()            const { return false; }
     virtual bool     HasLdrexStrex()              const { return false; }
+    virtual bool     HasLdrexStrexV6k()           const { return false; }
     virtual bool     HasBarrierInsn()             const { return false; }
 
     /* DDI 0406C.c A4.4.8, p. A4-172: SDIV and UDIV are OPTIONAL in an ARMv7-A

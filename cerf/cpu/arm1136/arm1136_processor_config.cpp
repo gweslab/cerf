@@ -45,6 +45,9 @@ public:
     bool     HasExtendRotate()            const override { return true; }
     bool     HasRev()                     const override { return true; }
     bool     HasLdrexStrex()              const override { return true; }
+    /* ARM DDI 0211I section 2.10 (p. 2-24): "These instructions were
+       introduced in rev1 of the ARM1136JF-S processor (r1p0)." */
+    bool     HasLdrexStrexV6k()           const override { return true; }
     bool     HasCp15V6()                  const override { return true; }
     /* ARM DDI 0211I section 6.2.5: "Every supersection is defined to have its
        Domain as 0" and they work at either XP setting; Figures 6-4/6-7/6-8

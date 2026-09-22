@@ -29,6 +29,7 @@ public:
     bool     HasRev()                     const override { return true; }
     bool     HasExtendRotate()            const override { return true; }
     bool     HasLdrexStrex()              const override { return true; }
+    bool     HasLdrexStrexV6k()           const override { return true; }
     bool     HasBarrierInsn()             const override { return true; }
     bool     HasCp15V6()                  const override { return true; }
     bool     HasCp15V7()                  const override { return true; }

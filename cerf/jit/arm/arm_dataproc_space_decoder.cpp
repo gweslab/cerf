@@ -364,14 +364,13 @@ bool ArmDataprocSpaceDecoder::DecodeLdrexStrex(DecodedInsn* insn, ArmOpcode op) 
     if (bits27_23 != 0b00011u || bits11_8 != 0xFu || bits7_4 != 0x9u) {
         return false;
     }
-    if (bits22_21 != 0u) {
-        /* DDI 0406C.c Table A5-12 (p. A5-205): the doubleword / byte /
-           halfword rows (op 1010..1111) are v6K. */
-        if (processor_config_->HasCp15V7()) {
-            return MarkArmUnimplemented(insn, op.word);
-        }
+    /* DDI 0406C.c Table A5-12 (p. A5-205): the doubleword / byte /
+       halfword rows (op 1010..1111) are v6K. */
+    if (bits22_21 != 0u && !processor_config_->HasLdrexStrexV6k()) {
         return false;
     }
+    static constexpr uint32_t kExclusiveBytes[4] = {4u, 8u, 1u, 2u};
+    const uint32_t bytes = kExclusiveBytes[bits22_21];
 
     const uint32_t rn = (op.word >> 16) & 0xFu;
     const uint32_t rd = (op.word >> 12) & 0xFu;
@@ -388,7 +387,15 @@ bool ArmDataprocSpaceDecoder::DecodeLdrexStrex(DecodedInsn* insn, ArmOpcode op) 
         if (rt != 0xFu) {
             return false;
         }
-        insn->op1      = 4u;
+        /* A8.8.77 LDREXD A1 (p. A8-436): "t2 = t+1; ... if Rt<0> == '1' ||
+           Rt == '1110' || n == 15 then UNPREDICTABLE". */
+        if (bytes == 8u) {
+            if ((rd & 1u) != 0u || rd == ArmGpr::kR14) {
+                return false;
+            }
+            insn->rd2 = rd + 1u;
+        }
+        insn->op1      = bytes;
         insn->rd       = rd;   /* Rt destination */
         insn->rn       = rn;   /* address */
         insn->place_fn = &PlaceLdrex;
@@ -402,7 +409,16 @@ bool ArmDataprocSpaceDecoder::DecodeLdrexStrex(DecodedInsn* insn, ArmOpcode op) 
     if (rd == rt || rd == rn) {
         return false;
     }
-    insn->op1      = 4u;
+    /* A8.8.214 STREXD A1 (p. A8-694): "t2 = t+1; ... if d == 15 ||
+       Rt<0> == '1' || Rt == '1110' || n == 15 then UNPREDICTABLE; if d == n
+       || d == t || d == t2 then UNPREDICTABLE". */
+    if (bytes == 8u) {
+        if ((rt & 1u) != 0u || rt == ArmGpr::kR14 || rd == rt + 1u) {
+            return false;
+        }
+        insn->rd2 = rt + 1u;
+    }
+    insn->op1      = bytes;
     insn->rd       = rd;       /* status output (0 success, 1 fail) */
     insn->rn       = rn;       /* address */
     insn->rm       = rt;       /* source value */

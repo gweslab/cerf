@@ -201,9 +201,12 @@ uint8_t* PlaceStrex(uint8_t*      cursor,
     EmitMovBaseDisp32Imm32(cursor, kStateReg, MonitorArmedDisp(), 0u);
     uint8_t* done_label = EmitJmpLabel32(cursor);
 
+    /* DDI 0406C.c Table A3-3 (p. A3-116): StoreExcl(!t) and an Open Access
+       StoreExcl(x) both leave the local monitor in Open Access. */
     FixupLabel32(fail_label_a, cursor);
     FixupLabel32(fail_label_b, cursor);
-    EmitMovBaseDisp32Imm32(cursor, kStateReg, GprDisp(d->rd), 1u);
+    EmitMovBaseDisp32Imm32(cursor, kStateReg, GprDisp(d->rd),     1u);
+    EmitMovBaseDisp32Imm32(cursor, kStateReg, MonitorArmedDisp(), 0u);
     uint8_t* done_label_b = EmitJmpLabel32(cursor);
 
     cursor = EmitExclusiveTail(cursor, ctx, align_fault, /*is_write=*/true);

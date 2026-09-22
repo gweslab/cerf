@@ -1,6 +1,6 @@
 ---
 name: start-board-implementation
-description: The user invokes `/start-board-implementation` to begin bringing up a NEW board/ROM in CERF. It acquires the ROM (naming the board is enough - no path required), checks IDA MCP, then independently confirms - from the ROM bytes and the internet - the board identity, the SoC/CPU family, what CERF already supports, any reusable SoC, and whether the ROM is on the public manifest. It shows a fixed emoji readiness table + session estimate and asks `[yes|no]`. On `yes` it seeds a cross-session tracking doc and drives the boot-driven bring-up loop (build → run → read the first fault → research → implement fully → `/verify` → repeat). Invoke when the user types `/start-board-implementation`.
+description: The user invokes `/start-board-implementation` to begin bringing up a NEW board/ROM in CERF. It acquires the ROM (naming the board is enough - no path required), checks IDA MCP, then independently confirms - from the ROM bytes and the internet - the board identity, the SoC/CPU family, what CERF already supports, and any reusable SoC. It shows a fixed emoji readiness table + session estimate and asks `[yes|no]`. On `yes` it seeds a cross-session tracking doc and drives the boot-driven bring-up loop (build → run → read the first fault → research → implement fully → `/verify` → repeat). Invoke when the user types `/start-board-implementation`.
 ---
 
 # Start Board Implementation - new-board bring-up
@@ -59,8 +59,7 @@ like a human picking the obvious match.
 **Only if `ls` produced ZERO plausible candidates** - STOP and FAIL:
 
 > ❌ I couldn't find any ROM for "<what the user said>" under `bundled/devices/`.
-> Either sync it via the launcher or point me at the ROM path directly, then
-> re-run `/start-board-implementation`.
+> Point me at the ROM path directly, then re-run `/start-board-implementation`.
 
 ### Gate A2 - IDA MCP connectivity (warn + ask if absent)
 
@@ -134,11 +133,6 @@ fact gets a source.
   `MipsProcessorConfig`/`MipsCp0Emitter` on MIPS? If absent, is there a close
   relative sharing silicon/core? Reuse is the difference between a short and a
   long bring-up - name it.
-- **B6 - Public manifest.** `WebFetch`
-  `https://cerf.cx/cerf-bundles/manifest.json`. Listed → officially
-  distributed (tell the user). Not listed → user's own ROM; if it's a genuinely
-  unusual board, suggest they submit it (CERF Discord or `cerf@dz3n.net`) so
-  other devs benefit - a suggestion, never a requirement.
 
 ---
 
@@ -160,7 +154,6 @@ work/unconfirmed · ❌ missing/blocker).
 | 5 | SoC / CPU family               | <SoC>, <core>, <CpuArch + isa level>      | ✅/⚠️  |
 | 6 | SoC implemented in CERF        | <cerf/socs/<x> present | absent>           | ✅/❌  |
 | 7 | Reusable / similar SoC or core | <what reuses what | none - from scratch>  | ✅/⚠️  |
-| 8 | On public remote manifest      | <listed | not listed - user ROM>          | ✅/⚠️  |
 ```
 
 Under the table, the **session estimate** from rows 6-7:
@@ -199,7 +192,7 @@ keep it a coarse index. Seed it with:
   § The bring-up loop."* (Plus the committed reference set: `CLAUDE.md`,
   `agent_docs/rules.md`, `agent_docs/debugging.md`, `agent_docs/code_style.md`.)
 - **`Session 0`** - paste the Phase C readiness table verbatim (identity +
-  source, SoC/CPU, what CERF has, reuse plan, manifest, estimate). The durable
+  source, SoC/CPU, what CERF has, reuse plan, estimate). The durable
   baseline a compacted agent resumes from. Real work starts at Session 1.
 
 The `yes` authorizes this single create only - not standing authorization; every

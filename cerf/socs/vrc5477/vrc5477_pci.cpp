@@ -1,6 +1,7 @@
 #include "../../peripherals/pci/pci_host_bridge.h"
 #include "../../peripherals/pci/pci_device.h"
 
+#include "../../core/byte_order.h"
 #include "../../core/cerf_emulator.h"
 #include "../../core/log.h"
 #include "../../boards/board_context.h"
@@ -45,12 +46,12 @@ public:
     uint32_t WindowRead(uint32_t addr, unsigned size) override {
         if (IsConfigCycle()) {
             PciDevice* d = nullptr; uint32_t reg = 0;
-            if (!DecodeConfig(addr, &d, &reg)) return AllOnes(size);
+            if (!DecodeConfig(addr, &d, &reg)) return cerf::ByteWidthMask(size);
             return Extract(d->ConfigRead(reg & ~3u), addr, size);
         }
         for (PciDevice* d : devices_)
             if (d->MemClaims(addr)) return d->MemRead(addr, size);
-        return AllOnes(size);
+        return cerf::ByteWidthMask(size);
     }
     void WindowWrite(uint32_t addr, uint32_t v, unsigned size) override {
         if (IsConfigCycle()) {
@@ -67,7 +68,7 @@ public:
     uint32_t WindowIoRead(uint32_t pci_io, unsigned size) override {
         for (PciDevice* d : devices_)
             if (d->IoClaims(pci_io)) return d->IoRead(pci_io, size);
-        return AllOnes(size);
+        return cerf::ByteWidthMask(size);
     }
     void WindowIoWrite(uint32_t pci_io, uint32_t v, unsigned size) override {
         for (PciDevice* d : devices_)
@@ -130,16 +131,12 @@ private:
         return false;
     }
 
-    static uint32_t AllOnes(unsigned size) {
-        return size >= 4 ? 0xFFFFFFFFu : ((1u << (size * 8)) - 1u);
-    }
     static uint32_t Extract(uint32_t dword, uint32_t addr, unsigned size) {
-        const uint32_t v = dword >> ((addr & 3u) * 8u);
-        return size >= 4 ? v : (v & ((1u << (size * 8)) - 1u));
+        return (dword >> ((addr & 3u) * 8u)) & cerf::ByteWidthMask(size);
     }
     static uint32_t Merge(uint32_t dword, uint32_t v, uint32_t reg, unsigned size) {
         const unsigned shift = (reg & 3u) * 8u;
-        const uint32_t mask  = ((1u << (size * 8)) - 1u) << shift;
+        const uint32_t mask  = cerf::ByteWidthMask(size) << shift;
         return (dword & ~mask) | ((v << shift) & mask);
     }
 

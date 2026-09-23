@@ -1,6 +1,7 @@
 #pragma once
 
 #include "ppp_hdlc.h"
+#include "../../net/mac_address.h"
 
 #include <array>
 #include <cstddef>
@@ -78,8 +79,8 @@ private:
 
     uint8_t next_id_ = 1;
 
-    std::array<uint8_t, 6> guest_mac_{};
-    std::array<uint8_t, 6> gw_mac_{};
+    cerf::inet::MacAddress guest_mac_{};
+    cerf::inet::MacAddress gw_mac_{};
 
     std::mutex                        out_mu_;     /* leaf lock, never nested */
     std::vector<std::vector<uint8_t>> outbound_;

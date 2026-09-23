@@ -4,9 +4,11 @@
 
 #include "../../boards/board_context.h"
 #include "jornada_820_id.h"
+#include "../../core/byte_order.h"
 #include "../../core/cerf_emulator.h"
 #include "../../cpu/emulated_memory.h"
 #include "../../host/panel_frame_renderer.h"
+#include "../../lcd/lcd_pixel_expand.h"
 
 #include <cstring>
 
@@ -44,7 +46,7 @@ public:
         if (dbar1 == 0 || guest_w == 0 || guest_h == 0) return false;
         const size_t upper_bytes = (size_t)guest_w * (guest_h / 2u);
         return latch_.ProbeAndLatch(emu_.Get<EmulatedMemory>(),
-                                    dbar1 + kPaletteBytes, upper_bytes, 251u);
+                                    dbar1 + kPaletteBytes, upper_bytes);
     }
 
     void RenderInto(uint32_t* dib_bgra32,
@@ -64,15 +66,10 @@ public:
 
         uint32_t lut[256];
         for (uint32_t i = 0; i < 256; ++i) {
-            const uint16_t e = (uint16_t)(upper[i * 2] | (upper[i * 2 + 1] << 8));
-            const uint8_t r4 = (e >> 8) & 0xFu;
-            const uint8_t g4 = (e >> 4) & 0xFu;
-            const uint8_t b4 =  e       & 0xFu;
-            const uint8_t r  = (uint8_t)((r4 << 4) | r4);
-            const uint8_t g  = (uint8_t)((g4 << 4) | g4);
-            const uint8_t b  = (uint8_t)((b4 << 4) | b4);
-            lut[i] = 0xFF000000u | ((uint32_t)r << 16)
-                                 | ((uint32_t)g <<  8) | (uint32_t)b;
+            const uint16_t e = cerf::le::U16(upper, i * 2);
+            lut[i] = lcd_pixel::PackXrgb(lcd_pixel::Expand4((e >> 8) & 0xFu),
+                                         lcd_pixel::Expand4((e >> 4) & 0xFu),
+                                         lcd_pixel::Expand4(e & 0xFu));
         }
 
         const uint32_t panel_h    = guest_h / 2u;

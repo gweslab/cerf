@@ -3,6 +3,7 @@
 #include "host_guest_cursor.h"
 
 #include "../core/cerf_emulator.h"
+#include "../lcd/lcd_pixel_expand.h"
 #include "../peripherals/cerf_virt/cerf_virt_cursor.h"
 
 #include <vector>
@@ -38,7 +39,7 @@ HCURSOR BuildCursor(const GuestCursorShape& s) {
         const uint8_t* and_row = s.bits.data() + (size_t)row * stride;
         const uint8_t* xor_row = s.bits.data() + (size_t)(cy + row) * stride;
         for (int col = 0; col < cx; ++col) {
-            const uint8_t mask = (uint8_t)(0x80u >> (col & 7));
+            const uint8_t mask = (uint8_t)(1u << lcd_pixel::MsbFirstShift((uint32_t)col, 1u));
             const int byte = col >> 3;
             const int didx = row * win_stride + byte;
             if (!(and_row[byte] & mask)) andP[didx] &= (uint8_t)~mask;  /* opaque */

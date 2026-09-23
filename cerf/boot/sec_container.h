@@ -7,13 +7,26 @@ class MappedFile;
 
 /* Header of a Ford `.sec` update package (little-endian, first 0x40 bytes).
    Field offsets reverse-engineered + validated against the device `.sec`. */
+constexpr uint32_t kSecOffMagic       = 0x00;
+constexpr uint32_t kSecOffImageType   = 0x08;
+constexpr uint32_t kSecOffPkcs7       = 0x0C;
+constexpr uint32_t kSecOffSgmSize     = 0x14;
+constexpr uint32_t kSecOffFileSize    = 0x18;
+constexpr uint32_t kSecOffCatLen      = 0x20;
+constexpr uint32_t kSecOffPayload     = 0x24;
+constexpr uint32_t kSecOffChunkStride = 0x28;
+constexpr uint32_t kSecOffChunkCount  = 0x2C;
+
 struct SecHeader {
-    uint32_t magic;         /* 0x00: 0x400D400D                               */
-    uint32_t pkcs7_off;     /* 0x0C: offset of the PKCS#7 catalog (0x80)      */
-    uint32_t file_size;     /* 0x18: total container size                     */
-    uint32_t payload_off;   /* 0x24: offset of the chunked payload (0xEE54)   */
-    uint32_t chunk_stride;  /* 0x28: bytes per chunk incl. header (0x800040)  */
-    uint32_t chunk_count;   /* 0x2C: number of chunks (251)                   */
+    uint32_t magic;
+    uint32_t image_type;
+    uint32_t pkcs7_off;
+    uint32_t sgm_size;
+    uint32_t file_size;
+    uint32_t cat_len;
+    uint32_t payload_off;
+    uint32_t chunk_stride;
+    uint32_t chunk_count;
 };
 
 /* Reads the device's NAND flash, de-chunked from a `.sec`. The caller owns the

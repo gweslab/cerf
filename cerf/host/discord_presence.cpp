@@ -2,6 +2,7 @@
 #include <windows.h>
 
 #include "../boot/rom_parser_queries.h"
+#include "../core/byte_order.h"
 #include "../core/cerf_emulator.h"
 #include "../core/device_config.h"
 #include "../core/log.h"
@@ -138,9 +139,8 @@ private:
 
     bool WriteFrame(int32_t opcode, const std::string& payload) {
         std::vector<uint8_t> buf(8 + payload.size());
-        int32_t len = static_cast<int32_t>(payload.size());
-        std::memcpy(buf.data() + 0, &opcode, 4);
-        std::memcpy(buf.data() + 4, &len,    4);
+        cerf::le::Put32(buf.data() + 0, static_cast<uint32_t>(opcode));
+        cerf::le::Put32(buf.data() + 4, static_cast<uint32_t>(payload.size()));
         std::memcpy(buf.data() + 8, payload.data(), payload.size());
         return Transfer(true, buf.data(), static_cast<DWORD>(buf.size()));
     }
@@ -148,9 +148,8 @@ private:
     bool ReadFrame(int32_t& opcode, std::string& payload) {
         uint8_t hdr[8];
         if (!Transfer(false, hdr, 8)) return false;
-        int32_t len = 0;
-        std::memcpy(&opcode, hdr + 0, 4);
-        std::memcpy(&len,    hdr + 4, 4);
+        opcode = static_cast<int32_t>(cerf::le::U32(hdr, 0));
+        const int32_t len = static_cast<int32_t>(cerf::le::U32(hdr, 4));
         if (len < 0 || len > (1 << 20)) return false;
         payload.resize(static_cast<size_t>(len));
         if (len && !Transfer(false, reinterpret_cast<uint8_t*>(payload.data()),

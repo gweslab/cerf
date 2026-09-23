@@ -80,14 +80,7 @@ public:
             CerfFatalExit(CERF_FATAL_RUNTIME_ERROR);
         }
 
-        const ParsedROMHDR* hdr = nullptr;
-        for (const auto& xip : prim.xips) {
-            const ParsedROMHDR& h = xip.toc.romhdr;
-            if (prim.entry_va >= h.physfirst && prim.entry_va < h.physlast) {
-                hdr = &h;
-                break;
-            }
-        }
+        const ParsedROMHDR* hdr = prim.XipHeaderContaining(prim.entry_va);
         if (!hdr) {
             LOG(Caution, "PhilipsVelo1PageTableBuilder: entry VA 0x%08X lies in no "
                     "XIP\n", prim.entry_va);

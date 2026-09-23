@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../core/service.h"
+#include "mac_address.h"
 #include <array>
 #include <cstddef>
 #include <cstdint>
@@ -22,25 +23,28 @@ public:
 
     virtual void SendFrame(const uint8_t* frame, std::size_t len) = 0;
 
-    std::array<uint8_t, 6> AttachReceiver(const std::string& id, ReceiverKind kind,
+    cerf::inet::MacAddress AttachReceiver(const std::string& id, ReceiverKind kind,
                                           RxFn cb);
     void DetachReceiver(const std::string& id);
 
-    std::array<uint8_t, 6> MacForReceiver(const std::string& id, ReceiverKind kind);
+    cerf::inet::MacAddress MacForReceiver(const std::string& id, ReceiverKind kind);
 
-    virtual std::array<uint8_t, 6> GuestMacAddress() const = 0;
-    virtual std::array<uint8_t, 6> HostGatewayMacAddress() const = 0;
+    static constexpr cerf::inet::MacAddress kHostGatewayMac{0x52, 0x55, 0x0A, 0x00, 0x02, 0x02};
+
+    virtual cerf::inet::MacAddress GuestMacAddress() const = 0;
+    cerf::inet::MacAddress HostGatewayMacAddress() const { return kHostGatewayMac; }
 
 protected:
     void DispatchFrame(const uint8_t* frame, std::size_t len);
+    cerf::inet::MacAddress ConfiguredGuestMac() const;
 
 private:
     struct Receiver {
-        std::array<uint8_t, 6> mac{};
+        cerf::inet::MacAddress mac{};
         RxFn                   cb;
     };
 
-    std::array<uint8_t, 6> MacForReceiverLocked(const std::string& id,
+    cerf::inet::MacAddress MacForReceiverLocked(const std::string& id,
                                                 ReceiverKind kind);
 
     std::mutex                     rx_mutex_;

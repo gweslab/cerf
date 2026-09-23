@@ -1,18 +1,32 @@
 #include "network_backend.h"
 
+#include "mac_address.h"
+
 #include "../core/cerf_emulator.h"
+#include "../core/device_config.h"
 #include "../core/fatal.h"
 #include "../core/log.h"
 
 #include <cstring>
 
-std::array<uint8_t, 6> NetworkBackend::MacForReceiver(const std::string& id,
+cerf::inet::MacAddress NetworkBackend::ConfiguredGuestMac() const {
+    const std::string& s = emu_.Get<DeviceConfig>().network_mac;
+    cerf::inet::MacAddress out{};
+    if (!cerf::inet::ParseMac(s, out)) {
+        LOG(Caution, "FATAL: malformed network_mac='%s' (need XX:XX:XX:XX:XX:XX)\n",
+                s.c_str());
+        CerfFatalExit(CERF_FATAL_RUNTIME_ERROR);
+    }
+    return out;
+}
+
+cerf::inet::MacAddress NetworkBackend::MacForReceiver(const std::string& id,
                                                       ReceiverKind kind) {
     std::lock_guard<std::mutex> lk(rx_mutex_);
     return MacForReceiverLocked(id, kind);
 }
 
-std::array<uint8_t, 6> NetworkBackend::MacForReceiverLocked(const std::string& id,
+cerf::inet::MacAddress NetworkBackend::MacForReceiverLocked(const std::string& id,
                                                             ReceiverKind kind) {
     auto it = ordinals_.find(id);
     if (it == ordinals_.end()) {
@@ -27,22 +41,21 @@ std::array<uint8_t, 6> NetworkBackend::MacForReceiverLocked(const std::string& i
             it = ordinals_.emplace(id, next_ordinal_++).first;
         }
     }
-    std::array<uint8_t, 6> mac = GuestMacAddress();
+    cerf::inet::MacAddress mac = GuestMacAddress();
     mac[5] = static_cast<uint8_t>(mac[5] + it->second);
     return mac;
 }
 
-std::array<uint8_t, 6> NetworkBackend::AttachReceiver(const std::string& id,
+cerf::inet::MacAddress NetworkBackend::AttachReceiver(const std::string& id,
                                                       ReceiverKind kind, RxFn cb) {
     std::lock_guard<std::mutex> lk(rx_mutex_);
-    const std::array<uint8_t, 6> mac = MacForReceiverLocked(id, kind);
+    const cerf::inet::MacAddress mac = MacForReceiverLocked(id, kind);
 
     Receiver& r = receivers_[id];
     r.mac = mac;
     r.cb  = std::move(cb);
 
-    LOG(Net, "receiver '%s' attached as %02X:%02X:%02X:%02X:%02X:%02X\n",
-        id.c_str(), mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
+    LOG(Net, "receiver '%s' attached as %s\n", id.c_str(), cerf::inet::FormatMac(mac.data()).s);
     return mac;
 }
 

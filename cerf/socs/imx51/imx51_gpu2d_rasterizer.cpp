@@ -9,7 +9,7 @@
 #include "../../state/state_stream.h"
 #include "imx51_gpu2d_blend.h"
 #include "imx51_gpu2d_gradw_sampler.h"
-#include "imx51_pixel_pack.h"
+#include "../../lcd/lcd_pixel_expand.h"
 
 #include <algorithm>
 #include <cmath>
@@ -150,7 +150,7 @@ uint32_t Imx51Gpu2dRasterizer::LoadDest(const Gpu2dFillTarget& t, int32_t x, int
 void Imx51Gpu2dRasterizer::StoreDest(const Gpu2dFillTarget& t, int32_t x, int32_t y,
                                      uint32_t argb) {
     uint8_t* hp = DestHost(t, x, y);
-    if (t.dest_565) *reinterpret_cast<uint16_t*>(hp) = imx51_pixel::PackArgb565(argb);
+    if (t.dest_565) *reinterpret_cast<uint16_t*>(hp) = lcd_pixel::PackRgb565(argb);
     else            *reinterpret_cast<uint32_t*>(hp) = argb;
 }
 

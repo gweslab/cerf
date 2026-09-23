@@ -1,5 +1,6 @@
 #include "siemens_mp377_mram.h"
 
+#include "../../core/byte_order.h"
 #include "../../core/cerf_emulator.h"
 #include "../../peripherals/peripheral_dispatcher.h"
 #include "../../state/state_stream.h"
@@ -31,12 +32,11 @@ uint8_t SiemensMp377Mram::ReadByte(uint32_t addr) {
 }
 
 uint16_t SiemensMp377Mram::ReadHalf(uint32_t addr) {
-    return static_cast<uint16_t>(ReadByte(addr) | (ReadByte(addr + 1u) << 8));
+    return cerf::le::U16(mram_.data(), addr - MmioBase());
 }
 
 uint32_t SiemensMp377Mram::ReadWord(uint32_t addr) {
-    return static_cast<uint32_t>(ReadByte(addr) | (ReadByte(addr + 1u) << 8) | (ReadByte(addr + 2u) << 16) |
-                                 (ReadByte(addr + 3u) << 24));
+    return cerf::le::U32(mram_.data(), addr - MmioBase());
 }
 
 void SiemensMp377Mram::WriteByte(uint32_t addr, uint8_t value) {
@@ -44,15 +44,11 @@ void SiemensMp377Mram::WriteByte(uint32_t addr, uint8_t value) {
 }
 
 void SiemensMp377Mram::WriteHalf(uint32_t addr, uint16_t value) {
-    WriteByte(addr, static_cast<uint8_t>(value));
-    WriteByte(addr + 1u, static_cast<uint8_t>(value >> 8));
+    cerf::le::Put16(mram_.data() + (addr - MmioBase()), value);
 }
 
 void SiemensMp377Mram::WriteWord(uint32_t addr, uint32_t value) {
-    WriteByte(addr, static_cast<uint8_t>(value));
-    WriteByte(addr + 1u, static_cast<uint8_t>(value >> 8));
-    WriteByte(addr + 2u, static_cast<uint8_t>(value >> 16));
-    WriteByte(addr + 3u, static_cast<uint8_t>(value >> 24));
+    cerf::le::Put32(mram_.data() + (addr - MmioBase()), value);
 }
 
 void SiemensMp377Mram::SaveState(StateWriter& w) {
@@ -72,7 +68,7 @@ void SiemensMp377Mram::WriteAliasByte(uint32_t alias_pa, uint8_t value) {
 }
 
 void SiemensMp377Mram::SeedBspioBootState() {
-    PutLe32(kMp377BspioBootStateOffset, kMp377BspioBootStateUpdateOnce);
+    cerf::le::Put32(mram_.data() + kMp377BspioBootStateOffset, kMp377BspioBootStateUpdateOnce);
 }
 
 void SiemensMp377Mram::ResetErased() {
@@ -81,13 +77,6 @@ void SiemensMp377Mram::ResetErased() {
 
 uint32_t SiemensMp377Mram::OffsetFromAlias(uint32_t alias_pa) const {
     return alias_pa - kMp377MramAliasPa;
-}
-
-void SiemensMp377Mram::PutLe32(uint32_t off, uint32_t value) {
-    mram_[off + 0u] = static_cast<uint8_t>(value);
-    mram_[off + 1u] = static_cast<uint8_t>(value >> 8);
-    mram_[off + 2u] = static_cast<uint8_t>(value >> 16);
-    mram_[off + 3u] = static_cast<uint8_t>(value >> 24);
 }
 
 REGISTER_SERVICE(SiemensMp377Mram);

@@ -1,5 +1,6 @@
 #include "../../peripherals/peripheral_base.h"
 
+#include "../../core/byte_order.h"
 #include "../../core/cerf_emulator.h"
 #include "../../core/log.h"
 #include "../../peripherals/peripheral_dispatcher.h"
@@ -88,18 +89,12 @@ public:
     }
     uint16_t ReadHalf(uint32_t addr) override {
         const uint32_t off = DecodeOffset(addr);
-        if (off < kBufferRamEnd) {
-            const size_t i = off & ~uint32_t{1};
-            return static_cast<uint16_t>(data_ram_[i] | (data_ram_[i + 1] << 8));
-        }
-        if (off >= kSpareRamBase && off < kSpareRamEnd) {
-            const size_t i = (off - kSpareRamBase) & ~uint32_t{1};
-            return static_cast<uint16_t>(spare_ram_[i] | (spare_ram_[i + 1] << 8));
-        }
-        if (off >= kBootStateMirrorBase && off < kBootStateMirrorEnd) {
-            const size_t i = (off - kBootStateMirrorBase) & ~uint32_t{1};
-            return static_cast<uint16_t>(boot_state_mirror_[i] | (boot_state_mirror_[i + 1] << 8));
-        }
+        if (off < kBufferRamEnd)
+            return cerf::le::U16(data_ram_.data(), off & ~uint32_t{1});
+        if (off >= kSpareRamBase && off < kSpareRamEnd)
+            return cerf::le::U16(spare_ram_.data(), (off - kSpareRamBase) & ~uint32_t{1});
+        if (off >= kBootStateMirrorBase && off < kBootStateMirrorEnd)
+            return cerf::le::U16(boot_state_mirror_.data(), (off - kBootStateMirrorBase) & ~uint32_t{1});
         /* siemens_mp377_v1040 TFFS3.dll sub_2BD2740; Samsung OneNAND
            ECC Status Register 0, chip word 0xFF00. */
         if (off == 0x3FC00u || off == 0x3FC02u) return 0;
@@ -130,21 +125,15 @@ public:
     void WriteHalf(uint32_t addr, uint16_t v) override {
         const uint32_t off = DecodeOffset(addr);
         if (off < kBufferRamEnd) {
-            const size_t i = off & ~uint32_t{1};
-            data_ram_[i] = static_cast<uint8_t>(v & uint8_t{0xFFu});
-            data_ram_[i + 1] = static_cast<uint8_t>((v >> 8) & uint8_t{0xFFu});
+            cerf::le::Put16(data_ram_.data() + (off & ~uint32_t{1}), v);
             return;
         }
         if (off >= kSpareRamBase && off < kSpareRamEnd) {
-            const size_t i = (off - kSpareRamBase) & ~uint32_t{1};
-            spare_ram_[i] = static_cast<uint8_t>(v & uint8_t{0xFFu});
-            spare_ram_[i + 1] = static_cast<uint8_t>((v >> 8) & uint8_t{0xFFu});
+            cerf::le::Put16(spare_ram_.data() + ((off - kSpareRamBase) & ~uint32_t{1}), v);
             return;
         }
         if (off >= kBootStateMirrorBase && off < kBootStateMirrorEnd) {
-            const size_t i = (off - kBootStateMirrorBase) & ~uint32_t{1};
-            boot_state_mirror_[i] = static_cast<uint8_t>(v & uint8_t{0xFFu});
-            boot_state_mirror_[i + 1] = static_cast<uint8_t>((v >> 8) & uint8_t{0xFFu});
+            cerf::le::Put16(boot_state_mirror_.data() + ((off - kBootStateMirrorBase) & ~uint32_t{1}), v);
             return;
         }
         RegWrite16(off, v);

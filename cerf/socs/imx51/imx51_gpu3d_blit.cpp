@@ -1,6 +1,7 @@
 #include "imx51_gpu3d_blit.h"
 #include "imx51_gpu3d_memory.h"
-#include "imx51_pixel_pack.h"
+#include "../../lcd/lcd_pixel_expand.h"
+#include "../../core/byte_order.h"
 #include "../../core/cerf_emulator.h"
 #include "../../core/fatal.h"
 #include "../../boards/board_context.h"
@@ -109,14 +110,9 @@ void Imx51Gpu3dBlit::Draw(uint32_t ctrl, uint64_t pa,
         for (uint32_t y = 0u; y < srcH; ++y) {
             const uint8_t* srow = s0 + uint64_t(y) * srcPitch * 4u;
             uint8_t* drow = d0 + uint64_t(y) * dstPitch * 2u;
-            for (uint32_t x = 0u; x < srcW; ++x) {
-                const uint8_t* p = srow + x * 4u;
-                const uint32_t pixel = uint32_t(p[0]) | (uint32_t(p[1]) << 8) |
-                                       (uint32_t(p[2]) << 16) | (uint32_t(p[3]) << 24);
-                const uint16_t packed = imx51_pixel::PackArgb565(pixel);
-                drow[x * 2u] = static_cast<uint8_t>(packed);
-                drow[x * 2u + 1u] = static_cast<uint8_t>(packed >> 8);
-            }
+            for (uint32_t x = 0u; x < srcW; ++x)
+                cerf::le::Put16(drow + x * 2u,
+                                lcd_pixel::PackRgb565(cerf::le::U32(srow, x * 4u)));
         }
     } else {
         HaltUnsupportedAccess("blit 565 source into 8888 dest (expand not modeled)", srcBase, dstBase);

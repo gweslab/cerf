@@ -12,8 +12,6 @@
 
 namespace {
 
-constexpr size_t kContentProbeStride = 251;
-
 class CasioCassiopeiaE55Renderer : public PanelFrameRenderer {
 public:
     using PanelFrameRenderer::PanelFrameRenderer;
@@ -34,7 +32,7 @@ public:
         lcd.MaybePublishDisplaySize();
         if (!lcd.IsDisplayEnabled()) return false;
         if (latch_.Latched())         return true;
-        return latch_.ProbeAndLatch(lcd.FbBytes(), lcd.FbSize(), kContentProbeStride);
+        return latch_.ProbeAndLatch(lcd.FbBytes(), lcd.FbSize());
     }
 
     void RenderInto(uint32_t* dib, uint32_t host_w, uint32_t host_h) override {

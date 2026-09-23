@@ -1,5 +1,6 @@
 #pragma once
 
+#include "../../core/byte_order.h"
 #include "../../peripherals/peripheral_base.h"
 #include "../../peripherals/ps2_mouse/ps2_mouse.h"
 
@@ -65,11 +66,7 @@ private:
     void RaiseIrq();   /* mouse 8042 IRQ (bit11) */
     void RaiseIntrSource(uint32_t bit);
     void PulseGpio14();
-    uint32_t IntrMask() const {
-        return static_cast<uint32_t>(store_[kIntrMask]) |
-               (store_[kIntrMask + 1] << 8) | (store_[kIntrMask + 2] << 16) |
-               (store_[kIntrMask + 3] << 24);
-    }
+    uint32_t IntrMask() const { return cerf::le::U32(store_.data(), kIntrMask); }
     uint8_t Ps2StatusByte() { return 0x80u | (mouse_.HasData() ? 0x20u : 0u); }
 
     std::vector<uint8_t> store_;

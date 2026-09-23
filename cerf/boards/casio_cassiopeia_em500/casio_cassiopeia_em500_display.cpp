@@ -1,5 +1,6 @@
 #include "casio_cassiopeia_em500_display.h"
 
+#include "../../core/byte_order.h"
 #include "../../core/cerf_emulator.h"
 #include "../../core/fatal.h"
 #include "../../core/log.h"
@@ -55,13 +56,13 @@ bool CasioCassiopeiaEm500Display::TryReadByte(uint32_t off, uint8_t& out) {
 
 bool CasioCassiopeiaEm500Display::TryReadHalf(uint32_t off, uint16_t& out) {
     if (!InFb(off)) return false;
-    std::memcpy(&out, &fb_[off - kFbOffset], sizeof(out));
+    out = cerf::le::U16(fb_.data(), off - kFbOffset);
     return true;
 }
 
 bool CasioCassiopeiaEm500Display::TryReadWord(uint32_t off, uint32_t& out) {
     if (InFb(off)) {
-        std::memcpy(&out, &fb_[off - kFbOffset], sizeof(out));
+        out = cerf::le::U32(fb_.data(), off - kFbOffset);
         return true;
     }
     /* ddi.dll sub_FC4E38 @0xFC4F08 lw 0($v0); @0xFC4F10 beqz loc_FC4F24;
@@ -88,13 +89,13 @@ bool CasioCassiopeiaEm500Display::TryWriteByte(uint32_t off, uint8_t value) {
 
 bool CasioCassiopeiaEm500Display::TryWriteHalf(uint32_t off, uint16_t value) {
     if (!InFb(off)) return false;
-    std::memcpy(&fb_[off - kFbOffset], &value, sizeof(value));
+    cerf::le::Put16(fb_.data() + (off - kFbOffset), value);
     return true;
 }
 
 bool CasioCassiopeiaEm500Display::TryWriteWord(uint32_t off, uint32_t value) {
     if (InFb(off)) {
-        std::memcpy(&fb_[off - kFbOffset], &value, sizeof(value));
+        cerf::le::Put32(fb_.data() + (off - kFbOffset), value);
         return true;
     }
     switch (off) {
@@ -177,7 +178,7 @@ void CasioCassiopeiaEm500Display::RunFill() {
     for (uint32_t row = 0; row < h; ++row) {
         uint8_t* p = fb_.data() + fb_off + row * StrideBytes();
         for (uint32_t col = 0; col < w; ++col)
-            std::memcpy(p + col * 2u, &color, sizeof(color));
+            cerf::le::Put16(p + col * 2u, color);
     }
 }
 

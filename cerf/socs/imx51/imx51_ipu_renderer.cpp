@@ -5,16 +5,17 @@
 
 #include "../../boards/board_context.h"
 #include "../../boards/ford_sync2/ford_sync_2_id.h"
+#include "../../core/byte_order.h"
 #include "../../core/cerf_emulator.h"
 #include "../../core/log.h"
 #include "../../cpu/emulated_memory.h"
 #include "../../host/panel_frame_renderer.h"
+#include "../../lcd/lcd_pixel_expand.h"
 
 #include <cstring>
 
 namespace {
 
-constexpr size_t   kContentProbeStride = 251;
 constexpr uint32_t kBppRgb565 = 3u;   /* CPMEM BPP code for 16bpp (ipu-cpmem.c) */
 constexpr uint32_t kBpp32     = 0u;   /* CPMEM BPP code for 32bpp (ipu-cpmem.c) */
 
@@ -23,18 +24,6 @@ constexpr uint32_t kDpFgEn         = 0x1u; /* FG_EN[0]: partial (FG) plane enabl
 constexpr uint32_t kDpComComposite = 0x3u; /* FG_EN|GWSEL: partial plane, GWAM=0 local alpha */
 constexpr uint32_t kDpComGlobal    = 0x7u; /* FG_EN|GWSEL|GWAM: partial plane, global alpha */
 constexpr uint32_t kFgPfsRgba8888  = 7u;   /* ch27 PFS for the RGBA8888 FG plane (live: s224) */
-
-/* 5:6:5 -> BGRA8888 (top bits replicated for clean 8-bit expansion). */
-inline uint32_t Expand565(uint16_t px) {
-    const uint8_t r5 = (px >> 11) & 0x1Fu;
-    const uint8_t g6 = (px >>  5) & 0x3Fu;
-    const uint8_t b5 =  px        & 0x1Fu;
-    const uint8_t r  = static_cast<uint8_t>((r5 << 3) | (r5 >> 2));
-    const uint8_t g  = static_cast<uint8_t>((g6 << 2) | (g6 >> 4));
-    const uint8_t b  = static_cast<uint8_t>((b5 << 3) | (b5 >> 2));
-    return 0xFF000000u | (static_cast<uint32_t>(r) << 16)
-                       | (static_cast<uint32_t>(g) << 8) | b;
-}
 
 /* DP graphic-window local per-pixel alpha (RM Table 42-116, GWAM=0):
    out = (A*FG + (255-A)*BG)/255 per channel, round-to-nearest. FG/BG/out are
@@ -45,7 +34,7 @@ inline uint32_t BlendLocalAlpha(uint32_t fg, uint32_t bg) {
     auto ch = [&](uint32_t sh) -> uint32_t {
         return (a * ((fg >> sh) & 0xFFu) + ia * ((bg >> sh) & 0xFFu) + 127u) / 255u;
     };
-    return 0xFF000000u | (ch(16) << 16) | (ch(8) << 8) | ch(0);
+    return lcd_pixel::PackXrgb(ch(16), ch(8), ch(0));
 }
 
 /* i.MX51 IPUv3EX display scanout -> host frame. The DP composites a full
@@ -75,9 +64,9 @@ public:
         Imx51IpuChannelDesc fg;
         if (FgActive(fg))   /* content lives in the FG buffer; the BG plane can be empty */
             return latch_.ProbeAndLatch(mem, fg.eba1,
-                       static_cast<size_t>(fg.fw) * 4u * fg.fh, kContentProbeStride);
+                       static_cast<size_t>(fg.fw) * 4u * fg.fh);
         return latch_.ProbeAndLatch(mem, bg.eba,
-                   static_cast<size_t>(bg.sl) * bg.fh, kContentProbeStride);
+                   static_cast<size_t>(bg.sl) * bg.fh);
     }
 
     void RenderInto(uint32_t* dib_bgra32,
@@ -158,10 +147,10 @@ private:
         const uint32_t cw = (bg.fw < host_w) ? bg.fw : host_w;
         const uint32_t ch = (bg.fh < host_h) ? bg.fh : host_h;
         for (uint32_t y = 0; y < ch; ++y) {
-            const uint16_t* srow =
-                reinterpret_cast<const uint16_t*>(src + static_cast<size_t>(y) * bg.sl);
+            const uint8_t* srow = src + static_cast<size_t>(y) * bg.sl;
             uint32_t* drow = dib + static_cast<size_t>(y) * host_w;
-            for (uint32_t x = 0; x < cw; ++x) drow[x] = Expand565(srow[x]);
+            for (uint32_t x = 0; x < cw; ++x)
+                drow[x] = lcd_pixel::Expand565(cerf::le::U16(srow, static_cast<size_t>(x) * 2u));
         }
     }
 
@@ -176,15 +165,14 @@ private:
         const uint32_t cw = (fg.fw < host_w) ? fg.fw : host_w;
         const uint32_t ch = (fg.fh < host_h) ? fg.fh : host_h;
         for (uint32_t y = 0; y < ch; ++y) {
-            const uint32_t* frow =
-                reinterpret_cast<const uint32_t*>(fg_src + static_cast<size_t>(y) * fg_stride);
-            const uint16_t* brow = bg_src
-                ? reinterpret_cast<const uint16_t*>(bg_src + static_cast<size_t>(y) * bg.sl)
-                : nullptr;
+            const uint8_t* frow = fg_src + static_cast<size_t>(y) * fg_stride;
+            const uint8_t* brow = bg_src ? bg_src + static_cast<size_t>(y) * bg.sl : nullptr;
             uint32_t* drow = dib + static_cast<size_t>(y) * host_w;
             for (uint32_t x = 0; x < cw; ++x) {
-                const uint32_t bgpx = brow ? Expand565(brow[x]) : 0xFF000000u;
-                drow[x] = BlendLocalAlpha(frow[x], bgpx);
+                const uint32_t bgpx = brow
+                    ? lcd_pixel::Expand565(cerf::le::U16(brow, static_cast<size_t>(x) * 2u))
+                    : 0xFF000000u;
+                drow[x] = BlendLocalAlpha(cerf::le::U32(frow, static_cast<size_t>(x) * 4u), bgpx);
             }
         }
     }
@@ -200,11 +188,10 @@ private:
         const uint32_t cw = (fg.fw < host_w) ? fg.fw : host_w;
         const uint32_t ch = (fg.fh < host_h) ? fg.fh : host_h;
         for (uint32_t y = 0; y < ch; ++y) {
-            const uint32_t* frow =
-                reinterpret_cast<const uint32_t*>(fg_src + static_cast<size_t>(y) * fg_stride);
+            const uint8_t* frow = fg_src + static_cast<size_t>(y) * fg_stride;
             uint32_t* drow = dib + static_cast<size_t>(y) * host_w;
             for (uint32_t x = 0; x < cw; ++x)
-                drow[x] = 0xFF000000u | (frow[x] & 0x00FFFFFFu);
+                drow[x] = 0xFF000000u | cerf::le::U24(frow, static_cast<size_t>(x) * 4u);
         }
     }
 };

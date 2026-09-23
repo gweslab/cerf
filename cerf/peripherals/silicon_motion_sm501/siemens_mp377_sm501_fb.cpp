@@ -5,6 +5,7 @@
 
 #include "../../boards/board_context.h"
 #include "../../boards/siemens_mp377/siemens_mp377_id.h"
+#include "../../core/byte_order.h"
 #include "../../core/cerf_emulator.h"
 #include "../../peripherals/peripheral_dispatcher.h"
 #include "../../state/state_stream.h"
@@ -36,13 +37,11 @@ uint8_t SiemensMp377Sm501Fb::ReadByte(uint32_t a) {
 }
 
 uint16_t SiemensMp377Sm501Fb::ReadHalf(uint32_t a) {
-    const size_t i = CpuVramOffset(a);
-    return static_cast<uint16_t>(vram_[i] | (vram_[i + 1] << 8));
+    return cerf::le::U16(vram_.data(), CpuVramOffset(a));
 }
 
 uint32_t SiemensMp377Sm501Fb::ReadWord(uint32_t a) {
-    const size_t i = CpuVramOffset(a);
-    return static_cast<uint32_t>(vram_[i] | (vram_[i + 1] << 8) | (vram_[i + 2] << 16) | (vram_[i + 3] << 24));
+    return cerf::le::U32(vram_.data(), CpuVramOffset(a));
 }
 
 void SiemensMp377Sm501Fb::WriteByte(uint32_t a, uint8_t v) {
@@ -53,17 +52,13 @@ void SiemensMp377Sm501Fb::WriteByte(uint32_t a, uint8_t v) {
 
 void SiemensMp377Sm501Fb::WriteHalf(uint32_t a, uint16_t v) {
     const size_t i = CpuVramOffset(a);
-    vram_[i] = static_cast<uint8_t>(v);
-    vram_[i + 1] = static_cast<uint8_t>(v >> 8);
+    cerf::le::Put16(vram_.data() + i, v);
     NoteWrite(static_cast<uint32_t>(i));
 }
 
 void SiemensMp377Sm501Fb::WriteWord(uint32_t a, uint32_t v) {
     const size_t i = CpuVramOffset(a);
-    vram_[i] = static_cast<uint8_t>(v);
-    vram_[i + 1] = static_cast<uint8_t>(v >> 8);
-    vram_[i + 2] = static_cast<uint8_t>(v >> 16);
-    vram_[i + 3] = static_cast<uint8_t>(v >> 24);
+    cerf::le::Put32(vram_.data() + i, v);
     NoteWrite(static_cast<uint32_t>(i));
 }
 
@@ -88,18 +83,14 @@ bool SiemensMp377Sm501Fb::WriteVramByte(uint32_t off, uint8_t value) {
 
 bool SiemensMp377Sm501Fb::WriteVramHalf(uint32_t off, uint16_t value) {
     if (off + 1u >= kSm501FbBytes) return false;
-    vram_[off] = static_cast<uint8_t>(value);
-    vram_[off + 1u] = static_cast<uint8_t>(value >> 8);
+    cerf::le::Put16(vram_.data() + off, value);
     Note2dWrite(off, 2u);
     return true;
 }
 
 bool SiemensMp377Sm501Fb::WriteVramWord(uint32_t off, uint32_t value) {
     if (off + 3u >= kSm501FbBytes) return false;
-    vram_[off] = static_cast<uint8_t>(value);
-    vram_[off + 1u] = static_cast<uint8_t>(value >> 8);
-    vram_[off + 2u] = static_cast<uint8_t>(value >> 16);
-    vram_[off + 3u] = static_cast<uint8_t>(value >> 24);
+    cerf::le::Put32(vram_.data() + off, value);
     Note2dWrite(off, 4u);
     return true;
 }

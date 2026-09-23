@@ -1,5 +1,8 @@
 #include "omap3530_gpmc.h"
 
+#include "../../core/byte_order.h"
+#include "../../storage/fat_volume_layout.h"
+
 void Omap3530Gpmc::OnReady() {
     Omap3530PrcmStubBlock::OnReady();
     /* In-RAM blank NAND for CS0 - 256 MB of 0xFF. */
@@ -10,29 +13,22 @@ void Omap3530Gpmc::OnReady() {
 void Omap3530Gpmc::WriteCeBootMbr() {
     auto& chip = nand_[0];
 
-    constexpr size_t   kPartTableOffset = 446;
-    constexpr size_t   kBootSigOffset   = 510;
     constexpr uint8_t  kPartDos32       = 0x0B;
     constexpr uint32_t kPartStartSec    = 64;
     constexpr uint32_t kPartTotalSec    = 131008;
 
     uint8_t* data = chip.storage.data();
     data[0] = 0xE9u; data[1] = 0xFDu; data[2] = 0xFFu;
-    data[kBootSigOffset    ] = 0x55u;
-    data[kBootSigOffset + 1] = 0xAAu;
+    fat_volume_layout::WriteBootSignature(data);
 
-    std::memset(data + kPartTableOffset, 0, 4 * 16);
+    std::memset(fat_volume_layout::MbrPartitionEntry(data, 0), 0,
+                4 * fat_volume_layout::kMbrPartEntryBytes);
 
-    uint8_t* pe = data + kPartTableOffset;
-    pe[ 4] = kPartDos32;
-    pe[ 8] = static_cast<uint8_t>( kPartStartSec        & 0xFFu);
-    pe[ 9] = static_cast<uint8_t>((kPartStartSec >>  8) & 0xFFu);
-    pe[10] = static_cast<uint8_t>((kPartStartSec >> 16) & 0xFFu);
-    pe[11] = static_cast<uint8_t>((kPartStartSec >> 24) & 0xFFu);
-    pe[12] = static_cast<uint8_t>( kPartTotalSec        & 0xFFu);
-    pe[13] = static_cast<uint8_t>((kPartTotalSec >>  8) & 0xFFu);
-    pe[14] = static_cast<uint8_t>((kPartTotalSec >> 16) & 0xFFu);
-    pe[15] = static_cast<uint8_t>((kPartTotalSec >> 24) & 0xFFu);
+    fat_volume_layout::MbrPartition part;
+    part.type = kPartDos32;
+    part.start_lba = kPartStartSec;
+    part.sectors = kPartTotalSec;
+    fat_volume_layout::WriteMbrPartition(data, 0, part);
 
     uint8_t* spare = chip.storage.data() + kPageDataSize;
     /* If any ECC byte != 0, mspart's later MBR re-read fails
@@ -138,16 +134,12 @@ void Omap3530Gpmc::PushPrefetchByte8(uint32_t cs, uint8_t value) {
     }
 }
 
-size_t Omap3530Gpmc::PageByteOffset(uint8_t col_lo, uint8_t col_hi,
-                                    uint8_t page0, uint8_t page1, uint8_t page2) {
-    /* x16 chip: driver encodes column as (offset_bytes / 2); multiply
-       back here or reads land at half the requested byte offset. */
-    const uint32_t column_words =
-        (static_cast<uint32_t>(col_hi) << 8) | col_lo;
-    const uint32_t page =
-        (static_cast<uint32_t>(page2) << 16) |
-        (static_cast<uint32_t>(page1) <<  8) |
-         static_cast<uint32_t>(page0);
+size_t Omap3530Gpmc::PageByteOffset(const NandChip& chip) {
+    const uint8_t page_bytes[3] = {
+        chip.addr_bytes[2], chip.addr_bytes[3],
+        chip.addr_idx >= 5 ? chip.addr_bytes[4] : uint8_t(0)};
+    const uint32_t column_words = cerf::le::U16(chip.addr_bytes);
+    const uint32_t page         = cerf::le::U24(page_bytes);
     return static_cast<size_t>(page) * kPageTotalSize +
            static_cast<size_t>(column_words) * 2u;
 }
@@ -181,10 +173,7 @@ void Omap3530Gpmc::WriteNandCommand(uint32_t cs, uint16_t cmd) {
         break;
     case 0x30u:                              /* READ page (2nd, confirm) */
         if (chip.state == NandState::ReadAddr && chip.addr_idx >= 4) {
-            const uint8_t a4 = chip.addr_idx >= 5 ? chip.addr_bytes[4] : 0;
-            const size_t offset = PageByteOffset(
-                chip.addr_bytes[0], chip.addr_bytes[1],
-                chip.addr_bytes[2], chip.addr_bytes[3], a4);
+            const size_t offset = PageByteOffset(chip);
             if (offset < chip.storage.size()) {
                 chip.data_offset    = offset;
                 chip.data_remaining =
@@ -208,10 +197,7 @@ void Omap3530Gpmc::WriteNandCommand(uint32_t cs, uint16_t cmd) {
         break;
     case 0xD0u:                              /* BLOCK ERASE (2nd, confirm) */
         if (chip.state == NandState::EraseAddr && chip.addr_idx >= 3) {
-            const uint32_t page =
-                (static_cast<uint32_t>(chip.addr_bytes[2]) << 16) |
-                (static_cast<uint32_t>(chip.addr_bytes[1]) <<  8) |
-                 static_cast<uint32_t>(chip.addr_bytes[0]);
+            const uint32_t page = cerf::le::U24(chip.addr_bytes);
             const uint32_t block = page / kPagesPerBlock;
             if (block < kBlockCount && !chip.storage.empty()) {
                 const size_t block_offset =
@@ -246,10 +232,7 @@ void Omap3530Gpmc::WriteNandAddress(uint32_t cs, uint16_t addr) {
             "geometry mismatch?\n", cs, chip.addr_idx);
     }
     if (chip.state == NandState::WriteAddr && chip.addr_idx >= 4) {
-        const uint8_t a4 = chip.addr_idx >= 5 ? chip.addr_bytes[4] : 0;
-        const size_t offset = PageByteOffset(
-            chip.addr_bytes[0], chip.addr_bytes[1],
-            chip.addr_bytes[2], chip.addr_bytes[3], a4);
+        const size_t offset = PageByteOffset(chip);
         if (offset < chip.storage.size()) {
             chip.data_offset    = offset;
             chip.data_remaining =
@@ -266,10 +249,8 @@ void Omap3530Gpmc::WriteNandData16(uint32_t cs, uint16_t value) {
     if (chip.state == NandState::WriteData &&
         chip.data_offset + 2 <= chip.storage.size() &&
         chip.data_remaining >= 2) {
-        chip.storage[chip.data_offset    ] &=
-            static_cast<uint8_t>(value & 0xFFu);
-        chip.storage[chip.data_offset + 1] &=
-            static_cast<uint8_t>(value >> 8);
+        uint8_t* const cell = chip.storage.data() + chip.data_offset;
+        cerf::le::Put16(cell, static_cast<uint16_t>(cerf::le::U16(cell) & value));
         chip.data_offset    += 2;
         chip.data_remaining -= 2;
     }
@@ -293,12 +274,10 @@ uint16_t Omap3530Gpmc::ReadNandData16(uint32_t cs) {
     case NandState::ReadDataReady:
         if (chip.data_offset + 2 <= chip.storage.size() &&
             chip.data_remaining >= 2) {
-            const uint8_t b0 = chip.storage[chip.data_offset    ];
-            const uint8_t b1 = chip.storage[chip.data_offset + 1];
+            const uint16_t v = cerf::le::U16(chip.storage.data(), chip.data_offset);
             chip.data_offset    += 2;
             chip.data_remaining -= 2;
-            return static_cast<uint16_t>(b0) |
-                   (static_cast<uint16_t>(b1) << 8);
+            return v;
         }
         return 0xFFFFu;
     case NandState::StatusRead:

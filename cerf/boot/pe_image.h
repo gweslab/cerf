@@ -34,6 +34,22 @@ public:
 
     const std::vector<Section>& Sections() const { return sections_; }
 
+    static constexpr uint32_t kNoFileOff = 0xFFFFFFFFu;
+
+    static constexpr int kDirImport    = 1;
+    static constexpr int kDirBaseReloc = 5;
+
+    static constexpr uint16_t kMachineR3000     = 0x162;
+    static constexpr uint16_t kMachineR4000     = 0x166;
+    static constexpr uint16_t kMachineR10000    = 0x168;
+    static constexpr uint16_t kMachineWceMipsV2 = 0x169;
+    static constexpr uint16_t kMachineMips16    = 0x266;
+    static constexpr uint16_t kMachineMipsFpu   = 0x366;
+    static constexpr uint16_t kMachineMipsFpu16 = 0x466;
+
+    int      SectionIndexForRva(uint32_t rva) const;
+    uint32_t RvaToFileOff(uint32_t rva) const;
+
 private:
     struct Directory { uint32_t rva = 0; uint32_t size = 0; };
 

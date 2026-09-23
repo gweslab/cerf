@@ -1,5 +1,6 @@
 #include "casio_cassiopeia_e55_lcd.h"
 
+#include "../../core/byte_order.h"
 #include "../../core/cerf_emulator.h"
 #include "../../core/fatal.h"
 #include "../../lcd/display_size_latch.h"
@@ -8,8 +9,6 @@
 #include "../../state/state_stream.h"
 #include "../board_context.h"
 #include "casio_cassiopeia_e55_id.h"
-
-#include <cstring>
 
 namespace {
 
@@ -41,21 +40,13 @@ uint8_t CasioCassiopeiaE55Lcd::ReadByte(uint32_t addr) {
 
 uint16_t CasioCassiopeiaE55Lcd::ReadHalf(uint32_t addr) {
     const uint32_t off = addr - kBase;
-    if (InFb(off) && off + 1u < kFbSize) {
-        uint16_t v;
-        std::memcpy(&v, fb_.data() + off, sizeof(v));
-        return v;
-    }
+    if (InFb(off) && off + 1u < kFbSize) return cerf::le::U16(fb_.data(), off);
     HaltUnsupportedAccess("ReadHalf", addr, 0);
 }
 
 uint32_t CasioCassiopeiaE55Lcd::ReadWord(uint32_t addr) {
     const uint32_t off = addr - kBase;
-    if (InFb(off) && off + 3u < kFbSize) {
-        uint32_t v;
-        std::memcpy(&v, fb_.data() + off, sizeof(v));
-        return v;
-    }
+    if (InFb(off) && off + 3u < kFbSize) return cerf::le::U32(fb_.data(), off);
     HaltUnsupportedAccess("ReadWord", addr, 0);
 }
 
@@ -79,7 +70,7 @@ void CasioCassiopeiaE55Lcd::WriteByte(uint32_t addr, uint8_t value) {
 void CasioCassiopeiaE55Lcd::WriteHalf(uint32_t addr, uint16_t value) {
     const uint32_t off = addr - kBase;
     if (InFb(off) && off + 1u < kFbSize) {
-        std::memcpy(fb_.data() + off, &value, sizeof(value));
+        cerf::le::Put16(fb_.data() + off, value);
         return;
     }
     HaltUnsupportedAccess("WriteHalf", addr, value);
@@ -88,7 +79,7 @@ void CasioCassiopeiaE55Lcd::WriteHalf(uint32_t addr, uint16_t value) {
 void CasioCassiopeiaE55Lcd::WriteWord(uint32_t addr, uint32_t value) {
     const uint32_t off = addr - kBase;
     if (InFb(off) && off + 3u < kFbSize) {
-        std::memcpy(fb_.data() + off, &value, sizeof(value));
+        cerf::le::Put32(fb_.data() + off, value);
         return;
     }
     HaltUnsupportedAccess("WriteWord", addr, value);

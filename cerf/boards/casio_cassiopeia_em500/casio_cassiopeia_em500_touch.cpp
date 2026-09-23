@@ -1,5 +1,6 @@
 #include "casio_cassiopeia_em500_touch.h"
 
+#include "../../core/byte_order.h"
 #include "../../core/cerf_emulator.h"
 #include "../../cpu/emulated_memory.h"
 #include "../../state/emulation_freeze.h"
@@ -7,7 +8,6 @@
 
 #include <algorithm>
 #include <chrono>
-#include <cstring>
 
 namespace {
 
@@ -163,8 +163,7 @@ void CasioCassiopeiaEm500Touch::PresentLiftLocked() {
 void CasioCassiopeiaEm500Touch::DepositGate() {
     uint8_t* p = emu_->Get<EmulatedMemory>().TryTranslateWrite(kGatePa);
     if (!p) return;
-    uint32_t v = kGateArmed;
-    std::memcpy(p, &v, sizeof(v));
+    cerf::le::Put32(p, kGateArmed);
 }
 
 void CasioCassiopeiaEm500Touch::WorkerLoop() {

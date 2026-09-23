@@ -2,16 +2,16 @@
 
 #include "cerf_virt_framebuffer.h"
 
+#include "../../core/byte_order.h"
 #include "../../core/cerf_emulator.h"
 #include "../../core/device_config.h"
 #include "../../host/guest_additions_frame_renderer.h"
+#include "../../lcd/lcd_pixel_expand.h"
 
 #include <algorithm>
 #include <cstring>
 
 namespace {
-
-constexpr size_t kContentProbeStride = 251;
 
 class CerfVirtFramebufferRenderer : public GuestAdditionsFrameRenderer {
 public:
@@ -33,7 +33,7 @@ public:
         if (latch_.Latched()) return true;
         const size_t bytes = fb.SizeBytes();
         if (bytes == 0 || bytes > fb.Capacity()) return false;
-        return latch_.ProbeAndLatch(fb.Bytes(), bytes, kContentProbeStride);
+        return latch_.ProbeAndLatch(fb.Bytes(), bytes);
     }
 
     void RearmContentLatch() override {
@@ -68,24 +68,13 @@ public:
                 for (uint32_t x = 0; x < copy_w; ++x)
                     dst_row[x] = 0xFF000000u | pal[src_row[x]];
             } else if (bpp == 16u) {
-                const uint16_t* s = reinterpret_cast<const uint16_t*>(src_row);
-                for (uint32_t x = 0; x < copy_w; ++x) {
-                    const uint32_t p  = s[x];
-                    const uint32_t r5 = (p >> 11) & 0x1Fu;
-                    const uint32_t g6 = (p >> 5)  & 0x3Fu;
-                    const uint32_t b5 =  p        & 0x1Fu;
-                    dst_row[x] = 0xFF000000u
-                               | (((r5 << 3) | (r5 >> 2)) << 16)
-                               | (((g6 << 2) | (g6 >> 4)) << 8)
-                               |  ((b5 << 3) | (b5 >> 2));
-                }
+                for (uint32_t x = 0; x < copy_w; ++x)
+                    dst_row[x] = lcd_pixel::Expand565(
+                        cerf::le::U16(src_row, static_cast<size_t>(x) * 2u));
             } else if (bpp == 24u) {
                 for (uint32_t x = 0; x < copy_w; ++x) {
-                    const uint8_t* p = src_row + static_cast<size_t>(x) * 3u;
                     dst_row[x] = 0xFF000000u
-                               | (static_cast<uint32_t>(p[2]) << 16)
-                               | (static_cast<uint32_t>(p[1]) << 8)
-                               |  static_cast<uint32_t>(p[0]);
+                               | cerf::le::U24(src_row, static_cast<size_t>(x) * 3u);
                 }
             }
         }

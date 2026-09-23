@@ -1,8 +1,7 @@
 #include "mediaq_mq1188_ge.h"
 
+#include "../../core/byte_order.h"
 #include "../../core/log.h"
-
-#include <cstring>
 
 /* Colour BitBLT, source streamed through the Source FIFO (ddi.dll sub_1845A9C):
    16-bpp pixels two per dword, height rows of dwordsPerRow each; first valid
@@ -38,21 +37,15 @@ void MediaQMq1188Ge::BlitColorSource(const uint32_t* r) {
     const uint32_t fbsize = FbBytes();
 
     for (uint32_t row = 0; row < h; ++row) {
-        const uint32_t* line = &src_fifo_[static_cast<size_t>(row) * dwords_per_row];
+        const uint8_t* line = SrcFifoBytes() + static_cast<size_t>(row) * dwords_per_row * 4u;
         if ((start_px + w + 1u) / 2u > dwords_per_row) break;  /* malformed stream. */
         for (uint32_t col = 0; col < w; ++col) {
-            const uint32_t slot = start_px + col;
-            const uint32_t dword = line[slot >> 1];
-            const uint32_t px = (slot & 1u) ? (dword >> 16) & 0xFFFFu : dword & 0xFFFFu;
+            const uint32_t px = cerf::le::U16(line, (start_px + col) * 2u);
             if (trans && px == key) continue;
             const uint64_t addr = static_cast<uint64_t>(base) +
                 static_cast<uint64_t>(dy + row) * stride +
                 static_cast<uint64_t>(dx + col) * bpp;
-            if (addr + bpp > fbsize) continue;
-            uint32_t d = 0u;
-            std::memcpy(&d, fb + addr, bpp);
-            const uint32_t res = Rop3(rop, PatternOperand(r, col, row), px, d) & 0xFFFFu;
-            std::memcpy(fb + addr, &res, bpp);
+            RopPixel(fb, fbsize, addr, bpp, 0xFFFFu, rop, PatternOperand(r, col, row), px);
         }
     }
 }
@@ -113,23 +106,16 @@ void MediaQMq1188Ge::BlitMonoSource(const uint32_t* r) {
 
     for (uint32_t row = 0; row < h; ++row) {
         for (uint32_t col = 0; col < w; ++col) {
-            const uint32_t bit_idx  = bit_off0 + row * stride_bits + col;
-            const uint32_t byte_idx = bit_idx >> 3;
-            const uint32_t bit = (src_fifo_[byte_idx >> 2] >>
-                (8u * (byte_idx & 3u) + (7u - (bit_idx & 7u)))) & 1u;
+            const uint32_t bit = MonoBit(SrcFifoBytes(), bit_off0 + row * stride_bits + col);
             if (bit && trans_set) continue;
             if (!bit && trans_clear) continue;
             const uint32_t color = bit ? fg : bg;
             const uint64_t addr = static_cast<uint64_t>(base) +
                 static_cast<uint64_t>(dy + row) * stride +
                 static_cast<uint64_t>(dx + col) * bpp;
-            if (addr + bpp > fbsize) continue;
-            uint32_t d = 0u;
-            std::memcpy(&d, fb + addr, bpp);
             const uint32_t pat = pat_en
                 ? MonoPatternPixel(mono_pat[0], mono_pat[1], pat_fg, pat_bg, dx + col, dy + row) : 0u;
-            const uint32_t res = Rop3(rop, pat, color, d) & 0xFFFFu;
-            std::memcpy(fb + addr, &res, bpp);
+            RopPixel(fb, fbsize, addr, bpp, 0xFFFFu, rop, pat, color);
         }
     }
 }

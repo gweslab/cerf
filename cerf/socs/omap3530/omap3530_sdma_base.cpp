@@ -2,6 +2,7 @@
 
 #include "omap3530_sdma_base.h"
 
+#include "../../core/byte_order.h"
 #include "../../core/cerf_emulator.h"
 #include "../../core/log.h"
 #include "../../cpu/emulated_memory.h"
@@ -73,11 +74,8 @@ uint32_t ElementSize(uint32_t csdp) {
 uint32_t ByteSwap(uint32_t value, uint32_t es) {
     switch (es) {
     case 1: return value & 0xFFu;
-    case 2: return ((value & 0xFFu) << 8) | ((value >> 8) & 0xFFu);
-    case 4: return ((value & 0xFFu) << 24) |
-                   ((value & 0xFF00u) << 8) |
-                   ((value & 0xFF0000u) >> 8) |
-                   ((value >> 24) & 0xFFu);
+    case 2: return cerf::ByteSwap16(static_cast<uint16_t>(value));
+    case 4: return cerf::ByteSwap32(value);
     default: return value;
     }
 }
@@ -343,7 +341,7 @@ bool Omap3530SdmaBase::TransferOneElement(int ch) {
         }
         uint8_t* sh = mem.TryTranslate(spa);
         if (sh) {
-            std::memcpy(&src_val, sh, es);
+            src_val = static_cast<uint32_t>(cerf::le::UN(sh, es));
         } else {
             switch (es) {
             case 1: src_val = disp.ReadByte(spa); break;
@@ -356,7 +354,7 @@ bool Omap3530SdmaBase::TransferOneElement(int ch) {
 
     bool write_dst = true;
     if (transp_copy) {
-        const uint32_t mask = (es == 4u) ? 0xFFFFFFFFu : ((1u << (es * 8u)) - 1u);
+        const uint32_t mask = cerf::ByteWidthMask(es);
         if ((src_val & mask) == (c.color & mask)) write_dst = false;
     }
 
@@ -369,7 +367,7 @@ bool Omap3530SdmaBase::TransferOneElement(int ch) {
         }
         uint8_t* dh = mem.TryTranslateWrite(dpa);
         if (dh) {
-            std::memcpy(dh, &dval, es);
+            cerf::le::PutN(dh, dval, es);
         } else {
             switch (es) {
             case 1: disp.WriteByte(dpa, static_cast<uint8_t> (dval)); break;

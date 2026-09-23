@@ -1,6 +1,7 @@
 #include "../../socs/imx51/usb_device_host.h"
 
 #include "../../boot/sec_flash.h"
+#include "../../core/byte_order.h"
 #include "../../core/cerf_emulator.h"
 #include "../../core/log.h"
 #include "../../core/service.h"
@@ -9,6 +10,7 @@
 #include "../../host/host_icon_cache.h"
 #include "../../host/host_widget.h"
 #include "../../host/host_widget_registry.h"
+#include "../../peripherals/usb/usb_device.h"
 #include "../../socs/imx51/imx51_usboh3.h"
 #include "../../state/state_stream.h"
 
@@ -17,13 +19,9 @@
 
 namespace {
 
-uint32_t Rd32(const uint8_t* p) {
-    return p[0] | (p[1] << 8) | (p[2] << 16) | (static_cast<uint32_t>(p[3]) << 24);
-}
-void Wr32(uint8_t* p, uint32_t v) {
-    p[0] = static_cast<uint8_t>(v);       p[1] = static_cast<uint8_t>(v >> 8);
-    p[2] = static_cast<uint8_t>(v >> 16); p[3] = static_cast<uint8_t>(v >> 24);
-}
+using cerf::le::Put32;
+using cerf::le::U16;
+using cerf::le::U32;
 
 /* Ford SYNC2 USB host driver (CERF plays the host PC for SBOOT's USB-device
    flasher). Control-request encodings grounded in SBOOT sub_8005F0A4 /
@@ -47,7 +45,7 @@ public:
         LOG(UsbOtg, "[USBHOST] device reset -> enumerate\n");
         step_ = Step::kDevDesc;
         dl_   = DlPhase::kNone;
-        GetDescriptor(kDescDevice, 18);
+        GetDescriptor(UsbDevice::kDescDevice, UsbDevice::kDevDescSize);
     }
 
     void OnDeviceIn(uint32_t ep, const uint8_t* data, uint32_t len) override {
@@ -98,37 +96,32 @@ private:
        follow. */
     enum class DlPhase { kNone, kTxnInfo, kImgHdr, kCat, kSegment, kDone };
 
-    static constexpr uint8_t  kDescDevice   = 0x01;
-    static constexpr uint8_t  kDescConfig   = 0x02;
-    static constexpr uint8_t  kDescEndpoint = 0x05;
     static constexpr uint32_t kFordSig      = 0xCB00C001u;
 
     void Send(uint8_t bm_req, uint8_t b_req, uint16_t w_value,
               uint16_t w_index, uint16_t w_length) {
-        const uint8_t s[8] = {
-            bm_req, b_req,
-            static_cast<uint8_t>(w_value),  static_cast<uint8_t>(w_value >> 8),
-            static_cast<uint8_t>(w_index),  static_cast<uint8_t>(w_index >> 8),
-            static_cast<uint8_t>(w_length), static_cast<uint8_t>(w_length >> 8),
-        };
+        uint8_t s[UsbDevice::SetupPacket::kSize];
+        UsbDevice::SetupPacket{bm_req, b_req, w_value, w_index, w_length}.Encode(s);
         emu_.Get<Imx51Usboh3>().DeliverSetup(s);
     }
-    /* wValue = (type << 8) | index 0 (GET_DESCRIPTOR, bmRequestType IN/std/device). */
     void GetDescriptor(uint8_t type, uint16_t len) {
-        Send(0x80, 0x06, static_cast<uint16_t>(type << 8), 0, len);
+        Send(UsbDevice::kReqDirDeviceToHost, UsbDevice::kReqGetDescriptor,
+             static_cast<uint16_t>(type << 8), 0, len);
     }
-    void SetAddress(uint16_t addr) { Send(0x00, 0x05, addr, 0, 0); }       /* sub_8005EE80 */
-    void SetConfiguration(uint16_t cfg) { Send(0x00, 0x09, cfg, 0, 0); }   /* sub_8005EECC */
+    void SetAddress(uint16_t addr) { Send(0x00, UsbDevice::kReqSetAddress, addr, 0, 0); }       /* sub_8005EE80 */
+    void SetConfiguration(uint16_t cfg) { Send(0x00, UsbDevice::kReqSetConfiguration, cfg, 0, 0); }   /* sub_8005EECC */
 
     void CaptureData(const uint8_t* d, uint32_t len) {
         switch (step_) {
             case Step::kDevDesc:
-                if (len >= 12)
+                if (len >= UsbDevice::kDevDescOffIdProduct + 2)
                     LOG(UsbOtg, "[USBHOST] device descriptor bLength=%u VID=0x%04X PID=0x%04X\n",
-                        d[0], d[8] | (d[9] << 8), d[10] | (d[11] << 8));
+                        d[0], U16(d, UsbDevice::kDevDescOffIdVendor),
+                        U16(d, UsbDevice::kDevDescOffIdProduct));
                 break;
             case Step::kConfShort:
-                if (len >= 4) conf_total_ = static_cast<uint16_t>(d[2] | (d[3] << 8));
+                if (len >= UsbDevice::kCfgDescOffTotalLength + 2)
+                    conf_total_ = U16(d, UsbDevice::kCfgDescOffTotalLength);
                 LOG(UsbOtg, "[USBHOST] config descriptor wTotalLength=%u\n", conf_total_);
                 break;
             case Step::kConfFull:
@@ -146,7 +139,7 @@ private:
         for (uint32_t i = 0; i + 2 <= len;) {
             const uint8_t blen = d[i], btype = d[i + 1];
             if (blen == 0) break;
-            if (btype == kDescEndpoint && i + 4 <= len)
+            if (btype == UsbDevice::kDescEndpoint && i + 4 <= len)
                 LOG(UsbOtg, "[USBHOST] endpoint addr=0x%02X attr=0x%02X\n", d[i + 2], d[i + 3]);
             i += blen;
         }
@@ -155,8 +148,8 @@ private:
     void AdvanceAfterStatus() {
         switch (step_) {
             case Step::kDevDesc:   step_ = Step::kSetAddr;   SetAddress(1);                  break;
-            case Step::kSetAddr:   step_ = Step::kConfShort; GetDescriptor(kDescConfig, 9);  break;
-            case Step::kConfShort: step_ = Step::kConfFull;  GetDescriptor(kDescConfig, conf_total_); break;
+            case Step::kSetAddr:   step_ = Step::kConfShort; GetDescriptor(UsbDevice::kDescConfiguration, UsbDevice::kCfgDescSize);  break;
+            case Step::kConfShort: step_ = Step::kConfFull;  GetDescriptor(UsbDevice::kDescConfiguration, conf_total_); break;
             case Step::kConfFull:  step_ = Step::kSetConfig; SetConfiguration(1);            break;
             case Step::kSetConfig: step_ = Step::kConfigured;
                 LOG(UsbOtg, "[USBHOST] device CONFIGURED - enumeration complete\n");           break;
@@ -167,7 +160,7 @@ private:
     /* Device->host bulk IN: the 124-byte download request (sig 0xCB00C001) opens
        the download (sub_8004FF60); later 28-byte responses are status acks. */
     void OnBulkIn(const uint8_t* data, uint32_t len) {
-        const uint32_t sig = (len >= 4) ? Rd32(data) : 0u;
+        const uint32_t sig = (len >= 4) ? U32(data) : 0u;
         if (dl_ == DlPhase::kNone && sig == kFordSig) {
             LOG(UsbOtg, "[USBHOST] Ford download request (%u B) -> sending TransactionInfo\n", len);
             dl_ = DlPhase::kTxnInfo;
@@ -194,18 +187,17 @@ private:
        SegPerTR@+0x14=1 -> one chunk per transfer = chunk_count downloads. */
     uint32_t SendTxnInfo(uint8_t* dst, uint32_t max) {
         if (max < 60) return 0;
-        uint8_t hdr[0x2C] = {0};
-        emu_.Get<SecFlash>().ReadRaw(0, hdr, sizeof(hdr));
+        const SecHeader& sec = emu_.Get<SecFlash>().Header();
         std::memset(dst, 0, 60);
-        Wr32(dst + 0x00, kFordSig);
-        Wr32(dst + 0x04, 60);
-        Wr32(dst + 0x0C, Rd32(hdr + 0x18));   /* ImageSize = SEC image size */
-        Wr32(dst + 0x10, Rd32(hdr + 0x28));   /* SegSize   = .sec chunk stride */
-        Wr32(dst + 0x14, 1);                  /* SegPerTR */
-        Wr32(dst + 0x18, 0);                  /* transaction type 0 = download+flash */
+        Put32(dst + 0x00, kFordSig);
+        Put32(dst + 0x04, 60);
+        Put32(dst + 0x0C, sec.file_size);
+        Put32(dst + 0x10, sec.chunk_stride);
+        Put32(dst + 0x14, 1);
+        Put32(dst + 0x18, 0);
         dl_ = DlPhase::kImgHdr;
         LOG(UsbOtg, "[USBHOST] sent TransactionInfo (download+flash, SegSize=0x%X ImageSize=0x%X)\n",
-            Rd32(hdr + 0x28), Rd32(hdr + 0x18));
+            sec.chunk_stride, sec.file_size);
         return 60;
     }
 
@@ -217,12 +209,13 @@ private:
         uint8_t hdr[0x80] = {0};
         emu_.Get<SecFlash>().ReadRaw(0, hdr, sizeof(hdr));
         std::memcpy(dst, hdr, 0x80);
-        cat_off_       = Rd32(hdr + 0x0C);   /* HdrSize -> CAT start (0x80) */
-        cat_remaining_ = Rd32(hdr + 0x20);   /* CAT receive length */
-        seg_remaining_ = Rd32(hdr + 0x14);   /* SGMSize = payload bytes (= 251 segments) */
+        const SecHeader& sec = emu_.Get<SecFlash>().Header();
+        cat_off_       = sec.pkcs7_off;
+        cat_remaining_ = sec.cat_len;
+        seg_remaining_ = sec.sgm_size;
         dl_ = DlPhase::kCat;
         LOG(UsbOtg, "[USBHOST] sent image header (ImageType=0x%X CAT@0x%llX len=0x%X)\n",
-            Rd32(hdr + 0x08), static_cast<unsigned long long>(cat_off_), cat_remaining_);
+            sec.image_type, static_cast<unsigned long long>(cat_off_), cat_remaining_);
         return 0x80;
     }
 

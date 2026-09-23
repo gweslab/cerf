@@ -42,6 +42,7 @@ private:
     void     ReadId();
     uint64_t FlashOffset() const;
     uint64_t AutoFlashOffset() const;
+    std::array<uint8_t, 5> AutoAddrBytes() const;
 
     std::array<uint8_t, 0x200> spare_{};
     uint8_t  nand_cmd_  = 0;

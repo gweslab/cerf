@@ -1,5 +1,6 @@
 #include "cerf_virt_addr_map.h"
 #include "cerf_virt_autorun_regs.h"
+#include "cerf_virt_utf16_window.h"
 
 #include "../peripheral_base.h"
 #include "../peripheral_dispatcher.h"
@@ -56,11 +57,7 @@ public:
             const uint32_t idx = rel / CerfVirt::kArEntryStride;
             const uint32_t ch  = (rel % CerfVirt::kArEntryStride) / 2u;
             if (idx >= entries_.size()) return 0u;
-            const std::wstring& e = entries_[idx];
-            uint32_t v = 0;
-            if (ch < e.size())     v |= (uint16_t)e[ch];
-            if (ch + 1 < e.size()) v |= (uint32_t)(uint16_t)e[ch + 1] << 16;
-            return v;
+            return CerfVirt::Utf16WindowWord(entries_[idx], ch);
         }
         HaltUnsupportedAccess("ReadWord", addr, 0);
     }

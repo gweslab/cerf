@@ -2,6 +2,7 @@
 
 #include "../../boards/board_context.h"
 #include "../../boards/falcon_pc3xx/falcon_4220_id.h"
+#include "../../core/byte_order.h"
 #include "../../core/cerf_emulator.h"
 #include "../../core/log.h"
 #include "../../host/host_window.h"
@@ -104,17 +105,13 @@ uint16_t MediaQMq1188::ReadHalf(uint32_t addr) {
         const uint32_t word = RegRead(addr & ~0x3u);
         return static_cast<uint16_t>(word >> ((off & 0x2u) * 8u));
     }
-    uint16_t v;
-    std::memcpy(&v, &sram_[off], sizeof(v));
-    return v;
+    return cerf::le::U16(&sram_[off]);
 }
 
 uint32_t MediaQMq1188::ReadWord(uint32_t addr) {
     const uint32_t off = addr - MmioBase();
     if (InRegWindow(off)) return RegRead(addr);
-    uint32_t v;
-    std::memcpy(&v, &sram_[off], sizeof(v));
-    return v;
+    return cerf::le::U32(&sram_[off]);
 }
 
 void MediaQMq1188::WriteByte(uint32_t addr, uint8_t value) {
@@ -138,13 +135,13 @@ void MediaQMq1188::WriteHalf(uint32_t addr, uint16_t value) {
                  (word & ~(0xFFFFu << shift)) | (static_cast<uint32_t>(value) << shift));
         return;
     }
-    std::memcpy(&sram_[off], &value, sizeof(value));
+    cerf::le::Put16(&sram_[off], value);
 }
 
 void MediaQMq1188::WriteWord(uint32_t addr, uint32_t value) {
     const uint32_t off = addr - MmioBase();
     if (InRegWindow(off)) { RegWrite(addr, value); return; }
-    std::memcpy(&sram_[off], &value, sizeof(value));
+    cerf::le::Put32(&sram_[off], value);
 }
 
 void MediaQMq1188::SaveState(StateWriter& w) {

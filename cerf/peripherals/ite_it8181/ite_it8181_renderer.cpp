@@ -10,8 +10,6 @@
 
 namespace {
 
-constexpr size_t kContentProbeStride = 251;
-
 class IteIt8181Renderer : public PanelFrameRenderer {
 public:
     using PanelFrameRenderer::PanelFrameRenderer;
@@ -32,7 +30,7 @@ public:
         if (!lcd.IsEnabled())  return false;
         if (latch_.Latched())  return true;
         const uint32_t bytes = lcd.StrideBytes() * lcd.GuestH();
-        return latch_.ProbeAndLatch(lcd.FbBytes(), bytes, kContentProbeStride);
+        return latch_.ProbeAndLatch(lcd.FbBytes(), bytes);
     }
 
     void RenderInto(uint32_t* dib, uint32_t host_w, uint32_t host_h) override {

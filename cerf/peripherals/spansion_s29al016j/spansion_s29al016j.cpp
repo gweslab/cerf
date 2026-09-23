@@ -1,5 +1,6 @@
 #include "../../peripherals/peripheral_base.h"
 
+#include "../../core/byte_order.h"
 #include "../../core/cerf_emulator.h"
 #include "../../core/log.h"
 #include "../../boards/board_context.h"
@@ -222,8 +223,7 @@ uint16_t SpansionS29AL016J::ReadHalf(uint32_t addr) {
     const uint32_t word = off >> 1;
     if (mode_ == Mode::ReadArray) {
         if (off + 1 >= kNorSize) return 0xFFFFu;
-        return static_cast<uint16_t>(backing_[off]) |
-               (static_cast<uint16_t>(backing_[off + 1]) << 8);
+        return cerf::le::U16(backing_.data(), off);
     }
     return (mode_ == Mode::AutoSelect) ? AutoSelectAt(word) : CfiAt(word);
 }
@@ -238,8 +238,7 @@ uint32_t SpansionS29AL016J::ReadWord(uint32_t addr) {
     if (mode_ == Mode::ReadArray) {
         const uint32_t byte_off = chip_word * 2;
         if (byte_off + 1 >= kNorSize) return 0xFFFFFFFFu;
-        v = static_cast<uint16_t>(backing_[byte_off]) |
-            (static_cast<uint16_t>(backing_[byte_off + 1]) << 8);
+        v = cerf::le::U16(backing_.data(), byte_off);
     } else {
         v = (mode_ == Mode::AutoSelect) ? AutoSelectAt(chip_word) : CfiAt(chip_word);
     }
@@ -380,8 +379,8 @@ void SpansionS29AL016J::HandleHalfCommand(uint32_t off, uint16_t cmd) {
 
 void SpansionS29AL016J::ProgramWord(uint32_t off, uint16_t value) {
     if (off + 1 >= kNorSize) return;
-    backing_[off    ] &= static_cast<uint8_t>(value & 0xFFu);
-    backing_[off + 1] &= static_cast<uint8_t>((value >> 8) & 0xFFu);
+    uint8_t* const p = backing_.data() + off;
+    cerf::le::Put16(p, cerf::le::U16(p) & value);
 }
 
 void SpansionS29AL016J::EraseSector(uint32_t off) {

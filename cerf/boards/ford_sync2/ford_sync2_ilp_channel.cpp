@@ -3,6 +3,7 @@
 #include "ford_sync2_vmcu_peer.h"
 #include "../board_context.h"
 #include "ford_sync_2_id.h"
+#include "../../core/byte_order.h"
 #include "../../core/cerf_emulator.h"
 #include "../../core/log.h"
 #include "../../host/emulation_pause.h"
@@ -15,10 +16,10 @@
 REGISTER_SERVICE(FordSync2IlpChannel);
 
 namespace {
-uint32_t ReadId(const uint8_t* p) {
-    return static_cast<uint32_t>(p[0]) | (static_cast<uint32_t>(p[1]) << 8) |
-           (static_cast<uint32_t>(p[2]) << 16) | (static_cast<uint32_t>(p[3]) << 24);
-}
+using cerf::le::Put16;
+using cerf::le::U16;
+using cerf::le::U32;
+using cerf::le::UN;
 }
 
 bool FordSync2IlpChannel::ShouldRegister() {
@@ -35,18 +36,15 @@ bool FordSync2IlpChannel::DecodeSet(const uint8_t* data, std::size_t n,
     };
     /* EA5T-14D544-BA.sec, ipc_ilprot.dll sub_C08DD274: SetSignalsAssoc builder. */
     if (n < 6 || n > 0x3F || data[0] != 2 || data[1] != 0) return fail("header", 0);
-    const unsigned count = data[4] | (data[5] << 8);
+    const unsigned count = U16(data, 4);
     std::size_t offset = 6;
     for (unsigned i = 0; i < count; ++i) {
         if (n - offset < 4) return fail("truncated identifier", offset);
-        const uint32_t id = ReadId(data + offset);
+        const uint32_t id = U32(data, offset);
         const auto width = FordSync2IlpSignals::HeadWriteWidth(id);
         if (width == 0 || width > sizeof(uint64_t)) return fail("unknown width", offset, id);
         if (n - offset - 4 < width) return fail("truncated value", offset, id);
-        uint64_t value = 0;
-        for (std::size_t b = 0; b < width; ++b)
-            value |= static_cast<uint64_t>(data[offset + 4 + b]) << (8 * b);
-        writes.push_back({id, value});
+        writes.push_back({id, UN(data + offset + 4, width)});
         offset += 4 + width;
     }
     if (offset != n) return fail("trailing bytes", offset);
@@ -64,9 +62,9 @@ void FordSync2IlpChannel::Complete(uint8_t type, uint16_t tid, bool accepted) {
        the guest treats any nonzero Set completion as failure. CERF uses byte 1
        as a generic failure; no named physical VMCU rejection code is established.
        This application completion is separate from the transport ACK and status indications. */
-    const uint8_t reply[] = {static_cast<uint8_t>(type | 0x80),
-        static_cast<uint8_t>(accepted ? 0 : 1), static_cast<uint8_t>(tid),
-        static_cast<uint8_t>(tid >> 8), 0, 0};
+    uint8_t reply[6] = {static_cast<uint8_t>(type | 0x80),
+        static_cast<uint8_t>(accepted ? 0 : 1)};
+    Put16(reply + 2, tid);
     Send(reply, type == 4 ? 6 : 4);
 }
 
@@ -115,7 +113,7 @@ void FordSync2IlpChannel::HandleSet(const uint8_t* data, std::size_t n, uint16_t
 void FordSync2IlpChannel::HandleInbound(const uint8_t* data, std::size_t n) {
     ++received_;
     if (n < 4) { ++malformed_; return; }
-    const uint16_t tid = static_cast<uint16_t>(data[2] | (data[3] << 8));
+    const uint16_t tid = U16(data, 2);
     if (data[0] == 2) { HandleSet(data, n, tid); return; }
     if (data[0] != 4 && data[0] != 5 && data[0] != 6) {
         LOG(Caution, "[VMCU] unmodelled ILP transaction type=%u tid=%u len=%zu\n", data[0], tid, n);
@@ -125,12 +123,12 @@ void FordSync2IlpChannel::HandleInbound(const uint8_t* data, std::size_t n) {
     Refresh();
     /* EA5T-14D544-BA.sec, ipc_ilprot.dll sub_C08D9A10, sub_C08D9468, sub_C08DCFEC. */
     if (data[1] != 0 || (data[0] == 5 ? n != 0x1A :
-        n < 6 || n != 6u + 4u * (data[4] | (data[5] << 8)))) {
+        n < 6 || n != 6u + 4u * U16(data, 4))) {
         ++malformed_; Complete(data[0], tid, false); return;
     }
     switch (data[0]) {
     case 5: {
-        const uint32_t id = ReadId(data + 4);
+        const uint32_t id = U32(data, 4);
         const auto sub = signals.NoteFilterRegistration(id, tid);
         /* EA5T-14D544-BA.sec, ipc_ilprot.dll sub_C08D9A10 accepts only status 0/0x40. */
         const bool retained = sub != FordSync2IlpSignals::kNoSubscriber;

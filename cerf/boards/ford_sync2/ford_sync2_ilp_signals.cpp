@@ -5,6 +5,7 @@
 
 #include "../board_context.h"
 #include "ford_sync_2_id.h"
+#include "../../core/byte_order.h"
 #include "../../core/cerf_emulator.h"
 #include "../../core/log.h"
 #include "../../state/state_stream.h"
@@ -14,6 +15,14 @@
 #include <vector>
 
 REGISTER_SERVICE(FordSync2IlpSignals);
+
+namespace {
+using cerf::le::Append16;
+using cerf::le::Append32;
+using cerf::le::AppendN;
+using cerf::le::U16;
+using cerf::le::U32;
+}
 
 namespace {
 
@@ -139,14 +148,11 @@ void FordSync2IlpSignals::AppendGetAssocReply(const uint8_t* req, std::size_t n,
     std::size_t used = 6u;
 
     const uint16_t count =
-        (n >= 6u) ? static_cast<uint16_t>(req[4] | (req[5] << 8)) : 0u;
+        (n >= 6u) ? U16(req, 4) : uint16_t{0};
     for (uint16_t i = 0; i < count; ++i) {
         const std::size_t o = 6u + static_cast<std::size_t>(i) * 4u;
         if (o + 4u > n) break;
-        const uint32_t sigid = static_cast<uint32_t>(req[o]) |
-                               (static_cast<uint32_t>(req[o + 1u]) << 8) |
-                               (static_cast<uint32_t>(req[o + 2u]) << 16) |
-                               (static_cast<uint32_t>(req[o + 3u]) << 24);
+        const uint32_t sigid = U32(req, o);
         /* ford_sync_2 ipc_ilprot.dll sub_C08DE3A4 returns 0xC0000030 when matched
            != requested, so any omission fails the head's whole read and discards
            the values that were sent; its caller ford_sync_2 VNIAudioSvc.dll
@@ -176,14 +182,8 @@ void FordSync2IlpSignals::AppendGetAssocReply(const uint8_t* req, std::size_t n,
             }
             break;
         }
-        body.push_back(req[o]);
-        body.push_back(req[o + 1u]);
-        body.push_back(req[o + 2u]);
-        body.push_back(req[o + 3u]);
-        const uint64_t value = reported_[idx].load(std::memory_order_relaxed);
-        for (std::size_t b = 0; b < width; ++b) {
-            body.push_back(static_cast<uint8_t>((value >> (8u * b)) & 0xFFu));
-        }
+        Append32(body, sigid);
+        AppendN(body, reported_[idx].load(std::memory_order_relaxed), width);
         used += 4u + width;
         ++answered;
     }
@@ -194,10 +194,8 @@ void FordSync2IlpSignals::AppendGetAssocReply(const uint8_t* req, std::size_t n,
        0x81 / 0x82 as the queue-underflow / queue-overflow errors. */
     pkt.push_back(0x84u);
     pkt.push_back(0x00u);
-    pkt.push_back(static_cast<uint8_t>(tid & 0xFFu));
-    pkt.push_back(static_cast<uint8_t>(tid >> 8));
-    pkt.push_back(static_cast<uint8_t>(answered & 0xFFu));
-    pkt.push_back(static_cast<uint8_t>(answered >> 8));
+    Append16(pkt, tid);
+    Append16(pkt, answered);
     pkt.insert(pkt.end(), body.begin(), body.end());
 }
 
@@ -220,19 +218,11 @@ bool FordSync2IlpSignals::AppendSignalIndication(uint32_t sigid, std::size_t sub
        ford_sync_2 VNIClimateSvc.dll CVNISignalListener::ReadSignals sub_C153A2E8
        consumes a record only when field +4 is 2, 3 or 4. */
     pkt.push_back(0x00u);
-    pkt.push_back(static_cast<uint8_t>(tid & 0xFFu));
-    pkt.push_back(static_cast<uint8_t>(tid >> 8));
-    pkt.push_back(0x01u);
-    pkt.push_back(0x00u);
-    pkt.push_back(static_cast<uint8_t>(sigid & 0xFFu));
-    pkt.push_back(static_cast<uint8_t>((sigid >> 8) & 0xFFu));
-    pkt.push_back(static_cast<uint8_t>((sigid >> 16) & 0xFFu));
-    pkt.push_back(static_cast<uint8_t>((sigid >> 24) & 0xFFu));
-    const std::size_t width = WireWidth(kGroundedSignals[idx].bits);
-    const uint64_t value = reported_[idx].load(std::memory_order_relaxed);
-    for (std::size_t b = 0; b < width; ++b) {
-        pkt.push_back(static_cast<uint8_t>((value >> (8u * b)) & 0xFFu));
-    }
+    Append16(pkt, tid);
+    Append16(pkt, 1u);
+    Append32(pkt, sigid);
+    AppendN(pkt, reported_[idx].load(std::memory_order_relaxed),
+            WireWidth(kGroundedSignals[idx].bits));
     return true;
 }
 
@@ -325,23 +315,16 @@ std::size_t FordSync2IlpSignals::AppendBatchedIndication(uint32_t* sigids, std::
         }
         const uint32_t sigid = sigids[k];
         sigids[k]            = kTakenSignal;
-        body.push_back(static_cast<uint8_t>(sigid & 0xFFu));
-        body.push_back(static_cast<uint8_t>((sigid >> 8) & 0xFFu));
-        body.push_back(static_cast<uint8_t>((sigid >> 16) & 0xFFu));
-        body.push_back(static_cast<uint8_t>((sigid >> 24) & 0xFFu));
-        const uint64_t value = reported_[idx].load(std::memory_order_relaxed);
-        for (std::size_t b = 0; b < width; ++b)
-            body.push_back(static_cast<uint8_t>((value >> (8u * b)) & 0xFFu));
+        Append32(body, sigid);
+        AppendN(body, reported_[idx].load(std::memory_order_relaxed), width);
         used += 4u + width;
         ++emitted;
     }
     if (emitted == 0u) return 0u;
     pkt.push_back(0x0Au);
     pkt.push_back(0x00u);
-    pkt.push_back(static_cast<uint8_t>(tid & 0xFFu));
-    pkt.push_back(static_cast<uint8_t>(tid >> 8));
-    pkt.push_back(static_cast<uint8_t>(emitted & 0xFFu));
-    pkt.push_back(static_cast<uint8_t>(emitted >> 8));
+    Append16(pkt, tid);
+    Append16(pkt, static_cast<uint16_t>(emitted));
     pkt.insert(pkt.end(), body.begin(), body.end());
     return emitted;
 }

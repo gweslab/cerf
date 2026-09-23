@@ -2,8 +2,10 @@
 
 #include "serial_line.h"
 
+#include "../../core/byte_order.h"
 #include "../../core/cerf_emulator.h"
 #include "../../core/log.h"
+#include "../../net/ipv4_packet.h"
 #include "../../net/network_backend.h"
 
 #include <cstring>
@@ -24,18 +26,38 @@ constexpr uint8_t kLcpMru = 1, kLcpAccm = 2, kLcpAuth = 3, kLcpMagic = 5,
 constexpr uint8_t kIpcpComp = 2, kIpcpAddr = 3, kIpcpDns = 129,
                   kIpcpWins = 130;
 
-constexpr uint16_t kEthIp  = 0x0800;
-constexpr uint16_t kEthArp = 0x0806;
-
 /* IPCP hands these to the guest; they must equal libslirp's configured guest /
    gateway / DNS addresses or traffic will not route. */
 const uint8_t kGuestIp[4] = {10, 0, 2, 15};
 const uint8_t kGwIp[4]    = {10, 0, 2, 2};
 const uint8_t kDnsIp[4]   = {10, 0, 2, 3};
 
-void Put16(std::vector<uint8_t>& v, uint16_t x) {
-    v.push_back((uint8_t)(x >> 8));
-    v.push_back((uint8_t)(x & 0xFF));
+constexpr uint16_t kArpHtypeEthernet = 0x0001;
+constexpr uint16_t kArpOperRequest   = 0x0001;
+constexpr uint16_t kArpOperReply     = 0x0002;
+
+using cerf::be::Append16;
+using cerf::be::Put16;
+using cerf::be::U16;
+using cerf::be::U32;
+using namespace cerf::inet;
+
+void AppendArpFrame(std::vector<uint8_t>& out, const uint8_t* eth_dst,
+                    const uint8_t* sender_mac, uint16_t oper,
+                    const uint8_t* target_mac, const uint8_t* target_ip) {
+    AppendEthHeader(out, eth_dst, sender_mac, kEthTypeArp);
+    const size_t at = out.size();
+    out.resize(at + kArpPacketSize);
+    uint8_t* arp = out.data() + at;
+    Put16(arp + kArpOffHtype, kArpHtypeEthernet);
+    Put16(arp + kArpOffPtype, kEthTypeIpv4);
+    arp[kArpOffHlen] = uint8_t(kEthMacSize);
+    arp[kArpOffPlen] = uint8_t(kIpv4AddrSize);
+    Put16(arp + kArpOffOper, oper);
+    std::memcpy(arp + kArpOffSenderMac, sender_mac, kEthMacSize);
+    std::memcpy(arp + kArpOffSenderIp, kGuestIp, kIpv4AddrSize);
+    std::memcpy(arp + kArpOffTargetMac, target_mac, kEthMacSize);
+    std::memcpy(arp + kArpOffTargetIp, target_ip, kIpv4AddrSize);
 }
 
 }  /* namespace */
@@ -55,7 +77,7 @@ PppTerminator::~PppTerminator() {
 
 void PppTerminator::Start() {
     auto& net = emu_.Get<NetworkBackend>();
-    const std::array<uint8_t, 6> mac =
+    const cerf::inet::MacAddress mac =
         net.MacForReceiver(net_id_, NetworkBackend::ReceiverKind::PointToPoint);
     {
         std::lock_guard<std::mutex> lk(mu_);
@@ -113,7 +135,7 @@ void PppTerminator::OnPppFrame(uint16_t proto, const uint8_t* p, size_t len) {
         /* RFC 1661 Protocol-Reject: data = the rejected protocol (2B) + its
            payload. */
         std::vector<uint8_t> d;
-        Put16(d, proto);
+        Append16(d, proto);
         d.insert(d.end(), p, p + len);
         SendCp(kProtoLcp, kProtoRej, next_id_++, d.data(), d.size());
     }
@@ -124,7 +146,7 @@ void PppTerminator::HandleConfProto(uint16_t proto, const uint8_t* p,
     if (len < 4) return;
     const uint8_t code = p[0];
     const uint8_t id   = p[1];
-    size_t plen = ((size_t)p[2] << 8) | p[3];
+    size_t plen = U16(p, 2);
     if (plen < 4 || plen > len) plen = len;
     const uint8_t* data = p + 4;
     const size_t   dlen = plen - 4;
@@ -192,8 +214,7 @@ void PppTerminator::HandleLcpConfReq(uint8_t id, const uint8_t* opts,
             case kLcpMru: case kLcpPfc: case kLcpAcfc: break;          /* ACK */
             case kLcpAccm:
                 if (vlen == 4) {
-                    negotiated_tx_accm_ = ((uint32_t)val[0] << 24) |
-                        ((uint32_t)val[1] << 16) | ((uint32_t)val[2] << 8) | val[3];
+                    negotiated_tx_accm_ = U32(val);
                 }
                 break;
             case kLcpMagic:
@@ -289,7 +310,7 @@ void PppTerminator::SendCp(uint16_t proto, uint8_t code, uint8_t id,
     pkt.reserve(len + 4);
     pkt.push_back(code);
     pkt.push_back(id);
-    Put16(pkt, (uint16_t)(len + 4));       /* length includes the 4-byte header */
+    Append16(pkt, (uint16_t)(len + 4));
     if (data && len) pkt.insert(pkt.end(), data, data + len);
     if (code != kEchoRep)
         LOG(Net, "[PPP] tx %s code=%u id=%u len=%zu\n",
@@ -329,10 +350,8 @@ void PppTerminator::PumpLocked() {
 void PppTerminator::HandleGuestIp(const uint8_t* ip, size_t len) {
     if (!ipcp_open_ || len == 0) return;
     std::vector<uint8_t> eth;
-    eth.reserve(len + 14);
-    eth.insert(eth.end(), gw_mac_.begin(), gw_mac_.end());        /* dst */
-    eth.insert(eth.end(), guest_mac_.begin(), guest_mac_.end());  /* src */
-    Put16(eth, kEthIp);
+    eth.reserve(len + kEthHeaderSize);
+    AppendEthHeader(eth, gw_mac_.data(), guest_mac_.data(), kEthTypeIpv4);
     eth.insert(eth.end(), ip, ip + len);
     QueueTx(std::move(eth));
 }
@@ -341,38 +360,27 @@ void PppTerminator::HandleGuestIp(const uint8_t* ip, size_t len) {
 
 void PppTerminator::OnHostFrame(const uint8_t* eth, size_t len) {
     std::lock_guard<std::mutex> lk(mu_);
-    if (!active_ || len < 14) return;
-    const uint16_t type = (uint16_t)((eth[12] << 8) | eth[13]);
-    if (type == kEthArp) { HandleArp(eth, len); return; }
-    if (type != kEthIp || !ipcp_open_) return;
-    SendPpp(kProtoIp, eth + 14, len - 14);   /* strip L2, carry IP to guest */
+    if (!active_ || len < kEthHeaderSize) return;
+    const uint16_t type = EthType(eth);
+    if (type == kEthTypeArp) { HandleArp(eth, len); return; }
+    if (type != kEthTypeIpv4 || !ipcp_open_) return;
+    SendPpp(kProtoIp, eth + kEthHeaderSize, len - kEthHeaderSize);
 }
 
 void PppTerminator::HandleArp(const uint8_t* eth, size_t len) {
     /* Answer ARP for the guest address on the guest's behalf (it has no L2),
        so libslirp's gateway can resolve 10.0.2.15 (RFC 826). */
-    if (len < 14 + 28) return;
-    const uint8_t* arp = eth + 14;
-    const uint16_t oper = (uint16_t)((arp[6] << 8) | arp[7]);
-    if (oper != 1) return;                       /* request only */
-    if (std::memcmp(arp + 24, kGuestIp, 4) != 0) return;   /* target == guest */
+    if (len < kEthHeaderSize + kArpPacketSize) return;
+    const uint8_t* arp = eth + kEthHeaderSize;
+    if (U16(arp, kArpOffOper) != kArpOperRequest) return;
+    if (std::memcmp(arp + kArpOffTargetIp, kGuestIp, kIpv4AddrSize) != 0) return;
 
-    const uint8_t* req_mac = arp + 8;            /* sender hw addr */
-    const uint8_t* req_ip  = arp + 14;           /* sender proto addr */
+    const uint8_t* req_mac = arp + kArpOffSenderMac;
+    const uint8_t* req_ip  = arp + kArpOffSenderIp;
 
     std::vector<uint8_t> out;
-    out.reserve(14 + 28);
-    out.insert(out.end(), req_mac, req_mac + 6);                 /* eth dst */
-    out.insert(out.end(), guest_mac_.begin(), guest_mac_.end()); /* eth src */
-    Put16(out, kEthArp);
-    Put16(out, 0x0001);                  /* htype Ethernet */
-    Put16(out, kEthIp);                  /* ptype IPv4 */
-    out.push_back(6); out.push_back(4);  /* hlen / plen */
-    Put16(out, 0x0002);                  /* oper reply */
-    out.insert(out.end(), guest_mac_.begin(), guest_mac_.end()); /* sender hw */
-    out.insert(out.end(), kGuestIp, kGuestIp + 4);               /* sender ip */
-    out.insert(out.end(), req_mac, req_mac + 6);                 /* target hw */
-    out.insert(out.end(), req_ip, req_ip + 4);                   /* target ip */
+    out.reserve(kEthHeaderSize + kArpPacketSize);
+    AppendArpFrame(out, req_mac, guest_mac_.data(), kArpOperReply, req_mac, req_ip);
     QueueTx(std::move(out));
 }
 
@@ -393,15 +401,7 @@ void PppTerminator::DrainTx() {
 }
 
 void PppTerminator::BuildGratuitousArp(std::vector<uint8_t>& out) const {
-    out.insert(out.end(), gw_mac_.begin(), gw_mac_.end());       /* eth dst */
-    out.insert(out.end(), guest_mac_.begin(), guest_mac_.end()); /* eth src */
-    Put16(out, kEthArp);
-    Put16(out, 0x0001);                  /* htype Ethernet */
-    Put16(out, kEthIp);                  /* ptype IPv4 */
-    out.push_back(6); out.push_back(4);  /* hlen / plen */
-    Put16(out, 0x0001);                  /* oper request; ar_tip==ar_sip => gratuitous */
-    out.insert(out.end(), guest_mac_.begin(), guest_mac_.end()); /* sender hw */
-    out.insert(out.end(), kGuestIp, kGuestIp + 4);               /* sender ip */
-    for (int i = 0; i < 6; ++i) out.push_back(0x00);             /* target hw */
-    out.insert(out.end(), kGuestIp, kGuestIp + 4);               /* target ip == sender */
+    const uint8_t no_target_mac[kEthMacSize] = {};
+    AppendArpFrame(out, gw_mac_.data(), guest_mac_.data(), kArpOperRequest,
+                   no_target_mac, kGuestIp);
 }

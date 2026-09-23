@@ -3,36 +3,25 @@
 #include "imx51_nand_store.h"
 
 #include "../../boards/board_context.h"
+#include "../../boot/rom_image_parse.h"
 #include "../../core/cerf_emulator.h"
 #include "../../core/device_config.h"
 #include "../../core/log.h"
 
 #include <algorithm>
 #include <array>
-#include <cstring>
 
 REGISTER_SERVICE(Imx51NandImgfsView);
 
 namespace {
 
-/* IMGFS volume GUID F8AC2C9D-E3D4-4D2B-BD30-916ED84F31DC in on-flash byte order
-   (the template imgfs.dll CVolume::Init memcmps against). */
-constexpr std::array<uint8_t, 16> kImgfsVolGuid = {
-    0xF8, 0xAC, 0x2C, 0x9D, 0xE3, 0xD4, 0x2B, 0x4D,
-    0xBD, 0x30, 0x91, 0x6E, 0xD8, 0x4F, 0x31, 0xDC};
-
-/* bytes_per_block field in the IMGFS superblock. */
-constexpr uint32_t kVolBpbOff = 0x24;
+using cerf::rom_image_parse::ImgfsSuperblock;
+using cerf::rom_image_parse::ReadImgfsSuperblock;
 
 /* Bound on the reconstructed span held in one Win32 (32-bit) allocation.
    Over-reading past the IMGFS partition is harmless - the walker only acts on
    dir-magic blocks. */
 constexpr uint64_t kReconstructCap = 0x04000000ull;
-
-uint32_t Rd32(const uint8_t* p) {
-    return uint32_t(p[0]) | (uint32_t(p[1]) << 8)
-         | (uint32_t(p[2]) << 16) | (uint32_t(p[3]) << 24);
-}
 
 bool SanePageSize(uint32_t v) {
     return v >= 0x200 && v <= 0x100000 && (v & (v - 1)) == 0;
@@ -63,11 +52,10 @@ bool Imx51NandImgfsView::LocateVolume() {
     for (uint64_t p = 0; p < pages; ++p) {
         nand.ReadMain(p * Imx51NandStore::kMainBytes, hdr.data(),
                       uint32_t(hdr.size()));
-        if (std::memcmp(hdr.data(), kImgfsVolGuid.data(),
-                        kImgfsVolGuid.size()) != 0)
-            continue;
-        const uint32_t bpb = Rd32(hdr.data() + kVolBpbOff);
-        if (!SanePageSize(bpb)) continue;  /* a code-constant GUID, not a header */
+        ImgfsSuperblock sb;
+        if (!ReadImgfsSuperblock(hdr, 0, sb)) continue;
+        const uint32_t bpb = sb.bytes_per_block;
+        if (!SanePageSize(bpb)) continue;
         base_page_ = p;
         bpb_       = bpb;
         located_   = true;

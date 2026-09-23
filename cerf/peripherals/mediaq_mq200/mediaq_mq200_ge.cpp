@@ -1,8 +1,7 @@
 #include "mediaq_mq200_ge.h"
 
+#include "../../core/byte_order.h"
 #include "../../core/log.h"
-
-#include <cstring>
 
 const MediaQGe::Layout& MediaQMq200Ge::Lyt() const {
     /* fg=GE42R, bg=GE43R, pat_fg=GE42R; src_stride=GE09R; GE0AR stride[11:0]
@@ -115,18 +114,12 @@ void MediaQMq200Ge::BlitColorSource(const uint32_t* r) {
         for (uint32_t col = 0; col < w; ++col) {
             const uint32_t pos = row_pos + col * bpp;
             if (static_cast<size_t>(pos) + bpp > fifo_bytes) break;  /* source under-delivered. */
-            const uint32_t px =
-                ((src_fifo_[pos >> 2] >> (8u * (pos & 3u))) & 0xFFu) |
-                (((src_fifo_[(pos + 1u) >> 2] >> (8u * ((pos + 1u) & 3u))) & 0xFFu) << 8);
+            const uint32_t px = cerf::le::U16(SrcFifoBytes(), pos);
             if (trans && px == key) continue;
             const uint64_t addr = static_cast<uint64_t>(base) +
                 static_cast<uint64_t>(dy + row) * stride +
                 static_cast<uint64_t>(dx + col) * bpp;
-            if (addr + bpp > fbsize) continue;
-            uint32_t d = 0u;
-            std::memcpy(&d, fb + addr, bpp);
-            const uint32_t res = Rop3(rop, PatternOperand(r, col, row), px, d) & 0xFFFFu;
-            std::memcpy(fb + addr, &res, bpp);
+            RopPixel(fb, fbsize, addr, bpp, 0xFFFFu, rop, PatternOperand(r, col, row), px);
         }
     }
 }
@@ -187,22 +180,15 @@ void MediaQMq200Ge::BlitMonoSource(const uint32_t* r) {
         for (uint32_t col = 0; col < w; ++col) {
             const uint32_t xx = dx + col;
             if (clip && (xx < cl || xx > cr)) continue;
-            const uint32_t bit_idx  = bit_off0 + row * stride_bits + col;
-            const uint32_t byte_idx = bit_idx >> 3;
-            const uint32_t bit = (src_fifo_[byte_idx >> 2] >>
-                (8u * (byte_idx & 3u) + (7u - (bit_idx & 7u)))) & 1u;
+            const uint32_t bit = MonoBit(SrcFifoBytes(), bit_off0 + row * stride_bits + col);
             if (bit && trans_set) continue;
             if (!bit && trans_clear) continue;
             const uint32_t color = bit ? fg : bg;
             const uint64_t addr = static_cast<uint64_t>(base) +
                 static_cast<uint64_t>(yy) * stride + static_cast<uint64_t>(xx) * bpp;
-            if (addr + bpp > fbsize) continue;
-            uint32_t d = 0u;
-            std::memcpy(&d, fb + addr, bpp);
             const uint32_t pat = pat_en
                 ? MonoPatternPixel(mono_pat[0], mono_pat[1], pat_fg, pat_bg, xx, yy) : 0u;
-            const uint32_t res = Rop3(rop, pat, color, d) & 0xFFFFu;
-            std::memcpy(fb + addr, &res, bpp);
+            RopPixel(fb, fbsize, addr, bpp, 0xFFFFu, rop, pat, color);
         }
     }
 }
@@ -216,7 +202,7 @@ void MediaQMq200Ge::DrawLine(uint32_t cmd) {
                      "(GE0AR=0x%08X)\n", reg_[kGe0ADstStride]);
         CerfFatalExit(CERF_FATAL_RUNTIME_ERROR);
     }
-    const uint32_t pmask = (bpp >= 4u) ? 0xFFFFFFFFu : ((1u << (bpp * 8u)) - 1u);
+    const uint32_t pmask = cerf::ByteWidthMask(bpp);
 
     const uint32_t ge01 = reg_[kGe01Size];    /* LINE_DRAW   */
     const uint32_t ge02 = reg_[kGe02DstXY];   /* LINE_MAJOR_X */
@@ -258,7 +244,7 @@ void MediaQMq200Ge::DrawLine(uint32_t cmd) {
         if (x >= 0 && y >= 0 && !(clip && (x < cl || x > cr || y < ct || y > cb)))
             RopPixel(fb, fbsize, static_cast<uint64_t>(base) +
                      static_cast<uint64_t>(y) * stride + static_cast<uint64_t>(x) * bpp,
-                     bpp, pmask, rop, color);
+                     bpp, pmask, rop, 0u, color);
         if (i + 1u >= cPels) break;
         if (y_major) y += step_y; else x += step_x;   /* major-axis step */
         if (axstp != 0) {

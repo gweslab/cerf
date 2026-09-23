@@ -71,6 +71,8 @@ public:
     uint32_t VramWrap(uint32_t off) const {
         return vram_mask_ ? (off & vram_mask_) : (off % vram_size_);
     }
+    uint32_t VramLoad(uint32_t off, uint32_t width) const;
+    void     VramStore(uint32_t off, uint32_t value, uint32_t width);
 
 private:
     static constexpr uint32_t kRegWindow      = 0x200u;

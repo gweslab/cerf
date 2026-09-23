@@ -1,15 +1,11 @@
 #include "compactflash_fat_common.h"
 
+#include "../../core/byte_order.h"
+
 #include <cstdio>
 #include <cstring>
 
 namespace cf_fat {
-
-void Wr16(uint8_t* p, uint16_t v) { p[0] = v & 0xFF; p[1] = (v >> 8) & 0xFF; }
-void Wr32(uint8_t* p, uint32_t v) {
-    p[0] = v & 0xFF; p[1] = (v >> 8) & 0xFF;
-    p[2] = (v >> 16) & 0xFF; p[3] = (v >> 24) & 0xFF;
-}
 
 std::wstring BaseName(const std::wstring& path) {
     const std::size_t s = path.find_last_of(L"\\/");
@@ -142,16 +138,16 @@ uint8_t* EmitFileDir(uint8_t* dir, const std::wstring& name, const uint8_t sfn[1
             if (ci < static_cast<int>(name.size())) ch = (uint16_t)name[ci];
             else if (ci == static_cast<int>(name.size())) ch = 0x0000;
             else ch = 0xFFFF;
-            Wr16(le + slots[i], ch);
+            cerf::le::Put16(le + slots[i], ch);
         }
         dir += 32;
     }
     std::memcpy(dir, sfn, 11);
     dir[11] = 0x20;        /* ATTR_ARCHIVE */
     dir[12] = ntres;
-    Wr16(dir + 20, static_cast<uint16_t>(first_clus >> 16));
-    Wr16(dir + 26, static_cast<uint16_t>(first_clus & 0xFFFF));
-    Wr32(dir + 28, size);
+    cerf::le::Put16(dir + 20, static_cast<uint16_t>(first_clus >> 16));
+    cerf::le::Put16(dir + 26, static_cast<uint16_t>(first_clus & 0xFFFF));
+    cerf::le::Put32(dir + 28, size);
     return dir + 32;
 }
 

@@ -1,5 +1,6 @@
 #include "emmc_card_base.h"
 
+#include "../../core/byte_order.h"
 #include "../../core/cerf_emulator.h"
 #include "../../core/fatal.h"
 #include "../../socs/guest_cpu_reset.h"
@@ -302,12 +303,7 @@ uint32_t EmmcCardBase::StatusWord(MmcState before) const {
 
 void EmmcCardBase::BuildCid(uint32_t out[4]) const {
     const SdCardCid cid = Cid();
-    for (uint32_t i = 0; i < 4u; ++i) {
-        out[i] = (static_cast<uint32_t>(cid[i * 4u + 0u]) << 24) |
-                 (static_cast<uint32_t>(cid[i * 4u + 1u]) << 16) |
-                 (static_cast<uint32_t>(cid[i * 4u + 2u]) << 8) |
-                  static_cast<uint32_t>(cid[i * 4u + 3u]);
-    }
+    for (uint32_t i = 0; i < 4u; ++i) out[i] = cerf::be::U32(cid.data(), i * 4u);
     SealCrc7(out);
 }
 

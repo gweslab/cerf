@@ -6,7 +6,9 @@
 #include "guest_additions_binaries.h"
 #include "guest_module_placer.h"
 #include "pe_image.h"
+#include "rom_record_layout.h"
 
+#include "../core/byte_order.h"
 #include "../core/cerf_emulator.h"
 #include "../core/log.h"
 
@@ -16,38 +18,8 @@ REGISTER_SERVICE(ImgfsVictimRecomposer);
 
 namespace {
 
-constexpr uint32_t kE32ObjcntOff      = 0x00;
-constexpr uint32_t kE32VbaseOff       = 0x08;
-constexpr uint32_t kE32SubsysMajorOff = 0x0C;
-constexpr uint32_t kE32SubsysMinorOff = 0x0E;
-constexpr uint32_t kE32HeaderO32Base = 0x70;
-constexpr uint32_t kO32Size          = 24;
-constexpr uint32_t kO32RvaOff        = 4;
-constexpr uint32_t kO32RealaddrOff   = 16;
-
-/* IMGFS is WM6+, so the module header is always the CE5+ e32_rom layout. */
-constexpr cerf::ce_imgfs_patcher::E32Layout kE32RomCE5plus = {
-    /*size           */ 110,
-    /*off_objcnt     */ 0x00,
-    /*off_imageflags */ 0x02,
-    /*off_entryrva   */ 0x04,
-    /*off_vbase      */ 0x08,
-    /*off_subsysmajor*/ 0x0C,
-    /*off_subsysminor*/ 0x0E,
-    /*off_stackmax   */ 0x10,
-    /*off_vsize      */ 0x14,
-    /*off_sect14rva  */ 0x18,
-    /*off_sect14size */ 0x1C,
-    /*off_timestamp  */ 0x20,
-    /*off_unit       */ 0x24,
-    /*off_subsys     */ 0x6C,
-};
-
-uint16_t Rd16(const uint8_t* p) { return uint16_t(p[0]) | (uint16_t(p[1]) << 8); }
-uint32_t Rd32(const uint8_t* p) {
-    return uint32_t(p[0]) | (uint32_t(p[1]) << 8)
-         | (uint32_t(p[2]) << 16) | (uint32_t(p[3]) << 24);
-}
+using cerf::le::U16;
+using cerf::le::U32;
 
 }  // namespace
 
@@ -55,24 +27,24 @@ std::optional<ImgfsVictimRecomposer::Result>
 ImgfsVictimRecomposer::Recompose(std::span<const uint8_t> orig_hdr,
                                  size_t                    num_sections,
                                  const std::string&        stub_path) {
-    if (orig_hdr.size() < kE32HeaderO32Base) {
+    if (orig_hdr.size() < kE32RomCE5plusO32Base) {
         LOG(Caution, "[GA recompose] victim header too short (%zu bytes)\n",
             orig_hdr.size());
         return std::nullopt;
     }
-    const uint32_t orig_vbase  = Rd32(orig_hdr.data() + kE32VbaseOff);
-    const uint16_t orig_objcnt = Rd16(orig_hdr.data() + kE32ObjcntOff);
-    const uint16_t orig_subsysmaj = Rd16(orig_hdr.data() + kE32SubsysMajorOff);
-    const uint16_t orig_subsysmin = Rd16(orig_hdr.data() + kE32SubsysMinorOff);
+    const uint8_t* h = orig_hdr.data();
+    const uint32_t orig_vbase     = U32(h, kE32OffVbase);
+    const uint16_t orig_objcnt    = U16(h, kE32OffObjcnt);
+    const uint16_t orig_subsysmaj = U16(h, kE32OffSubsysMajor);
+    const uint16_t orig_subsysmin = U16(h, kE32OffSubsysMinor);
     if (orig_objcnt == 0
-        || size_t(kE32HeaderO32Base) + size_t(orig_objcnt) * kO32Size > orig_hdr.size()) {
+        || size_t(kE32RomCE5plusO32Base) + size_t(orig_objcnt) * kO32RomSize > orig_hdr.size()) {
         LOG(Caution, "[GA recompose] victim objcnt=%u inconsistent with header "
             "size %zu\n", orig_objcnt, orig_hdr.size());
         return std::nullopt;
     }
-    const uint32_t orig_realaddr0 =
-        Rd32(orig_hdr.data() + kE32HeaderO32Base + kO32RealaddrOff);
-    const uint32_t orig_rva0 = Rd32(orig_hdr.data() + kE32HeaderO32Base + kO32RvaOff);
+    const uint32_t orig_realaddr0 = U32(h, kE32RomCE5plusO32Base + kO32OffRealaddr);
+    const uint32_t orig_rva0      = U32(h, kE32RomCE5plusO32Base + kO32OffRva);
     const uint32_t slot_base = orig_realaddr0 - orig_rva0 - orig_vbase;
 
     std::ifstream f(stub_path, std::ios::binary | std::ios::ate);
@@ -119,7 +91,7 @@ ImgfsVictimRecomposer::Recompose(std::span<const uint8_t> orig_hdr,
     slot_realaddr.reserve(slots.size());
     for (const auto& s : slots) slot_realaddr.push_back(orig_vbase + slot_base + s.rva);
     auto new_hdr = cerf::ce_imgfs_patcher::BuildModuleHeader(
-        kE32RomCE5plus, pe, orig_vbase, orig_subsysmaj, orig_subsysmin,
+        pe, orig_vbase, orig_subsysmaj, orig_subsysmin,
         slot_realaddr, slots);
 
     LOG(GuestAdditions, "[GA recompose] vbase=0x%08X subsysver=%u.%02u slots=%zu "

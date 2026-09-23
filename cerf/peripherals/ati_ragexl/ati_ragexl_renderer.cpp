@@ -2,14 +2,14 @@
 
 #include "ati_ragexl_display.h"
 
+#include "../../core/byte_order.h"
 #include "../../core/cerf_emulator.h"
 #include "../../host/panel_frame_renderer.h"
+#include "../../lcd/lcd_pixel_expand.h"
 
 #include <cstring>
 
 namespace {
-
-constexpr size_t kContentProbeStride = 251;
 
 /* Presents the Rage XL framebuffer at the CRTC-programmed geometry. The Mach64
    stores direct-colour pixels little-endian as B,G,R(,X); 16/15 bpp are 5-6-5 /
@@ -35,7 +35,7 @@ public:
         const size_t bytes = (size_t)f.stride * f.height;
         if ((size_t)f.start + bytes > f.fb_size) return false;
         if (latch_.Latched()) return true;
-        return latch_.ProbeAndLatch(f.fb + f.start, bytes, kContentProbeStride);
+        return latch_.ProbeAndLatch(f.fb + f.start, bytes);
     }
 
     void RenderInto(uint32_t* dib, uint32_t host_w, uint32_t host_h) override {
@@ -66,15 +66,8 @@ private:
             const int sy = cur.y + static_cast<int>(row);
             if (sy < 0 || static_cast<uint32_t>(sy) >= ch) continue;
             const uint8_t* rp = cur.def + (size_t)row * 16u;
-            uint32_t d0, d1, d2, d3;
-            std::memcpy(&d0, rp + 0, 4);  std::memcpy(&d1, rp + 4, 4);
-            std::memcpy(&d2, rp + 8, 4);  std::memcpy(&d3, rp + 12, 4);
-            const uint16_t w[8] = {
-                (uint16_t)(d2 & 0xFFFFu), (uint16_t)(d2 >> 16),
-                (uint16_t)(d3 & 0xFFFFu), (uint16_t)(d3 >> 16),
-                (uint16_t)(d0 & 0xFFFFu), (uint16_t)(d0 >> 16),
-                (uint16_t)(d1 & 0xFFFFu), (uint16_t)(d1 >> 16),
-            };
+            uint16_t w[8];
+            for (uint32_t k = 0; k < 8; ++k) w[k] = cerf::le::U16(rp, (k * 2u + 8u) % 16u);
             uint32_t* dst = dib + (size_t)sy * host_w;
             for (uint32_t col = 0; col < cols; ++col) {
                 const int sx = cur.x + static_cast<int>(col);
@@ -89,25 +82,13 @@ private:
         }
     }
 
-    static uint32_t Pack(uint32_t r, uint32_t g, uint32_t b) {
-        return 0xFF000000u | (r << 16) | (g << 8) | b;
-    }
-    static uint32_t Exp5(uint32_t v) { return (v << 3) | (v >> 2); }
-    static uint32_t Exp6(uint32_t v) { return (v << 2) | (v >> 4); }
-
     static uint32_t DecodePixel(const uint8_t* line, uint32_t x, uint32_t bpp) {
         switch (bpp) {
-            case 32: { const uint8_t* p = line + x * 4u; return Pack(p[2], p[1], p[0]); }
-            case 24: { const uint8_t* p = line + x * 3u; return Pack(p[2], p[1], p[0]); }
-            case 16: {
-                const uint16_t p = (uint16_t)(line[x * 2u] | (line[x * 2u + 1u] << 8));
-                return Pack(Exp5((p >> 11) & 0x1Fu), Exp6((p >> 5) & 0x3Fu), Exp5(p & 0x1Fu));
-            }
-            case 15: {
-                const uint16_t p = (uint16_t)(line[x * 2u] | (line[x * 2u + 1u] << 8));
-                return Pack(Exp5((p >> 10) & 0x1Fu), Exp5((p >> 5) & 0x1Fu), Exp5(p & 0x1Fu));
-            }
-            default: { const uint8_t g = line[x]; return Pack(g, g, g); }  /* 8bpp: palette not modelled */
+            case 32: return 0xFF000000u | cerf::le::U24(line, x * 4u);
+            case 24: return 0xFF000000u | cerf::le::U24(line, x * 3u);
+            case 16: return lcd_pixel::Expand565(cerf::le::U16(line, x * 2u));
+            case 15: return lcd_pixel::Expand555(cerf::le::U16(line, x * 2u));
+            default: { const uint8_t g = line[x]; return lcd_pixel::PackXrgb(g, g, g); }
         }
     }
 };

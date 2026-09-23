@@ -10,8 +10,6 @@
 
 namespace {
 
-constexpr size_t kContentProbeStride = 251;
-
 class NokiaLumia800PanelRenderer : public PanelFrameRenderer {
 public:
     using PanelFrameRenderer::PanelFrameRenderer;
@@ -31,8 +29,7 @@ public:
         const Msm8255MddiSurface s = emu_.Get<Msm8255MddiClient>().Surface();
         if (!s.visible)       return false;
         if (latch_.Latched()) return true;
-        return latch_.ProbeAndLatch(s.pixels, s.stride_bytes * s.height,
-                                    kContentProbeStride);
+        return latch_.ProbeAndLatch(s.pixels, s.stride_bytes * s.height);
     }
 
     void RenderInto(uint32_t* dib, uint32_t host_w, uint32_t host_h) override {

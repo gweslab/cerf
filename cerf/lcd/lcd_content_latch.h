@@ -12,12 +12,11 @@ class EmulatedMemory;
    un-latch, for guest reset. */
 class LcdContentLatch {
 public:
-    bool ProbeAndLatch(EmulatedMemory& mem, uint32_t fb_pa,
-                       size_t fb_bytes, size_t stride);
+    bool ProbeAndLatch(EmulatedMemory& mem, uint32_t fb_pa, size_t fb_bytes);
 
     /* Same probe over an fb that already lives in host memory (e.g. a
        display controller's internal VRAM). */
-    bool ProbeAndLatch(const uint8_t* fb, size_t fb_bytes, size_t stride);
+    bool ProbeAndLatch(const uint8_t* fb, size_t fb_bytes);
 
     bool Latched() const {
         return latched_.load(std::memory_order_acquire);

@@ -3,13 +3,12 @@
 #include "../../boards/board_context.h"
 #include "../../boards/simpad_sl4/simpad_sl4_id.h"
 #include "../../boards/smartbook_g138/smartbook_g138_id.h"
+#include "../../core/byte_order.h"
 #include "../../core/cerf_emulator.h"
 #include "../../core/log.h"
 #include "../../host/host_window.h"
 #include "../peripheral_dispatcher.h"
 #include "../../state/state_stream.h"
-
-#include <cstring>
 
 bool MediaQMq200::ShouldRegister() {
     auto* bd = emu_.TryGet<BoardContext>();
@@ -121,26 +120,23 @@ uint8_t MediaQMq200::ReadByte(uint32_t addr) {
         return static_cast<uint8_t>(RegRead(roff & ~0x3u) >> ((roff & 0x3u) * 8u));
     }
     HaltUnsupportedAccess("MQ200 ReadByte", addr, 0);
-    return 0;
 }
 
 uint16_t MediaQMq200::ReadHalf(uint32_t addr) {
     const uint32_t off = addr - MmioBase();
-    if (off < kFbSize) { uint16_t v; std::memcpy(&v, &fb_[off], sizeof(v)); return v; }
+    if (off < kFbSize) return cerf::le::U16(fb_.data(), off);
     if (off >= kRegWinOff && off < kRegWinOff + kRegSize) {
         const uint32_t roff = off - kRegWinOff;
         return static_cast<uint16_t>(RegRead(roff & ~0x3u) >> ((roff & 0x2u) * 8u));
     }
     HaltUnsupportedAccess("MQ200 ReadHalf", addr, 0);
-    return 0;
 }
 
 uint32_t MediaQMq200::ReadWord(uint32_t addr) {
     const uint32_t off = addr - MmioBase();
-    if (off < kFbSize) { uint32_t v; std::memcpy(&v, &fb_[off], sizeof(v)); return v; }
+    if (off < kFbSize) return cerf::le::U32(fb_.data(), off);
     if (off >= kRegWinOff && off < kRegWinOff + kRegSize) return RegRead(off - kRegWinOff);
     HaltUnsupportedAccess("MQ200 ReadWord", addr, 0);
-    return 0;
 }
 
 void MediaQMq200::WriteByte(uint32_t addr, uint8_t value) {
@@ -159,7 +155,7 @@ void MediaQMq200::WriteByte(uint32_t addr, uint8_t value) {
 
 void MediaQMq200::WriteHalf(uint32_t addr, uint16_t value) {
     const uint32_t off = addr - MmioBase();
-    if (off < kFbSize) { std::memcpy(&fb_[off], &value, sizeof(value)); return; }
+    if (off < kFbSize) { cerf::le::Put16(fb_.data() + off, value); return; }
     if (off >= kRegWinOff && off < kRegWinOff + kRegSize) {
         const uint32_t roff  = off - kRegWinOff;
         const uint32_t shift = (roff & 0x2u) * 8u;
@@ -173,7 +169,7 @@ void MediaQMq200::WriteHalf(uint32_t addr, uint16_t value) {
 
 void MediaQMq200::WriteWord(uint32_t addr, uint32_t value) {
     const uint32_t off = addr - MmioBase();
-    if (off < kFbSize) { std::memcpy(&fb_[off], &value, sizeof(value)); return; }
+    if (off < kFbSize) { cerf::le::Put32(fb_.data() + off, value); return; }
     if (off >= kRegWinOff && off < kRegWinOff + kRegSize) { RegWrite(off - kRegWinOff, value); return; }
     HaltUnsupportedAccess("MQ200 WriteWord", addr, value);
 }

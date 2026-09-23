@@ -1,5 +1,7 @@
 #pragma once
 
+#include "../../core/byte_order.h"
+
 #include <cstdint>
 
 /* SM501 Databook v1.02, section 4, 2D raster operations. */
@@ -59,4 +61,8 @@ inline uint16_t Sm501ApplyRasterOp16(uint32_t control, uint16_t source,
         }
     }
     return result;
+}
+
+inline void Sm501RasterOpPixel16(uint8_t* pixel, uint32_t control, uint16_t source, uint16_t pattern) {
+    cerf::le::Put16(pixel, Sm501ApplyRasterOp16(control, source, cerf::le::U16(pixel), pattern));
 }

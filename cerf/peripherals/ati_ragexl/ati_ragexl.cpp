@@ -2,6 +2,7 @@
 #include "../pci/pci_host_bridge.h"
 #include "ati_ragexl_display.h"
 
+#include "../../core/byte_order.h"
 #include "../../core/cerf_emulator.h"
 #include "../../core/log.h"
 #include "../../boards/board_context.h"
@@ -215,9 +216,8 @@ private:
         }
     }
 
-    static uint32_t Mask(unsigned size) { return size >= 4 ? 0xFFFFFFFFu : ((1u << (size * 8)) - 1u); }
     static uint32_t Slice(uint32_t dword, uint32_t off, unsigned size) {
-        return (dword >> ((off & 3u) * 8u)) & Mask(size);
+        return (dword >> ((off & 3u) * 8u)) & cerf::ByteWidthMask(size);
     }
 
     uint32_t RegOut(uint32_t off, unsigned size) const {
@@ -284,9 +284,7 @@ private:
     }
     uint32_t FbPixel(uint32_t addr, uint32_t bytespp) const {
         if (addr + bytespp > fb_.size()) EngineOob("read", addr);
-        uint32_t v = 0;
-        for (uint32_t b = 0; b < bytespp; ++b) v |= uint32_t(fb_[addr + b]) << (b * 8);
-        return v;
+        return static_cast<uint32_t>(cerf::le::UN(fb_.data() + addr, bytespp));
     }
 
     void ExecuteEngineOp(uint32_t launch_off, uint32_t launch_val) {
@@ -329,7 +327,7 @@ private:
                     if (da + bytespp > fb_.size()) EngineOob("write", da);
                     const uint32_t s = is_blit ? FbPixel(sbase + (uint32_t)syr * spitch + (uint32_t)sxc * bytespp, bytespp) : fg;
                     const uint32_t res = (mix_code == 7u) ? s : Rop(mix_code, FbPixel(da, bytespp), s);
-                    for (uint32_t b = 0; b < bytespp; ++b) fb_[da + b] = uint8_t(res >> (b * 8));
+                    cerf::le::PutN(fb_.data() + da, res, bytespp);
                 }
             }
             return;

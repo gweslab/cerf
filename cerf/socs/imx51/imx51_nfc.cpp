@@ -1,6 +1,7 @@
 #include "imx51_nfc.h"
 #include "imx51_nand_store.h"
 
+#include "../../core/byte_order.h"
 #include "../../core/cerf_emulator.h"
 #include "../../core/log.h"
 #include "../../cpu/emulated_memory.h"
@@ -78,9 +79,9 @@ constexpr std::array<uint8_t, 5> kReadIdBytes = {0x2Cu, 0x48u, 0x00u, 0x00u, 0x0
 /* Decode the five NAND address cycles (little-endian [col_lo, col_hi, row_lo,
    row_mid, row_hi]) to a linear flash byte offset: 12-bit column (4 KB page) +
    19-bit row (the 2 GB Micron part = 0x80000 pages; READ ID 0x2C/0x48 above). */
-uint64_t DecodeNandAddr(uint8_t a0, uint8_t a1, uint8_t a2, uint8_t a3, uint8_t a4) {
-    const uint32_t column = a0 | ((a1 & 0x0Fu) << 8);
-    const uint32_t row    = a2 | (a3 << 8) | ((a4 & 0x07u) << 16);
+uint64_t DecodeNandAddr(const std::array<uint8_t, 5>& a) {
+    const uint32_t column = cerf::le::U16(a.data()) & 0x0FFFu;
+    const uint32_t row    = cerf::le::U24(a.data() + 2) & 0x7FFFFu;
     return (static_cast<uint64_t>(row) << 12) | column;
 }
 
@@ -255,8 +256,7 @@ void Imx51Nfc::Launch(uint32_t value) {
 }
 
 uint64_t Imx51Nfc::FlashOffset() const {
-    return DecodeNandAddr(addr_bytes_[0], addr_bytes_[1], addr_bytes_[2],
-                          addr_bytes_[3], addr_bytes_[4]);
+    return DecodeNandAddr(addr_bytes_);
 }
 
 void Imx51Nfc::FillPageBuffer(uint64_t flash_off) {
@@ -289,11 +289,7 @@ void Imx51Nfc::AutoRead() {
     /* AUTO_READ issues the address phases (MCIMX51RM §45.9.1.2), latching the NAND
        address; a later manual FDO data-output (FDO=001) outputs that same latched
        page, so mirror it into addr_bytes_ - without this the FDO reads stale bytes. */
-    addr_bytes_[0] = static_cast<uint8_t>(nand_add_[0]);
-    addr_bytes_[1] = static_cast<uint8_t>(nand_add_[0] >> 8);
-    addr_bytes_[2] = static_cast<uint8_t>(nand_add_[0] >> 16);
-    addr_bytes_[3] = static_cast<uint8_t>(nand_add_[0] >> 24);
-    addr_bytes_[4] = static_cast<uint8_t>(nand_add_[8]);
+    addr_bytes_    = AutoAddrBytes();
     addr_idx_      = static_cast<uint32_t>(addr_bytes_.size());
     seq_data_off_  = AutoFlashOffset();   /* start page for a following Read-Cache sequence */
     FillPageBuffer(seq_data_off_);
@@ -323,11 +319,14 @@ void Imx51Nfc::AutoErase() {
 uint64_t Imx51Nfc::AutoFlashOffset() const {
     /* AUTO_READ address from the active group NAND_ADDRESS0 (Table 45-11):
        NAND_ADD0 = ADDRESS0[31:0], NAND_ADD8[7:0] = ADDRESS0[39:32]. */
-    return DecodeNandAddr(static_cast<uint8_t>(nand_add_[0]),
-                          static_cast<uint8_t>(nand_add_[0] >> 8),
-                          static_cast<uint8_t>(nand_add_[0] >> 16),
-                          static_cast<uint8_t>(nand_add_[0] >> 24),
-                          static_cast<uint8_t>(nand_add_[8]));
+    return DecodeNandAddr(AutoAddrBytes());
+}
+
+std::array<uint8_t, 5> Imx51Nfc::AutoAddrBytes() const {
+    std::array<uint8_t, 5> a{};
+    cerf::le::Put32(a.data(), nand_add_[0]);
+    a[4] = static_cast<uint8_t>(nand_add_[8]);
+    return a;
 }
 
 void Imx51Nfc::ReadId() {

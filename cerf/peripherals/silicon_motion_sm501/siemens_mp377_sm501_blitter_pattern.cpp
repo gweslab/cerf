@@ -40,10 +40,7 @@ void SiemensMp377Sm501Blitter::PatternFillRect16(const SiemensMp377Sm501Blitter:
             const uint32_t px = x >> 1;
             if (!DestinationPixelEnabled(adjusted, adjusted.dst_x + px, adjusted.dst_y + y)) continue;
             const uint16_t color = PatternPixel565(adjusted, px, y);
-            const uint16_t d = static_cast<uint16_t>(vram[row + x] | (vram[row + x + 1u] << 8));
-            const uint16_t out = Sm501ApplyRasterOp16(st.control, color, d, color);
-            vram[row + x] = static_cast<uint8_t>(out);
-            vram[row + x + 1u] = static_cast<uint8_t>(out >> 8);
+            Sm501RasterOpPixel16(vram + row + x, st.control, color, color);
         }
         fb.Note2dWrite(row, row_bytes);
     }

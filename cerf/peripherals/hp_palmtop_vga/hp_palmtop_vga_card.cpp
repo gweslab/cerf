@@ -2,6 +2,7 @@
 
 #include "../pcmcia/pcmcia_slot.h"
 
+#include "../../core/byte_order.h"
 #include "../../core/cerf_emulator.h"
 #include "../../core/log.h"
 #include "../../state/state_stream.h"
@@ -111,11 +112,8 @@ void HpPalmtopVgaCard::WriteCommon8(uint32_t offset, uint8_t value) {
 }
 
 uint16_t HpPalmtopVgaCard::ReadCommon16(uint32_t offset) {
-    if (offset - kFbBase < VgaController::kFbSize - 1u) {
-        const uint8_t* fb = controller_.Framebuffer();
-        const uint32_t r = offset - kFbBase;
-        return (uint16_t)(fb[r] | (fb[r + 1u] << 8));
-    }
+    if (offset - kFbBase < VgaController::kFbSize - 1u)
+        return cerf::le::U16(controller_.Framebuffer(), offset - kFbBase);
     return (uint16_t)(ReadCommon8(offset) | (ReadCommon8(offset + 1u) << 8));
 }
 
@@ -137,10 +135,7 @@ void HpPalmtopVgaCard::RestoreState(StateReader& r) {
 
 void HpPalmtopVgaCard::WriteCommon16(uint32_t offset, uint16_t value) {
     if (offset - kFbBase < VgaController::kFbSize - 1u) {
-        uint8_t* fb = controller_.Framebuffer();
-        const uint32_t r = offset - kFbBase;
-        fb[r]      = (uint8_t)(value & 0xFFu);
-        fb[r + 1u] = (uint8_t)(value >> 8);
+        cerf::le::Put16(controller_.Framebuffer() + (offset - kFbBase), value);
         return;
     }
     WriteCommon8(offset, (uint8_t)(value & 0xFFu));

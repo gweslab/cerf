@@ -12,8 +12,6 @@
 
 namespace {
 
-constexpr size_t kContentProbeStride = 251;
-
 /* ddi.dll DrvEnablePDEV reports bpp=16 w=320 h=240; nk.exe fill sub_9F0B7D20 @0x9F0B8184
    fills 0xF800 = RGB565 pure red - the framebuffer is 16bpp RGB565. */
 class CasioToricomailRenderer : public PanelFrameRenderer {
@@ -36,7 +34,7 @@ public:
         if (!asic.IsDisplayEnabled()) return false;
         if (latch_.Latched())         return true;
         const uint32_t bytes = asic.StrideBytes() * asic.GuestH();
-        return latch_.ProbeAndLatch(asic.FbBytes(), bytes, kContentProbeStride);
+        return latch_.ProbeAndLatch(asic.FbBytes(), bytes);
     }
 
     void RenderInto(uint32_t* dib, uint32_t host_w, uint32_t host_h) override {

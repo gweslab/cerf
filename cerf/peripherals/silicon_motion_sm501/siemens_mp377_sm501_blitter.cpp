@@ -3,6 +3,7 @@
 #include "siemens_mp377_sm501_blitter.h"
 #include "siemens_mp377_sm501_fb.h"
 #include "siemens_mp377_sm501_internal.h"
+#include "../../lcd/lcd_pixel_expand.h"
 #include "siemens_mp377_sm501_rop.h"
 #include "sm501_line_rasterizer.h"
 
@@ -123,10 +124,7 @@ void SiemensMp377Sm501Blitter::FillRect16(const SiemensMp377Sm501Blitter::State2
         const uint32_t row_bytes = std::min(width * 2u, kSm501FbBytes - row);
         for (uint32_t x = 0; x + 1u < row_bytes; x += 2u) {
             if (!DestinationPixelEnabled(st, st.dst_x + (x >> 1), st.dst_y + y)) continue;
-            const uint16_t d = static_cast<uint16_t>(vram[row + x] | (vram[row + x + 1u] << 8));
-            const uint16_t out = Sm501ApplyRasterOp16(st.control, color, d, color);
-            vram[row + x] = static_cast<uint8_t>(out);
-            vram[row + x + 1u] = static_cast<uint8_t>(out >> 8);
+            Sm501RasterOpPixel16(vram + row + x, st.control, color, color);
         }
         fb.Note2dWrite(row, row_bytes);
     }
@@ -204,8 +202,7 @@ void SiemensMp377Sm501Blitter::HostDataWritePixel(uint32_t x, uint32_t y, uint16
     const uint32_t stride = host_dst_pitch_bytes_;
     const uint32_t off = host_dst_base_ + abs_y * stride + abs_x * 2u;
     if (off + 1u >= kSm501FbBytes) return;
-    vram[off] = static_cast<uint8_t>(p);
-    vram[off + 1u] = static_cast<uint8_t>(p >> 8);
+    cerf::le::Put16(vram + off, p);
     fb.Note2dWrite(off, 2u);
 }
 void SiemensMp377Sm501Blitter::HostDataAdvanceRow() {
@@ -298,11 +295,7 @@ uint16_t SiemensMp377Sm501Blitter::PatternPixel565(const State2d& st, uint32_t x
         return static_cast<uint16_t>((i & 1u) ? (w >> 16) : (w & 0xFFFFu));
     }
     if (format == 2u && pattern_words_.size() >= 64u) {
-        const uint32_t c = pattern_words_[i];
-        const uint8_t r = static_cast<uint8_t>((c >> 16) & 0xFFu);
-        const uint8_t g = static_cast<uint8_t>((c >> 8) & 0xFFu);
-        const uint8_t b = static_cast<uint8_t>(c & 0xFFu);
-        return static_cast<uint16_t>(((r & 0xF8u) << 8) | ((g & 0xFCu) << 3) | (b >> 3));
+        return lcd_pixel::PackRgb565(pattern_words_[i]);
     }
     emu_.Get<Fatal>().Die("MP377 SM501 unsupported or incomplete 2D colour pattern format=%u words=%zu", format,
                           pattern_words_.size());
@@ -320,20 +313,11 @@ void SiemensMp377Sm501Blitter::HandleDdiVgxDataPortWord(uint32_t v) {
         return;
     }
     if (!host_data_active_) emu_.Get<Fatal>().Die("MP377 SM501 2D host data without an active command");
-    const uint8_t b0 = static_cast<uint8_t>(v);
-    const uint8_t b1 = static_cast<uint8_t>(v >> 8);
-    const uint8_t b2 = static_cast<uint8_t>(v >> 16);
-    const uint8_t b3 = static_cast<uint8_t>(v >> 24);
-    if (host_data_mono_) {
-        HostDataMonoByte(b0);
-        HostDataMonoByte(b1);
-        HostDataMonoByte(b2);
-        HostDataMonoByte(b3);
-    } else {
-        HostDataColorByte(b0);
-        HostDataColorByte(b1);
-        HostDataColorByte(b2);
-        HostDataColorByte(b3);
+    uint8_t bytes[4];
+    cerf::le::Put32(bytes, v);
+    for (const uint8_t b : bytes) {
+        if (host_data_mono_) HostDataMonoByte(b);
+        else                 HostDataColorByte(b);
     }
 }
 void SiemensMp377Sm501Blitter::ExecuteDdiFill(const SiemensMp377Sm501Blitter::State2d& st) {
@@ -415,11 +399,8 @@ void SiemensMp377Sm501Blitter::ExecuteDdiVideoToVideo(const SiemensMp377Sm501Bli
             const uint32_t dst_off = dst_row + x * 2u;
             if (src_off + 1u >= kSm501FbBytes || dst_off + 1u >= kSm501FbBytes) break;
             if (!DestinationPixelEnabled(st, r.dst_x + x, r.dst_y + y)) continue;
-            const uint16_t src = static_cast<uint16_t>(vram[src_off] | (vram[src_off + 1u] << 8));
-            const uint16_t d = static_cast<uint16_t>(vram[dst_off] | (vram[dst_off + 1u] << 8));
-            const uint16_t o = Sm501ApplyRasterOp16(st.control, src, d, st.fill_color);
-            vram[dst_off] = static_cast<uint8_t>(o);
-            vram[dst_off + 1u] = static_cast<uint8_t>(o >> 8);
+            Sm501RasterOpPixel16(vram + dst_off, st.control, cerf::le::U16(vram, src_off),
+                                 st.fill_color);
         }
         fb.Note2dWrite(dst_row, r.width * 2u);
     }

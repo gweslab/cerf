@@ -5,12 +5,15 @@
 #include "../peripheral_dispatcher.h"
 #include "../../boards/board_context.h"
 #include "../../boot/guest_additions_binaries.h"
+#include "../../core/byte_order.h"
 #include "../../core/cerf_emulator.h"
 #include "../../core/device_config.h"
 #include "../../core/log.h"
 #include "../../state/state_stream.h"
 
+#include <algorithm>
 #include <cstdint>
+#include <cstring>
 #include <fstream>
 #include <string>
 #include <vector>
@@ -87,14 +90,12 @@ private:
         self->emu_.Get<CerfGuestLiveness>().NotifyBodyFetch();
         if (off < CerfVirt::kGuestBodyHdrSize)
             return (off == 0) ? static_cast<uint32_t>(self->body_.size()) : 0u;
-        const uint32_t boff = off - CerfVirt::kGuestBodyHdrSize;
-        uint32_t v = 0;
-        for (uint32_t i = 0; i < width_bytes; ++i) {
-            const size_t idx = static_cast<size_t>(boff) + i;
-            if (idx < self->body_.size())
-                v |= static_cast<uint32_t>(self->body_[idx]) << (i * 8);
-        }
-        return v;
+        const size_t boff = off - CerfVirt::kGuestBodyHdrSize;
+        const size_t size = self->body_.size();
+        uint8_t word[4] = {};
+        if (boff < size)
+            std::memcpy(word, self->body_.data() + boff, std::min<size_t>(width_bytes, size - boff));
+        return static_cast<uint32_t>(cerf::le::UN(word, width_bytes));
     }
 
     static void FastWriteThunk(void*, uint32_t, uint32_t, uint32_t) {}

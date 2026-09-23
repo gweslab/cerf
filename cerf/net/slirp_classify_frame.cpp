@@ -1,56 +1,68 @@
 #define _CRT_SECURE_NO_WARNINGS
 #include "slirp_backend_internal.h"
 
+#include "../core/byte_order.h"
+#include "ipv4_packet.h"
+
 #include <cstddef>
 #include <cstdint>
 #include <cstdio>
+
+using cerf::be::U16;
+using namespace cerf::inet;
 
 void ClassifyFrame(const uint8_t* f, std::size_t len,
                    char* out, std::size_t out_len) {
     if (!out || out_len == 0) return;
     out[0] = '\0';
-    if (len < 14) { _snprintf_s(out, out_len, _TRUNCATE, "short<14"); return; }
-    uint16_t etype = (uint16_t(f[12]) << 8) | f[13];
-    if (etype == 0x0806) {
-        if (len >= 42) {
-            uint16_t op = (uint16_t(f[20]) << 8) | f[21];
+    if (len < kEthHeaderSize) { _snprintf_s(out, out_len, _TRUNCATE, "short<14"); return; }
+    uint16_t etype = EthType(f);
+    if (etype == kEthTypeArp) {
+        const uint8_t* arp = f + kEthHeaderSize;
+        if (len >= kEthHeaderSize + kArpPacketSize) {
+            uint16_t op = U16(arp, kArpOffOper);
+            const uint8_t* sip = arp + kArpOffSenderIp;
+            const uint8_t* tip = arp + kArpOffTargetIp;
             _snprintf_s(out, out_len, _TRUNCATE,
                         "arp op=%u sender=%u.%u.%u.%u target=%u.%u.%u.%u", op,
-                        f[28], f[29], f[30], f[31], f[38], f[39], f[40], f[41]);
-        } else if (len >= 22) {
-            uint16_t op = (uint16_t(f[20]) << 8) | f[21];
+                        sip[0], sip[1], sip[2], sip[3], tip[0], tip[1], tip[2], tip[3]);
+        } else if (len >= kEthHeaderSize + kArpOffOper + 2) {
+            uint16_t op = U16(arp, kArpOffOper);
             _snprintf_s(out, out_len, _TRUNCATE, "arp op=%u", op);
         } else {
             _snprintf_s(out, out_len, _TRUNCATE, "arp");
         }
         return;
     }
-    if (etype == 0x0800 && len >= 34) {
-        uint8_t proto = f[14 + 9];
-        const uint8_t* ip = f + 14;
-        uint8_t ihl = (ip[0] & 0x0F) * 4;
-        if (len < 14u + ihl) {
+    if (etype == kEthTypeIpv4 && len >= kEthHeaderSize + kIpv4HeaderSize) {
+        const uint8_t* ip = f + kEthHeaderSize;
+        uint8_t proto = ip[kIpOffProto];
+        uint8_t ihl = static_cast<uint8_t>(Ipv4HeaderLen(ip));
+        if (len < kEthHeaderSize + ihl) {
             _snprintf_s(out, out_len, _TRUNCATE, "ipv4 proto=%u ihl=%u short", proto, ihl);
             return;
         }
         const uint8_t* l4 = ip + ihl;
+        const uint8_t* sa = ip + kIpOffSrc;
+        const uint8_t* da = ip + kIpOffDst;
         char sip[16] = {}, dip[16] = {};
         _snprintf_s(sip, sizeof(sip), _TRUNCATE, "%u.%u.%u.%u",
-                    ip[12], ip[13], ip[14], ip[15]);
+                    sa[0], sa[1], sa[2], sa[3]);
         _snprintf_s(dip, sizeof(dip), _TRUNCATE, "%u.%u.%u.%u",
-                    ip[16], ip[17], ip[18], ip[19]);
-        if (proto == 17 && len >= 14u + ihl + 8u) {
-            uint16_t sp = (uint16_t(l4[0]) << 8) | l4[1];
-            uint16_t dp = (uint16_t(l4[2]) << 8) | l4[3];
-            const char* hint = (sp == 68 || dp == 68 || sp == 67 || dp == 67)
+                    da[0], da[1], da[2], da[3]);
+        if (proto == kIpProtoUdp && len >= kEthHeaderSize + ihl + kUdpHeaderSize) {
+            uint16_t sp = U16(l4, kUdpOffSrcPort);
+            uint16_t dp = U16(l4, kUdpOffDstPort);
+            const char* hint = (sp == kUdpPortDhcpClient || dp == kUdpPortDhcpClient ||
+                                sp == kUdpPortDhcpServer || dp == kUdpPortDhcpServer)
                 ? " dhcp"
-                : (sp == 53 || dp == 53 ? " dns" : "");
+                : (sp == kUdpPortDns || dp == kUdpPortDns ? " dns" : "");
             _snprintf_s(out, out_len, _TRUNCATE,
                         "ipv4 udp %s:%u -> %s:%u%s", sip, sp, dip, dp, hint);
-        } else if (proto == 6 && len >= 14u + ihl + 20u) {
-            uint16_t sp = (uint16_t(l4[0]) << 8) | l4[1];
-            uint16_t dp = (uint16_t(l4[2]) << 8) | l4[3];
-            uint8_t  flg = l4[13];
+        } else if (proto == kIpProtoTcp && len >= kEthHeaderSize + ihl + kTcpHeaderSize) {
+            uint16_t sp = U16(l4, kTcpOffSrcPort);
+            uint16_t dp = U16(l4, kTcpOffDstPort);
+            uint8_t  flg = l4[kTcpOffFlags];
             char flags[8] = {};
             int n = 0;
             if (flg & 0x02) flags[n++] = 'S';
@@ -61,7 +73,7 @@ void ClassifyFrame(const uint8_t* f, std::size_t len,
             if (n == 0) flags[n++] = '.';
             _snprintf_s(out, out_len, _TRUNCATE,
                         "ipv4 tcp %s:%u -> %s:%u [%s]", sip, sp, dip, dp, flags);
-        } else if (proto == 1) {
+        } else if (proto == kIpProtoIcmp) {
             _snprintf_s(out, out_len, _TRUNCATE,
                         "ipv4 icmp %s -> %s", sip, dip);
         } else {
@@ -70,7 +82,7 @@ void ClassifyFrame(const uint8_t* f, std::size_t len,
         }
         return;
     }
-    if (etype == 0x86DD) {
+    if (etype == kEthTypeIpv6) {
         _snprintf_s(out, out_len, _TRUNCATE, "ipv6");
         return;
     }

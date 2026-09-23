@@ -1,5 +1,6 @@
 #include "imx51_usboh3.h"
 
+#include "../../core/byte_order.h"
 #include "../../core/cerf_emulator.h"
 #include "../../cpu/emulated_memory.h"
 #include "../../peripherals/usb/usb_device.h"
@@ -252,15 +253,10 @@ bool Imx51Usboh3::ExecuteQtd(uint32_t qtd_addr, UsbDevice* dev, uint32_t endpt) 
     uint32_t residual = 0u;
 
     if (endpt == 0u && pid == kQtdPidSetup) {
-        if (total != 8u) return retire(total, true);
-        uint8_t raw[8] = {};
-        transfer(raw, 8u, false);
-        UsbDevice::SetupPacket setup{};
-        setup.bmRequestType = raw[0];
-        setup.bRequest      = raw[1];
-        setup.wValue        = static_cast<uint16_t>(raw[2] | (raw[3] << 8));
-        setup.wIndex        = static_cast<uint16_t>(raw[4] | (raw[5] << 8));
-        setup.wLength        = static_cast<uint16_t>(raw[6] | (raw[7] << 8));
+        if (total != UsbDevice::SetupPacket::kSize) return retire(total, true);
+        uint8_t raw[UsbDevice::SetupPacket::kSize] = {};
+        transfer(raw, UsbDevice::SetupPacket::kSize, false);
+        const UsbDevice::SetupPacket setup = UsbDevice::SetupPacket::Decode(raw);
         if (!dev->BeginControlTransfer(setup)) return retire(total, true);
         residual = 0u;
     } else if (endpt == 0u && pid == kQtdPidIn) {

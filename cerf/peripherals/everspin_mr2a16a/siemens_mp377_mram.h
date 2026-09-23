@@ -39,7 +39,6 @@ public:
 private:
     void ResetErased();
     uint32_t OffsetFromAlias(uint32_t alias_pa) const;
-    void PutLe32(uint32_t off, uint32_t value);
 
     std::array<uint8_t, kMp377MramSize> mram_{};
 };

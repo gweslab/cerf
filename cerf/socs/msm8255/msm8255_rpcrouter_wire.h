@@ -1,5 +1,7 @@
 #pragma once
 
+#include "../../core/byte_order.h"
+
 #include <cstdint>
 
 /* Linux arch/arm/mach-msm smd_rpcrouter.h: struct rr_header. */
@@ -77,7 +79,4 @@ inline constexpr uint32_t kReplyVerfLenOff    = 16u;
 inline constexpr uint32_t kReplyAcceptStatOff = 20u;
 inline constexpr uint32_t kReplyResultsOff    = 24u;
 
-constexpr uint32_t Be32(uint32_t v) {
-    return (v >> 24) | ((v >> 8) & 0xFF00u) | ((v << 8) & 0xFF0000u) |
-           (v << 24);
-}
+constexpr uint32_t Be32(uint32_t v) { return cerf::ByteSwap32(v); }

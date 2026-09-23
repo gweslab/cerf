@@ -1,5 +1,6 @@
 #include "compactflash_card.h"
 
+#include "../../core/byte_order.h"
 #include "../../core/cerf_emulator.h"
 #include "../../core/log.h"
 #include "../pcmcia/pcmcia_slot.h"
@@ -364,8 +365,7 @@ uint8_t CompactFlashCard::ReadRegLocked(int reg) {
 
 uint16_t CompactFlashCard::ReadData16Locked() {
     if (!(status_ & kStDrq)) return 0xFFFFu;
-    const uint16_t v = static_cast<uint16_t>(buf_[buf_pos_]) |
-                       (static_cast<uint16_t>(buf_[buf_pos_ + 1u]) << 8);
+    const uint16_t v = cerf::le::U16(buf_.data(), buf_pos_);
     buf_pos_ += 2u;
     if (buf_pos_ >= 512u) {
         if (--sectors_left_ == 0) {
@@ -437,8 +437,7 @@ void CompactFlashCard::WriteRegLocked(int reg, uint8_t value) {
 
 void CompactFlashCard::WriteData16Locked(uint16_t value) {
     if (!writing_ || !(status_ & kStDrq)) return;
-    buf_[buf_pos_]      = static_cast<uint8_t>(value & 0xFFu);
-    buf_[buf_pos_ + 1u] = static_cast<uint8_t>(value >> 8);
+    cerf::le::Put16(buf_.data() + buf_pos_, value);
     buf_pos_ += 2u;
     if (buf_pos_ >= 512u) CompleteWriteSectorLocked();
 }

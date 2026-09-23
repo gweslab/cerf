@@ -1,9 +1,6 @@
+#include "../../peripherals/ite_it8368/ite_it8368_socket_host.h"
+
 #include "../../core/cerf_emulator.h"
-#include "../../core/service.h"
-#include "../../host/host_widget_registry.h"
-#include "../../peripherals/ite_it8368/ite_it8368.h"
-#include "../../peripherals/pcmcia/pcmcia_slot.h"
-#include "../../socs/pr31x00/pr31x00_card_space.h"
 #include "../../socs/pr31x00/pr31x00_io.h"
 #include "../board_context.h"
 #include "sharp_mobilon_hc4100_id.h"
@@ -15,45 +12,21 @@ namespace {
    which pcmcia.dll sub_1492478 registers through InterruptInitialize. */
 constexpr uint32_t kIt8368IntMfioPin = 2;
 
-class SharpMobilonHc4100Pcmcia : public Service,
-                                 public PcmciaSlotHost,
-                                 public IteIt8368IntSink {
+class SharpMobilonHc4100Pcmcia : public IteIt8368SocketHost {
 public:
     explicit SharpMobilonHc4100Pcmcia(CerfEmulator& emu)
-        : Service(emu), slot0_(emu, *this, L"PC Card slot") {}
+        : IteIt8368SocketHost(emu, L"PC Card slot") {}
 
     bool ShouldRegister() override {
         auto* bd = emu_.TryGet<BoardContext>();
         return bd && bd->GetBoardId() == BoardId::SharpMobilonHc4100;
     }
 
-    void OnReady() override {
-        emu_.Get<Pr31x00CardSpace>().ProvideSockets(&slot0_, nullptr);
-        emu_.Get<IteIt8368>().SetSlot(&slot0_);
-        emu_.Get<IteIt8368>().SetIntSink(this);
-        emu_.Get<HostWidgetRegistry>().Register(&slot0_);
-    }
-
     void OnIt8368IntLevel(bool asserted) override {
         emu_.Get<Pr31x00Io>().DriveMfioInput(kIt8368IntMfioPin, asserted);
     }
-
-    void OnShutdown() override { slot0_.OnShutdown(); }
-
-    void OnCardDetectChanged(PcmciaSlot&) override {
-        emu_.Get<IteIt8368>().NotifyCardDetect();
-    }
-    void OnCardIrqAsserted(PcmciaSlot&) override {
-        emu_.Get<IteIt8368>().SetCardIrq(true);
-    }
-    void OnCardIrqDeasserted(PcmciaSlot&) override {
-        emu_.Get<IteIt8368>().SetCardIrq(false);
-    }
-
-private:
-    PcmciaSlot slot0_;
 };
 
-}  /* namespace */
+}
 
 REGISTER_SERVICE(SharpMobilonHc4100Pcmcia);

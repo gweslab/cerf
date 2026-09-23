@@ -2,14 +2,13 @@
 
 #include "cerf_virt_addr_map.h"
 #include "../../boards/board_context.h"
+#include "../../core/byte_order.h"
 #include "../../core/cerf_emulator.h"
 #include "../../core/device_config.h"
 #include "../../core/log.h"
 #include "../../cpu/emulated_memory.h"
 #include "../../jit/guest_engine.h"
 #include "../../socs/guest_cpu_reset.h"
-
-#include <cstring>
 
 REGISTER_SERVICE(CerfVirtDmaArena);
 
@@ -46,10 +45,8 @@ void CerfVirtDmaArena::OnReady() {
 }
 
 void CerfVirtDmaArena::ZeroOwners() {
-    for (uint32_t i = 0; i < CerfVirt::kDmaArenaProcMax; ++i) {
-        const uint32_t z = 0u;
-        std::memcpy(base_ + PartitionBase(i) + CerfVirt::kDmaPartOwnerPid, &z, 4);
-    }
+    for (uint32_t i = 0; i < CerfVirt::kDmaArenaProcMax; ++i)
+        cerf::le::Put32(base_ + PartitionBase(i) + CerfVirt::kDmaPartOwnerPid, 0u);
 }
 
 uint8_t* CerfVirtDmaArena::At(uint32_t offset, uint32_t bytes) {
@@ -65,8 +62,7 @@ void CerfVirtDmaArena::Claim(uint32_t pid) {
     }
     uint32_t free_idx = CerfVirt::kDmaArenaProcMax;
     for (uint32_t i = 0; i < CerfVirt::kDmaArenaProcMax; ++i) {
-        uint32_t owner = 0;
-        std::memcpy(&owner, base_ + PartitionBase(i) + CerfVirt::kDmaPartOwnerPid, 4);
+        const uint32_t owner = cerf::le::U32(base_ + PartitionBase(i), CerfVirt::kDmaPartOwnerPid);
         if (owner == pid) return;
         if (owner == 0u && free_idx == CerfVirt::kDmaArenaProcMax) free_idx = i;
     }
@@ -76,5 +72,5 @@ void CerfVirtDmaArena::Claim(uint32_t pid) {
             pid, CerfVirt::kDmaArenaProcMax);
         CerfFatalExit();
     }
-    std::memcpy(base_ + PartitionBase(free_idx) + CerfVirt::kDmaPartOwnerPid, &pid, 4);
+    cerf::le::Put32(base_ + PartitionBase(free_idx) + CerfVirt::kDmaPartOwnerPid, pid);
 }

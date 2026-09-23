@@ -1,5 +1,6 @@
 #include "../../core/service.h"
 
+#include "../../core/byte_order.h"
 #include "../../core/cerf_emulator.h"
 #include "../../host/battery_widget.h"
 #include "../../host/host_widget_registry.h"
@@ -124,10 +125,8 @@ private:
         if (fill > 100) fill = 100;
         const uint32_t a4  = kVEmpty + static_cast<uint32_t>(fill) * (kVFull - kVEmpty) / 100u;
         const uint32_t enc = a4 << 2;
-        resp_[0] = static_cast<uint8_t>(kVFull >> 8);     /* 0x10 */
-        resp_[1] = static_cast<uint8_t>(kVFull & 0xFFu);  /* 0x68 */
-        resp_[4] = static_cast<uint8_t>((enc >> 8) & 0x7Fu);
-        resp_[5] = static_cast<uint8_t>(enc & 0xFFu);
+        cerf::be::Put16(resp_ + 0, static_cast<uint16_t>(kVFull));
+        cerf::be::Put16(resp_ + 4, static_cast<uint16_t>(enc & 0x7FFFu));
         resp_len_ = 32u;
     }
 

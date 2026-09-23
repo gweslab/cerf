@@ -40,7 +40,7 @@ uint8_t Jornada820CompanionAsic::ReadByte(uint32_t addr) {
 
 uint16_t Jornada820CompanionAsic::ReadHalf(uint32_t addr) {
     const uint32_t o = addr - MmioBase();
-    return static_cast<uint16_t>(store_[o] | (store_[o + 1] << 8));
+    return cerf::le::U16(store_.data(), o);
 }
 
 uint32_t Jornada820CompanionAsic::ReadWord(uint32_t addr) {
@@ -49,8 +49,7 @@ uint32_t Jornada820CompanionAsic::ReadWord(uint32_t addr) {
     if (o == kPs2Data)       return mouse_.ReadData();
     if (o == kPcmciaStatus)  return emu_.Get<Jornada820Pcmcia>().ReadSocketStatus();
     if (o == kIntrStatus)    return intr_pending_;
-    return static_cast<uint32_t>(store_[o]) | (store_[o + 1] << 8) |
-           (store_[o + 2] << 16) | (store_[o + 3] << 24);
+    return cerf::le::U32(store_.data(), o);
 }
 
 void Jornada820CompanionAsic::WriteByte(uint32_t addr, uint8_t v) {
@@ -60,9 +59,7 @@ void Jornada820CompanionAsic::WriteByte(uint32_t addr, uint8_t v) {
 }
 
 void Jornada820CompanionAsic::WriteHalf(uint32_t addr, uint16_t v) {
-    const uint32_t o = addr - MmioBase();
-    store_[o]     = static_cast<uint8_t>(v);
-    store_[o + 1] = static_cast<uint8_t>(v >> 8);
+    cerf::le::Put16(store_.data() + (addr - MmioBase()), v);
 }
 
 void Jornada820CompanionAsic::WriteWord(uint32_t addr, uint32_t v) {
@@ -73,10 +70,7 @@ void Jornada820CompanionAsic::WriteWord(uint32_t addr, uint32_t v) {
         if (intr_pending_ & IntrMask()) PulseGpio14();  /* another source waits */
         return;
     }
-    store_[o]     = static_cast<uint8_t>(v);
-    store_[o + 1] = static_cast<uint8_t>(v >> 8);
-    store_[o + 2] = static_cast<uint8_t>(v >> 16);
-    store_[o + 3] = static_cast<uint8_t>(v >> 24);
+    cerf::le::Put32(store_.data() + o, v);
 }
 
 void Jornada820CompanionAsic::PulseGpio14() {

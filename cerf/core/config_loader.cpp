@@ -7,6 +7,7 @@
 #include "main_config.h"
 #include "log.h"
 #include "cerf_paths.h"
+#include "../net/mac_address.h"
 #include <nlohmann/json.hpp>
 #include <fstream>
 #include <cstring>
@@ -122,10 +123,8 @@ void LoadNetwork(const json& root, DeviceConfig& config, const std::string& path
     }
     if (n.contains("mac")) {
         std::string v = CfgReadOptString(n, "mac", path, "network");
-        unsigned b[6] = {};
-        int got = std::sscanf(v.c_str(), "%02X:%02X:%02X:%02X:%02X:%02X",
-                              &b[0], &b[1], &b[2], &b[3], &b[4], &b[5]);
-        if (got != 6)
+        std::array<uint8_t, cerf::inet::kEthMacSize> mac{};
+        if (!cerf::inet::ParseMac(v, mac))
             CfgFatal(path, "network.mac '" + v + "' must be XX:XX:XX:XX:XX:XX hex");
         config.network_mac = v;
     }

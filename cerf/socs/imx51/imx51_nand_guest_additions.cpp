@@ -23,14 +23,8 @@
 
 namespace {
 
-constexpr uint32_t kPage              = 0x1000;
-constexpr uint32_t kDirentFileSizeOff = 0x18;
-
-uint16_t Rd16(const uint8_t* p) { return uint16_t(p[0]) | (uint16_t(p[1]) << 8); }
-uint32_t Rd32(const uint8_t* p) {
-    return uint32_t(p[0]) | (uint32_t(p[1]) << 8)
-         | (uint32_t(p[2]) << 16) | (uint32_t(p[3]) << 24);
-}
+using cerf::ce_imgfs_walker::kDirentFileSizeOff;
+using cerf::ce_imgfs_walker::kImgfsPageSize;
 
 class Imx51NandGuestAdditions : public Service {
 public:
@@ -66,17 +60,14 @@ public:
     }
 
 private:
-    /* Patch `len` bytes at IMGFS logical offset `logical_off` into the NAND read
-       overlay. Direct-addressed volume: logical byte L is physical NAND byte
-       (base_page*kPage + L), so the overlay is keyed by (base_page + L/kPage). */
     void PatchVolume(uint64_t logical_off, const uint8_t* data, uint32_t len) {
         auto& store = emu_.Get<Imx51NandStore>();
         uint32_t done = 0;
         while (done < len) {
             const uint64_t voff  = logical_off + done;
-            const uint64_t page  = base_page_ + voff / kPage;
-            const uint32_t in_pg = uint32_t(voff % kPage);
-            const uint32_t n     = std::min<uint32_t>(kPage - in_pg, len - done);
+            const uint64_t page  = base_page_ + voff / kImgfsPageSize;
+            const uint32_t in_pg = uint32_t(voff % kImgfsPageSize);
+            const uint32_t n     = std::min<uint32_t>(kImgfsPageSize - in_pg, len - done);
             std::array<uint8_t, Imx51NandStore::kMainBytes>  main{};
             std::array<uint8_t, Imx51NandStore::kSpareBytes> spare{};
             store.ReadPage(page * Imx51NandStore::kMainBytes, main.data(), spare.data());
@@ -87,9 +78,9 @@ private:
     }
 
     void WritePageBytes(uint32_t logical_page, const uint8_t* src, uint32_t real_size) {
-        std::array<uint8_t, kPage> buf{};
-        std::memcpy(buf.data(), src, std::min<uint32_t>(real_size, kPage));
-        PatchVolume(uint64_t(logical_page) * kPage, buf.data(), kPage);
+        std::array<uint8_t, kImgfsPageSize> buf{};
+        std::memcpy(buf.data(), src, std::min<uint32_t>(real_size, kImgfsPageSize));
+        PatchVolume(uint64_t(logical_page) * kImgfsPageSize, buf.data(), kImgfsPageSize);
     }
 
     /* Logical data pages the victim's own module-header + section index blocks
@@ -101,14 +92,13 @@ private:
         auto collect = [&](uint32_t indexptr, uint32_t indexsize) {
             if (!indexptr || !indexsize) return;
             const std::vector<uint8_t> idx = tr.Read(vol, indexptr, indexsize);
-            for (size_t o = 0; o + 8 <= idx.size(); o += 8) {
-                const uint16_t comp = Rd16(idx.data() + o);
-                const uint16_t full = Rd16(idx.data() + o + 2);
-                const uint32_t ptr  = Rd32(idx.data() + o + 4);
-                if (comp == 0 && full == 0 && ptr == 0) break;
-                if (ptr == 0) continue;
-                const uint32_t first = ptr / kPage;
-                const uint32_t last  = (ptr + comp + kPage - 1) / kPage;
+            using cerf::ce_imgfs_walker::kIndexRecSize;
+            for (size_t o = 0; o + kIndexRecSize <= idx.size(); o += kIndexRecSize) {
+                const auto rec = cerf::ce_imgfs_walker::ReadIndexRecord(idx.data() + o);
+                if (rec.IsTerminator()) break;
+                if (rec.ptr == 0) continue;
+                const uint32_t first = rec.ptr / kImgfsPageSize;
+                const uint32_t last  = cerf::ce_imgfs_walker::PagesFor(size_t(rec.ptr) + rec.comp_size);
                 for (uint32_t p = first; p < last; ++p) pages.insert(p);
             }
         };
@@ -145,7 +135,7 @@ private:
         const uint32_t hdr_page = take(1)[0];
         WritePageBytes(hdr_page, new_hdr.data(), uint32_t(new_hdr.size()));
         const auto mod_idx = cerf::ce_imgfs_patcher::BuildIndexBlock(
-            uint32_t(new_hdr.size()), hdr_page * kPage);
+            uint32_t(new_hdr.size()), hdr_page * kImgfsPageSize);
         PatchVolume(victim.mod_indexptr, mod_idx.data(), uint32_t(mod_idx.size()));
         const uint32_t hdr_size = uint32_t(new_hdr.size());
         PatchVolume(victim.dirent_off + kDirentFileSizeOff,
@@ -154,16 +144,12 @@ private:
         /* Each stub slot -> freed pages; repoint that section's index block. */
         for (size_t i = 0; i < slots.size(); ++i) {
             const auto& s = slots[i];
-            const uint32_t pages_needed = (uint32_t(s.bytes.size()) + kPage - 1) / kPage;
-            const std::vector<uint32_t> pg = take(pages_needed);
-            std::vector<cerf::ce_imgfs_patcher::IndexRec> recs;
-            recs.reserve(pages_needed);
-            for (uint32_t p = 0; p < pages_needed; ++p) {
-                const uint32_t off = p * kPage;
-                WritePageBytes(pg[p], s.bytes.data() + off,
-                               std::min<uint32_t>(kPage, uint32_t(s.bytes.size()) - off));
-                recs.push_back({kPage, pg[p] * kPage});
-            }
+            const std::vector<uint32_t> pg = take(cerf::ce_imgfs_walker::PagesFor(s.bytes.size()));
+            const auto recs = cerf::ce_imgfs_patcher::WritePagedData(
+                s.bytes, [&](uint32_t p, const uint8_t* data, uint32_t len) {
+                    WritePageBytes(pg[p], data, len);
+                    return pg[p] * kImgfsPageSize;
+                });
             const auto sec_idx = cerf::ce_imgfs_patcher::BuildIndexBlock(recs);
             PatchVolume(victim.sections[i].sec_indexptr, sec_idx.data(),
                         uint32_t(sec_idx.size()));

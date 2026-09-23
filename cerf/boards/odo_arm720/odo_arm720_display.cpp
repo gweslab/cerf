@@ -212,8 +212,7 @@ public:
         return latch_.ProbeAndLatch(emu_.Get<EmulatedMemory>(),
                                     emu_.Get<OdoArm720DisplayDma>()
                                        .GetEffectivePa(),
-                                    (size_t)(xs * ys) / 4u,
-                                    251u);
+                                    (size_t)(xs * ys) / 4u);
     }
 
     void RenderInto(uint32_t* dib_bgra32,

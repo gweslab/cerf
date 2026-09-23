@@ -17,6 +17,9 @@
 #include "slirp_backend.h"
 #include "slirp_backend_internal.h"
 #include "slirp_poll_shim.h"
+#include "ipv4_packet.h"
+#include "mac_address.h"
+#include "../core/byte_order.h"
 #include "../core/cerf_emulator.h"
 #include "../core/device_config.h"
 #include "../core/log.h"
@@ -42,21 +45,7 @@ struct SlirpTimer {
 
 namespace {
 
-std::array<uint8_t, 6> ParseMac(const std::string& s) {
-    std::array<uint8_t, 6> out{};
-    unsigned bytes[6] = {};
-    int n = std::sscanf(s.c_str(),
-                        "%02X:%02X:%02X:%02X:%02X:%02X",
-                        &bytes[0], &bytes[1], &bytes[2],
-                        &bytes[3], &bytes[4], &bytes[5]);
-    if (n != 6) {
-        LOG(Caution, "FATAL: malformed network_mac='%s' (need XX:XX:XX:XX:XX:XX)\n",
-                s.c_str());
-        CerfFatalExit(CERF_FATAL_RUNTIME_ERROR);
-    }
-    for (int i = 0; i < 6; i++) out[i] = (uint8_t)bytes[i];
-    return out;
-}
+constexpr uint8_t kNoMac[cerf::inet::kEthMacSize] = {};
 
 /* libslirp fixed network - 10.0.2.0/24, host 10.0.2.2, dhcp 10.0.2.15,
    dns 10.0.2.3. These are libslirp's documented defaults; matching them
@@ -73,10 +62,7 @@ in_addr MakeAddr(uint8_t a, uint8_t b, uint8_t c, uint8_t d) {
 in6_addr MakeAddr6(uint16_t a, uint16_t b, uint16_t c, uint16_t d,
                    uint16_t e, uint16_t f, uint16_t g, uint16_t h) {
     in6_addr r{};
-    auto put = [&](size_t i, uint16_t v) {
-        r.u.Byte[2 * i]     = (uint8_t)(v >> 8);
-        r.u.Byte[2 * i + 1] = (uint8_t)(v & 0xFF);
-    };
+    auto put = [&](size_t i, uint16_t v) { cerf::be::Put16(r.u.Byte + 2 * i, v); };
     put(0, a); put(1, b); put(2, c); put(3, d);
     put(4, e); put(5, f); put(6, g); put(7, h);
     return r;
@@ -131,7 +117,7 @@ bool SlirpBackend::ShouldRegister() {
 
 void SlirpBackend::OnReady() {
     auto& cfg = emu_.Get<DeviceConfig>();
-    guest_mac_ = ParseMac(cfg.network_mac);
+    guest_mac_ = ConfiguredGuestMac();
     mtu_ = cfg.network_mtu;
 
     /* WSAStartup once per process - safe to call repeatedly; ref-counted. */
@@ -206,11 +192,10 @@ void SlirpBackend::OnReady() {
         CerfFatalExit(CERF_FATAL_RUNTIME_ERROR);
     }
 
-    LOG(Net, "SlirpBackend ready: guest=%02X:%02X:%02X:%02X:%02X:%02X "
+    LOG(Net, "SlirpBackend ready: guest=%s "
              "v4=10.0.2.0/24 host=10.0.2.2 dhcp=10.0.2.15 dns=10.0.2.3 "
              "v6=%s mtu=%u\n",
-        guest_mac_[0], guest_mac_[1], guest_mac_[2],
-        guest_mac_[3], guest_mac_[4], guest_mac_[5],
+        cerf::inet::FormatMac(guest_mac_.data()).s,
         host_has_v6 ? "fec0::/64 host6=fec0::2 dns6=fec0::3"
                     : "LAN-router off (host has no v6 internet - guest stays link-local)",
         mtu_);
@@ -290,11 +275,10 @@ void SlirpBackend::SendFrame(const uint8_t* frame, std::size_t len) {
         uint64_t n = tx_count.fetch_add(1, std::memory_order_relaxed) + 1;
         char tag[128] = {};
         ClassifyFrame(frame, len, tag, sizeof(tag));
-        LOG(Net, "TX #%llu len=%zu src=%02X:%02X:%02X:%02X:%02X:%02X %s\n",
-            (unsigned long long)n, len,
-            len >= 12 ? frame[6]  : 0, len >= 12 ? frame[7]  : 0,
-            len >= 12 ? frame[8]  : 0, len >= 12 ? frame[9]  : 0,
-            len >= 12 ? frame[10] : 0, len >= 12 ? frame[11] : 0, tag);
+        using namespace cerf::inet;
+        const uint8_t* src = len >= kEthOffSrc + kEthMacSize ? frame + kEthOffSrc : kNoMac;
+        LOG(Net, "TX #%llu len=%zu src=%s %s\n",
+            (unsigned long long)n, len, FormatMac(src).s, tag);
     }
     if (TryInterceptIcmpEcho(frame, len)) return;
     /* AAAA strip - when the host has no IPv6 internet, reply to AAAA
@@ -306,12 +290,8 @@ void SlirpBackend::SendFrame(const uint8_t* frame, std::size_t len) {
     slirp_input(slirp_, frame, (int)len);
 }
 
-std::array<uint8_t, 6> SlirpBackend::GuestMacAddress() const {
+cerf::inet::MacAddress SlirpBackend::GuestMacAddress() const {
     return guest_mac_;
-}
-
-std::array<uint8_t, 6> SlirpBackend::HostGatewayMacAddress() const {
-    return {0x52, 0x55, 0x0A, 0x00, 0x02, 0x02};
 }
 
 void SlirpBackend::OnSlirpSendPacket(const void* buf, std::size_t len) {
@@ -319,11 +299,10 @@ void SlirpBackend::OnSlirpSendPacket(const void* buf, std::size_t len) {
     uint64_t n = rx_count.fetch_add(1, std::memory_order_relaxed) + 1;
     char tag[128] = {};
     ClassifyFrame(static_cast<const uint8_t*>(buf), len, tag, sizeof(tag));
-    const uint8_t* rx = static_cast<const uint8_t*>(buf);
-    LOG(Net, "RX #%llu len=%zu dst=%02X:%02X:%02X:%02X:%02X:%02X %s\n",
-        (unsigned long long)n, len,
-        len >= 6 ? rx[0] : 0, len >= 6 ? rx[1] : 0, len >= 6 ? rx[2] : 0,
-        len >= 6 ? rx[3] : 0, len >= 6 ? rx[4] : 0, len >= 6 ? rx[5] : 0, tag);
+    using namespace cerf::inet;
+    const uint8_t* rx  = static_cast<const uint8_t*>(buf);
+    const uint8_t* dst = len >= kEthOffDst + kEthMacSize ? rx + kEthOffDst : kNoMac;
+    LOG(Net, "RX #%llu len=%zu dst=%s %s\n", (unsigned long long)n, len, FormatMac(dst).s, tag);
     DispatchFrame(static_cast<const uint8_t*>(buf), len);
 }
 

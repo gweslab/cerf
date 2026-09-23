@@ -2,12 +2,14 @@
 
 #include "../board_context.h"
 #include "zune_30_id.h"
+#include "../../core/byte_order.h"
 #include "../../core/cerf_emulator.h"
 #include "../../core/device_config.h"
 #include "../../core/log.h"
 #include "../../core/cerf_paths.h"
 #include "../../core/string_utils.h"
 #include "../../storage/disk_image.h"
+#include "../../storage/fat_volume_layout.h"
 
 #include <cstdint>
 #include <cstring>
@@ -43,11 +45,7 @@ constexpr uint8_t kMbrP1[16] = {0x01,0x01,0x02,0x00, 0x0B,0x0D,0x4D,0x30,
 constexpr uint8_t kMbrP2[16] = {0x00,0x0D,0x4E,0x30, 0x0B,0x0F,0xFF,0x1B,
                                 0x40,0xB0,0x04,0x00, 0x00,0x8E,0x79,0x03};
 
-inline void Put16(uint8_t* p, uint16_t v) { p[0] = uint8_t(v); p[1] = uint8_t(v >> 8); }
-inline void Put32(uint8_t* p, uint32_t v) {
-    p[0] = uint8_t(v); p[1] = uint8_t(v >> 8);
-    p[2] = uint8_t(v >> 16); p[3] = uint8_t(v >> 24);
-}
+using cerf::le::Put32;
 
 class ZuneBoardAtaService : public BoardAtaService {
 public:
@@ -88,41 +86,40 @@ public:
 private:
     static void WriteMbr(DiskImage& img) {
         uint8_t sec[kSectorSize] = {};
-        std::memcpy(sec + 0x1BE, kMbrP1, 16);
-        std::memcpy(sec + 0x1CE, kMbrP2, 16);
-        sec[0x1FE] = 0x55; sec[0x1FF] = 0xAA;
+        std::memcpy(fat_volume_layout::MbrPartitionEntry(sec, 0), kMbrP1, 16);
+        std::memcpy(fat_volume_layout::MbrPartitionEntry(sec, 1), kMbrP2, 16);
+        fat_volume_layout::WriteBootSignature(sec);
         img.WriteSectors(0, 1, sec);
     }
 
     static void FormatFat32(DiskImage& img, const ZunePart& p) {
         uint8_t vbr[kSectorSize] = {};
-        vbr[0] = 0xEB; vbr[1] = 0xFE; vbr[2] = 0x90;   /* halt; never runs on ARM */
-        std::memcpy(vbr + 3, "MSWIN4.1", 8);
-        Put16(vbr + 11, 512);
-        vbr[13] = p.sec_per_clus;
-        Put16(vbr + 14, kReservedSectors);
-        vbr[16] = 2;                                   /* num FATs */
-        vbr[21] = 0xF8;                                /* media */
-        Put16(vbr + 24, p.sec_per_track);
-        Put16(vbr + 26, p.num_heads);
-        Put32(vbr + 32, p.total_sectors);
-        Put32(vbr + 36, p.fat_size_sectors);
-        Put32(vbr + 44, 2);                            /* root cluster */
-        Put16(vbr + 48, 1);                            /* FSInfo sector */
-        vbr[64] = 0x80;                                /* drive number */
-        vbr[66] = 0x29;                                /* extended boot signature */
-        Put32(vbr + 67, p.vol_id);
-        std::memset(vbr + 71, ' ', 11);                /* volume label (blank) */
-        std::memcpy(vbr + 82, "FAT32   ", 8);
-        vbr[510] = 0x55; vbr[511] = 0xAA;
+        fat_volume_layout::Bpb bpb;
+        bpb.jump[0] = 0xEB; bpb.jump[1] = 0xFE; bpb.jump[2] = 0x90;
+        bpb.oem_name = "MSWIN4.1";
+        bpb.sectors_per_cluster = p.sec_per_clus;
+        bpb.reserved_sectors = kReservedSectors;
+        bpb.num_fats = 2;
+        bpb.media = 0xF8;
+        bpb.sectors_per_track = p.sec_per_track;
+        bpb.num_heads = p.num_heads;
+        bpb.total_sectors32 = p.total_sectors;
+        fat_volume_layout::WriteBpb(vbr, bpb);
+        fat_volume_layout::Fat32Extension ext;
+        ext.fat_size32 = p.fat_size_sectors;
+        ext.root_cluster = 2;
+        ext.fsinfo_sector = 1;
+        ext.drive_number = 0x80;
+        ext.boot_signature = 0x29;
+        ext.volume_id = p.vol_id;
+        ext.volume_label = "           ";
+        ext.fs_type = "FAT32   ";
+        fat_volume_layout::WriteFat32Extension(vbr, ext);
+        fat_volume_layout::WriteBootSignature(vbr);
         img.WriteSectors(p.start_lba, 1, vbr);
 
         uint8_t fsi[kSectorSize] = {};
-        Put32(fsi + 0,   0x41615252u);                 /* lead sig */
-        Put32(fsi + 484, 0x61417272u);                 /* struc sig */
-        Put32(fsi + 488, 0xFFFFFFFFu);                 /* free count: unknown */
-        Put32(fsi + 492, 0xFFFFFFFFu);                 /* next free: unknown */
-        Put32(fsi + 508, 0xAA550000u);                 /* trail sig */
+        fat_volume_layout::WriteFsInfo(fsi, 0xFFFFFFFFu, 0xFFFFFFFFu);
         img.WriteSectors(p.start_lba + 1u, 1, fsi);
 
         /* Both FAT copies, first sector: entry0=media+EOC, entry1=EOC, entry2=

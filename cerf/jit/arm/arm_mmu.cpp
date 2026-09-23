@@ -4,6 +4,7 @@
 
 #include "../../boards/board_context.h"
 #include "../../boards/page_table_builder.h"
+#include "../../core/byte_order.h"
 #include "../../core/cerf_emulator.h"
 #include "../../cpu/arm_processor_config.h"
 #include "../../cpu/emulated_memory.h"
@@ -284,7 +285,7 @@ uint32_t __cdecl ArmMmu::UnalignedHalfwordLoadHelper(ArmMmu* mmu, uint32_t va,
         !mmu->AccessPaged(cs, va + 1u, &b[1], 1, /*is_load=*/true, fu)) {
         return 0xFFFFFFFFu;
     }
-    return static_cast<uint32_t>(b[0]) | (static_cast<uint32_t>(b[1]) << 8);
+    return cerf::le::U16(b);
 }
 
 uint32_t __cdecl ArmMmu::UnalignedHalfwordStoreHelper(ArmMmu* mmu, uint32_t va,
@@ -292,8 +293,8 @@ uint32_t __cdecl ArmMmu::UnalignedHalfwordStoreHelper(ArmMmu* mmu, uint32_t va,
                                                       uint32_t force_user) {
     ArmCpuState* cs = mmu->emu_.Get<ArmCpu>().State();
     const bool   fu = force_user != 0u;
-    uint8_t b[2] = { static_cast<uint8_t>(value),
-                     static_cast<uint8_t>(value >> 8) };
+    uint8_t b[2];
+    cerf::le::Put16(b, static_cast<uint16_t>(value));
     if (!mmu->AccessPaged(cs, va,      &b[0], 1, /*is_load=*/false, fu) ||
         !mmu->AccessPaged(cs, va + 1u, &b[1], 1, /*is_load=*/false, fu)) {
         return 0xFFFFFFFFu;
@@ -311,11 +312,7 @@ uint64_t __cdecl ArmMmu::UnalignedWordLoadHelper(ArmMmu* mmu, uint32_t va,
             return 0u;
         }
     }
-    const uint32_t value = static_cast<uint32_t>(b[0]) |
-                           (static_cast<uint32_t>(b[1]) << 8) |
-                           (static_cast<uint32_t>(b[2]) << 16) |
-                           (static_cast<uint32_t>(b[3]) << 24);
-    return (1ull << 32) | value;
+    return (1ull << 32) | cerf::le::U32(b);
 }
 
 uint32_t __cdecl ArmMmu::UnalignedWordStoreHelper(ArmMmu* mmu, uint32_t va,
@@ -323,10 +320,8 @@ uint32_t __cdecl ArmMmu::UnalignedWordStoreHelper(ArmMmu* mmu, uint32_t va,
                                                   uint32_t force_user) {
     ArmCpuState* cs = mmu->emu_.Get<ArmCpu>().State();
     const bool   fu = force_user != 0u;
-    uint8_t b[4] = { static_cast<uint8_t>(value),
-                     static_cast<uint8_t>(value >> 8),
-                     static_cast<uint8_t>(value >> 16),
-                     static_cast<uint8_t>(value >> 24) };
+    uint8_t b[4];
+    cerf::le::Put32(b, value);
     for (uint32_t i = 0; i < 4u; ++i) {
         if (!mmu->AccessPaged(cs, va + i, &b[i], 1, /*is_load=*/false, fu)) {
             return 0xFFFFFFFFu;

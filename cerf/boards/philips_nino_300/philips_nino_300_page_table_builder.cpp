@@ -49,14 +49,7 @@ public:
         }
 
         const ParsedRom&    prim = rom.Primary();
-        const ParsedROMHDR* hdr  = nullptr;
-        for (const auto& xip : prim.xips) {
-            const ParsedROMHDR& h = xip.toc.romhdr;
-            if (prim.entry_va >= h.physfirst && prim.entry_va < h.physlast) {
-                hdr = &h;
-                break;
-            }
-        }
+        const ParsedROMHDR* hdr  = prim.XipHeaderContaining(prim.entry_va);
         if (!hdr) {
             hdr = &prim.xips.front().toc.romhdr;
         }

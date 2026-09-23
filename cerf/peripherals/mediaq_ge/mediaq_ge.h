@@ -1,5 +1,7 @@
 #pragma once
 
+#include "../../lcd/lcd_pixel_expand.h"
+
 #include <cstdint>
 #include <vector>
 
@@ -121,9 +123,15 @@ protected:
 
     uint32_t PatternOperand(const uint32_t* r, uint32_t lx, uint32_t ly) const;
 
-    /* One ROP'd line pixel into the framebuffer (shared by per-part DrawLine). */
-    static void RopPixel(uint8_t* fb, uint32_t fbsize, uint64_t addr,
-                         uint32_t bpp, uint32_t pmask, uint8_t rop, uint32_t color);
+    static void RopPixel(uint8_t* fb, uint32_t fbsize, uint64_t addr, uint32_t bpp,
+                         uint32_t pmask, uint8_t rop, uint32_t pattern, uint32_t source);
+
+    static uint32_t MonoBit(const uint8_t* bytes, uint64_t bit_idx) {
+        return (bytes[bit_idx >> 3] >> lcd_pixel::MsbFirstShift(static_cast<uint32_t>(bit_idx), 1u)) & 1u;
+    }
+    const uint8_t* SrcFifoBytes() const {
+        return reinterpret_cast<const uint8_t*>(src_fifo_.data());
+    }
 
     virtual void DrawLine(uint32_t cmd);
 

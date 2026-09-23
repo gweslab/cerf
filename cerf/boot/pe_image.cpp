@@ -1,5 +1,6 @@
 #include "pe_image.h"
 
+#include "../core/byte_order.h"
 #include "../core/log.h"
 
 #include <cstring>
@@ -34,15 +35,8 @@ constexpr size_t kSecOffSizeOfRawData       = 16;
 constexpr size_t kSecOffPointerToRawData    = 20;
 constexpr size_t kSecOffCharacteristics     = 36;
 
-uint16_t RdU16(const uint8_t* p, size_t off) {
-    return uint16_t(p[off]) | (uint16_t(p[off + 1]) << 8);
-}
-uint32_t RdU32(const uint8_t* p, size_t off) {
-    return uint32_t(p[off])
-         | (uint32_t(p[off + 1]) << 8)
-         | (uint32_t(p[off + 2]) << 16)
-         | (uint32_t(p[off + 3]) << 24);
-}
+using cerf::le::U16;
+using cerf::le::U32;
 
 }  /* namespace */
 
@@ -53,50 +47,46 @@ PeImage::PeImage(std::vector<uint8_t> pe_bytes)
         LOG(Caution, "[PeImage] DOS header too small (%zu bytes)\n", pe_bytes_.size());
         return;
     }
-    if (RdU16(pe_bytes_.data(), 0) != kDosMagic) {
+    if (U16(pe_bytes_.data(), 0) != kDosMagic) {
         LOG(Caution, "[PeImage] bad DOS magic\n");
         return;
     }
-    const uint32_t e_lfanew = RdU32(pe_bytes_.data(), 0x3C);
+    const uint32_t e_lfanew = U32(pe_bytes_.data(), 0x3C);
     if (e_lfanew + 24 + 224 > pe_bytes_.size()) {
         LOG(Caution, "[PeImage] PE header offset out of bounds: 0x%X\n", e_lfanew);
         return;
     }
-    if (RdU32(pe_bytes_.data(), e_lfanew) != kPeSignature) {
+    if (U32(pe_bytes_.data(), e_lfanew) != kPeSignature) {
         LOG(Caution, "[PeImage] bad PE signature\n");
         return;
     }
 
     const size_t file_hdr_off    = e_lfanew + 4;
-    machine_                     = RdU16(pe_bytes_.data(), file_hdr_off + 0);
-    const uint16_t num_sections  = RdU16(pe_bytes_.data(), file_hdr_off + kFileOffNumberOfSections);
-    const uint16_t opt_hdr_size  = RdU16(pe_bytes_.data(), file_hdr_off + kFileOffSizeOfOptionalHdr);
-    image_flags_                 = RdU16(pe_bytes_.data(), file_hdr_off + kFileOffCharacteristics);
+    machine_                     = U16(pe_bytes_.data(), file_hdr_off + 0);
+    const uint16_t num_sections  = U16(pe_bytes_.data(), file_hdr_off + kFileOffNumberOfSections);
+    const uint16_t opt_hdr_size  = U16(pe_bytes_.data(), file_hdr_off + kFileOffSizeOfOptionalHdr);
+    image_flags_                 = U16(pe_bytes_.data(), file_hdr_off + kFileOffCharacteristics);
 
     const size_t opt_hdr_off = file_hdr_off + 20;
-    const uint16_t magic = RdU16(pe_bytes_.data(), opt_hdr_off + kOptOffMagic);
+    const uint16_t magic = U16(pe_bytes_.data(), opt_hdr_off + kOptOffMagic);
     if (magic != kOptHdrMagicPe32) {
         LOG(Caution, "[PeImage] not PE32 (optional-header magic=0x%X)\n", magic);
         return;
     }
 
-    entry_rva_      = RdU32(pe_bytes_.data(), opt_hdr_off + kOptOffEntryPoint);
-    image_base_     = RdU32(pe_bytes_.data(), opt_hdr_off + kOptOffImageBase);
-    image_size_     = RdU32(pe_bytes_.data(), opt_hdr_off + kOptOffSizeOfImage);
-    subsystem_      = RdU16(pe_bytes_.data(), opt_hdr_off + kOptOffSubsystem);
-    stack_reserve_  = RdU32(pe_bytes_.data(), opt_hdr_off + kOptOffStackReserve);
+    entry_rva_      = U32(pe_bytes_.data(), opt_hdr_off + kOptOffEntryPoint);
+    image_base_     = U32(pe_bytes_.data(), opt_hdr_off + kOptOffImageBase);
+    image_size_     = U32(pe_bytes_.data(), opt_hdr_off + kOptOffSizeOfImage);
+    subsystem_      = U16(pe_bytes_.data(), opt_hdr_off + kOptOffSubsystem);
+    stack_reserve_  = U32(pe_bytes_.data(), opt_hdr_off + kOptOffStackReserve);
 
-    /* PE images can declare fewer than 16 data directories
-       (NumberOfRvaAndSizes < 16); entries past that count must be
-       treated as zero rather than read from random bytes following
-       the section table. */
-    const uint32_t num_dirs_in_pe = RdU32(pe_bytes_.data(), opt_hdr_off + kOptOffNumberOfRvaAndSizes);
+    const uint32_t num_dirs_in_pe = U32(pe_bytes_.data(), opt_hdr_off + kOptOffNumberOfRvaAndSizes);
     const uint32_t copy_dirs =
         num_dirs_in_pe < uint32_t(kNumberOfDirs) ? num_dirs_in_pe : uint32_t(kNumberOfDirs);
     const size_t dirs_off = opt_hdr_off + kOptOffDataDirectory;
     for (uint32_t i = 0; i < copy_dirs; ++i) {
-        dirs_[i].rva  = RdU32(pe_bytes_.data(), dirs_off + i * 8);
-        dirs_[i].size = RdU32(pe_bytes_.data(), dirs_off + i * 8 + 4);
+        dirs_[i].rva  = U32(pe_bytes_.data(), dirs_off + i * 8);
+        dirs_[i].size = U32(pe_bytes_.data(), dirs_off + i * 8 + 4);
     }
 
     const size_t sec_off = opt_hdr_off + opt_hdr_size;
@@ -110,11 +100,11 @@ PeImage::PeImage(std::vector<uint8_t> pe_bytes)
     for (uint16_t i = 0; i < num_sections; ++i) {
         const size_t s = sec_off + size_t(i) * kSecHdrSize;
         Section sec;
-        sec.vsize       = RdU32(pe_bytes_.data(), s + kSecOffVirtualSize);
-        sec.rva         = RdU32(pe_bytes_.data(), s + kSecOffVirtualAddress);
-        sec.psize       = RdU32(pe_bytes_.data(), s + kSecOffSizeOfRawData);
-        sec.pe_file_off = RdU32(pe_bytes_.data(), s + kSecOffPointerToRawData);
-        sec.flags       = RdU32(pe_bytes_.data(), s + kSecOffCharacteristics);
+        sec.vsize       = U32(pe_bytes_.data(), s + kSecOffVirtualSize);
+        sec.rva         = U32(pe_bytes_.data(), s + kSecOffVirtualAddress);
+        sec.psize       = U32(pe_bytes_.data(), s + kSecOffSizeOfRawData);
+        sec.pe_file_off = U32(pe_bytes_.data(), s + kSecOffPointerToRawData);
+        sec.flags       = U32(pe_bytes_.data(), s + kSecOffCharacteristics);
         sections_.push_back(sec);
     }
 
@@ -122,4 +112,20 @@ PeImage::PeImage(std::vector<uint8_t> pe_bytes)
     LOG(Boot, "[PeImage] parsed: entry_rva=0x%X image_base=0x%X "
               "image_size=0x%X subsys=%u sections=%u\n",
         entry_rva_, image_base_, image_size_, (unsigned)subsystem_, (unsigned)num_sections);
+}
+
+int PeImage::SectionIndexForRva(uint32_t rva) const {
+    for (size_t i = 0; i < sections_.size(); ++i) {
+        const Section& s = sections_[i];
+        const uint32_t span = (s.vsize > s.psize) ? s.vsize : s.psize;
+        if (rva >= s.rva && rva < s.rva + span) return int(i);
+    }
+    return -1;
+}
+
+uint32_t PeImage::RvaToFileOff(uint32_t rva) const {
+    const int i = SectionIndexForRva(rva);
+    if (i < 0) return kNoFileOff;
+    const Section& s = sections_[size_t(i)];
+    return s.pe_file_off + (rva - s.rva);
 }

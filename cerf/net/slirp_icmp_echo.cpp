@@ -15,28 +15,22 @@
 #include <thread>
 #include <vector>
 
+#include "../core/byte_order.h"
 #include "../core/cerf_emulator.h"
 #include "../core/log.h"
 #include "../state/emulation_freeze.h"
+#include "ipv4_packet.h"
 
 namespace {
 
-/* Internet checksum (RFC 1071) over the ICMP header+payload we built
-   ourselves. The IP header's own checksum is computed inline by the
-   caller because it's a fixed 20 bytes with no payload dependency. */
-uint16_t InetChecksum(const uint8_t* data, size_t len) {
-    uint32_t sum = 0;
-    for (size_t i = 0; i + 1 < len; i += 2)
-        sum += (uint32_t)((data[i] << 8) | data[i + 1]);
-    if (len & 1) sum += (uint32_t)(data[len - 1] << 8);
-    while (sum >> 16) sum = (sum & 0xFFFF) + (sum >> 16);
-    return (uint16_t)~sum;
-}
+using cerf::be::Put16;
+using cerf::be::U16;
+using namespace cerf::inet;
 
 /* Identify an outbound IPv4 ICMP echo request. Returns false if the
    frame is anything else (caller falls through to slirp_input). */
 struct IcmpEchoRequest {
-    std::array<uint8_t, 6> guest_mac;
+    MacAddress guest_mac;
     uint32_t guest_ip_n;   /* network-byte-order */
     uint32_t dest_ip_n;    /* network-byte-order */
     uint16_t id;           /* host order */
@@ -46,21 +40,20 @@ struct IcmpEchoRequest {
 
 bool ParseIcmpEchoRequest(const uint8_t* frame, size_t len,
                           IcmpEchoRequest& out) {
-    /* Min: 14 (Eth) + 20 (IP) + 8 (ICMP) = 42. */
-    if (len < 42) return false;
-    if (!(frame[12] == 0x08 && frame[13] == 0x00)) return false;  /* IPv4 */
-    const uint8_t* ip = frame + 14;
-    uint8_t ihl = (ip[0] & 0x0F) * 4;
-    if (ihl < 20 || (size_t)14 + ihl + 8 > len) return false;
-    if (ip[9] != 1 /* IPPROTO_ICMP */) return false;
-    const uint8_t* icmp = frame + 14 + ihl;
-    if (icmp[0] != 8 /* ICMP_ECHO_REQUEST */ || icmp[1] != 0) return false;
-    std::memcpy(out.guest_mac.data(), frame + 6, 6);
-    std::memcpy(&out.guest_ip_n, ip + 12, 4);
-    std::memcpy(&out.dest_ip_n, ip + 16, 4);
-    out.id  = (uint16_t)((icmp[4] << 8) | icmp[5]);
-    out.seq = (uint16_t)((icmp[6] << 8) | icmp[7]);
-    out.payload.assign(icmp + 8, frame + len);
+    if (len < kEthHeaderSize + kIpv4HeaderSize + kIcmpHeaderSize) return false;
+    if (EthType(frame) != kEthTypeIpv4) return false;
+    const uint8_t* ip = frame + kEthHeaderSize;
+    const uint32_t ihl = Ipv4HeaderLen(ip);
+    if (ihl < kIpv4HeaderSize || kEthHeaderSize + ihl + kIcmpHeaderSize > len) return false;
+    if (ip[kIpOffProto] != kIpProtoIcmp) return false;
+    const uint8_t* icmp = frame + kEthHeaderSize + ihl;
+    if (icmp[kIcmpOffType] != kIcmpTypeEchoRequest || icmp[kIcmpOffCode] != 0) return false;
+    std::memcpy(out.guest_mac.data(), frame + kEthOffSrc, kEthMacSize);
+    std::memcpy(&out.guest_ip_n, ip + kIpOffSrc, kIpv4AddrSize);
+    std::memcpy(&out.dest_ip_n, ip + kIpOffDst, kIpv4AddrSize);
+    out.id  = U16(icmp, kIcmpOffId);
+    out.seq = U16(icmp, kIcmpOffSeq);
+    out.payload.assign(icmp + kIcmpHeaderSize, frame + len);
     return true;
 }
 
@@ -71,48 +64,27 @@ std::vector<uint8_t> BuildIcmpEchoReplyFrame(const IcmpEchoRequest& req,
                                              uint16_t mtu_cap) {
     std::vector<uint8_t> out;
     size_t icmp_data_len = er.DataSize;
-    size_t max_data = (size_t)mtu_cap - 14 - 20 - 8;
+    size_t max_data = (size_t)mtu_cap - kEthHeaderSize - kIpv4HeaderSize - kIcmpHeaderSize;
     if (icmp_data_len > max_data) return out;  /* empty = caller drops */
-    out.assign(14 + 20 + 8 + icmp_data_len, 0);
+    out.assign(kEthHeaderSize + kIpv4HeaderSize + kIcmpHeaderSize + icmp_data_len, 0);
 
-    /* Ethernet: dst = guest, src = libslirp gateway MAC. */
-    std::memcpy(out.data() + 0, req.guest_mac.data(), 6);
-    const uint8_t gw_mac[6] = {0x52, 0x55, 0x0A, 0x00, 0x02, 0x02};
-    std::memcpy(out.data() + 6, gw_mac, 6);
-    out[12] = 0x08; out[13] = 0x00;
+    PutEthHeader(out.data(), req.guest_mac.data(), NetworkBackend::kHostGatewayMac.data(),
+                 kEthTypeIpv4);
 
-    /* IPv4 header, 20 bytes, no options. */
-    uint8_t* oip = out.data() + 14;
-    oip[0] = 0x45; oip[1] = 0;
-    uint16_t total_len = (uint16_t)(20 + 8 + icmp_data_len);
-    oip[2] = (uint8_t)(total_len >> 8); oip[3] = (uint8_t)total_len;
-    oip[4] = 0; oip[5] = 1;  /* ID */
-    oip[6] = 0; oip[7] = 0;  /* flags + frag offset */
-    oip[8] = 64;             /* TTL */
-    oip[9] = 1;              /* IPPROTO_ICMP */
-    oip[10] = 0; oip[11] = 0;                /* checksum placeholder */
-    std::memcpy(oip + 12, &req.dest_ip_n, 4);  /* src = original dst */
-    std::memcpy(oip + 16, &req.guest_ip_n, 4); /* dst = guest */
-    /* IPv4 header checksum: 16-bit ones-complement over the 20-byte header. */
-    {
-        uint32_t sum = 0;
-        for (int i = 0; i < 20; i += 2)
-            sum += (uint32_t)((oip[i] << 8) | oip[i + 1]);
-        while (sum >> 16) sum = (sum & 0xFFFF) + (sum >> 16);
-        uint16_t ck = (uint16_t)~sum;
-        oip[10] = (uint8_t)(ck >> 8); oip[11] = (uint8_t)ck;
-    }
+    uint8_t* oip = out.data() + kEthHeaderSize;
+    WriteIpv4Header(oip, static_cast<uint16_t>(kIpv4HeaderSize + kIcmpHeaderSize + icmp_data_len),
+                    kIpProtoIcmp,
+                    reinterpret_cast<const uint8_t*>(&req.dest_ip_n),
+                    reinterpret_cast<const uint8_t*>(&req.guest_ip_n));
 
-    /* ICMP echo reply: type 0, echo id/seq, original payload. */
-    uint8_t* oicmp = out.data() + 14 + 20;
-    oicmp[0] = 0; oicmp[1] = 0;
-    oicmp[2] = 0; oicmp[3] = 0;                        /* checksum placeholder */
-    oicmp[4] = (uint8_t)(req.id  >> 8); oicmp[5] = (uint8_t)req.id;
-    oicmp[6] = (uint8_t)(req.seq >> 8); oicmp[7] = (uint8_t)req.seq;
+    uint8_t* oicmp = out.data() + kEthHeaderSize + kIpv4HeaderSize;
+    oicmp[kIcmpOffType] = kIcmpTypeEchoReply; oicmp[kIcmpOffCode] = 0;
+    Put16(oicmp + kIcmpOffChecksum, 0);
+    Put16(oicmp + kIcmpOffId, req.id);
+    Put16(oicmp + kIcmpOffSeq, req.seq);
     if (icmp_data_len && er.Data)
-        std::memcpy(oicmp + 8, er.Data, icmp_data_len);
-    uint16_t icmp_ck = InetChecksum(oicmp, 8 + icmp_data_len);
-    oicmp[2] = (uint8_t)(icmp_ck >> 8); oicmp[3] = (uint8_t)icmp_ck;
+        std::memcpy(oicmp + kIcmpHeaderSize, er.Data, icmp_data_len);
+    Put16(oicmp + kIcmpOffChecksum, InetChecksum(oicmp, kIcmpHeaderSize + icmp_data_len));
     return out;
 }
 

@@ -32,8 +32,7 @@ public:
     bool TryInterceptIcmpEcho(const uint8_t* frame, std::size_t len);
 
     bool TryInterceptAaaaQuery(const uint8_t* frame, std::size_t len);
-    std::array<uint8_t, 6> GuestMacAddress() const override;
-    std::array<uint8_t, 6> HostGatewayMacAddress() const override;
+    cerf::inet::MacAddress GuestMacAddress() const override;
 
     /* Implementation hooks for the C callbacks libslirp invokes. Public so
        the static C-shim functions in the .cpp can call them; do not call
@@ -51,7 +50,7 @@ private:
     void JoinIcmpThreads();
     int64_t NowMs() const;
 
-    std::array<uint8_t, 6> guest_mac_{};
+    cerf::inet::MacAddress guest_mac_{};
     uint32_t mtu_ = 1500;
     bool host_has_v6_ = false;        /* set by IPv6 reachability probe in OnInit */
 

@@ -1,8 +1,9 @@
 #include "rom_parser_queries.h"
 
-#include "rom_image_parse.h"
+#include "rom_record_layout.h"
 
 #include "../boards/board_context.h"
+#include "../core/byte_order.h"
 #include "../core/cerf_emulator.h"
 #include "../core/log.h"
 
@@ -13,7 +14,7 @@ REGISTER_SERVICE(RomParserQueries);
 
 namespace {
 
-using cerf::rom_image_parse::U32;
+using cerf::le::U16;
 
 inline char AsciiLower(char c) {
     return char(std::tolower(static_cast<unsigned char>(c)));
@@ -69,29 +70,6 @@ RomParserQueries::ReadVa(uint32_t va, uint32_t len) const {
     return {};
 }
 
-std::span<const uint8_t>
-RomParserQueries::ModuleBytesByName(const char* name) const {
-    for (const auto& rom : Loaded()) {
-        if (rom.is_ce1) {
-            LOG(Caution, "RomParser: ModuleBytesByName('%s') on a CE 1.0 image "
-                         "is not implemented\n", name);
-            CerfFatalExit(CERF_FATAL_RUNTIME_ERROR);
-        }
-        for (const auto& xip : rom.xips) {
-            for (const auto& m : xip.toc.modules) {
-                if (!EqualIgnoreCase(m.lpszFileName, name)) continue;
-                if (m.ulE32Offset < xip.load_offset) return {};
-                const size_t e32_off =
-                    size_t(m.ulE32Offset - xip.load_offset);
-                if (e32_off + 0x18 > rom.flat.size()) return {};
-                const uint32_t vsize = U32(rom.flat.data(), e32_off + 0x14);
-                return ReadVa(m.ulLoadOffset, vsize);
-            }
-        }
-    }
-    return {};
-}
-
 bool RomParserQueries::KernelSubsystemVersion(uint16_t& major,
                                               uint16_t& minor) const {
     for (const auto& rom : Loaded()) {
@@ -101,10 +79,10 @@ bool RomParserQueries::KernelSubsystemVersion(uint16_t& major,
                 if (!EqualIgnoreCase(m.lpszFileName, "nk.exe")) continue;
                 if (m.ulE32Offset < xip.load_offset) return false;
                 const size_t e32_off = size_t(m.ulE32Offset - xip.load_offset);
-                if (e32_off + 0x10 > rom.flat.size()) return false;
+                if (e32_off + kE32OffSubsysMinor + 2 > rom.flat.size()) return false;
                 const uint8_t* p = rom.flat.data() + e32_off;
-                major = uint16_t(p[0x0C] | (p[0x0D] << 8));
-                minor = uint16_t(p[0x0E] | (p[0x0F] << 8));
+                major = U16(p, kE32OffSubsysMajor);
+                minor = U16(p, kE32OffSubsysMinor);
                 return true;
             }
         }

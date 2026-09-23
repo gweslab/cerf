@@ -5,6 +5,7 @@
 #include "cerf_virt_framebuffer.h"
 #include "cerf_virt_dma_arena.h"
 #include "../../core/log.h"
+#include "../../lcd/lcd_pixel_expand.h"
 
 #include <cstdint>
 
@@ -123,9 +124,7 @@ inline uint32_t BltSurfaceAccess::ReadStraddlePixel(const Surface& s, int32_t x,
     const uint32_t off = (uint32_t)y * (uint32_t)s.desc->stride + (uint32_t)x * bpp;
     uint8_t* p = s.host_base + off;
     if (p < s.host_lo || p + bpp > s.host_hi) FatalStraddle(s, x, y, off);
-    uint32_t v = 0;
-    for (uint32_t i = 0; i < bpp; ++i) v |= (uint32_t)(p[i]) << (8u * i);
-    return v;
+    return BltPixelOps::ReadPixel(p, bpp);
 }
 
 inline void BltSurfaceAccess::WriteStraddlePixel(const Surface& s, int32_t x,
@@ -134,7 +133,7 @@ inline void BltSurfaceAccess::WriteStraddlePixel(const Surface& s, int32_t x,
     const uint32_t off = (uint32_t)y * (uint32_t)s.desc->stride + (uint32_t)x * bpp;
     uint8_t* p = s.host_base + off;
     if (p < s.host_lo || p + bpp > s.host_hi) FatalStraddle(s, x, y, off);
-    for (uint32_t i = 0; i < bpp; ++i) p[i] = (uint8_t)(value >> (8u * i));
+    BltPixelOps::WritePixel(p, bpp, value);
 }
 
 inline bool BltSurfaceAccess::ReadSubBytePixel(const Surface& s, int32_t x,
@@ -144,8 +143,7 @@ inline bool BltSurfaceAccess::ReadSubBytePixel(const Surface& s, int32_t x,
     uint32_t run = 0;
     uint8_t* p = PixelPtr(s, (int32_t)(bit_x >> 3), y, 1u, &run);
     if (!p) return false;
-    const uint32_t shift = 8u - bits - (bit_x & 7u);
-    *out = (uint32_t)((*p >> shift) & ((1u << bits) - 1u));
+    *out = (uint32_t)((*p >> lcd_pixel::MsbFirstShift(bit_x, bits)) & ((1u << bits) - 1u));
     return true;
 }
 
@@ -156,7 +154,7 @@ inline bool BltSurfaceAccess::WriteSubBytePixel(const Surface& s, int32_t x,
     uint32_t run = 0;
     uint8_t* p = PixelPtr(s, (int32_t)(bit_x >> 3), y, 1u, &run);
     if (!p) return false;
-    const uint32_t shift = 8u - bits - (bit_x & 7u);
+    const uint32_t shift = lcd_pixel::MsbFirstShift(bit_x, bits);
     const uint8_t  mask  = (uint8_t)(((1u << bits) - 1u) << shift);
     *p = (uint8_t)((*p & ~mask) | ((value << shift) & mask));
     return true;

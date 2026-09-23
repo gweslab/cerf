@@ -26,7 +26,12 @@ constexpr size_t kCe1FileOffLoadVa   = 0x128;
 
 constexpr uint32_t kPeSignature = 0x00004550u;
 
-std::vector<size_t> FindAllCe1Romhdrs(std::span<const uint8_t> flat);
+struct Ce1RomhdrHit {
+    size_t       off = 0;
+    ParsedROMHDR hdr;
+};
+
+std::vector<Ce1RomhdrHit> FindAllCe1Romhdrs(std::span<const uint8_t> flat);
 
 bool ValidateCe1Xip(std::span<const uint8_t> flat,
                     size_t                   romhdr_off,

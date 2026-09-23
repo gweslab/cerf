@@ -1,6 +1,8 @@
 #include "dp8390_receiver.h"
 
+#include "../../core/byte_order.h"
 #include "../../core/log.h"
+#include "../../net/ipv4_packet.h"
 
 #include <cstring>
 
@@ -11,7 +13,7 @@ namespace {
 /* DP8390D datasheet, 1992 National LAN databook, MAR0-MAR7 p. 1-158. */
 uint32_t MulticastFilterBit(const uint8_t* dest) {
     uint32_t crc = 0xFFFFFFFFu;
-    for (std::size_t i = 0; i < 6; ++i) {
+    for (std::size_t i = 0; i < cerf::inet::kEthMacSize; ++i) {
         uint8_t octet = dest[i];
         for (int bit = 0; bit < 8; ++bit) {
             const uint32_t feed = ((crc >> 31) ^ octet) & 0x1u;
@@ -33,7 +35,7 @@ bool Dp8390Receiver::AcceptsDestinationLocked(const uint8_t* dest) const {
     /* DP8390D datasheet, 1992 National LAN databook, destination address
        p. 1-133, RCR p. 1-155, MAR0-MAR7 p. 1-158. */
     bool all_ones = true;
-    for (std::size_t i = 0; i < 6; ++i) {
+    for (std::size_t i = 0; i < cerf::inet::kEthMacSize; ++i) {
         if (dest[i] != 0xFFu) {
             all_ones = false;
             break;
@@ -51,7 +53,7 @@ bool Dp8390Receiver::AcceptsDestinationLocked(const uint8_t* dest) const {
     }
 
     if (nic_.rcr_ & kRcrPromiscuous) return true;
-    return std::memcmp(dest, nic_.par_.data(), 6) == 0;
+    return std::memcmp(dest, nic_.par_.data(), nic_.par_.size()) == 0;
 }
 
 bool Dp8390Receiver::OnFrameLocked(const uint8_t* frame, std::size_t len) {
@@ -145,13 +147,9 @@ bool Dp8390Receiver::OnFrameLocked(const uint8_t* frame, std::size_t len) {
     };
 
     const uint8_t status = static_cast<uint8_t>(
-        kRsrPrx | ((frame[0] & 0x01u) ? kRsrPhy : 0u));
-    const uint8_t header[4] = {
-        status,
-        next_page,
-        static_cast<uint8_t>(total_with_header & 0xFFu),
-        static_cast<uint8_t>(total_with_header >> 8),
-    };
+        kRsrPrx | ((frame[cerf::inet::kEthOffDst] & 0x01u) ? kRsrPhy : 0u));
+    uint8_t header[4] = {status, next_page};
+    cerf::le::Put16(header + 2, static_cast<uint16_t>(total_with_header));
     write_into_ring(start_off, header, 4);
     write_into_ring(start_off + 4u, frame, len);
 

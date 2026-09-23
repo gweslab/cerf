@@ -3,6 +3,7 @@
 #include "boot_bar.h"
 
 #include "../core/cerf_emulator.h"
+#include "../lcd/lcd_pixel_expand.h"
 #include "emulation_pause.h"
 #include "uart_boot_bar_data.h"
 
@@ -39,7 +40,7 @@ void BootBar::RenderInto(uint32_t* dib_bgra32,
             const uint32_t out_r = (sr * sa + dr * inv) / 255u;
             const uint32_t out_g = (sg * sa + dg * inv) / 255u;
             const uint32_t out_b = (sb * sa + db * inv) / 255u;
-            dst_row[dst_x] = 0xFF000000u | (out_r << 16) | (out_g << 8) | out_b;
+            dst_row[dst_x] = lcd_pixel::PackXrgb(out_r, out_g, out_b);
         }
     }
 }

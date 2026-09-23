@@ -1,6 +1,7 @@
 #include "imx51_gpu3d_texture.h"
 #include "imx51_gpu3d_memory.h"
 #include "imx51_gpu3d_tiling.h"
+#include "../../core/byte_order.h"
 #include "../../core/cerf_emulator.h"
 #include "../../core/fatal.h"
 #include "../../boards/board_context.h"
@@ -171,7 +172,7 @@ Imx51Gpu3dVec4 Imx51Gpu3dTexture::Sample(const std::unordered_map<uint32_t,uint3
         Imx51Gpu3dVec4 raw{};
         if (bytes == 4u) for (unsigned c = 0; c < 4; ++c) raw[c] = float(p[c]) / 255.0f;
         else if (bytes == 2u) {
-            const uint32_t packed = uint32_t(p[0]) | (uint32_t(p[1]) << 8);
+            const uint32_t packed = cerf::le::U16(p);
             /* Mesa e97ad748, fd2_util.c: pipe2surface, CASE(8,8,0,0), FMT_8_8. */
             if (format == 10u) raw = {float(p[0])/255.0f,float(p[1])/255.0f,0.0f,1.0f};
             else if (format == 15u) for (unsigned i=0;i<4;++i) raw[i]=float((packed>>(i*4u))&15u)/15.0f;

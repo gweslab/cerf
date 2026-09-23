@@ -3,10 +3,9 @@
 
 #include "../peripheral_base.h"
 #include "../peripheral_dispatcher.h"
+#include "../../core/byte_order.h"
 #include "../../core/cerf_emulator.h"
 #include "../../core/device_config.h"
-
-#include <cstring>
 
 namespace {
 
@@ -35,17 +34,13 @@ public:
 private:
     static uint32_t FastReadThunk(void* ctx, uint32_t off, uint32_t width_bytes) {
         auto* self = static_cast<CerfVirtFramebufferMem*>(ctx);
-        const uint8_t* p = self->fb_->Bytes() + off;
-        uint32_t v = 0;
-        std::memcpy(&v, p, width_bytes);
-        return v;
+        return static_cast<uint32_t>(cerf::le::UN(self->fb_->Bytes() + off, width_bytes));
     }
 
     static void FastWriteThunk(void* ctx, uint32_t off,
                                uint32_t value, uint32_t width_bytes) {
         auto* self = static_cast<CerfVirtFramebufferMem*>(ctx);
-        uint8_t* p = self->fb_->Bytes() + off;
-        std::memcpy(p, &value, width_bytes);
+        cerf::le::PutN(self->fb_->Bytes() + off, value, width_bytes);
         self->fb_->MarkDirty();
     }
 

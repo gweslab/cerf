@@ -2,10 +2,12 @@
 
 #include "../../boards/board_context.h"
 #include "casio_toricomail_id.h"
+#include "../../core/byte_order.h"
 #include "../../core/cerf_emulator.h"
 #include "../../core/fatal.h"
 #include "../../core/log.h"
 #include "../../cpu/emulated_memory.h"
+#include "../../lcd/lcd_pixel_expand.h"
 #include "../../peripherals/peripheral_dispatcher.h"
 #include "../../socs/guest_cpu_reset.h"
 #include "../../socs/vr41xx/vr41xx_giu.h"
@@ -43,7 +45,7 @@ void CasioToricomailAsic::RunFillLocked() {
     for (uint32_t y = 0; y < fill_height_; ++y) {
         uint8_t* row = fb_.data() + dst + static_cast<size_t>(y) * kPitchBytes;
         for (uint32_t x = 0; x < fill_width_; ++x)
-            std::memcpy(row + x * 2u, &fill_value_, sizeof(fill_value_));
+            cerf::le::Put16(row + x * 2u, fill_value_);
     }
     /* ddi.dll blit sub_13815A8 writes 0x208/0x20A fresh on every blit; nk.exe fill
        sub_9F0B7D20 never writes them and fills from origin - the destination is
@@ -97,9 +99,8 @@ void CasioToricomailAsic::RunBlitLocked() {
         const uint8_t* mask = fb_.data() + src + StageOffset(y);
         uint8_t*       row  = fb_.data() + dst + static_cast<size_t>(y) * kPitchBytes;
         for (uint32_t x = 0; x < fill_width_; ++x) {
-            const uint32_t bit = static_cast<uint32_t>(src_bit) + x;
-            if ((mask[bit >> 3] >> (7u - (bit & 7u))) & 1u)
-                std::memcpy(row + x * 2u, &fg, sizeof(fg));
+            if (lcd_pixel::PackedIndexMsbFirst(mask, static_cast<uint32_t>(src_bit) + x, 1u))
+                cerf::le::Put16(row + x * 2u, fg);
         }
     }
     fill_dst_lo_ = 0; fill_dst_hi_ = 0;
@@ -347,13 +348,13 @@ uint8_t CasioToricomailAsic::ReadByte(uint32_t addr) {
 
 uint16_t CasioToricomailAsic::ReadHalf(uint32_t addr) {
     const uint32_t off = addr - kBase;
-    if (InFb(off)) { uint16_t v; std::memcpy(&v, &fb_[off - kFbOffset], sizeof(v)); return v; }
+    if (InFb(off)) return cerf::le::U16(fb_.data(), off - kFbOffset);
     return ReadReg(off);
 }
 
 uint32_t CasioToricomailAsic::ReadWord(uint32_t addr) {
     const uint32_t off = addr - kBase;
-    if (InFb(off)) { uint32_t v; std::memcpy(&v, &fb_[off - kFbOffset], sizeof(v)); return v; }
+    if (InFb(off)) return cerf::le::U32(fb_.data(), off - kFbOffset);
     /* ddi.dll blit sub_13815A8 drives the blit registers as 32-bit words; the 16-bit bus
        splits each into low-then-high halfword accesses. */
     return static_cast<uint32_t>(ReadReg(off)) |
@@ -368,13 +369,13 @@ void CasioToricomailAsic::WriteByte(uint32_t addr, uint8_t value) {
 
 void CasioToricomailAsic::WriteHalf(uint32_t addr, uint16_t value) {
     const uint32_t off = addr - kBase;
-    if (InFb(off)) { std::memcpy(&fb_[off - kFbOffset], &value, sizeof(value)); return; }
+    if (InFb(off)) { cerf::le::Put16(fb_.data() + (off - kFbOffset), value); return; }
     WriteReg(off, value);
 }
 
 void CasioToricomailAsic::WriteWord(uint32_t addr, uint32_t value) {
     const uint32_t off = addr - kBase;
-    if (InFb(off)) { std::memcpy(&fb_[off - kFbOffset], &value, sizeof(value)); return; }
+    if (InFb(off)) { cerf::le::Put32(fb_.data() + (off - kFbOffset), value); return; }
     /* ddi.dll blit sub_13815A8 drives the blit registers as 32-bit words; the 16-bit bus
        splits each into low-then-high halfword accesses. */
     WriteReg(off,      static_cast<uint16_t>(value & 0xFFFFu));

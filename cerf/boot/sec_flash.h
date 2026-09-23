@@ -16,7 +16,8 @@ public:
     bool ShouldRegister() override;
     void OnReady() override;
 
-    bool     IsPresent() const { return sec_.IsValid(); }
+    bool             IsPresent() const { return sec_.IsValid(); }
+    const SecHeader& Header()    const { return sec_.Header(); }
     uint64_t FlashSize() const { return sec_.FlashSize(mf_); }
 
     size_t ReadFlash(uint64_t flash_off, void* dst, size_t len) {

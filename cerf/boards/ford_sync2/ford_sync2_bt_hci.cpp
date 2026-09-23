@@ -1,5 +1,6 @@
 #include "ford_sync2_bt_hci.h"
 
+#include "../../core/byte_order.h"
 #include "../../core/cerf_emulator.h"
 #include "../../core/log.h"
 #include "../../boards/board_context.h"
@@ -70,12 +71,14 @@ void FordSync2BtHci::OnGuestTx(uint8_t byte) {
     cmd_[n_++] = byte;
     if (n_ < 4u) return;                          /* need op_lo op_hi plen   */
     if (n_ < 4u + cmd_[3]) return;                /* + plen parameter bytes  */
-    Reply(cmd_[1], cmd_[2]);
+    Reply();
     n_ = 0;
 }
 
-void FordSync2BtHci::Reply(uint8_t op_lo, uint8_t op_hi) {
-    const uint16_t opcode = static_cast<uint16_t>(op_lo | (op_hi << 8));
+void FordSync2BtHci::Reply() {
+    const uint8_t  op_lo  = cmd_[1];
+    const uint8_t  op_hi  = cmd_[2];
+    const uint16_t opcode = cerf::le::U16(cmd_, 1);
     /* The driver's read paths require the H4 event type 0x04 then the Command
        Complete event: sub_C07773F4 reads N bytes, asserts the leading 0x04 and
        strips it; sub_C0777478 (Read_BD_ADDR) reads it raw. So every reply leads
@@ -105,10 +108,9 @@ void FordSync2BtHci::Reply(uint8_t op_lo, uint8_t op_hi) {
         return;
     }
     if (opcode == kOpReadPageTimeout) {
-        const uint8_t ev[9] = {kH4Event, kEvtCmdComplete, 0x06u, 0x01u,
-                               op_lo, op_hi, kStatusSuccess,
-                               static_cast<uint8_t>(kDefaultPageTimeout & 0xFFu),
-                               static_cast<uint8_t>(kDefaultPageTimeout >> 8)};
+        uint8_t ev[9] = {kH4Event, kEvtCmdComplete, 0x06u, 0x01u,
+                         op_lo, op_hi, kStatusSuccess};
+        cerf::le::Put16(ev + 7, kDefaultPageTimeout);
         uart_->InjectRx(ev, sizeof(ev));
         LOG(Board, "[BT] Read_Page_Timeout -> CC (0x2000)\n");
         return;

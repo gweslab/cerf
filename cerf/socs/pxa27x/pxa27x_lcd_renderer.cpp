@@ -4,6 +4,7 @@
 
 #include "../../boards/board_context.h"
 #include "pxa270_id.h"
+#include "../../core/byte_order.h"
 #include "../../core/cerf_emulator.h"
 #include "../../core/log.h"
 #include "../../cpu/emulated_memory.h"
@@ -13,8 +14,6 @@
 #include <cstring>
 
 namespace {
-
-constexpr size_t kContentProbeStride = 251;
 
 /* Intel PXA27x Developer's Manual 280000-001 Table 7-43: BPP3:BPP = 0b0100
    selects 16 bpp with no palette. Section 7.4.1.3: the palette RAM is bypassed
@@ -51,7 +50,7 @@ public:
         const size_t fb_bytes = (size_t)guest_w * (size_t)guest_h
                               * (size_t)kBytesPerPixel16Bpp;
         return latch_.ProbeAndLatch(emu_.Get<EmulatedMemory>(),
-                                    fb_pa, fb_bytes, kContentProbeStride);
+                                    fb_pa, fb_bytes);
     }
 
     void RenderInto(uint32_t* dib_bgra32,
@@ -78,11 +77,11 @@ public:
            0 in the low half. Section 7.4.13: each line in memory must start at a
            word boundary. */
         for (uint32_t y = 0; y < copy_h; ++y) {
-            const uint16_t* src_row = reinterpret_cast<const uint16_t*>(
-                src_base + (size_t)y * guest_w * kBytesPerPixel16Bpp);
+            const uint8_t* src_row = src_base + (size_t)y * guest_w * kBytesPerPixel16Bpp;
             uint32_t* dst_row = dib_bgra32 + (size_t)y * host_w;
             for (uint32_t x = 0; x < copy_w; ++x)
-                dst_row[x] = lcd_pixel::Expand565(src_row[x]);
+                dst_row[x] = lcd_pixel::Expand565(
+                    cerf::le::U16(src_row, (size_t)x * kBytesPerPixel16Bpp));
         }
     }
 

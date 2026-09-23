@@ -1,5 +1,9 @@
 #pragma once
 
+#include "ce_imgfs_walker.h"
+#include "rom_record_layout.h"
+
+#include <algorithm>
 #include <cstdint>
 #include <vector>
 
@@ -39,25 +43,21 @@ struct IndexRec {
 };
 std::vector<uint8_t> BuildIndexBlock(const std::vector<IndexRec>& records);
 
-struct E32Layout {
-    uint32_t size;
-    uint32_t off_objcnt;
-    uint32_t off_imageflags;
-    uint32_t off_entryrva;
-    uint32_t off_vbase;
-    uint32_t off_subsysmajor;
-    uint32_t off_subsysminor;
-    uint32_t off_stackmax;
-    uint32_t off_vsize;
-    uint32_t off_sect14rva;
-    uint32_t off_sect14size;
-    int32_t  off_timestamp;
-    uint32_t off_unit;
-    uint32_t off_subsys;
-};
+template <typename WritePage>
+std::vector<IndexRec> WritePagedData(const std::vector<uint8_t>& bytes, WritePage write_page) {
+    using cerf::ce_imgfs_walker::kImgfsPageSize;
+    const uint32_t pages = cerf::ce_imgfs_walker::PagesFor(bytes.size());
+    std::vector<IndexRec> recs;
+    recs.reserve(pages);
+    for (uint32_t p = 0; p < pages; ++p) {
+        const uint32_t off   = p * kImgfsPageSize;
+        const uint32_t chunk = std::min<uint32_t>(kImgfsPageSize, uint32_t(bytes.size()) - off);
+        recs.push_back({kImgfsPageSize, write_page(p, bytes.data() + off, chunk)});
+    }
+    return recs;
+}
 
-std::vector<uint8_t> BuildModuleHeader(const E32Layout&            L,
-                                        const PeImage&             pe,
+std::vector<uint8_t> BuildModuleHeader(const PeImage&             pe,
                                         uint32_t                   target_vbase,
                                         uint16_t                   subsys_major,
                                         uint16_t                   subsys_minor,

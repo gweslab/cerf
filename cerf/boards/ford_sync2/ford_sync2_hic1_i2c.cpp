@@ -1,5 +1,6 @@
 #include "../../core/service.h"
 
+#include "../../core/byte_order.h"
 #include "../../core/cerf_emulator.h"
 #include "../../core/log.h"
 #include "../board_context.h"
@@ -61,7 +62,7 @@ private:
         ArmMmuProbe& probe = emu_.Get<ArmMmuProbe>();
         auto rd = [&](uint32_t va) -> uint32_t {
             uint8_t* p = probe.PeekVaToHost(va);
-            return p ? *reinterpret_cast<uint32_t*>(p) : 0u;
+            return p ? cerf::le::U32(p) : 0u;
         };
         char chain[320];
         int o = 0;

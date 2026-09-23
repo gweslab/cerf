@@ -1,6 +1,7 @@
 #include "vga_controller.h"
 
 #include "../../core/log.h"
+#include "../../lcd/lcd_pixel_expand.h"
 #include "../../state/state_stream.h"
 
 #include <algorithm>
@@ -37,12 +38,6 @@ constexpr uint8_t kCrStartHi   = 0x0C;
 constexpr uint8_t kCrStartLo   = 0x0D;
 constexpr uint8_t kCrV_DispEnd = 0x12;
 constexpr uint8_t kCrOffset    = 0x13;
-
-uint32_t Expand5(uint32_t v) { return (v << 3) | (v >> 2); }
-uint32_t Expand6(uint32_t v) { return (v << 2) | (v >> 4); }
-uint32_t PackBgra(uint32_t r, uint32_t g, uint32_t b) {
-    return 0xFF000000u | (r << 16) | (g << 8) | b;
-}
 }  /* namespace */
 
 VgaController::VgaController() : fb_(kFbSize, 0u) {}
@@ -212,16 +207,14 @@ void VgaController::RenderInto(uint32_t* dib, uint32_t dst_w, uint32_t dst_h) {
             for (uint32_t x = 0; x < cw; ++x) {
                 const uint32_t at = (line + x) % kFbSize;
                 const uint8_t* c = dac_pal_[fb[at]];
-                row[x] = PackBgra(Expand6(c[0]), Expand6(c[1]), Expand6(c[2]));
+                row[x] = lcd_pixel::PackXrgb(lcd_pixel::Expand6(c[0]), lcd_pixel::Expand6(c[1]),
+                                             lcd_pixel::Expand6(c[2]));
             }
         } else {  /* 16bpp 5-6-5 */
             for (uint32_t x = 0; x < cw; ++x) {
                 const uint32_t at = (line + x * 2u) % kFbSize;
-                const uint16_t p = (uint16_t)(fb[at] |
-                                              (fb[(at + 1u) % kFbSize] << 8));
-                row[x] = PackBgra(Expand5((p >> 11) & 0x1Fu),
-                                  Expand6((p >> 5) & 0x3Fu),
-                                  Expand5(p & 0x1Fu));
+                row[x] = lcd_pixel::Expand565(
+                    (uint16_t)(fb[at] | (fb[(at + 1u) % kFbSize] << 8)));
             }
         }
     }

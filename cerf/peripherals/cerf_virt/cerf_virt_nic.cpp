@@ -6,10 +6,12 @@
 #include "../peripheral_dispatcher.h"
 #include "../../boards/board_context.h"
 #include "../../host/host_auto_resize.h"
+#include "../../core/byte_order.h"
 #include "../../core/cerf_emulator.h"
 #include "../../core/device_config.h"
 #include "../../core/fatal.h"
 #include "../../core/log.h"
+#include "../../net/mac_address.h"
 #include "../../net/network_backend.h"
 #include "../../state/state_stream.h"
 
@@ -47,9 +49,8 @@ public:
             [this](const uint8_t* frame, std::size_t len) { OnRxFrame(frame, len); });
         rx_installed_ = true;
 
-        LOG(Net, "[GA-NIC] ready: MAC=%02X:%02X:%02X:%02X:%02X:%02X regs PA 0x%08X\n",
-            guest_mac_[0], guest_mac_[1], guest_mac_[2],
-            guest_mac_[3], guest_mac_[4], guest_mac_[5], MmioBase());
+        LOG(Net, "[GA-NIC] ready: MAC=%s regs PA 0x%08X\n",
+            cerf::inet::FormatMac(guest_mac_.data()).s, MmioBase());
     }
 
     void OnShutdown() override { DetachRx(); }
@@ -72,12 +73,11 @@ public:
         case CerfVirt::kNicRegMagic:      return CerfVirt::kNicMagic;
         case CerfVirt::kNicRegMacWord0: {
             std::lock_guard<std::mutex> lk(mu_);
-            return (uint32_t)guest_mac_[0] | ((uint32_t)guest_mac_[1] << 8) |
-                   ((uint32_t)guest_mac_[2] << 16) | ((uint32_t)guest_mac_[3] << 24);
+            return cerf::le::U32(guest_mac_.data(), 0);
         }
         case CerfVirt::kNicRegMacWord1: {
             std::lock_guard<std::mutex> lk(mu_);
-            return (uint32_t)guest_mac_[4] | ((uint32_t)guest_mac_[5] << 8);
+            return cerf::le::U16(guest_mac_.data(), 4);
         }
         case CerfVirt::kNicRegLinkUp:     return 1u;
         case CerfVirt::kNicRegMaxFrame:   return kMaxFrame;
@@ -162,8 +162,7 @@ private:
 
         while (read_seq != new_write_seq) {
             const uint8_t* slot = stage.TxSlot(read_seq);
-            uint32_t len = 0;
-            std::memcpy(&len, slot + CerfVirt::kNicSlotLenOff, sizeof(len));
+            const uint32_t len = cerf::le::U32(slot, CerfVirt::kNicSlotLenOff);
             if (len == 0u || len > kMaxFrame) {
                 emu_.Get<Fatal>().Die("[GA-NIC] TX slot %u declares len=%u (max %u)",
                                       read_seq % CerfVirt::kNicTxSlots, len, kMaxFrame);
@@ -194,9 +193,8 @@ private:
         }
 
         uint8_t* slot = emu_.Get<CerfVirtNicStage>().RxSlot(write_seq);
-        const uint32_t len32 = static_cast<uint32_t>(len);
         std::memcpy(slot + CerfVirt::kNicSlotPayloadOff, frame, len);
-        std::memcpy(slot + CerfVirt::kNicSlotLenOff, &len32, sizeof(len32));
+        cerf::le::Put32(slot + CerfVirt::kNicSlotLenOff, static_cast<uint32_t>(len));
 
         rx_write_seq_.store(write_seq + 1u, std::memory_order_release);
 
@@ -204,7 +202,7 @@ private:
     }
 
     std::mutex mu_;
-    std::array<uint8_t, 6> guest_mac_{};
+    cerf::inet::MacAddress guest_mac_{};
     bool nic_enabled_ = false;
     bool rx_installed_ = false;
 

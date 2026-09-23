@@ -1,11 +1,15 @@
 #include "rom_symbol_flash_parse.h"
 
+#include "../core/byte_order.h"
+
 #include <cstddef>
 #include <string_view>
 
 namespace cerf::rom_image_parse {
 
 namespace {
+
+using cerf::le::U32;
 
 constexpr std::string_view kSymbolOsPartName = "Windows CE";
 
@@ -61,39 +65,29 @@ bool ResolveOsPartition(std::span<const uint8_t> raw,
     const uint64_t part_end =
         uint64_t(data_off) + uint64_t(part.blocks) * kSymbolFlashBlockBytes;
 
-    if (data_off + kRomSignatureOffset + 8 > raw.size()) return false;
-    if (U32(raw.data(), data_off + kRomSignatureOffset) != kRomSignature)
-        return false;
-
-    const uint32_t ptoc = U32(raw.data(), data_off + kRomSignatureOffset + 4);
+    EcecRecord ecec;
+    if (!ReadEcec(raw, data_off + kRomSignatureOffset, ecec)) return false;
+    const uint32_t ptoc = ecec.ptoc;
     if (ptoc <= uint32_t(data_off)) return false;
 
-    const uint32_t va_top = ptoc & ~0xFFFFFu;
-    const uint32_t va_min =
-        (ptoc > uint32_t(part_end)) ? ptoc - uint32_t(part_end) : 0u;
-
-    for (uint32_t flash_va = va_top; flash_va >= va_min;
-         flash_va -= 0x100000u) {
-        const uint32_t romhdr_off = ptoc - flash_va;
-        if (romhdr_off >= data_off && romhdr_off + kRomHdrSize <= part_end) {
-            ParsedROMHDR h;
-            if (ParseRomHdr(raw, romhdr_off, h) &&
-                h.physfirst == flash_va + uint32_t(data_off) &&
-                h.physlast > h.physfirst) {
-                const uint32_t span = h.physlast - h.physfirst;
-                if (uint64_t(data_off) + span <= part_end) {
-                    out.data_off    = data_off;
-                    out.flat_size   = span;
-                    out.base_va     = h.physfirst;
-                    out.flash_va    = flash_va;
-                    out.part_blocks = part.blocks;
-                    return true;
-                }
-            }
-        }
-        if (flash_va < va_min + 0x100000u) break;
+    ParsedROMHDR h;
+    uint32_t     pf = 0;
+    if (!FindSelfLocatingRomhdr(
+            raw.subspan(data_off, size_t(part_end - data_off)), ptoc, 0x100000u,
+            uint32_t(data_off),
+            [&](const ParsedROMHDR& c) {
+                return c.physfirst >= uint32_t(data_off) && c.physlast > c.physfirst
+                    && uint64_t(data_off) + (c.physlast - c.physfirst) <= part_end;
+            },
+            h, pf)) {
+        return false;
     }
-    return false;
+    out.data_off    = data_off;
+    out.flat_size   = h.physlast - h.physfirst;
+    out.base_va     = pf;
+    out.flash_va    = pf - uint32_t(data_off);
+    out.part_blocks = part.blocks;
+    return true;
 }
 
 }  /* namespace */

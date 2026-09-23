@@ -111,6 +111,7 @@ The file [`licenses/OFL-1.1.txt`](licenses/OFL-1.1.txt) contains the full licens
 - **[Dolphin](https://dolphin-emu.org/)**
 - **[MAME](https://www.mamedev.org/)**
 - **[OpenOCD](https://openocd.org/)**
+- **[dosfstools](https://github.com/dosfstools/dosfstools)**
 
 ## Trademarks
 

@@ -7,6 +7,7 @@
 
 #include "ford_sync2_ilp_channel.h"
 #include "ford_sync2_vmcu_diag_channel.h"
+#include "../../core/byte_order.h"
 #include "../../core/cerf_emulator.h"
 #include "../../core/log.h"
 #include "../../boards/board_context.h"
@@ -16,6 +17,23 @@
 
 #include <cstdio>
 #include <vector>
+
+namespace {
+
+using cerf::le::Append16;
+using cerf::le::Append32;
+using cerf::le::Put16;
+using cerf::le::Put32;
+using cerf::le::U16;
+using cerf::le::U32;
+
+uint16_t IpcmpChecksum(const uint8_t* p, std::size_t len) {
+    uint32_t sum = 0u;
+    for (std::size_t i = 0; i < len; ++i) sum += p[i];
+    return static_cast<uint16_t>(sum);
+}
+
+}
 
 bool FordSync2VmcuPeer::ShouldRegister() {
     auto* bd = emu_.TryGet<BoardContext>();
@@ -30,13 +48,8 @@ void FordSync2VmcuPeer::OnReady() {
 std::vector<uint8_t> FordSync2VmcuPeer::EncodeFrame(const uint8_t* payload,
                                                     std::size_t len) {
     /* sync_2 EA5T-14D544-BA.sec, IPCMP.dll sub_C0E23130. */
-    uint32_t sum = 0u;
-    for (std::size_t i = 0; i < len; ++i) sum += payload[i];
-    sum &= 0xFFFFu;
-
     std::vector<uint8_t> flat(payload, payload + len);
-    flat.push_back(static_cast<uint8_t>(sum & 0xFFu));
-    flat.push_back(static_cast<uint8_t>(sum >> 8));
+    Append16(flat, IpcmpChecksum(payload, len));
     flat.push_back(0u);
 
     std::vector<uint8_t> out;
@@ -87,16 +100,9 @@ std::vector<uint8_t> FordSync2VmcuPeer::BuildLinkFrame(uint8_t type, uint8_t tid
                                                        uint16_t token) {
     /* ipc.dll LINK packet (Cid 0): header(2)=01 00, data(12)=[type][Tid]
        [token:2][config-CRC:4][pad:4]. */
-    const uint8_t payload[14] = {
-        0x01u, 0x00u,
-        type, tid,
-        static_cast<uint8_t>(token & 0xFFu), static_cast<uint8_t>(token >> 8),
-        static_cast<uint8_t>(kConfigCrc & 0xFFu),
-        static_cast<uint8_t>((kConfigCrc >> 8) & 0xFFu),
-        static_cast<uint8_t>((kConfigCrc >> 16) & 0xFFu),
-        static_cast<uint8_t>((kConfigCrc >> 24) & 0xFFu),
-        0u, 0u, 0u, 0u,
-    };
+    uint8_t payload[14] = { 0x01u, 0x00u, type, tid };
+    Put16(payload + 4, token);
+    Put32(payload + 6, kConfigCrc);
     return EncodeFrame(payload, sizeof(payload));
 }
 
@@ -105,22 +111,18 @@ std::vector<uint8_t> FordSync2VmcuPeer::BuildAckFrame(uint8_t cid, uint8_t ack_s
        no data. byte0 = Cid<<2 | 2 (ACK type bit1) -> head RX routes to the RX-ACK
        handler sub_C093BE18; byte1 = next-expected-seq << 1 (the seq the head
        validates against its outstanding TX window); bytes[2..3] = RX window. */
-    const uint8_t pkt[4] = {
+    uint8_t pkt[4] = {
         static_cast<uint8_t>((cid << 2) | 0x02u),
         static_cast<uint8_t>(ack_seq << 1),
-        static_cast<uint8_t>(kAckWindow & 0xFFu),
-        static_cast<uint8_t>(kAckWindow >> 8),
     };
+    Put16(pkt + 2, kAckWindow);
     return EncodeFrame(pkt, sizeof(pkt));
 }
 
 std::vector<uint8_t> FordSync2VmcuPeer::BuildWindowUpdateFrame(uint8_t cid) {
     /* EA5T-14D544-BA.sec, ipc.dll C0938180 (window update), C093D3E0 (receive). */
-    const uint8_t pkt[4] = {
-        static_cast<uint8_t>((cid << 2) | 0x02u), 1u,
-        static_cast<uint8_t>(kAckWindow & 0xFFu),
-        static_cast<uint8_t>(kAckWindow >> 8),
-    };
+    uint8_t pkt[4] = { static_cast<uint8_t>((cid << 2) | 0x02u), 1u };
+    Put16(pkt + 2, kAckWindow);
     return EncodeFrame(pkt, sizeof(pkt));
 }
 
@@ -233,7 +235,7 @@ void FordSync2VmcuPeer::HandleInboundSetOids(const uint8_t* inb, std::size_t n) 
 void FordSync2VmcuPeer::HandleInboundGetAllOids(const uint8_t* inb, std::size_t n) {
     if (n < 4u) return;
     const uint8_t tid = inb[1];
-    const uint16_t count = static_cast<uint16_t>(inb[2] | (inb[3] << 8));
+    const uint16_t count = U16(inb, 2);
     if (count == 0u || 4u + 4u * static_cast<std::size_t>(count) > n) return;
 
     /* Answer only OIDs CERF has a grounded value for; omit the rest. An omitted OID
@@ -242,16 +244,11 @@ void FordSync2VmcuPeer::HandleInboundGetAllOids(const uint8_t* inb, std::size_t 
     std::vector<uint8_t> body;
     uint16_t answered = 0u;
     for (uint16_t i = 0; i < count; ++i) {
-        const uint8_t* o = inb + 4u + static_cast<std::size_t>(i) * 4u;
-        const uint32_t oid = static_cast<uint32_t>(o[0]) |
-                             (static_cast<uint32_t>(o[1]) << 8) |
-                             (static_cast<uint32_t>(o[2]) << 16) |
-                             (static_cast<uint32_t>(o[3]) << 24);
+        const uint32_t oid = U32(inb, 4u + static_cast<std::size_t>(i) * 4u);
         std::vector<uint8_t> val;
         if (!AppendGroundedOidValue(oid, val)) continue;
-        body.push_back(o[0]); body.push_back(o[1]); body.push_back(o[2]); body.push_back(o[3]);
-        body.push_back(static_cast<uint8_t>(val.size() & 0xFFu));
-        body.push_back(static_cast<uint8_t>(val.size() >> 8));
+        Append32(body, oid);
+        Append16(body, static_cast<uint16_t>(val.size()));
         body.insert(body.end(), val.begin(), val.end());
         ++answered;
     }
@@ -264,8 +261,7 @@ void FordSync2VmcuPeer::HandleInboundGetAllOids(const uint8_t* inb, std::size_t 
     reply.push_back(tid);
     reply.push_back(0x00u);
     reply.push_back(0x00u);
-    reply.push_back(static_cast<uint8_t>(answered & 0xFFu));
-    reply.push_back(static_cast<uint8_t>(answered >> 8));
+    Append16(reply, answered);
     reply.insert(reply.end(), body.begin(), body.end());
     SendOnCid(kInboundCid, inbound_tx_seq_, reply.data(), reply.size());
 }
@@ -336,10 +332,7 @@ std::size_t FordSync2VmcuPeer::Deframe(const std::vector<uint8_t>& rle,
     }
     if (dec.size() < 5u) return 0u;
     const std::size_t n = dec.size() - 3u;
-    uint32_t sum = 0u;
-    for (std::size_t j = 0; j < n; ++j) sum += dec[j];
-    if ((sum & 0xFFFFu) != static_cast<uint32_t>(dec[n] | (dec[n + 1u] << 8)))
-        return 0u;
+    if (IpcmpChecksum(dec.data(), n) != U16(dec.data(), n)) return 0u;
     dec.resize(n);
     return n;
 }

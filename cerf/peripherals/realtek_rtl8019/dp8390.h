@@ -1,5 +1,7 @@
 #pragma once
 
+#include "../../net/mac_address.h"
+
 #include <array>
 #include <cstddef>
 #include <cstdint>
@@ -143,7 +145,7 @@ private:
     uint8_t cntr1_ = 0u;
     uint8_t cntr2_ = 0u;
 
-    std::array<uint8_t, 6> par_{};
+    cerf::inet::MacAddress par_{};
     std::array<uint8_t, 8> mar_{};
     uint8_t                curr_ = 0u;
 

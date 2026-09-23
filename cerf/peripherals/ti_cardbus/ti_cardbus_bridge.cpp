@@ -4,6 +4,7 @@
 #include "../pcmcia/pcmcia_slot.h"
 #include "../pcmcia/pcmcia_auto_insert.h"
 
+#include "../../core/byte_order.h"
 #include "../../core/cerf_emulator.h"
 #include "../../core/log.h"
 #include "../../boards/board_context.h"
@@ -116,7 +117,7 @@ public:
     uint32_t IoRead(uint32_t pci_io, unsigned size) override {
         uint32_t card = 0; bool mapped;
         { std::lock_guard<std::mutex> lk(mtx_); mapped = exca_.MapIo(pci_io, &card); }
-        if (!mapped) return (size >= 4) ? 0xFFFFFFFFu : ((1u << (size * 8)) - 1u);
+        if (!mapped) return cerf::ByteWidthMask(size);
         const uint32_t v = (size >= 2) ? slot_.ReadIo16(card) : slot_.ReadIo8(card);
         return v;
     }
@@ -190,7 +191,7 @@ private:
     uint32_t CardMemRead(uint32_t addr, unsigned size) {
         uint32_t card = 0; bool attr = false, wr = false, mapped;
         { std::lock_guard<std::mutex> lk(mtx_); mapped = exca_.MapMem(addr, &card, &attr, &wr); }
-        if (!mapped) return (size >= 4) ? 0xFFFFFFFFu : ((1u << (size * 8)) - 1u);
+        if (!mapped) return cerf::ByteWidthMask(size);
         const uint32_t v = attr ? slot_.ReadAttribute8(card)
                                 : (size >= 2 ? slot_.ReadCommon16(card) : slot_.ReadCommon8(card));
         return v;

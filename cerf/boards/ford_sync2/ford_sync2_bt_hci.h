@@ -29,7 +29,7 @@ public:
     void RestoreState(StateReader& r) override;
 
 private:
-    void Reply(uint8_t op_lo, uint8_t op_hi);
+    void Reply();
 
     Imx51Uart1* uart_ = nullptr;
 

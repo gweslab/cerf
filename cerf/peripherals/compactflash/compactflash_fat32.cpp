@@ -2,8 +2,10 @@
 
 #include "compactflash_fat_common.h"
 
+#include "../../core/byte_order.h"
 #include "../../core/cerf_emulator.h"
 #include "../../core/log.h"
+#include "../../storage/fat_volume_layout.h"
 
 #include <algorithm>
 #include <array>
@@ -23,9 +25,6 @@ constexpr uint32_t kNumFats     = 2;
 constexpr uint32_t kRootClus    = 2;
 constexpr uint32_t kMinClusters = 66000;   /* > 65525 -> valid FAT32 */
 constexpr uint32_t kEoc         = 0x0FFFFFFFu;
-
-using cf_fat::Wr16;
-using cf_fat::Wr32;
 
 }  /* namespace */
 
@@ -93,42 +92,35 @@ bool CompactFlashFat32Builder::Build(const std::wstring& out_path,
 
     std::vector<uint8_t> img(static_cast<std::size_t>(total_sectors) * 512, 0);
 
-    /* Boot sector / BPB. */
     uint8_t* bs = img.data();
-    bs[0] = 0xEB; bs[1] = 0x58; bs[2] = 0x90;
-    std::memcpy(bs + 3, "MSWIN4.1", 8);
-    Wr16(bs + 11, kBytesPerSec);
-    bs[13] = kSecPerClus;
-    Wr16(bs + 14, kReserved);
-    bs[16] = kNumFats;
-    Wr16(bs + 17, 0);          /* RootEntCnt = 0 (FAT32) */
-    Wr16(bs + 19, 0);          /* TotSec16 = 0 */
-    bs[21] = 0xF8;             /* media */
-    Wr16(bs + 22, 0);          /* FATSz16 = 0 */
-    Wr16(bs + 24, 63);         /* SecPerTrk */
-    Wr16(bs + 26, 16);         /* NumHeads */
-    Wr32(bs + 28, 0);          /* HiddSec */
-    Wr32(bs + 32, total_sectors);
-    Wr32(bs + 36, fat_sectors);
-    Wr16(bs + 40, 0);          /* ExtFlags */
-    Wr16(bs + 42, 0);          /* FSVer */
-    Wr32(bs + 44, kRootClus);
-    Wr16(bs + 48, 1);          /* FSInfo sector */
-    Wr16(bs + 50, 6);          /* backup boot sector */
-    bs[64] = 0x80;             /* drive number */
-    bs[66] = 0x29;             /* boot signature */
-    Wr32(bs + 67, 0xCE5FCF01u);/* volume id */
-    std::memcpy(bs + 71, "CERF CF    ", 11);
-    std::memcpy(bs + 82, "FAT32   ", 8);
-    bs[510] = 0x55; bs[511] = 0xAA;
+    fat_volume_layout::Bpb bpb;
+    bpb.jump[0] = 0xEB; bpb.jump[1] = 0x58; bpb.jump[2] = 0x90;
+    bpb.oem_name = "MSWIN4.1";
+    bpb.bytes_per_sector = kBytesPerSec;
+    bpb.sectors_per_cluster = kSecPerClus;
+    bpb.reserved_sectors = kReserved;
+    bpb.num_fats = kNumFats;
+    bpb.media = 0xF8;
+    bpb.sectors_per_track = 63;
+    bpb.num_heads = 16;
+    bpb.total_sectors32 = total_sectors;
+    fat_volume_layout::WriteBpb(bs, bpb);
+    fat_volume_layout::Fat32Extension ext;
+    ext.fat_size32 = fat_sectors;
+    ext.root_cluster = kRootClus;
+    ext.fsinfo_sector = 1;
+    ext.backup_boot_sector = 6;
+    ext.drive_number = 0x80;
+    ext.boot_signature = 0x29;
+    ext.volume_id = 0xCE5FCF01u;
+    ext.volume_label = "CERF CF    ";
+    ext.fs_type = "FAT32   ";
+    fat_volume_layout::WriteFat32Extension(bs, ext);
+    fat_volume_layout::WriteBootSignature(bs);
 
-    /* FSInfo (sector 1) + backup boot (sector 6). */
-    uint8_t* fsi = img.data() + 512;
-    Wr32(fsi + 0,   0x41615252u);
-    Wr32(fsi + 484, 0x61417272u);
-    Wr32(fsi + 488, data_clusters - (root_clusters + payload_clusters)); /* free */
-    Wr32(fsi + 492, root_clusters + payload_clusters + 2);               /* next free */
-    fsi[508] = 0x00; fsi[509] = 0x00; fsi[510] = 0x55; fsi[511] = 0xAA;
+    fat_volume_layout::WriteFsInfo(img.data() + 512,
+                                   data_clusters - (root_clusters + payload_clusters),
+                                   root_clusters + payload_clusters + 2);
     std::memcpy(img.data() + 6 * 512, bs, 512);
 
     /* Assign clusters: root first (clusters 2..), then each file. */
@@ -141,8 +133,8 @@ bool CompactFlashFat32Builder::Build(const std::wstring& out_path,
     /* FAT entries. */
     const uint32_t fat0 = kReserved * 512;
     auto set_fat = [&](uint32_t clus, uint32_t val) {
-        Wr32(img.data() + fat0 + clus * 4, val);
-        Wr32(img.data() + fat0 + fat_sectors * 512 + clus * 4, val);
+        cerf::le::Put32(img.data() + fat0 + clus * 4, val);
+        cerf::le::Put32(img.data() + fat0 + fat_sectors * 512 + clus * 4, val);
     };
     set_fat(0, 0x0FFFFFF8u);
     set_fat(1, kEoc);

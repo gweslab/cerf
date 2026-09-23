@@ -106,8 +106,7 @@ private:
     NandChip   nand_[kCsCount]{};
     std::mutex nand_mu_;
 
-    static size_t PageByteOffset(uint8_t col_lo, uint8_t col_hi,
-                                 uint8_t page0, uint8_t page1, uint8_t page2);
+    static size_t PageByteOffset(const NandChip& chip);
 
     void WriteCeBootMbr();
 

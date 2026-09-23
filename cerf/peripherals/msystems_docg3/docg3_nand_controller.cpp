@@ -1,5 +1,6 @@
 #include "../peripheral_base.h"
 
+#include "../../core/byte_order.h"
 #include "../../core/cerf_emulator.h"
 #include "../../core/log.h"
 #include "../../boards/board_context.h"
@@ -183,10 +184,7 @@ private:
     }
 
     uint32_t LatchedSector() const {
-        const uint32_t s = addr_bytes_[0] |
-                           (static_cast<uint32_t>(addr_bytes_[1]) << 8) |
-                           (static_cast<uint32_t>(addr_bytes_[2]) << 16);
-        return s;   /* sector = (block << 6) | (page & 0x3F) (doc_setup_addr_sector) */
+        return cerf::le::U24(addr_bytes_);
     }
 
     void HandleCommand(uint8_t cmd) {

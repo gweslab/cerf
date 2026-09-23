@@ -1,6 +1,7 @@
 #include "../../peripherals/everspin_mr2a16a/siemens_mp377_mram.h"
 #include "../../peripherals/silicon_motion_sm501/siemens_mp377_sm501.h"
 
+#include "../../core/byte_order.h"
 #include "../../core/cerf_emulator.h"
 #include "../../peripherals/peripheral_base.h"
 #include "../../peripherals/peripheral_dispatcher.h"
@@ -135,10 +136,8 @@ private:
         /* P377 nk.exe HWI_GetMRAMStart/HWI_GetMRAMSize descriptor. */
         hwi_[0x44] = 0x02u;
         hwi_[0x45] = 0x00u;
-        hwi_[0x46] = static_cast<uint8_t>((kMp377MramAliasPa >> 16) & 0xFFu);
-        hwi_[0x47] = static_cast<uint8_t>((kMp377MramAliasPa >> 24) & 0xFFu);
-        hwi_[0x48] = static_cast<uint8_t>((kMramAliasSize >> 10) & 0xFFu);
-        hwi_[0x49] = static_cast<uint8_t>((kMramAliasSize >> 18) & 0xFFu);
+        cerf::le::Put16(hwi_.data() + 0x46, static_cast<uint16_t>(kMp377MramAliasPa >> 16));
+        cerf::le::Put16(hwi_.data() + 0x48, static_cast<uint16_t>(kMramAliasSize >> 10));
 
         /* P377 nk.exe HWI_GetOneNandInfo descriptor. */
         hwi_[0x4A] = 0x01u;

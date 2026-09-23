@@ -2,10 +2,13 @@
 
 #include "../pcmcia/pcmcia_slot.h"
 
+#include "../../core/byte_order.h"
 #include "../../core/cerf_emulator.h"
 #include "../../core/fatal.h"
 #include "../../core/log.h"
 #include "../../core/string_utils.h"
+#include "../../net/ipv4_packet.h"
+#include "../../net/mac_address.h"
 #include "../../net/network_backend.h"
 #include "../../state/state_stream.h"
 
@@ -129,9 +132,7 @@ void Rtl8019::OnInserted() {
         });
     WriteMacProm();
     rx_installed_ = true;
-    LOG(Net, "[NE2000] inserted: MAC=%02X:%02X:%02X:%02X:%02X:%02X\n",
-        guest_mac_[0], guest_mac_[1], guest_mac_[2],
-        guest_mac_[3], guest_mac_[4], guest_mac_[5]);
+    LOG(Net, "[NE2000] inserted: MAC=%s\n", cerf::inet::FormatMac(guest_mac_.data()).s);
 }
 
 void Rtl8019::PowerOn() {
@@ -170,9 +171,10 @@ void Rtl8019::SetIrqLineLocked(bool level) {
 void Rtl8019::OnRxFrame(const uint8_t* frame, std::size_t len) {
     /* linux-2.6.25 drivers/net/lib8390.c ei_receive() - the 8390 driver
        rejects ring packets outside 60..1518 bytes as "bogus packet size". */
-    if (len > 1518u) {
-        emu_.Get<Fatal>().Die("[NE2000] RX frame len=%u exceeds 1518",
-                              static_cast<unsigned>(len));
+    if (len > cerf::inet::kEthMaxFrameSize) {
+        emu_.Get<Fatal>().Die("[NE2000] RX frame len=%u exceeds %u",
+                              static_cast<unsigned>(len),
+                              static_cast<unsigned>(cerf::inet::kEthMaxFrameSize));
     }
     uint8_t padded[60];
     if (len < sizeof(padded)) {
@@ -267,9 +269,7 @@ uint16_t Rtl8019::ReadCommon16(uint32_t offset) {
     const uint32_t base = offset & ~1u;
     if (base >= Dp8390::kRamBase &&
         base + 1u < Dp8390::kRamBase + Dp8390::kRamSize) {
-        const uint32_t off = base - Dp8390::kRamBase;
-        return static_cast<uint16_t>(card_ram_[off]) |
-               (static_cast<uint16_t>(card_ram_[off + 1]) << 8);
+        return cerf::le::U16(card_ram_.data(), base - Dp8390::kRamBase);
     }
     return kBusFloat16;
 }
@@ -292,9 +292,7 @@ void Rtl8019::WriteCommon16(uint32_t offset, uint16_t value) {
     const uint32_t base = offset & ~1u;
     if (base >= Dp8390::kRamBase &&
         base + 1u < Dp8390::kRamBase + Dp8390::kRamSize) {
-        const uint32_t off = base - Dp8390::kRamBase;
-        card_ram_[off]     = static_cast<uint8_t>(value & 0xFFu);
-        card_ram_[off + 1] = static_cast<uint8_t>(value >> 8);
+        cerf::le::Put16(card_ram_.data() + (base - Dp8390::kRamBase), value);
         return;
     }
     emu_.Get<Fatal>().Die("[NE2000] write16 common offset 0x%X = 0x%04X "
@@ -377,17 +375,13 @@ void Rtl8019::WriteIo16(uint32_t card_io, uint16_t value) {
 
 std::wstring Rtl8019::TooltipDetail() const {
     wchar_t buf[64];
-    swprintf_s(buf, L"Ethernet  %02X:%02X:%02X:%02X:%02X:%02X",
-               guest_mac_[0], guest_mac_[1], guest_mac_[2],
-               guest_mac_[3], guest_mac_[4], guest_mac_[5]);
+    swprintf_s(buf, L"Ethernet  %hs", cerf::inet::FormatMac(guest_mac_.data()).s);
     return buf;
 }
 
 std::vector<WidgetMenuItem> Rtl8019::BuildCardMenu() {
     wchar_t buf[64];
-    swprintf_s(buf, L"MAC  %02X:%02X:%02X:%02X:%02X:%02X",
-               guest_mac_[0], guest_mac_[1], guest_mac_[2],
-               guest_mac_[3], guest_mac_[4], guest_mac_[5]);
+    swprintf_s(buf, L"MAC  %hs", cerf::inet::FormatMac(guest_mac_.data()).s);
     WidgetMenuItem mac;
     mac.label   = buf;
     mac.enabled = false;

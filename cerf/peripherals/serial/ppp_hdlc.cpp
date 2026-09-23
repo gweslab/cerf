@@ -1,5 +1,7 @@
 #include "ppp_hdlc.h"
 
+#include "../../core/byte_order.h"
+
 namespace {
 
 /* RFC 1662: Flag Sequence 0x7e, Control Escape 0x7d; PPPINITFCS16 0xffff
@@ -84,7 +86,7 @@ void PppHdlc::EndFrame() {
     if (p[0] & 0x01) { proto = p[0]; p += 1; len -= 1; }   /* PFC single octet */
     else {
         if (len < 2) return;
-        proto = (uint16_t)((p[0] << 8) | p[1]);
+        proto = cerf::be::U16(p);
         p += 2; len -= 2;
     }
     if (sink_) sink_(proto, p, len);
@@ -96,14 +98,12 @@ void PppHdlc::BuildFrame(uint16_t protocol, const uint8_t* payload, size_t len,
     body.reserve(len + 6);
     body.push_back(0xFF);
     body.push_back(0x03);
-    body.push_back((uint8_t)(protocol >> 8));
-    body.push_back((uint8_t)(protocol & 0xFF));
+    cerf::be::Append16(body, protocol);
     body.insert(body.end(), payload, payload + len);
 
     const uint16_t fcs = (uint16_t)(Pppfcs16(kInitFcs, body.data(), body.size())
                                     ^ 0xFFFF);
-    body.push_back((uint8_t)(fcs & 0xFF));
-    body.push_back((uint8_t)((fcs >> 8) & 0xFF));
+    cerf::le::Append16(body, fcs);
 
     out.push_back(kFlag);
     for (uint8_t b : body) {

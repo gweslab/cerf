@@ -8,8 +8,10 @@
 #include "imgfs_victim_recomposer.h"
 #include "rom_parser_queries.h"
 #include "rom_parser_service.h"
+#include "rom_record_layout.h"
 
 #include "../boards/board_context.h"
+#include "../core/byte_order.h"
 #include "../core/cerf_emulator.h"
 #include "../core/device_config.h"
 #include "../core/log.h"
@@ -26,14 +28,10 @@ REGISTER_SERVICE(ImgfsInjector);
 
 namespace {
 
-constexpr uint32_t kE32SubsysmajorOff = 0x0C;
-constexpr uint32_t kE32VbaseOff       = 0x08;
-constexpr uint32_t kDirentFileSizeOff = 0x18;
-
-inline uint32_t Rd32(const uint8_t* p) {
-    return uint32_t(p[0]) | (uint32_t(p[1]) << 8)
-         | (uint32_t(p[2]) << 16) | (uint32_t(p[3]) << 24);
-}
+using cerf::ce_imgfs_walker::kDirentFileSizeOff;
+using cerf::ce_imgfs_walker::kImgfsEraseBlock;
+using cerf::ce_imgfs_walker::kImgfsPageSize;
+using cerf::le::U32;
 
 }  /* namespace */
 
@@ -54,7 +52,7 @@ void ImgfsInjector::OnReady() {
         auto& pt = emu_.Get<PageTableBuilder>();
         auto& mem = emu_.Get<EmulatedMemory>();
         const uint32_t e32_pa = pt.VaToPa(nk->ulE32Offset);
-        const uint16_t sub = mem.ReadHalf(e32_pa + kE32SubsysmajorOff);
+        const uint16_t sub = mem.ReadHalf(e32_pa + kE32OffSubsysMajor);
         if (sub >= 3 && sub <= 8) ce_major_ = sub;
     }
 
@@ -83,26 +81,18 @@ void ImgfsInjector::OnReady() {
     }
     flash_anchored_ = true;
 
-    constexpr uint32_t kErase = 0x10000;
-    constexpr uint32_t kPage  = 0x1000;
-    constexpr uint32_t kDpb   = 15;
     const size_t imgfs_size = rom.raw.size() - rom.imgfs_file_off;
-    const size_t num_blocks = imgfs_size / kErase;
+    const size_t num_blocks = imgfs_size / kImgfsEraseBlock;
     uint32_t max_ls = 0;
-    for (size_t blk = 0; blk < num_blocks; ++blk) {
-        const size_t map_off = rom.imgfs_file_off + blk * kErase + kDpb * kPage;
-        for (uint32_t e = 0; e < kDpb; ++e) {
-            const size_t eo = map_off + e * 8;
-            if (eo + 8 > rom.raw.size()) break;
-            const uint32_t ls = Rd32(rom.raw.data() + eo);
-            if (ls == 0xFFFFFFFFu) {
+    cerf::ce_imgfs_walker::ForEachFtlMapEntry(rom.raw, rom.imgfs_file_off, num_blocks,
+        [&](size_t blk, uint32_t e, uint32_t ls, uint32_t) {
+            if (ls == cerf::ce_imgfs_walker::kFtlErasedSector) {
                 free_ftl_slots_.push_back(
-                    {uint32_t(blk), e, uint32_t(blk * (kDpb + 1) + e)});
+                    {uint32_t(blk), e, cerf::ce_imgfs_walker::FtlPhysPage(blk, e)});
             } else if (ls > max_ls) {
                 max_ls = ls;
             }
-        }
-    }
+        });
     next_new_ls_ = max_ls + 1;
 
     LOG(GuestAdditions,
@@ -156,9 +146,6 @@ bool ImgfsInjector::ReplaceVictim(const char* victim_name,
         return flash_pa_base_ + uint32_t(off);
     };
 
-    constexpr uint32_t kErase  = 0x10000;
-    constexpr uint32_t kPage   = 0x1000;
-    constexpr uint32_t kDpb    = 15;
     /* IMGFS FTL flag word: imgfs.dll skips an entry whose bit 18 is set
        (deleted-pending), so a live mapping clears it - 0xFFFBFFFF. */
     constexpr uint32_t kValidFlags = 0xFFFBFFFFu;
@@ -181,16 +168,17 @@ bool ImgfsInjector::ReplaceVictim(const char* victim_name,
             const auto slot = free_ftl_slots_.front();
             free_ftl_slots_.erase(free_ftl_slots_.begin());
             const uint32_t new_ls = next_new_ls_++;
-            const uint32_t map_entry_file_off = uint32_t(
-                rom.imgfs_file_off + slot.block_idx * kErase
-                + kDpb * kPage + slot.entry_idx * 8);
+            using cerf::ce_imgfs_walker::kImgfsMapOffFlags;
+            using cerf::ce_imgfs_walker::kImgfsMapOffSector;
+            const uint32_t map_entry_file_off = uint32_t(cerf::ce_imgfs_walker::FtlMapEntryOffset(
+                rom.imgfs_file_off, slot.block_idx, slot.entry_idx));
             const uint32_t map_entry_pa = flash_pa_base_ + map_entry_file_off;
-            const uint32_t pre_ls = mem.ReadWord(map_entry_pa + 0);
-            const uint32_t pre_fl = mem.ReadWord(map_entry_pa + 4);
-            mem.WriteWord(map_entry_pa + 0, new_ls);
-            mem.WriteWord(map_entry_pa + 4, kValidFlags);
-            const uint32_t post_ls = mem.ReadWord(map_entry_pa + 0);
-            const uint32_t post_fl = mem.ReadWord(map_entry_pa + 4);
+            const uint32_t pre_ls = mem.ReadWord(map_entry_pa + kImgfsMapOffSector);
+            const uint32_t pre_fl = mem.ReadWord(map_entry_pa + kImgfsMapOffFlags);
+            mem.WriteWord(map_entry_pa + kImgfsMapOffSector, new_ls);
+            mem.WriteWord(map_entry_pa + kImgfsMapOffFlags, kValidFlags);
+            const uint32_t post_ls = mem.ReadWord(map_entry_pa + kImgfsMapOffSector);
+            const uint32_t post_fl = mem.ReadWord(map_entry_pa + kImgfsMapOffFlags);
             LOG(GuestAdditions,
                 "[ImgfsInjector] %s %s FTL slot blk=%u entry=%u pa=0x%08X: "
                 "pre(ls=0x%08X fl=0x%08X) -> post(ls=0x%08X fl=0x%08X) "
@@ -203,7 +191,7 @@ bool ImgfsInjector::ReplaceVictim(const char* victim_name,
                 CerfFatalExit();
             }
             const uint32_t phys_page_pa = flash_pa_base_
-                + uint32_t(rom.imgfs_file_off + slot.phys_page_idx * kPage);
+                + uint32_t(rom.imgfs_file_off + slot.phys_page_idx * kImgfsPageSize);
             if (new_ls < base_sector) {
                 LOG(Caution, "[ImgfsInjector] new_ls=0x%X < base_sector=0x%X\n",
                     new_ls, base_sector);
@@ -220,7 +208,7 @@ bool ImgfsInjector::ReplaceVictim(const char* victim_name,
         for (uint32_t b = 0; b < real_size; ++b) {
             mem.WriteByte(pa + b, src[b]);
         }
-        for (uint32_t b = real_size; b < kPage; ++b) {
+        for (uint32_t b = real_size; b < kImgfsPageSize; ++b) {
             mem.WriteByte(pa + b, 0);
         }
     };
@@ -228,7 +216,7 @@ bool ImgfsInjector::ReplaceVictim(const char* victim_name,
     /* Module header (e32_rom + o32 array, ~200 bytes for cerf_guest)
        - one fresh 4 KB page. */
     auto hdr_pages = allocate_pages(1, "mod_hdr");
-    const uint32_t hdr_la = hdr_pages[0].first * kPage;
+    const uint32_t hdr_la = hdr_pages[0].first * kImgfsPageSize;
     const uint32_t hdr_pa = hdr_pages[0].second;
     write_bytes_to_page(hdr_pa, new_hdr.data(), uint32_t(new_hdr.size()));
     LOG(GuestAdditions, "[ImgfsInjector] %s mod_hdr: la=0x%08X pa=0x%08X size=%zu\n",
@@ -237,8 +225,8 @@ bool ImgfsInjector::ReplaceVictim(const char* victim_name,
     /* Verify the header write landed: read back e32_vbase (off 0x08) from the
        patched header page and compare to the vbase the recomposed header carries.
        Mismatch means the DRAM write didn't take. */
-    const uint32_t expected_vbase = Rd32(new_hdr.data() + kE32VbaseOff);
-    const uint32_t verify_vbase   = mem.ReadWord(hdr_pa + kE32VbaseOff);
+    const uint32_t expected_vbase = U32(new_hdr.data(), kE32OffVbase);
+    const uint32_t verify_vbase   = mem.ReadWord(hdr_pa + kE32OffVbase);
     if (verify_vbase != expected_vbase) {
         LOG(Caution, "[ImgfsInjector] %s VERIFY FAIL: hdr e32_vbase "
                 "expected 0x%08X got 0x%08X\n",
@@ -246,10 +234,10 @@ bool ImgfsInjector::ReplaceVictim(const char* victim_name,
         CerfFatalExit();
     }
 
-    std::vector<cerf::ce_imgfs_patcher::IndexRec> mod_recs = {{kPage, hdr_la}};
+    std::vector<cerf::ce_imgfs_patcher::IndexRec> mod_recs = {{kImgfsPageSize, hdr_la}};
     const auto mod_idx_new = cerf::ce_imgfs_patcher::BuildIndexBlock(mod_recs);
     auto mod_idx_pages = allocate_pages(1, "mod_idx");
-    const uint32_t mod_idx_la = mod_idx_pages[0].first * kPage;
+    const uint32_t mod_idx_la = mod_idx_pages[0].first * kImgfsPageSize;
     const uint32_t mod_idx_pa = mod_idx_pages[0].second;
     write_bytes_to_page(mod_idx_pa, mod_idx_new.data(),
                         uint32_t(mod_idx_new.size()));
@@ -269,19 +257,13 @@ bool ImgfsInjector::ReplaceVictim(const char* victim_name,
     for (size_t i = 0; i < slots.size(); ++i) {
         const auto& s = slots[i];
         const auto& sec_dir = victim->sections[i];
-        const uint32_t pages_needed = (uint32_t(s.bytes.size()) + kPage - 1) / kPage;
+        const uint32_t pages_needed = cerf::ce_imgfs_walker::PagesFor(s.bytes.size());
         auto sec_pages = allocate_pages(pages_needed, "sec_data");
-        std::vector<cerf::ce_imgfs_patcher::IndexRec> sec_recs;
-        sec_recs.reserve(pages_needed);
-        for (uint32_t p = 0; p < pages_needed; ++p) {
-            const uint32_t la = sec_pages[p].first * kPage;
-            const uint32_t pa = sec_pages[p].second;
-            const uint32_t off   = p * kPage;
-            const uint32_t chunk = std::min<uint32_t>(
-                kPage, uint32_t(s.bytes.size()) - off);
-            write_bytes_to_page(pa, s.bytes.data() + off, chunk);
-            sec_recs.push_back({kPage, la});
-        }
+        const auto sec_recs = cerf::ce_imgfs_patcher::WritePagedData(
+            s.bytes, [&](uint32_t p, const uint8_t* data, uint32_t len) {
+                write_bytes_to_page(sec_pages[p].second, data, len);
+                return sec_pages[p].first * kImgfsPageSize;
+            });
         LOG(GuestAdditions,
             "[ImgfsInjector] %s sec[%zu]: %u pages, vsize=%u psize=%u rva=0x%X\n",
             victim_name, i, pages_needed, s.vsize, s.psize, s.rva);
@@ -289,7 +271,7 @@ bool ImgfsInjector::ReplaceVictim(const char* victim_name,
         const auto sec_idx_new =
             cerf::ce_imgfs_patcher::BuildIndexBlock(sec_recs);
         auto sec_idx_pages = allocate_pages(1, "sec_idx");
-        const uint32_t sec_idx_la = sec_idx_pages[0].first * kPage;
+        const uint32_t sec_idx_la = sec_idx_pages[0].first * kImgfsPageSize;
         const uint32_t sec_idx_pa = sec_idx_pages[0].second;
         write_bytes_to_page(sec_idx_pa, sec_idx_new.data(),
                             uint32_t(sec_idx_new.size()));

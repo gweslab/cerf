@@ -1,5 +1,7 @@
 #include "rom_wmstore_parse.h"
 
+#include "../core/byte_order.h"
+
 #include <algorithm>
 #include <cstring>
 #include <string>
@@ -7,6 +9,9 @@
 namespace cerf::rom_image_parse {
 
 namespace {
+
+using cerf::le::U16;
+using cerf::le::U32;
 
 struct EscoPayload {
     size_t off   = 0;
@@ -73,21 +78,18 @@ bool WmstoreLocateOsXip(std::span<const uint8_t> raw, WmstoreOsXip& out) {
             + uint64_t(U32(entry, kWmstorePartStartLbaOff)) * kWmstoreSectorBytes;
         const uint64_t part_bytes =
             uint64_t(U32(entry, kWmstorePartSizeLbaOff)) * kWmstoreSectorBytes;
-        if (start_off + kRomSignatureOffset + 8u > payload_end) return false;
+        if (start_off > payload_end) return false;
 
         const size_t avail = size_t(std::min<uint64_t>(
             part_bytes, uint64_t(payload_end) - start_off));
         std::span<const uint8_t> xip = raw.subspan(size_t(start_off), avail);
 
-        if (xip.size() < kRomSignatureOffset + 12u) return false;
-        if (U32(xip.data(), kRomSignatureOffset) != kRomSignature) return false;
-
-        const uint32_t ptoc_va    = U32(xip.data(), kRomSignatureOffset + 4u);
-        const uint32_t romhdr_off = U32(xip.data(), kRomSignatureOffset + 8u);
+        EcecRecord ecec;
+        if (!ReadEcec(xip, kRomSignatureOffset, ecec)) return false;
 
         ParsedROMHDR hdr;
-        if (!ParseRomHdr(xip, romhdr_off, hdr)) return false;
-        if (uint64_t(hdr.physfirst) + romhdr_off != ptoc_va) return false;
+        if (!ParseSelfLocatingRomhdr(xip, ecec.ptoc, ecec.ptoc - ecec.romhdr_off, hdr))
+            return false;
         if (hdr.physlast <= hdr.physfirst) return false;
 
         const uint32_t flat_size = hdr.physlast - hdr.physfirst;

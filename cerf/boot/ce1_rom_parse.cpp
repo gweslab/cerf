@@ -4,15 +4,15 @@
 
 #include "rom_image_parse.h"
 
+#include "../core/byte_order.h"
 #include "../core/log.h"
 
 #include <algorithm>
 
 namespace cerf::ce1_rom_parse {
 
-using cerf::rom_image_parse::ParseRomHdr;
-using cerf::rom_image_parse::U32;
-using cerf::rom_image_parse::kRomHdrSize;
+using cerf::le::U32;
+using cerf::rom_image_parse::ForEachParsedRomhdr;
 
 namespace {
 
@@ -39,25 +39,24 @@ bool VaToOff(std::span<const uint8_t> flat, uint32_t va, uint32_t base_va,
 
 }  /* namespace */
 
-std::vector<size_t> FindAllCe1Romhdrs(std::span<const uint8_t> flat) {
-    std::vector<size_t> hits;
-    for (size_t off = 0; off + kRomHdrSize <= flat.size(); off += 4) {
-        ParsedROMHDR h;
-        if (!ParseRomHdr(flat, off, h)) continue;
-        if (h.nummods == 0) continue;
-        if (h.physlast <= h.physfirst) continue;
-        if (h.physlast - h.physfirst > flat.size()) continue;
+std::vector<Ce1RomhdrHit> FindAllCe1Romhdrs(std::span<const uint8_t> flat) {
+    std::vector<Ce1RomhdrHit> hits;
+    ForEachParsedRomhdr(flat, 0, [&](size_t off, const ParsedROMHDR& h) {
+        if (h.nummods == 0) return false;
+        if (h.physlast <= h.physfirst) return false;
+        if (h.physlast - h.physfirst > flat.size()) return false;
 
         const size_t toc0   = off + kRomHdrSize;
         const uint64_t arrays = uint64_t(h.nummods)  * kCe1TocEntrySize
                               + uint64_t(h.numfiles) * kCe1FileEntrySize;
-        if (toc0 + arrays > flat.size()) continue;
+        if (toc0 + arrays > flat.size()) return false;
 
         std::string name;
-        if (!ReadInlineName(flat, toc0 + kCe1TocOffName, name)) continue;
+        if (!ReadInlineName(flat, toc0 + kCe1TocOffName, name)) return false;
 
-        hits.push_back(off);
-    }
+        hits.push_back({off, h});
+        return false;
+    });
     return hits;
 }
 
@@ -134,13 +133,7 @@ void ParseCe1ModulesAndFiles(std::span<const uint8_t> flat,
 bool ResolveCe1Xips(std::span<const uint8_t>      flat,
                     std::vector<ParsedXipRegion>& out_xips,
                     uint32_t&                     out_base_va) {
-    struct Cand { size_t off; ParsedROMHDR hdr; };
-    std::vector<Cand> cands;
-    for (size_t off : FindAllCe1Romhdrs(flat)) {
-        Cand c{off, {}};
-        if (!ParseRomHdr(flat, off, c.hdr)) continue;
-        cands.push_back(std::move(c));
-    }
+    const std::vector<Ce1RomhdrHit> cands = FindAllCe1Romhdrs(flat);
 
     uint32_t base_va   = 0;
     bool     have_base = false;

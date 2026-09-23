@@ -1,23 +1,20 @@
 #include "mediaq_ge.h"
 
+#include "../../core/byte_order.h"
 #include "../../core/log.h"
 
-#include <cstring>
-
-void MediaQGe::RopPixel(uint8_t* fb, uint32_t fbsize, uint64_t addr,
-                        uint32_t bpp, uint32_t pmask, uint8_t rop, uint32_t color) {
+void MediaQGe::RopPixel(uint8_t* fb, uint32_t fbsize, uint64_t addr, uint32_t bpp,
+                        uint32_t pmask, uint8_t rop, uint32_t pattern, uint32_t source) {
     if (addr + bpp > fbsize) return;
-    uint32_t d = 0u;
-    std::memcpy(&d, fb + addr, bpp);
-    const uint32_t res = Rop3(rop, 0u, color, d) & pmask;
-    std::memcpy(fb + addr, &res, bpp);
+    uint8_t* const px = fb + addr;
+    const uint32_t d = static_cast<uint32_t>(cerf::le::UN(px, bpp));
+    cerf::le::PutN(px, Rop3(rop, pattern, source, d) & pmask, bpp);
 }
 
 uint32_t MediaQGe::MonoPatternPixel(uint32_t pat0, uint32_t pat1, uint32_t pat_fg,
                                     uint32_t pat_bg, uint32_t x, uint32_t y) {
     const uint32_t p[2] = { pat0, pat1 };
-    const uint32_t pr = y & 7u, pc = x & 7u;
-    return ((p[pr >> 2] >> ((pr & 3u) * 8u + (7u - pc))) & 1u) ? pat_fg : pat_bg;
+    return MonoBit(reinterpret_cast<const uint8_t*>(p), (y & 7u) * 8u + (x & 7u)) ? pat_fg : pat_bg;
 }
 
 uint32_t MediaQGe::PatternOperand(const uint32_t* r, uint32_t lx, uint32_t ly) const {
@@ -31,9 +28,8 @@ uint32_t MediaQGe::PatternOperand(const uint32_t* r, uint32_t lx, uint32_t ly) c
        ends at GE13R); its pattern fills are mono, and a non-mono P here is only a
        P-ignored screen copy, so 0 is harmless. */
     if (L.color_pat_base == 0u) return 0u;
-    const uint32_t i  = row * 8u + col;
-    const uint32_t dw = r[L.color_pat_base + (i >> 1)];
-    return (i & 1u) ? (dw >> 16) & 0xFFFFu : dw & 0xFFFFu;
+    return cerf::le::U16(reinterpret_cast<const uint8_t*>(r + L.color_pat_base),
+                         (row * 8u + col) * 2u);
 }
 
 /* Flat rectangle fill: pattern and source are both the fill colour, so each
@@ -66,7 +62,7 @@ void MediaQGe::FillSolid(uint8_t rop, uint32_t color, uint32_t cmd) {
 
     uint8_t* const fb     = Fb();
     const uint32_t fbsize = FbBytes();
-    const uint32_t pmask  = (bpp >= 4u) ? 0xFFFFFFFFu : ((1u << (bpp * 8u)) - 1u);
+    const uint32_t pmask  = cerf::ByteWidthMask(bpp);
 
     for (int row = 0; row < h; ++row) {
         const int yy = y + ydir * row;
@@ -76,11 +72,7 @@ void MediaQGe::FillSolid(uint8_t rop, uint32_t color, uint32_t cmd) {
             if (xx < 0 || (clip && (xx < cl || xx > cr))) continue;
             const uint64_t addr = static_cast<uint64_t>(base) +
                 static_cast<uint64_t>(yy) * stride + static_cast<uint64_t>(xx) * bpp;
-            if (addr + bpp > fbsize) continue;
-            uint32_t d = 0u;
-            std::memcpy(&d, fb + addr, bpp);
-            const uint32_t res = Rop3(rop, color, color, d) & pmask;
-            std::memcpy(fb + addr, &res, bpp);
+            RopPixel(fb, fbsize, addr, bpp, pmask, rop, color, color);
         }
     }
 }
@@ -110,7 +102,7 @@ void MediaQGe::BlitColorFromDisplay(uint32_t cmd) {
     const int ystep = (cmd & kCmdYNeg) ? -1 : 1;
     const uint8_t rop = static_cast<uint8_t>(cmd & kCmdRopMask);
     const bool trans  = (cmd & kCmdColorTrans) != 0u;
-    const uint32_t key = reg_[kGe04ColorCmp] & ((bpp >= 4u) ? 0xFFFFFFFFu : ((1u << (bpp * 8u)) - 1u));
+    const uint32_t key = reg_[kGe04ColorCmp] & cerf::ByteWidthMask(bpp);
     const bool clip = (cmd & kCmdEnClip) != 0u;
     const int cl = static_cast<int>(reg_[kGe05ClipLT] & 0xFFFu);
     const int ct = static_cast<int>((reg_[kGe05ClipLT] >> 16) & 0xFFFu);
@@ -119,7 +111,7 @@ void MediaQGe::BlitColorFromDisplay(uint32_t cmd) {
 
     uint8_t* const fb     = Fb();
     const uint32_t fbsize = FbBytes();
-    const uint32_t pmask  = (bpp >= 4u) ? 0xFFFFFFFFu : ((1u << (bpp * 8u)) - 1u);
+    const uint32_t pmask  = cerf::ByteWidthMask(bpp);
 
     for (uint32_t r = 0; r < h; ++r) {
         const int syr = sy + ystep * static_cast<int>(r);
@@ -136,15 +128,11 @@ void MediaQGe::BlitColorFromDisplay(uint32_t cmd) {
             const uint64_t daddr = static_cast<uint64_t>(base) +
                 static_cast<uint64_t>(dyr) * stride + static_cast<uint64_t>(dxc) * bpp;
             if (saddr + bpp > fbsize || daddr + bpp > fbsize) continue;
-            uint32_t s = 0u;
-            std::memcpy(&s, fb + saddr, bpp);
+            const uint32_t s = static_cast<uint32_t>(cerf::le::UN(fb + saddr, bpp));
             if (trans && (s & pmask) == key) continue;
-            uint32_t d = 0u;
-            std::memcpy(&d, fb + daddr, bpp);
             const uint32_t p = PatternOperand(reg_, static_cast<uint32_t>(dxc - dx),
                                               static_cast<uint32_t>(dyr - dy));
-            const uint32_t res = Rop3(rop, p, s, d) & pmask;
-            std::memcpy(fb + daddr, &res, bpp);
+            RopPixel(fb, fbsize, daddr, bpp, pmask, rop, p, s);
         }
     }
 }
@@ -177,7 +165,7 @@ void MediaQGe::BlitMonoFromDisplay(uint32_t cmd) {
     const uint32_t src_stride = g09 & 0x3FFu;          /* GE09R[9:0] bytes. */
     const uint32_t bit_off0   = (g09 >> 25) & 0x7u;    /* GE09R[27:25]. */
     const uint8_t rop = static_cast<uint8_t>(cmd & kCmdRopMask);
-    const uint32_t pmask = (bpp >= 4u) ? 0xFFFFFFFFu : ((1u << (bpp * 8u)) - 1u);
+    const uint32_t pmask = cerf::ByteWidthMask(bpp);
     const uint32_t fg = reg_[Lyt().fg_index] & pmask;
     const uint32_t bg = reg_[Lyt().bg_index] & pmask;
     const bool mono_trans  = (cmd & kCmdMonoTrans) != 0u;
@@ -207,17 +195,13 @@ void MediaQGe::BlitMonoFromDisplay(uint32_t cmd) {
             const uint32_t bit_idx = bit_off0 + static_cast<uint32_t>(sxc);
             const uint64_t sbyte = row_byte + (bit_idx >> 3);
             if (sbyte >= fbsize) continue;
-            const uint32_t bit = (fb[sbyte] >> (7u - (bit_idx & 7u))) & 1u;
+            const uint32_t bit = MonoBit(fb + row_byte, bit_idx);
             if (bit && trans_set) continue;
             if (!bit && trans_clear) continue;
             const uint32_t color = bit ? fg : bg;
             const uint64_t daddr = static_cast<uint64_t>(base) +
                 static_cast<uint64_t>(dyr) * stride + static_cast<uint64_t>(dxc) * bpp;
-            if (daddr + bpp > fbsize) continue;
-            uint32_t d = 0u;
-            std::memcpy(&d, fb + daddr, bpp);
-            const uint32_t res = Rop3(rop, 0u, color, d) & pmask;
-            std::memcpy(fb + daddr, &res, bpp);
+            RopPixel(fb, fbsize, daddr, bpp, pmask, rop, 0u, color);
         }
     }
 }
@@ -234,7 +218,7 @@ void MediaQGe::DrawLine(uint32_t cmd) {
         CerfFatalExit(CERF_FATAL_RUNTIME_ERROR);
     }
 
-    const uint32_t pmask = (bpp >= 4u) ? 0xFFFFFFFFu : ((1u << (bpp * 8u)) - 1u);
+    const uint32_t pmask = cerf::ByteWidthMask(bpp);
     const uint32_t color = LineColor(cmd) & pmask;
 
     /* GE00R[25] ROP2: the ROP byte is the low nibble duplicated into [7:4]. */
@@ -276,7 +260,7 @@ void MediaQGe::DrawLine(uint32_t cmd) {
         if (x >= 0 && y >= 0 && !(clip && (x < cl || x > cr || y < ct || y > cb)))
             RopPixel(fb, fbsize, static_cast<uint64_t>(base) +
                      static_cast<uint64_t>(y) * stride + static_cast<uint64_t>(x) * bpp,
-                     bpp, pmask, rop, color);
+                     bpp, pmask, rop, 0u, color);
         if (y_major) y += step_y; else x += step_x;
         err -= dmin;
         if (err < 0) {

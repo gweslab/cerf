@@ -6,9 +6,6 @@
 
 namespace cf_fat {
 
-void Wr16(uint8_t* p, uint16_t v);
-void Wr32(uint8_t* p, uint32_t v);
-
 std::wstring BaseName(const std::wstring& path);
 
 std::vector<uint8_t> ReadHostFile(const std::wstring& path);

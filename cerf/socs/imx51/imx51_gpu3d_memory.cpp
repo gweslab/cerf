@@ -1,5 +1,6 @@
 #include "imx51_gpu3d_memory.h"
 #include "imx51_gpu3d_regs.h"
+#include "../../core/byte_order.h"
 #include "../../core/cerf_emulator.h"
 #include "../../core/fatal.h"
 #include "../../cpu/emulated_memory.h"
@@ -34,11 +35,8 @@ uint8_t* Imx51Gpu3dMemory::MemorySpan(uint64_t pa, uint64_t size, bool write, ui
 }
 
 uint32_t Imx51Gpu3dMemory::ReadPa32(uint64_t pa, uint32_t mmu_config) {
-    const uint8_t* p = ReadSpan(pa, 4u, mmu_config);
-    return uint32_t(p[0]) | (uint32_t(p[1]) << 8) |
-           (uint32_t(p[2]) << 16) | (uint32_t(p[3]) << 24);
+    return cerf::le::U32(ReadSpan(pa, 4u, mmu_config));
 }
 void Imx51Gpu3dMemory::WritePa32(uint64_t pa, uint32_t value, uint32_t mmu_config) {
-    uint8_t* p = WriteSpan(pa, 4u, mmu_config);
-    for (unsigned i = 0; i < 4; ++i) p[i] = static_cast<uint8_t>(value >> (i * 8));
+    cerf::le::Put32(WriteSpan(pa, 4u, mmu_config), value);
 }

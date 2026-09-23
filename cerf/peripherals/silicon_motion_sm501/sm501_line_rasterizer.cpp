@@ -44,11 +44,8 @@ Sm501LineDirtyRange RasterizeSm501Line(const Sm501LineState& state) {
                 const uint32_t off = state.surface_base + static_cast<uint32_t>(y) * state.surface_pitch +
                                      static_cast<uint32_t>(x) * 2u;
                 if (off + 1u < state.vram_size) {
-                    const uint16_t d = static_cast<uint16_t>(state.vram[off] | (state.vram[off + 1u] << 8u));
-                    const uint16_t out =
-                        Sm501ApplyRasterOp16(state.control, state.foreground, d, state.foreground);
-                    state.vram[off] = static_cast<uint8_t>(out);
-                    state.vram[off + 1u] = static_cast<uint8_t>(out >> 8u);
+                    Sm501RasterOpPixel16(state.vram + off, state.control, state.foreground,
+                                         state.foreground);
                     first_dirty = std::min(first_dirty, off);
                     last_dirty = std::max(last_dirty, off + 2u);
                 }

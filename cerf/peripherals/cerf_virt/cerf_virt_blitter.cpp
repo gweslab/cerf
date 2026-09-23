@@ -4,6 +4,7 @@
 #include "cerf_virt_blt_aatext.h"
 #include "cerf_virt_framebuffer.h"
 
+#include "../../core/byte_order.h"
 #include "../../core/cerf_emulator.h"
 #include "../../core/device_config.h"
 #include "../../core/log.h"
@@ -306,7 +307,7 @@ bool CerfVirtBlitter::Execute(const CerfBltDescriptor& d) {
                     uint32_t mrun = 0;
                     uint8_t* mp = PixelPtr(mask, (int32_t)(mx >> 3), mask_y, 1u, &mrun);
                     if (!mp) FatalPixel("mask", d.mask, (int32_t)mx, mask_y);
-                    rop3 = (*mp & (0x80u >> (mx & 7u))) ? fg_rop3 : bg_rop3;
+                    rop3 = ((*mp >> lcd_pixel::MsbFirstShift(mx, 1u)) & 1u) ? fg_rop3 : bg_rop3;
                 }
 
                 uint32_t brush_val = solid;
@@ -392,8 +393,7 @@ bool CerfVirtBlitter::BlendAAText(const CerfBltDescriptor& d, Surface& dst,
     if (!ResolveSurface(d.mask, 1u, &mask)) FatalSurface("AA-text mask", d.mask);
     AATextContext aa;
     aa.Build(d_masks, d.solid_color);
-    const uint32_t on_color = d.solid_color &
-        ((d_bpp >= 4u) ? 0xFFFFFFFFu : ((1u << (d_bpp * 8u)) - 1u));
+    const uint32_t on_color = d.solid_color & cerf::ByteWidthMask(d_bpp);
 
     const int32_t width  = d.dst_rect.right  - d.dst_rect.left;
     const int32_t height = d.dst_rect.bottom - d.dst_rect.top;

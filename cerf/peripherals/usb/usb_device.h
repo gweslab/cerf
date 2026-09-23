@@ -17,6 +17,10 @@ public:
         uint16_t wValue;
         uint16_t wIndex;
         uint16_t wLength;
+
+        static constexpr uint32_t kSize = 8u;
+        static SetupPacket Decode(const uint8_t* raw);
+        void Encode(uint8_t* out) const;
     };
 
     /* USB 2.0 Spec Table 9-2 (p248): bmRequestType bit layout. */
@@ -44,9 +48,21 @@ public:
     static constexpr uint8_t kDescDevice        = 1u;
     static constexpr uint8_t kDescConfiguration = 2u;
     static constexpr uint8_t kDescString        = 3u;
+    static constexpr uint8_t kDescEndpoint      = 5u;
+
+    static constexpr uint32_t kDevDescSize           = 18u;
+    static constexpr uint32_t kDevDescOffIdVendor    = 8u;
+    static constexpr uint32_t kDevDescOffIdProduct   = 10u;
+    static constexpr uint32_t kDevDescOffBcdDevice   = 12u;
+    static constexpr uint32_t kCfgDescSize           = 9u;
+    static constexpr uint32_t kCfgDescOffTotalLength = 2u;
 
     /* USB 2.0 Spec Table 9-6 (p252): Standard Feature Selectors. */
     static constexpr uint16_t kFeatureEndpointHalt = 0u;
+
+    static std::vector<uint8_t> StandardDeviceDescriptor(uint8_t device_class, uint8_t subclass,
+                                                         uint8_t protocol, uint16_t id_vendor,
+                                                         uint16_t id_product, uint16_t bcd_device);
 
     bool HandleSetup(const SetupPacket& setup, std::vector<uint8_t>& data_stage);
     bool BeginControlTransfer(const SetupPacket& setup);

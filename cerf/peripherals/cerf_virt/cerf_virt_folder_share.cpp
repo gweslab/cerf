@@ -1,5 +1,6 @@
 #include "cerf_virt_addr_map.h"
 #include "cerf_virt_folder_share_regs.h"
+#include "cerf_virt_utf16_window.h"
 #include "folder_share_stage.h"
 #include "folder_share_files.h"
 #include "folder_share_dir.h"
@@ -13,7 +14,7 @@
 #include "../../core/log.h"
 #include "../../state/state_stream.h"
 
-#include <cstring>
+#include <string>
 
 using namespace CerfVirt;
 
@@ -31,7 +32,6 @@ public:
 
     void OnReady() override {
         emu_.Get<PeripheralDispatcher>().Register(this);
-        std::memset(mount_bytes_, 0, sizeof(mount_bytes_));
     }
 
     uint32_t MmioBase() const override {
@@ -53,9 +53,7 @@ public:
         }
         if (off >= kFsMountPoint && off + 4u <= kFsMountPoint + kMountBytes) {
             RefreshMount();
-            uint32_t v;
-            std::memcpy(&v, mount_bytes_ + (off - kFsMountPoint), 4);
-            return v;
+            return Utf16WindowWord(mount_, (off - kFsMountPoint) / 2u);
         }
         HaltUnsupportedAccess("ReadWord", addr, 0);
     }
@@ -95,11 +93,7 @@ private:
         if (mount_inited_ && g == mount_gen_) return;
         mount_gen_ = g;
         mount_inited_ = true;
-        std::wstring mp = cfg.MountPoint();
-        std::memset(mount_bytes_, 0, sizeof(mount_bytes_));
-        size_t n = mp.size();
-        if (n > kFsMountPointMaxWchars - 1) n = kFsMountPointMaxWchars - 1;
-        std::memcpy(mount_bytes_, mp.data(), n * sizeof(uint16_t));
+        mount_ = cfg.MountPoint().substr(0, kFsMountPointMaxWchars - 1);
     }
 
     void HandleCode(uint32_t code) {
@@ -148,7 +142,7 @@ private:
     uint32_t result_      = 0;
     uint32_t mount_gen_   = 0;
     bool     mount_inited_ = false;
-    uint8_t  mount_bytes_[kMountBytes];
+    std::wstring mount_;
 };
 
 REGISTER_SERVICE(CerfVirtFolderShare);

@@ -3,6 +3,7 @@
 #include "guest_module_placer.h"
 
 #include "rom_parser_service.h"
+#include "rom_record_layout.h"
 
 #include "../core/cerf_emulator.h"
 #include "../core/log.h"
@@ -36,7 +37,6 @@ uint32_t GuestModulePlacer::ComputeVbase(uint32_t orig_vbase,
     auto& mem = emu_.Get<EmulatedMemory>();
     const auto& toc = parser.Primary().xips[0].toc;
 
-    constexpr uint32_t kO32CodeRealaddr = 16u;
     uint32_t slot_ceiling = 0xFFFFFFFFu;   /* lowest module vbase > victim */
     uint32_t lowest_code  = 0xFFFFFFFFu;   /* lowest section-1 code realaddr */
     for (const auto& m : toc.modules) {
@@ -47,7 +47,7 @@ uint32_t GuestModulePlacer::ComputeVbase(uint32_t orig_vbase,
         }
         const uint32_t o32_pa = pt.VaToPa(m.ulO32Offset);
         if (o32_pa) {
-            const uint32_t code = mem.ReadWord(o32_pa + kO32CodeRealaddr);
+            const uint32_t code = mem.ReadWord(o32_pa + kO32OffRealaddr);
             if (code >= kModCodeBase && code < kModCodeEnd && code < lowest_code)
                 lowest_code = code;
         }

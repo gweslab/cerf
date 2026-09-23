@@ -7,6 +7,7 @@
 #include "../cpu/emulated_memory.h"
 #include "../jit/arm/arm_mmu.h"
 #include "../jit/arm/arm_mmu_probe.h"
+#include "../lcd/lcd_pixel_expand.h"
 #include "frame_renderer.h"
 
 #include <windowsx.h>
@@ -99,14 +100,13 @@ void MemoryVisualizer::RenderInto(HDC dc, uint32_t* dib, uint32_t w, uint32_t h)
                 case Interp::Bit1: {
                     const uint8_t byte = rd(row_pa + (sx >> 3), m0);
                     dst[x] = !m0 ? kUnmapped
-                           : ((byte >> (7u - (sx & 7u))) & 1u) ? 0xFFFFFFFFu
+                           : ((byte >> lcd_pixel::MsbFirstShift(sx, 1u)) & 1u) ? 0xFFFFFFFFu
                                                                : 0xFF000000u;
                     break;
                 }
                 case Interp::Gray8: {
                     const uint8_t v = rd(row_pa + sx, m0);
-                    dst[x] = !m0 ? kUnmapped
-                                 : (0xFF000000u | (v << 16) | (v << 8) | v);
+                    dst[x] = !m0 ? kUnmapped : lcd_pixel::PackXrgb(v, v, v);
                     break;
                 }
                 case Interp::Rgb565: {
@@ -114,14 +114,7 @@ void MemoryVisualizer::RenderInto(HDC dc, uint32_t* dib, uint32_t w, uint32_t h)
                     const uint8_t lo = rd(row_pa + sx * 2u,      m0);
                     const uint8_t hi = rd(row_pa + sx * 2u + 1u, m1);
                     if (!m0 || !m1) { dst[x] = kUnmapped; break; }
-                    const uint16_t px = (uint16_t)(lo | (hi << 8));
-                    const uint8_t  r5 = (px >> 11) & 0x1Fu;
-                    const uint8_t  g6 = (px >>  5) & 0x3Fu;
-                    const uint8_t  b5 =  px        & 0x1Fu;
-                    const uint8_t  r  = (uint8_t)((r5 << 3) | (r5 >> 2));
-                    const uint8_t  g  = (uint8_t)((g6 << 2) | (g6 >> 4));
-                    const uint8_t  b  = (uint8_t)((b5 << 3) | (b5 >> 2));
-                    dst[x] = 0xFF000000u | (r << 16) | (g << 8) | b;
+                    dst[x] = lcd_pixel::Expand565((uint16_t)(lo | (hi << 8)));
                     break;
                 }
                 case Interp::Rgb8888: {
@@ -129,8 +122,7 @@ void MemoryVisualizer::RenderInto(HDC dc, uint32_t* dib, uint32_t w, uint32_t h)
                     const uint8_t b = rd(row_pa + sx * 4u,      m0);
                     const uint8_t g = rd(row_pa + sx * 4u + 1u, m1);
                     const uint8_t r = rd(row_pa + sx * 4u + 2u, m2);
-                    dst[x] = (!m0 || !m1 || !m2) ? kUnmapped
-                           : (0xFF000000u | (r << 16) | (g << 8) | b);
+                    dst[x] = (!m0 || !m1 || !m2) ? kUnmapped : lcd_pixel::PackXrgb(r, g, b);
                     break;
                 }
             }

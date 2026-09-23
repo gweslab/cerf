@@ -1,5 +1,7 @@
 #pragma once
 
+#include "../../core/byte_order.h"
+
 #include <cstdint>
 
 namespace CerfVirt {
@@ -114,17 +116,9 @@ struct BltPixelOps {
     }
 
     static uint32_t ReadPixel(const uint8_t* p, uint32_t bpp) {
-        if (bpp == 1) return *p;
-        if (bpp == 2) return *reinterpret_cast<const uint16_t*>(p);
-        if (bpp == 4) return *reinterpret_cast<const uint32_t*>(p);
-        return (uint32_t)p[0] | ((uint32_t)p[1] << 8) | ((uint32_t)p[2] << 16);
+        return static_cast<uint32_t>(cerf::le::UN(p, bpp));
     }
-    static void WritePixel(uint8_t* p, uint32_t bpp, uint32_t v) {
-        if (bpp == 1) { *p = (uint8_t)v; return; }
-        if (bpp == 2) { *reinterpret_cast<uint16_t*>(p) = (uint16_t)v; return; }
-        if (bpp == 4) { *reinterpret_cast<uint32_t*>(p) = v; return; }
-        p[0]=(uint8_t)v; p[1]=(uint8_t)(v>>8); p[2]=(uint8_t)(v>>16);
-    }
+    static void WritePixel(uint8_t* p, uint32_t bpp, uint32_t v) { cerf::le::PutN(p, v, bpp); }
 };
 
 }

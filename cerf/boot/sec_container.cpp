@@ -1,5 +1,6 @@
 #include "sec_container.h"
 
+#include "../core/byte_order.h"
 #include "../storage/mapped_file.h"
 
 #include <algorithm>
@@ -9,12 +10,7 @@ namespace {
 constexpr uint32_t kSecMagic    = 0x400D400Du;
 constexpr uint32_t kChunkHdrLen = 0x40u;
 
-uint32_t Rd32(const uint8_t* p) {
-    return  static_cast<uint32_t>(p[0])
-         | (static_cast<uint32_t>(p[1]) << 8)
-         | (static_cast<uint32_t>(p[2]) << 16)
-         | (static_cast<uint32_t>(p[3]) << 24);
-}
+using cerf::le::U32;
 
 }  /* namespace */
 
@@ -24,12 +20,15 @@ bool SecContainer::Open(MappedFile& mf) {
     const uint8_t* h = mf.View(0, kChunkHdrLen);
     if (!h) return false;
 
-    hdr_.magic        = Rd32(h + 0x00);
-    hdr_.pkcs7_off    = Rd32(h + 0x0C);
-    hdr_.file_size    = Rd32(h + 0x18);
-    hdr_.payload_off  = Rd32(h + 0x24);
-    hdr_.chunk_stride = Rd32(h + 0x28);
-    hdr_.chunk_count  = Rd32(h + 0x2C);
+    hdr_.magic        = U32(h, kSecOffMagic);
+    hdr_.image_type   = U32(h, kSecOffImageType);
+    hdr_.pkcs7_off    = U32(h, kSecOffPkcs7);
+    hdr_.sgm_size     = U32(h, kSecOffSgmSize);
+    hdr_.file_size    = U32(h, kSecOffFileSize);
+    hdr_.cat_len      = U32(h, kSecOffCatLen);
+    hdr_.payload_off  = U32(h, kSecOffPayload);
+    hdr_.chunk_stride = U32(h, kSecOffChunkStride);
+    hdr_.chunk_count  = U32(h, kSecOffChunkCount);
 
     if (hdr_.magic != kSecMagic)           return false;
     if (hdr_.chunk_stride <= kChunkHdrLen) return false;   /* data-per-chunk > 0 */

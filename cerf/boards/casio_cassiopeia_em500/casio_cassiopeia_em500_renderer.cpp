@@ -12,8 +12,6 @@
 
 namespace {
 
-constexpr size_t kContentProbeStride = 251;
-
 /* ddi.dll @0xFC5458-0xFC546C (andi 0xF800/0x7E0/0x1F channel split): the 16bpp
    framebuffer is RGB565. */
 class CasioCassiopeiaEm500Renderer : public PanelFrameRenderer {
@@ -36,7 +34,7 @@ public:
         if (!asic.IsDisplayEnabled()) return false;
         if (latch_.Latched())         return true;
         const uint32_t bytes = asic.StrideBytes() * asic.GuestH();
-        return latch_.ProbeAndLatch(asic.FbBytes(), bytes, kContentProbeStride);
+        return latch_.ProbeAndLatch(asic.FbBytes(), bytes);
     }
 
     void RenderInto(uint32_t* dib, uint32_t host_w, uint32_t host_h) override {

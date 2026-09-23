@@ -1,20 +1,15 @@
 #include "ce_imgfs_xpress.h"
 
+#include "../core/byte_order.h"
+
 #include <cstring>
 
 namespace cerf::ce_imgfs_xpress {
 
 namespace {
 
-inline uint16_t Rd16(const uint8_t* p) {
-    return uint16_t(p[0]) | (uint16_t(p[1]) << 8);
-}
-inline uint32_t Rd32(const uint8_t* p) {
-    return uint32_t(p[0])
-         | (uint32_t(p[1]) << 8)
-         | (uint32_t(p[2]) << 16)
-         | (uint32_t(p[3]) << 24);
-}
+using cerf::le::U16;
+using cerf::le::U32;
 
 }
 
@@ -28,7 +23,7 @@ std::vector<uint8_t> Decompress(const uint8_t* src,
 
     while (si < src_size && di < out_size) {
         if (si + 4 > src_size) break;
-        const uint32_t flags = Rd32(src + si);
+        const uint32_t flags = U32(src + si);
         si += 4;
 
         for (int bit = 31; bit >= 0; --bit) {
@@ -41,7 +36,7 @@ std::vector<uint8_t> Decompress(const uint8_t* src,
             }
             /* Match. */
             if (si + 2 > src_size) return std::vector<uint8_t>(dst.begin(), dst.begin() + di);
-            const uint16_t val = Rd16(src + si);
+            const uint16_t val = U16(src + si);
             si += 2;
             const uint32_t match_off = (val >> 3) + 1;
             uint32_t       match_len = val & 7;
@@ -64,12 +59,12 @@ std::vector<uint8_t> Decompress(const uint8_t* src,
                     if (match_len == 255) {
                         /* 16-bit extension. */
                         if (si + 2 > src_size) return std::vector<uint8_t>(dst.begin(), dst.begin() + di);
-                        match_len = Rd16(src + si);
+                        match_len = U16(src + si);
                         si += 2;
                         if (match_len == 0) {
                             /* 32-bit extension. */
                             if (si + 4 > src_size) return std::vector<uint8_t>(dst.begin(), dst.begin() + di);
-                            match_len = Rd32(src + si);
+                            match_len = U32(src + si);
                             si += 4;
                         }
                         if (match_len < 22) return std::vector<uint8_t>(dst.begin(), dst.begin() + di);

@@ -1,6 +1,7 @@
 #include "cerf_virt_task_manager.h"
 #include "cerf_virt_task_manager_regs.h"
 #include "cerf_virt_addr_map.h"
+#include "cerf_virt_utf16_window.h"
 
 #include "../peripheral_dispatcher.h"
 #include "../../boards/board_context.h"
@@ -42,13 +43,7 @@ uint32_t CerfVirtTaskManager::ReadWord(uint32_t addr) {
         default: break;
     }
     if (off >= kTmCmdRunText && off + 4u <= kTmCmdRunText + kRunTextBytes) {
-        const uint32_t idx = (off - kTmCmdRunText) / 2u;
-        uint32_t v = 0;
-        if (idx < cmd_run_text_.size())
-            v |= (uint16_t)cmd_run_text_[idx];
-        if (idx + 1 < cmd_run_text_.size())
-            v |= (uint32_t)(uint16_t)cmd_run_text_[idx + 1] << 16;
-        return v;
+        return Utf16WindowWord(cmd_run_text_, (off - kTmCmdRunText) / 2u);
     }
     HaltUnsupportedAccess("ReadWord", addr, 0);
 }

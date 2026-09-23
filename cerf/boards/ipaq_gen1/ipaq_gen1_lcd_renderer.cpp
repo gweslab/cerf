@@ -4,12 +4,15 @@
 
 #include "../board_context.h"
 #include "ipaq_gen1_id.h"
+#include "../../core/byte_order.h"
 #include "../../core/cerf_emulator.h"
 #include "../../core/log.h"
 #include "../../cpu/emulated_memory.h"
 #include "../../host/panel_frame_renderer.h"
+#include "../../lcd/lcd_pixel_expand.h"
 
 #include <algorithm>
+#include <cstdio>
 #include <cstring>
 
 namespace {
@@ -21,7 +24,6 @@ namespace {
 
 constexpr uint32_t kDummyPaletteBytes  = 32;
 constexpr uint32_t kBytesPerGuestPixel = 2;
-constexpr size_t   kContentProbeStride = 251;
 
 /* Panel is 320x240: Linux arch/arm/mach-sa1100/h3600.c h3600_lcd_info and
    h3100.c h3100_lcd_info, both .xres = 320, .yres = 240. */
@@ -80,8 +82,7 @@ public:
         }
         return latch_.ProbeAndLatch(emu_.Get<EmulatedMemory>(),
                                     fb_pa + data_off,
-                                    pixel_bytes,
-                                    kContentProbeStride);
+                                    pixel_bytes);
     }
 
     void RenderInto(uint32_t* dib_bgra32,
@@ -131,8 +132,7 @@ private:
     }
 
     MonoLayout ResolveMonoLayout(const uint8_t* fb_base) {
-        const uint16_t entry0 =
-            (uint16_t)(fb_base[0] | ((uint16_t)fb_base[1] << 8));
+        const uint16_t entry0 = cerf::le::U16(fb_base);
         const uint32_t pbs = (entry0 >> 12) & 0x3u;
         switch (pbs) {
             case 0: return MonoLayout{ 0x20u,  4u, 16u  };
@@ -152,8 +152,7 @@ private:
                          uint32_t host_w, uint32_t host_h,
                          const uint8_t* fb_base,
                          uint32_t guest_w, uint32_t guest_h) {
-        const uint16_t* pixels = reinterpret_cast<const uint16_t*>(
-            fb_base + kDummyPaletteBytes);
+        const uint8_t* pixels = fb_base + kDummyPaletteBytes;
 
         /* Host window is portrait (panel orientation); FB is landscape.
            Rotate 90° CCW: dest(x_dst, y_dst) = src(W_src - 1 - y_dst, x_dst).
@@ -165,16 +164,8 @@ private:
             uint32_t* dst_row = dib_bgra32 + (size_t)y_dst * host_w;
             for (uint32_t x_dst = 0; x_dst < copy_w; ++x_dst) {
                 const uint32_t y_src = x_dst;
-                const uint16_t p  = pixels[(size_t)y_src * guest_w + x_src];
-                const uint8_t  r5 = (p >> 11) & 0x1Fu;
-                const uint8_t  g6 = (p >>  5) & 0x3Fu;
-                const uint8_t  b5 =  p        & 0x1Fu;
-                const uint8_t  r  = (uint8_t)((r5 << 3) | (r5 >> 2));
-                const uint8_t  g  = (uint8_t)((g6 << 2) | (g6 >> 4));
-                const uint8_t  b  = (uint8_t)((b5 << 3) | (b5 >> 2));
-                dst_row[x_dst] = 0xFF000000u | ((uint32_t)r << 16)
-                                             | ((uint32_t)g <<  8)
-                                             |  (uint32_t)b;
+                dst_row[x_dst] = lcd_pixel::Expand565(cerf::le::U16(
+                    pixels, ((size_t)y_src * guest_w + x_src) * kBytesPerGuestPixel));
             }
         }
     }
@@ -189,27 +180,17 @@ private:
            every frame; mirror that by rebuilding the LUT per render. */
         uint32_t lut[256];
         for (uint32_t i = 0; i < ml.pal_entries; ++i) {
-            const uint16_t e =
-                (uint16_t)(fb_base[i * 2] | ((uint16_t)fb_base[i * 2 + 1] << 8));
+            const uint16_t e = cerf::le::U16(fb_base, i * 2);
             const uint8_t  g = kMonoGray[e & 0xFu];
-            lut[i] = 0xFF000000u | ((uint32_t)g << 16)
-                                 | ((uint32_t)g <<  8)
-                                 |  (uint32_t)g;
+            lut[i] = lcd_pixel::PackXrgb(g, g, g);
         }
         if (!mono_palette_logged_) {
             mono_palette_logged_ = true;
-            LOG(Lcd, "IpaqGen1LcdRenderer: mono frame %ubpp, palette "
-                     "%04X %04X %04X %04X %04X %04X %04X %04X "
-                     "%04X %04X %04X %04X %04X %04X %04X %04X\n",
-                ml.bits_per_px,
-                fb_base[0]  | (fb_base[1]  << 8), fb_base[2]  | (fb_base[3]  << 8),
-                fb_base[4]  | (fb_base[5]  << 8), fb_base[6]  | (fb_base[7]  << 8),
-                fb_base[8]  | (fb_base[9]  << 8), fb_base[10] | (fb_base[11] << 8),
-                fb_base[12] | (fb_base[13] << 8), fb_base[14] | (fb_base[15] << 8),
-                fb_base[16] | (fb_base[17] << 8), fb_base[18] | (fb_base[19] << 8),
-                fb_base[20] | (fb_base[21] << 8), fb_base[22] | (fb_base[23] << 8),
-                fb_base[24] | (fb_base[25] << 8), fb_base[26] | (fb_base[27] << 8),
-                fb_base[28] | (fb_base[29] << 8), fb_base[30] | (fb_base[31] << 8));
+            char pal[16 * 5 + 1];
+            for (uint32_t i = 0; i < 16; ++i)
+                std::snprintf(pal + i * 5, 6, "%04X ", cerf::le::U16(fb_base, i * 2));
+            LOG(Lcd, "IpaqGen1LcdRenderer: mono frame %ubpp, palette %s\n",
+                ml.bits_per_px, pal);
         }
 
         /* H31xx glass is mounted 180° relative to H36xx glass: the LCD

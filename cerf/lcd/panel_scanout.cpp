@@ -1,5 +1,8 @@
 #include "panel_scanout.h"
 
+#include "lcd_pixel_expand.h"
+#include "../core/byte_order.h"
+
 #include <cstring>
 
 constexpr uint32_t kGray2Step = 255u / 3u;
@@ -17,23 +20,13 @@ void PanelScanout::Blit(const PanelSurface& src, uint32_t* dib,
         switch (format_) {
             case PanelPixelFormat::kGray2Msb:
                 for (uint32_t x = 0; x < cw; ++x) {
-                    const uint32_t v = (line[x >> 2] >> (6u - 2u * (x & 3u))) & 3u;
-                    const uint32_t g = v * kGray2Step;
-                    dst[x] = 0xFF000000u | (g << 16) | (g << 8) | g;
+                    const uint32_t g = lcd_pixel::PackedIndexMsbFirst(line, x, 2u) * kGray2Step;
+                    dst[x] = lcd_pixel::PackXrgb(g, g, g);
                 }
                 break;
             case PanelPixelFormat::kRgb565Le:
-                for (uint32_t x = 0; x < cw; ++x) {
-                    uint16_t px;
-                    std::memcpy(&px, line + x * 2u, sizeof(px));
-                    const uint32_t r5 = (px >> 11) & 0x1Fu;
-                    const uint32_t g6 = (px >> 5)  & 0x3Fu;
-                    const uint32_t b5 =  px        & 0x1Fu;
-                    dst[x] = 0xFF000000u
-                           | (((r5 << 3) | (r5 >> 2)) << 16)
-                           | (((g6 << 2) | (g6 >> 4)) << 8)
-                           |  ((b5 << 3) | (b5 >> 2));
-                }
+                for (uint32_t x = 0; x < cw; ++x)
+                    dst[x] = lcd_pixel::Expand565(cerf::le::U16(line, x * 2u));
                 break;
         }
     }

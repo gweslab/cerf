@@ -2,8 +2,10 @@
 
 #include "compactflash_fat_common.h"
 
+#include "../../core/byte_order.h"
 #include "../../core/cerf_emulator.h"
 #include "../../core/log.h"
+#include "../../storage/fat_volume_layout.h"
 
 #include <algorithm>
 #include <array>
@@ -15,9 +17,6 @@
 REGISTER_SERVICE(CompactFlashFat16Builder);
 
 namespace {
-
-using cf_fat::Wr16;
-using cf_fat::Wr32;
 
 constexpr uint32_t kBytesPerSec = 512;
 constexpr uint32_t kSecPerClus  = 2;
@@ -124,38 +123,40 @@ bool CompactFlashFat16Builder::Build(const std::wstring& out_path,
 
     std::vector<uint8_t> img(static_cast<std::size_t>(total_sectors) * 512, 0);
 
-    uint8_t* pe = img.data() + 0x1BE;
-    uint8_t chs[3];
-    pe[0] = 0x80;
-    PackChs(kPartStart, chs);                     pe[1] = chs[0]; pe[2] = chs[1]; pe[3] = chs[2];
-    pe[4] = kPartType;
-    PackChs(kPartStart + part_sectors - 1, chs);  pe[5] = chs[0]; pe[6] = chs[1]; pe[7] = chs[2];
-    Wr32(pe + 8, kPartStart);
-    Wr32(pe + 12, part_sectors);
-    img[510] = 0x55; img[511] = 0xAA;
+    fat_volume_layout::MbrPartition part;
+    part.status = 0x80;
+    PackChs(kPartStart, part.chs_first);
+    part.type = kPartType;
+    PackChs(kPartStart + part_sectors - 1, part.chs_last);
+    part.start_lba = kPartStart;
+    part.sectors = part_sectors;
+    fat_volume_layout::WriteMbrPartition(img.data(), 0, part);
+    fat_volume_layout::WriteBootSignature(img.data());
 
     uint8_t* bs = img.data() + static_cast<std::size_t>(kPartStart) * 512;
-    bs[0] = 0xEB; bs[1] = 0xFE; bs[2] = 0x00;   /* EB FE 00 = jmp $;nop, non-bootable */
-    Wr16(bs + 11, kBytesPerSec);
-    bs[13] = kSecPerClus;
-    Wr16(bs + 14, kReserved);
-    bs[16] = kNumFats;
-    Wr16(bs + 17, kRootEntries);
-    if (part_sectors <= 0xFFFFu) { Wr16(bs + 19, static_cast<uint16_t>(part_sectors)); Wr32(bs + 32, 0); }
-    else                         { Wr16(bs + 19, 0);                                    Wr32(bs + 32, part_sectors); }
-    bs[21] = kMedia;
-    Wr16(bs + 22, static_cast<uint16_t>(fat_sectors));
-    Wr16(bs + 24, kSecPerTrack);
-    Wr16(bs + 26, kHeads);
-    Wr32(bs + 28, kPartStart);
-    bs[36] = 0x80;
-    bs[510] = 0x55; bs[511] = 0xAA;
+    fat_volume_layout::Bpb bpb;
+    bpb.jump[0] = 0xEB; bpb.jump[1] = 0xFE; bpb.jump[2] = 0x00;
+    bpb.bytes_per_sector = kBytesPerSec;
+    bpb.sectors_per_cluster = kSecPerClus;
+    bpb.reserved_sectors = kReserved;
+    bpb.num_fats = kNumFats;
+    bpb.root_entries = kRootEntries;
+    if (part_sectors <= 0xFFFFu) bpb.total_sectors16 = static_cast<uint16_t>(part_sectors);
+    else                         bpb.total_sectors32 = part_sectors;
+    bpb.media = kMedia;
+    bpb.fat_size16 = static_cast<uint16_t>(fat_sectors);
+    bpb.sectors_per_track = kSecPerTrack;
+    bpb.num_heads = kHeads;
+    bpb.hidden_sectors = kPartStart;
+    fat_volume_layout::WriteBpb(bs, bpb);
+    bs[fat_volume_layout::kBs16DrvNum] = 0x80;
+    fat_volume_layout::WriteBootSignature(bs);
 
     uint32_t next = 2;
     for (auto& e : entries) { e.first_clus = e.clusters ? next : 0; next += e.clusters; }
 
     const std::size_t fat0 = (static_cast<std::size_t>(kPartStart) + kReserved) * 512;
-    auto set_fat = [&](uint32_t clus, uint16_t val) { Wr16(img.data() + fat0 + clus * 2, val); };
+    auto set_fat = [&](uint32_t clus, uint16_t val) { cerf::le::Put16(img.data() + fat0 + clus * 2, val); };
     set_fat(0, static_cast<uint16_t>(0xFF00u | kMedia));
     set_fat(1, kEoc16);
     for (const auto& e : entries)

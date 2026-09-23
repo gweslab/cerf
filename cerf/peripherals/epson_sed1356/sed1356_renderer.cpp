@@ -6,12 +6,11 @@
 #include "../../core/cerf_emulator.h"
 #include "../../core/log.h"
 #include "../../host/panel_frame_renderer.h"
+#include "../../lcd/lcd_pixel_expand.h"
 
 #include <cstring>
 
 namespace {
-
-constexpr size_t kContentProbeStride = 251;
 
 /* S1D13506 LCD pipe -> host BGRA. Pixel formats per Technical Manual §11.1:
    16 bpp 5-6-5, 15 bpp 5-5-5, 4/8 bpp through the 4-bit LCD LUT. */
@@ -39,8 +38,7 @@ public:
         if (bpp == 0 || stride == 0) return false;
         const size_t bytes = (size_t)stride * sed.LcdGuestH();
         if (start + bytes > sed.VramSize()) return false;
-        return latch_.ProbeAndLatch(sed.VramData() + start, bytes,
-                                    kContentProbeStride);
+        return latch_.ProbeAndLatch(sed.VramData() + start, bytes);
     }
 
     void RenderInto(uint32_t* dib, uint32_t host_w, uint32_t host_h) override {
@@ -94,37 +92,20 @@ public:
     }
 
 private:
-    static uint32_t Pack(uint32_t r, uint32_t g, uint32_t b) {
-        return 0xFF000000u | (r << 16) | (g << 8) | b;
-    }
-    static uint32_t Expand5(uint32_t v) { return (v << 3) | (v >> 2); }
-    static uint32_t Expand6(uint32_t v) { return (v << 2) | (v >> 4); }
-    static uint32_t Pack565(uint16_t p) {
-        return Pack(Expand5((p >> 11) & 0x1Fu), Expand6((p >> 5) & 0x3Fu),
-                    Expand5(p & 0x1Fu));
-    }
-
     static uint32_t FromLut(Sed1356& sed, uint32_t index) {
         uint8_t r4, g4, b4;
         sed.LcdLutRgb(index, r4, g4, b4);
-        return Pack(r4 * 0x11u, g4 * 0x11u, b4 * 0x11u);
+        return lcd_pixel::PackXrgb(lcd_pixel::Expand4(r4), lcd_pixel::Expand4(g4),
+                                   lcd_pixel::Expand4(b4));
     }
 
     static uint32_t DecodePixel(Sed1356& sed, const uint8_t* vram,
                                 uint32_t line, uint32_t x, uint32_t bpp) {
         switch (bpp) {
-            case 16u: {
-                const uint32_t at = line + x * 2u;
-                return Pack565((uint16_t)(vram[sed.VramWrap(at)] |
-                                          vram[sed.VramWrap(at + 1u)] << 8));
-            }
-            case 15u: {                        /* §11.1: 5-5-5. */
-                const uint32_t at = line + x * 2u;
-                const uint16_t p = (uint16_t)(vram[sed.VramWrap(at)] |
-                                              vram[sed.VramWrap(at + 1u)] << 8);
-                return Pack(Expand5((p >> 10) & 0x1Fu),
-                            Expand5((p >> 5) & 0x1Fu), Expand5(p & 0x1Fu));
-            }
+            case 16u:
+                return lcd_pixel::Expand565(static_cast<uint16_t>(sed.VramLoad(line + x * 2u, 2u)));
+            case 15u:                          /* §11.1: 5-5-5. */
+                return lcd_pixel::Expand555(static_cast<uint16_t>(sed.VramLoad(line + x * 2u, 2u)));
             case 8u:
                 return FromLut(sed, vram[sed.VramWrap(line + x)]);
             default: {                         /* 4 bpp: pixel 0 in bits 7:4. */
@@ -147,9 +128,11 @@ private:
 
         uint8_t r5, g6, b5;
         sed.LcdInkColor(0, r5, g6, b5);
-        const uint32_t c0 = Pack(Expand5(r5), Expand6(g6), Expand5(b5));
+        const uint32_t c0 = lcd_pixel::PackXrgb(lcd_pixel::Expand5(r5), lcd_pixel::Expand6(g6),
+                                                lcd_pixel::Expand5(b5));
         sed.LcdInkColor(1, r5, g6, b5);
-        const uint32_t c1 = Pack(Expand5(r5), Expand6(g6), Expand5(b5));
+        const uint32_t c1 = lcd_pixel::PackXrgb(lcd_pixel::Expand5(r5), lcd_pixel::Expand6(g6),
+                                                lcd_pixel::Expand5(b5));
 
         /* Cursor: fixed 64x64, 8 words/line; ink: covers the display from
            the top-left, line offset REG[072h]+1 words (§14.1). */

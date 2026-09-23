@@ -3,12 +3,17 @@
 #include "../core/log.h"
 #include "../cpu/emulated_memory.h"
 
+namespace {
+
+constexpr size_t kProbeStride = 251;
+
+}
+
 bool LcdContentLatch::ProbeAndLatch(EmulatedMemory& mem,
                                     uint32_t fb_pa,
-                                    size_t   fb_bytes,
-                                    size_t   stride) {
+                                    size_t   fb_bytes) {
     if (latched_.load(std::memory_order_acquire)) return true;
-    if (fb_bytes == 0 || stride == 0)             return false;
+    if (fb_bytes == 0)                            return false;
 
     /* TryTranslate - fb_pa may not be inside a declared region yet
        in the early mode-program-before-fb-write window; Translate
@@ -16,20 +21,19 @@ bool LcdContentLatch::ProbeAndLatch(EmulatedMemory& mem,
        just stays false until CE publishes a real fb. */
     const uint8_t* fb = mem.TryTranslate(fb_pa);
     if (!fb) return false;
-    return ProbeAndLatch(fb, fb_bytes, stride);
+    return ProbeAndLatch(fb, fb_bytes);
 }
 
-bool LcdContentLatch::ProbeAndLatch(const uint8_t* fb, size_t fb_bytes,
-                                    size_t stride) {
+bool LcdContentLatch::ProbeAndLatch(const uint8_t* fb, size_t fb_bytes) {
     if (latched_.load(std::memory_order_acquire)) return true;
-    if (!fb || fb_bytes == 0 || stride == 0)      return false;
+    if (!fb || fb_bytes == 0)                     return false;
 
     /* One walk computes both signals: any nonzero sample, and an
        FNV-1a signature of the samples for the post-Rearm baseline
        comparison. */
     bool     nonzero = false;
     uint64_t sig     = 14695981039346656037ull;
-    for (size_t i = 0; i < fb_bytes; i += stride) {
+    for (size_t i = 0; i < fb_bytes; i += kProbeStride) {
         const uint8_t b = fb[i];
         nonzero |= (b != 0);
         sig = (sig ^ b) * 1099511628211ull;

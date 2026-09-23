@@ -2,6 +2,7 @@
 
 #include "../../boards/board_context.h"
 #include "../../boards/nokia_lumia_800/nokia_lumia_800_id.h"
+#include "../../core/byte_order.h"
 #include "../../core/cerf_emulator.h"
 #include "../../core/fatal.h"
 #include "../../core/steady_time.h"
@@ -91,8 +92,7 @@ void Pm8058Rtc::WriteReg(uint16_t reg, uint8_t value) {
     if (reg >= kRegWrite && reg < kRegWrite + kBytes) {
         load_[reg - kRegWrite] = value;
         if (reg == kRegWrite) {
-            base_ = (uint32_t)load_[0] | ((uint32_t)load_[1] << 8) |
-                    ((uint32_t)load_[2] << 16) | ((uint32_t)load_[3] << 24);
+            base_ = cerf::le::U32(load_);
             anchor_us_ = HostSteadyMicros();
         }
         return;

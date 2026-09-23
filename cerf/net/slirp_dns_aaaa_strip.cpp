@@ -9,22 +9,26 @@
 #include <mutex>
 #include <vector>
 
+#include "../core/byte_order.h"
 #include "../core/log.h"
+#include "ipv4_packet.h"
 
 namespace {
 
-constexpr uint16_t QTYPE_AAAA = 28;
+using cerf::be::Put16;
+using cerf::be::U16;
+using namespace cerf::inet;
 
-/* Ones-complement checksum over a buffer (RFC 1071). Used for IPv4 header
-   and UDP (with pseudo-header). */
-uint16_t InetSum(const uint8_t* data, size_t len, uint32_t seed = 0) {
-    uint32_t sum = seed;
-    for (size_t i = 0; i + 1 < len; i += 2)
-        sum += (uint32_t)((data[i] << 8) | data[i + 1]);
-    if (len & 1) sum += (uint32_t)(data[len - 1] << 8);
-    while (sum >> 16) sum = (sum & 0xFFFF) + (sum >> 16);
-    return (uint16_t)~sum;
-}
+constexpr uint16_t QTYPE_AAAA = 28;
+constexpr size_t   kDnsHeaderSize       = 12;
+constexpr size_t   kDnsOffId            = 0;
+constexpr size_t   kDnsOffFlags         = 2;
+constexpr size_t   kDnsOffQdCount       = 4;
+constexpr size_t   kDnsOffAnCount       = 6;
+constexpr size_t   kDnsOffNsCount       = 8;
+constexpr size_t   kDnsOffArCount       = 10;
+constexpr size_t   kDnsQuestionTailSize = 4;
+constexpr size_t   kDnsMinQuestionSize  = 1 + kDnsQuestionTailSize;
 
 /* Walk DNS question name (labels + 00 terminator; compression not expected
    in a query). Returns offset just past the terminator, or 0 on malformed
@@ -44,38 +48,39 @@ size_t SkipDnsName(const uint8_t* dns, size_t dns_len, size_t off) {
    the question name's null terminator (i.e. the start of QTYPE/QCLASS). */
 bool IsAaaaQuery(const uint8_t* frame, size_t len, size_t* dns_off_out,
                  size_t* dns_len_out, size_t* q_name_end_off_out) {
-    if (len < 14 + 20 + 8 + 12 + 5) return false;               /* ETH+IP+UDP+DNShdr+"\0"+QTYPE+QCLASS */
-    if (!(frame[12] == 0x08 && frame[13] == 0x00)) return false; /* IPv4 ethertype */
+    if (len < kEthHeaderSize + kIpv4HeaderSize + kUdpHeaderSize + kDnsHeaderSize + kDnsMinQuestionSize)
+        return false;
+    if (EthType(frame) != kEthTypeIpv4) return false;
 
-    const uint8_t* ip = frame + 14;
-    if ((ip[0] & 0xF0) != 0x40) return false;                   /* IPv4 version */
-    uint8_t ihl = (uint8_t)((ip[0] & 0x0F) * 4);
-    if (ihl < 20) return false;
-    if (ip[9] != 17) return false;                              /* proto == UDP */
+    const uint8_t* ip = frame + kEthHeaderSize;
+    if ((ip[0] & 0xF0) != 0x40) return false;
+    const uint32_t ihl = Ipv4HeaderLen(ip);
+    if (ihl < kIpv4HeaderSize) return false;
+    if (ip[kIpOffProto] != kIpProtoUdp) return false;
 
-    size_t udp_off = 14 + (size_t)ihl;
-    if (udp_off + 8 > len) return false;
+    size_t udp_off = kEthHeaderSize + ihl;
+    if (udp_off + kUdpHeaderSize > len) return false;
     const uint8_t* udp = frame + udp_off;
-    uint16_t dst_port = (uint16_t)((udp[2] << 8) | udp[3]);
-    if (dst_port != 53) return false;
+    uint16_t dst_port = U16(udp, kUdpOffDstPort);
+    if (dst_port != kUdpPortDns) return false;
 
-    uint16_t udp_len_field = (uint16_t)((udp[4] << 8) | udp[5]);
-    if (udp_len_field < 8) return false;
-    size_t dns_off = udp_off + 8;
-    size_t dns_len = (size_t)udp_len_field - 8;
+    uint16_t udp_len_field = U16(udp, kUdpOffLen);
+    if (udp_len_field < kUdpHeaderSize) return false;
+    size_t dns_off = udp_off + kUdpHeaderSize;
+    size_t dns_len = (size_t)udp_len_field - kUdpHeaderSize;
     if (dns_off + dns_len > len) return false;
-    if (dns_len < 12 + 5) return false;                          /* header + minimal question */
+    if (dns_len < kDnsHeaderSize + kDnsMinQuestionSize) return false;
 
     const uint8_t* dns = frame + dns_off;
-    uint16_t flags    = (uint16_t)((dns[2] << 8) | dns[3]);
-    if (flags & 0x8000) return false;                            /* QR bit set → it's a response, not a query */
-    uint16_t qd_count = (uint16_t)((dns[4] << 8) | dns[5]);
-    if (qd_count != 1) return false;                             /* only plain single-question queries */
+    uint16_t flags    = U16(dns, kDnsOffFlags);
+    if (flags & 0x8000) return false;
+    uint16_t qd_count = U16(dns, kDnsOffQdCount);
+    if (qd_count != 1) return false;
 
-    size_t name_end = SkipDnsName(dns, dns_len, 12);
-    if (name_end == 0 || name_end + 4 > dns_len) return false;
+    size_t name_end = SkipDnsName(dns, dns_len, kDnsHeaderSize);
+    if (name_end == 0 || name_end + kDnsQuestionTailSize > dns_len) return false;
 
-    uint16_t qtype  = (uint16_t)((dns[name_end] << 8) | dns[name_end + 1]);
+    uint16_t qtype  = U16(dns, name_end);
     if (qtype != QTYPE_AAAA) return false;
 
     *dns_off_out        = dns_off;
@@ -92,81 +97,52 @@ std::vector<uint8_t> BuildAaaaNoDataReply(const uint8_t* query_frame,
                                           size_t query_len,
                                           size_t dns_off,
                                           size_t q_name_end) {
-    /* Response DNS payload: 12-byte header + question section (up to
-       QTYPE+QCLASS after the name terminator) = q_name_end + 4. */
-    size_t resp_dns_len = q_name_end + 4;
-    if (dns_off + resp_dns_len > query_len) return {};           /* sanity */
+    size_t resp_dns_len = q_name_end + kDnsQuestionTailSize;
+    if (dns_off + resp_dns_len > query_len) return {};
 
-    size_t resp_udp_len = 8 + resp_dns_len;
-    size_t resp_ip_len  = 20 + resp_udp_len;
-    size_t resp_total   = 14 + resp_ip_len;
+    size_t resp_udp_len = kUdpHeaderSize + resp_dns_len;
+    size_t resp_ip_len  = kIpv4HeaderSize + resp_udp_len;
+    size_t resp_total   = kEthHeaderSize + resp_ip_len;
 
     std::vector<uint8_t> out(resp_total, 0);
 
-    /* Ethernet: swap src/dst. */
-    std::memcpy(out.data() + 0, query_frame + 6, 6);             /* dst ← query src (guest) */
-    std::memcpy(out.data() + 6, query_frame + 0, 6);             /* src ← query dst (slirp DNS) */
-    out[12] = 0x08; out[13] = 0x00;
+    PutEthHeader(out.data(), query_frame + kEthOffSrc, query_frame + kEthOffDst, kEthTypeIpv4);
 
-    /* IPv4 header - fixed 20-byte, no options. */
-    uint8_t* oip = out.data() + 14;
-    oip[0] = 0x45;                                               /* ver=4, ihl=5 */
-    oip[1] = 0;                                                  /* DSCP/ECN */
-    oip[2] = (uint8_t)(resp_ip_len >> 8); oip[3] = (uint8_t)resp_ip_len;
-    oip[4] = 0; oip[5] = 1;                                      /* ID */
-    oip[6] = 0; oip[7] = 0;                                      /* flags + frag offset */
-    oip[8] = 64;                                                 /* TTL */
-    oip[9] = 17;                                                 /* UDP */
-    oip[10] = 0; oip[11] = 0;                                    /* header checksum placeholder */
+    uint8_t* oip = out.data() + kEthHeaderSize;
+    const uint8_t* qip = query_frame + kEthHeaderSize;
+    const uint32_t qihl = Ipv4HeaderLen(qip);
+    WriteIpv4Header(oip, static_cast<uint16_t>(resp_ip_len), kIpProtoUdp,
+                    qip + kIpOffDst, qip + kIpOffSrc);
 
-    const uint8_t* qip = query_frame + 14;
-    uint8_t qihl = (uint8_t)((qip[0] & 0x0F) * 4);
-    std::memcpy(oip + 12, qip + 16, 4);                          /* src IP ← query dst IP (slirp DNS) */
-    std::memcpy(oip + 16, qip + 12, 4);                          /* dst IP ← query src IP (guest)    */
+    uint8_t* oudp = out.data() + kEthHeaderSize + kIpv4HeaderSize;
+    const uint8_t* qudp = query_frame + kEthHeaderSize + qihl;
+    std::memcpy(oudp + kUdpOffSrcPort, qudp + kUdpOffDstPort, 2);
+    std::memcpy(oudp + kUdpOffDstPort, qudp + kUdpOffSrcPort, 2);
+    Put16(oudp + kUdpOffLen, static_cast<uint16_t>(resp_udp_len));
+    Put16(oudp + kUdpOffChecksum, 0);
 
-    /* IPv4 header checksum (16-bit ones-complement over the 20-byte header). */
-    uint16_t ip_ck = InetSum(oip, 20, 0);
-    oip[10] = (uint8_t)(ip_ck >> 8); oip[11] = (uint8_t)ip_ck;
-
-    /* UDP header - swap ports; checksum computed after DNS payload written. */
-    uint8_t* oudp = out.data() + 14 + 20;
-    const uint8_t* qudp = query_frame + 14 + qihl;
-    oudp[0] = qudp[2]; oudp[1] = qudp[3];                        /* src port ← query dst port (53) */
-    oudp[2] = qudp[0]; oudp[3] = qudp[1];                        /* dst port ← query src port      */
-    oudp[4] = (uint8_t)(resp_udp_len >> 8); oudp[5] = (uint8_t)resp_udp_len;
-    oudp[6] = 0; oudp[7] = 0;                                    /* checksum placeholder */
-
-    /* DNS header. */
-    uint8_t* odns = out.data() + 14 + 20 + 8;
+    uint8_t* odns = out.data() + kEthHeaderSize + kIpv4HeaderSize + kUdpHeaderSize;
     const uint8_t* qdns = query_frame + dns_off;
-    odns[0] = qdns[0]; odns[1] = qdns[1];                        /* transaction ID */
-    /* Flags: QR=1, Opcode=0, AA=0, TC=0, RD=(echo client's), RA=1, Z=0, RCODE=0. */
-    uint8_t rd = (uint8_t)(qdns[2] & 0x01);                      /* preserve RD flag */
-    odns[2] = (uint8_t)(0x80 | rd);
-    odns[3] = (uint8_t)(0x80);                                   /* RA=1, RCODE=0 (NoError) */
-    odns[4] = 0; odns[5] = 1;                                    /* QDCOUNT=1 */
-    odns[6] = 0; odns[7] = 0;                                    /* ANCOUNT=0 - NoData */
-    odns[8] = 0; odns[9] = 0;                                    /* NSCOUNT=0 */
-    odns[10] = 0; odns[11] = 0;                                  /* ARCOUNT=0 */
+    std::memcpy(odns + kDnsOffId, qdns + kDnsOffId, 2);
+    uint8_t rd = (uint8_t)(qdns[kDnsOffFlags] & 0x01);
+    odns[kDnsOffFlags]     = (uint8_t)(0x80 | rd);
+    odns[kDnsOffFlags + 1] = (uint8_t)(0x80);
+    Put16(odns + kDnsOffQdCount, 1);
+    Put16(odns + kDnsOffAnCount, 0);
+    Put16(odns + kDnsOffNsCount, 0);
+    Put16(odns + kDnsOffArCount, 0);
 
-    /* Copy question section verbatim (name + QTYPE + QCLASS). */
-    std::memcpy(odns + 12, qdns + 12, resp_dns_len - 12);
+    std::memcpy(odns + kDnsHeaderSize, qdns + kDnsHeaderSize, resp_dns_len - kDnsHeaderSize);
 
-    /* UDP checksum: pseudo-header (src_ip, dst_ip, 0, proto, udp_len) +
-       UDP header + data. Mandatory for the reply even though IPv4 senders
-       can leave it zero; CE5 resolvers that validate it will drop a zero. */
     uint8_t pseudo[12] = {};
-    std::memcpy(pseudo + 0, oip + 12, 4);                        /* src IP (slirp DNS) */
-    std::memcpy(pseudo + 4, oip + 16, 4);                        /* dst IP (guest)     */
+    std::memcpy(pseudo + 0, oip + kIpOffSrc, kIpv4AddrSize);
+    std::memcpy(pseudo + 4, oip + kIpOffDst, kIpv4AddrSize);
     pseudo[8]  = 0;
-    pseudo[9]  = 17;                                             /* UDP */
-    pseudo[10] = (uint8_t)(resp_udp_len >> 8);
-    pseudo[11] = (uint8_t)resp_udp_len;
-    uint32_t seed = 0;
-    for (int i = 0; i < 12; i += 2) seed += (uint32_t)((pseudo[i] << 8) | pseudo[i + 1]);
-    uint16_t udp_ck = InetSum(oudp, resp_udp_len, seed);
-    if (udp_ck == 0) udp_ck = 0xFFFF;                            /* 0 means "no checksum" in UDP */
-    oudp[6] = (uint8_t)(udp_ck >> 8); oudp[7] = (uint8_t)udp_ck;
+    pseudo[9]  = kIpProtoUdp;
+    Put16(pseudo + 10, static_cast<uint16_t>(resp_udp_len));
+    uint16_t udp_ck = InetChecksum(oudp, resp_udp_len, WordSum(pseudo, sizeof(pseudo)));
+    if (udp_ck == 0) udp_ck = 0xFFFF;
+    Put16(oudp + kUdpOffChecksum, udp_ck);
 
     return out;
 }

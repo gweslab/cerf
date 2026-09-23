@@ -1,6 +1,7 @@
 #include "usb_state.h"
 #include "usb_hub.h"
 
+#include "../../core/byte_order.h"
 #include "../../state/state_stream.h"
 
 namespace {
@@ -31,17 +32,8 @@ UsbHub::UsbHub(int num_ports) {
 }
 
 std::vector<uint8_t> UsbHub::BuildDeviceDescriptor() const {
-    return {
-        18u, kDescDevice,
-        0x00u, 0x02u,
-        kHubClassCode, 0u, kHubDeviceProtocolSingleTt,
-        64u,
-        static_cast<uint8_t>(kHubIdVendor & 0xFFu), static_cast<uint8_t>(kHubIdVendor >> 8),
-        static_cast<uint8_t>(kHubIdProduct & 0xFFu), static_cast<uint8_t>(kHubIdProduct >> 8),
-        static_cast<uint8_t>(kHubBcdDevice & 0xFFu), static_cast<uint8_t>(kHubBcdDevice >> 8),
-        0u, 0u, 0u,
-        1u,
-    };
+    return StandardDeviceDescriptor(kHubClassCode, 0u, kHubDeviceProtocolSingleTt,
+                                    kHubIdVendor, kHubIdProduct, kHubBcdDevice);
 }
 
 std::vector<uint8_t> UsbHub::BuildConfigurationDescriptor() const {
@@ -95,8 +87,9 @@ bool UsbHub::HandleClassRequest(const SetupPacket& setup,
         if (port < 0 || port >= NumPorts()) return false;
         const uint16_t status = port_status_[static_cast<size_t>(port)];
         const uint16_t change = port_change_[static_cast<size_t>(port)];
-        data_stage = {static_cast<uint8_t>(status & 0xFFu), static_cast<uint8_t>(status >> 8),
-                      static_cast<uint8_t>(change & 0xFFu), static_cast<uint8_t>(change >> 8)};
+        data_stage.clear();
+        cerf::le::Append16(data_stage, status);
+        cerf::le::Append16(data_stage, change);
         return true;
     }
     if (setup.bRequest == kHubReqSetFeature && recip == 3u) {

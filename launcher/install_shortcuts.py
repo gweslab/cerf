@@ -175,13 +175,10 @@ def create_start_menu_entries(install_dir: Path) -> Optional[Path]:
 def remove_desktop_shortcut() -> None:
     path = desktop_shortcut_path()
     if path is not None and path.is_file():
-        try:
-            path.unlink()
-        except OSError:
-            pass
+        path.unlink()
 
 
 def remove_start_menu_entries() -> None:
     folder = start_menu_dir()
     if folder is not None and folder.is_dir():
-        shutil.rmtree(folder, ignore_errors=True)
+        shutil.rmtree(folder)

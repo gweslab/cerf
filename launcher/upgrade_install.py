@@ -10,10 +10,10 @@ from cerf_json_merge import migrate_cerf_json
 from cerf_user_json import (LauncherLink, read_launcher_link,
                             write_launcher_link)
 from device_state import load_local_manifest
+from retry_gate import RetryFn, attempt
 from upgrade_process import GLOBAL_CONFIG_NAME, UpgradeError
 
 LogFn = Callable[[str], None]
-RetryFn = Callable[[str, str], bool]
 
 
 def migrate_device_links(devices_dir: Path, log: LogFn) -> None:
@@ -50,15 +50,13 @@ def _payload_files(upgrade_dir: Path) -> List[Path]:
 
 def _copy_with_retry(source: Path, destination: Path, what: str,
                      ask_retry: RetryFn) -> None:
-    while True:
-        try:
-            destination.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copy2(source, destination)
-            return
-        except OSError as exc:
-            if not ask_retry("Copy failed",
-                             f"Copying {what} failed:\n{exc}\n\nRetry?"):
-                raise UpgradeError(f"copying {what} was cancelled") from exc
+    def copy() -> None:
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(source, destination)
+
+    error = attempt("Copy failed", f"Copying {what}", copy, ask_retry)
+    if error is not None:
+        raise UpgradeError(f"copying {what} was cancelled") from error
 
 
 def install_upgrade(upgrade_dir: Path, install_dir: Path, log: LogFn,
@@ -75,16 +73,13 @@ def install_upgrade(upgrade_dir: Path, install_dir: Path, log: LogFn,
     if not staged_config.is_file():
         raise UpgradeError(f"the new build ships no {GLOBAL_CONFIG_NAME}")
     log(f"Migrating {GLOBAL_CONFIG_NAME}")
-    while True:
-        try:
-            migrate_cerf_json(staged_config, install_dir / GLOBAL_CONFIG_NAME)
-            break
-        except (OSError, ValueError) as exc:
-            if not ask_retry("Migration failed",
-                             f"Migrating {GLOBAL_CONFIG_NAME} failed:\n{exc}\n\n"
-                             f"Retry?"):
-                raise UpgradeError(
-                    f"migrating {GLOBAL_CONFIG_NAME} was cancelled") from exc
+    error = attempt("Migration failed", f"Migrating {GLOBAL_CONFIG_NAME}",
+                    lambda: migrate_cerf_json(staged_config,
+                                              install_dir / GLOBAL_CONFIG_NAME),
+                    ask_retry, errors=(OSError, ValueError))
+    if error is not None:
+        raise UpgradeError(
+            f"migrating {GLOBAL_CONFIG_NAME} was cancelled") from error
 
     log("Migrating device repository links")
     migrate_device_links(install_dir / "devices", log)

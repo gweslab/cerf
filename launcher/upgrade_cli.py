@@ -62,7 +62,7 @@ def _install(window: UpgradeWindow, wait_pid: Optional[int],
             raise UpgradeError("cancelled while cerf.exe was running")
         install_upgrade(upgrade_dir, install_dir, window.post_log,
                         window.ask_retry)
-        finalize(install_dir, options, window.post_log)
+        finalize(install_dir, options, window.post_log, window.ask_retry)
         window.post_log("Starting the installed launcher")
         spawn_stage(launcher_exe_in(install_dir),
                     stage_argument(os.getpid(), POST_UPGRADE_FLAG,

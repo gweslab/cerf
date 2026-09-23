@@ -12,6 +12,7 @@ import ui_theme as theme
 
 
 DONE_HEADING = "CE Runtime Foundation has been uninstalled"
+PARTIAL_HEADING = "CE Runtime Foundation was only partly removed"
 
 
 def _root() -> tk.Tk:
@@ -54,11 +55,23 @@ def run_uninstall() -> int:
 
     progress = UninstallProgress(root)
     progress.log("Removing {}".format(install_dir))
-    locked = remove_installation(install_dir, delete_user_data, progress.log)
-    remove_shell_integration(progress.log)
-    progress.finish(DONE_HEADING)
+    locked, left = remove_installation(install_dir, delete_user_data,
+                                       progress.log, ask_retry)
+    left += remove_shell_integration(progress.log, ask_retry)
+    remove_folder = delete_user_data and not left
+    if locked is not None:
+        progress.log("{} {} removed after this window closes".format(
+            locked.name + (" and the installation folder"
+                           if remove_folder else ""),
+            "are" if remove_folder else "is"))
+    if left:
+        progress.log("")
+        progress.log("Left behind: {}".format(", ".join(left)))
+        progress.finish(PARTIAL_HEADING)
+    else:
+        progress.finish(DONE_HEADING)
     root.mainloop()
     root.destroy()
 
-    schedule_self_delete(locked, install_dir, delete_user_data)
+    schedule_self_delete(locked, install_dir, remove_folder)
     return 0

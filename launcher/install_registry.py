@@ -48,5 +48,5 @@ def register(install_dir: Path, version: str) -> None:
 def unregister() -> None:
     try:
         winreg.DeleteKey(winreg.HKEY_CURRENT_USER, UNINSTALL_ROOT)
-    except OSError:
+    except FileNotFoundError:
         pass

@@ -7,6 +7,7 @@ import install_registry
 import install_shortcuts
 from app_paths import resolve_version, resolve_version_tuple
 from install_options import InstallOptions
+from retry_gate import RetryFn, attempt
 
 LogFn = Callable[[str], None]
 
@@ -18,26 +19,26 @@ def _plain_version() -> str:
     return ".".join(str(n) for n in numbers)
 
 
-def finalize(install_dir: Path, options: InstallOptions, log: LogFn) -> None:
+def _create(what: str, action: Callable[[], object], log: LogFn,
+            ask_retry: RetryFn) -> None:
+    log("Creating " + what)
+    error = attempt("Create failed", "Creating " + what, action, ask_retry)
+    if error is not None:
+        log("  {} not created ({})".format(what, error))
+
+
+def finalize(install_dir: Path, options: InstallOptions, log: LogFn,
+             ask_retry: RetryFn) -> None:
     if options.desktop_icon:
-        log("Creating the desktop shortcut")
-        try:
-            install_shortcuts.create_desktop_shortcut(install_dir)
-        except OSError as exc:
-            log("  desktop shortcut not created ({})".format(exc))
-
+        _create("the desktop shortcut",
+                lambda: install_shortcuts.create_desktop_shortcut(install_dir),
+                log, ask_retry)
     if options.start_menu:
-        log("Creating the Start menu entries")
-        try:
-            install_shortcuts.create_start_menu_entries(install_dir)
-        except OSError as exc:
-            log("  Start menu entries not created ({})".format(exc))
-
+        _create("the Start menu entries",
+                lambda: install_shortcuts.create_start_menu_entries(
+                    install_dir), log, ask_retry)
     if not options.fresh:
         return
-
-    log("Registering in Programs and Features")
-    try:
-        install_registry.register(install_dir, _plain_version())
-    except OSError as exc:
-        log("  not registered ({})".format(exc))
+    _create("the Programs and Features entry",
+            lambda: install_registry.register(install_dir, _plain_version()),
+            log, ask_retry)

@@ -360,20 +360,23 @@ concretes (strategy pattern, selected by `BoardContext`).
   guest-additions display driver renders its first frame. The boot animation
   of CERF is only the placeholder while the guest renders nothing.
 
-  The compositor scales a smaller layer up by the largest integer factor that
-  fits, and then centers it. One factor serves both axes, so the aspect ratio
-  stays exact. Nearest-neighbor sampling keeps each source pixel square.
+  The compositor fits a layer of another size to the surface, keeps its aspect
+  ratio, and centers it. It never crops a layer. The compositor enlarges a
+  smaller layer by the largest integer factor that fits, with nearest-neighbor
+  sampling. It reduces a layer that is larger on either axis. Each output
+  pixel is then the average of the source pixels under it.
 
-  The layers are opaque, and the compositor skips each covered layer. DO NOT
-  blend the layers per pixel. The guest-additions surface has areas that are
-  legitimately black, and a blend makes the panel layer visible through them.
+  The layers are opaque, and the compositor skips each covered layer. The
+  compositor must not blend the layers per pixel. The guest-additions surface
+  has areas that are legitimately black, and a blend makes the panel layer
+  visible through them.
 
   The layer that covers the surface renders directly into the target DIB, so
   it costs no copy. The scratch buffer and the scaled copy occur only while
-  the compositor presents a smaller layer.
+  the compositor presents a layer of another size.
 
-  `RearmContentLatch` goes to every layer, so a guest reset rearms all of
-  them.
+  The compositor sends `RearmContentLatch` to every layer, so a guest reset
+  rearms all of them.
 
   To add a layer, register it on its own role slot. Then put the layer in the
   order of the compositor.

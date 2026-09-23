@@ -49,7 +49,10 @@ def main() -> int:
         f"NOT explicitly authorize THIS specific edit in this turn, REVERT "
         f"immediately and surface the deviation back to the user. Silent "
         f"agent rewrites of project documentation are how rules get "
-        f"rewritten without the user noticing."
+        f"rewritten without the user noticing. Exception is when you actually "
+        f"change a real subsystem, coordinated with user or it's a /verify agent "
+        f"requirement. Any changes ALWAYS follow Skill(leak) and Skill(simple-english) "
+        f"invocations to reduce retarded AI slop."
     )
 
     out = {

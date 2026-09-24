@@ -40,7 +40,8 @@ class PropertiesDialog:
 
         footer = ttk.Frame(dlg, padding=(12, 10))
         footer.pack(fill="x", side="bottom")
-        tk.Frame(dlg, height=1, bg=theme.BORDER).pack(fill="x", side="bottom")
+        tk.Frame(dlg, height=1, bg=theme.SEPARATOR).pack(fill="x",
+                                                         side="bottom")
         ttk.Button(footer, text="Cancel", command=self._on_cancel).pack(
             side="right")
         self._ok = ttk.Button(footer, text="OK", style="Accent.TButton",
@@ -62,7 +63,7 @@ class PropertiesDialog:
             font=("Segoe UI", 10))
         self._list.grid(row=0, column=0, sticky="ns")
         self._list.bind("<<ListboxSelect>>", self._on_list_select)
-        tk.Frame(main, width=1, bg=theme.BORDER).grid(row=0, column=1,
+        tk.Frame(main, width=1, bg=theme.SEPARATOR).grid(row=0, column=1,
                                                       sticky="ns")
 
         self._header = SideBlock(main, "", row=0, body_padding=(12, 10, 12, 12))

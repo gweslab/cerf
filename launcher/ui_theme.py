@@ -37,7 +37,8 @@ def system_uses_dark() -> bool:
 _DARK_PALETTE: Dict[str, str] = {
     "BG": "#1e1e1e", "BG_LIGHTER": "#252526", "BG_FIELD": "#2d2d30",
     "BG_HOVER": "#3c3c3c", "BG_SELECTED": "#094771", "FG": "#e0e0e0",
-    "FG_DIM": "#808080", "BORDER": "#3f3f46", "UPDATE_LINK": "#e8c44a",
+    "FG_DIM": "#808080", "BORDER": "#3f3f46", "SEPARATOR": "#343434",
+    "UPDATE_LINK": "#e8c44a",
     "LINK_FG": "#569cd6", "GROUP_BG": "#252526", "PREVIEW_STOPPED": "#cfcfcf",
     "DANGER_FG": "#f48771", "WARN_FG": "#ffb900", "LAUNCH_FG": "#3fb950",
     "CARD_RUNNING_BG": "#1e3a1e", "CARD_UPDATE_BG": "#3a2f12",
@@ -48,7 +49,8 @@ _DARK_PALETTE: Dict[str, str] = {
 _LIGHT_PALETTE: Dict[str, str] = {
     "BG": "#f3f3f3", "BG_LIGHTER": "#ffffff", "BG_FIELD": "#ffffff",
     "BG_HOVER": "#e6e6e6", "BG_SELECTED": "#cce4f7", "FG": "#1b1b1b",
-    "FG_DIM": "#6b6b6b", "BORDER": "#c4c4c4", "UPDATE_LINK": "#8a5a00",
+    "FG_DIM": "#6b6b6b", "BORDER": "#c4c4c4", "SEPARATOR": "#dbdbdb",
+    "UPDATE_LINK": "#8a5a00",
     "LINK_FG": "#0a66c2", "GROUP_BG": "#ececec", "PREVIEW_STOPPED": "#8a8a8a",
     "DANGER_FG": "#c42b1c", "WARN_FG": "#8a5a00", "LAUNCH_FG": "#107c10",
     "CARD_RUNNING_BG": "#dff3df", "CARD_UPDATE_BG": "#fbeecb",
@@ -68,6 +70,7 @@ BG_SELECTED = _PALETTE["BG_SELECTED"]
 FG          = _PALETTE["FG"]
 FG_DIM      = _PALETTE["FG_DIM"]
 BORDER      = _PALETTE["BORDER"]
+SEPARATOR   = _PALETTE["SEPARATOR"]
 UPDATE_LINK = _PALETTE["UPDATE_LINK"]
 LINK_FG     = _PALETTE["LINK_FG"]
 GROUP_BG    = _PALETTE["GROUP_BG"]
@@ -102,6 +105,7 @@ def refresh_palette() -> bool:
     the caller re-runs apply_theme + per-widget retheme(). No change -> False."""
     global IS_DARK, _PALETTE, STATE_TINT
     global BG, BG_LIGHTER, BG_FIELD, BG_HOVER, BG_SELECTED, FG, FG_DIM, BORDER
+    global SEPARATOR
     global UPDATE_LINK, LINK_FG, GROUP_BG, PREVIEW_STOPPED, DANGER_FG, WARN_FG
     global LAUNCH_FG
     global CARD_RUNNING_BG, CARD_UPDATE_BG, CARD_RUNNING_SEL, CARD_UPDATE_SEL
@@ -119,6 +123,7 @@ def refresh_palette() -> bool:
     FG          = _PALETTE["FG"]
     FG_DIM      = _PALETTE["FG_DIM"]
     BORDER      = _PALETTE["BORDER"]
+    SEPARATOR   = _PALETTE["SEPARATOR"]
     UPDATE_LINK = _PALETTE["UPDATE_LINK"]
     LINK_FG     = _PALETTE["LINK_FG"]
     GROUP_BG    = _PALETTE["GROUP_BG"]
@@ -215,6 +220,18 @@ def apply_titlebar(window: tk.Misc) -> None:
         pass
 
 
+def _apply_flat_separator(root: tk.Tk, style: ttk.Style) -> None:
+    image = getattr(root, "_flat_separator_image", None)
+    if image is None:
+        image = tk.PhotoImage(master=root, width=1, height=1)
+        root._flat_separator_image = image
+        style.element_create("FlatSeparator.fill", "image", image,
+                             sticky="nswe")
+        for name in ("Horizontal.TSeparator", "Vertical.TSeparator"):
+            style.layout(name, [("FlatSeparator.fill", {"sticky": "nswe"})])
+    image.put(SEPARATOR, to=(0, 0, 1, 1))
+
+
 def apply_theme(root: tk.Tk) -> None:
     root.configure(bg=BG)
     style = ttk.Style(root)
@@ -230,7 +247,8 @@ def apply_theme(root: tk.Tk) -> None:
 
     style.configure("TFrame",       background=BG)
     style.configure("TLabel",       background=BG, foreground=FG)
-    style.configure("TSeparator",   background=BORDER)
+    style.configure("TSeparator",   background=SEPARATOR)
+    _apply_flat_separator(root, style)
     style.configure("TLabelframe",  background=BG, foreground=FG,
                                    bordercolor=BORDER)
     style.configure("TLabelframe.Label", background=BG, foreground=FG)

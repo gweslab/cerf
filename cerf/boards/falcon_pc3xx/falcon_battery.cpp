@@ -91,26 +91,26 @@ public:
     /* Serialize the 1-Wire slot FSM so a save mid-bit-bang restores mid-bit-bang
        (forwarded by Pxa255Gpio::SaveState/RestoreState). */
     void SaveState(StateWriter& w) override {
-        w.Write<uint8_t>(dir_out_ ? 1u : 0u);
-        w.Write<uint8_t>(armed_ ? 1u : 0u);
-        w.Write<uint8_t>(last_was_read_ ? 1u : 0u);
-        w.Write<uint8_t>(serving_ ? 1u : 0u);
-        w.Write(write_run_);
-        w.Write(resp_bit_);
-        w.Write(resp_len_);
-        w.WriteBytes(resp_, sizeof(resp_));
+        w.Write<uint8_t>("dir_out", dir_out_ ? 1u : 0u);
+        w.Write<uint8_t>("armed", armed_ ? 1u : 0u);
+        w.Write<uint8_t>("last_was_read", last_was_read_ ? 1u : 0u);
+        w.Write<uint8_t>("serving", serving_ ? 1u : 0u);
+        w.Write("write_run", write_run_);
+        w.Write("resp_bit", resp_bit_);
+        w.Write("resp_len", resp_len_);
+        w.WriteBytes("resp", resp_, sizeof(resp_));
     }
 
     void RestoreState(StateReader& r) override {
         uint8_t b = 0;
-        r.Read(b); dir_out_       = (b != 0);
-        r.Read(b); armed_         = (b != 0);
-        r.Read(b); last_was_read_ = (b != 0);
-        r.Read(b); serving_       = (b != 0);
-        r.Read(write_run_);
-        r.Read(resp_bit_);
-        r.Read(resp_len_);
-        r.ReadBytes(resp_, sizeof(resp_));
+        r.Read("dir_out", b); dir_out_       = (b != 0);
+        r.Read("armed", b); armed_         = (b != 0);
+        r.Read("last_was_read", b); last_was_read_ = (b != 0);
+        r.Read("serving", b); serving_       = (b != 0);
+        r.Read("write_run", write_run_);
+        r.Read("resp_bit", resp_bit_);
+        r.Read("resp_len", resp_len_);
+        r.ReadBytes("resp", resp_, sizeof(resp_));
     }
 
 private:

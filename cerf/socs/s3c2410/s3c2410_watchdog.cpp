@@ -29,8 +29,8 @@ public:
 
     /* JIT-thread-only register file (no worker thread) - the JIT is paused
        during save/restore, so no lock is needed. */
-    void SaveState(StateWriter& w) override    { w.WriteBytes(storage_, sizeof(storage_)); }
-    void RestoreState(StateReader& r) override { r.ReadBytes(storage_, sizeof(storage_)); }
+    void SaveState(StateWriter& w) override    { w.WriteBytes("storage", storage_, sizeof(storage_)); }
+    void RestoreState(StateReader& r) override { r.ReadBytes("storage", storage_, sizeof(storage_)); }
 
 private:
     static constexpr size_t kSlotCount = 3;  /* WTCON / WTDAT / WTCNT */

@@ -85,34 +85,29 @@ void CerfVirtFramebuffer::OnReady() {
 }
 
 void CerfVirtFramebuffer::SaveState(StateWriter& w) {
-
-    w.Write(width_);
-    w.Write(height_);
-    w.Write<uint8_t>(any_write_ ? 1u : 0u);
-    for (uint32_t i = 0; i < 256u; ++i) w.Write(palette_[i]);
-    w.Write<uint64_t>(bytes_.size());
-    if (!bytes_.empty()) w.WriteBytes(bytes_.data(), bytes_.size());
+    w.Write("bpp", bpp_);
+    w.Write("width", width_);
+    w.Write("height", height_);
+    w.Write<uint8_t>("any_write", any_write_ ? 1u : 0u);
+    for (uint32_t i = 0; i < 256u; ++i) w.Write("palette", palette_[i]);
+    w.WriteBytes("bytes", bytes_.data(), bytes_.size());
 }
 
 void CerfVirtFramebuffer::RestoreState(StateReader& r) {
-    r.Read(width_);
-    r.Read(height_);
+    uint32_t bpp = 0;
+    r.Read("bpp", bpp);
+    if (bpp != bpp_)
+        r.Reject("the guest display ran at %u bpp, this machine is at %u bpp", bpp, bpp_);
+    uint32_t w = 0, h = 0;
+    r.Read("width", w);
+    r.Read("height", h);
+    width_  = w;
+    height_ = h;
     uint8_t aw = 0;
-    r.Read(aw);
+    r.Read("any_write", aw);
     any_write_ = (aw != 0);
-    for (uint32_t i = 0; i < 256u; ++i) r.Read(palette_[i]);
-    uint64_t n = 0;
-    r.Read(n);
-    if (n == bytes_.size()) {
-        if (n) r.ReadBytes(bytes_.data(), bytes_.size());
-    } else {
-
-        LOG(Caution, "[CerfVirtFramebuffer] saved FB region %llu B != live %zu B; "
-                     "FB content not restored\n",
-            static_cast<unsigned long long>(n), bytes_.size());
-        std::vector<uint8_t> discard(static_cast<size_t>(n));
-        if (n) r.ReadBytes(discard.data(), static_cast<size_t>(n));
-    }
+    for (uint32_t i = 0; i < 256u; ++i) r.Read("palette", palette_[i]);
+    r.ReadBytes("bytes", bytes_.data(), bytes_.size());
 }
 
 void CerfVirtFramebuffer::ClearContent() {

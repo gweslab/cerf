@@ -95,17 +95,17 @@ public:
 
     void SaveState(StateWriter& w) override {
         drive_.SaveState(w);
-        w.WriteBytes(timing_.data(), timing_.size());
-        w.Write(ata_control_);
-        w.Write(int_enable_);
-        w.Write(fifo_alarm_);
+        w.WriteBytes("timing", timing_.data(), timing_.size());
+        w.Write("ata_control", ata_control_);
+        w.Write("int_enable", int_enable_);
+        w.Write("fifo_alarm", fifo_alarm_);
     }
     void RestoreState(StateReader& r) override {
         drive_.RestoreState(r);
-        r.ReadBytes(timing_.data(), timing_.size());
-        r.Read(ata_control_);
-        r.Read(int_enable_);
-        r.Read(fifo_alarm_);
+        r.ReadBytes("timing", timing_.data(), timing_.size());
+        r.Read("ata_control", ata_control_);
+        r.Read("int_enable", int_enable_);
+        r.Read("fifo_alarm", fifo_alarm_);
     }
 
     /* Re-assert the AVIC line from restored int_enable_ + drive state - the ATA

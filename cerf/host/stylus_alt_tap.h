@@ -39,7 +39,8 @@ private:
     Phase CurrentPhase() const { return phase_.load(std::memory_order_acquire); }
     void  SetPhase(Phase p) { phase_.store(p, std::memory_order_release); }
 
-    std::atomic<Phase> phase_{Phase::Idle};
+    std::atomic<Phase>    phase_{Phase::Idle};
+    std::atomic<uint32_t> restore_gen_{0};
     int                tap_x_ = 0;
     int                tap_y_ = 0;
 

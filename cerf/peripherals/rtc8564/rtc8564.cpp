@@ -146,30 +146,30 @@ public:
         }
         const uint64_t timer_elapsed_us = TimerElapsedMicros(now);
         const uint64_t pulse_remaining_us = interrupt_pulse_until_ > now ? interrupt_pulse_until_ - now : 0;
-        writer.Write(pointer_);
-        writer.Write(phase_);
-        writer.Write(read_mode_);
-        writer.Write(epoch_delta_seconds_);
-        writer.Write(timer_elapsed_us);
-        writer.Write(timer_reload_);
-        writer.Write(interrupt_asserted_);
-        writer.Write(pulse_remaining_us);
-        writer.WriteBytes(registers_.data(), registers_.size());
+        writer.Write("pointer", pointer_);
+        writer.Write("phase", phase_);
+        writer.Write("read_mode", read_mode_);
+        writer.Write("epoch_delta_seconds", epoch_delta_seconds_);
+        writer.Write("timer_elapsed_us", timer_elapsed_us);
+        writer.Write("timer_reload", timer_reload_);
+        writer.Write("interrupt_asserted", interrupt_asserted_);
+        writer.Write("pulse_remaining_us", pulse_remaining_us);
+        writer.WriteBytes("registers", registers_.data(), registers_.size());
     }
 
     void RestoreState(StateReader& reader) override {
         std::lock_guard<std::mutex> guard(mutex_);
-        reader.Read(pointer_);
-        reader.Read(phase_);
-        reader.Read(read_mode_);
-        reader.Read(epoch_delta_seconds_);
+        reader.Read("pointer", pointer_);
+        reader.Read("phase", phase_);
+        reader.Read("read_mode", read_mode_);
+        reader.Read("epoch_delta_seconds", epoch_delta_seconds_);
         uint64_t timer_elapsed_us = 0;
-        reader.Read(timer_elapsed_us);
-        reader.Read(timer_reload_);
-        reader.Read(interrupt_asserted_);
+        reader.Read("timer_elapsed_us", timer_elapsed_us);
+        reader.Read("timer_reload", timer_reload_);
+        reader.Read("interrupt_asserted", interrupt_asserted_);
         uint64_t pulse_remaining_us = 0;
-        reader.Read(pulse_remaining_us);
-        reader.ReadBytes(registers_.data(), registers_.size());
+        reader.Read("pulse_remaining_us", pulse_remaining_us);
+        reader.ReadBytes("registers", registers_.data(), registers_.size());
         pointer_ &= 0x0Fu;
         phase_ = phase_ <= 3 ? phase_ : 0;
         const uint64_t now = HostSteadyMicros();

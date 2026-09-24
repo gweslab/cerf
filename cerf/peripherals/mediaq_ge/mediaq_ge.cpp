@@ -84,21 +84,21 @@ void MediaQGe::ExecutePending() {
 }
 
 void MediaQGe::SaveState(StateWriter& w) const {
-    w.WriteBytes(reg_, sizeof(reg_));
-    w.Write<uint64_t>(src_fifo_.size());
+    w.WriteBytes("reg", reg_, sizeof(reg_));
+    w.Write<uint64_t>("src_fifo_count", src_fifo_.size());
     if (!src_fifo_.empty())
-        w.WriteBytes(src_fifo_.data(), src_fifo_.size() * sizeof(uint32_t));
-    w.WriteBytes(pending_reg_, sizeof(pending_reg_));
-    w.Write<uint8_t>(pending_active_ ? 1u : 0u);
-    w.Write(expected_dwords_);
+        w.WriteBytes("src_fifo", src_fifo_.data(), src_fifo_.size() * sizeof(uint32_t));
+    w.WriteBytes("pending_reg", pending_reg_, sizeof(pending_reg_));
+    w.Write<uint8_t>("pending_active", pending_active_ ? 1u : 0u);
+    w.Write("expected_dwords", expected_dwords_);
 }
 
 void MediaQGe::RestoreState(StateReader& r) {
-    r.ReadBytes(reg_, sizeof(reg_));
-    uint64_t n = 0; r.Read(n);
+    r.ReadBytes("reg", reg_, sizeof(reg_));
+    uint64_t n = 0; r.Read("src_fifo_count", n);
     src_fifo_.assign(static_cast<size_t>(n), 0u);
-    if (n) r.ReadBytes(src_fifo_.data(), static_cast<size_t>(n) * sizeof(uint32_t));
-    r.ReadBytes(pending_reg_, sizeof(pending_reg_));
-    uint8_t a = 0; r.Read(a); pending_active_ = (a != 0);
-    r.Read(expected_dwords_);
+    if (n) r.ReadBytes("src_fifo", src_fifo_.data(), static_cast<size_t>(n) * sizeof(uint32_t));
+    r.ReadBytes("pending_reg", pending_reg_, sizeof(pending_reg_));
+    uint8_t a = 0; r.Read("pending_active", a); pending_active_ = (a != 0);
+    r.Read("expected_dwords", expected_dwords_);
 }

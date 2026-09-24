@@ -188,33 +188,33 @@ void Pm8058Keypad::PublishIrq() {
 
 void Pm8058Keypad::SaveState(StateWriter& w) {
     std::lock_guard<std::mutex> lk(mtx_);
-    w.Write<uint8_t>(ctrl_);
-    w.Write<uint8_t>(scan_);
+    w.Write<uint8_t>("ctrl", ctrl_);
+    w.Write<uint8_t>("scan", scan_);
     for (uint32_t i = 0; i < kMaxDrive; ++i) {
-        w.Write<uint8_t>(state_[i]);
-        w.Write<uint8_t>(latched_new_[i]);
-        w.Write<uint8_t>(latched_old_[i]);
+        w.Write<uint8_t>("state", state_[i]);
+        w.Write<uint8_t>("latched_new", latched_new_[i]);
+        w.Write<uint8_t>("latched_old", latched_old_[i]);
     }
-    w.Write<uint32_t>(events_);
-    w.Write<uint32_t>(new_index_);
-    w.Write<uint32_t>(old_index_);
+    w.Write<uint32_t>("events", events_);
+    w.Write<uint32_t>("new_index", new_index_);
+    w.Write<uint32_t>("old_index", old_index_);
 }
 
 void Pm8058Keypad::RestoreState(StateReader& r) {
     std::lock_guard<std::mutex> lk(mtx_);
-    r.Read(ctrl_);
-    r.Read(scan_);
+    r.Read("ctrl", ctrl_);
+    r.Read("scan", scan_);
     for (uint32_t i = 0; i < kMaxDrive; ++i) {
-        r.Read(state_[i]);
-        r.Read(latched_new_[i]);
-        r.Read(latched_old_[i]);
+        r.Read("state", state_[i]);
+        r.Read("latched_new", latched_new_[i]);
+        r.Read("latched_old", latched_old_[i]);
     }
-    r.Read(events_);
-    r.Read(new_index_);
-    r.Read(old_index_);
+    r.Read("events", events_);
+    r.Read("new_index", new_index_);
+    r.Read("old_index", old_index_);
     if (new_index_ >= kMaxDrive || old_index_ >= kMaxDrive ||
         events_ > kMaxEvents) {
-        emu_.Get<Fatal>().Die(
+        r.Reject(
             "pm8058 keypad: restored indices %u and %u with %u events are "
             "outside the %u drive lines and %u events the block has",
             new_index_, old_index_, events_, kMaxDrive, kMaxEvents);

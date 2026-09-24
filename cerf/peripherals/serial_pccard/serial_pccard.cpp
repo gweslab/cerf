@@ -157,16 +157,16 @@ uint16_t SerialPcCard::ReadIo16(uint32_t offset) {
    config regs + the 16550 UART register file are the card state. uart_ is
    built in OnInserted so it always exists while the card sits in a slot. */
 void SerialPcCard::SaveState(StateWriter& w) {
-    w.Write(cor_); w.Write(fcsr_);
-    w.Write<uint8_t>(uart_irq_ ? 1u : 0u);
-    w.Write<uint8_t>(powered_ ? 1u : 0u);
+    w.Write("cor", cor_); w.Write("fcsr", fcsr_);
+    w.Write<uint8_t>("uart_irq", uart_irq_ ? 1u : 0u);
+    w.Write<uint8_t>("powered", powered_ ? 1u : 0u);
     uart_->SaveState(w);
 }
 
 void SerialPcCard::RestoreState(StateReader& r) {
-    r.Read(cor_); r.Read(fcsr_);
-    uint8_t irq = 0; r.Read(irq); uart_irq_ = (irq != 0);
-    uint8_t pwr = 0; r.Read(pwr); powered_ = (pwr != 0);
+    r.Read("cor", cor_); r.Read("fcsr", fcsr_);
+    uint8_t irq = 0; r.Read("uart_irq", irq); uart_irq_ = (irq != 0);
+    uint8_t pwr = 0; r.Read("powered", pwr); powered_ = (pwr != 0);
     uart_->RestoreState(r);
 }
 

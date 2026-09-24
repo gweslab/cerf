@@ -287,12 +287,12 @@ void S3C2410Intc::WriteReg(uint32_t offset, uint32_t value) {
 
 void S3C2410Intc::SaveState(StateWriter& w) {
     std::lock_guard<std::mutex> lk(state_mutex_);
-    w.WriteBytes(storage_, sizeof(storage_));
+    w.WriteBytes("storage", storage_, sizeof(storage_));
 }
 
 void S3C2410Intc::RestoreState(StateReader& r) {
     std::lock_guard<std::mutex> lk(state_mutex_);
-    r.ReadBytes(storage_, sizeof(storage_));
+    r.ReadBytes("storage", storage_, sizeof(storage_));
 }
 
 void S3C2410Intc::PostRestore() {

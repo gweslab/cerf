@@ -318,35 +318,35 @@ void Msm8255Vic::WriteReg(uint32_t off, uint32_t value) {
 void Msm8255Vic::SaveState(StateWriter& w) {
     std::lock_guard<std::mutex> lk(state_mutex_);
     for (uint32_t b = 0; b < kBankCount; ++b) {
-        w.Write<uint32_t>(raw_[b]);
-        w.Write<uint32_t>(latch_[b]);
-        w.Write<uint32_t>(enable_[b]);
-        w.Write<uint32_t>(type_[b]);
-        w.Write<uint32_t>(select_[b]);
-        w.Write<uint32_t>(polarity_[b]);
-        w.Write<uint32_t>(softint_[b]);
+        w.Write<uint32_t>("raw", raw_[b]);
+        w.Write<uint32_t>("latch", latch_[b]);
+        w.Write<uint32_t>("enable", enable_[b]);
+        w.Write<uint32_t>("type", type_[b]);
+        w.Write<uint32_t>("select", select_[b]);
+        w.Write<uint32_t>("polarity", polarity_[b]);
+        w.Write<uint32_t>("softint", softint_[b]);
     }
-    for (uint32_t s = 0; s < kSourceCount; ++s) w.Write<uint32_t>(vect_priority_[s]);
-    w.Write<uint32_t>(no_pend_val_);
-    w.Write<uint32_t>(master_en_);
-    w.Write<uint32_t>(config_);
+    for (uint32_t s = 0; s < kSourceCount; ++s) w.Write<uint32_t>("vect_priority", vect_priority_[s]);
+    w.Write<uint32_t>("no_pend_val", no_pend_val_);
+    w.Write<uint32_t>("master_en", master_en_);
+    w.Write<uint32_t>("config", config_);
 }
 
 void Msm8255Vic::RestoreState(StateReader& r) {
     std::lock_guard<std::mutex> lk(state_mutex_);
     for (uint32_t b = 0; b < kBankCount; ++b) {
-        r.Read(raw_[b]);
-        r.Read(latch_[b]);
-        r.Read(enable_[b]);
-        r.Read(type_[b]);
-        r.Read(select_[b]);
-        r.Read(polarity_[b]);
-        r.Read(softint_[b]);
+        r.Read("raw", raw_[b]);
+        r.Read("latch", latch_[b]);
+        r.Read("enable", enable_[b]);
+        r.Read("type", type_[b]);
+        r.Read("select", select_[b]);
+        r.Read("polarity", polarity_[b]);
+        r.Read("softint", softint_[b]);
     }
-    for (uint32_t s = 0; s < kSourceCount; ++s) r.Read(vect_priority_[s]);
-    r.Read(no_pend_val_);
-    r.Read(master_en_);
-    r.Read(config_);
+    for (uint32_t s = 0; s < kSourceCount; ++s) r.Read("vect_priority", vect_priority_[s]);
+    r.Read("no_pend_val", no_pend_val_);
+    r.Read("master_en", master_en_);
+    r.Read("config", config_);
 }
 
 void Msm8255Vic::PostRestore() {

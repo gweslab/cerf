@@ -87,17 +87,17 @@ public:
     }
 
     void SaveState(StateWriter& w) override {
-        w.Write(mode2_);
-        w.Write(rd_);
-        w.Write<uint8_t>(rd_valid_ ? 1u : 0u);
+        w.Write("mode2", mode2_);
+        w.Write("rd", rd_);
+        w.Write<uint8_t>("rd_valid", rd_valid_ ? 1u : 0u);
         if (auto* slave = emu_.TryGet<SsbiSlave>()) slave->SaveState(w);
     }
 
     void RestoreState(StateReader& r) override {
-        r.Read(mode2_);
-        r.Read(rd_);
+        r.Read("mode2", mode2_);
+        r.Read("rd", rd_);
         uint8_t valid = 0;
-        r.Read(valid);
+        r.Read("rd_valid", valid);
         rd_valid_ = valid != 0u;
         if (auto* slave = emu_.TryGet<SsbiSlave>()) slave->RestoreState(r);
     }

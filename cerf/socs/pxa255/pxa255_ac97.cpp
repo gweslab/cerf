@@ -42,26 +42,26 @@ void Pxa255Ac97::QueueOutput(const void* host_bytes, uint32_t length) {
 }
 
 void Pxa255Ac97::SaveState(StateWriter& w) {
-    w.Write(pocr_);
-    w.Write(picr_);
-    w.Write(mccr_);
-    w.Write(gcr_);
-    w.Write(mocr_);
-    w.Write(micr_);
-    w.WriteBytes(codec_, sizeof(codec_));
+    w.Write("pocr", pocr_);
+    w.Write("picr", picr_);
+    w.Write("mccr", mccr_);
+    w.Write("gcr", gcr_);
+    w.Write("mocr", mocr_);
+    w.Write("micr", micr_);
+    w.WriteBytes("codec", codec_, sizeof(codec_));
     /* When a real codec is registered (e.g. Wm9705Codec) it holds the live
        register file; codec_ above is only the no-codec shadow. */
     if (auto* codec = emu_.TryGet<Ac97Codec>()) codec->SaveState(w);
 }
 
 void Pxa255Ac97::RestoreState(StateReader& r) {
-    r.Read(pocr_);
-    r.Read(picr_);
-    r.Read(mccr_);
-    r.Read(gcr_);
-    r.Read(mocr_);
-    r.Read(micr_);
-    r.ReadBytes(codec_, sizeof(codec_));
+    r.Read("pocr", pocr_);
+    r.Read("picr", picr_);
+    r.Read("mccr", mccr_);
+    r.Read("gcr", gcr_);
+    r.Read("mocr", mocr_);
+    r.Read("micr", micr_);
+    r.ReadBytes("codec", codec_, sizeof(codec_));
     if (auto* codec = emu_.TryGet<Ac97Codec>()) codec->RestoreState(r);
     /* No host sink buffer or DMA pacing callback survives a snapshot; a still-
        active audio/touch coupling would block the guest DMA thread on a

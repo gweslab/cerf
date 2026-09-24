@@ -76,36 +76,32 @@ public:
     }
 
     void SaveState(StateWriter& w) override {
-        w.Write(pciinit00_);
-        w.Write(pciw0_);
-        w.Write<uint32_t>(static_cast<uint32_t>(devices_.size()));
+        w.Write("pciinit00", pciinit00_);
+        w.Write("pciw0", pciw0_);
+        w.Write<uint32_t>("devices_count", static_cast<uint32_t>(devices_.size()));
         for (PciDevice* d : devices_) {
-            w.Write<uint16_t>(static_cast<uint16_t>((d->PciDev() << 8) | d->PciFnc()));
+            w.Write<uint16_t>("pci_dev_fnc", static_cast<uint16_t>((d->PciDev() << 8) | d->PciFnc()));
             d->SaveState(w);
         }
     }
     void RestoreState(StateReader& r) override {
-        r.Read(pciinit00_);
-        r.Read(pciw0_);
+        r.Read("pciinit00", pciinit00_);
+        r.Read("pciw0", pciw0_);
         uint32_t n = 0;
-        r.Read(n);
-        if (n != devices_.size()) {
-            LOG(Caution, "Vrc5477Pci: device count %u != live %zu\n", n, devices_.size());
-            CerfFatalExit(CERF_FATAL_RUNTIME_ERROR);
-        }
+        r.Read("devices_count", n);
+        if (n != devices_.size())
+            r.Reject("Vrc5477Pci: %u devices, this build has %zu", n, devices_.size());
         for (uint32_t i = 0; i < n; ++i) {
             uint16_t tag = 0;
-            r.Read(tag);
+            r.Read("pci_dev_fnc", tag);
             const uint8_t dev = static_cast<uint8_t>(tag >> 8);
             const uint8_t fnc = static_cast<uint8_t>(tag & 0xFFu);
-            PciDevice* match = nullptr;
-            for (PciDevice* d : devices_)
-                if (d->PciDev() == dev && d->PciFnc() == fnc) { match = d; break; }
-            if (!match) {
-                LOG(Caution, "Vrc5477Pci: no live device for tag dev=%u fnc=%u\n", dev, fnc);
-                CerfFatalExit(CERF_FATAL_RUNTIME_ERROR);
-            }
-            match->RestoreState(r);
+            size_t match = devices_.size();
+            for (size_t k = 0; k < devices_.size(); ++k)
+                if (devices_[k]->PciDev() == dev && devices_[k]->PciFnc() == fnc) { match = k; break; }
+            if (match == devices_.size())
+                r.Reject("Vrc5477Pci: no device dev=%u fnc=%u in this build", dev, fnc);
+            devices_[match]->RestoreState(r);
         }
     }
 

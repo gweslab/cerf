@@ -14,11 +14,11 @@ bool DisplaySizeLatch::PublishOnce(CerfEmulator& emu, bool display_enabled) {
 }
 
 void DisplaySizeLatch::SaveState(StateWriter& w) const {
-    w.Write<uint8_t>(published_ ? 1u : 0u);
+    w.Write<uint8_t>("published", published_ ? 1u : 0u);
 }
 
 void DisplaySizeLatch::RestoreState(StateReader& r) {
     uint8_t v = 0;
-    r.Read(v);
+    r.Read("published", v);
     published_ = v != 0;
 }

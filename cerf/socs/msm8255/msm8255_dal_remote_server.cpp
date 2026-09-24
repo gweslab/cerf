@@ -121,12 +121,12 @@ uint32_t Msm8255DalRemoteServer::Answer(uint32_t in_pa, uint32_t in_avail,
 }
 
 void Msm8255DalRemoteServer::SaveState(StateWriter& w) {
-    w.Write<uint32_t>(port_announced_ ? 1u : 0u);
+    w.Write<uint32_t>("port_announced", port_announced_ ? 1u : 0u);
 }
 
 void Msm8255DalRemoteServer::RestoreState(StateReader& r) {
     uint32_t announced = 0;
-    r.Read(announced);
+    r.Read("port_announced", announced);
     port_announced_ = announced != 0u;
 }
 

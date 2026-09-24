@@ -60,6 +60,8 @@ public:
     static void __fastcall EnterDeepSleepHelper(ArmCpu* cpu);
 
 private:
+    template <typename F>
+    static constexpr void VisitState(ArmCpuState& s, F& field);
     void     SwitchModeBanks(uint32_t old_mode, uint32_t new_mode);
     void     EnterException(uint32_t target_mode, uint32_t new_lr_value,
                             uint32_t vect_offset, bool set_async_abort_mask);

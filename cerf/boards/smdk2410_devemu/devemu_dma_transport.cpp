@@ -160,16 +160,16 @@ public:
     }
 
     void SaveState(StateWriter& w) override {
-        w.WriteBytes(shared_.data(), shared_.size());
-        for (uint32_t v : ch_control_) w.Write<uint32_t>(v);
-        w.Write<uint32_t>(cmd_select_);
-        w.Write<uint32_t>(cmd_operation_);
+        w.WriteBytes("shared", shared_.data(), shared_.size());
+        for (uint32_t v : ch_control_) w.Write<uint32_t>("ch_control", v);
+        w.Write<uint32_t>("cmd_select", cmd_select_);
+        w.Write<uint32_t>("cmd_operation", cmd_operation_);
     }
     void RestoreState(StateReader& r) override {
-        r.ReadBytes(shared_.data(), shared_.size());
-        for (uint32_t& v : ch_control_) r.Read(v);
-        r.Read(cmd_select_);
-        r.Read(cmd_operation_);
+        r.ReadBytes("shared", shared_.data(), shared_.size());
+        for (uint32_t& v : ch_control_) r.Read("ch_control", v);
+        r.Read("cmd_select", cmd_select_);
+        r.Read("cmd_operation", cmd_operation_);
     }
 
 private:

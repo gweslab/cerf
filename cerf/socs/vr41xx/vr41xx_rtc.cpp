@@ -286,17 +286,17 @@ void Vr41xxRtc::WorkerLoop() {
 
 void Vr41xxRtc::SaveState(StateWriter& w) {
     std::lock_guard<std::mutex> lk(mtx_);
-    w.Write(ReadEtimeLocked());                 /* live elapsed value; re-anchored on restore */
-    w.Write(ecmp_); w.Write<uint8_t>(ecmp_armed_ ? 1 : 0);
-    w.Write(rtcl1_reload_); w.Write(rtcl2_reload_); w.Write(tclk_reload_);
-    w.Write(rtcintreg_);
+    w.Write("etime", ReadEtimeLocked());
+    w.Write("ecmp", ecmp_); w.Write<uint8_t>("ecmp_armed", ecmp_armed_ ? 1 : 0);
+    w.Write("rtcl1_reload", rtcl1_reload_); w.Write("rtcl2_reload", rtcl2_reload_); w.Write("tclk_reload", tclk_reload_);
+    w.Write("rtcintreg", rtcintreg_);
 }
 void Vr41xxRtc::RestoreState(StateReader& r) {
     std::lock_guard<std::mutex> lk(mtx_);
-    r.Read(etime_base_); etime_base_ &= kMask48;
-    uint8_t armed = 0; r.Read(ecmp_); r.Read(armed); ecmp_armed_ = armed != 0;
-    r.Read(rtcl1_reload_); r.Read(rtcl2_reload_); r.Read(tclk_reload_);
-    r.Read(rtcintreg_); rtcintreg_ &= kRtcIntMask;
+    r.Read("etime", etime_base_); etime_base_ &= kMask48;
+    uint8_t armed = 0; r.Read("ecmp", ecmp_); r.Read("ecmp_armed", armed); ecmp_armed_ = armed != 0;
+    r.Read("rtcl1_reload", rtcl1_reload_); r.Read("rtcl2_reload", rtcl2_reload_); r.Read("tclk_reload", tclk_reload_);
+    r.Read("rtcintreg", rtcintreg_); rtcintreg_ &= kRtcIntMask;
     const Clock::time_point now = Clock::now();   /* never raw-serialize a time_point */
     etime_anchor_ = rtcl1_anchor_ = rtcl2_anchor_ = tclk_anchor_ = now;
     rtcl1_periods_ack_ = rtcl2_periods_ack_ = tclk_periods_ack_ = 0;

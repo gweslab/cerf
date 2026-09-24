@@ -72,21 +72,21 @@ public:
     }
 
     void Save(StateWriter& w) const {
-        w.Write<uint32_t>(selected_.load(std::memory_order_acquire));
-        w.Write<uint32_t>(selection_valid_.load(std::memory_order_acquire));
+        w.Write<uint32_t>("selected", selected_.load(std::memory_order_acquire));
+        w.Write<uint32_t>("selection_valid", selection_valid_.load(std::memory_order_acquire));
         for (uint32_t i = 0; i < kMsm8255GpioPinCount; ++i) {
-            w.Write<uint32_t>(config_[i].load(std::memory_order_acquire));
+            w.Write<uint32_t>("config", config_[i].load(std::memory_order_acquire));
         }
     }
 
     Msm8255GpioMuxAccess Restore(StateReader& r, uint32_t& bad) {
         uint32_t selected = 0;
         uint32_t valid    = 0;
-        r.Read(selected);
-        r.Read(valid);
+        r.Read("selected", selected);
+        r.Read("selection_valid", valid);
         uint32_t configs[kMsm8255GpioPinCount] = {};
         for (uint32_t i = 0; i < kMsm8255GpioPinCount; ++i) {
-            r.Read(configs[i]);
+            r.Read("config", configs[i]);
         }
         if (valid != 0u && !banks_.OwnsPin(selected)) {
             bad = selected;

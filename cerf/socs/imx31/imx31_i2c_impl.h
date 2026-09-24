@@ -80,12 +80,12 @@ public:
     }
 
     void SaveState(StateWriter& w) override {
-        w.Write(iadr_); w.Write(ifdr_); w.Write(i2cr_);
-        w.Write(i2sr_); w.Write(i2dr_);
+        w.Write("iadr", iadr_); w.Write("ifdr", ifdr_); w.Write("i2cr", i2cr_);
+        w.Write("i2sr", i2sr_); w.Write("i2dr", i2dr_);
     }
     void RestoreState(StateReader& r) override {
-        r.Read(iadr_); r.Read(ifdr_); r.Read(i2cr_);
-        r.Read(i2sr_); r.Read(i2dr_);
+        r.Read("iadr", iadr_); r.Read("ifdr", ifdr_); r.Read("i2cr", i2cr_);
+        r.Read("i2sr", i2sr_); r.Read("i2dr", i2dr_);
     }
 
 private:

@@ -86,16 +86,16 @@ public:
     void WriteHalf(uint32_t a, uint16_t v) override { RmwNarrow(a, v, 0xFFFFu, 2u); }
 
     void SaveState(StateWriter& w) override {
-        for (auto r : regs_)    w.Write(r);
-        for (auto r : mac_csr_) w.Write(r);
-        w.Write(mac_csr_cmd_);
-        w.Write(mac_csr_data_);
+        for (auto r : regs_)    w.Write("regs", r);
+        for (auto r : mac_csr_) w.Write("mac_csr", r);
+        w.Write("mac_csr_cmd", mac_csr_cmd_);
+        w.Write("mac_csr_data", mac_csr_data_);
     }
     void RestoreState(StateReader& r) override {
-        for (auto& v : regs_)    r.Read(v);
-        for (auto& v : mac_csr_) r.Read(v);
-        r.Read(mac_csr_cmd_);
-        r.Read(mac_csr_data_);
+        for (auto& v : regs_)    r.Read("regs", v);
+        for (auto& v : mac_csr_) r.Read("mac_csr", v);
+        r.Read("mac_csr_cmd", mac_csr_cmd_);
+        r.Read("mac_csr_data", mac_csr_data_);
     }
 
 private:

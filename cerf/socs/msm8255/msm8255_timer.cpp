@@ -99,11 +99,11 @@ public:
     void SaveState(StateWriter& w) override {
         std::lock_guard<std::mutex> g(mtx_);
         const int64_t now = NowNs();
-        w.Write<uint32_t>(dgt_clk_ctl_.load(std::memory_order_acquire));
+        w.Write<uint32_t>("dgt_clk_ctl", dgt_clk_ctl_.load(std::memory_order_acquire));
         for (int n = 0; n < 2; ++n) {
-            w.Write<uint32_t>(ch_[n].match.load(std::memory_order_acquire));
-            w.Write<uint32_t>(ch_[n].enable.load(std::memory_order_acquire));
-            w.Write<uint32_t>(CountAt(ch_[n], n, now));
+            w.Write<uint32_t>("match", ch_[n].match.load(std::memory_order_acquire));
+            w.Write<uint32_t>("enable", ch_[n].enable.load(std::memory_order_acquire));
+            w.Write<uint32_t>("count", CountAt(ch_[n], n, now));
         }
     }
 
@@ -111,18 +111,18 @@ public:
         std::lock_guard<std::mutex> g(mtx_);
         const int64_t now = NowNs();
         uint32_t clk_ctl = 0;
-        r.Read(clk_ctl);
+        r.Read("dgt_clk_ctl", clk_ctl);
         if (clk_ctl > kDgtClkCtlMax && clk_ctl != kDgtClkCtlUnwritten) {
-            emu_.Get<Fatal>().Die(
+            r.Reject(
                 "msm8255 timer: restored DGT_CLK_CTL 0x%08X exceeds the "
                 "two-bit divide select", clk_ctl);
         }
         dgt_clk_ctl_.store(clk_ctl, std::memory_order_release);
         for (int n = 0; n < 2; ++n) {
             uint32_t match = 0, enable = 0, count = 0;
-            r.Read(match);
-            r.Read(enable);
-            r.Read(count);
+            r.Read("match", match);
+            r.Read("enable", enable);
+            r.Read("count", count);
             ch_[n].match.store(match, std::memory_order_release);
             ch_[n].enable.store(enable, std::memory_order_release);
             ch_[n].frozen.store(count, std::memory_order_release);

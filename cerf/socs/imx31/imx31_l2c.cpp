@@ -37,22 +37,22 @@ public:
 
     /* JIT-thread-only register file (no worker thread). */
     void SaveState(StateWriter& w) override {
-        w.Write(control_);
-        w.Write(aux_control_);
-        w.Write(debug_control_);
-        w.Write(lockdown_d_);
-        w.Write(lockdown_i_);
-        w.Write(line_data_);
-        w.Write(line_tag_);
+        w.Write("control", control_);
+        w.Write("aux_control", aux_control_);
+        w.Write("debug_control", debug_control_);
+        w.Write("lockdown_d", lockdown_d_);
+        w.Write("lockdown_i", lockdown_i_);
+        w.Write("line_data", line_data_);
+        w.Write("line_tag", line_tag_);
     }
     void RestoreState(StateReader& r) override {
-        r.Read(control_);
-        r.Read(aux_control_);
-        r.Read(debug_control_);
-        r.Read(lockdown_d_);
-        r.Read(lockdown_i_);
-        r.Read(line_data_);
-        r.Read(line_tag_);
+        r.Read("control", control_);
+        r.Read("aux_control", aux_control_);
+        r.Read("debug_control", debug_control_);
+        r.Read("lockdown_d", lockdown_d_);
+        r.Read("lockdown_i", lockdown_i_);
+        r.Read("line_data", line_data_);
+        r.Read("line_tag", line_tag_);
     }
 
 private:

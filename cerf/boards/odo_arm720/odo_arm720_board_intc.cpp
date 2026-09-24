@@ -182,14 +182,14 @@ void OdoArm720BoardIntc::WriteReg16(uint32_t offset, uint16_t value) {
 
 void OdoArm720BoardIntc::SaveState(StateWriter& w) {
     std::lock_guard<std::mutex> lk(state_mutex_);
-    w.Write<uint32_t>(cpu_isr_);
-    w.Write<uint32_t>(cpu_mr_);
+    w.Write<uint32_t>("cpu_isr", cpu_isr_);
+    w.Write<uint32_t>("cpu_mr", cpu_mr_);
 }
 
 void OdoArm720BoardIntc::RestoreState(StateReader& r) {
     std::lock_guard<std::mutex> lk(state_mutex_);
-    r.Read(cpu_isr_);
-    r.Read(cpu_mr_);
+    r.Read("cpu_isr", cpu_isr_);
+    r.Read("cpu_mr", cpu_mr_);
 }
 
 void OdoArm720BoardIntc::PostRestore() {

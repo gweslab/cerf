@@ -46,10 +46,10 @@ public:
     }
 
     void SaveState(StateWriter& w) override {
-        w.Write(reg_); w.Write(len_); w.Write(data_idx_); w.Write(phase_);
+        w.Write("reg", reg_); w.Write("len", len_); w.Write("data_idx", data_idx_); w.Write("phase", phase_);
     }
     void RestoreState(StateReader& r) override {
-        r.Read(reg_); r.Read(len_); r.Read(data_idx_); r.Read(phase_);
+        r.Read("reg", reg_); r.Read("len", len_); r.Read("data_idx", data_idx_); r.Read("phase", phase_);
     }
 
 private:

@@ -117,11 +117,11 @@ void Sa11xxSsp::WriteWord(uint32_t addr, uint32_t value) {
 }
 
 void Sa11xxSsp::SaveState(StateWriter& w) {
-    w.Write(sscr0_);  w.Write(sscr1_);  w.Write(ssdr_);  w.Write(sssr_);
+    w.Write("sscr0", sscr0_);  w.Write("sscr1", sscr1_);  w.Write("ssdr", ssdr_);  w.Write("sssr", sssr_);
 }
 
 void Sa11xxSsp::RestoreState(StateReader& r) {
-    r.Read(sscr0_);  r.Read(sscr1_);  r.Read(ssdr_);  r.Read(sssr_);
+    r.Read("sscr0", sscr0_);  r.Read("sscr1", sscr1_);  r.Read("ssdr", ssdr_);  r.Read("sssr", sssr_);
 }
 
 }  /* namespace */

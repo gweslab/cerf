@@ -31,71 +31,65 @@ public:
     static bool IsDataPort(uint32_t offset) { return offset >= 0x110000u && offset < 0x110100u; }
 
     void SaveState(StateWriter& w) const {
-        w.Write(pattern_upload_active_);
-        w.Write(pattern_valid_);
-        WriteSm501VectorState(w, pattern_words_);
-        w.Write(host_data_active_);
-        w.Write(host_data_mono_);
-        w.Write(host_dst_x_);
-        w.Write(host_dst_y_);
-        w.Write(host_width_);
-        w.Write(host_height_);
-        w.Write(host_dst_pitch_bytes_);
-        w.Write(host_dst_surface_width_);
-        w.Write(host_dst_surface_height_);
-        w.Write(host_dst_base_);
-        w.Write(host_y_);
-        w.Write(host_src_byte_in_row_);
-        w.Write(host_src_bit_offset_);
-        w.Write(host_src_active_bytes_);
-        w.Write(host_src_pitch_bytes_);
-        WriteSm501VectorState(w, host_row_bytes_);
-        w.Write(host_fg_);
-        w.Write(host_bg_);
-        w.Write(host_mono_transparent_);
-        w.Write(host_clip_enabled_);
-        w.Write(host_clip_excludes_inside_);
-        w.Write(host_clip_left_);
-        w.Write(host_clip_top_);
-        w.Write(host_clip_right_);
-        w.Write(host_clip_bottom_);
+        w.Write("pattern_upload_active", pattern_upload_active_);
+        w.Write("pattern_valid", pattern_valid_);
+        WriteSm501VectorState(w, "pattern_word_count", "pattern_words", pattern_words_);
+        w.Write("host_data_active", host_data_active_);
+        w.Write("host_data_mono", host_data_mono_);
+        w.Write("host_dst_x", host_dst_x_);
+        w.Write("host_dst_y", host_dst_y_);
+        w.Write("host_width", host_width_);
+        w.Write("host_height", host_height_);
+        w.Write("host_dst_pitch_bytes", host_dst_pitch_bytes_);
+        w.Write("host_dst_surface_width", host_dst_surface_width_);
+        w.Write("host_dst_surface_height", host_dst_surface_height_);
+        w.Write("host_dst_base", host_dst_base_);
+        w.Write("host_y", host_y_);
+        w.Write("host_src_byte_in_row", host_src_byte_in_row_);
+        w.Write("host_src_bit_offset", host_src_bit_offset_);
+        w.Write("host_src_active_bytes", host_src_active_bytes_);
+        w.Write("host_src_pitch_bytes", host_src_pitch_bytes_);
+        WriteSm501VectorState(w, "host_row_byte_count", "host_row_bytes", host_row_bytes_);
+        w.Write("host_fg", host_fg_);
+        w.Write("host_bg", host_bg_);
+        w.Write("host_mono_transparent", host_mono_transparent_);
+        w.Write("host_clip_enabled", host_clip_enabled_);
+        w.Write("host_clip_excludes_inside", host_clip_excludes_inside_);
+        w.Write("host_clip_left", host_clip_left_);
+        w.Write("host_clip_top", host_clip_top_);
+        w.Write("host_clip_right", host_clip_right_);
+        w.Write("host_clip_bottom", host_clip_bottom_);
     }
 
     void RestoreState(StateReader& r) {
-        r.Read(pattern_upload_active_);
-        r.Read(pattern_valid_);
-        const uint64_t pattern_size = ReadSm501VectorState(r, pattern_words_, 64u);
-        if (pattern_size > 64u)
-            emu_.Get<Fatal>().Die("SM501 pattern state size: count=%llu maximum=%u",
-                                  static_cast<unsigned long long>(pattern_size), 64u);
-        r.Read(host_data_active_);
-        r.Read(host_data_mono_);
-        r.Read(host_dst_x_);
-        r.Read(host_dst_y_);
-        r.Read(host_width_);
-        r.Read(host_height_);
-        r.Read(host_dst_pitch_bytes_);
-        r.Read(host_dst_surface_width_);
-        r.Read(host_dst_surface_height_);
-        r.Read(host_dst_base_);
-        r.Read(host_y_);
-        r.Read(host_src_byte_in_row_);
-        r.Read(host_src_bit_offset_);
-        r.Read(host_src_active_bytes_);
-        r.Read(host_src_pitch_bytes_);
-        const uint64_t row_size = ReadSm501VectorState(r, host_row_bytes_, 4096u);
-        if (row_size > 4096u)
-            emu_.Get<Fatal>().Die("SM501 host row state size: count=%llu maximum=%u",
-                                  static_cast<unsigned long long>(row_size), 4096u);
-        r.Read(host_fg_);
-        r.Read(host_bg_);
-        r.Read(host_mono_transparent_);
-        r.Read(host_clip_enabled_);
-        r.Read(host_clip_excludes_inside_);
-        r.Read(host_clip_left_);
-        r.Read(host_clip_top_);
-        r.Read(host_clip_right_);
-        r.Read(host_clip_bottom_);
+        r.Read("pattern_upload_active", pattern_upload_active_);
+        r.Read("pattern_valid", pattern_valid_);
+        ReadSm501VectorState(r, "pattern_word_count", "pattern_words", pattern_words_, 64u);
+        r.Read("host_data_active", host_data_active_);
+        r.Read("host_data_mono", host_data_mono_);
+        r.Read("host_dst_x", host_dst_x_);
+        r.Read("host_dst_y", host_dst_y_);
+        r.Read("host_width", host_width_);
+        r.Read("host_height", host_height_);
+        r.Read("host_dst_pitch_bytes", host_dst_pitch_bytes_);
+        r.Read("host_dst_surface_width", host_dst_surface_width_);
+        r.Read("host_dst_surface_height", host_dst_surface_height_);
+        r.Read("host_dst_base", host_dst_base_);
+        r.Read("host_y", host_y_);
+        r.Read("host_src_byte_in_row", host_src_byte_in_row_);
+        r.Read("host_src_bit_offset", host_src_bit_offset_);
+        r.Read("host_src_active_bytes", host_src_active_bytes_);
+        r.Read("host_src_pitch_bytes", host_src_pitch_bytes_);
+        ReadSm501VectorState(r, "host_row_byte_count", "host_row_bytes", host_row_bytes_, 4096u);
+        r.Read("host_fg", host_fg_);
+        r.Read("host_bg", host_bg_);
+        r.Read("host_mono_transparent", host_mono_transparent_);
+        r.Read("host_clip_enabled", host_clip_enabled_);
+        r.Read("host_clip_excludes_inside", host_clip_excludes_inside_);
+        r.Read("host_clip_left", host_clip_left_);
+        r.Read("host_clip_top", host_clip_top_);
+        r.Read("host_clip_right", host_clip_right_);
+        r.Read("host_clip_bottom", host_clip_bottom_);
     }
 
 private:

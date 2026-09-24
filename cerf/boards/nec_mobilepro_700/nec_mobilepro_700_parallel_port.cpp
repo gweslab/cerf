@@ -51,8 +51,8 @@ public:
         HaltUnsupportedAccess("MobilePro700 ParallelPort WriteByte", addr, value);
     }
 
-    void SaveState(StateWriter& w) override { w.Write(command_); }
-    void RestoreState(StateReader& r) override { r.Read(command_); }
+    void SaveState(StateWriter& w) override { w.Write("command", command_); }
+    void RestoreState(StateReader& r) override { r.Read("command", command_); }
 
 private:
     static constexpr uint32_t kBase       = 0x1600FFE0u;

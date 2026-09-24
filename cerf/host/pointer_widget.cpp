@@ -111,30 +111,30 @@ bool PointerWidget::PollDirty() {
 void PointerWidget::SaveWidgetState(StateWriter& w) const {
     PointerSource* a = emu_.Get<PointerRouter>().Active();
     const std::wstring name = a ? a->SourceName() : std::wstring();
-    w.Write<uint32_t>(static_cast<uint32_t>(name.size()));
-    w.WriteBytes(name.data(), name.size() * sizeof(wchar_t));
-    w.Write<uint8_t>(emu_.Get<PointerRouter>().UserPicked() ? 1u : 0u);
-    w.Write<uint8_t>(emu_.Get<StylusAltTap>().Enabled() ? 1u : 0u);
-    w.Write<uint8_t>(emu_.Get<PointerStylusSimulation>().Enabled() ? 1u : 0u);
+    w.Write<uint32_t>("name_count", static_cast<uint32_t>(name.size()));
+    w.WriteBytes("name", name.data(), name.size() * sizeof(wchar_t));
+    w.Write<uint8_t>("user_picked", emu_.Get<PointerRouter>().UserPicked() ? 1u : 0u);
+    w.Write<uint8_t>("alt_tap_enabled", emu_.Get<StylusAltTap>().Enabled() ? 1u : 0u);
+    w.Write<uint8_t>("stylus_sim_enabled", emu_.Get<PointerStylusSimulation>().Enabled() ? 1u : 0u);
     emu_.Get<StylusAltTap>().SaveState(w);
 }
 
 void PointerWidget::RestoreWidgetState(StateReader& r) {
     uint32_t n = 0;
-    r.Read(n);
-    if (n > 1024u) return;   /* corrupt; outer section frame realigns */
+    r.Read("name_count", n);
+    if (n > 1024u) r.Reject("pointer source name of %u characters", n);
     std::wstring name(n, L'\0');
-    r.ReadBytes(name.data(), n * sizeof(wchar_t));
+    r.ReadBytes("name", name.data(), n * sizeof(wchar_t));
     if (!name.empty()) emu_.Get<PointerRouter>().RestoreActiveByName(name);
     uint8_t picked = 0;
-    r.Read(picked);
+    r.Read("user_picked", picked);
     emu_.Get<PointerRouter>().RestoreUserPicked(picked != 0);
     uint8_t alt_tap = 1;
-    r.Read(alt_tap);
+    r.Read("alt_tap_enabled", alt_tap);
     auto& tap = emu_.Get<StylusAltTap>();
     tap.SetEnabled(alt_tap != 0);
     uint8_t stylus_sim = 0;
-    r.Read(stylus_sim);
+    r.Read("stylus_sim_enabled", stylus_sim);
     emu_.Get<PointerStylusSimulation>().SetEnabled(stylus_sim != 0);
     tap.RestoreState(r);
 }

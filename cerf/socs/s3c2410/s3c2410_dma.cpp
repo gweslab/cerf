@@ -294,32 +294,17 @@ bool S3C2410Dma::RunAtomicLocked(Channel& c) {
 
 void S3C2410Dma::SaveState(StateWriter& w) {
     std::lock_guard<std::mutex> lk(mutex_);
-    for (const Channel& c : ch_) {
-        w.Write<uint32_t>(c.disrc);
-        w.Write<uint32_t>(c.disrcc);
-        w.Write<uint32_t>(c.didst);
-        w.Write<uint32_t>(c.didstc);
-        w.Write<uint32_t>(c.dcon);
-        w.Write<uint32_t>(c.mask);
-        w.Write<uint32_t>(c.curr_src);
-        w.Write<uint32_t>(c.curr_dst);
-        w.Write<uint32_t>(c.curr_tc);
-    }
+    static_assert(StateVisitCoversAllBytes<Channel>(
+                      [](Channel& c, StateFieldBytes& f) { Channel::Visit(c, f); }),
+                  "Channel::Visit must name or skip every field of Channel");
+    StateWriteField field(w);
+    for (Channel& c : ch_) Channel::Visit(c, field);
 }
 
 void S3C2410Dma::RestoreState(StateReader& r) {
     std::lock_guard<std::mutex> lk(mutex_);
-    for (Channel& c : ch_) {
-        r.Read(c.disrc);
-        r.Read(c.disrcc);
-        r.Read(c.didst);
-        r.Read(c.didstc);
-        r.Read(c.dcon);
-        r.Read(c.mask);
-        r.Read(c.curr_src);
-        r.Read(c.curr_dst);
-        r.Read(c.curr_tc);
-    }
+    StateReadField field(r);
+    for (Channel& c : ch_) Channel::Visit(c, field);
 }
 
 void S3C2410Dma::PostRestore() {

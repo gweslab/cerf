@@ -95,11 +95,11 @@ void Pxa27xClockManager::WriteWord(uint32_t addr, uint32_t value) {
 }
 
 void Pxa27xClockManager::SaveState(StateWriter& w) {
-    w.Write(cccr_); w.Write(cken_); w.Write(oscc_);
+    w.Write("cccr", cccr_); w.Write("cken", cken_); w.Write("oscc", oscc_);
 }
 
 void Pxa27xClockManager::RestoreState(StateReader& r) {
-    r.Read(cccr_); r.Read(cken_); r.Read(oscc_);
+    r.Read("cccr", cccr_); r.Read("cken", cken_); r.Read("oscc", oscc_);
 }
 
 }  /* namespace */

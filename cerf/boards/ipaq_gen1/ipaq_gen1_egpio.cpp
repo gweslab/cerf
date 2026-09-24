@@ -57,12 +57,12 @@ void IpaqGen1Egpio::StoreLatch(const char* op, uint32_t addr, uint32_t value) {
 }
 
 void IpaqGen1Egpio::SaveState(StateWriter& w) {
-    w.Write(latched_.load(std::memory_order_acquire));
+    w.Write("latched", latched_.load(std::memory_order_acquire));
 }
 
 void IpaqGen1Egpio::RestoreState(StateReader& r) {
     uint16_t v = 0;
-    r.Read(v);
+    r.Read("latched", v);
     latched_.store(v, std::memory_order_release);
 }
 

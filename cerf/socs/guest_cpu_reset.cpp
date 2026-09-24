@@ -47,23 +47,19 @@ void GuestCpuReset::SetPendingResume(bool is_resume) {
 }
 
 void GuestCpuReset::SaveState(StateWriter& w) const {
-    w.Write<uint32_t>(static_cast<uint32_t>(pending_kind_.load(std::memory_order_acquire)));
-    w.Write<uint8_t>(pending_is_resume_.load(std::memory_order_acquire) ? 1u : 0u);
+    w.Write<uint32_t>("pending_kind", static_cast<uint32_t>(pending_kind_.load(std::memory_order_acquire)));
+    w.Write<uint8_t>("pending_is_resume", pending_is_resume_.load(std::memory_order_acquire) ? 1u : 0u);
 }
 
 void GuestCpuReset::RestoreState(StateReader& r) {
     uint32_t kind = 0;
-    r.Read(kind);
+    r.Read("pending_kind", kind);
     if (kind != static_cast<uint32_t>(ResetLineKind::Rtc) &&
-        kind != static_cast<uint32_t>(ResetLineKind::Other)) {
-        LOG(Caution, "GuestCpuReset: state image carries reset kind %u, which is not a "
-                "ResetLineKind - restoring it would deliver a reset on the wrong column\n",
-            kind);
-        CerfFatalExit(CERF_FATAL_RUNTIME_ERROR);
-    }
+        kind != static_cast<uint32_t>(ResetLineKind::Other))
+        r.Reject("reset kind %u is not a ResetLineKind", kind);
     pending_kind_.store(static_cast<ResetLineKind>(kind), std::memory_order_release);
     uint8_t resume = 0;
-    r.Read(resume);
+    r.Read("pending_is_resume", resume);
     pending_is_resume_.store(resume != 0, std::memory_order_release);
 }
 

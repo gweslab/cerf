@@ -226,19 +226,19 @@ void Pxa27xUdc::WriteWord(uint32_t addr, uint32_t value) {
 }
 
 void Pxa27xUdc::SaveState(StateWriter& w) {
-    w.Write(udccr_);   w.Write(udcicr0_); w.Write(udcicr1_);
-    w.Write(udcotgicr_);
-    w.Write(up2ocr_);  w.Write(up3ocr_);  w.Write(udccsr0_);
-    w.WriteBytes(epcsr_, sizeof(epcsr_));
-    w.WriteBytes(epcr_,  sizeof(epcr_));
+    w.Write("udccr", udccr_);   w.Write("udcicr0", udcicr0_); w.Write("udcicr1", udcicr1_);
+    w.Write("udcotgicr", udcotgicr_);
+    w.Write("up2ocr", up2ocr_);  w.Write("up3ocr", up3ocr_);  w.Write("udccsr0", udccsr0_);
+    w.WriteBytes("epcsr", epcsr_, sizeof(epcsr_));
+    w.WriteBytes("epcr", epcr_,  sizeof(epcr_));
 }
 
 void Pxa27xUdc::RestoreState(StateReader& r) {
-    r.Read(udccr_);   r.Read(udcicr0_); r.Read(udcicr1_);
-    r.Read(udcotgicr_);
-    r.Read(up2ocr_);  r.Read(up3ocr_);  r.Read(udccsr0_);
-    r.ReadBytes(epcsr_, sizeof(epcsr_));
-    r.ReadBytes(epcr_,  sizeof(epcr_));
+    r.Read("udccr", udccr_);   r.Read("udcicr0", udcicr0_); r.Read("udcicr1", udcicr1_);
+    r.Read("udcotgicr", udcotgicr_);
+    r.Read("up2ocr", up2ocr_);  r.Read("up3ocr", up3ocr_);  r.Read("udccsr0", udccsr0_);
+    r.ReadBytes("epcsr", epcsr_, sizeof(epcsr_));
+    r.ReadBytes("epcr", epcr_,  sizeof(epcr_));
 }
 
 }

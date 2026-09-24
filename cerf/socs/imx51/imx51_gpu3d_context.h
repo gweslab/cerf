@@ -16,6 +16,17 @@ public:
     void SaveState(StateWriter& writer);
     void RestoreState(StateReader& reader);
 private:
-    struct Bank { uint32_t address = 0; bool enabled = false; };
+    struct Bank {
+        uint32_t address = 0;
+        bool     enabled = false;
+        uint8_t  pad[3]  = {};
+
+        template <typename F>
+        static constexpr void Visit(Bank& b, F& field) {
+            field("address", b.address);
+            field("enabled", b.enabled);
+            field.Skip(b.pad);
+        }
+    };
     std::array<Bank, 3> banks_{};
 };

@@ -56,19 +56,19 @@ public:
        ring indices. The scancode lookup table is constant data. */
     void SaveState(StateWriter& w) override {
         std::lock_guard<std::mutex> lk(state_mutex_);
-        w.Write<uint16_t>(kb_csr_);
-        w.Write<uint16_t>(kb_isr_);
-        w.WriteBytes(scancode_fifo_, sizeof(scancode_fifo_));
-        w.Write<int>(fifo_head_);
-        w.Write<int>(fifo_tail_);
+        w.Write<uint16_t>("kb_csr", kb_csr_);
+        w.Write<uint16_t>("kb_isr", kb_isr_);
+        w.WriteBytes("scancode_fifo", scancode_fifo_, sizeof(scancode_fifo_));
+        w.Write<int>("fifo_head", fifo_head_);
+        w.Write<int>("fifo_tail", fifo_tail_);
     }
     void RestoreState(StateReader& r) override {
         std::lock_guard<std::mutex> lk(state_mutex_);
-        r.Read(kb_csr_);
-        r.Read(kb_isr_);
-        r.ReadBytes(scancode_fifo_, sizeof(scancode_fifo_));
-        r.Read(fifo_head_);
-        r.Read(fifo_tail_);
+        r.Read("kb_csr", kb_csr_);
+        r.Read("kb_isr", kb_isr_);
+        r.ReadBytes("scancode_fifo", scancode_fifo_, sizeof(scancode_fifo_));
+        r.Read("fifo_head", fifo_head_);
+        r.Read("fifo_tail", fifo_tail_);
     }
 
     void OnHostKey(uint8_t vk, bool key_up);

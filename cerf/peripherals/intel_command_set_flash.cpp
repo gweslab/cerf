@@ -183,25 +183,25 @@ uint8_t IntelCommandSetFlash::DecodeCommand(uint32_t value, uint32_t /*width*/) 
 }
 
 void IntelCommandSetFlash::SaveState(StateWriter& w) {
-    w.Write(mode_);
-    w.Write(buf_remaining_);
-    w.Write<uint64_t>(shadow_.size());
-    for (const auto& pr : shadow_) { w.Write(pr.first); w.Write(pr.second); }
-    w.Write<uint64_t>(block_locked_.size());
-    if (!block_locked_.empty())
-        w.WriteBytes(block_locked_.data(), block_locked_.size());
+    w.Write("mode", mode_);
+    w.Write("buf_remaining", buf_remaining_);
+    w.Write<uint64_t>("shadow_count", shadow_.size());
+    for (const auto& pr : shadow_) {
+        w.Write("shadow_address", pr.first);
+        w.Write("shadow_original_byte", pr.second);
+    }
+    w.WriteBytes("block_locked", block_locked_.data(), block_locked_.size());
 }
 
 void IntelCommandSetFlash::RestoreState(StateReader& r) {
-    r.Read(mode_);
-    r.Read(buf_remaining_);
-    uint64_t n = 0; r.Read(n);
+    r.Read("mode", mode_);
+    r.Read("buf_remaining", buf_remaining_);
+    uint64_t n = 0; r.Read("shadow_count", n);
     shadow_.clear();
     for (uint64_t i = 0; i < n; ++i) {
-        uint32_t a = 0; uint8_t b = 0; r.Read(a); r.Read(b);
+        uint32_t a = 0; uint8_t b = 0;
+        r.Read("shadow_address", a); r.Read("shadow_original_byte", b);
         shadow_.push_back({a, b});
     }
-    uint64_t m = 0; r.Read(m);
-    block_locked_.assign(static_cast<size_t>(m), 0u);
-    if (m) r.ReadBytes(block_locked_.data(), static_cast<size_t>(m));
+    r.ReadBytes("block_locked", block_locked_.data(), block_locked_.size());
 }

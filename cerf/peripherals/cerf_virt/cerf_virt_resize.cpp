@@ -51,22 +51,22 @@ void CerfVirtResize::WriteWord(uint32_t addr, uint32_t value) {
 }
 
 void CerfVirtResize::SaveState(StateWriter& w) {
-    w.Write<uint32_t>(want_w_.load());
-    w.Write<uint32_t>(want_h_.load());
-    w.Write<uint32_t>(want_gen_.load());
-    w.Write<uint32_t>(applied_w_.load());
-    w.Write<uint32_t>(applied_h_.load());
-    w.Write<uint32_t>(applied_gen_.load());
+    w.Write<uint32_t>("want_w", want_w_.load());
+    w.Write<uint32_t>("want_h", want_h_.load());
+    w.Write<uint32_t>("want_gen", want_gen_.load());
+    w.Write<uint32_t>("applied_w", applied_w_.load());
+    w.Write<uint32_t>("applied_h", applied_h_.load());
+    w.Write<uint32_t>("applied_gen", applied_gen_.load());
 }
 
 void CerfVirtResize::RestoreState(StateReader& r) {
     uint32_t v;
-    r.Read(v); want_w_.store(v);
-    r.Read(v); want_h_.store(v);
-    r.Read(v); want_gen_.store(v);
-    r.Read(v); applied_w_.store(v);
-    r.Read(v); applied_h_.store(v);
-    r.Read(v); applied_gen_.store(v);
+    r.Read("want_w", v); want_w_.store(v);
+    r.Read("want_h", v); want_h_.store(v);
+    r.Read("want_gen", v); want_gen_.store(v);
+    r.Read("applied_w", v); applied_w_.store(v);
+    r.Read("applied_h", v); applied_h_.store(v);
+    r.Read("applied_gen", v); applied_gen_.store(v);
 }
 
 void CerfVirtResize::RequestResize(uint32_t w, uint32_t h) {

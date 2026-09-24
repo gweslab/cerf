@@ -49,14 +49,14 @@ public:
     }
 
     void SaveState(StateWriter& w) override {
-        w.Write(ctrl_);
-        w.Write(duty_);
-        w.Write(perval_);
+        w.Write("ctrl", ctrl_);
+        w.Write("duty", duty_);
+        w.Write("perval", perval_);
     }
     void RestoreState(StateReader& r) override {
-        r.Read(ctrl_);
-        r.Read(duty_);
-        r.Read(perval_);
+        r.Read("ctrl", ctrl_);
+        r.Read("duty", duty_);
+        r.Read("perval", perval_);
     }
 
 private:

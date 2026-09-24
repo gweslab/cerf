@@ -57,12 +57,12 @@ public:
     /* JIT-thread-only register file (no worker thread). input_level_ is
        board-driven state; serialize it symmetrically (build-specific image). */
     void SaveState(StateWriter& w) override {
-        w.WriteBytes(regs_.data(), sizeof(regs_));
-        w.Write(input_level_);
+        w.WriteBytes("regs", regs_.data(), sizeof(regs_));
+        w.Write("input_level", input_level_);
     }
     void RestoreState(StateReader& r) override {
-        r.ReadBytes(regs_.data(), sizeof(regs_));
-        r.Read(input_level_);
+        r.ReadBytes("regs", regs_.data(), sizeof(regs_));
+        r.Read("input_level", input_level_);
     }
 
 private:

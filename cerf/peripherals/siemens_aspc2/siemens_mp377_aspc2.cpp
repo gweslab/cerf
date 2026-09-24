@@ -125,33 +125,33 @@ void SiemensMp377Aspc2::WriteWord(uint32_t addr, uint32_t value) {
 }
 
 void SiemensMp377Aspc2::SaveState(StateWriter& w) {
-    w.Write(probe_control_);
-    w.Write(interrupt_control_lo_);
-    w.Write(interrupt_control_hi_);
-    w.Write(interrupt_mask_lo_);
-    w.Write(interrupt_mask_hi_);
-    w.Write(request_control_);
-    w.Write(mode0_);
-    w.Write(interrupt_event_lo_);
-    w.Write(interrupt_event_hi_);
-    w.Write(interface_address_);
-    w.Write(service_control_lo_);
-    w.Write(service_control_hi_);
+    w.Write("probe_control", probe_control_);
+    w.Write("interrupt_control_lo", interrupt_control_lo_);
+    w.Write("interrupt_control_hi", interrupt_control_hi_);
+    w.Write("interrupt_mask_lo", interrupt_mask_lo_);
+    w.Write("interrupt_mask_hi", interrupt_mask_hi_);
+    w.Write("request_control", request_control_);
+    w.Write("mode0", mode0_);
+    w.Write("interrupt_event_lo", interrupt_event_lo_);
+    w.Write("interrupt_event_hi", interrupt_event_hi_);
+    w.Write("interface_address", interface_address_);
+    w.Write("service_control_lo", service_control_lo_);
+    w.Write("service_control_hi", service_control_hi_);
 }
 
 void SiemensMp377Aspc2::RestoreState(StateReader& r) {
-    r.Read(probe_control_);
-    r.Read(interrupt_control_lo_);
-    r.Read(interrupt_control_hi_);
-    r.Read(interrupt_mask_lo_);
-    r.Read(interrupt_mask_hi_);
-    r.Read(request_control_);
-    r.Read(mode0_);
-    r.Read(interrupt_event_lo_);
-    r.Read(interrupt_event_hi_);
-    r.Read(interface_address_);
-    r.Read(service_control_lo_);
-    r.Read(service_control_hi_);
+    r.Read("probe_control", probe_control_);
+    r.Read("interrupt_control_lo", interrupt_control_lo_);
+    r.Read("interrupt_control_hi", interrupt_control_hi_);
+    r.Read("interrupt_mask_lo", interrupt_mask_lo_);
+    r.Read("interrupt_mask_hi", interrupt_mask_hi_);
+    r.Read("request_control", request_control_);
+    r.Read("mode0", mode0_);
+    r.Read("interrupt_event_lo", interrupt_event_lo_);
+    r.Read("interrupt_event_hi", interrupt_event_hi_);
+    r.Read("interface_address", interface_address_);
+    r.Read("service_control_lo", service_control_lo_);
+    r.Read("service_control_hi", service_control_hi_);
 }
 
 REGISTER_SERVICE(SiemensMp377Aspc2);

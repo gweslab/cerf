@@ -26,11 +26,11 @@ public:
 
     void SaveState(StateWriter& w) override {
         NecMobilePro900BoardWindow::SaveState(w);
-        w.Write(heartbeat_);
+        w.Write("heartbeat", heartbeat_);
     }
     void RestoreState(StateReader& r) override {
         NecMobilePro900BoardWindow::RestoreState(r);
-        r.Read(heartbeat_);
+        r.Read("heartbeat", heartbeat_);
     }
 
 protected:

@@ -141,20 +141,21 @@ void Pr31x00CardSpace::WriteMem16(uint32_t off, uint16_t value) {
     slot->WriteCommon16(o, value);
 }
 
-/* Socket wiring is board-deterministic, so the present/absent pattern is symmetric
-   across save and restore. */
 void Pr31x00CardSpace::SaveState(StateWriter& w) {
     for (int i = 0; i < 2; ++i) {
         PcmciaSlot* s = sockets_[i];
-        w.Write<uint8_t>(s ? 1u : 0u);
+        w.Write<uint8_t>("socket_present", s ? 1u : 0u);
         if (s) s->SaveSlotState(w);
     }
 }
 
 void Pr31x00CardSpace::RestoreState(StateReader& r) {
     for (int i = 0; i < 2; ++i) {
-        uint8_t present = 0; r.Read(present);
-        if (present && sockets_[i]) sockets_[i]->RestoreSlotState(r);
+        uint8_t present = 0; r.Read("socket_present", present);
+        if ((present != 0u) != (sockets_[i] != nullptr))
+            r.Reject("socket %d is %s in the image and %s in this build", i,
+                     present ? "wired" : "absent", sockets_[i] ? "wired" : "absent");
+        if (sockets_[i]) sockets_[i]->RestoreSlotState(r);
     }
 }
 

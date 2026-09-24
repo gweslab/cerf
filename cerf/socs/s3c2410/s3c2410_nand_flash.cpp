@@ -81,22 +81,22 @@ public:
     void     WriteWord(uint32_t addr, uint32_t value) override;
 
     void SaveState(StateWriter& w) override {
-        w.Write<uint32_t>(conf_);
-        w.Write<uint32_t>(command_);
-        w.Write<uint32_t>(id_index_);
-        w.Write<uint32_t>(addr_cycle_);
-        w.Write<uint32_t>(column_base_);
-        w.Write<uint32_t>(column_);
-        w.Write<uint32_t>(page_);
+        w.Write<uint32_t>("conf", conf_);
+        w.Write<uint32_t>("command", command_);
+        w.Write<uint32_t>("id_index", id_index_);
+        w.Write<uint32_t>("addr_cycle", addr_cycle_);
+        w.Write<uint32_t>("column_base", column_base_);
+        w.Write<uint32_t>("column", column_);
+        w.Write<uint32_t>("page", page_);
     }
     void RestoreState(StateReader& r) override {
-        r.Read(conf_);
-        r.Read(command_);
-        r.Read(id_index_);
-        r.Read(addr_cycle_);
-        r.Read(column_base_);
-        r.Read(column_);
-        r.Read(page_);
+        r.Read("conf", conf_);
+        r.Read("command", command_);
+        r.Read("id_index", id_index_);
+        r.Read("addr_cycle", addr_cycle_);
+        r.Read("column_base", column_base_);
+        r.Read("column", column_);
+        r.Read("page", page_);
     }
 
 private:

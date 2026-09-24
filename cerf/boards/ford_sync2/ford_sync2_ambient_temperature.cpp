@@ -34,16 +34,17 @@ void FordSync2AmbientTemperature::Clear() {
 
 void FordSync2AmbientTemperature::SaveState(StateWriter& w) const {
     std::lock_guard<std::mutex> lock(mutex_);
-    w.Write<uint8_t>(state_.available);
-    w.Write<uint8_t>(state_.half_celsius.has_value());
-    w.Write<int16_t>(state_.half_celsius.value_or(0));
+    w.Write<uint8_t>("available", state_.available);
+    w.Write<uint8_t>("has_half_celsius", state_.half_celsius.has_value());
+    w.Write<int16_t>("half_celsius", state_.half_celsius.value_or(0));
 }
 
 void FordSync2AmbientTemperature::RestoreState(StateReader& r) {
     std::lock_guard<std::mutex> lock(mutex_);
     uint8_t available = 0, valid = 0;
     int16_t half_celsius = 0;
-    r.Read(available); r.Read(valid); r.Read(half_celsius);
+    r.Read("available", available); r.Read("has_half_celsius", valid);
+    r.Read("half_celsius", half_celsius);
     state_.available = available != 0;
     state_.half_celsius = valid ? std::optional<int16_t>(half_celsius) : std::nullopt;
     ++state_.revision;

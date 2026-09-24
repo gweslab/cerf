@@ -71,24 +71,24 @@ uint32_t Msm8255NpaClients::ApplyRequest(uint32_t handle, uint32_t request) {
 }
 
 void Msm8255NpaClients::SaveState(StateWriter& w) {
-    w.Write<uint32_t>(static_cast<uint32_t>(resource_.size()));
+    w.Write<uint32_t>("resource_count", static_cast<uint32_t>(resource_.size()));
     for (uint32_t i = 0; i < resource_.size(); ++i) {
-        w.Write<uint32_t>(resource_[i]);
-        w.Write<uint32_t>(request_[i]);
-        w.Write<uint32_t>(issued_[i]);
+        w.Write<uint32_t>("resource", resource_[i]);
+        w.Write<uint32_t>("request", request_[i]);
+        w.Write<uint32_t>("issued", issued_[i]);
     }
 }
 
 void Msm8255NpaClients::RestoreState(StateReader& r) {
     uint32_t clients = 0;
-    r.Read(clients);
+    r.Read("resource_count", clients);
     resource_.assign(clients, 0u);
     request_.assign(clients, 0u);
     issued_.assign(clients, 0u);
     for (uint32_t i = 0; i < clients; ++i) {
-        r.Read(resource_[i]);
-        r.Read(request_[i]);
-        r.Read(issued_[i]);
+        r.Read("resource", resource_[i]);
+        r.Read("request", request_[i]);
+        r.Read("issued", issued_[i]);
     }
 }
 

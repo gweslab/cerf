@@ -28,16 +28,16 @@ bool Imx51Gpu3dRaster::ShouldRegister() {
     return board && board->GetSocId() == SocId::Imx51;
 }
 void Imx51Gpu3dRaster::SaveState(StateWriter& writer) {
-    writer.Write(gmem_binding_); writer.Write(gmem_pitch_);
-    writer.WriteBytes(gmem_.data(),gmem_.size());
+    writer.Write("gmem_binding", gmem_binding_); writer.Write("gmem_pitch", gmem_pitch_);
+    writer.WriteBytes("gmem", gmem_.data(),gmem_.size());
 }
 void Imx51Gpu3dRaster::RestoreState(StateReader& reader) {
-    reader.Read(gmem_binding_); reader.Read(gmem_pitch_);
-    reader.ReadBytes(gmem_.data(),gmem_.size());
+    reader.Read("gmem_binding", gmem_binding_); reader.Read("gmem_pitch", gmem_pitch_);
+    reader.ReadBytes("gmem", gmem_.data(),gmem_.size());
     if (gmem_binding_ != 0xFFFFFFFFu &&
         ((gmem_binding_ & 0xFF0u) != 0u || (gmem_binding_ & 0xFFFFF000u) >= gmem_.size() || gmem_pitch_ == 0 || gmem_pitch_ > 16383u ||
          ((gmem_binding_ & 15u) != 0u && (gmem_binding_ & 15u) != 2u && (gmem_binding_ & 15u) != 5u)))
-        emu_.Get<Fatal>().Die("GPU raster invalid saved GMEM binding");
+        reader.Reject("GPU raster GMEM binding 0x%08X pitch %u", gmem_binding_, gmem_pitch_);
 }
 
 /* Khronos OpenGL ES 2.0.25 sections 2.13 and 2.13.1. */

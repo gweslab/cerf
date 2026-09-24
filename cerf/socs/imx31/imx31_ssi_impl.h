@@ -131,16 +131,16 @@ public:
        there is no heap data to serialize - only the plain control registers
        and the W1C error-flag latch are guest-observable state. */
     void SaveState(StateWriter& w) override {
-        w.Write(scr_);    w.Write(sier_);   w.Write(stcr_);   w.Write(srcr_);
-        w.Write(stccr_);  w.Write(srccr_);  w.Write(sfcsr_);  w.Write(sacnt_);
-        w.Write(sacadd_); w.Write(sacdat_); w.Write(satag_);  w.Write(stmsk_);
-        w.Write(srmsk_);  w.Write(sisr_err_);
+        w.Write("scr", scr_);    w.Write("sier", sier_);   w.Write("stcr", stcr_);   w.Write("srcr", srcr_);
+        w.Write("stccr", stccr_);  w.Write("srccr", srccr_);  w.Write("sfcsr", sfcsr_);  w.Write("sacnt", sacnt_);
+        w.Write("sacadd", sacadd_); w.Write("sacdat", sacdat_); w.Write("satag", satag_);  w.Write("stmsk", stmsk_);
+        w.Write("srmsk", srmsk_);  w.Write("sisr_err", sisr_err_);
     }
     void RestoreState(StateReader& r) override {
-        r.Read(scr_);    r.Read(sier_);   r.Read(stcr_);   r.Read(srcr_);
-        r.Read(stccr_);  r.Read(srccr_);  r.Read(sfcsr_);  r.Read(sacnt_);
-        r.Read(sacadd_); r.Read(sacdat_); r.Read(satag_);  r.Read(stmsk_);
-        r.Read(srmsk_);  r.Read(sisr_err_);
+        r.Read("scr", scr_);    r.Read("sier", sier_);   r.Read("stcr", stcr_);   r.Read("srcr", srcr_);
+        r.Read("stccr", stccr_);  r.Read("srccr", srccr_);  r.Read("sfcsr", sfcsr_);  r.Read("sacnt", sacnt_);
+        r.Read("sacadd", sacadd_); r.Read("sacdat", sacdat_); r.Read("satag", satag_);  r.Read("stmsk", stmsk_);
+        r.Read("srmsk", srmsk_);  r.Read("sisr_err", sisr_err_);
     }
 
 private:

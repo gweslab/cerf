@@ -31,8 +31,8 @@ protected:
         Vr41xxSiu::WriteChipExtReg(idx, value);
     }
     void ResetChip() override                      { baud_reload_ = 0; }
-    void SaveChipState(StateWriter& w) override    { w.Write(baud_reload_); }
-    void RestoreChipState(StateReader& r) override { r.Read(baud_reload_); }
+    void SaveChipState(StateWriter& w) override    { w.Write("baud_reload", baud_reload_); }
+    void RestoreChipState(StateReader& r) override { r.Read("baud_reload", baud_reload_); }
 
 private:
     uint8_t baud_reload_ = 0;   /* SIU 0x09 divisor-reload strobe */

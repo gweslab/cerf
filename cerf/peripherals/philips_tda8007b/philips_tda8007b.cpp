@@ -39,10 +39,10 @@ public:
     /* The 16 byte registers are the whole SCR state - writes land here,
        reads come straight back. No host-only members to skip. */
     void SaveState(StateWriter& w) override {
-        w.WriteBytes(regs_.data(), regs_.size());
+        w.WriteBytes("regs", regs_.data(), regs_.size());
     }
     void RestoreState(StateReader& r) override {
-        r.ReadBytes(regs_.data(), regs_.size());
+        r.ReadBytes("regs", regs_.data(), regs_.size());
     }
 
 private:

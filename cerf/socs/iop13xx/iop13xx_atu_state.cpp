@@ -66,35 +66,34 @@ bool Iop13xxAtuState::CpuPhysToPciMemBus(uint64_t cpu_pa, uint32_t size, uint64_
 }
 
 void Iop13xxAtuState::SaveCoreState(StateWriter& w) const {
-    w.Write(atucmd_);
-    w.Write(atusr_);
-    w.Write(atucr_);
-    w.Write(atuisr_);
-    w.Write(atuimr_);
+    w.Write("atucmd", atucmd_);
+    w.Write("atusr", atusr_);
+    w.Write("atucr", atucr_);
+    w.Write("atuisr", atuisr_);
+    w.Write("atuimr", atuimr_);
 }
 
 void Iop13xxAtuState::RestoreCoreState(StateReader& r) {
-    r.Read(atucmd_);
-    r.Read(atusr_);
-    r.Read(atucr_);
-    r.Read(atuisr_);
-    r.Read(atuimr_);
+    r.Read("atucmd", atucmd_);
+    r.Read("atusr", atusr_);
+    r.Read("atucr", atucr_);
+    r.Read("atuisr", atuisr_);
+    r.Read("atuimr", atuimr_);
 }
 
 void Iop13xxAtuState::SaveOutboundState(StateWriter& w) const {
-    w.Write(oiobar_);
-    w.Write(oiowtvr_);
-    for (const auto& win : oum_) {
-        w.Write(win.bar);
-        w.Write(win.wtvr);
-    }
+    w.Write("oiobar", oiobar_);
+    w.Write("oiowtvr", oiowtvr_);
+    static_assert(StateVisitCoversAllBytes<MemoryWindow>(
+                      [](MemoryWindow& win, StateFieldBytes& f) { MemoryWindow::Visit(win, f); }),
+                  "MemoryWindow::Visit must name or skip every field of MemoryWindow");
+    StateWriteField field(w);
+    for (MemoryWindow win : oum_) MemoryWindow::Visit(win, field);
 }
 
 void Iop13xxAtuState::RestoreOutboundState(StateReader& r) {
-    r.Read(oiobar_);
-    r.Read(oiowtvr_);
-    for (auto& win : oum_) {
-        r.Read(win.bar);
-        r.Read(win.wtvr);
-    }
+    r.Read("oiobar", oiobar_);
+    r.Read("oiowtvr", oiowtvr_);
+    StateReadField field(r);
+    for (MemoryWindow& win : oum_) MemoryWindow::Visit(win, field);
 }

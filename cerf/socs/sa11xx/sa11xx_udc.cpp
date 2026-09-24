@@ -128,29 +128,29 @@ void Sa11xxUdc::WriteWord(uint32_t addr, uint32_t value) {
 }
 
 void Sa11xxUdc::SaveState(StateWriter& w) {
-    w.Write(udccr_);
-    w.Write(udcar_);
-    w.Write(udcomp_);
-    w.Write(udcimp_);
-    w.Write(udccs0_);
-    w.Write(udccs1_);
-    w.Write(udccs2_);
-    w.Write(udcd0_);
-    w.Write(udcdr_);
-    w.Write(udcsr_);
+    w.Write("udccr", udccr_);
+    w.Write("udcar", udcar_);
+    w.Write("udcomp", udcomp_);
+    w.Write("udcimp", udcimp_);
+    w.Write("udccs0", udccs0_);
+    w.Write("udccs1", udccs1_);
+    w.Write("udccs2", udccs2_);
+    w.Write("udcd0", udcd0_);
+    w.Write("udcdr", udcdr_);
+    w.Write("udcsr", udcsr_);
 }
 
 void Sa11xxUdc::RestoreState(StateReader& r) {
-    r.Read(udccr_);
-    r.Read(udcar_);
-    r.Read(udcomp_);
-    r.Read(udcimp_);
-    r.Read(udccs0_);
-    r.Read(udccs1_);
-    r.Read(udccs2_);
-    r.Read(udcd0_);
-    r.Read(udcdr_);
-    r.Read(udcsr_);
+    r.Read("udccr", udccr_);
+    r.Read("udcar", udcar_);
+    r.Read("udcomp", udcomp_);
+    r.Read("udcimp", udcimp_);
+    r.Read("udccs0", udccs0_);
+    r.Read("udccs1", udccs1_);
+    r.Read("udccs2", udccs2_);
+    r.Read("udcd0", udcd0_);
+    r.Read("udcdr", udcdr_);
+    r.Read("udcsr", udcsr_);
 }
 
 }  /* namespace */

@@ -114,14 +114,14 @@ void CasioCassiopeiaE55PcCard::OnCardIrqDeasserted(PcmciaSlot&) {
 }
 
 void CasioCassiopeiaE55PcCard::SaveState(StateWriter& w) {
-    w.Write(reg_space_);
-    w.Write(in_reset_);
+    w.Write("reg_space", reg_space_);
+    w.Write("in_reset", in_reset_);
     slot0_.SaveSlotState(w);
 }
 
 void CasioCassiopeiaE55PcCard::RestoreState(StateReader& r) {
-    r.Read(reg_space_);
-    r.Read(in_reset_);
+    r.Read("reg_space", reg_space_);
+    r.Read("in_reset", in_reset_);
     slot0_.RestoreSlotState(r);
 }
 

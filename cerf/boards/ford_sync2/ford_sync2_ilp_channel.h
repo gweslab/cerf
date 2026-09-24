@@ -18,7 +18,6 @@ public:
     enum class Result { Accepted, Invalid, Unavailable, Unsupported };
     struct Device {
         std::string key;
-        uint32_t version;
         std::function<void(bool)> refresh;
         std::function<void(uint32_t)> watchdog;
         std::function<bool(uint32_t)> owns;

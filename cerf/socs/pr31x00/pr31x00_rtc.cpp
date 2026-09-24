@@ -227,15 +227,15 @@ void Pr31x00Rtc::WriteWord(uint32_t addr, uint32_t value) {
 
 void Pr31x00Rtc::SaveState(StateWriter& w) {
     std::lock_guard<std::mutex> lk(mtx_);
-    w.Write(CountLocked());
-    w.Write(alarm_);
-    w.Write(alarm_armed_);
-    w.Write(alarm_fired_);
-    w.Write(rollover_fired_);
-    w.Write(timer_ctl_);
-    w.Write(rtc_clr_);
-    w.Write(perval_);
-    w.Write(periodic_enabled_);
+    w.Write("count", CountLocked());
+    w.Write("alarm", alarm_);
+    w.Write("alarm_armed", alarm_armed_);
+    w.Write("alarm_fired", alarm_fired_);
+    w.Write("rollover_fired", rollover_fired_);
+    w.Write("timer_ctl", timer_ctl_);
+    w.Write("rtc_clr", rtc_clr_);
+    w.Write("perval", perval_);
+    w.Write("periodic_enabled", periodic_enabled_);
     uint64_t rem_ns = 0;
     if (periodic_enabled_) {
         const auto now = Clock::now();
@@ -244,22 +244,22 @@ void Pr31x00Rtc::SaveState(StateWriter& w) {
                          periodic_next_ - now).count();
         }
     }
-    w.Write(rem_ns);
+    w.Write("rem_ns", rem_ns);
 }
 
 void Pr31x00Rtc::RestoreState(StateReader& r) {
     std::lock_guard<std::mutex> lk(mtx_);
-    r.Read(base_ticks_);
-    r.Read(alarm_);
-    r.Read(alarm_armed_);
-    r.Read(alarm_fired_);
-    r.Read(rollover_fired_);
-    r.Read(timer_ctl_);
-    r.Read(rtc_clr_);
-    r.Read(perval_);
-    r.Read(periodic_enabled_);
+    r.Read("count", base_ticks_);
+    r.Read("alarm", alarm_);
+    r.Read("alarm_armed", alarm_armed_);
+    r.Read("alarm_fired", alarm_fired_);
+    r.Read("rollover_fired", rollover_fired_);
+    r.Read("timer_ctl", timer_ctl_);
+    r.Read("rtc_clr", rtc_clr_);
+    r.Read("perval", perval_);
+    r.Read("periodic_enabled", periodic_enabled_);
     uint64_t rem_ns = 0;
-    r.Read(rem_ns);
+    r.Read("rem_ns", rem_ns);
     anchor_ = Clock::now();
     periodic_next_ = Clock::now() +
         std::chrono::duration_cast<Clock::duration>(std::chrono::nanoseconds(rem_ns));

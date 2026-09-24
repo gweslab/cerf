@@ -28,8 +28,8 @@ public:
     void     WriteWord(uint32_t addr, uint32_t value) override;
 
     /* JIT-thread-only register file (no worker thread). */
-    void SaveState(StateWriter& w) override    { w.WriteBytes(storage_, sizeof(storage_)); }
-    void RestoreState(StateReader& r) override { r.ReadBytes(storage_, sizeof(storage_)); }
+    void SaveState(StateWriter& w) override    { w.WriteBytes("storage", storage_, sizeof(storage_)); }
+    void RestoreState(StateReader& r) override { r.ReadBytes("storage", storage_, sizeof(storage_)); }
 
 private:
     static constexpr size_t kSlotCount = 13;  /* BWSCON..MRSRB7 */

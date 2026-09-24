@@ -77,15 +77,15 @@ public:
 
     void SaveState(StateWriter& w) override {
         Vr41xxPmuBase::SaveState(w);
-        w.Write(int2reg_);
-        w.Write(cnt2reg_);
+        w.Write("int2reg", int2reg_);
+        w.Write("cnt2reg", cnt2reg_);
         emu_.Get<Vr4122ClockState>().SaveState(w);
     }
 
     void RestoreState(StateReader& r) override {
         Vr41xxPmuBase::RestoreState(r);
-        r.Read(int2reg_);
-        r.Read(cnt2reg_);
+        r.Read("int2reg", int2reg_);
+        r.Read("cnt2reg", cnt2reg_);
         emu_.Get<Vr4122ClockState>().RestoreState(r);
     }
 

@@ -46,8 +46,8 @@ public:
         if (off == kReboot && (value & 0xFFu) == kRebootCmd) TriggerReset();
     }
 
-    void SaveState(StateWriter& w) override { w.WriteBytes(regs_, sizeof(regs_)); }
-    void RestoreState(StateReader& r) override { r.ReadBytes(regs_, sizeof(regs_)); }
+    void SaveState(StateWriter& w) override { w.WriteBytes("regs", regs_, sizeof(regs_)); }
+    void RestoreState(StateReader& r) override { r.ReadBytes("regs", regs_, sizeof(regs_)); }
 
 private:
     static constexpr uint32_t kReboot    = 0x80Cu;  /* PA 0xA3CC380C - base 0xA3CC3000. */

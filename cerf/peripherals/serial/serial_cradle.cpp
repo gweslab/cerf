@@ -33,22 +33,22 @@ void SerialCradle::OnShutdown() {
 
 void SerialCradle::SaveCradleState(StateWriter& w) {
     std::lock_guard<std::mutex> lk(mtx_);
-    w.Write<uint8_t>(static_cast<uint8_t>(kind_));
+    w.Write<uint8_t>("kind", static_cast<uint8_t>(kind_));
     const uint32_t n = static_cast<uint32_t>(host_port_.size());
-    w.Write(n);
-    if (n) w.WriteBytes(host_port_.data(), n * sizeof(wchar_t));
+    w.Write("host_port_count", n);
+    if (n) w.WriteBytes("host_port", host_port_.data(), n * sizeof(wchar_t));
 }
 
 void SerialCradle::RestoreCradleState(StateReader& r) {
     std::lock_guard<std::mutex> lk(mtx_);
     uint8_t k = 0;
-    r.Read(k);
+    r.Read("kind", k);
     restored_kind_ = static_cast<Kind>(k);
 
     uint32_t n = 0;
-    r.Read(n);
+    r.Read("host_port_count", n);
     restored_port_.assign(n, L'\0');
-    if (n) r.ReadBytes(restored_port_.data(), n * sizeof(wchar_t));
+    if (n) r.ReadBytes("host_port", restored_port_.data(), n * sizeof(wchar_t));
 }
 
 void SerialCradle::PostRestore() {

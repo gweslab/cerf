@@ -141,16 +141,16 @@ public:
     void WriteHalf(uint32_t addr, uint16_t v) override { HaltUnsupportedAccess("PR31x00 Power WriteHalf", addr, v); }
 
     void SaveState(StateWriter& w) override {
-        w.Write(Ctl()); w.Write(signals_);
-        w.Write(pending_cause_.load(std::memory_order_acquire));
+        w.Write("ctl", Ctl()); w.Write("signals", signals_);
+        w.Write("pending_cause", pending_cause_.load(std::memory_order_acquire));
     }
     void RestoreState(StateReader& r) override {
         uint32_t ctl = 0;
-        r.Read(ctl);
+        r.Read("ctl", ctl);
         ctl_.store(ctl, std::memory_order_release);
-        r.Read(signals_);
+        r.Read("signals", signals_);
         uint32_t cause = kCauseNone;
-        r.Read(cause);
+        r.Read("pending_cause", cause);
         pending_cause_.store(cause, std::memory_order_release);
     }
 

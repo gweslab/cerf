@@ -76,16 +76,16 @@ public:
     }
 
     void SaveState(StateWriter& w) override {
-        w.Write(scr_);
-        w.Write(srsr_.load(std::memory_order_acquire));
-        w.Write(sisr_);
-        w.Write(simr_);
+        w.Write("scr", scr_);
+        w.Write("srsr", srsr_.load(std::memory_order_acquire));
+        w.Write("sisr", sisr_);
+        w.Write("simr", simr_);
     }
     void RestoreState(StateReader& r) override {
-        r.Read(scr_);
-        uint32_t s = 0; r.Read(s); srsr_.store(s, std::memory_order_release);
-        r.Read(sisr_);
-        r.Read(simr_);
+        r.Read("scr", scr_);
+        uint32_t s = 0; r.Read("srsr", s); srsr_.store(s, std::memory_order_release);
+        r.Read("sisr", sisr_);
+        r.Read("simr", simr_);
     }
 
 private:

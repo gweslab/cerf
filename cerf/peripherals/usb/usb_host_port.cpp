@@ -15,32 +15,22 @@ void UsbHostPort::Detach() {
 }
 
 void UsbHostPort::SaveState(StateWriter& w) {
-    w.Write<uint32_t>(device_ ? device_->StateKind() : 0);
-    const uint64_t length_pos = w.BytesWritten();
-    w.Write<uint64_t>(0);
-    const uint64_t start = w.BytesWritten();
+    w.BeginFrame(device_ ? device_->StateKind() : 0);
     if (device_) device_->SaveState(w);
-    const uint64_t length = w.BytesWritten() - start;
-    w.PatchAt(length_pos, &length, sizeof(length));
+    w.EndFrame();
 }
 
 void UsbHostPort::RestoreState(StateReader& r) {
-    uint32_t kind = 0; uint64_t length = 0;
-    r.Read(kind); r.Read(length);
-    const auto start = r.Position();
-    UsbState::Require(r.Ok() && start <= r.FileSize() &&
-                      length <= r.FileSize() - start, "invalid device frame");
+    const uint32_t kind = r.EnterFrame();
     device_.reset();
     std::unique_ptr<UsbDevice> restored;
     if (kind) {
-        UsbState::Require(static_cast<bool>(factory_), "no device factory");
+        UsbState::Require(r, static_cast<bool>(factory_), "no device factory");
         restored = factory_(kind);
-        UsbState::Require(restored != nullptr, "unsupported device kind");
+        UsbState::Require(r, restored != nullptr, "unsupported device kind");
         restored->RestoreState(r);
-    } else {
-        UsbState::Require(length == 0, "invalid empty port");
     }
-    UsbState::Require(r.Ok() && r.Position() == start + length, "device frame mismatch");
+    r.LeaveFrame();
     device_ = std::move(restored);
 }
 

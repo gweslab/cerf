@@ -30,12 +30,12 @@ void CerfGuestLiveness::NotifyBodyFetch() {
 }
 
 void CerfGuestLiveness::SaveState(StateWriter& w) const {
-    w.Write<uint8_t>(alive_.load(std::memory_order_acquire) ? 1u : 0u);
+    w.Write<uint8_t>("alive", alive_.load(std::memory_order_acquire) ? 1u : 0u);
 }
 
 void CerfGuestLiveness::RestoreState(StateReader& r) {
     uint8_t v = 0;
-    r.Read(v);
+    r.Read("alive", v);
     alive_.store(v != 0, std::memory_order_release);
 }
 

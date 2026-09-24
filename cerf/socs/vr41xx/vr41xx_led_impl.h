@@ -193,15 +193,15 @@ public:
 
     void SaveState(StateWriter& w) override {
         std::lock_guard<std::mutex> lk(state_mutex_);
-        w.Write(cnt_); w.Write(hts_); w.Write(lts_); w.Write(astc_); w.Write(int_);
-        w.Write(HltcNowLocked());
-        w.Write(astc_remaining_);
+        w.Write("cnt", cnt_); w.Write("hts", hts_); w.Write("lts", lts_); w.Write("astc", astc_); w.Write("int", int_);
+        w.Write("hltc", HltcNowLocked());
+        w.Write("astc_remaining", astc_remaining_);
     }
     void RestoreState(StateReader& r) override {
         std::lock_guard<std::mutex> lk(state_mutex_);
-        r.Read(cnt_); r.Read(hts_); r.Read(lts_); r.Read(astc_); r.Read(int_);
+        r.Read("cnt", cnt_); r.Read("hts", hts_); r.Read("lts", lts_); r.Read("astc", astc_); r.Read("int", int_);
         uint32_t hltc = 0;
-        r.Read(hltc); r.Read(astc_remaining_);
+        r.Read("hltc", hltc); r.Read("astc_remaining", astc_remaining_);
         ReanchorHltcLocked(hltc);
         last_pair_index_ = (cnt_ & kCntEnable) ? PairIndexLocked() : 0;
     }

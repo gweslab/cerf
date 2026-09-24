@@ -40,20 +40,20 @@ uint32_t CerfVirtPointer::ReadWord(uint32_t addr) {
 void CerfVirtPointer::WriteWord(uint32_t, uint32_t) {}
 
 void CerfVirtPointer::SaveState(StateWriter& w) {
-    w.Write<uint32_t>(x_.load());
-    w.Write<uint32_t>(y_.load());
-    w.Write<uint32_t>(buttons_.load());
-    w.Write<uint32_t>(wheel_.load());
-    w.Write<uint32_t>(seq_.load());
+    w.Write<uint32_t>("x", x_.load());
+    w.Write<uint32_t>("y", y_.load());
+    w.Write<uint32_t>("buttons", buttons_.load());
+    w.Write<uint32_t>("wheel", wheel_.load());
+    w.Write<uint32_t>("seq", seq_.load());
 }
 
 void CerfVirtPointer::RestoreState(StateReader& r) {
     uint32_t v;
-    r.Read(v); x_.store(v);
-    r.Read(v); y_.store(v);
-    r.Read(v); buttons_.store(v);
-    r.Read(v); wheel_.store(v);
-    r.Read(v); seq_.store(v);
+    r.Read("x", v); x_.store(v);
+    r.Read("y", v); y_.store(v);
+    r.Read("buttons", v); buttons_.store(v);
+    r.Read("wheel", v); wheel_.store(v);
+    r.Read("seq", v); seq_.store(v);
 }
 
 void CerfVirtPointer::Bump() { seq_.fetch_add(1u); }

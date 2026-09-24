@@ -101,31 +101,36 @@ public:
     }
 
     void SaveState(StateWriter& w) override {
-        w.Write(pm_override1_);
-        w.Write(pm_override2_);
-        w.Write(rb_cntl_);
-        w.Write(rb_base_);
-        w.Write(rb_rptr_addr_);
-        w.Write(rptr_);
-        w.Write(wptr_);
-        w.Write(static_cast<uint32_t>(reg_file_.size()));
-        for (const auto& [idx, val] : reg_file_) { w.Write(idx); w.Write(val); }
+        w.Write("pm_override1", pm_override1_);
+        w.Write("pm_override2", pm_override2_);
+        w.Write("rb_cntl", rb_cntl_);
+        w.Write("rb_base", rb_base_);
+        w.Write("rb_rptr_addr", rb_rptr_addr_);
+        w.Write("rptr", rptr_);
+        w.Write("wptr", wptr_);
+        w.Write("reg_file_count", static_cast<uint32_t>(reg_file_.size()));
+        for (const auto& [idx, val] : reg_file_) { w.Write("idx", idx); w.Write("val", val); }
         emu_.Get<Imx51Gpu3dContext>().SaveState(w);
         emu_.Get<Imx51Gpu3dDraw>().SaveState(w);
         emu_.Get<Imx51Gpu3dRaster>().SaveState(w);
     }
     void RestoreState(StateReader& r) override {
-        r.Read(pm_override1_);
-        r.Read(pm_override2_);
-        r.Read(rb_cntl_);
-        r.Read(rb_base_);
-        r.Read(rb_rptr_addr_);
-        r.Read(rptr_);
-        r.Read(wptr_);
+        r.Read("pm_override1", pm_override1_);
+        r.Read("pm_override2", pm_override2_);
+        r.Read("rb_cntl", rb_cntl_);
+        r.Read("rb_base", rb_base_);
+        r.Read("rb_rptr_addr", rb_rptr_addr_);
+        r.Read("rptr", rptr_);
+        r.Read("wptr", wptr_);
         uint32_t n = 0;
-        r.Read(n);
+        r.Read("reg_file_count", n);
         reg_file_.clear();
-        for (uint32_t k = 0; k < n; ++k) { uint32_t idx = 0, val = 0; r.Read(idx); r.Read(val); reg_file_[idx] = val; }
+        for (uint32_t k = 0; k < n; ++k) {
+            uint32_t idx = 0, val = 0;
+            r.Read("idx", idx);
+            r.Read("val", val);
+            reg_file_[idx] = val;
+        }
         emu_.Get<Imx51Gpu3dContext>().RestoreState(r);
         emu_.Get<Imx51Gpu3dDraw>().RestoreState(r);
         emu_.Get<Imx51Gpu3dRaster>().RestoreState(r);

@@ -35,6 +35,13 @@ private:
         uint32_t isr  = 0;                /* software-fired bits */
     };
 
+    template <typename F>
+    static constexpr void VisitBank(Bank& b, F& field) {
+        field("itr", b.itr);
+        field("mir", b.mir);
+        field("isr", b.isr);
+    }
+
     /* Compute the highest-priority pending source across all banks
        (priority < threshold, not masked). Returns -1 if nothing
        pending. Caller holds state_mutex_. Ties are broken by

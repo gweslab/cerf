@@ -180,40 +180,40 @@ public:
     /* Every member is a plain register (scalar or fixed register-file array);
        all are guest-observable. No host pointers, FIFOs, or rebase-time state. */
     void SaveState(StateWriter& w) override {
-        w.WriteBytes(portsc_, sizeof(portsc_));
-        w.Write(usbcmd_);
-        w.Write(usbintr_);
-        w.Write(usb_ctrl_);
-        w.Write(otg_mirror_);
-        w.Write(usbmode_);
-        w.Write(configflag_);
-        w.Write(otgsc_);
-        w.Write(ulpiview_);
-        w.Write(frindex_);
-        w.Write(ctrl_ds_seg_);
-        w.Write(periodic_base_);
-        w.Write(async_addr_);
-        w.Write(tx_fill_tune_);
-        w.Write(endpt_stat_);
-        w.WriteBytes(endptctrl_, sizeof(endptctrl_));
+        w.WriteBytes("portsc", portsc_, sizeof(portsc_));
+        w.Write("usbcmd", usbcmd_);
+        w.Write("usbintr", usbintr_);
+        w.Write("usb_ctrl", usb_ctrl_);
+        w.Write("otg_mirror", otg_mirror_);
+        w.Write("usbmode", usbmode_);
+        w.Write("configflag", configflag_);
+        w.Write("otgsc", otgsc_);
+        w.Write("ulpiview", ulpiview_);
+        w.Write("frindex", frindex_);
+        w.Write("ctrl_ds_seg", ctrl_ds_seg_);
+        w.Write("periodic_base", periodic_base_);
+        w.Write("async_addr", async_addr_);
+        w.Write("tx_fill_tune", tx_fill_tune_);
+        w.Write("endpt_stat", endpt_stat_);
+        w.WriteBytes("endptctrl", endptctrl_, sizeof(endptctrl_));
     }
     void RestoreState(StateReader& r) override {
-        r.ReadBytes(portsc_, sizeof(portsc_));
-        r.Read(usbcmd_);
-        r.Read(usbintr_);
-        r.Read(usb_ctrl_);
-        r.Read(otg_mirror_);
-        r.Read(usbmode_);
-        r.Read(configflag_);
-        r.Read(otgsc_);
-        r.Read(ulpiview_);
-        r.Read(frindex_);
-        r.Read(ctrl_ds_seg_);
-        r.Read(periodic_base_);
-        r.Read(async_addr_);
-        r.Read(tx_fill_tune_);
-        r.Read(endpt_stat_);
-        r.ReadBytes(endptctrl_, sizeof(endptctrl_));
+        r.ReadBytes("portsc", portsc_, sizeof(portsc_));
+        r.Read("usbcmd", usbcmd_);
+        r.Read("usbintr", usbintr_);
+        r.Read("usb_ctrl", usb_ctrl_);
+        r.Read("otg_mirror", otg_mirror_);
+        r.Read("usbmode", usbmode_);
+        r.Read("configflag", configflag_);
+        r.Read("otgsc", otgsc_);
+        r.Read("ulpiview", ulpiview_);
+        r.Read("frindex", frindex_);
+        r.Read("ctrl_ds_seg", ctrl_ds_seg_);
+        r.Read("periodic_base", periodic_base_);
+        r.Read("async_addr", async_addr_);
+        r.Read("tx_fill_tune", tx_fill_tune_);
+        r.Read("endpt_stat", endpt_stat_);
+        r.ReadBytes("endptctrl", endptctrl_, sizeof(endptctrl_));
     }
 
 private:

@@ -56,11 +56,11 @@ public:
     void WriteWord(uint32_t addr, uint32_t v) override    { Write<uint32_t>(addr, v); }
 
     void SaveState(StateWriter& w) override {
-        w.WriteBytes(regs_, sizeof(regs_));
+        w.WriteBytes("regs", regs_, sizeof(regs_));
         emu_.Get<Vrc5477Intc>().SaveState(w);
     }
     void RestoreState(StateReader& r) override {
-        r.ReadBytes(regs_, sizeof(regs_));
+        r.ReadBytes("regs", regs_, sizeof(regs_));
         emu_.Get<Vrc5477Intc>().RestoreState(r);
     }
     void PostRestore() override { emu_.Get<Vrc5477Intc>().Renotify(); }

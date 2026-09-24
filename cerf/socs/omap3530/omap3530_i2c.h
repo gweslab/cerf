@@ -38,40 +38,40 @@ public:
 
     void SaveState(StateWriter& w) override {
         std::lock_guard<std::mutex> lk(state_mutex_);
-        w.Write(stat_);    w.Write(ie_);   w.Write(we_);   w.Write(buf_);
-        w.Write(cnt_);     w.Write(sysc_); w.Write(con_);  w.Write(oa0_);
-        w.Write(sa_);      w.Write(psc_);  w.Write(scll_); w.Write(sclh_);
-        w.Write(systest_); w.Write(oa1_);  w.Write(oa2_);  w.Write(oa3_);
-        w.Write(actoa_);   w.Write(sblock_);
-        w.Write(pending_active_);
-        w.Write(pending_is_read_);
-        w.Write(pending_slave_addr_);
-        w.Write(pending_tx_dma_req_);
-        w.Write(pending_rx_dma_req_);
-        w.Write<uint32_t>(static_cast<uint32_t>(tx_fifo_.size()));
-        for (uint8_t b : tx_fifo_) w.Write(b);
-        w.Write<uint32_t>(static_cast<uint32_t>(rx_fifo_.size()));
-        for (uint8_t b : rx_fifo_) w.Write(b);
+        w.Write("stat", stat_);    w.Write("ie", ie_);   w.Write("we", we_);   w.Write("buf", buf_);
+        w.Write("cnt", cnt_);     w.Write("sysc", sysc_); w.Write("con", con_);  w.Write("oa0", oa0_);
+        w.Write("sa", sa_);      w.Write("psc", psc_);  w.Write("scll", scll_); w.Write("sclh", sclh_);
+        w.Write("systest", systest_); w.Write("oa1", oa1_);  w.Write("oa2", oa2_);  w.Write("oa3", oa3_);
+        w.Write("actoa", actoa_);   w.Write("sblock", sblock_);
+        w.Write("pending_active", pending_active_);
+        w.Write("pending_is_read", pending_is_read_);
+        w.Write("pending_slave_addr", pending_slave_addr_);
+        w.Write("pending_tx_dma_req", pending_tx_dma_req_);
+        w.Write("pending_rx_dma_req", pending_rx_dma_req_);
+        w.Write<uint32_t>("tx_fifo_count", static_cast<uint32_t>(tx_fifo_.size()));
+        for (uint8_t b : tx_fifo_) w.Write("tx_fifo", b);
+        w.Write<uint32_t>("rx_fifo_count", static_cast<uint32_t>(rx_fifo_.size()));
+        for (uint8_t b : rx_fifo_) w.Write("rx_fifo", b);
     }
     void RestoreState(StateReader& r) override {
         std::lock_guard<std::mutex> lk(state_mutex_);
-        r.Read(stat_);    r.Read(ie_);   r.Read(we_);   r.Read(buf_);
-        r.Read(cnt_);     r.Read(sysc_); r.Read(con_);  r.Read(oa0_);
-        r.Read(sa_);      r.Read(psc_);  r.Read(scll_); r.Read(sclh_);
-        r.Read(systest_); r.Read(oa1_);  r.Read(oa2_);  r.Read(oa3_);
-        r.Read(actoa_);   r.Read(sblock_);
-        r.Read(pending_active_);
-        r.Read(pending_is_read_);
-        r.Read(pending_slave_addr_);
-        r.Read(pending_tx_dma_req_);
-        r.Read(pending_rx_dma_req_);
+        r.Read("stat", stat_);    r.Read("ie", ie_);   r.Read("we", we_);   r.Read("buf", buf_);
+        r.Read("cnt", cnt_);     r.Read("sysc", sysc_); r.Read("con", con_);  r.Read("oa0", oa0_);
+        r.Read("sa", sa_);      r.Read("psc", psc_);  r.Read("scll", scll_); r.Read("sclh", sclh_);
+        r.Read("systest", systest_); r.Read("oa1", oa1_);  r.Read("oa2", oa2_);  r.Read("oa3", oa3_);
+        r.Read("actoa", actoa_);   r.Read("sblock", sblock_);
+        r.Read("pending_active", pending_active_);
+        r.Read("pending_is_read", pending_is_read_);
+        r.Read("pending_slave_addr", pending_slave_addr_);
+        r.Read("pending_tx_dma_req", pending_tx_dma_req_);
+        r.Read("pending_rx_dma_req", pending_rx_dma_req_);
         tx_fifo_.clear();
         uint32_t n = 0;
-        r.Read(n);
-        for (uint32_t i = 0; i < n; ++i) { uint8_t b = 0; r.Read(b); tx_fifo_.push_back(b); }
+        r.Read("tx_fifo_count", n);
+        for (uint32_t i = 0; i < n; ++i) { uint8_t b = 0; r.Read("tx_fifo", b); tx_fifo_.push_back(b); }
         rx_fifo_.clear();
-        r.Read(n);
-        for (uint32_t i = 0; i < n; ++i) { uint8_t b = 0; r.Read(b); rx_fifo_.push_back(b); }
+        r.Read("rx_fifo_count", n);
+        for (uint32_t i = 0; i < n; ++i) { uint8_t b = 0; r.Read("rx_fifo", b); rx_fifo_.push_back(b); }
     }
 
 protected:

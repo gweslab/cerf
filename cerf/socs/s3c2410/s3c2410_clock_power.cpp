@@ -169,14 +169,14 @@ public:
     }
 
     void SaveState(StateWriter& w) {
-        for (uint32_t i = 0; i < kSlotCount; ++i) w.Write<uint32_t>(regs_[i]);
-        w.Write<uint8_t>(pll_configured_ ? 1u : 0u);
+        for (uint32_t i = 0; i < kSlotCount; ++i) w.Write<uint32_t>("regs", regs_[i]);
+        w.Write<uint8_t>("pll_configured", pll_configured_ ? 1u : 0u);
     }
 
     void RestoreState(StateReader& r) {
-        for (uint32_t i = 0; i < kSlotCount; ++i) r.Read(regs_[i]);
+        for (uint32_t i = 0; i < kSlotCount; ++i) r.Read("regs", regs_[i]);
         uint8_t configured = 0;
-        r.Read(configured);
+        r.Read("pll_configured", configured);
         pll_configured_ = configured != 0u;
         Derive();
     }

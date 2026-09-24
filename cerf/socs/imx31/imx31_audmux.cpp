@@ -53,8 +53,8 @@ public:
     }
 
     /* JIT-thread-only register file (no worker thread). */
-    void SaveState(StateWriter& w) override    { w.WriteBytes(regs_.data(), regs_.size() * sizeof(uint32_t)); }
-    void RestoreState(StateReader& r) override { r.ReadBytes(regs_.data(), regs_.size() * sizeof(uint32_t)); }
+    void SaveState(StateWriter& w) override    { w.WriteBytes("regs", regs_.data(), regs_.size() * sizeof(uint32_t)); }
+    void RestoreState(StateReader& r) override { r.ReadBytes("regs", regs_.data(), regs_.size() * sizeof(uint32_t)); }
 
 private:
     std::array<uint32_t, 15> regs_ = kReset;

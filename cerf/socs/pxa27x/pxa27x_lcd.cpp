@@ -368,49 +368,49 @@ void Pxa27xLcd::WriteWord(uint32_t addr, uint32_t value) {
 
 void Pxa27xLcd::SaveState(StateWriter& w) {
     std::lock_guard<std::mutex> lk(state_mtx_);
-    for (uint32_t i = 0; i < 6u; ++i) w.Write(lccr_[i]);
-    w.Write(lcsr0_);
-    w.Write(lcsr1_);
-    w.Write(liidr_);
-    w.Write(trgbr_);
-    w.Write(tcr_);
-    w.Write(cmdcr_);
-    w.Write(prsr_);
-    w.Write(ovl1c1_);
-    w.Write(ovl1c2_);
-    w.Write(ovl2c1_);
-    w.Write(ovl2c2_);
-    w.Write(ccr_);
+    for (uint32_t i = 0; i < 6u; ++i) w.Write("lccr", lccr_[i]);
+    w.Write("lcsr0", lcsr0_);
+    w.Write("lcsr1", lcsr1_);
+    w.Write("liidr", liidr_);
+    w.Write("trgbr", trgbr_);
+    w.Write("tcr", tcr_);
+    w.Write("cmdcr", cmdcr_);
+    w.Write("prsr", prsr_);
+    w.Write("ovl1c1", ovl1c1_);
+    w.Write("ovl1c2", ovl1c2_);
+    w.Write("ovl2c1", ovl2c1_);
+    w.Write("ovl2c2", ovl2c2_);
+    w.Write("ccr", ccr_);
     for (uint32_t i = 0; i < kChannels; ++i) {
-        w.Write(fdadr_[i]);
-        w.Write(fsadr_[i]);
-        w.Write(fidr_ [i]);
-        w.Write(ldcmd_[i]);
-        w.Write(fbr_  [i]);
+        w.Write("fdadr", fdadr_[i]);
+        w.Write("fsadr", fsadr_[i]);
+        w.Write("fidr", fidr_ [i]);
+        w.Write("ldcmd", ldcmd_[i]);
+        w.Write("fbr", fbr_  [i]);
     }
 }
 
 void Pxa27xLcd::RestoreState(StateReader& r) {
     std::lock_guard<std::mutex> lk(state_mtx_);
-    for (uint32_t i = 0; i < 6u; ++i) r.Read(lccr_[i]);
-    r.Read(lcsr0_);
-    r.Read(lcsr1_);
-    r.Read(liidr_);
-    r.Read(trgbr_);
-    r.Read(tcr_);
-    r.Read(cmdcr_);
-    r.Read(prsr_);
-    r.Read(ovl1c1_);
-    r.Read(ovl1c2_);
-    r.Read(ovl2c1_);
-    r.Read(ovl2c2_);
-    r.Read(ccr_);
+    for (uint32_t i = 0; i < 6u; ++i) r.Read("lccr", lccr_[i]);
+    r.Read("lcsr0", lcsr0_);
+    r.Read("lcsr1", lcsr1_);
+    r.Read("liidr", liidr_);
+    r.Read("trgbr", trgbr_);
+    r.Read("tcr", tcr_);
+    r.Read("cmdcr", cmdcr_);
+    r.Read("prsr", prsr_);
+    r.Read("ovl1c1", ovl1c1_);
+    r.Read("ovl1c2", ovl1c2_);
+    r.Read("ovl2c1", ovl2c1_);
+    r.Read("ovl2c2", ovl2c2_);
+    r.Read("ccr", ccr_);
     for (uint32_t i = 0; i < kChannels; ++i) {
-        r.Read(fdadr_[i]);
-        r.Read(fsadr_[i]);
-        r.Read(fidr_ [i]);
-        r.Read(ldcmd_[i]);
-        r.Read(fbr_  [i]);
+        r.Read("fdadr", fdadr_[i]);
+        r.Read("fsadr", fsadr_[i]);
+        r.Read("fidr", fidr_ [i]);
+        r.Read("ldcmd", ldcmd_[i]);
+        r.Read("fbr", fbr_  [i]);
     }
 }
 

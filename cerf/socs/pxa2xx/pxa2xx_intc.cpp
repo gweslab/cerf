@@ -278,23 +278,23 @@ void Pxa2xxIntc::WriteByteAt(uint32_t off, uint8_t value) {
 void Pxa2xxIntc::SaveState(StateWriter& w) {
     std::lock_guard<std::mutex> guard(state_mtx_);
     for (uint32_t b = 0; b < kBanks; ++b) {
-        w.Write(icpr_[b]);
-        w.Write(icmr_[b]);
-        w.Write(iclr_[b]);
+        w.Write("icpr", icpr_[b]);
+        w.Write("icmr", icmr_[b]);
+        w.Write("iclr", iclr_[b]);
     }
-    w.Write(iccr_);
-    for (uint32_t i = 0; i < kIprSlots; ++i) w.Write(ipr_[i]);
+    w.Write("iccr", iccr_);
+    for (uint32_t i = 0; i < kIprSlots; ++i) w.Write("ipr", ipr_[i]);
 }
 
 void Pxa2xxIntc::RestoreState(StateReader& r) {
     std::lock_guard<std::mutex> guard(state_mtx_);
     for (uint32_t b = 0; b < kBanks; ++b) {
-        r.Read(icpr_[b]);
-        r.Read(icmr_[b]);
-        r.Read(iclr_[b]);
+        r.Read("icpr", icpr_[b]);
+        r.Read("icmr", icmr_[b]);
+        r.Read("iclr", iclr_[b]);
     }
-    r.Read(iccr_);
-    for (uint32_t i = 0; i < kIprSlots; ++i) r.Read(ipr_[i]);
+    r.Read("iccr", iccr_);
+    for (uint32_t i = 0; i < kIprSlots; ++i) r.Read("ipr", ipr_[i]);
 }
 
 void Pxa2xxIntc::PostRestore() {

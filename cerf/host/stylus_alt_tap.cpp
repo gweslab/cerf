@@ -96,22 +96,24 @@ void StylusAltTap::Cancel() {
 }
 
 void StylusAltTap::SaveState(StateWriter& w) const {
-    w.Write<uint8_t>(static_cast<uint8_t>(CurrentPhase()));
-    w.Write<int32_t>(tap_x_);
-    w.Write<int32_t>(tap_y_);
+    w.Write<uint8_t>("phase", static_cast<uint8_t>(CurrentPhase()));
+    w.Write<int32_t>("tap_x", tap_x_);
+    w.Write<int32_t>("tap_y", tap_y_);
 }
 
 void StylusAltTap::RestoreState(StateReader& r) {
     uint8_t raw = 0;
     int32_t x = 0, y = 0;
-    r.Read(raw);
-    r.Read(x);
-    r.Read(y);
+    r.Read("phase", raw);
+    r.Read("tap_x", x);
+    r.Read("tap_y", y);
     const Phase saved = raw <= static_cast<uint8_t>(Phase::AltTrail)
                         ? static_cast<Phase>(raw) : Phase::Idle;
+    const uint32_t gen = restore_gen_.fetch_add(1u, std::memory_order_acq_rel) + 1u;
     if (saved == Phase::Idle && CurrentPhase() == Phase::Idle) return;
-    emu_.Get<HostWindow>().RunOnUiThread([this, saved, x, y] {
+    emu_.Get<HostWindow>().RunOnUiThread([this, saved, x, y, gen] {
         auto freeze = emu_.Get<EmulationFreeze>().WorkerSection();
+        if (restore_gen_.load(std::memory_order_acquire) != gen) return;
         KillTimer(emu_.Get<HostCanvas>().Hwnd(), kTimerId);
         SetPhase(Phase::Idle);
         if (saved == Phase::Idle) return;

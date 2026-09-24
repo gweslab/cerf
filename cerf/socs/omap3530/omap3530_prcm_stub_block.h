@@ -49,10 +49,10 @@ protected:
     /* regs_ is sized in OnReady (MmioSize/4), which runs before restore, so
        the blob length matches on both sides for the same concrete. */
     void SaveRegsLocked(StateWriter& w) const {
-        w.WriteBytes(regs_.data(), regs_.size() * sizeof(uint32_t));
+        w.WriteBytes("regs", regs_.data(), regs_.size() * sizeof(uint32_t));
     }
     void RestoreRegsLocked(StateReader& r) {
-        r.ReadBytes(regs_.data(), regs_.size() * sizeof(uint32_t));
+        r.ReadBytes("regs", regs_.data(), regs_.size() * sizeof(uint32_t));
     }
 
     uint32_t PeekReg(uint32_t off) const {
@@ -202,12 +202,12 @@ public:
     void SaveState(StateWriter& w) override {
         std::lock_guard<std::mutex> lk(mu_);
         SaveRegsLocked(w);
-        w.Write(irq_line_high_);
+        w.Write("irq_line_high", irq_line_high_);
     }
     void RestoreState(StateReader& r) override {
         std::lock_guard<std::mutex> lk(mu_);
         RestoreRegsLocked(r);
-        r.Read(irq_line_high_);
+        r.Read("irq_line_high", irq_line_high_);
     }
 
 protected:

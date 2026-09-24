@@ -73,16 +73,16 @@ void CasioCassiopeiaEm500Modem::OnUartIrq(bool asserted) {
 }
 
 void CasioCassiopeiaEm500Modem::SaveState(StateWriter& w) const {
-    w.Write(ctrl_8600_);
-    w.Write(socket_a1c0_);
-    w.Write(socket_a1c4_);
+    w.Write("ctrl_8600", ctrl_8600_);
+    w.Write("socket_a1c0", socket_a1c0_);
+    w.Write("socket_a1c4", socket_a1c4_);
     uart_->SaveState(w);
 }
 
 void CasioCassiopeiaEm500Modem::RestoreState(StateReader& r) {
-    r.Read(ctrl_8600_);
-    r.Read(socket_a1c0_);
-    r.Read(socket_a1c4_);
+    r.Read("ctrl_8600", ctrl_8600_);
+    r.Read("socket_a1c0", socket_a1c0_);
+    r.Read("socket_a1c4", socket_a1c4_);
     uart_->RestoreState(r);
 }
 

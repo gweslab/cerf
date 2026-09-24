@@ -58,11 +58,11 @@ public:
 
     void SaveState(StateWriter& w) override {
         std::lock_guard<std::mutex> lk(state_mutex_);
-        w.WriteBytes(regs_.data(), regs_.size());
+        w.WriteBytes("regs", regs_.data(), regs_.size());
     }
     void RestoreState(StateReader& r) override {
         std::lock_guard<std::mutex> lk(state_mutex_);
-        r.ReadBytes(regs_.data(), regs_.size());
+        r.ReadBytes("regs", regs_.data(), regs_.size());
     }
 
     /* HostWidget. The icon IS the LED state; no data path -> no RX/TX. */

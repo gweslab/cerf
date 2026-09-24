@@ -110,31 +110,31 @@ public:
     }
 
     void SaveState(StateWriter& w) override {
-        w.Write(gptcr_.load(std::memory_order_acquire));
-        w.Write(gptpr_.load(std::memory_order_acquire));
-        w.Write(gptsr_.load(std::memory_order_acquire));
-        w.Write(gptir_.load(std::memory_order_acquire));
-        for (int n = 0; n < 3; ++n) w.Write(gptocr_[n].load(std::memory_order_acquire));
-        for (int n = 0; n < 2; ++n) w.Write(gpticr_[n].load(std::memory_order_acquire));
-        for (int n = 0; n < 3; ++n) w.Write(ocr_anchor_[n].load(std::memory_order_acquire));
-        w.Write(frozen_count_.load(std::memory_order_acquire));
-        w.Write(last_seen_count_);
-        w.Write<uint32_t>(ReadCounter());   /* current count; re-anchored on restore */
+        w.Write("gptcr", gptcr_.load(std::memory_order_acquire));
+        w.Write("gptpr", gptpr_.load(std::memory_order_acquire));
+        w.Write("gptsr", gptsr_.load(std::memory_order_acquire));
+        w.Write("gptir", gptir_.load(std::memory_order_acquire));
+        for (int n = 0; n < 3; ++n) w.Write("gptocr", gptocr_[n].load(std::memory_order_acquire));
+        for (int n = 0; n < 2; ++n) w.Write("gpticr", gpticr_[n].load(std::memory_order_acquire));
+        for (int n = 0; n < 3; ++n) w.Write("ocr_anchor", ocr_anchor_[n].load(std::memory_order_acquire));
+        w.Write("frozen_count", frozen_count_.load(std::memory_order_acquire));
+        w.Write("last_seen_count", last_seen_count_);
+        w.Write<uint32_t>("counter", ReadCounter());
     }
     void RestoreState(StateReader& r) override {
         uint32_t v = 0;
         uint64_t u = 0;
-        r.Read(v); gptcr_.store(v, std::memory_order_release);
-        r.Read(v); gptpr_.store(v, std::memory_order_release);
-        r.Read(v); gptsr_.store(v, std::memory_order_release);
-        r.Read(v); gptir_.store(v, std::memory_order_release);
-        for (int n = 0; n < 3; ++n) { r.Read(v); gptocr_[n].store(v, std::memory_order_release); }
-        for (int n = 0; n < 2; ++n) { r.Read(v); gpticr_[n].store(v, std::memory_order_release); }
-        for (int n = 0; n < 3; ++n) { r.Read(u); ocr_anchor_[n].store(u, std::memory_order_release); }
-        r.Read(v); frozen_count_.store(v, std::memory_order_release);
-        r.Read(last_seen_count_);
+        r.Read("gptcr", v); gptcr_.store(v, std::memory_order_release);
+        r.Read("gptpr", v); gptpr_.store(v, std::memory_order_release);
+        r.Read("gptsr", v); gptsr_.store(v, std::memory_order_release);
+        r.Read("gptir", v); gptir_.store(v, std::memory_order_release);
+        for (int n = 0; n < 3; ++n) { r.Read("gptocr", v); gptocr_[n].store(v, std::memory_order_release); }
+        for (int n = 0; n < 2; ++n) { r.Read("gpticr", v); gpticr_[n].store(v, std::memory_order_release); }
+        for (int n = 0; n < 3; ++n) { r.Read("ocr_anchor", u); ocr_anchor_[n].store(u, std::memory_order_release); }
+        r.Read("frozen_count", v); frozen_count_.store(v, std::memory_order_release);
+        r.Read("last_seen_count", last_seen_count_);
         uint32_t cnt = 0;
-        r.Read(cnt);
+        r.Read("counter", cnt);
         baseline_packed_.store(PackPair(cnt, GuestCycles()), std::memory_order_release);
         cv_.notify_all();
     }

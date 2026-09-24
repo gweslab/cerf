@@ -136,14 +136,14 @@ void AmdCommandSetFlash::DoWriteHalf(uint32_t io_addr, uint16_t value) {
 }
 
 void AmdCommandSetFlash::SaveState(StateWriter& w) {
-    w.Write((uint8_t)st_);
-    w.Write((uint8_t)(bypass_ ? 1u : 0u));
-    w.Write(cached_word0_);
+    w.Write("st", (uint8_t)st_);
+    w.Write("bypass", (uint8_t)(bypass_ ? 1u : 0u));
+    w.Write("cached_word0", cached_word0_);
 }
 void AmdCommandSetFlash::RestoreState(StateReader& r) {
-    uint8_t st = 0; r.Read(st); st_ = (St)st;
-    uint8_t byp = 0; r.Read(byp); bypass_ = (byp != 0);
-    r.Read(cached_word0_);
+    uint8_t st = 0; r.Read("st", st); st_ = (St)st;
+    uint8_t byp = 0; r.Read("bypass", byp); bypass_ = (byp != 0);
+    r.Read("cached_word0", cached_word0_);
 }
 
 std::vector<WidgetMenuItem> AmdCommandSetFlash::BuildMenu() {

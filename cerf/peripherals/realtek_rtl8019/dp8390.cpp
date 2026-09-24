@@ -418,31 +418,31 @@ void Dp8390::CompleteTxLocked() {
 }
 
 void Dp8390::SaveState(StateWriter& w) {
-    w.Write(cr_);
-    w.Write(pstart_); w.Write(pstop_); w.Write(bnry_);
-    w.Write(tsr_); w.Write(tpsr_); w.Write(ncr_);
-    w.Write(isr_); w.Write(rcr_); w.Write(tcr_); w.Write(dcr_);
-    w.Write(rsr_); w.Write(imr_);
-    w.Write(tbcr_); w.Write(rsar_); w.Write(rbcr_); w.Write(crda_);
-    w.Write(cntr0_); w.Write(cntr1_); w.Write(cntr2_);
-    w.WriteBytes(par_.data(), par_.size());
-    w.WriteBytes(mar_.data(), mar_.size());
-    w.Write(curr_);
-    w.Write(dma_remaining_);
-    w.Write(rst_overflow_);
+    w.Write("cr", cr_);
+    w.Write("pstart", pstart_); w.Write("pstop", pstop_); w.Write("bnry", bnry_);
+    w.Write("tsr", tsr_); w.Write("tpsr", tpsr_); w.Write("ncr", ncr_);
+    w.Write("isr", isr_); w.Write("rcr", rcr_); w.Write("tcr", tcr_); w.Write("dcr", dcr_);
+    w.Write("rsr", rsr_); w.Write("imr", imr_);
+    w.Write("tbcr", tbcr_); w.Write("rsar", rsar_); w.Write("rbcr", rbcr_); w.Write("crda", crda_);
+    w.Write("cntr0", cntr0_); w.Write("cntr1", cntr1_); w.Write("cntr2", cntr2_);
+    w.WriteBytes("par", par_.data(), par_.size());
+    w.WriteBytes("mar", mar_.data(), mar_.size());
+    w.Write("curr", curr_);
+    w.Write("dma_remaining", dma_remaining_);
+    w.Write("rst_overflow", rst_overflow_);
 }
 
 void Dp8390::RestoreState(StateReader& r) {
-    r.Read(cr_);
-    r.Read(pstart_); r.Read(pstop_); r.Read(bnry_);
-    r.Read(tsr_); r.Read(tpsr_); r.Read(ncr_);
-    r.Read(isr_); r.Read(rcr_); r.Read(tcr_); r.Read(dcr_);
-    r.Read(rsr_); r.Read(imr_);
-    r.Read(tbcr_); r.Read(rsar_); r.Read(rbcr_); r.Read(crda_);
-    r.Read(cntr0_); r.Read(cntr1_); r.Read(cntr2_);
-    r.ReadBytes(par_.data(), par_.size());
-    r.ReadBytes(mar_.data(), mar_.size());
-    r.Read(curr_);
-    r.Read(dma_remaining_);
-    r.Read(rst_overflow_);
+    r.Read("cr", cr_);
+    r.Read("pstart", pstart_); r.Read("pstop", pstop_); r.Read("bnry", bnry_);
+    r.Read("tsr", tsr_); r.Read("tpsr", tpsr_); r.Read("ncr", ncr_);
+    r.Read("isr", isr_); r.Read("rcr", rcr_); r.Read("tcr", tcr_); r.Read("dcr", dcr_);
+    r.Read("rsr", rsr_); r.Read("imr", imr_);
+    r.Read("tbcr", tbcr_); r.Read("rsar", rsar_); r.Read("rbcr", rbcr_); r.Read("crda", crda_);
+    r.Read("cntr0", cntr0_); r.Read("cntr1", cntr1_); r.Read("cntr2", cntr2_);
+    r.ReadBytes("par", par_.data(), par_.size());
+    r.ReadBytes("mar", mar_.data(), mar_.size());
+    r.Read("curr", curr_);
+    r.Read("dma_remaining", dma_remaining_);
+    r.Read("rst_overflow", rst_overflow_);
 }

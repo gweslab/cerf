@@ -40,8 +40,8 @@ public:
     void WriteHalf(uint32_t addr, uint16_t value) override { WriteReg(addr, value); }
     void WriteWord(uint32_t addr, uint32_t value) override { WriteReg(addr, value); }
 
-    void SaveState(StateWriter& w) override { for (auto v : regs_) w.Write(v); }
-    void RestoreState(StateReader& r) override { for (auto& v : regs_) r.Read(v); }
+    void SaveState(StateWriter& w) override { for (auto v : regs_) w.Write("regs", v); }
+    void RestoreState(StateReader& r) override { for (auto& v : regs_) r.Read("regs", v); }
 
 private:
     enum : uint32_t {

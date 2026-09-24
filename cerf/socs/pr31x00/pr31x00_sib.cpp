@@ -217,15 +217,15 @@ public:
     }
 
     void SaveState(StateWriter& w) override {
-        w.Write(ctl_); w.Write(dma_ctl_); w.Write(sf0_aux_); w.Write(sf1_aux_);
-        w.Write(snd_tx_hold_); w.Write(tel_tx_hold_); w.Write(sf0_stat_);
-        w.Write(snd_tx_start_); w.Write(snd_size_);
+        w.Write("ctl", ctl_); w.Write("dma_ctl", dma_ctl_); w.Write("sf0_aux", sf0_aux_); w.Write("sf1_aux", sf1_aux_);
+        w.Write("snd_tx_hold", snd_tx_hold_); w.Write("tel_tx_hold", tel_tx_hold_); w.Write("sf0_stat", sf0_stat_);
+        w.Write("snd_tx_start", snd_tx_start_); w.Write("snd_size", snd_size_);
         if (auto* codec = emu_.TryGet<Pr31x00SibCodec>()) codec->SaveState(w);
     }
     void RestoreState(StateReader& r) override {
-        r.Read(ctl_); r.Read(dma_ctl_); r.Read(sf0_aux_); r.Read(sf1_aux_);
-        r.Read(snd_tx_hold_); r.Read(tel_tx_hold_); r.Read(sf0_stat_);
-        r.Read(snd_tx_start_); r.Read(snd_size_);
+        r.Read("ctl", ctl_); r.Read("dma_ctl", dma_ctl_); r.Read("sf0_aux", sf0_aux_); r.Read("sf1_aux", sf1_aux_);
+        r.Read("snd_tx_hold", snd_tx_hold_); r.Read("tel_tx_hold", tel_tx_hold_); r.Read("sf0_stat", sf0_stat_);
+        r.Read("snd_tx_start", snd_tx_start_); r.Read("snd_size", snd_size_);
         if (auto* codec = emu_.TryGet<Pr31x00SibCodec>()) codec->RestoreState(r);
     }
     void PostRestore() override {

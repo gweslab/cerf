@@ -39,8 +39,8 @@ protected:
     }
 
     void ResetChip() override                      { sreset_ = 0; csel_ = 0; }
-    void SaveChipState(StateWriter& w) override    { w.Write(sreset_); w.Write(csel_); }
-    void RestoreChipState(StateReader& r) override { r.Read(sreset_); r.Read(csel_); }
+    void SaveChipState(StateWriter& w) override    { w.Write("sreset", sreset_); w.Write("csel", csel_); }
+    void RestoreChipState(StateReader& r) override { r.Read("sreset", sreset_); r.Read("csel", csel_); }
 
 private:
     uint8_t sreset_ = 0;   /* SIU 0x09 SIURESET D0 */

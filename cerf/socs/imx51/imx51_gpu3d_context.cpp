@@ -65,8 +65,13 @@ void Imx51Gpu3dContext::ShadowWrite(uint32_t index, uint32_t value, uint32_t con
 }
 
 void Imx51Gpu3dContext::SaveState(StateWriter& writer) {
-    for (const auto& bank : banks_) { writer.Write(bank.address); writer.Write(bank.enabled); }
+    static_assert(StateVisitCoversAllBytes<Bank>(
+                      [](Bank& b, StateFieldBytes& f) { Bank::Visit(b, f); }),
+                  "Bank::Visit must name or skip every field of Bank");
+    StateWriteField field(writer);
+    for (Bank& bank : banks_) Bank::Visit(bank, field);
 }
 void Imx51Gpu3dContext::RestoreState(StateReader& reader) {
-    for (auto& bank : banks_) { reader.Read(bank.address); reader.Read(bank.enabled); }
+    StateReadField field(reader);
+    for (Bank& bank : banks_) Bank::Visit(bank, field);
 }

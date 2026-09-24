@@ -187,27 +187,27 @@ void Sa1111Sac::CompleteTransmit(bool buffer_b) {
 
 void Sa1111Sac::SaveState(StateWriter& w) {
     std::lock_guard<std::mutex> lk(dma_mtx_);
-    w.Write(accar_);  w.Write(accdr_);  w.Write(acsar_);
-    w.Write(sadtcs_); w.Write(sadtsa_); w.Write(sadtca_); w.Write(sadtsb_); w.Write(sadtcb_);
-    w.Write(sadrcs_); w.Write(sadrsa_); w.Write(sadrca_); w.Write(sadrsb_); w.Write(sadrcb_);
-    w.Write(saitr_);
-    w.Write(sacr0_); w.Write(sacr1_); w.Write(sacr2_);
-    w.Write(l3car_);
-    w.WriteBytes(l3_regs_, sizeof(l3_regs_));   /* UDA1344 codec register file */
-    w.Write<uint8_t>(l3wd_ ? 1u : 0u);
-    w.Write<uint8_t>(l3rd_ ? 1u : 0u);
+    w.Write("accar", accar_);  w.Write("accdr", accdr_);  w.Write("acsar", acsar_);
+    w.Write("sadtcs", sadtcs_); w.Write("sadtsa", sadtsa_); w.Write("sadtca", sadtca_); w.Write("sadtsb", sadtsb_); w.Write("sadtcb", sadtcb_);
+    w.Write("sadrcs", sadrcs_); w.Write("sadrsa", sadrsa_); w.Write("sadrca", sadrca_); w.Write("sadrsb", sadrsb_); w.Write("sadrcb", sadrcb_);
+    w.Write("saitr", saitr_);
+    w.Write("sacr0", sacr0_); w.Write("sacr1", sacr1_); w.Write("sacr2", sacr2_);
+    w.Write("l3car", l3car_);
+    w.WriteBytes("l3_regs", l3_regs_, sizeof(l3_regs_));
+    w.Write<uint8_t>("l3wd", l3wd_ ? 1u : 0u);
+    w.Write<uint8_t>("l3rd", l3rd_ ? 1u : 0u);
 }
 
 void Sa1111Sac::RestoreState(StateReader& r) {
     std::lock_guard<std::mutex> lk(dma_mtx_);
-    r.Read(accar_);  r.Read(accdr_);  r.Read(acsar_);
-    r.Read(sadtcs_); r.Read(sadtsa_); r.Read(sadtca_); r.Read(sadtsb_); r.Read(sadtcb_);
-    r.Read(sadrcs_); r.Read(sadrsa_); r.Read(sadrca_); r.Read(sadrsb_); r.Read(sadrcb_);
-    r.Read(saitr_);
-    r.Read(sacr0_); r.Read(sacr1_); r.Read(sacr2_);
-    r.Read(l3car_);
-    r.ReadBytes(l3_regs_, sizeof(l3_regs_));
-    uint8_t l3wd = 0, l3rd = 0; r.Read(l3wd); r.Read(l3rd);
+    r.Read("accar", accar_);  r.Read("accdr", accdr_);  r.Read("acsar", acsar_);
+    r.Read("sadtcs", sadtcs_); r.Read("sadtsa", sadtsa_); r.Read("sadtca", sadtca_); r.Read("sadtsb", sadtsb_); r.Read("sadtcb", sadtcb_);
+    r.Read("sadrcs", sadrcs_); r.Read("sadrsa", sadrsa_); r.Read("sadrca", sadrca_); r.Read("sadrsb", sadrsb_); r.Read("sadrcb", sadrcb_);
+    r.Read("saitr", saitr_);
+    r.Read("sacr0", sacr0_); r.Read("sacr1", sacr1_); r.Read("sacr2", sacr2_);
+    r.Read("l3car", l3car_);
+    r.ReadBytes("l3_regs", l3_regs_, sizeof(l3_regs_));
+    uint8_t l3wd = 0, l3rd = 0; r.Read("l3wd", l3wd); r.Read("l3rd", l3rd);
     l3wd_ = (l3wd != 0); l3rd_ = (l3rd != 0);
     /* No host audio sink owns a buffer after a restore; clear the in-flight TX
        so the guest re-arms on the next DMA program (mirrors Sa11xxDma). */

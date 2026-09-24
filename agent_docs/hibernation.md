@@ -37,76 +37,79 @@ device directory.
 
 ## The `.img` format
 
-`StateImageHeader` (magic `CERFIMG1`, `format_version`, ROM fingerprint =
-`rom_entry_va` + `rom_total_bytes` + `periph_layout_sig` + a `guest_additions`
-byte), followed by a section count and length-framed sections
-(`StateSectionHeader{ id, length }`). The length frame lets restore **skip** a
-section that it does not apply (warm boot). It also lets restore tolerate a
-peripheral whose Save/Restore are asymmetric, with no desync of the whole stream.
-`SeekTo(body_start + length)` re-aligns after every section.
+The image starts with a magic and an identity header. Length-framed sections
+follow. Each peripheral has its own frame inside the Periph section, with its
+`MmioBase` as the frame id. Every field carries a tag with its name, kind and
+size.
 
-`ValidateHeader` verifies identity **before** CERF mutates any live state. A wrong
-ROM, a wrong peripheral layout signature, or a guest-additions mismatch is refused
-at that point. `periph_layout_sig` is a hash over the registered peripheral set.
-Identity comes from `RomParserService`.
+Hibernation compares the identity **before** CERF mutates any live state.
 
-## Build-specific by design
+## Compatibility
 
-CERF state images are **build-specific**. Only the exact binary that wrote an
-`.img` ever restores it. `ValidateHeader` enforces that at load, against the
-identity the header carries: the ROM, the registered peripheral set, the
-guest-additions flag, and `format_version`. There is deliberately no
-per-peripheral image versioning.
+The image describes its own layout. The reader compares each field name, kind
+and size, each frame id and each frame length with what this build expects. A
+difference refuses the image. A build that serializes a peripheral the same way
+loads an image from another build. A build that changes a layout refuses only an
+image that carries the old layout.
 
-**Those other fields do not read the contents of a section. A peripheral that
-changes the shape of its own section therefore changes nothing they can
-observe.** Only `format_version` refuses such an image, so a layout change
-depends on it alone. It moves one time for each body of work that ships. The
-increment goes in the commit that lands that work, never in an intermediate
-commit, because no binary ships between those commits.
+**The stream takes scalars, enums and arrays of them only.** A struct written as
+one blob can gain a field inside its padding, and its `sizeof` stays the same.
+A size tag cannot see that change. Write a struct field by field, so an added
+field adds a tag.
 
-The consequence for the peripheral contract: the ONLY serialization requirement is
-that the `SaveState` and `RestoreState` of a peripheral are **exact mirrors of each
-other in the same build** (a clean round-trip). Cross-build `.img` compatibility is
-**not** a requirement. Never engineer for it. During bring-up a peripheral can grow
-its `SaveState` (new registers), reorder fields, or drop a field that it no longer
-has. It can also move onto a shared core that serializes in a different order.
-Such a peripheral does nothing wrong.
+The field list of a struct is one visitor that save and restore share. A
+`static_assert` on `StateVisitCoversAllBytes` makes the build fail when the
+visitor does not name or skip every member exactly once. A struct with padding
+carries its padding as a named member.
+
+**Every field has a name, and the name is the identity of the field.** The same
+name on the save side and the restore side is one field. A rename is a layout
+change. When a field changes its meaning, its units or its set of values, give
+it a new name.
+
+The restore is transactional. Before it applies an image, CERF writes the live
+machine to `rollback.img` in the device directory. When the reader refuses the
+image part way through, CERF restores the rollback image and shows the reason.
+The machine then equals a save and restore of the live machine. Host coupling
+that every restore resets stays reset, for example an open shared-folder handle
+or an in-flight audio stream. A failed boot-time restore leaves the unmodified cold-boot
+machine. A rollback that fails is a CERF bug, and CERF halts.
+
+The magic moves only when the frame or tag encoding in `state_stream` changes.
+
+A `RestoreState` never calls `CerfFatalExit` or `Fatal::Die` on a value it read
+from the image. It calls `r.Reject`, which refuses the image.
+
+A buffer whose size this build fixes is read at that size, with no saved count.
+The byte-block tag then refuses an image that saved another size.
+
+A frame with no owner in this build refuses the image. The one exception is a
+part that the machine does not need, for example a host widget. The caller
+skips that frame with `SkipFrame`.
 
 ## Sections - what each captures
 
-CERF saves and restores in file order: **Cpu → Mmu → Ram → Flash → Periph →
-Presentation → Widget → Reset**.
-
-- **Cpu** - the flat CPU-state POD of the engine, through the ISA-neutral
-  `GuestEngine::SaveCpuState` / `RestoreCpuState` seam. The ARM engine
-  serializes `ArmCpuState` (GPRs, `guest_cycle_counter`, CPSR, banked regs,
-  `irq_interrupt_pending`). The MIPS engine serializes `MipsCpuState`.
-- **Mmu** - the persistent MMU state of the engine, through
-  `GuestEngine::SaveMmuState` / `RestoreMmuState`. ARM: cp15 persistent register
-  fields only. The TLBs and SMC bitmaps are derived state. Restore flushes them
-  (`ArmTlbFlushAll`) and never serializes them. MIPS: the `MipsMmu` residual state.
-- **Ram** - `EmulatedMemory` volatile (PAGE_READWRITE) regions.
-- **Flash** - `EmulatedMemory` backed PAGE_READONLY / PAGE_EXECUTE_READ regions
-  (flash writes-since-boot ARE machine state). Restore applies this section on
-  warm boot too, because flash survives a reboot on real hardware.
-- **Periph** - every `PeripheralDispatcher::RegisteredPeripherals()` entry, tagged
-  with its `MmioBase()`. The save pass and the restore pass walk the set in the same
-  order. The restore pass verifies the tag.
-- **Presentation** - `HostCanvas` guest-surface dimensions, so a custom resolution
+- **Cpu** - the CPU state of the engine, field by field.
+- **Mmu** - the persistent MMU state of the engine. The TLBs and SMC bitmaps are
+  derived state. Restore flushes them and never serializes them.
+- **Ram** - the volatile memory regions.
+- **Flash** - the read-only memory regions. Flash writes since boot are machine
+  state. Restore applies this section on a warm boot too, because flash survives
+  a reboot on real hardware.
+- **Periph** - every registered peripheral.
+- **Presentation** - the guest-surface dimensions, so a custom resolution
   restores its window size.
-- **Widget** - `HostWidgetRegistry` state that drives guest-visible hardware
-  (for example the charge level / AC of the battery widget, which a board service
-  feeds into GPIO/MCU lines). Full restore only. On a warm boot the board service
+- **Widget** - the host-widget state that drives guest-visible hardware (for
+  example the charge level / AC of the battery widget, which a board service
+  feeds into GPIO/MCU lines). Only a full restore applies it. On a warm boot the board service
   re-asserts it when it re-drives at startup.
-- **Reset** - `GuestCpuReset` + `GuestColdBoot` state (reset cause, registered
-  boot-time guest-RAM write replays).
+- **Reset** - the reset cause and the registered boot-time guest-RAM write
+  replays.
 
-CERF **flushes** the JIT translation cache and never saves it
-(`FlushTranslationCache()`). Interrupt delivery re-arms from the restored
-state: each engine's `Run` re-reads the live interrupt line every
-iteration, and the INTC's `PostRestore` re-drives that line. An INTC
-without the `PostRestore` re-drive silently drops a restored-pending IRQ.
+CERF **flushes** the JIT translation cache and never saves it. The `Run` of each
+engine re-reads the live interrupt line on every iteration. The `PostRestore` of
+the INTC re-drives that line from the restored state. An INTC without that
+re-drive silently drops a restored-pending IRQ.
 
 ## The two-thread freeze model - read before touching ANY peripheral
 
@@ -141,13 +144,18 @@ first two.**
 
 ### 1. `SaveState(StateWriter&)` / `RestoreState(StateReader&)`
 
-Serialize **every mutable register / latch / counter / FIFO**, not only an obvious
-`storage_[]` array: timer counters, DMA transfer registers, RTC base, LCD
-framebuffer configuration, blit-engine latched-op params, FIFO contents,
-mode/command FSM latches. Save and Restore must be **exact mirrors** (same field
-order). Use `#include "../../state/state_stream.h"` with `w.Write<T>()` /
-`r.Read<T>()`. Length-prefix variable-size data (member-vector NAND/NOR, FIFOs),
-so forward-skip stays valid. For `std::atomic<uintN>`, use
+Serialize **every mutable register, latch, counter and FIFO**, not only an
+obvious `storage_[]` array. Examples:
+
+- timer counters and DMA transfer registers
+- the RTC base and the LCD framebuffer configuration
+- the latched parameters of a blit engine
+- FIFO contents and mode or command FSM latches
+
+Save and Restore must be **exact mirrors** (same fields, same names, same
+order). Length-prefix data whose size changes at run time, for example a FIFO.
+Put a part that another build can lack, for example an optional card, in its own
+`BeginFrame` / `EndFrame`. For `std::atomic<uintN>`, use
 `.load(std::memory_order_acquire)` / `.store(v, std::memory_order_release)`.
 
 ### 2. `PostRestore()`
@@ -195,7 +203,7 @@ freeze model.
 - **Non-`Peripheral` stateful objects** (PCMCIA `PcmciaSlot` / `PcmciaCard`,
   sub-devices like a companion-ASIC `Ps2Mouse`) are not auto-enumerated → they need
   an explicit serialization walk + card-presence recreation
-  (`PcmciaCardCatalog::Create(id, binding)`).
+  (`PcmciaCardCatalog::TryCreate(id, binding)`).
 - **Rebase timers** - a timer anchored to a baseline **never raw-serializes
   that baseline or a `std::chrono::time_point`.** It saves the live counter,
   re-anchors at the restored guest time, re-arms its events and re-drives its

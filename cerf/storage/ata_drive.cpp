@@ -308,25 +308,25 @@ void AtaDrive::BuildIdentify() {
 }
 
 void AtaDrive::SaveState(StateWriter& w) const {
-    w.Write(features_); w.Write(error_);   w.Write(sector_cnt_);
-    w.Write(lba_low_);  w.Write(lba_mid_); w.Write(lba_high_);
-    w.Write(device_);   w.Write(status_);
-    w.Write(nien_);     w.Write(irq_);
-    w.WriteBytes(buf_, sizeof(buf_));
-    w.Write(buf_pos_);  w.Write(buf_len_); w.Write(buf_out_);
-    w.Write(xfer_lba_); w.Write(xfer_remaining_);
-    w.Write(multiple_block_); w.Write(cur_block_);
-    w.Write(logged_id_); w.Write(logged_rd_); w.Write(logged_wr_);
+    w.Write("features", features_); w.Write("error", error_);   w.Write("sector_cnt", sector_cnt_);
+    w.Write("lba_low", lba_low_);  w.Write("lba_mid", lba_mid_); w.Write("lba_high", lba_high_);
+    w.Write("device", device_);   w.Write("status", status_);
+    w.Write("nien", nien_);     w.Write("irq", irq_);
+    w.WriteBytes("buf", buf_, sizeof(buf_));
+    w.Write("buf_pos", buf_pos_);  w.Write("buf_len", buf_len_); w.Write("buf_out", buf_out_);
+    w.Write("xfer_lba", xfer_lba_); w.Write("xfer_remaining", xfer_remaining_);
+    w.Write("multiple_block", multiple_block_); w.Write("cur_block", cur_block_);
+    w.Write("logged_id", logged_id_); w.Write("logged_rd", logged_rd_); w.Write("logged_wr", logged_wr_);
 }
 
 void AtaDrive::RestoreState(StateReader& r) {
-    r.Read(features_); r.Read(error_);   r.Read(sector_cnt_);
-    r.Read(lba_low_);  r.Read(lba_mid_); r.Read(lba_high_);
-    r.Read(device_);   r.Read(status_);
-    r.Read(nien_);     r.Read(irq_);
-    r.ReadBytes(buf_, sizeof(buf_));
-    r.Read(buf_pos_);  r.Read(buf_len_); r.Read(buf_out_);
-    r.Read(xfer_lba_); r.Read(xfer_remaining_);
-    r.Read(multiple_block_); r.Read(cur_block_);
-    r.Read(logged_id_); r.Read(logged_rd_); r.Read(logged_wr_);
+    r.Read("features", features_); r.Read("error", error_);   r.Read("sector_cnt", sector_cnt_);
+    r.Read("lba_low", lba_low_);  r.Read("lba_mid", lba_mid_); r.Read("lba_high", lba_high_);
+    r.Read("device", device_);   r.Read("status", status_);
+    r.Read("nien", nien_);     r.Read("irq", irq_);
+    r.ReadBytes("buf", buf_, sizeof(buf_));
+    r.Read("buf_pos", buf_pos_);  r.Read("buf_len", buf_len_); r.Read("buf_out", buf_out_);
+    r.Read("xfer_lba", xfer_lba_); r.Read("xfer_remaining", xfer_remaining_);
+    r.Read("multiple_block", multiple_block_); r.Read("cur_block", cur_block_);
+    r.Read("logged_id", logged_id_); r.Read("logged_rd", logged_rd_); r.Read("logged_wr", logged_wr_);
 }

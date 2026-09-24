@@ -262,16 +262,21 @@ void Sa11xxDma::WriteWord(uint32_t addr, uint32_t value) {
 
 void Sa11xxDma::SaveState(StateWriter& w) {
     std::lock_guard<std::mutex> lk(state_mtx_);
-    w.WriteBytes(ch_, sizeof(ch_));
+    static_assert(StateVisitCoversAllBytes<Channel>(
+                      [](Channel& c, StateFieldBytes& f) { VisitChannel(c, f); }),
+                  "Sa11xxDma::VisitChannel must name or skip every field of Channel");
+    StateWriteField field(w);
+    for (Channel& c : ch_) VisitChannel(c, field);
 }
 
 void Sa11xxDma::RestoreState(StateReader& r) {
     std::lock_guard<std::mutex> lk(state_mtx_);
-    r.ReadBytes(ch_, sizeof(ch_));
-    /* No host sink owns a buffer after a restore; clearing the in-flight
-       flags lets a paused channel re-submit on the next RUN edge instead
-       of waiting forever for a CompleteTransfer that won't arrive. */
-    for (auto& c : ch_) { c.in_flight_a = false; c.in_flight_b = false; }
+    StateReadField field(r);
+    for (Channel& c : ch_) {
+        VisitChannel(c, field);
+        c.in_flight_a = false;
+        c.in_flight_b = false;
+    }
 }
 
 REGISTER_SERVICE(Sa11xxDma);

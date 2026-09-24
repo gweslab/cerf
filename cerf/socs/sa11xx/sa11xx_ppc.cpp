@@ -106,16 +106,16 @@ void Sa11xxPpc::WriteWord(uint32_t addr, uint32_t value) {
 
 void Sa11xxPpc::SaveState(StateWriter& w) {
     std::lock_guard<std::mutex> lk(mtx_);
-    w.WriteBytes(regs_, sizeof(regs_));
-    w.Write(input_state_);
-    w.Write(mccr1_);
+    w.WriteBytes("regs", regs_, sizeof(regs_));
+    w.Write("input_state", input_state_);
+    w.Write("mccr1", mccr1_);
 }
 
 void Sa11xxPpc::RestoreState(StateReader& r) {
     std::lock_guard<std::mutex> lk(mtx_);
-    r.ReadBytes(regs_, sizeof(regs_));
-    r.Read(input_state_);
-    r.Read(mccr1_);
+    r.ReadBytes("regs", regs_, sizeof(regs_));
+    r.Read("input_state", input_state_);
+    r.Read("mccr1", mccr1_);
 }
 
 REGISTER_SERVICE(Sa11xxPpc);

@@ -237,49 +237,49 @@ private:
     }
 
     void SaveState(StateWriter& w) override {
-        w.Write(base_);
-        w.Write(block_count_);
-        w.Write<uint64_t>(nand_.size());
-        if (!nand_.empty()) w.WriteBytes(nand_.data(), nand_.size());
-        w.Write(read_address_);
-        w.Write(flash_sequence_);
-        w.Write(flash_command_);
-        w.Write(flash_control_);
-        w.Write(test_reg_);
-        w.Write(config_reg_);
-        w.Write(device_select_);
-        w.Write(asic_mode_);
-        w.Write(ecc_conf0_);
-        w.Write(ecc_conf1_);
-        w.WriteBytes(addr_bytes_, sizeof(addr_bytes_));
-        w.Write<int32_t>(addr_len_);
-        w.Write<uint64_t>(data_base_);
-        w.Write<uint64_t>(data_cursor_);
-        w.Write<uint8_t>(data_wide_pending_ ? 1u : 0u);
+        w.Write("base", base_);
+        w.Write("block_count", block_count_);
+        w.WriteBytes("nand", nand_.data(), nand_.size());
+        w.Write("read_address", read_address_);
+        w.Write("flash_sequence", flash_sequence_);
+        w.Write("flash_command", flash_command_);
+        w.Write("flash_control", flash_control_);
+        w.Write("test_reg", test_reg_);
+        w.Write("config_reg", config_reg_);
+        w.Write("device_select", device_select_);
+        w.Write("asic_mode", asic_mode_);
+        w.Write("ecc_conf0", ecc_conf0_);
+        w.Write("ecc_conf1", ecc_conf1_);
+        w.WriteBytes("addr_bytes", addr_bytes_, sizeof(addr_bytes_));
+        w.Write<int32_t>("addr_len", addr_len_);
+        w.Write<uint64_t>("data_base", data_base_);
+        w.Write<uint64_t>("data_cursor", data_cursor_);
+        w.Write<uint8_t>("data_wide_pending", data_wide_pending_ ? 1u : 0u);
     }
     void RestoreState(StateReader& r) override {
-        r.Read(base_);
-        r.Read(block_count_);
-        uint64_t n = 0;
-        r.Read(n);
-        nand_.assign(static_cast<size_t>(n), 0u);
-        if (n) r.ReadBytes(nand_.data(), static_cast<size_t>(n));
-        r.Read(read_address_);
-        r.Read(flash_sequence_);
-        r.Read(flash_command_);
-        r.Read(flash_control_);
-        r.Read(test_reg_);
-        r.Read(config_reg_);
-        r.Read(device_select_);
-        r.Read(asic_mode_);
-        r.Read(ecc_conf0_);
-        r.Read(ecc_conf1_);
-        r.ReadBytes(addr_bytes_, sizeof(addr_bytes_));
-        int32_t al = 0; r.Read(al); addr_len_ = al;
+        uint32_t base = 0, block_count = 0;
+        r.Read("base", base);
+        r.Read("block_count", block_count);
+        if (base != base_ || block_count != block_count_)
+            r.Reject("DiskOnChip at 0x%08X with %u blocks, this device has 0x%08X with %u",
+                     base, block_count, base_, block_count_);
+        r.ReadBytes("nand", nand_.data(), nand_.size());
+        r.Read("read_address", read_address_);
+        r.Read("flash_sequence", flash_sequence_);
+        r.Read("flash_command", flash_command_);
+        r.Read("flash_control", flash_control_);
+        r.Read("test_reg", test_reg_);
+        r.Read("config_reg", config_reg_);
+        r.Read("device_select", device_select_);
+        r.Read("asic_mode", asic_mode_);
+        r.Read("ecc_conf0", ecc_conf0_);
+        r.Read("ecc_conf1", ecc_conf1_);
+        r.ReadBytes("addr_bytes", addr_bytes_, sizeof(addr_bytes_));
+        int32_t al = 0; r.Read("addr_len", al); addr_len_ = al;
         uint64_t db = 0, dc = 0;
-        r.Read(db); data_base_ = static_cast<size_t>(db);
-        r.Read(dc); data_cursor_ = static_cast<size_t>(dc);
-        uint8_t wp = 0; r.Read(wp); data_wide_pending_ = (wp != 0);
+        r.Read("data_base", db); data_base_ = static_cast<size_t>(db);
+        r.Read("data_cursor", dc); data_cursor_ = static_cast<size_t>(dc);
+        uint8_t wp = 0; r.Read("data_wide_pending", wp); data_wide_pending_ = (wp != 0);
     }
 
     uint32_t base_        = 0;

@@ -86,15 +86,15 @@ void Pxa255Rtc::WriteWord(uint32_t addr, uint32_t value) {
 
 void Pxa255Rtc::SaveState(StateWriter& w) {
     std::lock_guard<std::mutex> g(mtx_);
-    w.Write(ReadRcnrLocked());   /* live RCNR; re-baselined on restore */
-    w.Write(rtar_); w.Write(rtsr_); w.Write(rttr_);
+    w.Write("rcnr", ReadRcnrLocked());
+    w.Write("rtar", rtar_); w.Write("rtsr", rtsr_); w.Write("rttr", rttr_);
 }
 
 void Pxa255Rtc::RestoreState(StateReader& r) {
     std::lock_guard<std::mutex> g(mtx_);
-    r.Read(rcnr_base_);
+    r.Read("rcnr", rcnr_base_);
     baseline_ = Clock::now();    /* never raw-serialize a time_point (hibernation.md) */
-    r.Read(rtar_); r.Read(rtsr_); r.Read(rttr_);
+    r.Read("rtar", rtar_); r.Read("rtsr", rtsr_); r.Read("rttr", rttr_);
 }
 
 }  /* namespace */

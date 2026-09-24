@@ -73,11 +73,11 @@ public:
             MergeWrite(addr, value, 1u);
     }
     void SaveState(StateWriter& writer) override {
-        writer.Write(occar_);
+        writer.Write("occar", occar_);
         if constexpr (kPrimary) emu_.Get<Iop13xxPciConfig>().SaveState(writer);
     }
     void RestoreState(StateReader& reader) override {
-        reader.Read(occar_);
+        reader.Read("occar", occar_);
         if constexpr (kPrimary) emu_.Get<Iop13xxPciConfig>().RestoreState(reader);
     }
 

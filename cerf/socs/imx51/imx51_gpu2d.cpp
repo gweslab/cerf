@@ -98,15 +98,15 @@ public:
     void SaveState(StateWriter& w) override {
         SaveLatch(w, cmd_);
         SaveLatch(w, mmu_cmd_);
-        w.Write(mh_arbiter_config_);
-        w.Write(mh_mmu_config_);
-        w.Write(mh_interrupt_mask_);
-        w.Write(mh_mpu_base_);
-        w.Write(mh_mpu_end_);
-        w.Write(mh_read_addr_);
-        w.Write(irq_enable_);
-        w.Write(irqstatus_);
-        w.Write(irq_active_g2d_);
+        w.Write("mh_arbiter_config", mh_arbiter_config_);
+        w.Write("mh_mmu_config", mh_mmu_config_);
+        w.Write("mh_interrupt_mask", mh_interrupt_mask_);
+        w.Write("mh_mpu_base", mh_mpu_base_);
+        w.Write("mh_mpu_end", mh_mpu_end_);
+        w.Write("mh_read_addr", mh_read_addr_);
+        w.Write("irq_enable", irq_enable_);
+        w.Write("irqstatus", irqstatus_);
+        w.Write("irq_active_g2d", irq_active_g2d_);
         /* Services, not in the peripheral walk - serialized through this funnel. */
         emu_.Get<Imx51Gpu2dCommandEngine>().SaveState(w);
         emu_.Get<Imx51Gpu2dRasterizer>().SaveState(w);
@@ -114,15 +114,15 @@ public:
     void RestoreState(StateReader& r) override {
         RestoreLatch(r, cmd_);
         RestoreLatch(r, mmu_cmd_);
-        r.Read(mh_arbiter_config_);
-        r.Read(mh_mmu_config_);
-        r.Read(mh_interrupt_mask_);
-        r.Read(mh_mpu_base_);
-        r.Read(mh_mpu_end_);
-        r.Read(mh_read_addr_);
-        r.Read(irq_enable_);
-        r.Read(irqstatus_);
-        r.Read(irq_active_g2d_);
+        r.Read("mh_arbiter_config", mh_arbiter_config_);
+        r.Read("mh_mmu_config", mh_mmu_config_);
+        r.Read("mh_interrupt_mask", mh_interrupt_mask_);
+        r.Read("mh_mpu_base", mh_mpu_base_);
+        r.Read("mh_mpu_end", mh_mpu_end_);
+        r.Read("mh_read_addr", mh_read_addr_);
+        r.Read("irq_enable", irq_enable_);
+        r.Read("irqstatus", irqstatus_);
+        r.Read("irq_active_g2d", irq_active_g2d_);
         emu_.Get<Imx51Gpu2dCommandEngine>().RestoreState(r);
         emu_.Get<Imx51Gpu2dRasterizer>().RestoreState(r);
     }
@@ -136,8 +136,17 @@ private:
        GSL_CMDWINDOW_{TARGET,ADDR}_{SHIFT,MASK}): target=w&0xFF, addr=(w>>8)&0xFFFF. */
     struct Latch {
         bool     have_addr = false;
+        uint8_t  pad[3]    = {};
         uint32_t target    = 0;
         uint32_t addr      = 0;
+
+        template <typename F>
+        static constexpr void Visit(Latch& l, F& field) {
+            field("have_addr", l.have_addr);
+            field.Skip(l.pad);
+            field("target", l.target);
+            field("addr", l.addr);
+        }
     };
 
     void Funnel(Latch& l, uint32_t v, bool is_mmu) {
@@ -185,18 +194,16 @@ private:
         if (irq_enable_ & kVgcIrqG2d) emu_.Get<IrqController>().AssertIrq(kTzicG2d);
     }
 
-    static void SaveLatch(StateWriter& w, const Latch& l) {
-        const uint8_t h = l.have_addr ? 1u : 0u;
-        w.Write(h);
-        w.Write(l.target);
-        w.Write(l.addr);
+    static void SaveLatch(StateWriter& w, Latch& l) {
+        static_assert(StateVisitCoversAllBytes<Latch>(
+                          [](Latch& x, StateFieldBytes& f) { Latch::Visit(x, f); }),
+                      "Latch::Visit must name or skip every field of Latch");
+        StateWriteField field(w);
+        Latch::Visit(l, field);
     }
     static void RestoreLatch(StateReader& r, Latch& l) {
-        uint8_t h = 0;
-        r.Read(h);
-        l.have_addr = (h != 0u);
-        r.Read(l.target);
-        r.Read(l.addr);
+        StateReadField field(r);
+        Latch::Visit(l, field);
     }
 
     uint32_t mh_arbiter_config_ = 0;

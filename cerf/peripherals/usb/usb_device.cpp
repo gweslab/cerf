@@ -143,21 +143,21 @@ bool UsbDevice::HandleSetup(const SetupPacket& setup,
 }
 
 void UsbDevice::SaveState(StateWriter& w) {
-    w.Write(address_); w.Write(configuration_);
-    for (bool stalled : stalled_) w.Write<uint8_t>(stalled ? 1 : 0);
-    UsbState::WriteBuffer(w, control_reply_);
-    w.Write(control_reply_offset_);
+    w.Write("address", address_); w.Write("configuration", configuration_);
+    for (bool stalled : stalled_) w.Write<uint8_t>("stalled", stalled ? 1 : 0);
+    UsbState::WriteBuffer(w, "control_reply_size", "control_reply", control_reply_);
+    w.Write("control_reply_offset", control_reply_offset_);
 }
 void UsbDevice::RestoreState(StateReader& r) {
-    r.Read(address_); r.Read(configuration_);
-    UsbState::Require(r.Ok() && address_ <= 127 && configuration_ <= ConfigurationCount(),
+    r.Read("address", address_); r.Read("configuration", configuration_);
+    UsbState::Require(r, address_ <= 127 && configuration_ <= ConfigurationCount(),
                       "invalid USB address/configuration");
     for (auto& stalled : stalled_) {
-        uint8_t value = 0; r.Read(value);
-        UsbState::Require(r.Ok() && value <= 1, "invalid endpoint state");
+        uint8_t value = 0; r.Read("stalled", value);
+        UsbState::Require(r, value <= 1, "invalid endpoint state");
         stalled = value != 0;
     }
-    UsbState::ReadBuffer(r, control_reply_, 65535);
-    r.Read(control_reply_offset_);
-    UsbState::Require(r.Ok() && control_reply_offset_ <= control_reply_.size(), "invalid control reply");
+    UsbState::ReadBuffer(r, "control_reply_size", "control_reply", control_reply_, 65535);
+    r.Read("control_reply_offset", control_reply_offset_);
+    UsbState::Require(r, control_reply_offset_ <= control_reply_.size(), "invalid control reply");
 }

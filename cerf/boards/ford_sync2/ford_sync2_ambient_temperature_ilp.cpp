@@ -14,9 +14,8 @@ public:
         return board && board->GetBoardId() == BoardId::FordSync2;
     }
     void OnReady() override {
-        emu_.Get<FordSync2AmbientTemperature>();
         emu_.Get<FordSync2IlpChannel>().RegisterDevice({
-            "ambient-temperature", 1,
+            "ambient-temperature",
             [this](bool force) { Refresh(force); },
             {},
             {},

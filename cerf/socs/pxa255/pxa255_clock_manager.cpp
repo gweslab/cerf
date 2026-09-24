@@ -65,11 +65,11 @@ void Pxa255ClockManager::WriteWord(uint32_t addr, uint32_t value) {
 }
 
 void Pxa255ClockManager::SaveState(StateWriter& w) {
-    w.Write(cccr_); w.Write(cken_); w.Write(oon_);
+    w.Write("cccr", cccr_); w.Write("cken", cken_); w.Write("oon", oon_);
 }
 
 void Pxa255ClockManager::RestoreState(StateReader& r) {
-    r.Read(cccr_); r.Read(cken_); r.Read(oon_);
+    r.Read("cccr", cccr_); r.Read("cken", cken_); r.Read("oon", oon_);
 }
 
 }  /* namespace */

@@ -122,22 +122,22 @@ public:
     }
 
     void SaveState(StateWriter& w) override {
-        w.Write<uint32_t>(tx_write_seq_.load());
-        w.Write<uint32_t>(tx_read_seq_.load());
-        w.Write<uint32_t>(rx_write_seq_.load());
-        w.Write<uint32_t>(rx_read_seq_.load());
-        w.Write<uint32_t>(rx_dropped_.load());
-        for (uint8_t b : guest_mac_) w.Write<uint8_t>(b);
+        w.Write<uint32_t>("tx_write_seq", tx_write_seq_.load());
+        w.Write<uint32_t>("tx_read_seq", tx_read_seq_.load());
+        w.Write<uint32_t>("rx_write_seq", rx_write_seq_.load());
+        w.Write<uint32_t>("rx_read_seq", rx_read_seq_.load());
+        w.Write<uint32_t>("rx_dropped", rx_dropped_.load());
+        for (uint8_t b : guest_mac_) w.Write<uint8_t>("guest_mac", b);
     }
 
     void RestoreState(StateReader& r) override {
         uint32_t v;
-        r.Read(v); tx_write_seq_.store(v);
-        r.Read(v); tx_read_seq_.store(v);
-        r.Read(v); rx_write_seq_.store(v);
-        r.Read(v); rx_read_seq_.store(v);
-        r.Read(v); rx_dropped_.store(v);
-        for (auto& b : guest_mac_) { uint8_t x; r.Read(x); b = x; }
+        r.Read("tx_write_seq", v); tx_write_seq_.store(v);
+        r.Read("tx_read_seq", v); tx_read_seq_.store(v);
+        r.Read("rx_write_seq", v); rx_write_seq_.store(v);
+        r.Read("rx_read_seq", v); rx_read_seq_.store(v);
+        r.Read("rx_dropped", v); rx_dropped_.store(v);
+        for (auto& b : guest_mac_) { uint8_t x; r.Read("guest_mac", x); b = x; }
     }
 
 private:

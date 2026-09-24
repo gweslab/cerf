@@ -28,11 +28,11 @@ void Sa1111SystemController::WriteWord(uint32_t addr, uint32_t value) {
 }
 
 void Sa1111SystemController::SaveState(StateWriter& w) {
-    w.WriteBytes(regs_, sizeof(regs_));
+    w.WriteBytes("regs", regs_, sizeof(regs_));
 }
 
 void Sa1111SystemController::RestoreState(StateReader& r) {
-    r.ReadBytes(regs_, sizeof(regs_));
+    r.ReadBytes("regs", regs_, sizeof(regs_));
 }
 
 REGISTER_SERVICE(Sa1111SystemController);

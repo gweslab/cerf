@@ -156,29 +156,29 @@ void I8042Controller::WriteCommand(uint8_t v) {
 
 void I8042Controller::SaveState(StateWriter& w) {
     std::lock_guard<std::mutex> lk(mtx_);
-    w.Write(cmd_byte_);
-    w.Write(static_cast<uint8_t>(pending_));
-    w.Write(out_byte_);
-    w.Write<uint8_t>(out_full_ ? 1u : 0u);
-    w.Write<uint8_t>(out_aux_ ? 1u : 0u);
-    w.Write<uint32_t>(static_cast<uint32_t>(ctrl_resp_.size()));
-    for (uint8_t b : ctrl_resp_) w.Write(b);
+    w.Write("cmd_byte", cmd_byte_);
+    w.Write("pending", static_cast<uint8_t>(pending_));
+    w.Write("out_byte", out_byte_);
+    w.Write<uint8_t>("out_full", out_full_ ? 1u : 0u);
+    w.Write<uint8_t>("out_aux", out_aux_ ? 1u : 0u);
+    w.Write<uint32_t>("ctrl_resp_count", static_cast<uint32_t>(ctrl_resp_.size()));
+    for (uint8_t b : ctrl_resp_) w.Write("ctrl_resp", b);
     kbd_.SaveState(w);
     mouse_.SaveState(w);
 }
 
 void I8042Controller::RestoreState(StateReader& r) {
     std::lock_guard<std::mutex> lk(mtx_);
-    r.Read(cmd_byte_);
-    uint8_t p = 0; r.Read(p); pending_ = static_cast<Pending>(p);
-    r.Read(out_byte_);
+    r.Read("cmd_byte", cmd_byte_);
+    uint8_t p = 0; r.Read("pending", p); pending_ = static_cast<Pending>(p);
+    r.Read("out_byte", out_byte_);
     uint8_t full = 0, aux = 0;
-    r.Read(full); r.Read(aux);
+    r.Read("out_full", full); r.Read("out_aux", aux);
     out_full_ = (full != 0);
     out_aux_  = (aux != 0);
-    uint32_t n = 0; r.Read(n);
+    uint32_t n = 0; r.Read("ctrl_resp_count", n);
     ctrl_resp_.clear();
-    for (uint32_t i = 0; i < n; ++i) { uint8_t b = 0; r.Read(b); ctrl_resp_.push_back(b); }
+    for (uint32_t i = 0; i < n; ++i) { uint8_t b = 0; r.Read("ctrl_resp", b); ctrl_resp_.push_back(b); }
     kbd_.RestoreState(r);
     mouse_.RestoreState(r);
 }

@@ -153,10 +153,10 @@ public:
     }
 
     void SaveState(StateWriter& w) override {
-        w.Write(ctrl0_); w.Write(ctrl2_); w.Write(ctrl6_); w.Write(card_access_);
+        w.Write("ctrl0", ctrl0_); w.Write("ctrl2", ctrl2_); w.Write("ctrl6", ctrl6_); w.Write("card_access", card_access_);
     }
     void RestoreState(StateReader& r) override {
-        r.Read(ctrl0_); r.Read(ctrl2_); r.Read(ctrl6_); r.Read(card_access_);
+        r.Read("ctrl0", ctrl0_); r.Read("ctrl2", ctrl2_); r.Read("ctrl6", ctrl6_); r.Read("card_access", card_access_);
     }
 
 private:

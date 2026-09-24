@@ -193,33 +193,33 @@ bool Pcic82365::MapMem(uint32_t bus_off, uint32_t* card_addr,
 }
 
 void Pcic82365::SaveState(StateWriter& w) const {
-    w.Write<uint8_t>(card_irq_ ? 1u : 0u);
-    w.Write(reg_power_control_); w.Write(reg_interrupt_and_gen_ctrl_);
-    w.Write(reg_card_status_change_); w.Write(reg_status_change_int_cfg_);
-    w.Write(reg_window_enable_); w.Write(reg_io_window_control_);
-    w.WriteBytes(io_start_lo_, sizeof(io_start_lo_));
-    w.WriteBytes(io_start_hi_, sizeof(io_start_hi_));
-    w.WriteBytes(io_end_lo_, sizeof(io_end_lo_));
-    w.WriteBytes(io_end_hi_, sizeof(io_end_hi_));
-    w.WriteBytes(io_off_lo_, sizeof(io_off_lo_));
-    w.WriteBytes(io_off_hi_, sizeof(io_off_hi_));
-    w.WriteBytes(mem_reg_, sizeof(mem_reg_));
-    w.WriteBytes(mem_page_, sizeof(mem_page_));
-    w.WriteBytes(timing_, sizeof(timing_));
+    w.Write<uint8_t>("card_irq", card_irq_ ? 1u : 0u);
+    w.Write("reg_power_control", reg_power_control_); w.Write("reg_interrupt_and_gen_ctrl", reg_interrupt_and_gen_ctrl_);
+    w.Write("reg_card_status_change", reg_card_status_change_); w.Write("reg_status_change_int_cfg", reg_status_change_int_cfg_);
+    w.Write("reg_window_enable", reg_window_enable_); w.Write("reg_io_window_control", reg_io_window_control_);
+    w.WriteBytes("io_start_lo", io_start_lo_, sizeof(io_start_lo_));
+    w.WriteBytes("io_start_hi", io_start_hi_, sizeof(io_start_hi_));
+    w.WriteBytes("io_end_lo", io_end_lo_, sizeof(io_end_lo_));
+    w.WriteBytes("io_end_hi", io_end_hi_, sizeof(io_end_hi_));
+    w.WriteBytes("io_off_lo", io_off_lo_, sizeof(io_off_lo_));
+    w.WriteBytes("io_off_hi", io_off_hi_, sizeof(io_off_hi_));
+    w.WriteBytes("mem_reg", mem_reg_, sizeof(mem_reg_));
+    w.WriteBytes("mem_page", mem_page_, sizeof(mem_page_));
+    w.WriteBytes("timing", timing_, sizeof(timing_));
 }
 
 void Pcic82365::RestoreState(StateReader& r) {
-    uint8_t irq = 0u; r.Read(irq); card_irq_ = (irq != 0u);
-    r.Read(reg_power_control_); r.Read(reg_interrupt_and_gen_ctrl_);
-    r.Read(reg_card_status_change_); r.Read(reg_status_change_int_cfg_);
-    r.Read(reg_window_enable_); r.Read(reg_io_window_control_);
-    r.ReadBytes(io_start_lo_, sizeof(io_start_lo_));
-    r.ReadBytes(io_start_hi_, sizeof(io_start_hi_));
-    r.ReadBytes(io_end_lo_, sizeof(io_end_lo_));
-    r.ReadBytes(io_end_hi_, sizeof(io_end_hi_));
-    r.ReadBytes(io_off_lo_, sizeof(io_off_lo_));
-    r.ReadBytes(io_off_hi_, sizeof(io_off_hi_));
-    r.ReadBytes(mem_reg_, sizeof(mem_reg_));
-    r.ReadBytes(mem_page_, sizeof(mem_page_));
-    r.ReadBytes(timing_, sizeof(timing_));
+    uint8_t irq = 0u; r.Read("card_irq", irq); card_irq_ = (irq != 0u);
+    r.Read("reg_power_control", reg_power_control_); r.Read("reg_interrupt_and_gen_ctrl", reg_interrupt_and_gen_ctrl_);
+    r.Read("reg_card_status_change", reg_card_status_change_); r.Read("reg_status_change_int_cfg", reg_status_change_int_cfg_);
+    r.Read("reg_window_enable", reg_window_enable_); r.Read("reg_io_window_control", reg_io_window_control_);
+    r.ReadBytes("io_start_lo", io_start_lo_, sizeof(io_start_lo_));
+    r.ReadBytes("io_start_hi", io_start_hi_, sizeof(io_start_hi_));
+    r.ReadBytes("io_end_lo", io_end_lo_, sizeof(io_end_lo_));
+    r.ReadBytes("io_end_hi", io_end_hi_, sizeof(io_end_hi_));
+    r.ReadBytes("io_off_lo", io_off_lo_, sizeof(io_off_lo_));
+    r.ReadBytes("io_off_hi", io_off_hi_, sizeof(io_off_hi_));
+    r.ReadBytes("mem_reg", mem_reg_, sizeof(mem_reg_));
+    r.ReadBytes("mem_page", mem_page_, sizeof(mem_page_));
+    r.ReadBytes("timing", timing_, sizeof(timing_));
 }

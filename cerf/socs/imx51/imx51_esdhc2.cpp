@@ -103,8 +103,8 @@ public:
         }
     }
 
-    void SaveState(StateWriter& w) override { w.WriteBytes(regs_.data(), sizeof(regs_)); }
-    void RestoreState(StateReader& r) override { r.ReadBytes(regs_.data(), sizeof(regs_)); }
+    void SaveState(StateWriter& w) override { w.WriteBytes("regs", regs_.data(), sizeof(regs_)); }
+    void RestoreState(StateReader& r) override { r.ReadBytes("regs", regs_.data(), sizeof(regs_)); }
 
 private:
     uint32_t ReadReg(uint32_t off) const {

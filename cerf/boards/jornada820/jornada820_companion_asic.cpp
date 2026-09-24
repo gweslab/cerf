@@ -96,18 +96,14 @@ void Jornada820CompanionAsic::RaisePcmciaStatusChange(int socket) {
 }
 
 void Jornada820CompanionAsic::SaveState(StateWriter& w) {
-    w.Write<uint64_t>(store_.size());
-    w.WriteBytes(store_.data(), store_.size());
-    w.Write(intr_pending_);
+    w.WriteBytes("store", store_.data(), store_.size());
+    w.Write("intr_pending", intr_pending_);
     mouse_.SaveState(w);
 }
 
 void Jornada820CompanionAsic::RestoreState(StateReader& r) {
-    uint64_t n = 0;
-    r.Read(n);
-    store_.assign(static_cast<size_t>(n), 0u);
-    r.ReadBytes(store_.data(), static_cast<size_t>(n));
-    r.Read(intr_pending_);
+    r.ReadBytes("store", store_.data(), store_.size());
+    r.Read("intr_pending", intr_pending_);
     mouse_.RestoreState(r);
 }
 

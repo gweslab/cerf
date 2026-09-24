@@ -294,11 +294,11 @@ void SiemensMp377Sm501AudioMcu::RunAc97Frames(uint32_t frames) {
 void SiemensMp377Sm501AudioMcu::SaveState(StateWriter& w) const {
     std::lock_guard<std::recursive_mutex> lock(core_mutex_);
     core_.SaveState(w);
-    w.Write(enabled_.load(std::memory_order_acquire));
-    w.Write(from_cpu_irq_pending_.load(std::memory_order_acquire));
-    w.Write(to_cpu_irq_pending_.load(std::memory_order_acquire));
-    w.Write(to_cpu_token_.load(std::memory_order_acquire));
-    w.Write(from_cpu_token_.load(std::memory_order_acquire));
+    w.Write("enabled", enabled_.load(std::memory_order_acquire));
+    w.Write("from_cpu_irq_pending", from_cpu_irq_pending_.load(std::memory_order_acquire));
+    w.Write("to_cpu_irq_pending", to_cpu_irq_pending_.load(std::memory_order_acquire));
+    w.Write("to_cpu_token", to_cpu_token_.load(std::memory_order_acquire));
+    w.Write("from_cpu_token", from_cpu_token_.load(std::memory_order_acquire));
 }
 
 void SiemensMp377Sm501AudioMcu::RestoreState(StateReader& r) {
@@ -309,11 +309,11 @@ void SiemensMp377Sm501AudioMcu::RestoreState(StateReader& r) {
     bool to_cpu_irq_pending = false;
     uint32_t to_cpu_token = 0u;
     uint32_t from_cpu_token = 0u;
-    r.Read(enabled);
-    r.Read(from_cpu_irq_pending);
-    r.Read(to_cpu_irq_pending);
-    r.Read(to_cpu_token);
-    r.Read(from_cpu_token);
+    r.Read("enabled", enabled);
+    r.Read("from_cpu_irq_pending", from_cpu_irq_pending);
+    r.Read("to_cpu_irq_pending", to_cpu_irq_pending);
+    r.Read("to_cpu_token", to_cpu_token);
+    r.Read("from_cpu_token", from_cpu_token);
     enabled_.store(enabled, std::memory_order_release);
     from_cpu_irq_pending_.store(from_cpu_irq_pending, std::memory_order_release);
     to_cpu_irq_pending_.store(to_cpu_irq_pending, std::memory_order_release);

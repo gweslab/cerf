@@ -54,8 +54,8 @@ public:
     void WriteByte(uint32_t addr, uint8_t  v) override { HaltUnsupportedAccess("FIR WriteByte", addr, v); }
     void WriteWord(uint32_t addr, uint32_t v) override { HaltUnsupportedAccess("FIR WriteWord", addr, v); }
 
-    void SaveState(StateWriter& w) override { w.Write(frstr_); w.Write(irsr1_); }
-    void RestoreState(StateReader& r) override { r.Read(frstr_); r.Read(irsr1_); }
+    void SaveState(StateWriter& w) override { w.Write("frstr", frstr_); w.Write("irsr1", irsr1_); }
+    void RestoreState(StateReader& r) override { r.Read("frstr", frstr_); r.Read("irsr1", irsr1_); }
 
 private:
     static constexpr uint32_t kOffFrstr = 0x00u;   /* FRSTR at Base+0x00 */

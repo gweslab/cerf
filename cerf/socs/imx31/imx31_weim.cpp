@@ -59,8 +59,8 @@ public:
     uint32_t ReadWord (uint32_t addr) override;
     void     WriteWord(uint32_t addr, uint32_t value) override;
 
-    void SaveState(StateWriter& w) override    { w.WriteBytes(regs_, sizeof(regs_)); }
-    void RestoreState(StateReader& r) override { r.ReadBytes(regs_, sizeof(regs_)); }
+    void SaveState(StateWriter& w) override    { w.WriteBytes("regs", regs_, sizeof(regs_)); }
+    void RestoreState(StateReader& r) override { r.ReadBytes("regs", regs_, sizeof(regs_)); }
 
 private:
     uint32_t regs_[kSlotCount] = {};

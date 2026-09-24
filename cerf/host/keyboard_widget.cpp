@@ -85,19 +85,19 @@ std::vector<WidgetMenuItem> KeyboardWidget::BuildMenu() {
 void KeyboardWidget::SaveWidgetState(StateWriter& w) const {
     KeyboardInput* a = emu_.Get<KeyboardRouter>().Active();
     const std::wstring name = a ? a->SourceName() : std::wstring();
-    w.Write<uint32_t>(static_cast<uint32_t>(name.size()));
-    w.WriteBytes(name.data(), name.size() * sizeof(wchar_t));
-    w.Write<uint8_t>(emu_.Get<KeyboardRouter>().UserPicked() ? 1u : 0u);
+    w.Write<uint32_t>("name_count", static_cast<uint32_t>(name.size()));
+    w.WriteBytes("name", name.data(), name.size() * sizeof(wchar_t));
+    w.Write<uint8_t>("user_picked", emu_.Get<KeyboardRouter>().UserPicked() ? 1u : 0u);
 }
 
 void KeyboardWidget::RestoreWidgetState(StateReader& r) {
     uint32_t n = 0;
-    r.Read(n);
-    if (n > 1024u) return;   /* corrupt; outer section frame realigns */
+    r.Read("name_count", n);
+    if (n > 1024u) r.Reject("keyboard source name of %u characters", n);
     std::wstring name(n, L'\0');
-    r.ReadBytes(name.data(), n * sizeof(wchar_t));
+    r.ReadBytes("name", name.data(), n * sizeof(wchar_t));
     if (!name.empty()) emu_.Get<KeyboardRouter>().RestoreActiveByName(name);
     uint8_t picked = 0;
-    r.Read(picked);
+    r.Read("user_picked", picked);
     emu_.Get<KeyboardRouter>().RestoreUserPicked(picked != 0);
 }

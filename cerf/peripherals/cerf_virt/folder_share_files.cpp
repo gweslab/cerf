@@ -47,11 +47,11 @@ void FolderShareFiles::ReconcileGeneration() {
 }
 
 void FolderShareFiles::SaveState(StateWriter& w) {
-    w.Write(open_seq_);
+    w.Write("open_seq", open_seq_);
 }
 
 void FolderShareFiles::RestoreState(StateReader& r) {
-    r.Read(open_seq_);
+    r.Read("open_seq", open_seq_);
     CloseAll();
 }
 

@@ -62,16 +62,16 @@ void Sa11xxMcp::RouteCodecCommand(uint32_t cmd) {
 }
 
 void Sa11xxMcp::SaveState(StateWriter& w) {
-    w.Write(mccr0_);
-    w.Write(mcsr_);
-    w.Write(mcdr2_read_);
+    w.Write("mccr0", mccr0_);
+    w.Write("mcsr", mcsr_);
+    w.Write("mcdr2_read", mcdr2_read_);
     if (auto* codec = emu_.TryGet<Sa11xxMcpCodec>()) codec->SaveState(w);
 }
 
 void Sa11xxMcp::RestoreState(StateReader& r) {
-    r.Read(mccr0_);
-    r.Read(mcsr_);
-    r.Read(mcdr2_read_);
+    r.Read("mccr0", mccr0_);
+    r.Read("mcsr", mcsr_);
+    r.Read("mcdr2_read", mcdr2_read_);
     if (auto* codec = emu_.TryGet<Sa11xxMcpCodec>()) codec->RestoreState(r);
 }
 

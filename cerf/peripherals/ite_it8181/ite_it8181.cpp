@@ -64,22 +64,15 @@ void IteIt8181::WriteWord(uint32_t addr, uint32_t value) {
 }
 
 void IteIt8181::SaveState(StateWriter& w) {
-    w.Write<uint64_t>(fb_.size());
-    if (!fb_.empty()) w.WriteBytes(fb_.data(), fb_.size());
-    w.Write<uint8_t>(fb_written_ ? 1u : 0u);
+    w.WriteBytes("fb", fb_.data(), fb_.size());
+    w.Write<uint8_t>("fb_written", fb_written_ ? 1u : 0u);
     size_latch_.SaveState(w);
 }
 
 void IteIt8181::RestoreState(StateReader& r) {
-    uint64_t n = 0; r.Read(n);
-    if (n != kVramSize) {
-        emu_.Get<Fatal>().Die("IteIt8181::RestoreState: VRAM is %llu bytes, expected %u",
-                              static_cast<unsigned long long>(n), kVramSize);
-    }
-    fb_.assign(kVramSize, 0u);
-    r.ReadBytes(fb_.data(), fb_.size());
+    r.ReadBytes("fb", fb_.data(), fb_.size());
     uint8_t b = 0;
-    r.Read(b); fb_written_     = (b != 0);
+    r.Read("fb_written", b); fb_written_     = (b != 0);
     size_latch_.RestoreState(r);
 }
 

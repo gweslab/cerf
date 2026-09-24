@@ -18,11 +18,11 @@ public:
 
     void SaveState(StateWriter& w) override {
         Uart16550::SaveState(w);
-        w.Write(isr_);
+        w.Write("isr", isr_);
     }
     void RestoreState(StateReader& r) override {
         Uart16550::RestoreState(r);
-        r.Read(isr_);
+        r.Read("isr", isr_);
     }
 
 protected:

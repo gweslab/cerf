@@ -147,27 +147,27 @@ void Imx51Ecspi1::WriteWord(uint32_t addr, uint32_t value) {
 }
 
 void Imx51Ecspi1::SaveState(StateWriter& w) {
-    w.Write(conreg_);   w.Write(configreg_); w.Write(intreg_);
-    w.Write(dmareg_);   w.Write(statreg_);   w.Write(periodreg_);
-    w.Write(testreg_);
-    w.Write(static_cast<uint32_t>(tx_fifo_.size()));
-    for (uint32_t v : tx_fifo_) w.Write(v);
-    w.Write(static_cast<uint32_t>(rx_fifo_.size()));
-    for (uint32_t v : rx_fifo_) w.Write(v);
+    w.Write("conreg", conreg_);   w.Write("configreg", configreg_); w.Write("intreg", intreg_);
+    w.Write("dmareg", dmareg_);   w.Write("statreg", statreg_);   w.Write("periodreg", periodreg_);
+    w.Write("testreg", testreg_);
+    w.Write("tx_fifo_count", static_cast<uint32_t>(tx_fifo_.size()));
+    for (uint32_t v : tx_fifo_) w.Write("tx_fifo", v);
+    w.Write("rx_fifo_count", static_cast<uint32_t>(rx_fifo_.size()));
+    for (uint32_t v : rx_fifo_) w.Write("rx_fifo", v);
     if (auto* s = slave_) s->SaveState(w);
 }
 
 void Imx51Ecspi1::RestoreState(StateReader& r) {
-    r.Read(conreg_);   r.Read(configreg_); r.Read(intreg_);
-    r.Read(dmareg_);   r.Read(statreg_);   r.Read(periodreg_);
-    r.Read(testreg_);
+    r.Read("conreg", conreg_);   r.Read("configreg", configreg_); r.Read("intreg", intreg_);
+    r.Read("dmareg", dmareg_);   r.Read("statreg", statreg_);   r.Read("periodreg", periodreg_);
+    r.Read("testreg", testreg_);
     tx_fifo_.clear();
     rx_fifo_.clear();
     uint32_t n = 0;
-    r.Read(n);
-    for (uint32_t i = 0; i < n; ++i) { uint32_t v = 0; r.Read(v); tx_fifo_.push_back(v); }
-    r.Read(n);
-    for (uint32_t i = 0; i < n; ++i) { uint32_t v = 0; r.Read(v); rx_fifo_.push_back(v); }
+    r.Read("tx_fifo_count", n);
+    for (uint32_t i = 0; i < n; ++i) { uint32_t v = 0; r.Read("tx_fifo", v); tx_fifo_.push_back(v); }
+    r.Read("rx_fifo_count", n);
+    for (uint32_t i = 0; i < n; ++i) { uint32_t v = 0; r.Read("rx_fifo", v); rx_fifo_.push_back(v); }
     if (auto* s = slave_) s->RestoreState(r);
 }
 

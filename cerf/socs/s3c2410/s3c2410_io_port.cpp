@@ -179,16 +179,16 @@ public:
     void     WriteWord(uint32_t addr, uint32_t value) override;
 
     void SaveState(StateWriter& w) override {
-        w.WriteBytes(storage_, sizeof(storage_));
-        w.Write<uint32_t>(LoadLevels());
-        w.Write<uint32_t>(LoadDriven());
+        w.WriteBytes("storage", storage_, sizeof(storage_));
+        w.Write<uint32_t>("levels", LoadLevels());
+        w.Write<uint32_t>("driven", LoadDriven());
     }
     void RestoreState(StateReader& r) override {
-        r.ReadBytes(storage_, sizeof(storage_));
+        r.ReadBytes("storage", storage_, sizeof(storage_));
         uint32_t levels = 0;
         uint32_t driven = 0;
-        r.Read(levels);
-        r.Read(driven);
+        r.Read("levels", levels);
+        r.Read("driven", driven);
         StoreLevels(levels);
         StoreDriven(driven);
     }

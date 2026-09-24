@@ -33,12 +33,12 @@ void P2FpgaSerial::SetCsrABits(uint16_t bits) {
 
 void P2FpgaSerial::SaveState(StateWriter& w) {
     std::lock_guard<std::mutex> lk(state_mutex_);
-    w.Write(csr_a_);
-    w.Write(csr_b_);
+    w.Write("csr_a", csr_a_);
+    w.Write("csr_b", csr_b_);
 }
 
 void P2FpgaSerial::RestoreState(StateReader& r) {
     std::lock_guard<std::mutex> lk(state_mutex_);
-    r.Read(csr_a_);
-    r.Read(csr_b_);
+    r.Read("csr_a", csr_a_);
+    r.Read("csr_b", csr_b_);
 }

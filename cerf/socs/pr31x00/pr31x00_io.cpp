@@ -178,27 +178,27 @@ void Pr31x00Io::RegisterIoOutObserver(IoOutObserver cb) {
 }
 
 void Pr31x00Io::SaveState(StateWriter& w) {
-    w.Write(io_ctl_);
-    w.Write(mfio_dout_);
-    w.Write(mfio_direc_);
-    w.Write(mfio_sel_);
-    w.Write(io_pd_);
-    w.Write(mfio_pd_);
-    w.Write(mfio_din_.load());
-    w.Write(io_din_.load());
+    w.Write("io_ctl", io_ctl_);
+    w.Write("mfio_dout", mfio_dout_);
+    w.Write("mfio_direc", mfio_direc_);
+    w.Write("mfio_sel", mfio_sel_);
+    w.Write("io_pd", io_pd_);
+    w.Write("mfio_pd", mfio_pd_);
+    w.Write("mfio_din", mfio_din_.load());
+    w.Write("io_din", io_din_.load());
     if (auto* slave = emu_.TryGet<Pr31x00MfioSlave>()) slave->SaveState(w);
 }
 
 void Pr31x00Io::RestoreState(StateReader& r) {
-    r.Read(io_ctl_);
-    r.Read(mfio_dout_);
-    r.Read(mfio_direc_);
-    r.Read(mfio_sel_);
-    r.Read(io_pd_);
-    r.Read(mfio_pd_);
+    r.Read("io_ctl", io_ctl_);
+    r.Read("mfio_dout", mfio_dout_);
+    r.Read("mfio_direc", mfio_direc_);
+    r.Read("mfio_sel", mfio_sel_);
+    r.Read("io_pd", io_pd_);
+    r.Read("mfio_pd", mfio_pd_);
     uint32_t din = 0;
-    r.Read(din); mfio_din_.store(din);
-    r.Read(din); io_din_.store(din);
+    r.Read("mfio_din", din); mfio_din_.store(din);
+    r.Read("io_din", din); io_din_.store(din);
     if (auto* slave = emu_.TryGet<Pr31x00MfioSlave>()) slave->RestoreState(r);
 }
 

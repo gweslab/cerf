@@ -158,18 +158,14 @@ public:
     void     WriteWord(uint32_t addr, uint32_t value) override;
 
     void SaveState(StateWriter& w) override {
-        w.Write<uint64_t>(backing_.size());
-        if (!backing_.empty()) w.WriteBytes(backing_.data(), backing_.size());
-        w.Write(mode_);
-        w.Write(stage_);
+        w.WriteBytes("backing", backing_.data(), backing_.size());
+        w.Write("mode", mode_);
+        w.Write("stage", stage_);
     }
     void RestoreState(StateReader& r) override {
-        uint64_t n = 0;
-        r.Read(n);
-        backing_.assign(static_cast<size_t>(n), 0u);
-        if (n) r.ReadBytes(backing_.data(), static_cast<size_t>(n));
-        r.Read(mode_);
-        r.Read(stage_);
+        r.ReadBytes("backing", backing_.data(), backing_.size());
+        r.Read("mode", mode_);
+        r.Read("stage", stage_);
     }
 
 private:

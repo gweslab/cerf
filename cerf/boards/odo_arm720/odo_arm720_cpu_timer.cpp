@@ -63,11 +63,11 @@ public:
 
     void SaveState(StateWriter& w) override {
         std::lock_guard<std::mutex> lk(state_mutex_);
-        w.Write(cpuisr_);  w.Write(tir_);
+        w.Write("cpuisr", cpuisr_);  w.Write("tir", tir_);
     }
     void RestoreState(StateReader& r) override {
         std::lock_guard<std::mutex> lk(state_mutex_);
-        r.Read(cpuisr_);  r.Read(tir_);
+        r.Read("cpuisr", cpuisr_);  r.Read("tir", tir_);
         period_start_ = Clock::now();
     }
     void PostRestore() override {

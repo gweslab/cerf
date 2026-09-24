@@ -103,7 +103,7 @@ protected:
     virtual bool          IsSolidFill(uint32_t cmd) const = 0;   /* this command is a flat fill. */
     virtual uint32_t      SolidFillColor() const = 0;            /* its source colour. */
     virtual uint32_t      LineColor(uint32_t cmd) const = 0;     /* solid colour for a Bresenham line. */
-    virtual uint32_t      ExpectedSourceDwords() const = 0;      /* dwords a system-source blit consumes. */
+    virtual uint32_t      ExpectedSourceDwords() const = 0;
     virtual void          BlitColorSource(const uint32_t* r) = 0;/* colour BitBLT, source via FIFO. */
     virtual void          BlitMonoSource(const uint32_t* r) = 0; /* mono->colour BitBLT, source via FIFO. */
 

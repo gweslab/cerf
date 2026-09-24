@@ -46,13 +46,13 @@ public:
        are UI-thread display latches, not guest state. */
     void SaveState(StateWriter& w) override {
         std::lock_guard<std::mutex> lk(state_mutex_);
-        w.Write<uint32_t>(led_discrete_value_);
-        w.Write<uint32_t>(led_alpha_value_);
+        w.Write<uint32_t>("led_discrete_value", led_discrete_value_);
+        w.Write<uint32_t>("led_alpha_value", led_alpha_value_);
     }
     void RestoreState(StateReader& r) override {
         std::lock_guard<std::mutex> lk(state_mutex_);
-        r.Read(led_discrete_value_);
-        r.Read(led_alpha_value_);
+        r.Read("led_discrete_value", led_discrete_value_);
+        r.Read("led_alpha_value", led_alpha_value_);
     }
 
     /* HostWidget. The icon IS the LED - the discrete LED register lights it,

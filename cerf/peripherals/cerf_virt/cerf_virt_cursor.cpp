@@ -74,34 +74,29 @@ void CerfVirtCursor::WriteWord(uint32_t addr, uint32_t value) {
 
 void CerfVirtCursor::SaveState(StateWriter& w) {
     std::lock_guard<std::mutex> lk(shape_mutex_);
-    w.Write<uint32_t>(seq_.load());
-    w.Write<uint8_t>(has_shape_ ? 1u : 0u);
-    w.Write<uint8_t>(shape_.visible ? 1u : 0u);
-    w.Write(shape_.cx);
-    w.Write(shape_.cy);
-    w.Write(shape_.xhot);
-    w.Write(shape_.yhot);
-    w.Write(shape_.stride);
-    w.Write<uint64_t>(shape_.bits.size());
-    if (!shape_.bits.empty()) w.WriteBytes(shape_.bits.data(), shape_.bits.size());
+    w.Write<uint32_t>("seq", seq_.load());
+    w.Write<uint8_t>("has_shape", has_shape_ ? 1u : 0u);
+    static_assert(StateVisitCoversAllBytes<GuestCursorShape>(
+                      [](GuestCursorShape& s, StateFieldBytes& f) { GuestCursorShape::Visit(s, f); }),
+                  "GuestCursorShape::Visit must name or skip every field of GuestCursorShape");
+    StateWriteField field(w);
+    GuestCursorShape::Visit(shape_, field);
+    w.Write<uint64_t>("shape_count", shape_.bits.size());
+    w.WriteBytes("shape", shape_.bits.data(), shape_.bits.size());
 }
 
 void CerfVirtCursor::RestoreState(StateReader& r) {
     std::lock_guard<std::mutex> lk(shape_mutex_);
     uint32_t v;
-    r.Read(v); seq_.store(v);
+    r.Read("seq", v); seq_.store(v);
     uint8_t b;
-    r.Read(b); has_shape_ = (b != 0);
-    r.Read(b); shape_.visible = (b != 0);
-    r.Read(shape_.cx);
-    r.Read(shape_.cy);
-    r.Read(shape_.xhot);
-    r.Read(shape_.yhot);
-    r.Read(shape_.stride);
+    r.Read("has_shape", b); has_shape_ = (b != 0);
+    StateReadField field(r);
+    GuestCursorShape::Visit(shape_, field);
     uint64_t n = 0;
-    r.Read(n);
+    r.Read("shape_count", n);
     shape_.bits.resize(static_cast<size_t>(n));
-    if (n) r.ReadBytes(shape_.bits.data(), static_cast<size_t>(n));
+    r.ReadBytes("shape", shape_.bits.data(), static_cast<size_t>(n));
 }
 
 bool CerfVirtCursor::GetShape(GuestCursorShape& out) {

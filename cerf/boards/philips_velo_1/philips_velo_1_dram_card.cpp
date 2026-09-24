@@ -93,24 +93,24 @@ public:
     }
 
     void SaveState(StateWriter& w) override {
-        w.Write(static_cast<uint8_t>(phase_));
-        w.Write(shift_); w.Write(bit_); w.Write(addr_);
-        w.Write(static_cast<uint8_t>(selected_));
-        w.Write(static_cast<uint8_t>(read_));
-        w.Write(static_cast<uint8_t>(in_ack_));
-        w.Write(static_cast<uint8_t>(scl_));
-        w.Write(static_cast<uint8_t>(sda_));
+        w.Write("phase", static_cast<uint8_t>(phase_));
+        w.Write("shift", shift_); w.Write("bit", bit_); w.Write("addr", addr_);
+        w.Write("selected", static_cast<uint8_t>(selected_));
+        w.Write("read", static_cast<uint8_t>(read_));
+        w.Write("in_ack", static_cast<uint8_t>(in_ack_));
+        w.Write("scl", static_cast<uint8_t>(scl_));
+        w.Write("sda", static_cast<uint8_t>(sda_));
     }
 
     void RestoreState(StateReader& r) override {
         uint8_t v = 0;
-        r.Read(v); phase_ = static_cast<Phase>(v);
-        r.Read(shift_); r.Read(bit_); r.Read(addr_);
-        r.Read(v); selected_ = v != 0;
-        r.Read(v); read_     = v != 0;
-        r.Read(v); in_ack_   = v != 0;
-        r.Read(v); scl_      = v != 0;
-        r.Read(v); sda_      = v != 0;
+        r.Read("phase", v); phase_ = static_cast<Phase>(v);
+        r.Read("shift", shift_); r.Read("bit", bit_); r.Read("addr", addr_);
+        r.Read("selected", v); selected_ = v != 0;
+        r.Read("read", v); read_     = v != 0;
+        r.Read("in_ack", v); in_ack_   = v != 0;
+        r.Read("scl", v); scl_      = v != 0;
+        r.Read("sda", v); sda_      = v != 0;
     }
 
 private:

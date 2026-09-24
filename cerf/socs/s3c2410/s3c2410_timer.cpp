@@ -315,33 +315,33 @@ void S3C2410Timer::WriteWord(uint32_t addr, uint32_t value) {
 
 void S3C2410Timer::SaveState(StateWriter& w) {
     const uint64_t now = Now();
-    w.Write(tcfg0_);
-    w.Write(tcfg1_);
-    w.Write(tcon_);
+    w.Write("tcfg0", tcfg0_);
+    w.Write("tcfg1", tcfg1_);
+    w.Write("tcon", tcon_);
     for (int i = 0; i < 5; ++i) {
         const TimerState& t = timers_[i];
-        w.Write(t.tcntb);
-        w.Write(t.tcmpb);
-        w.Write<uint8_t>(t.running ? 1u : 0u);
-        w.Write<uint8_t>(t.auto_reload ? 1u : 0u);
-        w.Write<uint32_t>(CountAt(i, now));
+        w.Write("tcntb", t.tcntb);
+        w.Write("tcmpb", t.tcmpb);
+        w.Write<uint8_t>("running", t.running ? 1u : 0u);
+        w.Write<uint8_t>("auto_reload", t.auto_reload ? 1u : 0u);
+        w.Write<uint32_t>("count", CountAt(i, now));
     }
 }
 
 void S3C2410Timer::RestoreState(StateReader& r) {
     const uint64_t now = Now();
-    r.Read(tcfg0_);
-    r.Read(tcfg1_);
-    r.Read(tcon_);
+    r.Read("tcfg0", tcfg0_);
+    r.Read("tcfg1", tcfg1_);
+    r.Read("tcon", tcon_);
     for (int i = 0; i < 5; ++i) {
         TimerState& t = timers_[i];
-        r.Read(t.tcntb);
-        r.Read(t.tcmpb);
+        r.Read("tcntb", t.tcntb);
+        r.Read("tcmpb", t.tcmpb);
         uint8_t running = 0, auto_reload = 0;
-        r.Read(running);
-        r.Read(auto_reload);
+        r.Read("running", running);
+        r.Read("auto_reload", auto_reload);
         uint32_t count = 0;
-        r.Read(count);
+        r.Read("count", count);
         t.running     = (running != 0);
         t.auto_reload = (auto_reload != 0);
         SetUnits(i);

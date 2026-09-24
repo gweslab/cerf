@@ -62,20 +62,20 @@ void Pm8058Gpio::WriteReg(uint16_t reg, uint8_t value) {
 
 void Pm8058Gpio::SaveState(StateWriter& w) {
     for (uint32_t g = 0; g < kGpios; ++g) {
-        w.Write<uint8_t>(read_bank_[g]);
-        for (uint32_t b = 0; b < kBanks; ++b) w.Write<uint8_t>(bank_data_[g][b]);
+        w.Write<uint8_t>("read_bank", read_bank_[g]);
+        for (uint32_t b = 0; b < kBanks; ++b) w.Write<uint8_t>("bank_data", bank_data_[g][b]);
     }
 }
 
 void Pm8058Gpio::RestoreState(StateReader& r) {
     for (uint32_t g = 0; g < kGpios; ++g) {
-        r.Read(read_bank_[g]);
+        r.Read("read_bank", read_bank_[g]);
         if (read_bank_[g] >= kBanks) {
-            emu_.Get<Fatal>().Die(
+            r.Reject(
                 "pm8058 gpio %u: restored read bank %u is outside the %u the "
                 "part has", g, read_bank_[g], kBanks);
         }
-        for (uint32_t b = 0; b < kBanks; ++b) r.Read(bank_data_[g][b]);
+        for (uint32_t b = 0; b < kBanks; ++b) r.Read("bank_data", bank_data_[g][b]);
     }
 }
 

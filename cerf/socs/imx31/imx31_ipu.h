@@ -22,23 +22,23 @@ public:
 
     void SaveState(StateWriter& w) override {
         std::lock_guard<std::mutex> lk(state_mtx_);
-        w.WriteBytes(regs_, sizeof(regs_));
-        w.WriteBytes(cpm_,  sizeof(cpm_));
-        w.Write(ima_mem_nu_);
-        w.Write(ima_row_nu_);
-        w.Write(ima_word_nu_);
-        w.Write(last_pub_w_);
-        w.Write(last_pub_h_);
+        w.WriteBytes("regs", regs_, sizeof(regs_));
+        w.WriteBytes("cpm", cpm_,  sizeof(cpm_));
+        w.Write("ima_mem_nu", ima_mem_nu_);
+        w.Write("ima_row_nu", ima_row_nu_);
+        w.Write("ima_word_nu", ima_word_nu_);
+        w.Write("last_pub_w", last_pub_w_);
+        w.Write("last_pub_h", last_pub_h_);
     }
     void RestoreState(StateReader& r) override {
         std::lock_guard<std::mutex> lk(state_mtx_);
-        r.ReadBytes(regs_, sizeof(regs_));
-        r.ReadBytes(cpm_,  sizeof(cpm_));
-        r.Read(ima_mem_nu_);
-        r.Read(ima_row_nu_);
-        r.Read(ima_word_nu_);
-        r.Read(last_pub_w_);
-        r.Read(last_pub_h_);
+        r.ReadBytes("regs", regs_, sizeof(regs_));
+        r.ReadBytes("cpm", cpm_,  sizeof(cpm_));
+        r.Read("ima_mem_nu", ima_mem_nu_);
+        r.Read("ima_row_nu", ima_row_nu_);
+        r.Read("ima_word_nu", ima_word_nu_);
+        r.Read("last_pub_w", last_pub_w_);
+        r.Read("last_pub_h", last_pub_h_);
     }
 
     /* Re-assert the AVIC line from the restored SDC3 vsync ctrl/stat - the IPU

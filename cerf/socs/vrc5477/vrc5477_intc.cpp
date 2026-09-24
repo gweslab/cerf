@@ -112,18 +112,18 @@ void Vrc5477Intc::WriteReg(uint32_t off, uint32_t value) {
 
 void Vrc5477Intc::SaveState(StateWriter& w) {
     std::lock_guard<std::mutex> lk(state_mtx_);
-    for (uint32_t v : intctrl_) w.Write(v);
-    w.Write(intppes0_); w.Write(intppes1_);
-    w.Write(cpustat_);  w.Write(busctrl_); w.Write(nmistat_); w.Write(pending_);
-    w.Write(line_level_);
+    for (uint32_t v : intctrl_) w.Write("intctrl", v);
+    w.Write("intppes0", intppes0_); w.Write("intppes1", intppes1_);
+    w.Write("cpustat", cpustat_);  w.Write("busctrl", busctrl_); w.Write("nmistat", nmistat_); w.Write("pending", pending_);
+    w.Write("line_level", line_level_);
 }
 
 void Vrc5477Intc::RestoreState(StateReader& r) {
     std::lock_guard<std::mutex> lk(state_mtx_);
-    for (uint32_t& v : intctrl_) r.Read(v);
-    r.Read(intppes0_); r.Read(intppes1_);
-    r.Read(cpustat_);  r.Read(busctrl_); r.Read(nmistat_); r.Read(pending_);
-    r.Read(line_level_);
+    for (uint32_t& v : intctrl_) r.Read("intctrl", v);
+    r.Read("intppes0", intppes0_); r.Read("intppes1", intppes1_);
+    r.Read("cpustat", cpustat_);  r.Read("busctrl", busctrl_); r.Read("nmistat", nmistat_); r.Read("pending", pending_);
+    r.Read("line_level", line_level_);
 }
 
 void Vrc5477Intc::Renotify() {

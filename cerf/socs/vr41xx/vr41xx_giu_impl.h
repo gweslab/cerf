@@ -163,38 +163,38 @@ public:
 
     void SaveState(StateWriter& w) override {
         std::lock_guard<std::mutex> lk(mtx_);
-        w.Write(iosel_l_);    w.Write(iosel_h_);
-        w.Write(piod_out_l_); w.Write(piod_out_h_);
-        w.Write(podat_l_);
-        w.Write(podat_h_);
-        w.Write(intstat_l_);  w.Write(intstat_h_);
-        w.Write(inten_l_);    w.Write(inten_h_);
-        w.Write(inttyp_l_);   w.Write(inttyp_h_);
-        w.Write(intalsel_l_); w.Write(intalsel_h_);
-        w.Write(inthtsel_l_); w.Write(inthtsel_h_);
+        w.Write("iosel_l", iosel_l_);    w.Write("iosel_h", iosel_h_);
+        w.Write("piod_out_l", piod_out_l_); w.Write("piod_out_h", piod_out_h_);
+        w.Write("podat_l", podat_l_);
+        w.Write("podat_h", podat_h_);
+        w.Write("intstat_l", intstat_l_);  w.Write("intstat_h", intstat_h_);
+        w.Write("inten_l", inten_l_);    w.Write("inten_h", inten_h_);
+        w.Write("inttyp_l", inttyp_l_);   w.Write("inttyp_h", inttyp_h_);
+        w.Write("intalsel_l", intalsel_l_); w.Write("intalsel_h", intalsel_h_);
+        w.Write("inthtsel_l", inthtsel_l_); w.Write("inthtsel_h", inthtsel_h_);
         if constexpr (!M.intstat_sets_while_disabled) {
-            w.Write(retained_l_);
-            w.Write(retained_h_);
+            w.Write("retained_l", retained_l_);
+            w.Write("retained_h", retained_h_);
         }
-        w.Write(level_);
+        w.Write("level", level_);
     }
 
     void RestoreState(StateReader& r) override {
         std::lock_guard<std::mutex> lk(mtx_);
-        r.Read(iosel_l_);    r.Read(iosel_h_);
-        r.Read(piod_out_l_); r.Read(piod_out_h_);
-        r.Read(podat_l_);
-        r.Read(podat_h_);
-        r.Read(intstat_l_);  r.Read(intstat_h_);
-        r.Read(inten_l_);    r.Read(inten_h_);
-        r.Read(inttyp_l_);   r.Read(inttyp_h_);
-        r.Read(intalsel_l_); r.Read(intalsel_h_);
-        r.Read(inthtsel_l_); r.Read(inthtsel_h_);
+        r.Read("iosel_l", iosel_l_);    r.Read("iosel_h", iosel_h_);
+        r.Read("piod_out_l", piod_out_l_); r.Read("piod_out_h", piod_out_h_);
+        r.Read("podat_l", podat_l_);
+        r.Read("podat_h", podat_h_);
+        r.Read("intstat_l", intstat_l_);  r.Read("intstat_h", intstat_h_);
+        r.Read("inten_l", inten_l_);    r.Read("inten_h", inten_h_);
+        r.Read("inttyp_l", inttyp_l_);   r.Read("inttyp_h", inttyp_h_);
+        r.Read("intalsel_l", intalsel_l_); r.Read("intalsel_h", intalsel_h_);
+        r.Read("inthtsel_l", inthtsel_l_); r.Read("inthtsel_h", inthtsel_h_);
         if constexpr (!M.intstat_sets_while_disabled) {
-            r.Read(retained_l_);
-            r.Read(retained_h_);
+            r.Read("retained_l", retained_l_);
+            r.Read("retained_h", retained_h_);
         }
-        r.Read(level_);
+        r.Read("level", level_);
     }
 
     void PostRestore() override {

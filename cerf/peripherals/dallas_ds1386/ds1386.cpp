@@ -230,22 +230,22 @@ void Ds1386Rtc::SaveState(StateWriter& w) {
     std::lock_guard<std::mutex> lk(mtx_);
     /* offset_sec_/frozen_sec_ are deltas/relative epochs, not host time_points,
        so they restore correctly against the new host clock (hibernation.md). */
-    w.Write(static_cast<uint8_t>(running_ ? 1u : 0u));
-    w.Write(offset_sec_); w.Write(frozen_sec_);
-    w.Write(cmd_); w.Write(month_flags_); w.Write(hours_mode_);
-    w.Write(al_min_); w.Write(al_hour_); w.Write(al_day_);
-    w.Write(wd_[0]); w.Write(wd_[1]);
-    w.WriteBytes(nvram_, sizeof(nvram_));
+    w.Write("running", static_cast<uint8_t>(running_ ? 1u : 0u));
+    w.Write("offset_sec", offset_sec_); w.Write("frozen_sec", frozen_sec_);
+    w.Write("cmd", cmd_); w.Write("month_flags", month_flags_); w.Write("hours_mode", hours_mode_);
+    w.Write("al_min", al_min_); w.Write("al_hour", al_hour_); w.Write("al_day", al_day_);
+    w.Write("wd", wd_[0]); w.Write("wd", wd_[1]);
+    w.WriteBytes("nvram", nvram_, sizeof(nvram_));
 }
 
 void Ds1386Rtc::RestoreState(StateReader& r) {
     std::lock_guard<std::mutex> lk(mtx_);
-    uint8_t run = 0; r.Read(run); running_ = run != 0;
-    r.Read(offset_sec_); r.Read(frozen_sec_);
-    r.Read(cmd_); r.Read(month_flags_); r.Read(hours_mode_);
-    r.Read(al_min_); r.Read(al_hour_); r.Read(al_day_);
-    r.Read(wd_[0]); r.Read(wd_[1]);
-    r.ReadBytes(nvram_, sizeof(nvram_));
+    uint8_t run = 0; r.Read("running", run); running_ = run != 0;
+    r.Read("offset_sec", offset_sec_); r.Read("frozen_sec", frozen_sec_);
+    r.Read("cmd", cmd_); r.Read("month_flags", month_flags_); r.Read("hours_mode", hours_mode_);
+    r.Read("al_min", al_min_); r.Read("al_hour", al_hour_); r.Read("al_day", al_day_);
+    r.Read("wd", wd_[0]); r.Read("wd", wd_[1]);
+    r.ReadBytes("nvram", nvram_, sizeof(nvram_));
 }
 
 }  /* namespace */

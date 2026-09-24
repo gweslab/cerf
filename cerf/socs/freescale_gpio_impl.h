@@ -133,16 +133,16 @@ public:
     }
 
     void SaveState(StateWriter& w) override {
-        w.Write(dr_);   w.Write(gdir_); w.Write(icr1_);
-        w.Write(icr2_); w.Write(imr_);  w.Write(isr_);
-        w.Write(input_level_);
-        if constexpr (kSoc == SocId::Imx51) w.Write(edge_sel_);
+        w.Write("dr", dr_);   w.Write("gdir", gdir_); w.Write("icr1", icr1_);
+        w.Write("icr2", icr2_); w.Write("imr", imr_);  w.Write("isr", isr_);
+        w.Write("input_level", input_level_);
+        if constexpr (kSoc == SocId::Imx51) w.Write("edge_sel", edge_sel_);
     }
     void RestoreState(StateReader& r) override {
-        r.Read(dr_);   r.Read(gdir_); r.Read(icr1_);
-        r.Read(icr2_); r.Read(imr_);  r.Read(isr_);
-        r.Read(input_level_);
-        if constexpr (kSoc == SocId::Imx51) r.Read(edge_sel_);
+        r.Read("dr", dr_);   r.Read("gdir", gdir_); r.Read("icr1", icr1_);
+        r.Read("icr2", icr2_); r.Read("imr", imr_);  r.Read("isr", isr_);
+        r.Read("input_level", input_level_);
+        if constexpr (kSoc == SocId::Imx51) r.Read("edge_sel", edge_sel_);
     }
 
 private:

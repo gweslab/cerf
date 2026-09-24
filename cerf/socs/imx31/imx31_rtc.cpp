@@ -96,11 +96,11 @@ void Imx31Rtc::WriteWord(uint32_t addr, uint32_t value) {
 }
 
 void Imx31Rtc::SaveState(StateWriter& w) {
-    for (uint32_t i = 0; i < kSlotCount; ++i) w.Write(regs_[i]);
+    for (uint32_t i = 0; i < kSlotCount; ++i) w.Write("regs", regs_[i]);
 }
 
 void Imx31Rtc::RestoreState(StateReader& r) {
-    for (uint32_t i = 0; i < kSlotCount; ++i) r.Read(regs_[i]);
+    for (uint32_t i = 0; i < kSlotCount; ++i) r.Read("regs", regs_[i]);
 }
 
 }  /* namespace */

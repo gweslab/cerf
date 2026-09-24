@@ -40,23 +40,23 @@ public:
        and are re-created on restore, not serialized. */
     void SaveState(StateWriter& w) override {
         std::lock_guard<std::mutex> lk(mtx_);
-        w.Write(kpcr_);
-        w.Write(kpsr_);
-        w.Write(kddr_);
-        w.Write(kpdr_col_);
-        w.WriteBytes(pressed_, sizeof(pressed_));
+        w.Write("kpcr", kpcr_);
+        w.Write("kpsr", kpsr_);
+        w.Write("kddr", kddr_);
+        w.Write("kpdr_col", kpdr_col_);
+        w.WriteBytes("pressed", pressed_, sizeof(pressed_));
         const uint8_t irq = irq_on_.load(std::memory_order_acquire) ? 1u : 0u;
-        w.Write(irq);
+        w.Write("irq", irq);
     }
     void RestoreState(StateReader& r) override {
         std::lock_guard<std::mutex> lk(mtx_);
-        r.Read(kpcr_);
-        r.Read(kpsr_);
-        r.Read(kddr_);
-        r.Read(kpdr_col_);
-        r.ReadBytes(pressed_, sizeof(pressed_));
+        r.Read("kpcr", kpcr_);
+        r.Read("kpsr", kpsr_);
+        r.Read("kddr", kddr_);
+        r.Read("kpdr_col", kpdr_col_);
+        r.ReadBytes("pressed", pressed_, sizeof(pressed_));
         uint8_t irq = 0;
-        r.Read(irq);
+        r.Read("irq", irq);
         irq_on_.store(irq != 0, std::memory_order_release);
     }
 

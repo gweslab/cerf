@@ -225,30 +225,30 @@ void Pxa27xKeypad::WriteWord(uint32_t addr, uint32_t value) {
 
 void Pxa27xKeypad::SaveState(StateWriter& w) {
     std::lock_guard<std::mutex> lk(state_mtx_);
-    w.Write(kpc_);
-    w.Write(kprec_);
-    w.Write(kpkdi_);
-    w.Write(kpas_);
-    for (uint32_t i = 0; i < 4u; ++i) w.Write(kpasmkp_[i]);
-    w.Write(mkp_);
-    w.Write(mi_);
-    w.Write(di_);
-    w.Write(imkp_latched_);
-    for (uint32_t i = 0; i < 8u; ++i) w.Write(matrix_col_rows_[i]);
+    w.Write("kpc", kpc_);
+    w.Write("kprec", kprec_);
+    w.Write("kpkdi", kpkdi_);
+    w.Write("kpas", kpas_);
+    for (uint32_t i = 0; i < 4u; ++i) w.Write("kpasmkp", kpasmkp_[i]);
+    w.Write("mkp", mkp_);
+    w.Write("mi", mi_);
+    w.Write("di", di_);
+    w.Write("imkp_latched", imkp_latched_);
+    for (uint32_t i = 0; i < 8u; ++i) w.Write("matrix_col_rows", matrix_col_rows_[i]);
 }
 
 void Pxa27xKeypad::RestoreState(StateReader& r) {
     std::lock_guard<std::mutex> lk(state_mtx_);
-    r.Read(kpc_);
-    r.Read(kprec_);
-    r.Read(kpkdi_);
-    r.Read(kpas_);
-    for (uint32_t i = 0; i < 4u; ++i) r.Read(kpasmkp_[i]);
-    r.Read(mkp_);
-    r.Read(mi_);
-    r.Read(di_);
-    r.Read(imkp_latched_);
-    for (uint32_t i = 0; i < 8u; ++i) r.Read(matrix_col_rows_[i]);
+    r.Read("kpc", kpc_);
+    r.Read("kprec", kprec_);
+    r.Read("kpkdi", kpkdi_);
+    r.Read("kpas", kpas_);
+    for (uint32_t i = 0; i < 4u; ++i) r.Read("kpasmkp", kpasmkp_[i]);
+    r.Read("mkp", mkp_);
+    r.Read("mi", mi_);
+    r.Read("di", di_);
+    r.Read("imkp_latched", imkp_latched_);
+    for (uint32_t i = 0; i < 8u; ++i) r.Read("matrix_col_rows", matrix_col_rows_[i]);
 }
 
 void Pxa27xKeypad::PostRestore() {

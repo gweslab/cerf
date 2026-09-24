@@ -102,21 +102,13 @@ void SiemensMp377Sm501Fb::Note2dWrite(uint32_t off, uint32_t bytes) {
 }
 
 void SiemensMp377Sm501Fb::SaveState(StateWriter& w) {
-    const uint64_t n = static_cast<uint64_t>(vram_.size());
-    w.Write(n);
-    if (n) w.WriteBytes(vram_.data(), static_cast<size_t>(n));
-    w.Write(written_);
+    w.WriteBytes("vram", vram_.data(), vram_.size());
+    w.Write("written", written_);
 }
 
 void SiemensMp377Sm501Fb::RestoreState(StateReader& r) {
-    uint64_t n = 0;
-    r.Read(n);
-    if (n != static_cast<uint64_t>(kSm501FbBytes)) {
-        HaltUnsupportedAccess("SM501 VRAM state size", kSm501FbBarPa, n);
-    }
-    vram_.resize(kSm501FbBytes);
-    r.ReadBytes(vram_.data(), vram_.size());
-    r.Read(written_);
+    r.ReadBytes("vram", vram_.data(), vram_.size());
+    r.Read("written", written_);
 }
 
 uint32_t SiemensMp377Sm501Fb::CpuVramOffset(uint32_t a) {

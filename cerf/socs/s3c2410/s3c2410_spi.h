@@ -37,6 +37,16 @@ private:
         uint32_t sprdat = 0x00u;
     };
 
+    template <typename F>
+    static constexpr void VisitChannel(Channel& c, F& field) {
+        field("spcon", c.spcon);
+        field("spsta", c.spsta);
+        field("sppin", c.sppin);
+        field("sppre", c.sppre);
+        field("sptdat", c.sptdat);
+        field("sprdat", c.sprdat);
+    }
+
     void Reset();
     void Transfer(int channel, uint8_t tx);
 

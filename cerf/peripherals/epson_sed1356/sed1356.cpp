@@ -327,14 +327,13 @@ void Sed1356::WriteWord(uint32_t addr, uint32_t value) {
 }
 
 void Sed1356::SaveState(StateWriter& w) {
-    w.WriteBytes(reg_, sizeof(reg_));
-    w.Write<uint64_t>(vram_.size());
-    if (!vram_.empty()) w.WriteBytes(vram_.data(), vram_.size());
-    w.WriteBytes(lcd_lut_, sizeof(lcd_lut_));
-    w.WriteBytes(crt_lut_, sizeof(crt_lut_));
-    w.Write(lut_index_);
-    w.Write(lut_component_);
-    w.WriteBytes(lut_rgb_latch_, sizeof(lut_rgb_latch_));
+    w.WriteBytes("reg", reg_, sizeof(reg_));
+    w.WriteBytes("vram", vram_.data(), vram_.size());
+    w.WriteBytes("lcd_lut", lcd_lut_, sizeof(lcd_lut_));
+    w.WriteBytes("crt_lut", crt_lut_, sizeof(crt_lut_));
+    w.Write("lut_index", lut_index_);
+    w.Write("lut_component", lut_component_);
+    w.WriteBytes("lut_rgb_latch", lut_rgb_latch_, sizeof(lut_rgb_latch_));
     w.Write<uint8_t>(enable_published_ ? 1u : 0u);
     w.Write(published_w_);
     w.Write(published_h_);
@@ -342,15 +341,13 @@ void Sed1356::SaveState(StateWriter& w) {
 }
 
 void Sed1356::RestoreState(StateReader& r) {
-    r.ReadBytes(reg_, sizeof(reg_));
-    uint64_t n = 0; r.Read(n);
-    vram_.assign(static_cast<size_t>(n), 0u);
-    if (n) r.ReadBytes(vram_.data(), static_cast<size_t>(n));
-    r.ReadBytes(lcd_lut_, sizeof(lcd_lut_));
-    r.ReadBytes(crt_lut_, sizeof(crt_lut_));
-    r.Read(lut_index_);
-    r.Read(lut_component_);
-    r.ReadBytes(lut_rgb_latch_, sizeof(lut_rgb_latch_));
+    r.ReadBytes("reg", reg_, sizeof(reg_));
+    r.ReadBytes("vram", vram_.data(), vram_.size());
+    r.ReadBytes("lcd_lut", lcd_lut_, sizeof(lcd_lut_));
+    r.ReadBytes("crt_lut", crt_lut_, sizeof(crt_lut_));
+    r.Read("lut_index", lut_index_);
+    r.Read("lut_component", lut_component_);
+    r.ReadBytes("lut_rgb_latch", lut_rgb_latch_, sizeof(lut_rgb_latch_));
     uint8_t en = 0; r.Read(en); enable_published_ = (en != 0);
     r.Read(published_w_);
     r.Read(published_h_);

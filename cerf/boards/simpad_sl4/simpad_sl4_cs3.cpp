@@ -48,10 +48,10 @@ public:
 
     /* State image: the latch shadow is the entire guest-writable state. */
     void SaveState(StateWriter& w) override {
-        w.Write(shadow_);
+        w.Write("shadow", shadow_);
     }
     void RestoreState(StateReader& r) override {
-        r.Read(shadow_);
+        r.Read("shadow", shadow_);
     }
 
 private:

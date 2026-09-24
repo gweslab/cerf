@@ -60,11 +60,11 @@ void Pxa255I2s::WriteWord(uint32_t addr, uint32_t value) {
 }
 
 void Pxa255I2s::SaveState(StateWriter& w) {
-    w.Write(sacr0_); w.Write(sacr1_); w.Write(saimr_); w.Write(sadiv_);
+    w.Write("sacr0", sacr0_); w.Write("sacr1", sacr1_); w.Write("saimr", saimr_); w.Write("sadiv", sadiv_);
 }
 
 void Pxa255I2s::RestoreState(StateReader& r) {
-    r.Read(sacr0_); r.Read(sacr1_); r.Read(saimr_); r.Read(sadiv_);
+    r.Read("sacr0", sacr0_); r.Read("sacr1", sacr1_); r.Read("saimr", saimr_); r.Read("sadiv", sadiv_);
     /* No host sink / DMA pacing callback survives a snapshot; reset so the guest re-arms. */
     audio_out_.StopAudioOut();
 }

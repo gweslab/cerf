@@ -20,8 +20,8 @@ public:
 
     /* WRSR is read-only (cold power-on signature) and recomputed, not stored;
        WCR and WSR are the whole writable state. */
-    void SaveState(StateWriter& w) override    { w.Write(wcr_); w.Write(wsr_); }
-    void RestoreState(StateReader& r) override { r.Read(wcr_); r.Read(wsr_); }
+    void SaveState(StateWriter& w) override    { w.Write("wcr", wcr_); w.Write("wsr", wsr_); }
+    void RestoreState(StateReader& r) override { r.Read("wcr", wcr_); r.Read("wsr", wsr_); }
 
 protected:
     uint16_t ReadReg16(uint32_t off) override {

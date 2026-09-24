@@ -147,23 +147,20 @@ void PcmciaSlot::OnShutdown() {
 
 void PcmciaSlot::SaveSlotState(StateWriter& w) {
     std::lock_guard<std::mutex> lk(bus_mutex_);
-    w.Write<uint8_t>(powered_ ? 1u : 0u);
+    w.Write<uint8_t>("powered", powered_ ? 1u : 0u);
     const bool has = (card_ != nullptr);
-    w.Write<uint8_t>(has ? 1u : 0u);
+    w.Write<uint8_t>("has", has ? 1u : 0u);
     if (!has) return;
     const std::string id = card_->SaveId();
-    w.Write<uint32_t>(static_cast<uint32_t>(id.size()));
-    if (!id.empty()) w.WriteBytes(id.data(), id.size());
+    w.Write<uint32_t>("id_count", static_cast<uint32_t>(id.size()));
+    if (!id.empty()) w.WriteBytes("id", id.data(), id.size());
     const std::wstring binding = card_->SaveBinding();
-    w.Write<uint32_t>(static_cast<uint32_t>(binding.size()));
+    w.Write<uint32_t>("binding_count", static_cast<uint32_t>(binding.size()));
     if (!binding.empty())
-        w.WriteBytes(binding.data(), binding.size() * sizeof(wchar_t));
-    const uint64_t len_off = w.BytesWritten();
-    w.Write<uint64_t>(0);   /* card-body length placeholder */
-    const uint64_t body_off = w.BytesWritten();
+        w.WriteBytes("binding", binding.data(), binding.size() * sizeof(wchar_t));
+    w.BeginFrame(0);
     card_->SaveState(w);
-    const uint64_t len = w.BytesWritten() - body_off;
-    w.PatchAt(len_off, &len, sizeof(len));
+    w.EndFrame();
 }
 
 /* Called by the controller with its own lock released: the card may drive its socket IRQ
@@ -176,8 +173,8 @@ void PcmciaSlot::PostRestoreSlot() {
 void PcmciaSlot::RestoreSlotState(StateReader& r) {
     std::lock_guard<std::mutex> lk(bus_mutex_);
     uint8_t powered = 0, has = 0;
-    r.Read(powered);
-    r.Read(has);
+    r.Read("powered", powered);
+    r.Read("has", has);
     if (!has) {
         /* Saved socket was empty; eject any live card so the restored
            desktop matches exactly. */
@@ -186,22 +183,24 @@ void PcmciaSlot::RestoreSlotState(StateReader& r) {
         PublishPinsLocked();
         return;
     }
-    uint32_t idlen = 0; r.Read(idlen);
+    uint32_t idlen = 0; r.Read("id_count", idlen);
     std::string id(static_cast<size_t>(idlen), '\0');
-    if (idlen) r.ReadBytes(&id[0], idlen);
-    uint32_t blen = 0; r.Read(blen);
+    if (idlen) r.ReadBytes("id", &id[0], idlen);
+    uint32_t blen = 0; r.Read("binding_count", blen);
     std::wstring binding(static_cast<size_t>(blen), L'\0');
-    if (blen) r.ReadBytes(&binding[0], blen * sizeof(wchar_t));
-    uint64_t body_len = 0; r.Read(body_len);
-    const uint64_t body_start = r.Position();
+    if (blen) r.ReadBytes("binding", &binding[0], blen * sizeof(wchar_t));
+    if (const uint32_t frame = r.EnterFrame(); frame != 0u)
+        r.Reject("PC Card body in frame 0x%X, this build writes frame 0", frame);
     /* Resume the exact desktop: rebuild the saved card from its id + host
        binding when the socket is empty or holds a different card, then apply
        its register state. */
     if (!card_ || id != card_->SaveId()) {
+        auto card = emu_.Get<PcmciaCardCatalog>().TryCreate(id, binding);
+        if (!card) r.Reject("PC Card '%s' is unknown to this build", id.c_str());
         if (card_) EjectLocked();
         powered_ = (powered != 0);
         PublishPinsLocked();
-        InsertLocked(emu_.Get<PcmciaCardCatalog>().Create(id, binding));
+        InsertLocked(std::move(card));
     } else if (powered_ != (powered != 0)) {
         powered_ = (powered != 0);
         PublishPinsLocked();
@@ -209,7 +208,7 @@ void PcmciaSlot::RestoreSlotState(StateReader& r) {
         else          card_->PowerOff();
     }
     card_->RestoreState(r);
-    r.SeekTo(body_start + body_len);   /* align to the framed body end */
+    r.LeaveFrame();
 }
 
 void PcmciaSlot::EjectCard() {

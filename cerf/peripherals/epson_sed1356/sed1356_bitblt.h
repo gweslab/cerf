@@ -51,12 +51,16 @@ private:
     struct Params {
         uint8_t  op = 0, rop = 0;
         bool     bpp16 = false;              /* REG[101h] bit 0.            */
+        uint8_t  pad = 0;
         uint32_t src = 0, dst = 0;           /* 21-bit byte addresses.      */
         uint32_t width = 0, height = 0;      /* pixels/lines (already +1).  */
         uint32_t src_stride = 0, dst_stride = 0;  /* line-to-line bytes.    */
         uint32_t px = 1;                     /* bytes per pixel.            */
         uint16_t bg = 0, fg = 0;
     };
+
+    template <typename P, typename F>
+    static constexpr void VisitParams(P& p, F& field);
 
     void ExecuteDisplayOp();                 /* src+dst both in display memory. */
     void ExecuteCpuLine(uint32_t line);

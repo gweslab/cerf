@@ -89,10 +89,10 @@ public:
     }
 
     void SaveState(StateWriter& w) override {
-        for (uint32_t i = 0; i < kRegCount; ++i) w.Write(regs_[i]);
+        for (uint32_t i = 0; i < kRegCount; ++i) w.Write("regs", regs_[i]);
     }
     void RestoreState(StateReader& r) override {
-        for (uint32_t i = 0; i < kRegCount; ++i) r.Read(regs_[i]);
+        for (uint32_t i = 0; i < kRegCount; ++i) r.Read("regs", regs_[i]);
     }
 
 private:

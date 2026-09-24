@@ -102,6 +102,7 @@ struct MipsTlbEntry {
     uint8_t  g;          /* global: EntryLo0 & EntryLo1 & 1 */
     uint8_t  v0, d0, c0; /* even page: valid / dirty / cache attr (bits 5:3) */
     uint8_t  v1, d1, c1; /* odd page */
+    uint8_t  pad[7];
     uint64_t pfn[2];     /* even/odd physical frame */
 };
 
@@ -164,11 +165,6 @@ struct MipsCpuState {
     uint32_t llbit;
     uint32_t ll_addr;
 
-    /* Emulator-side fields, polled by the JIT run loop at safe boundaries and
-     * written from peripheral threads (single-word stores are atomic on x86).
-     * Mirrors ArmCpuState so the shared JitRunner / hibernation contract
-     * applies uniformly across ISAs. */
-    uint32_t irq_interrupt_pending;
     uint32_t reset_pending;
     uint32_t deep_sleep;
     uint32_t guest_cycle_counter;
@@ -204,6 +200,10 @@ struct MipsCpuState {
        (QEMU exception.c exception_resume_pc:41, MIPS_HFLAG_B16 ? 2 : 4). */
     uint32_t branch_len;
 };
+
+static_assert(offsetof(MipsTlbEntry, pfn) == 24, "MipsTlbEntry layout");
+static_assert(sizeof(MipsTlbEntry) == 40, "MipsTlbEntry layout");
+static_assert(sizeof(MipsCpuState) == 5560, "MipsCpuState layout");
 
 /* CP0 register number -> byte offset of its field in MipsCpuState, or -1 for a
    register CERF does not model. Shared by the MFC0 (read) and MTC0 (write) place

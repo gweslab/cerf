@@ -98,8 +98,8 @@ public:
     void WriteByte(uint32_t addr, uint8_t  v) override { HaltUnsupportedAccess("AIU WriteByte", addr, v); }
     void WriteWord(uint32_t addr, uint32_t v) override { HaltUnsupportedAccess("AIU WriteWord", addr, v); }
 
-    void SaveState(StateWriter& w) override { w.Write(seq_); w.Write(scnt_); w.Write(mcnt_); w.Write(int_); }
-    void RestoreState(StateReader& r) override { r.Read(seq_); r.Read(scnt_); r.Read(mcnt_); r.Read(int_); }
+    void SaveState(StateWriter& w) override { w.Write("seq", seq_); w.Write("scnt", scnt_); w.Write("mcnt", mcnt_); w.Write("int", int_); }
+    void RestoreState(StateReader& r) override { r.Read("seq", seq_); r.Read("scnt", scnt_); r.Read("mcnt", mcnt_); r.Read("int", int_); }
 
 private:
     uint16_t seq_  = 0;   /* SEQREG  (AIURST/AIUMEN/AIUSEN) */

@@ -137,50 +137,38 @@ public:
 
     void SaveState(StateWriter& w) override {
         std::lock_guard<std::mutex> g(lock_);
-        for (const Channel& c : chans_) {
-            w.Write<uint32_t>(c.rslt_conf);
-            w.Write<uint32_t>(c.count);
-            w.Write<uint32_t>(c.head);
-            w.Write<uint32_t>(c.cmd_ptr);
-            w.Write<uint32_t>(c.in_flight ? 1u : 0u);
-            w.Write<uint32_t>(c.crci);
-            w.Write<uint32_t>(c.await_crci);
-            for (uint32_t v : c.fifo) w.Write<uint32_t>(v);
-        }
+        static_assert(StateVisitCoversAllBytes<Channel>(
+                          [](Channel& c, StateFieldBytes& f) { Channel::Visit(c, f); }),
+                      "Channel::Visit must name or skip every field of Channel");
+        StateWriteField field(w);
+        for (Channel& c : chans_) Channel::Visit(c, field);
     }
 
     void RestoreState(StateReader& r) override {
         std::lock_guard<std::mutex> g(lock_);
+        StateReadField field(r);
         for (Channel& c : chans_) {
-            r.Read(c.rslt_conf);
-            r.Read(c.count);
-            r.Read(c.head);
-            r.Read(c.cmd_ptr);
-            uint32_t in_flight = 0u;
-            r.Read(in_flight);
-            c.in_flight = in_flight != 0u;
-            r.Read(c.crci);
-            r.Read(c.await_crci);
-            for (uint32_t& v : c.fifo) r.Read(v);
+            Channel::Visit(c, field);
             if (c.count > kRsltFifoDepth || c.head >= kRsltFifoDepth) {
-                emu_.Get<Fatal>().Die(
+                r.Reject(
                     "msm8255 dmov: restored channel result fifo carries count %u "
                     "head %u past its depth %u", c.count, c.head, kRsltFifoDepth);
             }
             if (c.crci != 0u &&
                 !emu_.Get<Msm8255CrciBus>().Declared(c.crci)) {
-                emu_.Get<Fatal>().Die(
+                r.Reject(
                     "msm8255 dmov: restored channel is paced on crci %u, and no "
                     "modeled peripheral drives that line", c.crci);
             }
             if (c.await_crci != 0u && c.await_crci != c.crci) {
-                emu_.Get<Fatal>().Die(
+                r.Reject(
                     "msm8255 dmov: restored channel waits on crci %u while it "
                     "is paced on crci %u", c.await_crci, c.crci);
             }
-            if (c.in_flight) {
-                emu_.Get<Msm8255AdmCommandList>().RequireModeledCmdPtr(
-                    c.cmd_ptr);
+            if (c.in_flight &&
+                !emu_.Get<Msm8255AdmCommandList>().IsModeledCmdPtr(c.cmd_ptr)) {
+                r.Reject("msm8255 dmov: restored in-flight command pointer 0x%08X "
+                         "is not a modeled type 0 pointer list", c.cmd_ptr);
             }
         }
     }
@@ -205,8 +193,22 @@ private:
         uint32_t count = 0u;
         uint32_t cmd_ptr   = 0u;
         bool     in_flight = false;
+        uint8_t  pad[3]    = {};
         uint32_t crci       = 0u;
         uint32_t await_crci = 0u;
+
+        template <typename F>
+        static constexpr void Visit(Channel& c, F& field) {
+            field("rslt_conf", c.rslt_conf);
+            field("fifo", c.fifo);
+            field("head", c.head);
+            field("count", c.count);
+            field("cmd_ptr", c.cmd_ptr);
+            field("in_flight", c.in_flight);
+            field.Skip(c.pad);
+            field("crci", c.crci);
+            field("await_crci", c.await_crci);
+        }
     };
 
     static uint32_t RegOf(uint32_t off) { return off & ~0x3Cu; }

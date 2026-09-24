@@ -133,45 +133,45 @@ public:
     }
 
     void SaveState(StateWriter& w) override {
-        w.Write<uint32_t>(Load(power_));
-        w.Write<uint32_t>(Load(clock_));
-        w.Write<uint32_t>(Load(mask0_));
-        w.Write<uint32_t>(Load(mask1_));
-        w.Write<uint32_t>(Load(argument_));
-        w.Write<uint32_t>(Load(status_));
-        for (auto& word : response_) w.Write<uint32_t>(Load(word));
-        w.Write<uint32_t>(Load(data_timer_));
-        w.Write<uint32_t>(Load(data_length_));
-        w.Write<uint32_t>(Load(data_ctrl_));
-        w.Write<uint32_t>(read_pos_);
-        w.Write<uint32_t>(static_cast<uint32_t>(read_data_.size()));
-        for (uint8_t b : read_data_) w.Write<uint8_t>(b);
-        w.Write<uint32_t>(data_count_);
+        w.Write<uint32_t>("power", Load(power_));
+        w.Write<uint32_t>("clock", Load(clock_));
+        w.Write<uint32_t>("mask0", Load(mask0_));
+        w.Write<uint32_t>("mask1", Load(mask1_));
+        w.Write<uint32_t>("argument", Load(argument_));
+        w.Write<uint32_t>("status", Load(status_));
+        for (auto& word : response_) w.Write<uint32_t>("response", Load(word));
+        w.Write<uint32_t>("data_timer", Load(data_timer_));
+        w.Write<uint32_t>("data_length", Load(data_length_));
+        w.Write<uint32_t>("data_ctrl", Load(data_ctrl_));
+        w.Write<uint32_t>("read_pos", read_pos_);
+        w.Write<uint32_t>("read_data_count", static_cast<uint32_t>(read_data_.size()));
+        for (uint8_t b : read_data_) w.Write<uint8_t>("read_data", b);
+        w.Write<uint32_t>("data_count", data_count_);
         if (auto* card = CardForSlot()) card->SaveState(w);
     }
 
     void RestoreState(StateReader& r) override {
-        RestoreField(r, power_, kPowerWritable, kPower);
-        RestoreField(r, clock_, kClockWritable, kClock);
-        RestoreField(r, mask0_, kMaskWritable, kMask0);
-        RestoreField(r, mask1_, kMaskWritable, kMask1);
-        RestoreField(r, argument_, 0xFFFFFFFFu, kArgument);
-        RestoreField(r, status_, kStatusLatchable, kStatus);
+        RestoreField(r, "power", power_, kPowerWritable, kPower);
+        RestoreField(r, "clock", clock_, kClockWritable, kClock);
+        RestoreField(r, "mask0", mask0_, kMaskWritable, kMask0);
+        RestoreField(r, "mask1", mask1_, kMaskWritable, kMask1);
+        RestoreField(r, "argument", argument_, 0xFFFFFFFFu, kArgument);
+        RestoreField(r, "status", status_, kStatusLatchable, kStatus);
         for (uint32_t i = 0; i < 4u; ++i) {
-            RestoreField(r, response_[i], 0xFFFFFFFFu, kResponse0 + i * 4u);
+            RestoreField(r, "response", response_[i], 0xFFFFFFFFu, kResponse0 + i * 4u);
         }
-        RestoreField(r, data_timer_, 0xFFFFFFFFu, kDataTimer);
-        RestoreField(r, data_length_, 0xFFFFFFFFu, kDataLength);
-        RestoreField(r, data_ctrl_, kDataCtrlModelled, kDataCtrl);
+        RestoreField(r, "data_timer", data_timer_, 0xFFFFFFFFu, kDataTimer);
+        RestoreField(r, "data_length", data_length_, 0xFFFFFFFFu, kDataLength);
+        RestoreField(r, "data_ctrl", data_ctrl_, kDataCtrlModelled, kDataCtrl);
         uint32_t pos    = 0u;
         uint32_t staged = 0u;
         uint32_t count  = 0u;
-        r.Read(pos);
-        r.Read(staged);
+        r.Read("read_pos", pos);
+        r.Read("read_data_count", staged);
         read_data_.resize(staged);
-        for (uint32_t i = 0; i < staged; ++i) r.Read(read_data_[i]);
-        r.Read(count);
-        RequireReachableDataPath(pos, staged, count);
+        for (uint32_t i = 0; i < staged; ++i) r.Read("read_data", read_data_[i]);
+        r.Read("data_count", count);
+        RequireReachableDataPath(r, pos, staged, count);
         read_pos_   = pos;
         data_count_ = count;
         if (auto* card = CardForSlot()) card->RestoreState(r);
@@ -401,7 +401,7 @@ private:
         return v;
     }
 
-    void RequireReachableDataPath(uint32_t pos, uint32_t staged,
+    void RequireReachableDataPath(StateReader& r, uint32_t pos, uint32_t staged,
                                   uint32_t count) {
         const uint32_t ctrl      = Load(data_ctrl_);
         const uint32_t block     = BlockBytes(ctrl);
@@ -421,7 +421,7 @@ private:
                     staged == block && count % block == 0u &&
                     (pos < staged ? count >= block : count == 0u)));
         if (!reachable) {
-            emu_.Get<Fatal>().Die(
+            r.Reject(
                 "Peripheral at 0x%08X: restored fifo cursor %u over %u staged "
                 "bytes with %u bytes left to receive under data control "
                 "0x%08X is not a state this data path reaches",
@@ -454,12 +454,12 @@ private:
         UpdateIrq();
     }
 
-    void RestoreField(StateReader& r, std::atomic<uint32_t>& reg,
+    void RestoreField(StateReader& r, const char* name, std::atomic<uint32_t>& reg,
                       uint32_t writable, uint32_t offset) {
         uint32_t value = kUngroundedPowerOn;
-        r.Read(value);
+        r.Read(name, value);
         if ((value & ~writable) != 0u) {
-            emu_.Get<Fatal>().Die(
+            r.Reject(
                 "Peripheral at 0x%08X: restored +0x%03X value 0x%08X carries "
                 "bits the guest never writes", kBase, offset, value);
         }

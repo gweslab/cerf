@@ -57,11 +57,11 @@ void Pxa255LcdController::WriteWord(uint32_t addr, uint32_t value) {
 }
 
 void Pxa255LcdController::SaveState(StateWriter& w) {
-    w.WriteBytes(regs_, sizeof(regs_));
+    w.WriteBytes("regs", regs_, sizeof(regs_));
 }
 
 void Pxa255LcdController::RestoreState(StateReader& r) {
-    r.ReadBytes(regs_, sizeof(regs_));
+    r.ReadBytes("regs", regs_, sizeof(regs_));
 }
 
 }  /* namespace */

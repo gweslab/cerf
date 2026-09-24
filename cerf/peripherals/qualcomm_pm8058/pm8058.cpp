@@ -134,7 +134,7 @@ public:
         emu_.Get<Pm8058Keypad>().SaveState(w);
         emu_.Get<Pm8058Gpio>().SaveState(w);
         emu_.Get<Pm8058Rtc>().SaveState(w);
-        w.Write<uint16_t>(probe_next_);
+        w.Write<uint16_t>("probe_next", probe_next_);
     }
 
     void RestoreState(StateReader& r) override {
@@ -142,9 +142,9 @@ public:
         emu_.Get<Pm8058Keypad>().RestoreState(r);
         emu_.Get<Pm8058Gpio>().RestoreState(r);
         emu_.Get<Pm8058Rtc>().RestoreState(r);
-        r.Read(probe_next_);
+        r.Read("probe_next", probe_next_);
         if (probe_next_ > kRegCount) {
-            emu_.Get<Fatal>().Die(
+            r.Reject(
                 "pm8058: restored boot-walk position 0x%03X is past the %u "
                 "registers the part addresses", probe_next_, kRegCount);
         }

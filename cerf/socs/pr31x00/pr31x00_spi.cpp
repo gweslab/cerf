@@ -108,11 +108,11 @@ public:
     void WriteHalf(uint32_t addr, uint16_t v) override { HaltUnsupportedAccess("PR31x00 SPI WriteHalf", addr, v); }
 
     void SaveState(StateWriter& w) override {
-        w.Write(ctl_);
+        w.Write("ctl", ctl_);
         if (auto* slave = emu_.TryGet<Pr31x00SpiSlave>()) slave->SaveState(w);
     }
     void RestoreState(StateReader& r) override {
-        r.Read(ctl_);
+        r.Read("ctl", ctl_);
         if (auto* slave = emu_.TryGet<Pr31x00SpiSlave>()) slave->RestoreState(r);
     }
 

@@ -306,25 +306,26 @@ void Serial16550::PushRx(const uint8_t* data, size_t n) {
 
 void Serial16550::SaveState(StateWriter& w) const {
     std::lock_guard<std::mutex> lk(mu_);
-    w.Write(ier_); w.Write(fcr_); w.Write(lcr_); w.Write(mcr_);
-    w.Write(lsr_); w.Write(msr_); w.Write(scr_);
-    w.Write(dll_); w.Write(dlm_);
-    w.Write<uint8_t>(thre_armed_ ? 1u : 0u);
-    w.Write<uint64_t>(rx_.size());
-    if (!rx_.empty()) w.WriteBytes(rx_.data(), rx_.size());
-    w.Write<uint64_t>(rx_pos_);
+    w.Write("ier", ier_); w.Write("fcr", fcr_); w.Write("lcr", lcr_); w.Write("mcr", mcr_);
+    w.Write("lsr", lsr_); w.Write("msr", msr_); w.Write("scr", scr_);
+    w.Write("dll", dll_); w.Write("dlm", dlm_);
+    w.Write<uint8_t>("thre_armed", thre_armed_ ? 1u : 0u);
+    w.Write<uint64_t>("rx_count", rx_.size());
+    if (!rx_.empty()) w.WriteBytes("rx", rx_.data(), rx_.size());
+    w.Write<uint64_t>("rx_pos", rx_pos_);
 }
 
 void Serial16550::RestoreState(StateReader& r) {
     std::lock_guard<std::mutex> lk(mu_);
-    r.Read(ier_); r.Read(fcr_); r.Read(lcr_); r.Read(mcr_);
-    r.Read(lsr_); r.Read(msr_); r.Read(scr_);
-    r.Read(dll_); r.Read(dlm_);
-    uint8_t armed = 0; r.Read(armed); thre_armed_ = (armed != 0);
-    uint64_t n = 0; r.Read(n);
+    r.Read("ier", ier_); r.Read("fcr", fcr_); r.Read("lcr", lcr_); r.Read("mcr", mcr_);
+    r.Read("lsr", lsr_); r.Read("msr", msr_); r.Read("scr", scr_);
+    r.Read("dll", dll_); r.Read("dlm", dlm_);
+    uint8_t armed = 0; r.Read("thre_armed", armed); thre_armed_ = (armed != 0);
+    uint64_t n = 0; r.Read("rx_count", n);
     rx_.assign(static_cast<size_t>(n), 0u);
-    if (n) r.ReadBytes(rx_.data(), static_cast<size_t>(n));
-    uint64_t pos = 0; r.Read(pos); rx_pos_ = static_cast<size_t>(pos);
+    if (n) r.ReadBytes("rx", rx_.data(), static_cast<size_t>(n));
+    uint64_t pos = 0; r.Read("rx_pos", pos);
+    rx_pos_ = static_cast<size_t>(pos);
 }
 
 void Serial16550::RepublishIrq() {

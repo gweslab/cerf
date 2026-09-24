@@ -406,29 +406,29 @@ void CasioCassiopeiaEm500Companion::WriteCodecCommand(uint32_t value) {
 }
 
 void CasioCassiopeiaEm500Companion::SaveState(StateWriter& w) {
-    w.Write(mbox_cmd_);
-    w.Write(ctrl8904_);
-    w.Write(ctrl_a0d4_);
-    w.Write(clk8004_);
-    w.Write(data_a040_);
-    for (uint32_t v : sib_regs_) w.Write(v);
+    w.Write("mbox_cmd", mbox_cmd_);
+    w.Write("ctrl8904", ctrl8904_);
+    w.Write("ctrl_a0d4", ctrl_a0d4_);
+    w.Write("clk8004", clk8004_);
+    w.Write("data_a040", data_a040_);
+    for (uint32_t v : sib_regs_) w.Write("sib_regs", v);
     for (const std::atomic<uint32_t>& v : sys_ctrl_)
-        w.Write(v.load(std::memory_order_acquire));
-    for (uint16_t v : edge_cfg_) w.Write(v);
-    w.Write(reg_1110_);
-    w.Write(reg_1054_);
-    w.Write(socket_ctrl_ac8_);
-    w.Write(socket_a038_);
-    w.Write(intcfg8404_);
-    for (uint16_t v : codec_regs_) w.Write(v);
-    w.Write(codec_written_);
-    w.Write(codec_data_);
-    w.Write<uint8_t>(codec_data_valid_ ? 1u : 0u);
-    w.Write(latch1118_);
-    w.Write(latch130C_);
-    w.Write(strap8000_);
-    w.Write(adc_ctrl_89C_);
-    w.Write(reg_0304_);
+        w.Write("sys_ctrl", v.load(std::memory_order_acquire));
+    for (uint16_t v : edge_cfg_) w.Write("edge_cfg", v);
+    w.Write("reg_1110", reg_1110_);
+    w.Write("reg_1054", reg_1054_);
+    w.Write("socket_ctrl_ac8", socket_ctrl_ac8_);
+    w.Write("socket_a038", socket_a038_);
+    w.Write("intcfg8404", intcfg8404_);
+    for (uint16_t v : codec_regs_) w.Write("codec_regs", v);
+    w.Write("codec_written", codec_written_);
+    w.Write("codec_data", codec_data_);
+    w.Write<uint8_t>("codec_data_valid", codec_data_valid_ ? 1u : 0u);
+    w.Write("latch1118", latch1118_);
+    w.Write("latch130C", latch130C_);
+    w.Write("strap8000", strap8000_);
+    w.Write("adc_ctrl_89C", adc_ctrl_89C_);
+    w.Write("reg_0304", reg_0304_);
     eeprom_.SaveState(w);
     audio_.SaveState(w);
     display_.SaveState(w);
@@ -437,34 +437,34 @@ void CasioCassiopeiaEm500Companion::SaveState(StateWriter& w) {
 }
 
 void CasioCassiopeiaEm500Companion::RestoreState(StateReader& r) {
-    r.Read(mbox_cmd_);
-    r.Read(ctrl8904_);
-    r.Read(ctrl_a0d4_);
-    r.Read(clk8004_);
-    r.Read(data_a040_);
-    for (uint32_t& v : sib_regs_) r.Read(v);
+    r.Read("mbox_cmd", mbox_cmd_);
+    r.Read("ctrl8904", ctrl8904_);
+    r.Read("ctrl_a0d4", ctrl_a0d4_);
+    r.Read("clk8004", clk8004_);
+    r.Read("data_a040", data_a040_);
+    for (uint32_t& v : sib_regs_) r.Read("sib_regs", v);
     for (std::atomic<uint32_t>& v : sys_ctrl_) {
         uint32_t t = 0;
-        r.Read(t);
+        r.Read("sys_ctrl", t);
         v.store(t, std::memory_order_release);
     }
-    for (uint16_t& v : edge_cfg_) r.Read(v);
-    r.Read(reg_1110_);
-    r.Read(reg_1054_);
-    r.Read(socket_ctrl_ac8_);
-    r.Read(socket_a038_);
-    r.Read(intcfg8404_);
-    for (uint16_t& v : codec_regs_) r.Read(v);
-    r.Read(codec_written_);
-    r.Read(codec_data_);
+    for (uint16_t& v : edge_cfg_) r.Read("edge_cfg", v);
+    r.Read("reg_1110", reg_1110_);
+    r.Read("reg_1054", reg_1054_);
+    r.Read("socket_ctrl_ac8", socket_ctrl_ac8_);
+    r.Read("socket_a038", socket_a038_);
+    r.Read("intcfg8404", intcfg8404_);
+    for (uint16_t& v : codec_regs_) r.Read("codec_regs", v);
+    r.Read("codec_written", codec_written_);
+    r.Read("codec_data", codec_data_);
     uint8_t data_valid = 0;
-    r.Read(data_valid);
+    r.Read("codec_data_valid", data_valid);
     codec_data_valid_ = data_valid != 0;
-    r.Read(latch1118_);
-    r.Read(latch130C_);
-    r.Read(strap8000_);
-    r.Read(adc_ctrl_89C_);
-    r.Read(reg_0304_);
+    r.Read("latch1118", latch1118_);
+    r.Read("latch130C", latch130C_);
+    r.Read("strap8000", strap8000_);
+    r.Read("adc_ctrl_89C", adc_ctrl_89C_);
+    r.Read("reg_0304", reg_0304_);
     eeprom_.RestoreState(r);
     audio_.RestoreState(r);
     display_.RestoreState(r);

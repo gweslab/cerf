@@ -97,23 +97,23 @@ void Sa11xxLcd::WriteWord(uint32_t addr, uint32_t value) {
 }
 
 void Sa11xxLcd::SaveState(StateWriter& w) {
-    w.Write(lccr0_);
-    w.Write(lcsr_);
-    w.Write(dbar1_);
-    w.Write(dbar2_);
-    w.Write(lccr1_);
-    w.Write(lccr2_);
-    w.Write(lccr3_);
+    w.Write("lccr0", lccr0_);
+    w.Write("lcsr", lcsr_);
+    w.Write("dbar1", dbar1_);
+    w.Write("dbar2", dbar2_);
+    w.Write("lccr1", lccr1_);
+    w.Write("lccr2", lccr2_);
+    w.Write("lccr3", lccr3_);
 }
 
 void Sa11xxLcd::RestoreState(StateReader& r) {
-    r.Read(lccr0_);
-    r.Read(lcsr_);
-    r.Read(dbar1_);
-    r.Read(dbar2_);
-    r.Read(lccr1_);
-    r.Read(lccr2_);
-    r.Read(lccr3_);
+    r.Read("lccr0", lccr0_);
+    r.Read("lcsr", lcsr_);
+    r.Read("dbar1", dbar1_);
+    r.Read("dbar2", dbar2_);
+    r.Read("lccr1", lccr1_);
+    r.Read("lccr2", lccr2_);
+    r.Read("lccr3", lccr3_);
 }
 
 REGISTER_SERVICE(Sa11xxLcd);

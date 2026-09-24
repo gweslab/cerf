@@ -38,8 +38,8 @@ public:
     void WriteHalf(uint32_t addr, uint16_t value) override { Write(addr, value); }
     void WriteWord(uint32_t addr, uint32_t value) override { Write(addr, value); }
 
-    void SaveState(StateWriter& w) override { w.Write(enable_); }
-    void RestoreState(StateReader& r) override { r.Read(enable_); }
+    void SaveState(StateWriter& w) override { w.Write("enable", enable_); }
+    void RestoreState(StateReader& r) override { r.Read("enable", enable_); }
 
 private:
     uint32_t Read(uint32_t addr) {

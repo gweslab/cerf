@@ -223,12 +223,12 @@ void Sa11xxRtc::WriteWord(uint32_t addr, uint32_t value) {
 
 void Sa11xxRtc::SaveState(StateWriter& w) {
     std::lock_guard<std::mutex> sg(state_mtx_);
-    w.Write(rtar_);  w.Write(rcnr_);  w.Write(rttr_);  w.Write(rtsr_);
+    w.Write("rtar", rtar_);  w.Write("rcnr", rcnr_);  w.Write("rttr", rttr_);  w.Write("rtsr", rtsr_);
 }
 
 void Sa11xxRtc::RestoreState(StateReader& r) {
     std::lock_guard<std::mutex> sg(state_mtx_);
-    r.Read(rtar_);  r.Read(rcnr_);  r.Read(rttr_);  r.Read(rtsr_);
+    r.Read("rtar", rtar_);  r.Read("rcnr", rcnr_);  r.Read("rttr", rttr_);  r.Read("rtsr", rtsr_);
     /* Wall-clock counter: anchor the next 1-Hz edge one second after the
        restore so RCNR resumes ticking from its restored value. */
     next_tick_ = Clock::now() + std::chrono::seconds(1);

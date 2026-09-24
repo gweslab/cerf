@@ -102,11 +102,11 @@ protected:
     virtual void     RestoreChipState(StateReader& r) = 0;
 
     void SaveState(StateWriter& w) override {
-        Uart16550::SaveState(w); w.Write(irsel_); SaveChipState(w);
+        Uart16550::SaveState(w); w.Write("irsel", irsel_); SaveChipState(w);
         if (cradle_) cradle_->SaveCradleState(w);
     }
     void RestoreState(StateReader& r) override {
-        Uart16550::RestoreState(r); r.Read(irsel_); RestoreChipState(r);
+        Uart16550::RestoreState(r); r.Read("irsel", irsel_); RestoreChipState(r);
         if (cradle_) cradle_->RestoreCradleState(r);
     }
     void PostRestore() override {

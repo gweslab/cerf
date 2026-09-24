@@ -105,15 +105,15 @@ public:
 
     void SaveState(StateWriter& w) override {
         std::lock_guard<std::mutex> lk(state_mutex_);
-        w.Write(pccr_);
-        w.Write(pcssr_);
-        w.WriteBytes(irq_asserted_, sizeof(irq_asserted_));
+        w.Write("pccr", pccr_);
+        w.Write("pcssr", pcssr_);
+        w.WriteBytes("irq_asserted", irq_asserted_, sizeof(irq_asserted_));
     }
     void RestoreState(StateReader& r) override {
         std::lock_guard<std::mutex> lk(state_mutex_);
-        r.Read(pccr_);
-        r.Read(pcssr_);
-        r.ReadBytes(irq_asserted_, sizeof(irq_asserted_));
+        r.Read("pccr", pccr_);
+        r.Read("pcssr", pcssr_);
+        r.ReadBytes("irq_asserted", irq_asserted_, sizeof(irq_asserted_));
     }
 
     /* PcmciaSlotHost. */

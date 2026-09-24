@@ -8,16 +8,15 @@ FordSync2MediaHubSdReader::FordSync2MediaHubSdReader(std::optional<SdCardCid> ci
 
 void FordSync2MediaHubSdReader::SaveState(StateWriter& w) {
     UsbMassStorageDevice::SaveState(w);
-    w.Write<uint8_t>(cid_ ? 1 : 0);
-    if (cid_) w.WriteBytes(cid_->data(), cid_->size());
+    w.Write<uint8_t>("has_cid", cid_ ? 1 : 0);
+    if (cid_) w.WriteBytes("cid", cid_->data(), cid_->size());
 }
 void FordSync2MediaHubSdReader::RestoreState(StateReader& r) {
     UsbMassStorageDevice::RestoreState(r);
-    uint8_t has = 0; r.Read(has);
-    UsbState::Require(r.Ok() && has <= 1, "invalid CID presence");
+    uint8_t has = 0; r.Read("has_cid", has);
+    UsbState::Require(r, has <= 1, "invalid CID presence");
     cid_.reset();
-    if (has) { cid_.emplace(); r.ReadBytes(cid_->data(), cid_->size()); }
-    UsbState::Require(r.Ok(), "truncated CID");
+    if (has) { cid_.emplace(); r.ReadBytes("cid", cid_->data(), cid_->size()); }
 }
 bool FordSync2MediaHubSdReader::HandleVendorScsiCommand(const uint8_t* cdb, uint8_t cdb_len,
                              bool data_in, uint32_t transfer_len,

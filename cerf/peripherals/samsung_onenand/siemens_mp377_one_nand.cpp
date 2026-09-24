@@ -144,51 +144,51 @@ public:
     }
 
     void SaveState(StateWriter& w) override {
-        WriteVector(w, backing_);
-        WriteVector(w, spare_);
-        w.WriteBytes(data_ram_.data(), data_ram_.size());
-        w.WriteBytes(spare_ram_.data(), spare_ram_.size());
-        w.WriteBytes(boot_state_mirror_.data(), boot_state_mirror_.size());
-        w.Write(start_addr_1_);
-        w.Write(start_addr_2_);
-        w.Write(start_addr_3_);
-        w.Write(start_addr_4_);
-        w.Write(start_addr_5_);
-        w.Write(start_addr_6_);
-        w.Write(start_addr_7_);
-        w.Write(start_addr_8_);
-        w.Write(start_buffer_);
-        w.Write(sys_cfg_);
-        w.Write(ctrl_status_);
-        w.Write(interrupt_status_);
-        w.Write(unlock_start_);
-        w.Write(unlock_end_);
-        w.WriteBytes(block_unlocked_.data(), block_unlocked_.size());
-        w.Write(last_cmd_);
+        w.WriteBytes("backing", backing_.data(), backing_.size());
+        w.WriteBytes("spare", spare_.data(), spare_.size());
+        w.WriteBytes("data_ram", data_ram_.data(), data_ram_.size());
+        w.WriteBytes("spare_ram", spare_ram_.data(), spare_ram_.size());
+        w.WriteBytes("boot_state_mirror", boot_state_mirror_.data(), boot_state_mirror_.size());
+        w.Write("start_addr_1", start_addr_1_);
+        w.Write("start_addr_2", start_addr_2_);
+        w.Write("start_addr_3", start_addr_3_);
+        w.Write("start_addr_4", start_addr_4_);
+        w.Write("start_addr_5", start_addr_5_);
+        w.Write("start_addr_6", start_addr_6_);
+        w.Write("start_addr_7", start_addr_7_);
+        w.Write("start_addr_8", start_addr_8_);
+        w.Write("start_buffer", start_buffer_);
+        w.Write("sys_cfg", sys_cfg_);
+        w.Write("ctrl_status", ctrl_status_);
+        w.Write("interrupt_status", interrupt_status_);
+        w.Write("unlock_start", unlock_start_);
+        w.Write("unlock_end", unlock_end_);
+        w.WriteBytes("block_unlocked", block_unlocked_.data(), block_unlocked_.size());
+        w.Write("last_cmd", last_cmd_);
     }
 
     void RestoreState(StateReader& r) override {
-        ReadVector(r, backing_, kBackingSize, "OneNAND backing state size");
-        ReadVector(r, spare_, kSpareSize, "OneNAND spare state size");
-        r.ReadBytes(data_ram_.data(), data_ram_.size());
-        r.ReadBytes(spare_ram_.data(), spare_ram_.size());
-        r.ReadBytes(boot_state_mirror_.data(), boot_state_mirror_.size());
-        r.Read(start_addr_1_);
-        r.Read(start_addr_2_);
-        r.Read(start_addr_3_);
-        r.Read(start_addr_4_);
-        r.Read(start_addr_5_);
-        r.Read(start_addr_6_);
-        r.Read(start_addr_7_);
-        r.Read(start_addr_8_);
-        r.Read(start_buffer_);
-        r.Read(sys_cfg_);
-        r.Read(ctrl_status_);
-        r.Read(interrupt_status_);
-        r.Read(unlock_start_);
-        r.Read(unlock_end_);
-        r.ReadBytes(block_unlocked_.data(), block_unlocked_.size());
-        r.Read(last_cmd_);
+        r.ReadBytes("backing", backing_.data(), backing_.size());
+        r.ReadBytes("spare", spare_.data(), spare_.size());
+        r.ReadBytes("data_ram", data_ram_.data(), data_ram_.size());
+        r.ReadBytes("spare_ram", spare_ram_.data(), spare_ram_.size());
+        r.ReadBytes("boot_state_mirror", boot_state_mirror_.data(), boot_state_mirror_.size());
+        r.Read("start_addr_1", start_addr_1_);
+        r.Read("start_addr_2", start_addr_2_);
+        r.Read("start_addr_3", start_addr_3_);
+        r.Read("start_addr_4", start_addr_4_);
+        r.Read("start_addr_5", start_addr_5_);
+        r.Read("start_addr_6", start_addr_6_);
+        r.Read("start_addr_7", start_addr_7_);
+        r.Read("start_addr_8", start_addr_8_);
+        r.Read("start_buffer", start_buffer_);
+        r.Read("sys_cfg", sys_cfg_);
+        r.Read("ctrl_status", ctrl_status_);
+        r.Read("interrupt_status", interrupt_status_);
+        r.Read("unlock_start", unlock_start_);
+        r.Read("unlock_end", unlock_end_);
+        r.ReadBytes("block_unlocked", block_unlocked_.data(), block_unlocked_.size());
+        r.Read("last_cmd", last_cmd_);
     }
 
     static constexpr uint32_t kOneNandAliasStride = 0x00040000u;
@@ -199,22 +199,6 @@ public:
     }
 
 private:
-    static void WriteVector(StateWriter& w, const std::vector<uint8_t>& v) {
-        const uint64_t n = static_cast<uint64_t>(v.size());
-        w.Write(n);
-        if (n) w.WriteBytes(v.data(), static_cast<size_t>(n));
-    }
-
-    void ReadVector(StateReader& r, std::vector<uint8_t>& v, size_t expected, const char* what) {
-        uint64_t n = 0;
-        r.Read(n);
-        if (n != static_cast<uint64_t>(expected)) {
-            HaltUnsupportedAccess(what, MmioBase(), n);
-        }
-        v.resize(expected);
-        if (expected) r.ReadBytes(v.data(), expected);
-    }
-
     /* Page index in the backing array: linear page number computed from
        Start Address 1 (block) + Start Address 8 (page-in-block). sub_2BD2C14
        writes SA8 as ((page << 2) | 1), replicated across both halfwords. */

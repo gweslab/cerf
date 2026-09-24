@@ -421,19 +421,19 @@ uint32_t Msm8255NpaRemoteServer::ConsumeCallbackReply(uint32_t in_pa,
 }
 
 void Msm8255NpaRemoteServer::SaveState(StateWriter& w) {
-    w.Write<uint32_t>(next_xid_);
-    w.Write<uint32_t>(cb_xid_);
-    w.Write<uint32_t>(cb_proc_);
-    w.Write<uint32_t>(cb_outstanding_ ? 1u : 0u);
+    w.Write<uint32_t>("next_xid", next_xid_);
+    w.Write<uint32_t>("cb_xid", cb_xid_);
+    w.Write<uint32_t>("cb_proc", cb_proc_);
+    w.Write<uint32_t>("cb_outstanding", cb_outstanding_ ? 1u : 0u);
     emu_.Get<Msm8255NpaClients>().SaveState(w);
 }
 
 void Msm8255NpaRemoteServer::RestoreState(StateReader& r) {
     uint32_t outstanding = 0;
-    r.Read(next_xid_);
-    r.Read(cb_xid_);
-    r.Read(cb_proc_);
-    r.Read(outstanding);
+    r.Read("next_xid", next_xid_);
+    r.Read("cb_xid", cb_xid_);
+    r.Read("cb_proc", cb_proc_);
+    r.Read("cb_outstanding", outstanding);
     cb_outstanding_ = outstanding != 0u;
     emu_.Get<Msm8255NpaClients>().RestoreState(r);
 }

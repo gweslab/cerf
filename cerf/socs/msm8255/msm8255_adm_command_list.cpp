@@ -42,9 +42,14 @@ bool Msm8255AdmCommandList::ShouldRegister() {
     return bd && bd->GetSocId() == SocId::Msm8255;
 }
 
+bool Msm8255AdmCommandList::IsModeledCmdPtr(uint32_t value) const {
+    const uint32_t type = (value >> kCmdPtrTypeShift) & kCmdPtrTypeMask;
+    return type == kCmdPtrTypeList && (value >> 31) == 0u;
+}
+
 void Msm8255AdmCommandList::RequireModeledCmdPtr(uint32_t value) {
     const uint32_t type = (value >> kCmdPtrTypeShift) & kCmdPtrTypeMask;
-    if (type != kCmdPtrTypeList || (value >> 31) != 0u) {
+    if (!IsModeledCmdPtr(value)) {
         emu_.Get<Fatal>().Die(
             "msm8255 dmov: command pointer 0x%08X carries type %u with bit 31 "
             "set to %u, and only a type 0 pointer list with bit 31 clear is "

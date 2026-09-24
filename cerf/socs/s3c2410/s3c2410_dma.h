@@ -65,6 +65,19 @@ private:
         uint32_t curr_src = 0;
         uint32_t curr_dst = 0;
         uint32_t curr_tc  = 0;
+
+        template <typename F>
+        static constexpr void Visit(Channel& c, F& field) {
+            field("disrc", c.disrc);
+            field("disrcc", c.disrcc);
+            field("didst", c.didst);
+            field("didstc", c.didstc);
+            field("dcon", c.dcon);
+            field("mask", c.mask);
+            field("curr_src", c.curr_src);
+            field("curr_dst", c.curr_dst);
+            field("curr_tc", c.curr_tc);
+        }
     };
 
     static constexpr uint32_t kChannelCount   = 4u;

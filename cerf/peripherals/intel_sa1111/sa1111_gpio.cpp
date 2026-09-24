@@ -29,16 +29,16 @@ public:
     uint32_t MmioSize() const override { return 0x00000200u; }
 
     void SaveState(StateWriter& w) override {
-        w.WriteBytes(ddr_, sizeof(ddr_));
-        w.WriteBytes(dwr_, sizeof(dwr_));
-        w.WriteBytes(sdr_, sizeof(sdr_));
-        w.WriteBytes(ssr_, sizeof(ssr_));
+        w.WriteBytes("ddr", ddr_, sizeof(ddr_));
+        w.WriteBytes("dwr", dwr_, sizeof(dwr_));
+        w.WriteBytes("sdr", sdr_, sizeof(sdr_));
+        w.WriteBytes("ssr", ssr_, sizeof(ssr_));
     }
     void RestoreState(StateReader& r) override {
-        r.ReadBytes(ddr_, sizeof(ddr_));
-        r.ReadBytes(dwr_, sizeof(dwr_));
-        r.ReadBytes(sdr_, sizeof(sdr_));
-        r.ReadBytes(ssr_, sizeof(ssr_));
+        r.ReadBytes("ddr", ddr_, sizeof(ddr_));
+        r.ReadBytes("dwr", dwr_, sizeof(dwr_));
+        r.ReadBytes("sdr", sdr_, sizeof(sdr_));
+        r.ReadBytes("ssr", ssr_, sizeof(ssr_));
     }
 
     uint32_t ReadWord(uint32_t addr) override {

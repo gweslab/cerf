@@ -104,15 +104,15 @@ public:
 
     void SaveState(StateWriter& w) override {
         std::lock_guard<std::mutex> lk(state_mutex_);
-        w.Write(csr_);
-        w.Write(xsize_);
-        w.Write(ysize_);
+        w.Write("csr", csr_);
+        w.Write("xsize", xsize_);
+        w.Write("ysize", ysize_);
     }
     void RestoreState(StateReader& r) override {
         std::lock_guard<std::mutex> lk(state_mutex_);
-        r.Read(csr_);
-        r.Read(xsize_);
-        r.Read(ysize_);
+        r.Read("csr", csr_);
+        r.Read("xsize", xsize_);
+        r.Read("ysize", ysize_);
     }
 
 private:
@@ -172,13 +172,13 @@ public:
 
     void SaveState(StateWriter& w) override {
         std::lock_guard<std::mutex> lk(state_mutex_);
-        w.Write(dma_low_);
-        w.Write(dma_high_);
+        w.Write("dma_low", dma_low_);
+        w.Write("dma_high", dma_high_);
     }
     void RestoreState(StateReader& r) override {
         std::lock_guard<std::mutex> lk(state_mutex_);
-        r.Read(dma_low_);
-        r.Read(dma_high_);
+        r.Read("dma_low", dma_low_);
+        r.Read("dma_high", dma_high_);
     }
 
 private:

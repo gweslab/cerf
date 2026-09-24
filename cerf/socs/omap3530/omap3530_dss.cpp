@@ -222,20 +222,20 @@ uint32_t Omap3530Dss::GetGfxFormat() {
 
 void Omap3530Dss::SaveState(StateWriter& w) {
     std::lock_guard<std::mutex> lk(state_mutex_);
-    w.WriteBytes(dss_top_, sizeof(dss_top_));
-    w.WriteBytes(dispc_,   sizeof(dispc_));
-    w.WriteBytes(rfbi_,    sizeof(rfbi_));
-    w.WriteBytes(venc_,    sizeof(venc_));
-    w.Write(irq_line_high_);
+    w.WriteBytes("dss_top", dss_top_, sizeof(dss_top_));
+    w.WriteBytes("dispc", dispc_,   sizeof(dispc_));
+    w.WriteBytes("rfbi", rfbi_,    sizeof(rfbi_));
+    w.WriteBytes("venc", venc_,    sizeof(venc_));
+    w.Write("irq_line_high", irq_line_high_);
 }
 
 void Omap3530Dss::RestoreState(StateReader& r) {
     std::lock_guard<std::mutex> lk(state_mutex_);
-    r.ReadBytes(dss_top_, sizeof(dss_top_));
-    r.ReadBytes(dispc_,   sizeof(dispc_));
-    r.ReadBytes(rfbi_,    sizeof(rfbi_));
-    r.ReadBytes(venc_,    sizeof(venc_));
-    r.Read(irq_line_high_);
+    r.ReadBytes("dss_top", dss_top_, sizeof(dss_top_));
+    r.ReadBytes("dispc", dispc_,   sizeof(dispc_));
+    r.ReadBytes("rfbi", rfbi_,    sizeof(rfbi_));
+    r.ReadBytes("venc", venc_,    sizeof(venc_));
+    r.Read("irq_line_high", irq_line_high_);
 }
 
 REGISTER_SERVICE(Omap3530Dss);

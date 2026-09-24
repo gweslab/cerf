@@ -77,13 +77,13 @@ public:
 
     void SaveState(StateWriter& w) override {
         Vr41xxGiuBase::SaveState(w);
-        w.Write(podaten_);
-        w.Write(podatl_);
+        w.Write("podaten", podaten_);
+        w.Write("podatl", podatl_);
     }
     void RestoreState(StateReader& r) override {
         Vr41xxGiuBase::RestoreState(r);
-        r.Read(podaten_);
-        r.Read(podatl_);
+        r.Read("podaten", podaten_);
+        r.Read("podatl", podatl_);
     }
 
 private:

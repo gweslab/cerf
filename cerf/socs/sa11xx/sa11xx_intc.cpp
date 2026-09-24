@@ -172,18 +172,18 @@ void Sa11xxIntc::WriteWord(uint32_t addr, uint32_t value) {
 
 void Sa11xxIntc::SaveState(StateWriter& w) {
     std::lock_guard<std::mutex> guard(state_mtx_);
-    w.Write(icpr_);
-    w.Write(icmr_);
-    w.Write(iclr_);
-    w.Write(iccr_);
+    w.Write("icpr", icpr_);
+    w.Write("icmr", icmr_);
+    w.Write("iclr", iclr_);
+    w.Write("iccr", iccr_);
 }
 
 void Sa11xxIntc::RestoreState(StateReader& r) {
     std::lock_guard<std::mutex> guard(state_mtx_);
-    r.Read(icpr_);
-    r.Read(icmr_);
-    r.Read(iclr_);
-    r.Read(iccr_);
+    r.Read("icpr", icpr_);
+    r.Read("icmr", icmr_);
+    r.Read("iclr", iclr_);
+    r.Read("iccr", iccr_);
 }
 
 void Sa11xxIntc::PostRestore() {

@@ -58,26 +58,26 @@ public:
 
     void SaveState(StateWriter& w) override {
         std::lock_guard<std::mutex> lk(state_mutex_);
-        w.WriteBytes(dcsr_,  sizeof(dcsr_));
-        w.WriteBytes(ddadr_, sizeof(ddadr_));
-        w.WriteBytes(dsadr_, sizeof(dsadr_));
-        w.WriteBytes(dtadr_, sizeof(dtadr_));
-        w.WriteBytes(dcmd_,  sizeof(dcmd_));
-        w.WriteBytes(drcmr_, sizeof(drcmr_));
-        w.WriteBytes(audio_active_, sizeof(audio_active_));
-        w.WriteBytes(touch_active_, sizeof(touch_active_));
+        w.WriteBytes("dcsr", dcsr_,  sizeof(dcsr_));
+        w.WriteBytes("ddadr", ddadr_, sizeof(ddadr_));
+        w.WriteBytes("dsadr", dsadr_, sizeof(dsadr_));
+        w.WriteBytes("dtadr", dtadr_, sizeof(dtadr_));
+        w.WriteBytes("dcmd", dcmd_,  sizeof(dcmd_));
+        w.WriteBytes("drcmr", drcmr_, sizeof(drcmr_));
+        w.WriteBytes("audio_active", audio_active_, sizeof(audio_active_));
+        w.WriteBytes("touch_active", touch_active_, sizeof(touch_active_));
     }
 
     void RestoreState(StateReader& r) override {
         std::lock_guard<std::mutex> lk(state_mutex_);
-        r.ReadBytes(dcsr_,  sizeof(dcsr_));
-        r.ReadBytes(ddadr_, sizeof(ddadr_));
-        r.ReadBytes(dsadr_, sizeof(dsadr_));
-        r.ReadBytes(dtadr_, sizeof(dtadr_));
-        r.ReadBytes(dcmd_,  sizeof(dcmd_));
-        r.ReadBytes(drcmr_, sizeof(drcmr_));
-        r.ReadBytes(audio_active_, sizeof(audio_active_));
-        r.ReadBytes(touch_active_, sizeof(touch_active_));
+        r.ReadBytes("dcsr", dcsr_,  sizeof(dcsr_));
+        r.ReadBytes("ddadr", ddadr_, sizeof(ddadr_));
+        r.ReadBytes("dsadr", dsadr_, sizeof(dsadr_));
+        r.ReadBytes("dtadr", dtadr_, sizeof(dtadr_));
+        r.ReadBytes("dcmd", dcmd_,  sizeof(dcmd_));
+        r.ReadBytes("drcmr", drcmr_, sizeof(drcmr_));
+        r.ReadBytes("audio_active", audio_active_, sizeof(audio_active_));
+        r.ReadBytes("touch_active", touch_active_, sizeof(touch_active_));
         for (uint32_t ch = 0; ch < kNumChannels; ++ch) {
             audio_active_[ch] = false;
             touch_active_[ch] = false;

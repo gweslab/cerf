@@ -207,29 +207,29 @@ void S3C2410Adc::SetPen(bool down, uint16_t sample_x, uint16_t sample_y) {
 
 void S3C2410Adc::SaveState(StateWriter& w) {
     std::lock_guard<std::mutex> lk(state_mutex_);
-    w.Write<uint32_t>(con_);
-    w.Write<uint32_t>(tsc_);
-    w.Write<uint32_t>(dly_);
-    w.Write<uint32_t>(ecflg_ ? 1u : 0u);
-    w.Write<uint32_t>(pen_down_ ? 1u : 0u);
-    w.Write<uint32_t>(pen_x_);
-    w.Write<uint32_t>(pen_y_);
-    w.Write<uint32_t>(x_data_);
-    w.Write<uint32_t>(y_data_);
+    w.Write<uint32_t>("con", con_);
+    w.Write<uint32_t>("tsc", tsc_);
+    w.Write<uint32_t>("dly", dly_);
+    w.Write<uint32_t>("ecflg", ecflg_ ? 1u : 0u);
+    w.Write<uint32_t>("pen_down", pen_down_ ? 1u : 0u);
+    w.Write("pen_x", pen_x_);
+    w.Write("pen_y", pen_y_);
+    w.Write<uint32_t>("x_data", x_data_);
+    w.Write<uint32_t>("y_data", y_data_);
 }
 
 void S3C2410Adc::RestoreState(StateReader& r) {
     std::lock_guard<std::mutex> lk(state_mutex_);
     uint32_t v = 0;
-    r.Read(con_);
-    r.Read(tsc_);
-    r.Read(dly_);
-    r.Read(v); ecflg_ = (v != 0);
-    r.Read(v); pen_down_ = false;
-    r.Read(v); pen_x_ = static_cast<uint16_t>(v);
-    r.Read(v); pen_y_ = static_cast<uint16_t>(v);
-    r.Read(x_data_);
-    r.Read(y_data_);
+    r.Read("con", con_);
+    r.Read("tsc", tsc_);
+    r.Read("dly", dly_);
+    r.Read("ecflg", v); ecflg_ = (v != 0);
+    r.Read("pen_down", v); pen_down_ = false;
+    r.Read("pen_x", pen_x_);
+    r.Read("pen_y", pen_y_);
+    r.Read("x_data", x_data_);
+    r.Read("y_data", y_data_);
 }
 
 void S3C2410Adc::PostRestore() {

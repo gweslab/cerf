@@ -57,5 +57,5 @@ void NecMobilePro900L1110::WriteByte(uint32_t addr, uint8_t value) {
     WriteCommand(v);
 }
 
-void NecMobilePro900L1110::SaveState(StateWriter& w)   { w.Write(prc_); }
-void NecMobilePro900L1110::RestoreState(StateReader& r) { r.Read(prc_); }
+void NecMobilePro900L1110::SaveState(StateWriter& w)   { w.Write("prc", prc_); }
+void NecMobilePro900L1110::RestoreState(StateReader& r) { r.Read("prc", prc_); }

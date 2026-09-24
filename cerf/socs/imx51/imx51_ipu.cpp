@@ -87,10 +87,10 @@ public:
     }
 
     void SaveState(StateWriter& w) override {
-        w.WriteBytes(regs_.data(), regs_.size() * sizeof(uint32_t));
+        w.WriteBytes("regs", regs_.data(), regs_.size() * sizeof(uint32_t));
     }
     void RestoreState(StateReader& r) override {
-        r.ReadBytes(regs_.data(), regs_.size() * sizeof(uint32_t));
+        r.ReadBytes("regs", regs_.data(), regs_.size() * sizeof(uint32_t));
     }
     void PostRestore() override {
         /* OnLcdEnabled fires only on the IDMAC_CH_EN_1 ch23 0->1 edge in

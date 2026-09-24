@@ -41,10 +41,10 @@ public:
     void WriteWord(uint32_t addr, uint32_t v) override { WriteReg(addr - MmioBase(), v); }
 
     void SaveState(StateWriter& w) override {
-        w.Write(hscr0_);  w.Write(hscr1_);
+        w.Write("hscr0", hscr0_);  w.Write("hscr1", hscr1_);
     }
     void RestoreState(StateReader& r) override {
-        r.Read(hscr0_);  r.Read(hscr1_);
+        r.Read("hscr0", hscr0_);  r.Read("hscr1", hscr1_);
     }
 
 private:

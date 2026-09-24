@@ -162,32 +162,32 @@ public:
     }
 
     void SaveState(StateWriter& w) override {
-        w.WriteBytes(surface_.data(), surface_.size());
+        w.WriteBytes("surface", surface_.data(), surface_.size());
         size_latch_.SaveState(w);
-        w.Write<uint32_t>(packet_);
-        w.Write<uint32_t>(payload_lo_);
-        w.Write<uint32_t>(payload_hi_);
-        w.Write<uint32_t>(read_result_);
-        w.Write<uint32_t>(read_armed_ ? 1u : 0u);
-        w.Write<uint32_t>(brightness_);
-        w.Write<uint32_t>(display_on_ ? 1u : 0u);
-        w.Write<uint32_t>(sleeping_ ? 1u : 0u);
+        w.Write<uint32_t>("packet", packet_);
+        w.Write<uint32_t>("payload_lo", payload_lo_);
+        w.Write<uint32_t>("payload_hi", payload_hi_);
+        w.Write<uint32_t>("read_result", read_result_);
+        w.Write<uint32_t>("read_armed", read_armed_ ? 1u : 0u);
+        w.Write<uint32_t>("brightness", brightness_);
+        w.Write<uint32_t>("display_on", display_on_ ? 1u : 0u);
+        w.Write<uint32_t>("sleeping", sleeping_ ? 1u : 0u);
     }
 
     void RestoreState(StateReader& r) override {
         uint32_t armed = 0;
         uint32_t on    = 0;
         uint32_t sleep = 0;
-        r.ReadBytes(surface_.data(), surface_.size());
+        r.ReadBytes("surface", surface_.data(), surface_.size());
         size_latch_.RestoreState(r);
-        r.Read(packet_);
-        r.Read(payload_lo_);
-        r.Read(payload_hi_);
-        r.Read(read_result_);
-        r.Read(armed);
-        r.Read(brightness_);
-        r.Read(on);
-        r.Read(sleep);
+        r.Read("packet", packet_);
+        r.Read("payload_lo", payload_lo_);
+        r.Read("payload_hi", payload_hi_);
+        r.Read("read_result", read_result_);
+        r.Read("read_armed", armed);
+        r.Read("brightness", brightness_);
+        r.Read("display_on", on);
+        r.Read("sleeping", sleep);
         read_armed_ = armed != 0u;
         display_on_ = on != 0u;
         sleeping_   = sleep != 0u;

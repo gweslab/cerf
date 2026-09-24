@@ -91,21 +91,21 @@ public:
     }
 
     void SaveState(StateWriter& writer) override {
-        writer.WriteBytes(sm501_cfg_.data(), sm501_cfg_.size() * sizeof(sm501_cfg_[0]));
-        writer.WriteBytes(ertec_cfg_.data(), ertec_cfg_.size() * sizeof(ertec_cfg_[0]));
-        writer.Write(fb_bar_probe_);
-        writer.Write(regs_bar_probe_);
+        writer.WriteBytes("sm501_cfg", sm501_cfg_.data(), sm501_cfg_.size() * sizeof(sm501_cfg_[0]));
+        writer.WriteBytes("ertec_cfg", ertec_cfg_.data(), ertec_cfg_.size() * sizeof(ertec_cfg_[0]));
+        writer.Write("fb_bar_probe", fb_bar_probe_);
+        writer.Write("regs_bar_probe", regs_bar_probe_);
         for (bool probe : ertec_bar_probe_)
-            writer.Write(probe);
+            writer.Write("probe", probe);
     }
 
     void RestoreState(StateReader& reader) override {
-        reader.ReadBytes(sm501_cfg_.data(), sm501_cfg_.size() * sizeof(sm501_cfg_[0]));
-        reader.ReadBytes(ertec_cfg_.data(), ertec_cfg_.size() * sizeof(ertec_cfg_[0]));
-        reader.Read(fb_bar_probe_);
-        reader.Read(regs_bar_probe_);
+        reader.ReadBytes("sm501_cfg", sm501_cfg_.data(), sm501_cfg_.size() * sizeof(sm501_cfg_[0]));
+        reader.ReadBytes("ertec_cfg", ertec_cfg_.data(), ertec_cfg_.size() * sizeof(ertec_cfg_[0]));
+        reader.Read("fb_bar_probe", fb_bar_probe_);
+        reader.Read("regs_bar_probe", regs_bar_probe_);
         for (bool& probe : ertec_bar_probe_)
-            reader.Read(probe);
+            reader.Read("probe", probe);
     }
 
 private:

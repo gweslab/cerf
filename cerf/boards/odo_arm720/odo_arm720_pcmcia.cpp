@@ -44,17 +44,17 @@ public:
 
     void SaveState(StateWriter& w) override {
         std::lock_guard<std::mutex> lk(state_mutex_);
-        w.Write(pcmcia_reg0_);
-        w.Write(pcmcia_intr_reg0_);
-        w.Write(pcmcia_reg1_);
-        w.Write(pcmcia_intr_reg1_);
+        w.Write("pcmcia_reg0", pcmcia_reg0_);
+        w.Write("pcmcia_intr_reg0", pcmcia_intr_reg0_);
+        w.Write("pcmcia_reg1", pcmcia_reg1_);
+        w.Write("pcmcia_intr_reg1", pcmcia_intr_reg1_);
     }
     void RestoreState(StateReader& r) override {
         std::lock_guard<std::mutex> lk(state_mutex_);
-        r.Read(pcmcia_reg0_);
-        r.Read(pcmcia_intr_reg0_);
-        r.Read(pcmcia_reg1_);
-        r.Read(pcmcia_intr_reg1_);
+        r.Read("pcmcia_reg0", pcmcia_reg0_);
+        r.Read("pcmcia_intr_reg0", pcmcia_intr_reg0_);
+        r.Read("pcmcia_reg1", pcmcia_reg1_);
+        r.Read("pcmcia_intr_reg1", pcmcia_intr_reg1_);
     }
 
 private:

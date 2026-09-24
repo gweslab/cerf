@@ -56,12 +56,12 @@ void Vr4111BusError::WriteStatus(uint16_t value) {
 
 void Vr4111BusError::SaveState(StateWriter& w) {
     std::lock_guard<std::mutex> lk(mtx_);
-    w.Write<uint8_t>(berrst_ ? 1u : 0u);
+    w.Write<uint8_t>("berrst", berrst_ ? 1u : 0u);
 }
 
 void Vr4111BusError::RestoreState(StateReader& r) {
     uint8_t v = 0;
-    r.Read(v);
+    r.Read("berrst", v);
     std::lock_guard<std::mutex> lk(mtx_);
     berrst_ = v != 0;
 }

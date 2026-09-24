@@ -54,8 +54,8 @@ public:
     }
 
     /* JIT-thread-only register file (no worker thread). */
-    void SaveState(StateWriter& w) override    { w.WriteBytes(regs_.data(), sizeof(regs_)); }
-    void RestoreState(StateReader& r) override { r.ReadBytes(regs_.data(), sizeof(regs_)); }
+    void SaveState(StateWriter& w) override    { w.WriteBytes("regs", regs_.data(), sizeof(regs_)); }
+    void RestoreState(StateReader& r) override { r.ReadBytes("regs", regs_.data(), sizeof(regs_)); }
 
 private:
     std::array<uint32_t, kSize / 4> regs_{};

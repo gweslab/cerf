@@ -391,14 +391,13 @@ void EmmcCardBase::HaltUnmodelledCommand(uint8_t index, uint32_t argument) {
 }
 
 void EmmcCardBase::SaveState(StateWriter& w) {
-    w.Write<uint32_t>(static_cast<uint32_t>(state_));
-    w.Write<uint32_t>(rca_);
-    w.Write<uint32_t>(hs_timing_);
-    w.Write<uint32_t>(user_wp_);
-    w.Write<uint32_t>(multi_read_ ? 1u : 0u);
-    w.Write<uint32_t>(next_sector_);
-    w.Write<uint32_t>(static_cast<uint32_t>(power_on_wp_.size()));
-    w.WriteBytes(power_on_wp_.data(), power_on_wp_.size());
+    w.Write<uint32_t>("state", static_cast<uint32_t>(state_));
+    w.Write<uint32_t>("rca", rca_);
+    w.Write<uint32_t>("hs_timing", hs_timing_);
+    w.Write<uint32_t>("user_wp", user_wp_);
+    w.Write<uint32_t>("multi_read", multi_read_ ? 1u : 0u);
+    w.Write<uint32_t>("next_sector", next_sector_);
+    w.WriteBytes("power_on_wp", power_on_wp_.data(), power_on_wp_.size());
 }
 
 void EmmcCardBase::RestoreState(StateReader& r) {
@@ -408,51 +407,44 @@ void EmmcCardBase::RestoreState(StateReader& r) {
     uint32_t user_wp   = 0u;
     uint32_t multi     = 0u;
     uint32_t next      = 0u;
-    uint32_t groups    = 0u;
-    r.Read(state);
-    r.Read(rca);
-    r.Read(hs_timing);
-    r.Read(user_wp);
-    r.Read(multi);
-    r.Read(next);
-    r.Read(groups);
+    r.Read("state", state);
+    r.Read("rca", rca);
+    r.Read("hs_timing", hs_timing);
+    r.Read("user_wp", user_wp);
+    r.Read("multi_read", multi);
+    r.Read("next_sector", next);
     if (multi > 1u || next > SectorCount() ||
         (multi == 1u && state != static_cast<uint32_t>(MmcState::Data))) {
-        emu_.Get<Fatal>().Die(
+        r.Reject(
             "eMMC card in slot %u: restored multiple block read %u at sector %u "
             "in state %u is not a read this card can hold", SlotIndex(), multi,
             next, state);
     }
     multi_read_  = (multi == 1u);
     next_sector_ = next;
-    if (groups != power_on_wp_.size()) {
-        emu_.Get<Fatal>().Die(
-            "eMMC card in slot %u: restored %u write protect groups where the "
-            "card has %zu", SlotIndex(), groups, power_on_wp_.size());
-    }
-    r.ReadBytes(power_on_wp_.data(), power_on_wp_.size());
+    r.ReadBytes("power_on_wp", power_on_wp_.data(), power_on_wp_.size());
     for (const uint8_t group : power_on_wp_) {
         if (group > 1u) {
-            emu_.Get<Fatal>().Die(
+            r.Reject(
                 "eMMC card in slot %u: restored write protect group state %u is "
                 "not a state this card can hold", SlotIndex(),
                 static_cast<unsigned>(group));
         }
     }
     if ((user_wp & ~kUserWpPwrWpEn) != 0u) {
-        emu_.Get<Fatal>().Die(
+        r.Reject(
             "eMMC card in slot %u: restored USER_WP 0x%02X sets a bit this card "
             "cannot hold", SlotIndex(), user_wp);
     }
     user_wp_ = static_cast<uint8_t>(user_wp);
     if (hs_timing > kHsTimingHighSpeed) {
-        emu_.Get<Fatal>().Die(
+        r.Reject(
             "eMMC card in slot %u: restored interface timing %u is not a value "
             "this card can hold", SlotIndex(), hs_timing);
     }
     hs_timing_ = static_cast<uint8_t>(hs_timing);
     if (state > static_cast<uint32_t>(MmcState::Data) || rca > 0xFFFFu) {
-        emu_.Get<Fatal>().Die(
+        r.Reject(
             "eMMC card in slot %u: restored state %u rca 0x%X is not a state "
             "this card can reach", SlotIndex(), state, rca);
     }

@@ -34,8 +34,8 @@ public:
     void WriteHalf(uint32_t addr, uint16_t value) override { Store(addr, value, 2); }
     void WriteWord(uint32_t addr, uint32_t value) override { Store(addr, value, 4); }
 
-    void SaveState(StateWriter& w) override { w.WriteBytes(shadow_, sizeof(shadow_)); }
-    void RestoreState(StateReader& r) override { r.ReadBytes(shadow_, sizeof(shadow_)); }
+    void SaveState(StateWriter& w) override { w.WriteBytes("shadow", shadow_, sizeof(shadow_)); }
+    void RestoreState(StateReader& r) override { r.ReadBytes("shadow", shadow_, sizeof(shadow_)); }
 
 private:
     void Store(uint32_t addr, uint32_t value, uint32_t bytes) {

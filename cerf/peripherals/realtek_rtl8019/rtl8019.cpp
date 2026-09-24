@@ -390,20 +390,20 @@ std::vector<WidgetMenuItem> Rtl8019::BuildCardMenu() {
 
 void Rtl8019::SaveState(StateWriter& w) {
     std::lock_guard<std::mutex> lk(state_mutex_);
-    w.WriteBytes(guest_mac_.data(), guest_mac_.size());
+    w.WriteBytes("guest_mac", guest_mac_.data(), guest_mac_.size());
     nic_.SaveState(w);
-    w.Write(cor_); w.Write(ccsr_);
-    w.WriteBytes(card_rom_.data(), card_rom_.size());
-    w.WriteBytes(card_ram_.data(), card_ram_.size());
+    w.Write("cor", cor_); w.Write("ccsr", ccsr_);
+    w.WriteBytes("card_rom", card_rom_.data(), card_rom_.size());
+    w.WriteBytes("card_ram", card_ram_.data(), card_ram_.size());
 }
 
 void Rtl8019::RestoreState(StateReader& r) {
     std::lock_guard<std::mutex> lk(state_mutex_);
-    r.ReadBytes(guest_mac_.data(), guest_mac_.size());
+    r.ReadBytes("guest_mac", guest_mac_.data(), guest_mac_.size());
     nic_.RestoreState(r);
-    r.Read(cor_); r.Read(ccsr_);
-    r.ReadBytes(card_rom_.data(), card_rom_.size());
-    r.ReadBytes(card_ram_.data(), card_ram_.size());
+    r.Read("cor", cor_); r.Read("ccsr", ccsr_);
+    r.ReadBytes("card_rom", card_rom_.data(), card_rom_.size());
+    r.ReadBytes("card_ram", card_ram_.data(), card_ram_.size());
 }
 
 void Rtl8019::PostRestore() {

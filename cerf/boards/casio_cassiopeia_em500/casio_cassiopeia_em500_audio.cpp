@@ -319,38 +319,38 @@ void CasioCassiopeiaEm500Audio::OnBlockDone(uint32_t sink_gen) {
 
 void CasioCassiopeiaEm500Audio::SaveState(StateWriter& w) const {
     std::lock_guard<std::mutex> lk(mtx_);
-    w.Write(reg_880_);
-    w.Write(reg_884_);
-    w.Write(reg_888_);
-    w.Write(reg_890_);
-    w.Write(reg_898_);
-    w.Write(reg_8A0_);
-    for (uint32_t v : desc_) w.Write(v);
-    w.Write(reg_8C4_);
-    w.Write(reg_8C8_);
-    w.Write(reg_8CC_);
-    w.Write<uint8_t>(rate_doubler_ ? 1u : 0u);
-    w.Write(status_8A8_.load(std::memory_order_acquire));
+    w.Write("reg_880", reg_880_);
+    w.Write("reg_884", reg_884_);
+    w.Write("reg_888", reg_888_);
+    w.Write("reg_890", reg_890_);
+    w.Write("reg_898", reg_898_);
+    w.Write("reg_8A0", reg_8A0_);
+    for (uint32_t v : desc_) w.Write("desc", v);
+    w.Write("reg_8C4", reg_8C4_);
+    w.Write("reg_8C8", reg_8C8_);
+    w.Write("reg_8CC", reg_8CC_);
+    w.Write<uint8_t>("rate_doubler", rate_doubler_ ? 1u : 0u);
+    w.Write("status_8A8", status_8A8_.load(std::memory_order_acquire));
 }
 
 void CasioCassiopeiaEm500Audio::RestoreState(StateReader& r) {
     paced_.StopAudioOut();
     std::lock_guard<std::mutex> lk(mtx_);
-    r.Read(reg_880_);
-    r.Read(reg_884_);
-    r.Read(reg_888_);
-    r.Read(reg_890_);
-    r.Read(reg_898_);
-    r.Read(reg_8A0_);
-    for (uint32_t& v : desc_) r.Read(v);
-    r.Read(reg_8C4_);
-    r.Read(reg_8C8_);
-    r.Read(reg_8CC_);
+    r.Read("reg_880", reg_880_);
+    r.Read("reg_884", reg_884_);
+    r.Read("reg_888", reg_888_);
+    r.Read("reg_890", reg_890_);
+    r.Read("reg_898", reg_898_);
+    r.Read("reg_8A0", reg_8A0_);
+    for (uint32_t& v : desc_) r.Read("desc", v);
+    r.Read("reg_8C4", reg_8C4_);
+    r.Read("reg_8C8", reg_8C8_);
+    r.Read("reg_8CC", reg_8CC_);
     uint8_t doubler = 0;
-    r.Read(doubler);
+    r.Read("rate_doubler", doubler);
     rate_doubler_ = doubler != 0;
     uint16_t status = 0;
-    r.Read(status);
+    r.Read("status_8A8", status);
     status_8A8_.store(status, std::memory_order_release);
     queued_      = 0;
     next_queued_ = false;

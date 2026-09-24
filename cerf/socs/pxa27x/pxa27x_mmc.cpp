@@ -270,19 +270,19 @@ void Pxa27xMmc::WriteWord(uint32_t addr, uint32_t value) {
 }
 
 void Pxa27xMmc::SaveState(StateWriter& w) {
-    w.Write(stat_events_); w.Write(clk_on_); w.Write(cmd_armed_); w.Write(clk_is_off_);
-    w.Write(clkrt_);  w.Write(spi_);     w.Write(cmdat_);  w.Write(resto_);
-    w.Write(rdto_);   w.Write(blklen_);  w.Write(numblk_); w.Write(i_mask_);
-    w.Write(cmd_);    w.Write(argh_);    w.Write(argl_);   w.Write(rdwait_);
-    w.Write(blks_rem_);
+    w.Write("stat_events", stat_events_); w.Write("clk_on", clk_on_); w.Write("cmd_armed", cmd_armed_); w.Write("clk_is_off", clk_is_off_);
+    w.Write("clkrt", clkrt_);  w.Write("spi", spi_);     w.Write("cmdat", cmdat_);  w.Write("resto", resto_);
+    w.Write("rdto", rdto_);   w.Write("blklen", blklen_);  w.Write("numblk", numblk_); w.Write("i_mask", i_mask_);
+    w.Write("cmd", cmd_);    w.Write("argh", argh_);    w.Write("argl", argl_);   w.Write("rdwait", rdwait_);
+    w.Write("blks_rem", blks_rem_);
 }
 
 void Pxa27xMmc::RestoreState(StateReader& r) {
-    r.Read(stat_events_); r.Read(clk_on_); r.Read(cmd_armed_); r.Read(clk_is_off_);
-    r.Read(clkrt_);  r.Read(spi_);     r.Read(cmdat_);  r.Read(resto_);
-    r.Read(rdto_);   r.Read(blklen_);  r.Read(numblk_); r.Read(i_mask_);
-    r.Read(cmd_);    r.Read(argh_);    r.Read(argl_);   r.Read(rdwait_);
-    r.Read(blks_rem_);
+    r.Read("stat_events", stat_events_); r.Read("clk_on", clk_on_); r.Read("cmd_armed", cmd_armed_); r.Read("clk_is_off", clk_is_off_);
+    r.Read("clkrt", clkrt_);  r.Read("spi", spi_);     r.Read("cmdat", cmdat_);  r.Read("resto", resto_);
+    r.Read("rdto", rdto_);   r.Read("blklen", blklen_);  r.Read("numblk", numblk_); r.Read("i_mask", i_mask_);
+    r.Read("cmd", cmd_);    r.Read("argh", argh_);    r.Read("argl", argl_);   r.Read("rdwait", rdwait_);
+    r.Read("blks_rem", blks_rem_);
 }
 
 }

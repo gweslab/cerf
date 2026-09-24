@@ -238,6 +238,40 @@ struct ArmMmuState {
     uint8_t* code_xlat_bitmap       = nullptr;
     uint32_t code_page_dirty_bytes  = 0;
     uint8_t* code_page_dirty        = nullptr;
+
+    template <typename F>
+    static constexpr void Visit(ArmMmuState& s, F& field) {
+        field("control_register", s.control_register.word);
+        field("effective_control_register", s.effective_control_register.word);
+        field("aux_control_register", s.aux_control_register);
+        field("translation_table_base", s.translation_table_base.word);
+        field("domain_access_control", s.domain_access_control);
+        field("fault_status", s.fault_status.word);
+        field("fault_address", s.fault_address);
+        field("ifsr", s.ifsr);
+        field("ifar", s.ifar);
+        field("process_id", s.process_id);
+        field.Skip(s.fcse_fold_id);
+        field("coprocessor_access", s.coprocessor_access);
+        field("cssel_register", s.cssel_register);
+        field("ttbr1", s.ttbr1);
+        field("ttbcr", s.ttbcr);
+        field("prrr", s.prrr);
+        field("nmrr", s.nmrr);
+        field("contextidr", s.contextidr);
+        field("tpidrurw", s.tpidrurw);
+        field("tpidruro", s.tpidruro);
+        field("tpidrprw", s.tpidrprw);
+        field("l2_aux_control", s.l2_aux_control);
+        field.Skip(s.data_tlb);
+        field.Skip(s.instruction_tlb);
+        field.Skip(s.code_word_base);
+        field.Skip(s.code_word_top);
+        field.Skip(s.code_word_bitmap_bytes);
+        field.Skip(s.code_xlat_bitmap);
+        field.Skip(s.code_page_dirty_bytes);
+        field.Skip(s.code_page_dirty);
+    }
 };
 
 template <ArmMmuAccess kAccess>

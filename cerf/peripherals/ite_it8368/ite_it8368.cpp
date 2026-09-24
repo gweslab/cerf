@@ -432,43 +432,43 @@ IteIt8368::BusOps IteIt8368::WriteRegLocked(uint32_t off, uint16_t value) {
 
 void IteIt8368::SaveState(StateWriter& w) {
     std::lock_guard<std::mutex> lk(mu_);
-    w.Write(gpio_dataout_);
-    w.Write(gpio_dir_);
-    w.Write(gpio_posinten_);
-    w.Write(gpio_neginten_);
-    w.Write(gpio_posintstat_);
-    w.Write(gpio_negintstat_);
-    w.Write(mfio_posintstat_);
-    w.Write(mfio_negintstat_);
-    w.Write(mfio_dataout_);
-    w.Write(mfio_dir_);
-    w.Write(mfio_sel_);
-    w.Write(ctrl_);
-    w.Write(prev_datain_);
-    w.Write<uint8_t>(rst_asserted_ ? 1u : 0u);
-    w.Write<uint8_t>(card_irq_ ? 1u : 0u);
+    w.Write("gpio_dataout", gpio_dataout_);
+    w.Write("gpio_dir", gpio_dir_);
+    w.Write("gpio_posinten", gpio_posinten_);
+    w.Write("gpio_neginten", gpio_neginten_);
+    w.Write("gpio_posintstat", gpio_posintstat_);
+    w.Write("gpio_negintstat", gpio_negintstat_);
+    w.Write("mfio_posintstat", mfio_posintstat_);
+    w.Write("mfio_negintstat", mfio_negintstat_);
+    w.Write("mfio_dataout", mfio_dataout_);
+    w.Write("mfio_dir", mfio_dir_);
+    w.Write("mfio_sel", mfio_sel_);
+    w.Write("ctrl", ctrl_);
+    w.Write("prev_datain", prev_datain_);
+    w.Write<uint8_t>("rst_asserted", rst_asserted_ ? 1u : 0u);
+    w.Write<uint8_t>("card_irq", card_irq_ ? 1u : 0u);
 }
 
 void IteIt8368::RestoreState(StateReader& r) {
     std::lock_guard<std::mutex> lk(mu_);
-    r.Read(gpio_dataout_);
-    r.Read(gpio_dir_);
-    r.Read(gpio_posinten_);
-    r.Read(gpio_neginten_);
-    r.Read(gpio_posintstat_);
-    r.Read(gpio_negintstat_);
-    r.Read(mfio_posintstat_);
-    r.Read(mfio_negintstat_);
-    r.Read(mfio_dataout_);
-    r.Read(mfio_dir_);
-    r.Read(mfio_sel_);
-    r.Read(ctrl_);
-    r.Read(prev_datain_);
+    r.Read("gpio_dataout", gpio_dataout_);
+    r.Read("gpio_dir", gpio_dir_);
+    r.Read("gpio_posinten", gpio_posinten_);
+    r.Read("gpio_neginten", gpio_neginten_);
+    r.Read("gpio_posintstat", gpio_posintstat_);
+    r.Read("gpio_negintstat", gpio_negintstat_);
+    r.Read("mfio_posintstat", mfio_posintstat_);
+    r.Read("mfio_negintstat", mfio_negintstat_);
+    r.Read("mfio_dataout", mfio_dataout_);
+    r.Read("mfio_dir", mfio_dir_);
+    r.Read("mfio_sel", mfio_sel_);
+    r.Read("ctrl", ctrl_);
+    r.Read("prev_datain", prev_datain_);
     uint8_t rst = 0;
-    r.Read(rst);
+    r.Read("rst_asserted", rst);
     rst_asserted_ = rst != 0u;
     uint8_t irq = 0;
-    r.Read(irq);
+    r.Read("card_irq", irq);
     card_irq_ = irq != 0u;
 
     /* Every peripheral downstream of the INT pin restores its own copy of the

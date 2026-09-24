@@ -46,16 +46,16 @@ void CerfVirtKeyboard::PushKey(uint8_t vk, bool key_up) {
 }
 
 void CerfVirtKeyboard::SaveState(StateWriter& w) {
-    w.Write<uint32_t>(write_seq_.load());
+    w.Write<uint32_t>("write_seq", write_seq_.load());
     for (uint32_t i = 0; i < CerfVirt::kKbRingCount; ++i)
-        w.Write<uint32_t>(ring_[i].load());
+        w.Write<uint32_t>("ring", ring_[i].load());
 }
 
 void CerfVirtKeyboard::RestoreState(StateReader& r) {
     uint32_t v;
-    r.Read(v); write_seq_.store(v);
+    r.Read("write_seq", v); write_seq_.store(v);
     for (uint32_t i = 0; i < CerfVirt::kKbRingCount; ++i) {
-        r.Read(v); ring_[i].store(v);
+        r.Read("ring", v); ring_[i].store(v);
     }
 }
 

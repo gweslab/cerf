@@ -62,8 +62,8 @@ public:
         HaltUnsupportedAccess("MP377 power/reset unknown word write", addr, value);
     }
 
-    void SaveState(StateWriter& w) override { w.WriteBytes(regs_.data(), regs_.size() * sizeof(regs_[0])); }
-    void RestoreState(StateReader& r) override { r.ReadBytes(regs_.data(), regs_.size() * sizeof(regs_[0])); }
+    void SaveState(StateWriter& w) override { w.WriteBytes("regs", regs_.data(), regs_.size() * sizeof(regs_[0])); }
+    void RestoreState(StateReader& r) override { r.ReadBytes("regs", regs_.data(), regs_.size() * sizeof(regs_[0])); }
 
 private:
     void Reset() { regs_.fill(0); }

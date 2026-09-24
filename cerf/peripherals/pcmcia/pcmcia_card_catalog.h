@@ -29,11 +29,10 @@ public:
     void OnReady() override;
 
     const std::vector<Entry>& Entries() const { return entries_; }
-    /* binding is the card's host resource (CF image path / serial COM name);
-       empty for id-only cards. Used by the menu (empty) and by hibernation
-       restore (the saved binding) to rebuild an absent card. */
     std::unique_ptr<PcmciaCard> Create(const std::string& id,
                                        const std::wstring& binding = L"");
+    std::unique_ptr<PcmciaCard> TryCreate(const std::string& id,
+                                          const std::wstring& binding = L"");
 
 private:
     std::vector<Entry> entries_;

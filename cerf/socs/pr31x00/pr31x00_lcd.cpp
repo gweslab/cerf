@@ -335,11 +335,11 @@ void Pr31x00Lcd::StorePattern(uint32_t idx, uint32_t addr, uint32_t value,
 }
 
 void Pr31x00Lcd::SaveState(StateWriter& w) {
-    for (uint32_t i = 0; i < kRegs; ++i) w.Write(reg_[i]);
+    for (uint32_t i = 0; i < kRegs; ++i) w.Write("reg", reg_[i]);
 }
 
 void Pr31x00Lcd::RestoreState(StateReader& r) {
-    for (uint32_t i = 0; i < kRegs; ++i) r.Read(reg_[i]);
+    for (uint32_t i = 0; i < kRegs; ++i) r.Read("reg", reg_[i]);
 }
 
 REGISTER_SERVICE(Pr31x00Lcd);

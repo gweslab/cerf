@@ -56,10 +56,10 @@ public:
     }
 
     void SaveState(StateWriter& w) override {
-        w.Write(control_); w.Write(time_divider_); w.Write(reset_);
+        w.Write("control", control_); w.Write("time_divider", time_divider_); w.Write("reset", reset_);
     }
     void RestoreState(StateReader& r) override {
-        r.Read(control_); r.Read(time_divider_); r.Read(reset_);
+        r.Read("control", control_); r.Read("time_divider", time_divider_); r.Read("reset", reset_);
     }
 
 private:

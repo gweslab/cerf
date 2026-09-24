@@ -65,8 +65,8 @@ public:
     void WriteByte(uint32_t addr, uint8_t  v) override { HaltUnsupportedAccess("CasioHostLink WriteByte", addr, v); }
     void WriteWord(uint32_t addr, uint32_t v) override { HaltUnsupportedAccess("CasioHostLink WriteWord", addr, v); }
 
-    void SaveState(StateWriter& w) override { w.Write(probe_); }
-    void RestoreState(StateReader& r) override { r.Read(probe_); }
+    void SaveState(StateWriter& w) override { w.Write("probe", probe_); }
+    void RestoreState(StateReader& r) override { r.Read("probe", probe_); }
 
 private:
     uint16_t probe_ = 0u;

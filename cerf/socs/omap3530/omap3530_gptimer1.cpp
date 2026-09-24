@@ -463,30 +463,30 @@ void Omap3530Gptimer1::SaveState(StateWriter& w) {
     std::lock_guard<std::mutex> lk(state_mutex_);
     const int64_t now = NowNs();
     CatchUpLocked(now);
-    w.Write(tisr_);
-    w.Write(tier_);
-    w.Write(tclr_);
-    w.Write(tldr_);
-    w.Write(tmar_);
-    w.Write(tsicr_);
-    w.Write<uint32_t>(CounterAtLocked(now));
-    w.Write<uint8_t>(running_ ? 1u : 0u);
-    w.Write<uint8_t>(one_shot_done_ ? 1u : 0u);
+    w.Write("tisr", tisr_);
+    w.Write("tier", tier_);
+    w.Write("tclr", tclr_);
+    w.Write("tldr", tldr_);
+    w.Write("tmar", tmar_);
+    w.Write("tsicr", tsicr_);
+    w.Write<uint32_t>("counter", CounterAtLocked(now));
+    w.Write<uint8_t>("running", running_ ? 1u : 0u);
+    w.Write<uint8_t>("one_shot_done", one_shot_done_ ? 1u : 0u);
 }
 
 void Omap3530Gptimer1::RestoreState(StateReader& r) {
     std::lock_guard<std::mutex> lk(state_mutex_);
-    r.Read(tisr_);
-    r.Read(tier_);
-    r.Read(tclr_);
-    r.Read(tldr_);
-    r.Read(tmar_);
-    r.Read(tsicr_);
+    r.Read("tisr", tisr_);
+    r.Read("tier", tier_);
+    r.Read("tclr", tclr_);
+    r.Read("tldr", tldr_);
+    r.Read("tmar", tmar_);
+    r.Read("tsicr", tsicr_);
     uint32_t counter = 0;
     uint8_t  running = 0, one_shot_done = 0;
-    r.Read(counter);
-    r.Read(running);
-    r.Read(one_shot_done);
+    r.Read("counter", counter);
+    r.Read("running", running);
+    r.Read("one_shot_done", one_shot_done);
     tcrr_base_     = counter;
     anchor_ns_     = NowNs();
     folded_ticks_  = 0;

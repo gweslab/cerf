@@ -110,17 +110,17 @@ void Sa11xxSp1Gpclk::WriteWord(uint32_t addr, uint32_t value) {
 }
 
 void Sa11xxSp1Gpclk::SaveState(StateWriter& w) {
-    w.Write(gpclkr0_);
-    w.Write(gpclkr1_);
-    w.Write(gpclkr2_);
-    w.Write(gpclkr3_);
+    w.Write("gpclkr0", gpclkr0_);
+    w.Write("gpclkr1", gpclkr1_);
+    w.Write("gpclkr2", gpclkr2_);
+    w.Write("gpclkr3", gpclkr3_);
 }
 
 void Sa11xxSp1Gpclk::RestoreState(StateReader& r) {
-    r.Read(gpclkr0_);
-    r.Read(gpclkr1_);
-    r.Read(gpclkr2_);
-    r.Read(gpclkr3_);
+    r.Read("gpclkr0", gpclkr0_);
+    r.Read("gpclkr1", gpclkr1_);
+    r.Read("gpclkr2", gpclkr2_);
+    r.Read("gpclkr3", gpclkr3_);
 }
 
 }  /* namespace */

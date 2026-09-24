@@ -253,25 +253,25 @@ void Pxa27xRtc::WriteWord(uint32_t addr, uint32_t value) {
 void Pxa27xRtc::SaveState(StateWriter& w) {
     std::lock_guard<std::mutex> g(mtx_);
     const uint32_t live = ReadRcnrLocked();
-    w.Write(live);
-    w.Write(rtar_); w.Write(rtsr_); w.Write(rttr_);
-    w.Write(alarm_armed_at_); w.Write(hz_armed_at_);
+    w.Write("rcnr", live);
+    w.Write("rtar", rtar_); w.Write("rtsr", rtsr_); w.Write("rttr", rttr_);
+    w.Write("alarm_armed_at", alarm_armed_at_); w.Write("hz_armed_at", hz_armed_at_);
     const int64_t ww_live = WristwatchLocked().time_since_epoch().count();
-    w.Write(ww_live);
-    w.Write(rycr_shadow_); w.Write(rycr_pending_);
+    w.Write("ww_live", ww_live);
+    w.Write("rycr_shadow", rycr_shadow_); w.Write("rycr_pending", rycr_pending_);
 }
 
 void Pxa27xRtc::RestoreState(StateReader& r) {
     std::lock_guard<std::mutex> g(mtx_);
-    r.Read(rcnr_base_);
+    r.Read("rcnr", rcnr_base_);
     baseline_ = Clock::now();
-    r.Read(rtar_); r.Read(rtsr_); r.Read(rttr_);
-    r.Read(alarm_armed_at_); r.Read(hz_armed_at_);
+    r.Read("rtar", rtar_); r.Read("rtsr", rtsr_); r.Read("rttr", rttr_);
+    r.Read("alarm_armed_at", alarm_armed_at_); r.Read("hz_armed_at", hz_armed_at_);
     int64_t ww_live = 0;
-    r.Read(ww_live);
+    r.Read("ww_live", ww_live);
     ww_base_     = std::chrono::sys_seconds{std::chrono::seconds{ww_live}};
     ww_baseline_ = Clock::now();
-    r.Read(rycr_shadow_); r.Read(rycr_pending_);
+    r.Read("rycr_shadow", rycr_shadow_); r.Read("rycr_pending", rycr_pending_);
 }
 
 }  /* namespace */

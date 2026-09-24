@@ -128,23 +128,23 @@ void Sa11xxPowerManager::WriteWord(uint32_t addr, uint32_t value) {
 }
 
 void Sa11xxPowerManager::SaveState(StateWriter& w) {
-    w.Write(pmcr_);
-    w.Write(pssr_);
-    w.Write(pspr_);
-    w.Write(pwer_);
-    w.Write(pcfr_);
-    w.Write(ppcr_);
-    w.Write(pgsr_);
+    w.Write("pmcr", pmcr_);
+    w.Write("pssr", pssr_);
+    w.Write("pspr", pspr_);
+    w.Write("pwer", pwer_);
+    w.Write("pcfr", pcfr_);
+    w.Write("ppcr", ppcr_);
+    w.Write("pgsr", pgsr_);
 }
 
 void Sa11xxPowerManager::RestoreState(StateReader& r) {
-    r.Read(pmcr_);
-    r.Read(pssr_);
-    r.Read(pspr_);
-    r.Read(pwer_);
-    r.Read(pcfr_);
-    r.Read(ppcr_);
-    r.Read(pgsr_);
+    r.Read("pmcr", pmcr_);
+    r.Read("pssr", pssr_);
+    r.Read("pspr", pspr_);
+    r.Read("pwer", pwer_);
+    r.Read("pcfr", pcfr_);
+    r.Read("ppcr", ppcr_);
+    r.Read("pgsr", pgsr_);
 }
 
 }  /* namespace */

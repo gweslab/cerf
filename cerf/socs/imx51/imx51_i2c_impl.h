@@ -82,22 +82,22 @@ public:
     }
 
     void SaveState(StateWriter& w) override {
-        w.Write(iadr_); w.Write(ifdr_); w.Write(i2cr_);
-        w.Write(i2sr_); w.Write(i2dr_);
-        w.Write<uint8_t>(addr_phase_ ? 1 : 0);
-        w.Write<uint8_t>(matched_ ? 1 : 0);
-        w.Write(cur_addr_);
-        w.Write(rx_shift_);
+        w.Write("iadr", iadr_); w.Write("ifdr", ifdr_); w.Write("i2cr", i2cr_);
+        w.Write("i2sr", i2sr_); w.Write("i2dr", i2dr_);
+        w.Write<uint8_t>("addr_phase", addr_phase_ ? 1 : 0);
+        w.Write<uint8_t>("matched", matched_ ? 1 : 0);
+        w.Write("cur_addr", cur_addr_);
+        w.Write("rx_shift", rx_shift_);
         if (auto* s = WiredSlave()) s->SaveState(w);
     }
     void RestoreState(StateReader& r) override {
-        r.Read(iadr_); r.Read(ifdr_); r.Read(i2cr_);
-        r.Read(i2sr_); r.Read(i2dr_);
+        r.Read("iadr", iadr_); r.Read("ifdr", ifdr_); r.Read("i2cr", i2cr_);
+        r.Read("i2sr", i2sr_); r.Read("i2dr", i2dr_);
         uint8_t b = 0;
-        r.Read(b); addr_phase_ = b != 0;
-        r.Read(b); matched_ = b != 0;
-        r.Read(cur_addr_);
-        r.Read(rx_shift_);
+        r.Read("addr_phase", b); addr_phase_ = b != 0;
+        r.Read("matched", b); matched_ = b != 0;
+        r.Read("cur_addr", cur_addr_);
+        r.Read("rx_shift", rx_shift_);
         if (auto* s = WiredSlave()) s->RestoreState(r);
     }
     /* Re-drive the (level) TZIC line from the restored IIF/IIEN state. */

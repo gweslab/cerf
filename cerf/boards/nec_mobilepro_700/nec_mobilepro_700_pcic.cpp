@@ -219,11 +219,11 @@ void NecMobilePro700Pcic::OnCardIrqDeasserted(PcmciaSlot& slot) {
 void NecMobilePro700Pcic::SaveState(StateWriter& w) {
     {
         std::lock_guard<std::mutex> lk(state_mutex_);
-        w.Write(index_);
-        w.Write<uint8_t>(card_irq_[0] ? 1u : 0u);
-        w.Write<uint8_t>(card_irq_[1] ? 1u : 0u);
-        w.Write(voltage_select_[0]);
-        w.Write(voltage_select_[1]);
+        w.Write("index", index_);
+        w.Write<uint8_t>("card_irq", card_irq_[0] ? 1u : 0u);
+        w.Write<uint8_t>("card_irq", card_irq_[1] ? 1u : 0u);
+        w.Write("voltage_select", voltage_select_[0]);
+        w.Write("voltage_select", voltage_select_[1]);
         exca0_.SaveState(w);
         exca1_.SaveState(w);
     }
@@ -234,12 +234,12 @@ void NecMobilePro700Pcic::SaveState(StateWriter& w) {
 void NecMobilePro700Pcic::RestoreState(StateReader& r) {
     {
         std::lock_guard<std::mutex> lk(state_mutex_);
-        r.Read(index_);
+        r.Read("index", index_);
         uint8_t a = 0, b = 0;
-        r.Read(a); card_irq_[0] = (a != 0);
-        r.Read(b); card_irq_[1] = (b != 0);
-        r.Read(voltage_select_[0]);
-        r.Read(voltage_select_[1]);
+        r.Read("card_irq", a); card_irq_[0] = (a != 0);
+        r.Read("card_irq", b); card_irq_[1] = (b != 0);
+        r.Read("voltage_select", voltage_select_[0]);
+        r.Read("voltage_select", voltage_select_[1]);
         exca0_.RestoreState(r);
         exca1_.RestoreState(r);
     }

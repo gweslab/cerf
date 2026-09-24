@@ -77,11 +77,11 @@ public:
     }
 
     void SaveState(StateWriter& w) override {
-        w.Write(result_);
+        w.Write("result", result_);
         emu_.Get<FolderShareFiles>().SaveState(w);
     }
     void RestoreState(StateReader& r) override {
-        r.Read(result_);
+        r.Read("result", result_);
         emu_.Get<FolderShareFiles>().RestoreState(r);
         emu_.Get<FolderShareDir>().CloseAll();
     }

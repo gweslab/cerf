@@ -40,8 +40,8 @@ public:
     void     WriteWord(uint32_t addr, uint32_t value) override;
 
     /* CFI command-FSM latch (mode_) + status register. */
-    void SaveState(StateWriter& w) override { w.Write(mode_); w.Write(status_); }
-    void RestoreState(StateReader& r) override { r.Read(mode_); r.Read(status_); }
+    void SaveState(StateWriter& w) override { w.Write("mode", mode_); w.Write("status", status_); }
+    void RestoreState(StateReader& r) override { r.Read("mode", mode_); r.Read("status", status_); }
 
 private:
     /* Intel CFI command set (subset documented for Advanced+ Boot
@@ -51,8 +51,8 @@ private:
         kReadId     = 0x90,
         kReadStatus = 0x70,
         kCfiQuery   = 0x98,
-        kProgram    = 0x40,  /* word program setup */
-        kErase      = 0x20,  /* block erase setup, confirm with 0xD0 */
+        kProgram    = 0x40,
+        kErase      = 0x20,
     };
 
     Mode    mode_   = kReadArray;

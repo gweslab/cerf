@@ -187,31 +187,23 @@ void CasioCassiopeiaEm500Display::MaybePublishDisplaySize() {
 }
 
 void CasioCassiopeiaEm500Display::SaveState(StateWriter& w) const {
-    w.Write<uint64_t>(fb_.size());
-    if (!fb_.empty()) w.WriteBytes(fb_.data(), fb_.size());
-    w.Write(blit_op_); w.Write(blit_len_words_);
-    w.Write(blit_src_); w.Write(blit_dst_);
-    w.Write(fill_dst_lo_); w.Write(fill_dst_hi_);
-    w.Write(fill_w_); w.Write(fill_h_); w.Write(fill_color_); w.Write(fill_cmd_);
-    w.Write(reg_0980_); w.Write(reg_0984_); w.Write(reg_0988_);
-    w.Write(reg_098C_); w.Write(reg_0994_); w.Write(reg_099C_);
+    w.WriteBytes("fb", fb_.data(), fb_.size());
+    w.Write("blit_op", blit_op_); w.Write("blit_len_words", blit_len_words_);
+    w.Write("blit_src", blit_src_); w.Write("blit_dst", blit_dst_);
+    w.Write("fill_dst_lo", fill_dst_lo_); w.Write("fill_dst_hi", fill_dst_hi_);
+    w.Write("fill_w", fill_w_); w.Write("fill_h", fill_h_); w.Write("fill_color", fill_color_); w.Write("fill_cmd", fill_cmd_);
+    w.Write("reg_0980", reg_0980_); w.Write("reg_0984", reg_0984_); w.Write("reg_0988", reg_0988_);
+    w.Write("reg_098C", reg_098C_); w.Write("reg_0994", reg_0994_); w.Write("reg_099C", reg_099C_);
     size_latch_.SaveState(w);
 }
 
 void CasioCassiopeiaEm500Display::RestoreState(StateReader& r) {
-    uint64_t n = 0;
-    r.Read(n);
-    if (n != kFbSize) {
-        emu_->Get<Fatal>().Die("CasioCassiopeiaEm500Display::RestoreState: framebuffer is %llu "
-                               "bytes, expected %u", static_cast<unsigned long long>(n), kFbSize);
-    }
-    fb_.assign(kFbSize, 0u);
-    r.ReadBytes(fb_.data(), fb_.size());
-    r.Read(blit_op_); r.Read(blit_len_words_);
-    r.Read(blit_src_); r.Read(blit_dst_);
-    r.Read(fill_dst_lo_); r.Read(fill_dst_hi_);
-    r.Read(fill_w_); r.Read(fill_h_); r.Read(fill_color_); r.Read(fill_cmd_);
-    r.Read(reg_0980_); r.Read(reg_0984_); r.Read(reg_0988_);
-    r.Read(reg_098C_); r.Read(reg_0994_); r.Read(reg_099C_);
+    r.ReadBytes("fb", fb_.data(), fb_.size());
+    r.Read("blit_op", blit_op_); r.Read("blit_len_words", blit_len_words_);
+    r.Read("blit_src", blit_src_); r.Read("blit_dst", blit_dst_);
+    r.Read("fill_dst_lo", fill_dst_lo_); r.Read("fill_dst_hi", fill_dst_hi_);
+    r.Read("fill_w", fill_w_); r.Read("fill_h", fill_h_); r.Read("fill_color", fill_color_); r.Read("fill_cmd", fill_cmd_);
+    r.Read("reg_0980", reg_0980_); r.Read("reg_0984", reg_0984_); r.Read("reg_0988", reg_0988_);
+    r.Read("reg_098C", reg_098C_); r.Read("reg_0994", reg_0994_); r.Read("reg_099C", reg_099C_);
     size_latch_.RestoreState(r);
 }

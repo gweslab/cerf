@@ -248,39 +248,39 @@ void SiemensMp377Ertec400Nrt::SetInterruptMaskHigh(uint32_t mask) {
 void SiemensMp377Ertec400Nrt::SaveState(StateWriter& writer) const {
     std::lock_guard<std::mutex> lock(impl_->mutex);
     for (uint32_t value : impl_->tx_base)
-        writer.Write(value);
+        writer.Write("tx_base", value);
     for (uint32_t value : impl_->rx_base)
-        writer.Write(value);
+        writer.Write("rx_base", value);
     for (uint32_t value : impl_->tx_cursor)
-        writer.Write(value);
+        writer.Write("tx_cursor", value);
     for (uint32_t value : impl_->rx_cursor)
-        writer.Write(value);
+        writer.Write("rx_cursor", value);
     for (bool value : impl_->rx_armed)
-        writer.Write(static_cast<uint32_t>(value));
-    writer.Write(impl_->interrupt_status_high);
-    writer.Write(impl_->interrupt_mask_high);
-    writer.Write(static_cast<uint32_t>(impl_->link_event_sent));
+        writer.Write("rx_armed", static_cast<uint32_t>(value));
+    writer.Write("interrupt_status_high", impl_->interrupt_status_high);
+    writer.Write("interrupt_mask_high", impl_->interrupt_mask_high);
+    writer.Write("link_event_sent", static_cast<uint32_t>(impl_->link_event_sent));
 }
 
 void SiemensMp377Ertec400Nrt::RestoreState(StateReader& reader) {
     std::lock_guard<std::mutex> lock(impl_->mutex);
     for (uint32_t& value : impl_->tx_base)
-        reader.Read(value);
+        reader.Read("tx_base", value);
     for (uint32_t& value : impl_->rx_base)
-        reader.Read(value);
+        reader.Read("rx_base", value);
     for (uint32_t& value : impl_->tx_cursor)
-        reader.Read(value);
+        reader.Read("tx_cursor", value);
     for (uint32_t& value : impl_->rx_cursor)
-        reader.Read(value);
+        reader.Read("rx_cursor", value);
     for (auto&& value : impl_->rx_armed) {
         uint32_t stored = 0;
-        reader.Read(stored);
+        reader.Read("rx_armed", stored);
         value = stored != 0u;
     }
-    reader.Read(impl_->interrupt_status_high);
-    reader.Read(impl_->interrupt_mask_high);
+    reader.Read("interrupt_status_high", impl_->interrupt_status_high);
+    reader.Read("interrupt_mask_high", impl_->interrupt_mask_high);
     uint32_t link_event_sent = 0;
-    reader.Read(link_event_sent);
+    reader.Read("link_event_sent", link_event_sent);
     impl_->link_event_sent = link_event_sent != 0u;
     impl_->interrupt_asserted = false;
 }

@@ -151,11 +151,11 @@ public:
 
     void Save(StateWriter& w) const {
         for (uint32_t i = 0; i < kBankCount; ++i) {
-            w.Write<uint32_t>(in_[i].load(std::memory_order_acquire));
-            w.Write<uint32_t>(driven_[i].load(std::memory_order_acquire));
-            w.Write<uint32_t>(status_[i].load(std::memory_order_acquire));
+            w.Write<uint32_t>("in", in_[i].load(std::memory_order_acquire));
+            w.Write<uint32_t>("driven", driven_[i].load(std::memory_order_acquire));
+            w.Write<uint32_t>("status", status_[i].load(std::memory_order_acquire));
             for (uint32_t f = 0; f < kMsm8255GpioFamilies; ++f) {
-                w.Write<uint32_t>(regs_[i][f].load(std::memory_order_acquire));
+                w.Write<uint32_t>("regs", regs_[i][f].load(std::memory_order_acquire));
             }
         }
     }
@@ -165,9 +165,9 @@ public:
             uint32_t level = 0;
             uint32_t drv   = 0;
             uint32_t stat  = 0;
-            r.Read(level);
-            r.Read(drv);
-            r.Read(stat);
+            r.Read("in", level);
+            r.Read("driven", drv);
+            r.Read("status", stat);
             if (((level | drv | stat) & ~banks_[i].Pins()) != 0u) {
                 bad_off   = banks_[i].int_status;
                 bad_value = level | drv | stat;
@@ -178,7 +178,7 @@ public:
             status_[i].store(stat, std::memory_order_release);
             for (uint32_t f = 0; f < kMsm8255GpioFamilies; ++f) {
                 uint32_t value = 0;
-                r.Read(value);
+                r.Read("regs", value);
                 if ((value & ~banks_[i].Pins()) != 0u) {
                     bad_off   = FamilyOffset(banks_[i], f);
                     bad_value = value;

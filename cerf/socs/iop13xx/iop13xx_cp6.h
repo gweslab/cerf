@@ -47,6 +47,14 @@ private:
         uint32_t base_cycles = 0;
     };
 
+    template <typename F>
+    static constexpr void VisitTimer(Timer& t, F& field) {
+        field("timer_control", t.control);
+        field("timer_counter", t.counter);
+        field("timer_reload", t.reload);
+        field.Skip(t.base_cycles);
+    }
+
     static constexpr uint32_t kTimerEnable = 0x02u;
     static constexpr uint32_t kTimerReload = 0x04u;
     static constexpr uint32_t kTimer0Irq = 8u;

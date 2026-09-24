@@ -103,13 +103,13 @@ uint32_t S3C2410Lcd::GetGuestH() {
 }
 
 void S3C2410Lcd::SaveState(StateWriter& w) {
-    w.WriteBytes(ctrl_, sizeof(ctrl_));
-    w.WriteBytes(pal_,  sizeof(pal_));
+    w.WriteBytes("ctrl", ctrl_, sizeof(ctrl_));
+    w.WriteBytes("pal", pal_,  sizeof(pal_));
 }
 
 void S3C2410Lcd::RestoreState(StateReader& r) {
-    r.ReadBytes(ctrl_, sizeof(ctrl_));
-    r.ReadBytes(pal_,  sizeof(pal_));
+    r.ReadBytes("ctrl", ctrl_, sizeof(ctrl_));
+    r.ReadBytes("pal", pal_,  sizeof(pal_));
 }
 
 REGISTER_SERVICE(S3C2410Lcd);

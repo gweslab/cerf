@@ -184,12 +184,12 @@ public:
 
     void SaveState(StateWriter& w) override {
         for (uint32_t i = 0; i < kWordCount; ++i) {
-            w.Write<uint32_t>(regs_[i].load(std::memory_order_acquire));
+            w.Write<uint32_t>("regs", regs_[i].load(std::memory_order_acquire));
         }
-        w.Write<uint32_t>(rev_cursor_.load(std::memory_order_acquire));
-        w.Write<uint32_t>(response_pending_.load(std::memory_order_acquire));
-        w.Write<uint32_t>(response_address_.load(std::memory_order_acquire));
-        w.Write<uint32_t>(response_value_.load(std::memory_order_acquire));
+        w.Write<uint32_t>("rev_cursor", rev_cursor_.load(std::memory_order_acquire));
+        w.Write<uint32_t>("response_pending", response_pending_.load(std::memory_order_acquire));
+        w.Write<uint32_t>("response_address", response_address_.load(std::memory_order_acquire));
+        w.Write<uint32_t>("response_value", response_value_.load(std::memory_order_acquire));
         if (auto* client = emu_.TryGet<Msm8255MddiClient>()) {
             client->SaveState(w);
         }
@@ -198,13 +198,13 @@ public:
     void RestoreState(StateReader& r) override {
         for (uint32_t i = 0; i < kWordCount; ++i) {
             uint32_t v = kRegReset;
-            r.Read(v);
+            r.Read("regs", v);
             regs_[i].store(v, std::memory_order_release);
         }
-        RestoreField(r, rev_cursor_);
-        RestoreField(r, response_pending_);
-        RestoreField(r, response_address_);
-        RestoreField(r, response_value_);
+        RestoreField(r, "rev_cursor", rev_cursor_);
+        RestoreField(r, "response_pending", response_pending_);
+        RestoreField(r, "response_address", response_address_);
+        RestoreField(r, "response_value", response_value_);
         if (auto* client = emu_.TryGet<Msm8255MddiClient>()) {
             client->RestoreState(r);
         }
@@ -261,9 +261,9 @@ private:
         response_value_.store(0u, std::memory_order_release);
     }
 
-    static void RestoreField(StateReader& r, std::atomic<uint32_t>& field) {
+    static void RestoreField(StateReader& r, const char* name, std::atomic<uint32_t>& field) {
         uint32_t v = kRegReset;
-        r.Read(v);
+        r.Read(name, v);
         field.store(v, std::memory_order_release);
     }
 

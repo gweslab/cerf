@@ -72,8 +72,8 @@ public:
     uint32_t ReadWord (uint32_t addr) override { HaltUnsupportedAccess("HSP ReadWord", addr, 0); }
     void WriteWord(uint32_t addr, uint32_t v) override { HaltUnsupportedAccess("HSP WriteWord", addr, v); }
 
-    void SaveState(StateWriter& w) override { w.Write(init_); }
-    void RestoreState(StateReader& r) override { r.Read(init_); }
+    void SaveState(StateWriter& w) override { w.Write("init", init_); }
+    void RestoreState(StateReader& r) override { r.Read("init", init_); }
 
 private:
     uint16_t init_ = 0;   /* HSPINIT (reset 0, UM 25.2.1) */

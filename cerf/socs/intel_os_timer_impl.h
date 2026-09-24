@@ -59,60 +59,60 @@ public:
     }
 
     void SaveState(StateWriter& w) override {
-        for (int n = 0; n < 4; ++n) w.Write<uint32_t>(osmr_[n]);
-        w.Write<uint32_t>(ossr_);
-        w.Write<uint32_t>(ower_);
-        w.Write<uint32_t>(oier_);
-        w.Write<uint32_t>(Oscr(clock_->Cycles()));
-        for (int n = 0; n < 4; ++n) w.Write<uint32_t>(last_match_oscr_[n]);
-        for (int n = 0; n < 4; ++n) w.Write<uint8_t>(have_match_[n] ? 1u : 0u);
-        w.Write<uint8_t>(pair_oscr_read_ ? 1u : 0u);
-        w.Write<uint32_t>(pair_oscr_);
-        w.Write<uint32_t>(period_cand_);
-        w.Write<uint8_t>(bank_pending_ ? 1u : 0u);
-        w.Write<uint32_t>(bank_oscr_);
-        w.Write<uint8_t>(have_period_ ? 1u : 0u);
-        w.Write<uint32_t>(period_);
-        w.Write<uint8_t>(isr_write_pending_ ? 1u : 0u);
-        w.Write<uint8_t>(bank_pair_since_match_ ? 1u : 0u);
-        w.Write<uint8_t>(osmr0_written_since_ack_ ? 1u : 0u);
-        w.Write<uint8_t>(last_write_rephased_ ? 1u : 0u);
-        w.Write<uint8_t>(oscr_read_any_ ? 1u : 0u);
+        for (int n = 0; n < 4; ++n) w.Write<uint32_t>("osmr", osmr_[n]);
+        w.Write<uint32_t>("ossr", ossr_);
+        w.Write<uint32_t>("ower", ower_);
+        w.Write<uint32_t>("oier", oier_);
+        w.Write<uint32_t>("oscr", Oscr(clock_->Cycles()));
+        for (int n = 0; n < 4; ++n) w.Write<uint32_t>("last_match_oscr", last_match_oscr_[n]);
+        for (int n = 0; n < 4; ++n) w.Write<uint8_t>("have_match", have_match_[n] ? 1u : 0u);
+        w.Write<uint8_t>("pair_oscr_read", pair_oscr_read_ ? 1u : 0u);
+        w.Write<uint32_t>("pair_oscr", pair_oscr_);
+        w.Write<uint32_t>("period_cand", period_cand_);
+        w.Write<uint8_t>("bank_pending", bank_pending_ ? 1u : 0u);
+        w.Write<uint32_t>("bank_oscr", bank_oscr_);
+        w.Write<uint8_t>("have_period", have_period_ ? 1u : 0u);
+        w.Write<uint32_t>("period", period_);
+        w.Write<uint8_t>("isr_write_pending", isr_write_pending_ ? 1u : 0u);
+        w.Write<uint8_t>("bank_pair_since_match", bank_pair_since_match_ ? 1u : 0u);
+        w.Write<uint8_t>("osmr0_written_since_ack", osmr0_written_since_ack_ ? 1u : 0u);
+        w.Write<uint8_t>("last_write_rephased", last_write_rephased_ ? 1u : 0u);
+        w.Write<uint8_t>("oscr_read_any", oscr_read_any_ ? 1u : 0u);
     }
 
     void RestoreState(StateReader& r) override {
-        for (int n = 0; n < 4; ++n) r.Read(osmr_[n]);
-        r.Read(ossr_);
-        r.Read(ower_);
-        r.Read(oier_);
+        for (int n = 0; n < 4; ++n) r.Read("osmr", osmr_[n]);
+        r.Read("ossr", ossr_);
+        r.Read("ower", ower_);
+        r.Read("oier", oier_);
         uint32_t oscr = 0;
-        r.Read(oscr);
-        for (int n = 0; n < 4; ++n) r.Read(last_match_oscr_[n]);
+        r.Read("oscr", oscr);
+        for (int n = 0; n < 4; ++n) r.Read("last_match_oscr", last_match_oscr_[n]);
         for (int n = 0; n < 4; ++n) {
             uint8_t v = 0;
-            r.Read(v);
+            r.Read("have_match", v);
             have_match_[n] = v != 0u;
         }
         uint8_t flag = 0;
-        r.Read(flag);
+        r.Read("pair_oscr_read", flag);
         pair_oscr_read_ = flag != 0u;
-        r.Read(pair_oscr_);
-        r.Read(period_cand_);
-        r.Read(flag);
+        r.Read("pair_oscr", pair_oscr_);
+        r.Read("period_cand", period_cand_);
+        r.Read("bank_pending", flag);
         bank_pending_ = flag != 0u;
-        r.Read(bank_oscr_);
-        r.Read(flag);
+        r.Read("bank_oscr", bank_oscr_);
+        r.Read("have_period", flag);
         have_period_ = flag != 0u;
-        r.Read(period_);
-        r.Read(flag);
+        r.Read("period", period_);
+        r.Read("isr_write_pending", flag);
         isr_write_pending_ = flag != 0u;
-        r.Read(flag);
+        r.Read("bank_pair_since_match", flag);
         bank_pair_since_match_ = flag != 0u;
-        r.Read(flag);
+        r.Read("osmr0_written_since_ack", flag);
         osmr0_written_since_ack_ = flag != 0u;
-        r.Read(flag);
+        r.Read("last_write_rephased", flag);
         last_write_rephased_ = flag != 0u;
-        r.Read(flag);
+        r.Read("oscr_read_any", flag);
         oscr_read_any_ = flag != 0u;
         SetAnchor(clock_->Cycles(), oscr);
         ArmAll();

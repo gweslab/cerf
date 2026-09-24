@@ -309,26 +309,26 @@ void SiemensMp377TouchPanel::RecomputePenIrq() {
 
 void SiemensMp377TouchPanel::SaveState(StateWriter& w) const {
     uint32_t v = smi_last_cmd_.load(std::memory_order_acquire);
-    w.Write(v);
+    w.Write("smi_last_cmd", v);
     v = penirq_enabled_.load(std::memory_order_acquire);
-    w.Write(v);
-    w.WriteBytes(smi_response_q_, sizeof(smi_response_q_));
-    w.Write(smi_response_head_);
-    w.Write(smi_response_tail_);
+    w.Write("penirq_enabled", v);
+    w.WriteBytes("smi_response_q", smi_response_q_, sizeof(smi_response_q_));
+    w.Write("smi_response_head", smi_response_head_);
+    w.Write("smi_response_tail", smi_response_tail_);
 }
 
 void SiemensMp377TouchPanel::RestoreState(StateReader& r) {
     uint32_t v = 0;
-    r.Read(v);
+    r.Read("smi_last_cmd", v);
     smi_last_cmd_.store(v, std::memory_order_release);
-    r.Read(v);
+    r.Read("penirq_enabled", v);
     penirq_enabled_.store(v != 0u ? 1u : 0u, std::memory_order_release);
     touch_down_.store(0u, std::memory_order_release);
     touch_x_.store(0u, std::memory_order_release);
     touch_y_.store(0u, std::memory_order_release);
-    r.ReadBytes(smi_response_q_, sizeof(smi_response_q_));
-    r.Read(smi_response_head_);
-    r.Read(smi_response_tail_);
+    r.ReadBytes("smi_response_q", smi_response_q_, sizeof(smi_response_q_));
+    r.Read("smi_response_head", smi_response_head_);
+    r.Read("smi_response_tail", smi_response_tail_);
     smi_response_head_ &= 15u;
     smi_response_tail_ &= 15u;
 }

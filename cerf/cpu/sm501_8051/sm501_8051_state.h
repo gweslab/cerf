@@ -62,8 +62,29 @@ struct State {
 
     /* MCS-51 Hardware Description, How Interrupts Are Handled, condition 3. */
     bool block_next_vector = false;
+    uint8_t pad[2] = {};
 
     uint64_t executed = 0u;
+
+    template <typename F>
+    static constexpr void Visit(State& s, F& field) {
+        field("pc", s.pc);
+        field("iram", s.iram);
+        field("acc", s.acc);
+        field("b", s.b);
+        field("psw", s.psw);
+        field("sp", s.sp);
+        field("dpl", s.dpl);
+        field("dph", s.dph);
+        field("ie", s.ie);
+        field("eie", s.eie);
+        field("eip", s.eip);
+        field("extended_pending", s.extended_pending);
+        field("in_service", s.in_service);
+        field("block_next_vector", s.block_next_vector);
+        field.Skip(s.pad);
+        field("executed", s.executed);
+    }
 };
 
 }  // namespace sm501_8051

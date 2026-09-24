@@ -59,8 +59,8 @@ public:
         HaltUnsupportedAccess("WriteWord", addr, value);
     }
 
-    void SaveState(StateWriter& w) override { w.WriteBytes(regs_, sizeof(regs_)); }
-    void RestoreState(StateReader& r) override { r.ReadBytes(regs_, sizeof(regs_)); }
+    void SaveState(StateWriter& w) override { w.WriteBytes("regs", regs_, sizeof(regs_)); }
+    void RestoreState(StateReader& r) override { r.ReadBytes("regs", regs_, sizeof(regs_)); }
 
 private:
     enum : uint32_t {

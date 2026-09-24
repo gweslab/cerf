@@ -68,18 +68,18 @@ uint32_t NecMobilePro900BoardWindow::ReadReg(uint32_t addr) {
 }
 
 void NecMobilePro900BoardWindow::SaveState(StateWriter& w) {
-    w.Write(static_cast<uint32_t>(regs_.size()));
-    for (const auto& [off, val] : regs_) { w.Write(off); w.Write(val); }
+    w.Write("regs_count", static_cast<uint32_t>(regs_.size()));
+    for (const auto& [off, val] : regs_) { w.Write("off", off); w.Write("val", val); }
 }
 
 void NecMobilePro900BoardWindow::RestoreState(StateReader& r) {
     regs_.clear();
     uint32_t n = 0;
-    r.Read(n);
+    r.Read("regs_count", n);
     for (uint32_t i = 0; i < n; ++i) {
         uint32_t off = 0, val = 0;
-        r.Read(off);
-        r.Read(val);
+        r.Read("off", off);
+        r.Read("val", val);
         regs_[off] = val;
     }
 }

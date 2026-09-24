@@ -185,21 +185,21 @@ Pr31x00UartRxDma::RxInts Pr31x00UartRxDma::MeterLocked() {
 
 void Pr31x00UartRxDma::SaveState(StateWriter& w) {
     std::lock_guard<std::mutex> lk(mu_);
-    w.Write(buffer_pa_);
-    w.Write(length_);
-    w.Write(count_);
-    w.Write<uint8_t>(armed_ ? 1u : 0u);
+    w.Write("buffer_pa", buffer_pa_);
+    w.Write("length", length_);
+    w.Write("count", count_);
+    w.Write<uint8_t>("armed", armed_ ? 1u : 0u);
 }
 
 /* The endpoint that handed over the bytes still on the wire is rebuilt by the cradle,
    so the line comes back idle and its rate is re-applied from the restored registers. */
 void Pr31x00UartRxDma::RestoreState(StateReader& r) {
     std::lock_guard<std::mutex> lk(mu_);
-    r.Read(buffer_pa_);
-    r.Read(length_);
-    r.Read(count_);
+    r.Read("buffer_pa", buffer_pa_);
+    r.Read("length", length_);
+    r.Read("count", count_);
     uint8_t armed = 0;
-    r.Read(armed);
+    r.Read("armed", armed);
     armed_ = armed != 0u;
 
     wire_.clear();

@@ -54,8 +54,8 @@ public:
 
     /* Only the register file is machine state - tx_line_ is a host-side
        console line accumulator, rebuilt as the guest writes. */
-    void SaveState(StateWriter& w) override    { w.WriteBytes(storage_, sizeof(storage_)); }
-    void RestoreState(StateReader& r) override { r.ReadBytes(storage_, sizeof(storage_)); }
+    void SaveState(StateWriter& w) override    { w.WriteBytes("storage", storage_, sizeof(storage_)); }
+    void RestoreState(StateReader& r) override { r.ReadBytes("storage", storage_, sizeof(storage_)); }
 
 private:
     void     EmitTxByte(int uart_idx, uint8_t ch);

@@ -56,13 +56,13 @@ public:
        ReadWord overlay exactly. */
     void SaveState(StateWriter& w) override {
         std::lock_guard<std::mutex> lk(state_mutex_);
-        w.Write<uint32_t>(kernel_wrote_);
-        w.Write<bool>(peer_autofd_high_);
+        w.Write<uint32_t>("kernel_wrote", kernel_wrote_);
+        w.Write<bool>("peer_autofd_high", peer_autofd_high_);
     }
     void RestoreState(StateReader& r) override {
         std::lock_guard<std::mutex> lk(state_mutex_);
-        r.Read(kernel_wrote_);
-        r.Read(peer_autofd_high_);
+        r.Read("kernel_wrote", kernel_wrote_);
+        r.Read("peer_autofd_high", peer_autofd_high_);
     }
 
     uint32_t ReadWord(uint32_t addr) override {

@@ -112,13 +112,13 @@ void Omap3530Synctimer::WriteWord(uint32_t addr, uint32_t value) {
 
 void Omap3530Synctimer::SaveState(StateWriter& w) {
     std::lock_guard<std::mutex> lk(state_mutex_);
-    w.Write<uint32_t>(CounterAtLocked(NowNs()));
+    w.Write<uint32_t>("counter", CounterAtLocked(NowNs()));
 }
 
 void Omap3530Synctimer::RestoreState(StateReader& r) {
     std::lock_guard<std::mutex> lk(state_mutex_);
     uint32_t counter = 0;
-    r.Read(counter);
+    r.Read("counter", counter);
     SetAnchorLocked(counter, NowNs());
 }
 

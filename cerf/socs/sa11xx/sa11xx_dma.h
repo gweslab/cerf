@@ -61,7 +61,21 @@ private:
            a RUN 0→1 edge must not re-submit a buffer a sink still owns. */
         bool in_flight_a = false;
         bool in_flight_b = false;
+        uint8_t pad[2] = {};
     };
+
+    template <typename F>
+    static constexpr void VisitChannel(Channel& c, F& field) {
+        field("ddar", c.ddar);
+        field("dcsr", c.dcsr);
+        field("dbsa", c.dbsa);
+        field("dbta", c.dbta);
+        field("dbsb", c.dbsb);
+        field("dbtb", c.dbtb);
+        field.Skip(c.in_flight_a);
+        field.Skip(c.in_flight_b);
+        field.Skip(c.pad);
+    }
 
     mutable std::mutex   state_mtx_;
     Channel              ch_[kChannelCount]{};

@@ -262,17 +262,17 @@ void Pr31x00Intc::WriteWord(uint32_t addr, uint32_t value) {
 void Pr31x00Intc::SaveState(StateWriter& w) {
     std::lock_guard<std::mutex> lk(mtx_);
     for (uint32_t i = 0; i < kSets; ++i) {
-        w.Write(status_[i]); w.Write(enable_[i]); w.Write(free_running_[i]);
+        w.Write("status", status_[i]); w.Write("enable", enable_[i]); w.Write("free_running", free_running_[i]);
     }
-    w.Write(enable6_);
+    w.Write("enable6", enable6_);
 }
 
 void Pr31x00Intc::RestoreState(StateReader& r) {
     std::lock_guard<std::mutex> lk(mtx_);
     for (uint32_t i = 0; i < kSets; ++i) {
-        r.Read(status_[i]); r.Read(enable_[i]); r.Read(free_running_[i]);
+        r.Read("status", status_[i]); r.Read("enable", enable_[i]); r.Read("free_running", free_running_[i]);
     }
-    r.Read(enable6_);
+    r.Read("enable6", enable6_);
 }
 
 void Pr31x00Intc::PostRestore() {

@@ -383,39 +383,40 @@ void FordSync2VmcuPeer::OnGuestTx(uint8_t byte) {
 }
 
 void FordSync2VmcuPeer::SaveState(StateWriter& w) {
-    w.Write<uint8_t>(static_cast<uint8_t>(state_));
-    w.Write(peer_tid_);
-    w.Write(pm_tx_seq_);
-    w.Write(inbound_tx_seq_);
+    w.Write<uint8_t>("state", static_cast<uint8_t>(state_));
+    w.Write("peer_tid", peer_tid_);
+    w.Write("pm_tx_seq", pm_tx_seq_);
+    w.Write("inbound_tx_seq", inbound_tx_seq_);
     emu_.Get<FordSync2IlpChannel>().SaveState(w);
-    w.Write<uint8_t>(pm_state_pushed_ ? 1u : 0u);
+    w.Write<uint8_t>("pm_state_pushed", pm_state_pushed_ ? 1u : 0u);
     emu_.Get<FordSync2VmcuDiagChannel>().SaveState(w);
-    w.WriteBytes(next_rx_.data(), next_rx_.size());
-    w.Write<uint8_t>(discarding_frame_);
-    w.Write<uint32_t>(static_cast<uint32_t>(tx_frame_.size()));
-    w.WriteBytes(tx_frame_.data(), tx_frame_.size());
+    w.WriteBytes("next_rx", next_rx_.data(), next_rx_.size());
+    w.Write<uint8_t>("discarding_frame", discarding_frame_);
+    w.Write<uint32_t>("tx_frame_count", static_cast<uint32_t>(tx_frame_.size()));
+    w.WriteBytes("tx_frame", tx_frame_.data(), tx_frame_.size());
 }
 
 void FordSync2VmcuPeer::RestoreState(StateReader& r) {
     uint8_t s = 0;
-    r.Read(s);
+    r.Read("state", s);
     state_ = static_cast<PeerState>(s);
-    r.Read(peer_tid_);
-    r.Read(pm_tx_seq_);
-    r.Read(inbound_tx_seq_);
+    r.Read("peer_tid", peer_tid_);
+    r.Read("pm_tx_seq", pm_tx_seq_);
+    r.Read("inbound_tx_seq", inbound_tx_seq_);
     emu_.Get<FordSync2IlpChannel>().RestoreState(r);
     uint8_t pushed = 0;
-    r.Read(pushed);
+    r.Read("pm_state_pushed", pushed);
     pm_state_pushed_ = pushed != 0u;
     emu_.Get<FordSync2VmcuDiagChannel>().RestoreState(r);
-    r.ReadBytes(next_rx_.data(), next_rx_.size());
+    r.ReadBytes("next_rx", next_rx_.data(), next_rx_.size());
     uint8_t discarding = 0;
     uint32_t frame_size = 0;
-    r.Read(discarding); r.Read(frame_size);
-    if (frame_size > kMaxTxFrame) CerfFatalExit(CERF_FATAL_RUNTIME_ERROR);
+    r.Read("discarding_frame", discarding); r.Read("tx_frame_count", frame_size);
+    if (frame_size > kMaxTxFrame)
+        r.Reject("[VMCU] pending TX frame of %u bytes", frame_size);
     discarding_frame_ = discarding != 0;
     tx_frame_.resize(frame_size);
-    r.ReadBytes(tx_frame_.data(), tx_frame_.size());
+    r.ReadBytes("tx_frame", tx_frame_.data(), tx_frame_.size());
 }
 
 REGISTER_SERVICE(FordSync2VmcuPeer);

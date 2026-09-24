@@ -105,15 +105,15 @@ void Pxa255PowerManager::WriteWord(uint32_t addr, uint32_t value) {
 }
 
 void Pxa255PowerManager::SaveState(StateWriter& w) {
-    w.Write(pmcr_);  w.Write(pssr_);  w.Write(pspr_);  w.Write(pwer_);
-    w.Write(prer_);  w.Write(pfer_);  w.Write(pedr_);  w.Write(pcfr_);
-    w.Write(pgsr0_); w.Write(pgsr1_); w.Write(pgsr2_); w.Write(rcsr_);
+    w.Write("pmcr", pmcr_);  w.Write("pssr", pssr_);  w.Write("pspr", pspr_);  w.Write("pwer", pwer_);
+    w.Write("prer", prer_);  w.Write("pfer", pfer_);  w.Write("pedr", pedr_);  w.Write("pcfr", pcfr_);
+    w.Write("pgsr0", pgsr0_); w.Write("pgsr1", pgsr1_); w.Write("pgsr2", pgsr2_); w.Write("rcsr", rcsr_);
 }
 
 void Pxa255PowerManager::RestoreState(StateReader& r) {
-    r.Read(pmcr_);  r.Read(pssr_);  r.Read(pspr_);  r.Read(pwer_);
-    r.Read(prer_);  r.Read(pfer_);  r.Read(pedr_);  r.Read(pcfr_);
-    r.Read(pgsr0_); r.Read(pgsr1_); r.Read(pgsr2_); r.Read(rcsr_);
+    r.Read("pmcr", pmcr_);  r.Read("pssr", pssr_);  r.Read("pspr", pspr_);  r.Read("pwer", pwer_);
+    r.Read("prer", prer_);  r.Read("pfer", pfer_);  r.Read("pedr", pedr_);  r.Read("pcfr", pcfr_);
+    r.Read("pgsr0", pgsr0_); r.Read("pgsr1", pgsr1_); r.Read("pgsr2", pgsr2_); r.Read("rcsr", rcsr_);
 }
 
 }  /* namespace */

@@ -227,35 +227,24 @@ bool FordSync2IlpSignals::AppendSignalIndication(uint32_t sigid, std::size_t sub
 }
 
 void FordSync2IlpSignals::SaveState(StateWriter& w) const {
-    w.Write<uint16_t>(static_cast<uint16_t>(kSignalCount));
-    w.Write<uint16_t>(static_cast<uint16_t>(kMaxSubscribers));
     for (std::size_t i = 0; i < kSignalCount; ++i) {
-        w.Write<uint8_t>(sub_count_[i].load(std::memory_order_relaxed));
+        w.Write<uint8_t>("sub_count", sub_count_[i].load(std::memory_order_relaxed));
         for (std::size_t s = 0; s < kMaxSubscribers; ++s) {
-            w.Write<uint16_t>(sub_tid_[i][s].load(std::memory_order_relaxed));
+            w.Write<uint16_t>("sub_tid", sub_tid_[i][s].load(std::memory_order_relaxed));
         }
     }
-    w.Write<uint32_t>(static_cast<uint32_t>(cycle_));
+    w.Write<uint32_t>("cycle", static_cast<uint32_t>(cycle_));
 }
 
 void FordSync2IlpSignals::RestoreState(StateReader& r) {
-    uint16_t n = 0u, subs_per_signal = 0u;
-    r.Read(n);
-    r.Read(subs_per_signal);
-    if (!r.Ok() || n != kSignalCount || subs_per_signal != kMaxSubscribers) {
-        LOG(Caution, "[VMCU] invalid ILP subscription snapshot\n");
-        CerfFatalExit(CERF_FATAL_RUNTIME_ERROR);
-    }
-    for (uint16_t i = 0; i < n; ++i) {
+    for (std::size_t i = 0; i < kSignalCount; ++i) {
         uint8_t subs = 0u;
-        r.Read(subs);
-        for (uint16_t s = 0; s < subs_per_signal; ++s) {
+        r.Read("sub_count", subs);
+        for (std::size_t s = 0; s < kMaxSubscribers; ++s) {
             uint16_t tid = 0u;
-            r.Read(tid);
-            if (i < kSignalCount && s < kMaxSubscribers)
-                sub_tid_[i][s].store(tid, std::memory_order_relaxed);
+            r.Read("sub_tid", tid);
+            sub_tid_[i][s].store(tid, std::memory_order_relaxed);
         }
-        if (i >= kSignalCount) continue;
         if (subs > kMaxSubscribers) subs = static_cast<uint8_t>(kMaxSubscribers);
         reported_[i].store(0, std::memory_order_relaxed);
         reporting_[i].store(false, std::memory_order_relaxed);
@@ -263,7 +252,7 @@ void FordSync2IlpSignals::RestoreState(StateReader& r) {
         sub_count_[i].store(subs, std::memory_order_relaxed);
     }
     uint32_t cycle = 0u;
-    r.Read(cycle);
+    r.Read("cycle", cycle);
     cycle_ = cycle % kSignalCount;
 }
 

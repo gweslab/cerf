@@ -80,13 +80,13 @@ public:
     }
 
     void SaveState(StateWriter& writer) override {
-        writer.Write(output_enable_);
-        writer.Write(output_data_);
+        writer.Write("output_enable", output_enable_);
+        writer.Write("output_data", output_data_);
     }
 
     void RestoreState(StateReader& reader) override {
-        reader.Read(output_enable_);
-        reader.Read(output_data_);
+        reader.Read("output_enable", output_enable_);
+        reader.Read("output_data", output_data_);
     }
 
 private:

@@ -92,11 +92,11 @@ public:
 
     void SaveState(StateWriter& w) override {
         std::lock_guard<std::mutex> lk(state_mutex_);
-        w.Write(dma_low_);  w.Write(dma_high_);
+        w.Write("dma_low", dma_low_);  w.Write("dma_high", dma_high_);
     }
     void RestoreState(StateReader& r) override {
         std::lock_guard<std::mutex> lk(state_mutex_);
-        r.Read(dma_low_);  r.Read(dma_high_);
+        r.Read("dma_low", dma_low_);  r.Read("dma_high", dma_high_);
     }
 
 private:

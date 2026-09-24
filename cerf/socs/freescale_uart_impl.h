@@ -57,11 +57,11 @@ public:
        so it is skipped. An attached endpoint (e.g. the VMCU peer) serializes
        its own guest-coupled state via the forward below. */
     void SaveState(StateWriter& w) override {
-        w.WriteBytes(ctrl_, sizeof(ctrl_));
+        w.WriteBytes("ctrl", ctrl_, sizeof(ctrl_));
         if (endpoint_) endpoint_->SaveState(w);
     }
     void RestoreState(StateReader& r) override {
-        r.ReadBytes(ctrl_, sizeof(ctrl_));
+        r.ReadBytes("ctrl", ctrl_, sizeof(ctrl_));
         if (endpoint_) endpoint_->RestoreState(r);
     }
 

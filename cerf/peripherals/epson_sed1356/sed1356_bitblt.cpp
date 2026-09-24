@@ -334,27 +334,49 @@ void Sed1356BitBlt::ExecuteDisplayOp() {
     }
 }
 
+template <typename P, typename F>
+constexpr void Sed1356BitBlt::VisitParams(P& p, F& field) {
+    field("op", p.op);
+    field("rop", p.rop);
+    field("bpp16", p.bpp16);
+    field.Skip(p.pad);
+    field("src", p.src);
+    field("dst", p.dst);
+    field("width", p.width);
+    field("height", p.height);
+    field("src_stride", p.src_stride);
+    field("dst_stride", p.dst_stride);
+    field("px", p.px);
+    field("bg", p.bg);
+    field("fg", p.fg);
+}
+
 void Sed1356BitBlt::SaveState(StateWriter& w) const {
-    w.Write(p_);
-    w.Write<uint8_t>(cpu_op_active_ ? 1u : 0u);
-    w.Write(words_per_line_);
-    w.Write(lines_done_);
-    w.Write(read_line_);
-    w.Write<uint64_t>(in_fifo_.size());
-    for (uint16_t v : in_fifo_) w.Write<uint16_t>(v);
-    w.Write<uint64_t>(out_fifo_.size());
-    for (uint16_t v : out_fifo_) w.Write<uint16_t>(v);
+    static_assert(StateVisitCoversAllBytes<Params>(
+                      [](Params& p, StateFieldBytes& f) { VisitParams(p, f); }),
+                  "Sed1356BitBlt::VisitParams must name or skip every field of Params");
+    StateWriteField field(w);
+    VisitParams(p_, field);
+    w.Write<uint8_t>("cpu_op_active", cpu_op_active_ ? 1u : 0u);
+    w.Write("words_per_line", words_per_line_);
+    w.Write("lines_done", lines_done_);
+    w.Write("read_line", read_line_);
+    w.Write<uint64_t>("in_fifo_count", in_fifo_.size());
+    for (uint16_t v : in_fifo_) w.Write<uint16_t>("in_fifo", v);
+    w.Write<uint64_t>("out_fifo_count", out_fifo_.size());
+    for (uint16_t v : out_fifo_) w.Write<uint16_t>("out_fifo", v);
 }
 
 void Sed1356BitBlt::RestoreState(StateReader& r) {
-    r.Read(p_);
-    uint8_t active = 0; r.Read(active); cpu_op_active_ = (active != 0);
-    r.Read(words_per_line_);
-    r.Read(lines_done_);
-    r.Read(read_line_);
+    StateReadField field(r);
+    VisitParams(p_, field);
+    uint8_t active = 0; r.Read("cpu_op_active", active); cpu_op_active_ = (active != 0);
+    r.Read("words_per_line", words_per_line_);
+    r.Read("lines_done", lines_done_);
+    r.Read("read_line", read_line_);
     uint64_t n = 0;
-    r.Read(n); in_fifo_.clear();
-    for (uint64_t i = 0; i < n; ++i) { uint16_t v = 0; r.Read(v); in_fifo_.push_back(v); }
-    r.Read(n); out_fifo_.clear();
-    for (uint64_t i = 0; i < n; ++i) { uint16_t v = 0; r.Read(v); out_fifo_.push_back(v); }
+    r.Read("in_fifo_count", n); in_fifo_.clear();
+    for (uint64_t i = 0; i < n; ++i) { uint16_t v = 0; r.Read("in_fifo", v); in_fifo_.push_back(v); }
+    r.Read("out_fifo_count", n); out_fifo_.clear();
+    for (uint64_t i = 0; i < n; ++i) { uint16_t v = 0; r.Read("out_fifo", v); out_fifo_.push_back(v); }
 }

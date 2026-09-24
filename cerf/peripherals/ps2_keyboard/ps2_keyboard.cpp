@@ -66,14 +66,14 @@ void Ps2Keyboard::QueueScancodes(const uint8_t* bytes, size_t n) {
 
 void Ps2Keyboard::SaveState(StateWriter& w) const {
     std::lock_guard<std::mutex> lk(mtx_);
-    w.Write<uint8_t>(reporting_ ? 1u : 0u);
-    w.Write<uint8_t>(expect_param_ ? 1u : 0u);
+    w.Write<uint8_t>("reporting", reporting_ ? 1u : 0u);
+    w.Write<uint8_t>("expect_param", expect_param_ ? 1u : 0u);
 }
 
 void Ps2Keyboard::RestoreState(StateReader& r) {
     std::lock_guard<std::mutex> lk(mtx_);
     uint8_t rep = 0, ep = 0;
-    r.Read(rep); r.Read(ep);
+    r.Read("reporting", rep); r.Read("expect_param", ep);
     reporting_    = (rep != 0);
     expect_param_ = (ep != 0);
     out_.clear();   /* no host keystrokes survive a restore; drop queued bytes */

@@ -65,12 +65,12 @@ public:
     void WriteWord(uint32_t addr, uint32_t v) override { WriteHalf(addr, static_cast<uint16_t>(v)); }
 
     void SaveState(StateWriter& w) override {
-        w.Write(cur_reg_); w.Write(phase_);
-        for (auto r : reg_) w.Write(r);
+        w.Write("cur_reg", cur_reg_); w.Write("phase", phase_);
+        for (auto r : reg_) w.Write("reg", r);
     }
     void RestoreState(StateReader& r) override {
-        r.Read(cur_reg_); r.Read(phase_);
-        for (auto& x : reg_) r.Read(x);
+        r.Read("cur_reg", cur_reg_); r.Read("phase", phase_);
+        for (auto& x : reg_) r.Read("reg", x);
     }
 
 private:

@@ -156,30 +156,30 @@ public:
 
     void SaveState(StateWriter& w) override {
         std::lock_guard<std::mutex> lk(mtx_);
-        w.Write(state_); w.Write(cnt_cfg_); w.Write(intreg_);
-        w.Write(sivl_); w.Write(stbl_); w.Write(cmd_);
-        w.Write<uint8_t>(pen_prev_ ? 1 : 0);
-        w.Write<uint8_t>(penstc_ ? 1 : 0);
-        w.Write(pos_x_); w.Write(pos_y_);
-        for (auto& pg : page_buf_) for (uint16_t b : pg) w.Write(b);
-        w.Write(next_page_);
-        for (uint16_t b : adbuf_) w.Write(b);
-        w.Write(ascn_);
-        w.Write(amsk_);
+        w.Write("state", state_); w.Write("cnt_cfg", cnt_cfg_); w.Write("intreg", intreg_);
+        w.Write("sivl", sivl_); w.Write("stbl", stbl_); w.Write("cmd", cmd_);
+        w.Write<uint8_t>("pen_prev", pen_prev_ ? 1 : 0);
+        w.Write<uint8_t>("penstc", penstc_ ? 1 : 0);
+        w.Write("pos_x", pos_x_); w.Write("pos_y", pos_y_);
+        for (auto& pg : page_buf_) for (uint16_t b : pg) w.Write("pg", b);
+        w.Write("next_page", next_page_);
+        for (uint16_t b : adbuf_) w.Write("adbuf", b);
+        w.Write("ascn", ascn_);
+        w.Write("amsk", amsk_);
     }
 
     void RestoreState(StateReader& r) override {
         std::lock_guard<std::mutex> lk(mtx_);
-        r.Read(state_); r.Read(cnt_cfg_); r.Read(intreg_);
-        r.Read(sivl_); r.Read(stbl_); r.Read(cmd_);
+        r.Read("state", state_); r.Read("cnt_cfg", cnt_cfg_); r.Read("intreg", intreg_);
+        r.Read("sivl", sivl_); r.Read("stbl", stbl_); r.Read("cmd", cmd_);
         uint8_t prev = 0, stc = 0;
-        r.Read(prev); r.Read(stc);
-        r.Read(pos_x_); r.Read(pos_y_);
-        for (auto& pg : page_buf_) for (uint16_t& b : pg) r.Read(b);
-        r.Read(next_page_);
-        for (uint16_t& b : adbuf_) r.Read(b);
-        r.Read(ascn_);
-        r.Read(amsk_);
+        r.Read("pen_prev", prev); r.Read("penstc", stc);
+        r.Read("pos_x", pos_x_); r.Read("pos_y", pos_y_);
+        for (auto& pg : page_buf_) for (uint16_t& b : pg) r.Read("pg", b);
+        r.Read("next_page", next_page_);
+        for (uint16_t& b : adbuf_) r.Read("adbuf", b);
+        r.Read("ascn", ascn_);
+        r.Read("amsk", amsk_);
         /* PIUCNTREG D14 PENSTP "Previous touch panel contact state" (R/W) and D13 PENSTC
            "Current touch panel contact state" (VR4102 UM 19.3.1); "when PENCHGINTR is
            cleared to 0, PENSTC indicates the touch panel contact state" (VR4121 UM 20.3.2). */

@@ -195,29 +195,29 @@ void Pm8058Irq::WriteConfig(uint8_t value) {
 void Pm8058Irq::SaveState(StateWriter& w) {
     std::lock_guard<std::mutex> lk(mtx_);
     for (uint32_t b = 0; b < kBlocks; ++b) {
-        w.Write<uint8_t>(rt_[b]);
-        w.Write<uint8_t>(latched_[b]);
+        w.Write<uint8_t>("rt", rt_[b]);
+        w.Write<uint8_t>("latched", latched_[b]);
         for (uint32_t i = 0; i < kIrqsPerBlock; ++i) {
-            w.Write<uint8_t>(cfg_[b][i]);
+            w.Write<uint8_t>("cfg", cfg_[b][i]);
         }
     }
-    w.Write<uint8_t>(blk_sel_);
-    w.Write<uint8_t>(config_shadow_);
+    w.Write<uint8_t>("blk_sel", blk_sel_);
+    w.Write<uint8_t>("config_shadow", config_shadow_);
 }
 
 void Pm8058Irq::RestoreState(StateReader& r) {
     std::lock_guard<std::mutex> lk(mtx_);
     for (uint32_t b = 0; b < kBlocks; ++b) {
-        r.Read(rt_[b]);
-        r.Read(latched_[b]);
+        r.Read("rt", rt_[b]);
+        r.Read("latched", latched_[b]);
         for (uint32_t i = 0; i < kIrqsPerBlock; ++i) {
-            r.Read(cfg_[b][i]);
+            r.Read("cfg", cfg_[b][i]);
         }
     }
-    r.Read(blk_sel_);
-    r.Read(config_shadow_);
+    r.Read("blk_sel", blk_sel_);
+    r.Read("config_shadow", config_shadow_);
     if (blk_sel_ >= kBlocks) {
-        emu_.Get<Fatal>().Die(
+        r.Reject(
             "pm8058 irq: restored block select %u is outside the %u blocks the "
             "part has", blk_sel_, kBlocks);
     }

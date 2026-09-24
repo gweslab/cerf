@@ -132,27 +132,27 @@ public:
 
     void SaveState(StateWriter& w) override {
         std::lock_guard<std::recursive_mutex> lk(state_mu_);
-        w.Write(mc0ptr_);    w.Write(intr_);      w.Write(stop_stat_);  w.Write(hstart_);
-        w.Write(evtovr_);    w.Write(dspovr_);    w.Write(hostovr_);    w.Write(evtpend_);
-        w.Write(reset_);     w.Write(evterr_);    w.Write(intrmask_);   w.Write(psw_);
-        w.Write(evterrdbg_); w.Write(config_);    w.Write(once_enb_);   w.Write(once_data_);
-        w.Write(once_instr_);w.Write(once_stat_); w.Write(once_cmd_);   w.Write(illinstaddr_);
-        w.Write(chn0addr_);  w.Write(xtrig_conf1_);w.Write(xtrig_conf2_);
-        w.WriteBytes(chnpri_, sizeof(chnpri_));
-        w.WriteBytes(chnenbl_, sizeof(chnenbl_));
-        w.WriteBytes(rx_cursor_, sizeof(rx_cursor_));
+        w.Write("mc0ptr", mc0ptr_);    w.Write("intr", intr_);      w.Write("stop_stat", stop_stat_);  w.Write("hstart", hstart_);
+        w.Write("evtovr", evtovr_);    w.Write("dspovr", dspovr_);    w.Write("hostovr", hostovr_);    w.Write("evtpend", evtpend_);
+        w.Write("reset", reset_);     w.Write("evterr", evterr_);    w.Write("intrmask", intrmask_);   w.Write("psw", psw_);
+        w.Write("evterrdbg", evterrdbg_); w.Write("config", config_);    w.Write("once_enb", once_enb_);   w.Write("once_data", once_data_);
+        w.Write("once_instr", once_instr_);w.Write("once_stat", once_stat_); w.Write("once_cmd", once_cmd_);   w.Write("illinstaddr", illinstaddr_);
+        w.Write("chn0addr", chn0addr_);  w.Write("xtrig_conf1", xtrig_conf1_);w.Write("xtrig_conf2", xtrig_conf2_);
+        w.WriteBytes("chnpri", chnpri_, sizeof(chnpri_));
+        w.WriteBytes("chnenbl", chnenbl_, sizeof(chnenbl_));
+        w.WriteBytes("rx_cursor", rx_cursor_, sizeof(rx_cursor_));
     }
     void RestoreState(StateReader& r) override {
         std::lock_guard<std::recursive_mutex> lk(state_mu_);
-        r.Read(mc0ptr_);    r.Read(intr_);      r.Read(stop_stat_);  r.Read(hstart_);
-        r.Read(evtovr_);    r.Read(dspovr_);    r.Read(hostovr_);    r.Read(evtpend_);
-        r.Read(reset_);     r.Read(evterr_);    r.Read(intrmask_);   r.Read(psw_);
-        r.Read(evterrdbg_); r.Read(config_);    r.Read(once_enb_);   r.Read(once_data_);
-        r.Read(once_instr_);r.Read(once_stat_); r.Read(once_cmd_);   r.Read(illinstaddr_);
-        r.Read(chn0addr_);  r.Read(xtrig_conf1_);r.Read(xtrig_conf2_);
-        r.ReadBytes(chnpri_, sizeof(chnpri_));
-        r.ReadBytes(chnenbl_, sizeof(chnenbl_));
-        r.ReadBytes(rx_cursor_, sizeof(rx_cursor_));
+        r.Read("mc0ptr", mc0ptr_);    r.Read("intr", intr_);      r.Read("stop_stat", stop_stat_);  r.Read("hstart", hstart_);
+        r.Read("evtovr", evtovr_);    r.Read("dspovr", dspovr_);    r.Read("hostovr", hostovr_);    r.Read("evtpend", evtpend_);
+        r.Read("reset", reset_);     r.Read("evterr", evterr_);    r.Read("intrmask", intrmask_);   r.Read("psw", psw_);
+        r.Read("evterrdbg", evterrdbg_); r.Read("config", config_);    r.Read("once_enb", once_enb_);   r.Read("once_data", once_data_);
+        r.Read("once_instr", once_instr_);r.Read("once_stat", once_stat_); r.Read("once_cmd", once_cmd_);   r.Read("illinstaddr", illinstaddr_);
+        r.Read("chn0addr", chn0addr_);  r.Read("xtrig_conf1", xtrig_conf1_);r.Read("xtrig_conf2", xtrig_conf2_);
+        r.ReadBytes("chnpri", chnpri_, sizeof(chnpri_));
+        r.ReadBytes("chnenbl", chnenbl_, sizeof(chnenbl_));
+        r.ReadBytes("rx_cursor", rx_cursor_, sizeof(rx_cursor_));
         /* No host sink survives a restore, so no channel is claimed: leaving a
            claim set would make CompleteChannels skip the channel forever. The
            guest's next HSTART re-offers it and a sink re-claims. */

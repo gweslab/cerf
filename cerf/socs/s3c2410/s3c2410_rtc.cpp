@@ -393,29 +393,29 @@ void S3C2410Rtc::WriteWord(uint32_t addr, uint32_t value) {
 
 void S3C2410Rtc::SaveState(StateWriter& w) {
     Advance();
-    w.Write(mono_ns_);  w.Write(ns_rem_);  w.Write(frac_ns_);
-    w.Write(sec_);   w.Write(min_);  w.Write(hour_);
-    w.Write(date_);  w.Write(day_);  w.Write(mon_);   w.Write(year_);
-    w.Write(rtccon_);  w.Write(ticnt_);   w.Write(rtcalm_);
-    w.Write(almsec_);  w.Write(almmin_);  w.Write(almhour_);
-    w.Write(almdate_); w.Write(almmon_);  w.Write(almyear_);
-    w.Write(rtcrst_);
-    w.Write(tick_target_ns_);  w.Write(alarm_target_ns_);
-    w.Write<uint8_t>(tick_armed_ ? 1u : 0u);
-    w.Write<uint8_t>(alarm_armed_ ? 1u : 0u);
+    w.Write("mono_ns", mono_ns_);  w.Write("ns_rem", ns_rem_);  w.Write("frac_ns", frac_ns_);
+    w.Write("sec", sec_);   w.Write("min", min_);  w.Write("hour", hour_);
+    w.Write("date", date_);  w.Write("day", day_);  w.Write("mon", mon_);   w.Write("year", year_);
+    w.Write("rtccon", rtccon_);  w.Write("ticnt", ticnt_);   w.Write("rtcalm", rtcalm_);
+    w.Write("almsec", almsec_);  w.Write("almmin", almmin_);  w.Write("almhour", almhour_);
+    w.Write("almdate", almdate_); w.Write("almmon", almmon_);  w.Write("almyear", almyear_);
+    w.Write("rtcrst", rtcrst_);
+    w.Write("tick_target_ns", tick_target_ns_);  w.Write("alarm_target_ns", alarm_target_ns_);
+    w.Write<uint8_t>("tick_armed", tick_armed_ ? 1u : 0u);
+    w.Write<uint8_t>("alarm_armed", alarm_armed_ ? 1u : 0u);
 }
 
 void S3C2410Rtc::RestoreState(StateReader& r) {
-    r.Read(mono_ns_);  r.Read(ns_rem_);  r.Read(frac_ns_);
-    r.Read(sec_);   r.Read(min_);  r.Read(hour_);
-    r.Read(date_);  r.Read(day_);  r.Read(mon_);   r.Read(year_);
-    r.Read(rtccon_);  r.Read(ticnt_);   r.Read(rtcalm_);
-    r.Read(almsec_);  r.Read(almmin_);  r.Read(almhour_);
-    r.Read(almdate_); r.Read(almmon_);  r.Read(almyear_);
-    r.Read(rtcrst_);
-    r.Read(tick_target_ns_);  r.Read(alarm_target_ns_);
+    r.Read("mono_ns", mono_ns_);  r.Read("ns_rem", ns_rem_);  r.Read("frac_ns", frac_ns_);
+    r.Read("sec", sec_);   r.Read("min", min_);  r.Read("hour", hour_);
+    r.Read("date", date_);  r.Read("day", day_);  r.Read("mon", mon_);   r.Read("year", year_);
+    r.Read("rtccon", rtccon_);  r.Read("ticnt", ticnt_);   r.Read("rtcalm", rtcalm_);
+    r.Read("almsec", almsec_);  r.Read("almmin", almmin_);  r.Read("almhour", almhour_);
+    r.Read("almdate", almdate_); r.Read("almmon", almmon_);  r.Read("almyear", almyear_);
+    r.Read("rtcrst", rtcrst_);
+    r.Read("tick_target_ns", tick_target_ns_);  r.Read("alarm_target_ns", alarm_target_ns_);
     uint8_t ta = 0, aa = 0;
-    r.Read(ta);  r.Read(aa);
+    r.Read("tick_armed", ta);  r.Read("alarm_armed", aa);
     tick_armed_  = ta != 0u;
     alarm_armed_ = aa != 0u;
 }

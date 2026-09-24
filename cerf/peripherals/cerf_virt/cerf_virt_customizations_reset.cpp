@@ -29,11 +29,11 @@ void CerfVirtCustomizationsReset::Invalidate() {
 }
 
 void CerfVirtCustomizationsReset::SaveState(StateWriter& w) const {
-    w.Write<uint32_t>(applied_ ? 1u : 0u);
+    w.Write<uint32_t>("applied", applied_ ? 1u : 0u);
 }
 
 void CerfVirtCustomizationsReset::RestoreState(StateReader& r) {
     uint32_t v = 0;
-    r.Read(v);
+    r.Read("applied", v);
     applied_ = (v != 0u);
 }

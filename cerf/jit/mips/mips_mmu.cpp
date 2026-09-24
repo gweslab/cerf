@@ -30,11 +30,11 @@ void MipsMmu::JumpCacheClearPage(uint32_t page_va) {
 }
 
 void MipsMmu::SaveState(StateWriter& w) const {
-    w.Write(lcg_seed_);
-    w.Write(prev_random_idx_);
+    w.Write("lcg_seed", lcg_seed_);
+    w.Write("prev_random_idx", prev_random_idx_);
 }
 
 void MipsMmu::RestoreState(StateReader& r) {
-    r.Read(lcg_seed_);
-    r.Read(prev_random_idx_);
+    r.Read("lcg_seed", lcg_seed_);
+    r.Read("prev_random_idx", prev_random_idx_);
 }

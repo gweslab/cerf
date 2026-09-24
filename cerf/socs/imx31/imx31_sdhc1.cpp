@@ -105,16 +105,16 @@ public:
     }
 
     void SaveState(StateWriter& w) override {
-        w.Write(str_stp_clk_);  w.Write(status_);    w.Write(clk_rate_);
-        w.Write(cmd_dat_cont_); w.Write(res_to_);    w.Write(read_to_);
-        w.Write(blk_len_);      w.Write(nob_);       w.Write(int_cntr_);
-        w.Write(cmd_);          w.Write(arg_);
+        w.Write("str_stp_clk", str_stp_clk_);  w.Write("status", status_);    w.Write("clk_rate", clk_rate_);
+        w.Write("cmd_dat_cont", cmd_dat_cont_); w.Write("res_to", res_to_);    w.Write("read_to", read_to_);
+        w.Write("blk_len", blk_len_);      w.Write("nob", nob_);       w.Write("int_cntr", int_cntr_);
+        w.Write("cmd", cmd_);          w.Write("arg", arg_);
     }
     void RestoreState(StateReader& r) override {
-        r.Read(str_stp_clk_);  r.Read(status_);    r.Read(clk_rate_);
-        r.Read(cmd_dat_cont_); r.Read(res_to_);    r.Read(read_to_);
-        r.Read(blk_len_);      r.Read(nob_);       r.Read(int_cntr_);
-        r.Read(cmd_);          r.Read(arg_);
+        r.Read("str_stp_clk", str_stp_clk_);  r.Read("status", status_);    r.Read("clk_rate", clk_rate_);
+        r.Read("cmd_dat_cont", cmd_dat_cont_); r.Read("res_to", res_to_);    r.Read("read_to", read_to_);
+        r.Read("blk_len", blk_len_);      r.Read("nob", nob_);       r.Read("int_cntr", int_cntr_);
+        r.Read("cmd", cmd_);          r.Read("arg", arg_);
     }
 
     /* Re-assert the AVIC line from restored status_ & int_cntr_ - END_CMD_RESP

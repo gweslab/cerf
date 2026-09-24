@@ -326,35 +326,35 @@ void Vr41xxKiu::SetKeyState(uint8_t matrix_index, bool pressed) {
 
 void Vr41xxKiu::SaveState(StateWriter& w) {
     std::lock_guard<std::mutex> lk(mtx_);
-    for (uint16_t v : matrix_) w.Write(v);
-    w.Write(scanrep_);
-    w.Write(causes_);
-    w.Write(sstat_);
-    w.Write(wintvl_);
-    w.Write(wks_);
-    w.Write(scanline_);
-    w.Write(zero_scans_);
-    w.Write<uint8_t>(data_unread_ ? 1u : 0u);
-    w.Write<uint8_t>(stop_after_scan_ ? 1u : 0u);
-    w.Write<uint8_t>(scanstart_set_while_running_ ? 1u : 0u);
-    w.Write<uint8_t>(scanstp_set_in_waitkeyin_ ? 1u : 0u);
+    for (uint16_t v : matrix_) w.Write("matrix", v);
+    w.Write("scanrep", scanrep_);
+    w.Write("causes", causes_);
+    w.Write("sstat", sstat_);
+    w.Write("wintvl", wintvl_);
+    w.Write("wks", wks_);
+    w.Write("scanline", scanline_);
+    w.Write("zero_scans", zero_scans_);
+    w.Write<uint8_t>("data_unread", data_unread_ ? 1u : 0u);
+    w.Write<uint8_t>("stop_after_scan", stop_after_scan_ ? 1u : 0u);
+    w.Write<uint8_t>("scanstart_set_while_running", scanstart_set_while_running_ ? 1u : 0u);
+    w.Write<uint8_t>("scanstp_set_in_waitkeyin", scanstp_set_in_waitkeyin_ ? 1u : 0u);
 }
 
 void Vr41xxKiu::RestoreState(StateReader& r) {
     std::lock_guard<std::mutex> lk(mtx_);
-    for (uint16_t& v : matrix_) r.Read(v);
-    r.Read(scanrep_);
-    r.Read(causes_);
-    r.Read(sstat_);
-    r.Read(wintvl_);
-    r.Read(wks_);
-    r.Read(scanline_);
-    r.Read(zero_scans_);
+    for (uint16_t& v : matrix_) r.Read("matrix", v);
+    r.Read("scanrep", scanrep_);
+    r.Read("causes", causes_);
+    r.Read("sstat", sstat_);
+    r.Read("wintvl", wintvl_);
+    r.Read("wks", wks_);
+    r.Read("scanline", scanline_);
+    r.Read("zero_scans", zero_scans_);
     uint8_t unread = 0, stopping = 0, scanstart_held = 0, scanstp_held = 0;
-    r.Read(unread);
-    r.Read(stopping);
-    r.Read(scanstart_held);
-    r.Read(scanstp_held);
+    r.Read("data_unread", unread);
+    r.Read("stop_after_scan", stopping);
+    r.Read("scanstart_set_while_running", scanstart_held);
+    r.Read("scanstp_set_in_waitkeyin", scanstp_held);
     data_unread_     = unread != 0;
     stop_after_scan_ = stopping != 0;
     scanstart_set_while_running_ = scanstart_held != 0;

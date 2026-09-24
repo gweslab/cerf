@@ -25,10 +25,10 @@ void Vr4122ClockState::OnReady() {
 void Vr4122ClockState::SetPending(uint16_t tclkdiv) { pending_ = tclkdiv; }
 
 void Vr4122ClockState::SaveState(StateWriter& w) const {
-    w.Write(pending_);
-    w.Write(active_);
+    w.Write("pending", pending_);
+    w.Write("active", active_);
 }
 void Vr4122ClockState::RestoreState(StateReader& r) {
-    r.Read(pending_);
-    r.Read(active_);
+    r.Read("pending", pending_);
+    r.Read("active", active_);
 }

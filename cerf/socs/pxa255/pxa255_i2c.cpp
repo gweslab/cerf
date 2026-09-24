@@ -112,13 +112,13 @@ void Pxa255I2c::UpdateIrq() {
 }
 
 void Pxa255I2c::SaveState(StateWriter& w) {
-    w.Write(icr_); w.Write(isr_); w.Write(idbr_); w.Write(isar_);
-    w.Write(reading_);
+    w.Write("icr", icr_); w.Write("isr", isr_); w.Write("idbr", idbr_); w.Write("isar", isar_);
+    w.Write("reading", reading_);
 }
 
 void Pxa255I2c::RestoreState(StateReader& r) {
-    r.Read(icr_); r.Read(isr_); r.Read(idbr_); r.Read(isar_);
-    r.Read(reading_);
+    r.Read("icr", icr_); r.Read("isr", isr_); r.Read("idbr", idbr_); r.Read("isar", isar_);
+    r.Read("reading", reading_);
 }
 
 }  /* namespace */

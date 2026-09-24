@@ -222,58 +222,41 @@ void FordSync2IlpChannel::Refresh(bool force) {
     for (const auto& device : devices_) device.refresh(force);
 }
 
-/* Frame device payloads by stable key, version and length, independently of widgets.
-   Restore skips unknown keys/versions and leaves missing devices at startup defaults.
-   Device snapshots are authoritative: rebuild reported values from registered owners
-   while retaining subscriptions, so absent devices cannot leave stale reported values. */
 void FordSync2IlpChannel::SaveState(StateWriter& w) const {
-    w.Write(tx_seq_); w.Write(watchdog_pets_);
+    w.Write("tx_seq", tx_seq_); w.Write("watchdog_pets", watchdog_pets_);
     emu_.Get<FordSync2IlpSignals>().SaveState(w);
-    w.Write<uint32_t>(static_cast<uint32_t>(devices_.size()));
+    w.Write<uint32_t>("devices_count", static_cast<uint32_t>(devices_.size()));
     for (const auto& device : devices_) {
-        w.Write<uint32_t>(static_cast<uint32_t>(device.key.size()));
-        w.WriteBytes(device.key.data(), device.key.size());
-        w.Write(device.version);
-        const auto length_offset = w.BytesWritten();
-        w.Write<uint64_t>(0);
-        const auto start = w.BytesWritten();
+        w.Write<uint32_t>("key_count", static_cast<uint32_t>(device.key.size()));
+        w.WriteBytes("key", device.key.data(), device.key.size());
         device.save(w);
-        const auto length = w.BytesWritten() - start;
-        w.PatchAt(length_offset, &length, sizeof(length));
     }
 }
 
 void FordSync2IlpChannel::RestoreState(StateReader& r) {
-    r.Read(tx_seq_); r.Read(watchdog_pets_);
+    r.Read("tx_seq", tx_seq_); r.Read("watchdog_pets", watchdog_pets_);
     emu_.Get<FordSync2IlpSignals>().RestoreState(r);
     for (const auto& device : devices_) device.reset();
     uint32_t count = 0;
-    r.Read(count);
-    auto invalid = [] {
-        LOG(Caution, "[VMCU] invalid ILP device snapshot\n");
-        CerfFatalExit(CERF_FATAL_RUNTIME_ERROR);
-    };
-    if (!r.Ok() || count > 64) invalid();
+    r.Read("devices_count", count);
+    if (count != devices_.size())
+        r.Reject("[VMCU] the image has %u ILP devices, this build has %zu", count,
+                 devices_.size());
     std::vector<std::string> seen;
     for (uint32_t i = 0; i < count; ++i) {
-        uint32_t size = 0, version = 0;
-        uint64_t length = 0;
-        r.Read(size);
-        if (!r.Ok() || size == 0 || size > 64) invalid();
+        uint32_t size = 0;
+        r.Read("key_count", size);
+        if (size == 0 || size > 64) r.Reject("[VMCU] ILP device key of %u bytes", size);
         std::string key(size, '\0');
-        r.ReadBytes(key.data(), size);
-        r.Read(version); r.Read(length);
-        const auto start = r.Position();
-        if (!r.Ok() || start > r.FileSize() || length > r.FileSize() - start ||
-            std::find(seen.begin(), seen.end(), key) != seen.end()) invalid();
+        r.ReadBytes("key", key.data(), size);
+        if (std::find(seen.begin(), seen.end(), key) != seen.end())
+            r.Reject("[VMCU] ILP device '%s' appears twice", key.c_str());
         seen.push_back(key);
-        for (const auto& device : devices_) {
-            if (device.key != key || device.version != version) continue;
-            device.restore(r);
-            if (!r.Ok() || r.Position() != start + length) invalid();
-            break;
-        }
-        r.SeekTo(start + length);
+        const auto device = std::find_if(devices_.begin(), devices_.end(),
+            [&](const auto& d) { return d.key == key; });
+        if (device == devices_.end())
+            r.Reject("[VMCU] ILP device '%s' is not in this build", key.c_str());
+        device->restore(r);
     }
     Refresh(true);
 }

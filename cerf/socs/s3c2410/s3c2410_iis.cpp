@@ -117,24 +117,24 @@ public:
 
     void SaveState(StateWriter& w) override {
         std::lock_guard<std::mutex> lk(mutex_);
-        w.Write<uint32_t>(con_);
-        w.Write<uint32_t>(mod_);
-        w.Write<uint32_t>(psr_);
-        w.Write<uint32_t>(fcon_);
-        w.Write<uint32_t>(tx_count_);
-        w.Write<uint32_t>(tx_head_);
-        w.WriteBytes(tx_fifo_.data(), sizeof(tx_fifo_));
+        w.Write<uint32_t>("con", con_);
+        w.Write<uint32_t>("mod", mod_);
+        w.Write<uint32_t>("psr", psr_);
+        w.Write<uint32_t>("fcon", fcon_);
+        w.Write<uint32_t>("tx_count", tx_count_);
+        w.Write<uint32_t>("tx_head", tx_head_);
+        w.WriteBytes("tx_fifo", tx_fifo_.data(), sizeof(tx_fifo_));
     }
     void RestoreState(StateReader& r) override {
         {
             std::lock_guard<std::mutex> lk(mutex_);
-            r.Read(con_);
-            r.Read(mod_);
-            r.Read(psr_);
-            r.Read(fcon_);
-            r.Read(tx_count_);
-            r.Read(tx_head_);
-            r.ReadBytes(tx_fifo_.data(), sizeof(tx_fifo_));
+            r.Read("con", con_);
+            r.Read("mod", mod_);
+            r.Read("psr", psr_);
+            r.Read("fcon", fcon_);
+            r.Read("tx_count", tx_count_);
+            r.Read("tx_head", tx_head_);
+            r.ReadBytes("tx_fifo", tx_fifo_.data(), sizeof(tx_fifo_));
             playing_ = false;
         }
         audio_out_.StopAudioOut();

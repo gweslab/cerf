@@ -152,15 +152,15 @@ void FordSync2BtHci::Reply() {
 }
 
 void FordSync2BtHci::SaveState(StateWriter& w) {
-    w.Write<uint32_t>(n_);
-    w.WriteBytes(cmd_, sizeof(cmd_));
-    w.WriteBytes(bd_addr_, sizeof(bd_addr_));
+    w.Write<uint32_t>("cmd_len", n_);
+    w.WriteBytes("cmd", cmd_, sizeof(cmd_));
+    w.WriteBytes("bd_addr", bd_addr_, sizeof(bd_addr_));
 }
 
 void FordSync2BtHci::RestoreState(StateReader& r) {
-    r.Read(n_);
-    r.ReadBytes(cmd_, sizeof(cmd_));
-    r.ReadBytes(bd_addr_, sizeof(bd_addr_));
+    r.Read("cmd_len", n_);
+    r.ReadBytes("cmd", cmd_, sizeof(cmd_));
+    r.ReadBytes("bd_addr", bd_addr_, sizeof(bd_addr_));
 }
 
 REGISTER_SERVICE(FordSync2BtHci);

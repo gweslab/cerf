@@ -105,10 +105,10 @@ protected:
     }
     void ApplyResetExtLocked() override { mpci_ = mscu_ = mcsi_ = mbcu_ = 0; }
     void SaveStateExtLocked(StateWriter& w) override {
-        w.Write(mpci_); w.Write(mscu_); w.Write(mcsi_); w.Write(mbcu_);
+        w.Write("mpci", mpci_); w.Write("mscu", mscu_); w.Write("mcsi", mcsi_); w.Write("mbcu", mbcu_);
     }
     void RestoreStateExtLocked(StateReader& r) override {
-        r.Read(mpci_); r.Read(mscu_); r.Read(mcsi_); r.Read(mbcu_);
+        r.Read("mpci", mpci_); r.Read("mscu", mscu_); r.Read("mcsi", mcsi_); r.Read("mbcu", mbcu_);
     }
 
 private:

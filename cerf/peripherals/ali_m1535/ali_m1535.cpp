@@ -44,6 +44,22 @@ struct Pic8259 {
     bool    read_isr = false; /* OCW3 RIS: cmd-port read returns ISR vs IRR */
     bool    poll_pending = false;
 
+    template <typename F>
+    static constexpr void Visit(Pic8259& p, F& field) {
+        field("imr", p.imr);
+        field("irr", p.irr);
+        field("isr", p.isr);
+        field("icw1", p.icw1);
+        field("icw2", p.icw2);
+        field("icw3", p.icw3);
+        field("icw4", p.icw4);
+        field("init_step", p.init_step);
+        field("icw4_needed", p.icw4_needed);
+        field("single", p.single);
+        field("read_isr", p.read_isr);
+        field("poll_pending", p.poll_pending);
+    }
+
     void WriteCmd(uint8_t v) {
         if (v & 0x10) {                       /* ICW1 */
             icw1 = v; icw4_needed = v & 0x01; single = v & 0x02;
@@ -192,32 +208,20 @@ void AliM1535::WriteByte(uint32_t addr, uint8_t value) {
 
 void AliM1535::SaveState(StateWriter& w) {
     std::lock_guard<std::mutex> lk(pic_mtx_);
-    for (const Pic8259& p : pic_) {
-        w.Write(p.imr); w.Write(p.irr); w.Write(p.isr);
-        w.Write(p.icw1); w.Write(p.icw2); w.Write(p.icw3); w.Write(p.icw4);
-        w.Write(p.init_step);
-        w.Write(static_cast<uint8_t>(p.icw4_needed ? 1u : 0u));
-        w.Write(static_cast<uint8_t>(p.single ? 1u : 0u));
-        w.Write(static_cast<uint8_t>(p.read_isr ? 1u : 0u));
-        w.Write(static_cast<uint8_t>(p.poll_pending ? 1u : 0u));
-    }
-    w.WriteBytes(elcr_, sizeof(elcr_));
+    static_assert(StateVisitCoversAllBytes<Pic8259>(
+                      [](Pic8259& p, StateFieldBytes& f) { Pic8259::Visit(p, f); }),
+                  "Pic8259::Visit must name or skip every field of Pic8259");
+    StateWriteField field(w);
+    for (Pic8259& p : pic_) Pic8259::Visit(p, field);
+    w.WriteBytes("elcr", elcr_, sizeof(elcr_));
     emu_.Get<I8042Controller>().SaveState(w);   /* delegated sub-block (not auto-enumerated) */
 }
 
 void AliM1535::RestoreState(StateReader& r) {
     std::lock_guard<std::mutex> lk(pic_mtx_);
-    for (Pic8259& p : pic_) {
-        r.Read(p.imr); r.Read(p.irr); r.Read(p.isr);
-        r.Read(p.icw1); r.Read(p.icw2); r.Read(p.icw3); r.Read(p.icw4);
-        r.Read(p.init_step);
-        uint8_t b = 0;
-        r.Read(b); p.icw4_needed = b != 0;
-        r.Read(b); p.single = b != 0;
-        r.Read(b); p.read_isr = b != 0;
-        r.Read(b); p.poll_pending = b != 0;
-    }
-    r.ReadBytes(elcr_, sizeof(elcr_));
+    StateReadField field(r);
+    for (Pic8259& p : pic_) Pic8259::Visit(p, field);
+    r.ReadBytes("elcr", elcr_, sizeof(elcr_));
     emu_.Get<I8042Controller>().RestoreState(r);
 }
 

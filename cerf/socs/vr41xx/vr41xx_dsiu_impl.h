@@ -150,14 +150,14 @@ public:
 
     void SaveState(StateWriter& w) override {
         std::lock_guard<std::mutex> lk(mtx_);
-        w.Write(portreg_); w.Write(asim00_); w.Write(asim01_);
-        w.Write(txs0l_);   w.Write(intr0_);  w.Write(bprm0_);
+        w.Write("portreg", portreg_); w.Write("asim00", asim00_); w.Write("asim01", asim01_);
+        w.Write("txs0l", txs0l_);   w.Write("intr0", intr0_);  w.Write("bprm0", bprm0_);
     }
 
     void RestoreState(StateReader& r) override {
         std::lock_guard<std::mutex> lk(mtx_);
-        r.Read(portreg_); r.Read(asim00_); r.Read(asim01_);
-        r.Read(txs0l_);   r.Read(intr0_);  r.Read(bprm0_);
+        r.Read("portreg", portreg_); r.Read("asim00", asim00_); r.Read("asim01", asim01_);
+        r.Read("txs0l", txs0l_);   r.Read("intr0", intr0_);  r.Read("bprm0", bprm0_);
     }
 
     void PostRestore() override {

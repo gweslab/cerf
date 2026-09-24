@@ -49,51 +49,16 @@ uint32_t ArmMmu::DoublewordAlignMask() const {
 }
 
 void ArmMmu::SaveState(StateWriter& w) {
-    w.Write(state_.control_register);
-    w.Write(state_.effective_control_register);
-    w.Write(state_.aux_control_register);
-    w.Write(state_.translation_table_base);
-    w.Write(state_.domain_access_control);
-    w.Write(state_.fault_status);
-    w.Write(state_.fault_address);
-    w.Write(state_.ifsr);
-    w.Write(state_.ifar);
-    w.Write(state_.process_id);
-    w.Write(state_.coprocessor_access);
-    w.Write(state_.cssel_register);
-    w.Write(state_.ttbr1);
-    w.Write(state_.ttbcr);
-    w.Write(state_.prrr);
-    w.Write(state_.nmrr);
-    w.Write(state_.contextidr);
-    w.Write(state_.tpidrurw);
-    w.Write(state_.tpidruro);
-    w.Write(state_.tpidrprw);
-    w.Write(state_.l2_aux_control);
+    static_assert(StateVisitCoversAllBytes<ArmMmuState>(
+                      [](ArmMmuState& s, StateFieldBytes& f) { ArmMmuState::Visit(s, f); }),
+                  "ArmMmuState::Visit must name or skip every field of ArmMmuState");
+    StateWriteField field(w);
+    ArmMmuState::Visit(state_, field);
 }
 
 void ArmMmu::RestoreState(StateReader& r) {
-    r.Read(state_.control_register);
-    r.Read(state_.effective_control_register);
-    r.Read(state_.aux_control_register);
-    r.Read(state_.translation_table_base);
-    r.Read(state_.domain_access_control);
-    r.Read(state_.fault_status);
-    r.Read(state_.fault_address);
-    r.Read(state_.ifsr);
-    r.Read(state_.ifar);
-    r.Read(state_.process_id);
-    r.Read(state_.coprocessor_access);
-    r.Read(state_.cssel_register);
-    r.Read(state_.ttbr1);
-    r.Read(state_.ttbcr);
-    r.Read(state_.prrr);
-    r.Read(state_.nmrr);
-    r.Read(state_.contextidr);
-    r.Read(state_.tpidrurw);
-    r.Read(state_.tpidruro);
-    r.Read(state_.tpidrprw);
-    r.Read(state_.l2_aux_control);
+    StateReadField field(r);
+    ArmMmuState::Visit(state_, field);
     RefreshFcseFold();
     /* Restored TTBR0/process_id/contextidr differ from the live TLBs'
        context; a stale entry would return the prior context's PA. */

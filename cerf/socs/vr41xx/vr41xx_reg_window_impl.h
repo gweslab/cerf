@@ -126,12 +126,12 @@ public:
     void WriteByte(uint32_t addr, uint8_t v) override { HaltUnsupportedAccess("WriteByte", addr, v); }
 
     void SaveState(StateWriter& w) override {
-        for (uint32_t i = 0; i < M.num_regs; ++i) w.Write(reg_[i]);
-        for (uint32_t i = 0; i < M.num_regs; ++i) w.Write(undefined_[i]);
+        for (uint32_t i = 0; i < M.num_regs; ++i) w.Write("reg", reg_[i]);
+        for (uint32_t i = 0; i < M.num_regs; ++i) w.Write("undefined", undefined_[i]);
     }
     void RestoreState(StateReader& r) override {
-        for (uint32_t i = 0; i < M.num_regs; ++i) r.Read(reg_[i]);
-        for (uint32_t i = 0; i < M.num_regs; ++i) r.Read(undefined_[i]);
+        for (uint32_t i = 0; i < M.num_regs; ++i) r.Read("reg", reg_[i]);
+        for (uint32_t i = 0; i < M.num_regs; ++i) r.Read("undefined", undefined_[i]);
     }
 
 private:

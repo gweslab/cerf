@@ -109,27 +109,27 @@ void Sa1111Intc::LowerInterrupt(uint8_t source) {
    integer (raw lines, edge-detect latches, enable/polarity/test/status/
    wake registers). Order mirrors the field declaration order in the .h. */
 void Sa1111Intc::SaveState(StateWriter& w) {
-    w.Write(raw0_);      w.Write(raw1_);
-    w.Write(detect0_);   w.Write(detect1_);
-    w.Write(inttest0_);  w.Write(inttest1_);
-    w.Write(enable0_);   w.Write(enable1_);
-    w.Write(polarity0_); w.Write(polarity1_);
-    w.Write(tstsel_);
-    w.Write(status0_);   w.Write(status1_);
-    w.Write(wake_en0_);  w.Write(wake_en1_);
-    w.Write(wake_pol0_); w.Write(wake_pol1_);
+    w.Write("raw0", raw0_);      w.Write("raw1", raw1_);
+    w.Write("detect0", detect0_);   w.Write("detect1", detect1_);
+    w.Write("inttest0", inttest0_);  w.Write("inttest1", inttest1_);
+    w.Write("enable0", enable0_);   w.Write("enable1", enable1_);
+    w.Write("polarity0", polarity0_); w.Write("polarity1", polarity1_);
+    w.Write("tstsel", tstsel_);
+    w.Write("status0", status0_);   w.Write("status1", status1_);
+    w.Write("wake_en0", wake_en0_);  w.Write("wake_en1", wake_en1_);
+    w.Write("wake_pol0", wake_pol0_); w.Write("wake_pol1", wake_pol1_);
 }
 
 void Sa1111Intc::RestoreState(StateReader& r) {
-    r.Read(raw0_);      r.Read(raw1_);
-    r.Read(detect0_);   r.Read(detect1_);
-    r.Read(inttest0_);  r.Read(inttest1_);
-    r.Read(enable0_);   r.Read(enable1_);
-    r.Read(polarity0_); r.Read(polarity1_);
-    r.Read(tstsel_);
-    r.Read(status0_);   r.Read(status1_);
-    r.Read(wake_en0_);  r.Read(wake_en1_);
-    r.Read(wake_pol0_); r.Read(wake_pol1_);
+    r.Read("raw0", raw0_);      r.Read("raw1", raw1_);
+    r.Read("detect0", detect0_);   r.Read("detect1", detect1_);
+    r.Read("inttest0", inttest0_);  r.Read("inttest1", inttest1_);
+    r.Read("enable0", enable0_);   r.Read("enable1", enable1_);
+    r.Read("polarity0", polarity0_); r.Read("polarity1", polarity1_);
+    r.Read("tstsel", tstsel_);
+    r.Read("status0", status0_);   r.Read("status1", status1_);
+    r.Read("wake_en0", wake_en0_);  r.Read("wake_en1", wake_en1_);
+    r.Read("wake_pol0", wake_pol0_); r.Read("wake_pol1", wake_pol1_);
 }
 
 void Sa1111Intc::PostRestore() {

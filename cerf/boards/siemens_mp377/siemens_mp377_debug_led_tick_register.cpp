@@ -19,8 +19,8 @@ public:
         SiemensMp377DebugLedPeripheral::WriteHalf(addr, value);
     }
 
-    void SaveState(StateWriter& w) override { w.Write(value_); }
-    void RestoreState(StateReader& r) override { r.Read(value_); }
+    void SaveState(StateWriter& w) override { w.Write("value", value_); }
+    void RestoreState(StateReader& r) override { r.Read("value", value_); }
 
 private:
     uint16_t value_{};

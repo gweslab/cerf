@@ -94,23 +94,15 @@ void CasioCassiopeiaE55Lcd::MaybePublishDisplaySize() {
 }
 
 void CasioCassiopeiaE55Lcd::SaveState(StateWriter& w) {
-    for (uint32_t i = 0; i < kCtrlCount; ++i) w.Write(ctrl_[i]);
+    for (uint32_t i = 0; i < kCtrlCount; ++i) w.Write("ctrl", ctrl_[i]);
     size_latch_.SaveState(w);
-    w.Write<uint64_t>(fb_.size());
-    if (!fb_.empty()) w.WriteBytes(fb_.data(), fb_.size());
+    w.WriteBytes("fb", fb_.data(), fb_.size());
 }
 
 void CasioCassiopeiaE55Lcd::RestoreState(StateReader& r) {
-    for (uint32_t i = 0; i < kCtrlCount; ++i) r.Read(ctrl_[i]);
+    for (uint32_t i = 0; i < kCtrlCount; ++i) r.Read("ctrl", ctrl_[i]);
     size_latch_.RestoreState(r);
-    uint64_t n = 0;
-    r.Read(n);
-    if (n != kFbSize) {
-        emu_.Get<Fatal>().Die("CasioCassiopeiaE55Lcd::RestoreState: framebuffer is %llu bytes, "
-                              "expected %u", static_cast<unsigned long long>(n), kFbSize);
-    }
-    fb_.assign(kFbSize, 0u);
-    r.ReadBytes(fb_.data(), fb_.size());
+    r.ReadBytes("fb", fb_.data(), fb_.size());
 }
 
 REGISTER_SERVICE(CasioCassiopeiaE55Lcd);

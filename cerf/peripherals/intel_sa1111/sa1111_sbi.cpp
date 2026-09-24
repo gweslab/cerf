@@ -47,12 +47,12 @@ public:
     }
 
     void SaveState(StateWriter& w) override {
-        w.Write(skcr_);
-        w.Write(smcr_);
+        w.Write("skcr", skcr_);
+        w.Write("smcr", smcr_);
     }
     void RestoreState(StateReader& r) override {
-        r.Read(skcr_);
-        r.Read(smcr_);
+        r.Read("skcr", skcr_);
+        r.Read("smcr", smcr_);
     }
 
 private:

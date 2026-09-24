@@ -41,11 +41,11 @@ bool CasioCassiopeiaEm500Eeprom::TryWriteWord(uint32_t off, uint32_t value) {
 }
 
 void CasioCassiopeiaEm500Eeprom::SaveState(StateWriter& w) const {
-    w.Write(ctrl_a110_);
-    w.Write(ctrl_a118_);
+    w.Write("ctrl_a110", ctrl_a110_);
+    w.Write("ctrl_a118", ctrl_a118_);
 }
 
 void CasioCassiopeiaEm500Eeprom::RestoreState(StateReader& r) {
-    r.Read(ctrl_a110_);
-    r.Read(ctrl_a118_);
+    r.Read("ctrl_a110", ctrl_a110_);
+    r.Read("ctrl_a118", ctrl_a118_);
 }

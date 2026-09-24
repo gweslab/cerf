@@ -164,39 +164,17 @@ void Sfr::ReturnFromInterrupt() {
 }
 
 void Sfr::SaveState(StateWriter& writer) const {
-    writer.Write(state_.pc);
-    writer.WriteBytes(state_.iram.data(), state_.iram.size());
-    writer.Write(state_.acc);
-    writer.Write(state_.b);
-    writer.Write(state_.psw);
-    writer.Write(state_.sp);
-    writer.Write(state_.dpl);
-    writer.Write(state_.dph);
-    writer.Write(state_.ie);
-    writer.Write(state_.eie);
-    writer.Write(state_.eip);
-    writer.Write(state_.extended_pending);
-    writer.Write(state_.in_service);
-    writer.Write(state_.block_next_vector);
-    writer.Write(state_.executed);
+    static_assert(StateVisitCoversAllBytes<State>(
+                      [](State& s, StateFieldBytes& f) { State::Visit(s, f); }),
+                  "State::Visit must name or skip every field of State");
+    StateWriteField field(writer);
+    State saved = state_;
+    State::Visit(saved, field);
 }
 
 void Sfr::RestoreState(StateReader& reader) {
-    reader.Read(state_.pc);
-    reader.ReadBytes(state_.iram.data(), state_.iram.size());
-    reader.Read(state_.acc);
-    reader.Read(state_.b);
-    reader.Read(state_.psw);
-    reader.Read(state_.sp);
-    reader.Read(state_.dpl);
-    reader.Read(state_.dph);
-    reader.Read(state_.ie);
-    reader.Read(state_.eie);
-    reader.Read(state_.eip);
-    reader.Read(state_.extended_pending);
-    reader.Read(state_.in_service);
-    reader.Read(state_.block_next_vector);
-    reader.Read(state_.executed);
+    StateReadField field(reader);
+    State::Visit(state_, field);
 }
 
 }  // namespace sm501_8051

@@ -117,31 +117,31 @@ void Pm8058Rtc::WriteReg(uint16_t reg, uint8_t value) {
 
 void Pm8058Rtc::SaveState(StateWriter& w) {
     std::lock_guard<std::mutex> lk(mtx_);
-    w.Write<uint32_t>(CounterLocked());
-    w.Write<uint8_t>(running_ ? 1u : 0u);
-    w.Write<uint8_t>(ctrl_);
-    w.Write<uint8_t>(alarm_ctl2_);
+    w.Write<uint32_t>("counter", CounterLocked());
+    w.Write<uint8_t>("running", running_ ? 1u : 0u);
+    w.Write<uint8_t>("ctrl", ctrl_);
+    w.Write<uint8_t>("alarm_ctl2", alarm_ctl2_);
     for (uint32_t i = 0; i < kBytes; ++i) {
-        w.Write<uint8_t>(load_[i]);
-        w.Write<uint8_t>(alarm_[i]);
+        w.Write<uint8_t>("load", load_[i]);
+        w.Write<uint8_t>("alarm", alarm_[i]);
     }
 }
 
 void Pm8058Rtc::RestoreState(StateReader& r) {
     std::lock_guard<std::mutex> lk(mtx_);
     uint8_t running = 0;
-    r.Read(base_);
-    r.Read(running);
-    r.Read(ctrl_);
-    r.Read(alarm_ctl2_);
+    r.Read("counter", base_);
+    r.Read("running", running);
+    r.Read("ctrl", ctrl_);
+    r.Read("alarm_ctl2", alarm_ctl2_);
     for (uint32_t i = 0; i < kBytes; ++i) {
-        r.Read(load_[i]);
-        r.Read(alarm_[i]);
+        r.Read("load", load_[i]);
+        r.Read("alarm", alarm_[i]);
     }
     running_   = running != 0u;
     anchor_us_ = HostSteadyMicros();
     if (((ctrl_ & kEnable) != 0u) != running_) {
-        emu_.Get<Fatal>().Die(
+        r.Reject(
             "pm8058 rtc: restored control 0x%02X disagrees with the restored "
             "running flag %u", ctrl_, (unsigned)running_);
     }

@@ -139,15 +139,15 @@ void Sa11xxResetController::WriteWord(uint32_t addr, uint32_t value) {
 }
 
 void Sa11xxResetController::SaveState(StateWriter& w) {
-    w.Write(rcsr_.load(std::memory_order_acquire));
-    w.Write(tucr_);
+    w.Write("rcsr", rcsr_.load(std::memory_order_acquire));
+    w.Write("tucr", tucr_);
 }
 
 void Sa11xxResetController::RestoreState(StateReader& r) {
     uint32_t rcsr = 0;
-    r.Read(rcsr);
+    r.Read("rcsr", rcsr);
     rcsr_.store(rcsr, std::memory_order_release);
-    r.Read(tucr_);
+    r.Read("tucr", tucr_);
 }
 
 }  /* namespace */

@@ -244,38 +244,38 @@ void Omap3530UartBank::SaveState(StateWriter& w) {
        guest writes - not machine state. state_mutex_ is held (the bank
        drives a cross-thread RaiseSyncEvent path into the SDMA). */
     std::lock_guard<std::mutex> lk(state_mutex_);
-    w.Write(ier_);
-    w.Write(fcr_);
-    w.Write(lcr_);
-    w.Write(mcr_);
-    w.Write(mdr1_);
-    w.Write(scr_);
-    w.Write(msr_);
-    w.Write(spr_);
-    w.Write(dll_);
-    w.Write(dlh_);
-    w.Write(sysc_);
-    w.Write(wer_);
-    w.Write(pending_tx_dma_req_);
-    w.Write(pending_rx_dma_req_);
+    w.Write("ier", ier_);
+    w.Write("fcr", fcr_);
+    w.Write("lcr", lcr_);
+    w.Write("mcr", mcr_);
+    w.Write("mdr1", mdr1_);
+    w.Write("scr", scr_);
+    w.Write("msr", msr_);
+    w.Write("spr", spr_);
+    w.Write("dll", dll_);
+    w.Write("dlh", dlh_);
+    w.Write("sysc", sysc_);
+    w.Write("wer", wer_);
+    w.Write("pending_tx_dma_req", pending_tx_dma_req_);
+    w.Write("pending_rx_dma_req", pending_rx_dma_req_);
 }
 
 void Omap3530UartBank::RestoreState(StateReader& r) {
     std::lock_guard<std::mutex> lk(state_mutex_);
-    r.Read(ier_);
-    r.Read(fcr_);
-    r.Read(lcr_);
-    r.Read(mcr_);
-    r.Read(mdr1_);
-    r.Read(scr_);
-    r.Read(msr_);
-    r.Read(spr_);
-    r.Read(dll_);
-    r.Read(dlh_);
-    r.Read(sysc_);
-    r.Read(wer_);
-    r.Read(pending_tx_dma_req_);
-    r.Read(pending_rx_dma_req_);
+    r.Read("ier", ier_);
+    r.Read("fcr", fcr_);
+    r.Read("lcr", lcr_);
+    r.Read("mcr", mcr_);
+    r.Read("mdr1", mdr1_);
+    r.Read("scr", scr_);
+    r.Read("msr", msr_);
+    r.Read("spr", spr_);
+    r.Read("dll", dll_);
+    r.Read("dlh", dlh_);
+    r.Read("sysc", sysc_);
+    r.Read("wer", wer_);
+    r.Read("pending_tx_dma_req", pending_tx_dma_req_);
+    r.Read("pending_rx_dma_req", pending_rx_dma_req_);
 }
 
 class Omap3530Uart1 : public Omap3530UartBank {

@@ -62,22 +62,22 @@ public:
     }
 
     void SaveWidgetState(StateWriter& w) const override {
-        w.Write<uint8_t>(static_cast<uint8_t>(step_));
-        w.Write(conf_total_);
-        w.Write<uint8_t>(static_cast<uint8_t>(dl_));
-        w.Write(cat_off_);
-        w.Write(cat_remaining_);
-        w.Write(seg_off_);
-        w.Write(seg_remaining_);
+        w.Write<uint8_t>("step", static_cast<uint8_t>(step_));
+        w.Write("conf_total", conf_total_);
+        w.Write<uint8_t>("dl", static_cast<uint8_t>(dl_));
+        w.Write("cat_off", cat_off_);
+        w.Write("cat_remaining", cat_remaining_);
+        w.Write("seg_off", seg_off_);
+        w.Write("seg_remaining", seg_remaining_);
     }
     void RestoreWidgetState(StateReader& r) override {
-        uint8_t s = 0; r.Read(s); step_ = static_cast<Step>(s);
-        r.Read(conf_total_);
-        uint8_t d = 0; r.Read(d); dl_ = static_cast<DlPhase>(d);
-        r.Read(cat_off_);
-        r.Read(cat_remaining_);
-        r.Read(seg_off_);
-        r.Read(seg_remaining_);
+        uint8_t s = 0; r.Read("step", s); step_ = static_cast<Step>(s);
+        r.Read("conf_total", conf_total_);
+        uint8_t d = 0; r.Read("dl", d); dl_ = static_cast<DlPhase>(d);
+        r.Read("cat_off", cat_off_);
+        r.Read("cat_remaining", cat_remaining_);
+        r.Read("seg_off", seg_off_);
+        r.Read("seg_remaining", seg_remaining_);
     }
 
     // Once we have USB somewhere, this should become hot-pluggable device follwing PCMCIA example

@@ -54,8 +54,8 @@ public:
     void WriteByte(uint32_t addr, uint8_t  v) override { HaltUnsupportedAccess("PR31x00 MAGICBUS WriteByte", addr, v); }
     void WriteHalf(uint32_t addr, uint16_t v) override { HaltUnsupportedAccess("PR31x00 MAGICBUS WriteHalf", addr, v); }
 
-    void SaveState(StateWriter& w) override { w.Write(ctl_); }
-    void RestoreState(StateReader& r) override { r.Read(ctl_); }
+    void SaveState(StateWriter& w) override { w.Write("ctl", ctl_); }
+    void RestoreState(StateReader& r) override { r.Read("ctl", ctl_); }
 
 private:
     uint32_t ctl_ = 0;

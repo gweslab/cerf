@@ -95,11 +95,11 @@ void Omap3530SyscPadconf::WriteWord(uint32_t addr, uint32_t value) {
    only (no cross-thread caller), and the JIT is paused during save/restore,
    so no lock is needed. */
 void Omap3530SyscPadconf::SaveState(StateWriter& w) {
-    w.WriteBytes(regs_.data(), regs_.size() * sizeof(uint16_t));
+    w.WriteBytes("regs", regs_.data(), regs_.size() * sizeof(uint16_t));
 }
 
 void Omap3530SyscPadconf::RestoreState(StateReader& r) {
-    r.ReadBytes(regs_.data(), regs_.size() * sizeof(uint16_t));
+    r.ReadBytes("regs", regs_.data(), regs_.size() * sizeof(uint16_t));
 }
 
 }  /* namespace */

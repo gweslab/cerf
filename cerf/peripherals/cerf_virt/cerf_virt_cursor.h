@@ -9,8 +9,21 @@
 
 struct GuestCursorShape {
     bool     visible = false;
+    uint8_t  pad[3]  = {};
     uint32_t cx = 0, cy = 0, xhot = 0, yhot = 0, stride = 0;
     std::vector<uint8_t> bits;
+
+    template <typename F>
+    static constexpr void Visit(GuestCursorShape& s, F& field) {
+        field("visible", s.visible);
+        field.Skip(s.pad);
+        field("cx", s.cx);
+        field("cy", s.cy);
+        field("xhot", s.xhot);
+        field("yhot", s.yhot);
+        field("stride", s.stride);
+        field.Skip(s.bits);
+    }
 };
 
 class CerfVirtCursor : public Peripheral {

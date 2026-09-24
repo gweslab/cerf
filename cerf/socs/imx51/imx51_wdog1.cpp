@@ -26,10 +26,10 @@ public:
     /* WRSR is read-only (recomputed cold signature); WCR/WSR/WICR/WMCR are the
        writable state. */
     void SaveState(StateWriter& w) override {
-        w.Write(wcr_); w.Write(wsr_); w.Write(wicr_); w.Write(wmcr_);
+        w.Write("wcr", wcr_); w.Write("wsr", wsr_); w.Write("wicr", wicr_); w.Write("wmcr", wmcr_);
     }
     void RestoreState(StateReader& r) override {
-        r.Read(wcr_); r.Read(wsr_); r.Read(wicr_); r.Read(wmcr_);
+        r.Read("wcr", wcr_); r.Read("wsr", wsr_); r.Read("wicr", wicr_); r.Read("wmcr", wmcr_);
     }
 
 protected:

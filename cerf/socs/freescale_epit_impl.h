@@ -144,18 +144,18 @@ public:
     }
 
     void SaveState(StateWriter& w) override {
-        w.Write(cr_.load(std::memory_order_acquire));
-        w.Write(sr_.load(std::memory_order_acquire));
-        w.Write(lr_.load(std::memory_order_acquire));
-        w.Write(cmpr_.load(std::memory_order_acquire));
-        w.Write(anchor_cnt_.load(std::memory_order_acquire));
-        w.Write(frozen_cnt_.load(std::memory_order_acquire));
-        w.Write<uint32_t>(ReadCounter());   /* current CNT; re-anchored on restore */
+        w.Write("cr", cr_.load(std::memory_order_acquire));
+        w.Write("sr", sr_.load(std::memory_order_acquire));
+        w.Write("lr", lr_.load(std::memory_order_acquire));
+        w.Write("cmpr", cmpr_.load(std::memory_order_acquire));
+        w.Write("anchor_cnt", anchor_cnt_.load(std::memory_order_acquire));
+        w.Write("frozen_cnt", frozen_cnt_.load(std::memory_order_acquire));
+        w.Write<uint32_t>("counter", ReadCounter());
     }
     void RestoreState(StateReader& r) override {
         uint32_t cr = 0, sr = 0, lr = 0, cmpr = 0, anchor = 0, frozen = 0, cnt = 0;
-        r.Read(cr); r.Read(sr); r.Read(lr); r.Read(cmpr);
-        r.Read(anchor); r.Read(frozen); r.Read(cnt);
+        r.Read("cr", cr); r.Read("sr", sr); r.Read("lr", lr); r.Read("cmpr", cmpr);
+        r.Read("anchor_cnt", anchor); r.Read("frozen_cnt", frozen); r.Read("counter", cnt);
         cr_.store(cr,        std::memory_order_release);
         sr_.store(sr,        std::memory_order_release);
         lr_.store(lr,        std::memory_order_release);

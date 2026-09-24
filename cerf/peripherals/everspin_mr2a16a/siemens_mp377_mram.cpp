@@ -52,11 +52,11 @@ void SiemensMp377Mram::WriteWord(uint32_t addr, uint32_t value) {
 }
 
 void SiemensMp377Mram::SaveState(StateWriter& w) {
-    w.WriteBytes(mram_.data(), mram_.size());
+    w.WriteBytes("mram", mram_.data(), mram_.size());
 }
 
 void SiemensMp377Mram::RestoreState(StateReader& r) {
-    r.ReadBytes(mram_.data(), mram_.size());
+    r.ReadBytes("mram", mram_.data(), mram_.size());
 }
 
 uint8_t SiemensMp377Mram::ReadAliasByte(uint32_t alias_pa) const {

@@ -233,23 +233,23 @@ public:
 
     void SaveState(StateWriter& w) override {
         std::lock_guard<std::mutex> lk(mtx_);
-        w.Write(giuintl_); w.Write(giuinth_); w.Write(piuint_); w.Write(aiuint_);
-        w.Write(kiuint_);  w.Write(dsiuint_); w.Write(firint_);
-        w.Write(mgiul_);   w.Write(mgiuh_);   w.Write(mpiu_);   w.Write(maiu_);
-        w.Write(mkiu_);    w.Write(mdsiu_);   w.Write(mfir_);
-        w.Write(sysint1_direct_); w.Write(sysint2_direct_);
-        w.Write(msysint1_); w.Write(msysint2_); w.Write(nmireg_); w.Write(softint_);
+        w.Write("giuintl", giuintl_); w.Write("giuinth", giuinth_); w.Write("piuint", piuint_); w.Write("aiuint", aiuint_);
+        w.Write("kiuint", kiuint_);  w.Write("dsiuint", dsiuint_); w.Write("firint", firint_);
+        w.Write("mgiul", mgiul_);   w.Write("mgiuh", mgiuh_);   w.Write("mpiu", mpiu_);   w.Write("maiu", maiu_);
+        w.Write("mkiu", mkiu_);    w.Write("mdsiu", mdsiu_);   w.Write("mfir", mfir_);
+        w.Write("sysint1_direct", sysint1_direct_); w.Write("sysint2_direct", sysint2_direct_);
+        w.Write("msysint1", msysint1_); w.Write("msysint2", msysint2_); w.Write("nmireg", nmireg_); w.Write("softint", softint_);
         SaveStateExtLocked(w);
     }
 
     void RestoreState(StateReader& r) override {
         std::lock_guard<std::mutex> lk(mtx_);
-        r.Read(giuintl_); r.Read(giuinth_); r.Read(piuint_); r.Read(aiuint_);
-        r.Read(kiuint_);  r.Read(dsiuint_); r.Read(firint_);
-        r.Read(mgiul_);   r.Read(mgiuh_);   r.Read(mpiu_);   r.Read(maiu_);
-        r.Read(mkiu_);    r.Read(mdsiu_);   r.Read(mfir_);
-        r.Read(sysint1_direct_); r.Read(sysint2_direct_);
-        r.Read(msysint1_); r.Read(msysint2_); r.Read(nmireg_); r.Read(softint_);
+        r.Read("giuintl", giuintl_); r.Read("giuinth", giuinth_); r.Read("piuint", piuint_); r.Read("aiuint", aiuint_);
+        r.Read("kiuint", kiuint_);  r.Read("dsiuint", dsiuint_); r.Read("firint", firint_);
+        r.Read("mgiul", mgiul_);   r.Read("mgiuh", mgiuh_);   r.Read("mpiu", mpiu_);   r.Read("maiu", maiu_);
+        r.Read("mkiu", mkiu_);    r.Read("mdsiu", mdsiu_);   r.Read("mfir", mfir_);
+        r.Read("sysint1_direct", sysint1_direct_); r.Read("sysint2_direct", sysint2_direct_);
+        r.Read("msysint1", msysint1_); r.Read("msysint2", msysint2_); r.Read("nmireg", nmireg_); r.Read("softint", softint_);
         RestoreStateExtLocked(r);
     }
 

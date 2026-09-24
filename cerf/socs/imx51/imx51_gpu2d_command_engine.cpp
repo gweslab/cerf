@@ -460,21 +460,21 @@ void Imx51Gpu2dCommandEngine::FlushPath() {
 }
 
 void Imx51Gpu2dCommandEngine::SaveState(StateWriter& w) const {
-    w.Write(vgv3_nextaddr_);
-    w.Write(vgv3_nextcmd_);
-    w.Write(vgv3_cursor_);
-    w.Write(cur_x_);
-    w.Write(cur_y_);
-    w.Write(bbox_live_);
-    w.WriteBytes(vg_regs_, sizeof(vg_regs_));
+    w.Write("vgv3_nextaddr", vgv3_nextaddr_);
+    w.Write("vgv3_nextcmd", vgv3_nextcmd_);
+    w.Write("vgv3_cursor", vgv3_cursor_);
+    w.Write("cur_x", cur_x_);
+    w.Write("cur_y", cur_y_);
+    w.Write("bbox_live", bbox_live_);
+    w.WriteBytes("vg_regs", vg_regs_, sizeof(vg_regs_));
 }
 
 void Imx51Gpu2dCommandEngine::RestoreState(StateReader& r) {
-    r.Read(vgv3_nextaddr_);
-    r.Read(vgv3_nextcmd_);
-    r.Read(vgv3_cursor_);
-    r.Read(cur_x_);
-    r.Read(cur_y_);
-    r.Read(bbox_live_);
-    r.ReadBytes(vg_regs_, sizeof(vg_regs_));
+    r.Read("vgv3_nextaddr", vgv3_nextaddr_);
+    r.Read("vgv3_nextcmd", vgv3_nextcmd_);
+    r.Read("vgv3_cursor", vgv3_cursor_);
+    r.Read("cur_x", cur_x_);
+    r.Read("cur_y", cur_y_);
+    r.Read("bbox_live", bbox_live_);
+    r.ReadBytes("vg_regs", vg_regs_, sizeof(vg_regs_));
 }

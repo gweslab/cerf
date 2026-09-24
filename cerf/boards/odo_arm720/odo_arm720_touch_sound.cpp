@@ -396,22 +396,22 @@ void OdoArm720TouchSound::PenTimerMain() {
 
 void OdoArm720TouchSound::SaveState(StateWriter& w) {
     std::lock_guard<std::mutex> lk(state_mutex_);
-    w.Write(io_adc_cntr_);  w.Write(io_adc_str_);
-    w.Write(ucb_cntr_);     w.Write(ucb_str_);  w.Write(ucb_register_);
-    w.Write(io_sound_cntr_); w.Write(io_sound_str_);
-    w.Write(intr_mask_);
-    w.WriteBytes(ucb_regs_, sizeof(ucb_regs_));
-    w.Write(adc_x_);  w.Write(adc_y_);
+    w.Write("io_adc_cntr", io_adc_cntr_);  w.Write("io_adc_str", io_adc_str_);
+    w.Write("ucb_cntr", ucb_cntr_);     w.Write("ucb_str", ucb_str_);  w.Write("ucb_register", ucb_register_);
+    w.Write("io_sound_cntr", io_sound_cntr_); w.Write("io_sound_str", io_sound_str_);
+    w.Write("intr_mask", intr_mask_);
+    w.WriteBytes("ucb_regs", ucb_regs_, sizeof(ucb_regs_));
+    w.Write("adc_x", adc_x_);  w.Write("adc_y", adc_y_);
 }
 
 void OdoArm720TouchSound::RestoreState(StateReader& r) {
     std::lock_guard<std::mutex> lk(state_mutex_);
-    r.Read(io_adc_cntr_);  r.Read(io_adc_str_);
-    r.Read(ucb_cntr_);     r.Read(ucb_str_);  r.Read(ucb_register_);
-    r.Read(io_sound_cntr_); r.Read(io_sound_str_);
-    r.Read(intr_mask_);
-    r.ReadBytes(ucb_regs_, sizeof(ucb_regs_));
-    r.Read(adc_x_);  r.Read(adc_y_);
+    r.Read("io_adc_cntr", io_adc_cntr_);  r.Read("io_adc_str", io_adc_str_);
+    r.Read("ucb_cntr", ucb_cntr_);     r.Read("ucb_str", ucb_str_);  r.Read("ucb_register", ucb_register_);
+    r.Read("io_sound_cntr", io_sound_cntr_); r.Read("io_sound_str", io_sound_str_);
+    r.Read("intr_mask", intr_mask_);
+    r.ReadBytes("ucb_regs", ucb_regs_, sizeof(ucb_regs_));
+    r.Read("adc_x", adc_x_);  r.Read("adc_y", adc_y_);
     /* No host pen is held after a restore; drop the touch coupling so a saved
        pen-down doesn't stick. */
     pen_down_.store(false, std::memory_order_release);

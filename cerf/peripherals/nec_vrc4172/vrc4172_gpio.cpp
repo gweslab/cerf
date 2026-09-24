@@ -128,13 +128,13 @@ void Vrc4172Gpio::DriveGiuLocked() {
 
 void Vrc4172Gpio::SaveState(StateWriter& w) {
     std::lock_guard<std::mutex> lk(mtx_);
-    w.Write(dir_); w.Write(inten_); w.Write(intst_); w.Write(inttyp_);
-    w.Write(intlv0l_); w.Write(intlv0h_); w.Write(level_);
+    w.Write("dir", dir_); w.Write("inten", inten_); w.Write("intst", intst_); w.Write("inttyp", inttyp_);
+    w.Write("intlv0l", intlv0l_); w.Write("intlv0h", intlv0h_); w.Write("level", level_);
 }
 void Vrc4172Gpio::RestoreState(StateReader& r) {
     std::lock_guard<std::mutex> lk(mtx_);
-    r.Read(dir_); r.Read(inten_); r.Read(intst_); r.Read(inttyp_);
-    r.Read(intlv0l_); r.Read(intlv0h_); r.Read(level_);
+    r.Read("dir", dir_); r.Read("inten", inten_); r.Read("intst", intst_); r.Read("inttyp", inttyp_);
+    r.Read("intlv0l", intlv0l_); r.Read("intlv0h", intlv0h_); r.Read("level", level_);
 }
 void Vrc4172Gpio::PostRestore() {
     std::lock_guard<std::mutex> lk(mtx_);

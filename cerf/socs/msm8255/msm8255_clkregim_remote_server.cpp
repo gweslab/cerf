@@ -92,10 +92,10 @@ public:
     void SaveState(StateWriter& w) override {
         emu_.Get<Msm8255ClockRates>().SaveState(w);
         for (const auto& word : clock_known_) {
-            w.Write<uint32_t>(word.load(std::memory_order_acquire));
+            w.Write<uint32_t>("word", word.load(std::memory_order_acquire));
         }
         for (const auto& held : clock_refcount_) {
-            w.Write<uint32_t>(held.load(std::memory_order_acquire));
+            w.Write<uint32_t>("held", held.load(std::memory_order_acquire));
         }
     }
 
@@ -103,12 +103,12 @@ public:
         emu_.Get<Msm8255ClockRates>().RestoreState(r);
         for (auto& word : clock_known_) {
             uint32_t bits = 0u;
-            r.Read(bits);
+            r.Read("word", bits);
             word.store(bits, std::memory_order_release);
         }
         for (auto& held : clock_refcount_) {
             uint32_t count = 0u;
-            r.Read(count);
+            r.Read("held", count);
             held.store(count, std::memory_order_release);
         }
     }

@@ -129,21 +129,21 @@ void Pxa27xPowerManager::WriteWord(uint32_t addr, uint32_t value) {
 }
 
 void Pxa27xPowerManager::SaveState(StateWriter& w) {
-    w.Write(pmcr_); w.Write(pssr_); w.Write(pspr_); w.Write(pwer_);
-    w.Write(prer_); w.Write(pfer_); w.Write(pedr_); w.Write(pcfr_);
-    w.Write(rcsr_); w.Write(pslr_); w.Write(pstr_); w.Write(pvcr_);
-    w.Write(pucr_); w.Write(pkwr_); w.Write(pksr_);
-    for (uint32_t& v : pgsr_) w.Write(v);
-    for (uint32_t& v : pcmd_) w.Write(v);
+    w.Write("pmcr", pmcr_); w.Write("pssr", pssr_); w.Write("pspr", pspr_); w.Write("pwer", pwer_);
+    w.Write("prer", prer_); w.Write("pfer", pfer_); w.Write("pedr", pedr_); w.Write("pcfr", pcfr_);
+    w.Write("rcsr", rcsr_); w.Write("pslr", pslr_); w.Write("pstr", pstr_); w.Write("pvcr", pvcr_);
+    w.Write("pucr", pucr_); w.Write("pkwr", pkwr_); w.Write("pksr", pksr_);
+    for (uint32_t& v : pgsr_) w.Write("pgsr", v);
+    for (uint32_t& v : pcmd_) w.Write("pcmd", v);
 }
 
 void Pxa27xPowerManager::RestoreState(StateReader& r) {
-    r.Read(pmcr_); r.Read(pssr_); r.Read(pspr_); r.Read(pwer_);
-    r.Read(prer_); r.Read(pfer_); r.Read(pedr_); r.Read(pcfr_);
-    r.Read(rcsr_); r.Read(pslr_); r.Read(pstr_); r.Read(pvcr_);
-    r.Read(pucr_); r.Read(pkwr_); r.Read(pksr_);
-    for (uint32_t& v : pgsr_) r.Read(v);
-    for (uint32_t& v : pcmd_) r.Read(v);
+    r.Read("pmcr", pmcr_); r.Read("pssr", pssr_); r.Read("pspr", pspr_); r.Read("pwer", pwer_);
+    r.Read("prer", prer_); r.Read("pfer", pfer_); r.Read("pedr", pedr_); r.Read("pcfr", pcfr_);
+    r.Read("rcsr", rcsr_); r.Read("pslr", pslr_); r.Read("pstr", pstr_); r.Read("pvcr", pvcr_);
+    r.Read("pucr", pucr_); r.Read("pkwr", pkwr_); r.Read("pksr", pksr_);
+    for (uint32_t& v : pgsr_) r.Read("pgsr", v);
+    for (uint32_t& v : pcmd_) r.Read("pcmd", v);
 }
 
 }  /* namespace */

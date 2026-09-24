@@ -22,8 +22,8 @@ public:
     void     WriteWord(uint32_t addr, uint32_t value) override;
 
     /* JIT-thread-only register file (no worker thread). */
-    void SaveState(StateWriter& w) override    { w.WriteBytes(regs_, sizeof(regs_)); }
-    void RestoreState(StateReader& r) override { r.ReadBytes(regs_, sizeof(regs_)); }
+    void SaveState(StateWriter& w) override    { w.WriteBytes("regs", regs_, sizeof(regs_)); }
+    void RestoreState(StateReader& r) override { r.ReadBytes("regs", regs_, sizeof(regs_)); }
 
 protected:
     uint32_t regs_[11] = {

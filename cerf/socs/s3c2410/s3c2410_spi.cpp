@@ -176,7 +176,11 @@ void S3C2410Spi::Transfer(int channel, uint8_t tx) {
 }
 
 void S3C2410Spi::SaveState(StateWriter& w) {
-    w.WriteBytes(channel_, sizeof(channel_));
+    static_assert(StateVisitCoversAllBytes<Channel>(
+                      [](Channel& c, StateFieldBytes& f) { VisitChannel(c, f); }),
+                  "S3C2410Spi::VisitChannel must name or skip every field of Channel");
+    StateWriteField field(w);
+    for (Channel& c : channel_) VisitChannel(c, field);
     for (int ch = 0; ch < kChannels; ++ch) {
         if (slave_[ch] != nullptr) {
             slave_[ch]->SaveState(w);
@@ -185,7 +189,8 @@ void S3C2410Spi::SaveState(StateWriter& w) {
 }
 
 void S3C2410Spi::RestoreState(StateReader& r) {
-    r.ReadBytes(channel_, sizeof(channel_));
+    StateReadField field(r);
+    for (Channel& c : channel_) VisitChannel(c, field);
     for (int ch = 0; ch < kChannels; ++ch) {
         if (slave_[ch] != nullptr) {
             slave_[ch]->RestoreState(r);

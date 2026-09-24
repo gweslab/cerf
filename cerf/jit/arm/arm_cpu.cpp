@@ -413,12 +413,49 @@ uint32_t __cdecl ArmCpu::ExceptionReturnHelper(ArmCpu* cpu, uint32_t new_pc) {
     return cpu->ReturnFromException(spsr, new_pc);
 }
 
+template <typename F>
+constexpr void ArmCpu::VisitState(ArmCpuState& s, F& field) {
+    field("gprs", s.gprs);
+    field("cpsr", s.cpsr.word);
+    field("nf", s.nf);
+    field("zf", s.zf);
+    field("cf", s.cf);
+    field("vf", s.vf);
+    field("sp_bank", s.sp_bank);
+    field("lr_bank", s.lr_bank);
+    for (ArmPsrFull& spsr : s.spsr_bank) field("spsr_bank", spsr.word);
+    field("r8_r12_fiq", s.r8_r12_fiq);
+    field("vfp_d", s.vfp_d);
+    field("fpscr", s.fpscr);
+    field("fpexc", s.fpexc);
+    field("acc0", s.acc0);
+    field("ldrex_monitor_addr", s.ldrex_monitor_addr);
+    field("ldrex_monitor_armed", s.ldrex_monitor_armed);
+#if CERF_DEV_MODE
+    field.Skip(s.retired_insns);
+    field.Skip(s.executed_insns);
+#endif
+    field("guest_cycle_counter", s.guest_cycle_counter);
+    field.Skip(s.guest_cycle_deadline);
+    field("guest_cycle_hi", s.guest_cycle_hi);
+    field("guest_cycle_folded", s.guest_cycle_folded);
+    field("irq_interrupt_pending", s.irq_interrupt_pending);
+    field("reset_pending", s.reset_pending);
+    field("deep_sleep", s.deep_sleep);
+    field.Skip(s.chain_exit_request);
+}
+
 void ArmCpu::SaveState(StateWriter& w) {
-    w.Write<ArmCpuState>(state_);
+    static_assert(StateVisitCoversAllBytes<ArmCpuState>(
+                      [](ArmCpuState& s, StateFieldBytes& f) { VisitState(s, f); }),
+                  "ArmCpu::VisitState must name or skip every field of ArmCpuState");
+    StateWriteField field(w);
+    VisitState(state_, field);
 }
 
 void ArmCpu::RestoreState(StateReader& r) {
-    r.Read(state_);
+    StateReadField field(r);
+    VisitState(state_, field);
     std::atomic_ref<uint32_t>(state_.chain_exit_request)
         .store(state_.reset_pending != 0u ? kChainExitReset : 0u,
                std::memory_order_release);

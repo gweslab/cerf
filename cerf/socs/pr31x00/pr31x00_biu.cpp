@@ -130,11 +130,11 @@ void Pr31x00Biu::WriteConfig4(uint32_t addr, uint32_t value) {
 }
 
 void Pr31x00Biu::SaveState(StateWriter& w) {
-    for (uint32_t i = 0; i < kRegs; ++i) w.Write(reg_[i]);
+    for (uint32_t i = 0; i < kRegs; ++i) w.Write("reg", reg_[i]);
 }
 
 void Pr31x00Biu::RestoreState(StateReader& r) {
-    for (uint32_t i = 0; i < kRegs; ++i) r.Read(reg_[i]);
+    for (uint32_t i = 0; i < kRegs; ++i) r.Read("reg", reg_[i]);
 }
 
 REGISTER_SERVICE(Pr31x00Biu);

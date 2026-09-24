@@ -345,46 +345,46 @@ void Imx51Nfc::ReadStatus() {
 }
 
 void Imx51Nfc::SaveState(StateWriter& w) {
-    w.WriteBytes(spare_.data(), spare_.size());
-    w.Write(nand_cmd_);
-    for (uint32_t v : nand_add_) w.Write(v);
-    w.Write(cfg1_);
-    w.Write(ecc_status_);
-    w.Write(status_sum_);
-    w.Write(launch_);
-    w.Write(wr_protect_);
-    for (uint32_t v : unlock_) w.Write(v);
-    w.Write(cfg2_);
-    w.Write(cfg3_);
-    w.Write(axi_error_);
-    w.Write(delay_line_);
-    w.Write<uint8_t>(int_pending_ ? 1 : 0);
-    w.Write<uint8_t>(creq_ ? 1 : 0);
-    w.WriteBytes(addr_bytes_.data(), addr_bytes_.size());
-    w.Write(addr_idx_);
-    w.Write(seq_data_off_);
-    w.Write(seq_cache_off_);
+    w.WriteBytes("spare", spare_.data(), spare_.size());
+    w.Write("nand_cmd", nand_cmd_);
+    for (uint32_t v : nand_add_) w.Write("nand_add", v);
+    w.Write("cfg1", cfg1_);
+    w.Write("ecc_status", ecc_status_);
+    w.Write("status_sum", status_sum_);
+    w.Write("launch", launch_);
+    w.Write("wr_protect", wr_protect_);
+    for (uint32_t v : unlock_) w.Write("unlock", v);
+    w.Write("cfg2", cfg2_);
+    w.Write("cfg3", cfg3_);
+    w.Write("axi_error", axi_error_);
+    w.Write("delay_line", delay_line_);
+    w.Write<uint8_t>("int_pending", int_pending_ ? 1 : 0);
+    w.Write<uint8_t>("creq", creq_ ? 1 : 0);
+    w.WriteBytes("addr_bytes", addr_bytes_.data(), addr_bytes_.size());
+    w.Write("addr_idx", addr_idx_);
+    w.Write("seq_data_off", seq_data_off_);
+    w.Write("seq_cache_off", seq_cache_off_);
 }
 
 void Imx51Nfc::RestoreState(StateReader& r) {
-    r.ReadBytes(spare_.data(), spare_.size());
-    r.Read(nand_cmd_);
-    for (uint32_t& v : nand_add_) r.Read(v);
-    r.Read(cfg1_);
-    r.Read(ecc_status_);
-    r.Read(status_sum_);
-    r.Read(launch_);
-    r.Read(wr_protect_);
-    for (uint32_t& v : unlock_) r.Read(v);
-    r.Read(cfg2_);
-    r.Read(cfg3_);
-    r.Read(axi_error_);
-    r.Read(delay_line_);
+    r.ReadBytes("spare", spare_.data(), spare_.size());
+    r.Read("nand_cmd", nand_cmd_);
+    for (uint32_t& v : nand_add_) r.Read("nand_add", v);
+    r.Read("cfg1", cfg1_);
+    r.Read("ecc_status", ecc_status_);
+    r.Read("status_sum", status_sum_);
+    r.Read("launch", launch_);
+    r.Read("wr_protect", wr_protect_);
+    for (uint32_t& v : unlock_) r.Read("unlock", v);
+    r.Read("cfg2", cfg2_);
+    r.Read("cfg3", cfg3_);
+    r.Read("axi_error", axi_error_);
+    r.Read("delay_line", delay_line_);
     uint8_t b = 0;
-    r.Read(b); int_pending_ = b != 0;
-    r.Read(b); creq_ = b != 0;
-    r.ReadBytes(addr_bytes_.data(), addr_bytes_.size());
-    r.Read(addr_idx_);
-    r.Read(seq_data_off_);
-    r.Read(seq_cache_off_);
+    r.Read("int_pending", b); int_pending_ = b != 0;
+    r.Read("creq", b); creq_ = b != 0;
+    r.ReadBytes("addr_bytes", addr_bytes_.data(), addr_bytes_.size());
+    r.Read("addr_idx", addr_idx_);
+    r.Read("seq_data_off", seq_data_off_);
+    r.Read("seq_cache_off", seq_cache_off_);
 }

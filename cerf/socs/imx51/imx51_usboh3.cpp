@@ -250,17 +250,17 @@ void Imx51Usboh3::WriteWord(uint32_t addr, uint32_t value) {
 
 void Imx51Usboh3::SaveState(StateWriter& w) {
     std::lock_guard<std::mutex> lk(async_schedule_mtx_);
-    w.WriteBytes(regs_.data(), sizeof(regs_));
-    w.WriteBytes(phy_.data(), sizeof(phy_));
-    w.Write<uint8_t>(reset_seen_ ? 1 : 0);
+    w.WriteBytes("regs", regs_.data(), sizeof(regs_));
+    w.WriteBytes("phy", phy_.data(), sizeof(phy_));
+    w.Write<uint8_t>("reset_seen", reset_seen_ ? 1 : 0);
     if (host_) host_->SaveState(w);   /* forward to the registered USB host driver */
     otg_host_root_port_.SaveState(w);
 }
 void Imx51Usboh3::RestoreState(StateReader& r) {
     std::lock_guard<std::mutex> lk(async_schedule_mtx_);
-    r.ReadBytes(regs_.data(), sizeof(regs_));
-    r.ReadBytes(phy_.data(), sizeof(phy_));
-    uint8_t b = 0; r.Read(b); reset_seen_ = b != 0;
+    r.ReadBytes("regs", regs_.data(), sizeof(regs_));
+    r.ReadBytes("phy", phy_.data(), sizeof(phy_));
+    uint8_t b = 0; r.Read("reset_seen", b); reset_seen_ = b != 0;
     if (host_) host_->RestoreState(r);
     otg_host_root_port_.RestoreState(r);
 }

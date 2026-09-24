@@ -89,14 +89,14 @@ void Ps2Mouse::QueueMotion(int dx, int dy, uint32_t button_mask) {
 
 void Ps2Mouse::SaveState(StateWriter& w) const {
     std::lock_guard<std::mutex> lk(mtx_);
-    w.Write<uint8_t>(reporting_ ? 1u : 0u);
-    w.Write<uint8_t>(expect_param_ ? 1u : 0u);
+    w.Write<uint8_t>("reporting", reporting_ ? 1u : 0u);
+    w.Write<uint8_t>("expect_param", expect_param_ ? 1u : 0u);
 }
 
 void Ps2Mouse::RestoreState(StateReader& r) {
     std::lock_guard<std::mutex> lk(mtx_);
     uint8_t rep = 0, ep = 0;
-    r.Read(rep); r.Read(ep);
+    r.Read("reporting", rep); r.Read("expect_param", ep);
     reporting_ = (rep != 0);
     expect_param_ = (ep != 0);
     out_.clear();   /* no host motion survives a restore; drop queued bytes */

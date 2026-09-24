@@ -141,30 +141,30 @@ void Pxa27xDma::WriteRegLocked(uint32_t addr, uint32_t value) {
 
 void Pxa27xDma::SaveState(StateWriter& w) {
     std::lock_guard<std::mutex> lk(state_mutex_);
-    w.WriteBytes(dcsr_,  sizeof(dcsr_));
-    w.WriteBytes(ddadr_, sizeof(ddadr_));
-    w.WriteBytes(dsadr_, sizeof(dsadr_));
-    w.WriteBytes(dtadr_, sizeof(dtadr_));
-    w.WriteBytes(dcmd_,  sizeof(dcmd_));
-    w.WriteBytes(drcmr_lo_, sizeof(drcmr_lo_));
-    w.WriteBytes(drcmr_hi_, sizeof(drcmr_hi_));
-    w.Write(drcmr74_);
-    w.Write(dalgn_);
-    w.Write(dpcsr_);
+    w.WriteBytes("dcsr", dcsr_,  sizeof(dcsr_));
+    w.WriteBytes("ddadr", ddadr_, sizeof(ddadr_));
+    w.WriteBytes("dsadr", dsadr_, sizeof(dsadr_));
+    w.WriteBytes("dtadr", dtadr_, sizeof(dtadr_));
+    w.WriteBytes("dcmd", dcmd_,  sizeof(dcmd_));
+    w.WriteBytes("drcmr_lo", drcmr_lo_, sizeof(drcmr_lo_));
+    w.WriteBytes("drcmr_hi", drcmr_hi_, sizeof(drcmr_hi_));
+    w.Write("drcmr74", drcmr74_);
+    w.Write("dalgn", dalgn_);
+    w.Write("dpcsr", dpcsr_);
 }
 
 void Pxa27xDma::RestoreState(StateReader& r) {
     std::lock_guard<std::mutex> lk(state_mutex_);
-    r.ReadBytes(dcsr_,  sizeof(dcsr_));
-    r.ReadBytes(ddadr_, sizeof(ddadr_));
-    r.ReadBytes(dsadr_, sizeof(dsadr_));
-    r.ReadBytes(dtadr_, sizeof(dtadr_));
-    r.ReadBytes(dcmd_,  sizeof(dcmd_));
-    r.ReadBytes(drcmr_lo_, sizeof(drcmr_lo_));
-    r.ReadBytes(drcmr_hi_, sizeof(drcmr_hi_));
-    r.Read(drcmr74_);
-    r.Read(dalgn_);
-    r.Read(dpcsr_);
+    r.ReadBytes("dcsr", dcsr_,  sizeof(dcsr_));
+    r.ReadBytes("ddadr", ddadr_, sizeof(ddadr_));
+    r.ReadBytes("dsadr", dsadr_, sizeof(dsadr_));
+    r.ReadBytes("dtadr", dtadr_, sizeof(dtadr_));
+    r.ReadBytes("dcmd", dcmd_,  sizeof(dcmd_));
+    r.ReadBytes("drcmr_lo", drcmr_lo_, sizeof(drcmr_lo_));
+    r.ReadBytes("drcmr_hi", drcmr_hi_, sizeof(drcmr_hi_));
+    r.Read("drcmr74", drcmr74_);
+    r.Read("dalgn", dalgn_);
+    r.Read("dpcsr", dpcsr_);
     for (uint32_t ch = 0; ch < kNumChannels; ++ch) {
         audio_active_[ch] = false;
         audio_sink_[ch]   = nullptr;

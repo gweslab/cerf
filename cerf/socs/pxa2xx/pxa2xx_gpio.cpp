@@ -142,25 +142,25 @@ void Pxa2xxGpio::WriteWord(uint32_t addr, uint32_t value) {
 void Pxa2xxGpio::SaveState(StateWriter& w) {
     std::lock_guard<std::mutex> g(mtx_);
     const size_t nb = BankCount() * sizeof(uint32_t);
-    w.WriteBytes(in_,   nb);
-    w.WriteBytes(out_,  nb);
-    w.WriteBytes(gpdr_, nb);
-    w.WriteBytes(grer_, nb);
-    w.WriteBytes(gfer_, nb);
-    w.WriteBytes(gedr_, nb);
-    w.WriteBytes(gafr_, GafrCount() * sizeof(uint32_t));
+    w.WriteBytes("in", in_,   nb);
+    w.WriteBytes("out", out_,  nb);
+    w.WriteBytes("gpdr", gpdr_, nb);
+    w.WriteBytes("grer", grer_, nb);
+    w.WriteBytes("gfer", gfer_, nb);
+    w.WriteBytes("gedr", gedr_, nb);
+    w.WriteBytes("gafr", gafr_, GafrCount() * sizeof(uint32_t));
     if (serial_slave_) serial_slave_->SaveState(w);
 }
 
 void Pxa2xxGpio::RestoreState(StateReader& r) {
     std::lock_guard<std::mutex> g(mtx_);
     const size_t nb = BankCount() * sizeof(uint32_t);
-    r.ReadBytes(in_,   nb);
-    r.ReadBytes(out_,  nb);
-    r.ReadBytes(gpdr_, nb);
-    r.ReadBytes(grer_, nb);
-    r.ReadBytes(gfer_, nb);
-    r.ReadBytes(gedr_, nb);
-    r.ReadBytes(gafr_, GafrCount() * sizeof(uint32_t));
+    r.ReadBytes("in", in_,   nb);
+    r.ReadBytes("out", out_,  nb);
+    r.ReadBytes("gpdr", gpdr_, nb);
+    r.ReadBytes("grer", grer_, nb);
+    r.ReadBytes("gfer", gfer_, nb);
+    r.ReadBytes("gedr", gedr_, nb);
+    r.ReadBytes("gafr", gafr_, GafrCount() * sizeof(uint32_t));
     if (serial_slave_) serial_slave_->RestoreState(r);
 }

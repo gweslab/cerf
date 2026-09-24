@@ -76,16 +76,16 @@ public:
 
     void SaveState(StateWriter& w) override {
         for (auto& reg : regs_) {
-            w.Write<uint32_t>(reg.load(std::memory_order_acquire));
+            w.Write<uint32_t>("reg", reg.load(std::memory_order_acquire));
         }
     }
 
     void RestoreState(StateReader& r) override {
         for (uint32_t i = 0; i < kRegisterCount; ++i) {
             uint32_t value = kResetValue;
-            r.Read(value);
+            r.Read("reg", value);
             if ((value & ~kRegisters[i].accepted) != 0u) {
-                emu_.Get<Fatal>().Die(
+                r.Reject(
                     "msm8255 clk_ctl_sh2: restored +0x%03X value 0x%08X carries "
                     "bits the guest never writes", kRegisters[i].offset, value);
             }

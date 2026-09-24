@@ -102,13 +102,13 @@ void Pxa255Udc::WriteWord(uint32_t addr, uint32_t value) {
 }
 
 void Pxa255Udc::SaveState(StateWriter& w) {
-    w.Write(udccr_); w.Write(udccfr_); w.Write(uicr0_); w.Write(uicr1_);
-    w.WriteBytes(udccs_, sizeof(udccs_));
+    w.Write("udccr", udccr_); w.Write("udccfr", udccfr_); w.Write("uicr0", uicr0_); w.Write("uicr1", uicr1_);
+    w.WriteBytes("udccs", udccs_, sizeof(udccs_));
 }
 
 void Pxa255Udc::RestoreState(StateReader& r) {
-    r.Read(udccr_); r.Read(udccfr_); r.Read(uicr0_); r.Read(uicr1_);
-    r.ReadBytes(udccs_, sizeof(udccs_));
+    r.Read("udccr", udccr_); r.Read("udccfr", udccfr_); r.Read("uicr0", uicr0_); r.Read("uicr1", uicr1_);
+    r.ReadBytes("udccs", udccs_, sizeof(udccs_));
 }
 
 }  /* namespace */

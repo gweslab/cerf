@@ -76,14 +76,14 @@ void Pr31x00Ir::DriveCarDetInput(bool level) {
 }
 
 void Pr31x00Ir::SaveState(StateWriter& w) {
-    w.Write(ctl1_);
-    w.Write<uint8_t>(cardet_.load(std::memory_order_acquire) ? 1u : 0u);
+    w.Write("ctl1", ctl1_);
+    w.Write<uint8_t>("cardet", cardet_.load(std::memory_order_acquire) ? 1u : 0u);
 }
 
 void Pr31x00Ir::RestoreState(StateReader& r) {
-    r.Read(ctl1_);
+    r.Read("ctl1", ctl1_);
     uint8_t cardet = 0;
-    r.Read(cardet);
+    r.Read("cardet", cardet);
     cardet_.store(cardet != 0u, std::memory_order_release);
 }
 

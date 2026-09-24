@@ -137,11 +137,11 @@ void Wm9713Codec::PushLocked(uint16_t word) {
 }
 
 void Wm9713Codec::SaveState(StateWriter& w) {
-    w.WriteBytes(reg_, sizeof(reg_));
+    w.WriteBytes("reg", reg_, sizeof(reg_));
 }
 
 void Wm9713Codec::RestoreState(StateReader& r) {
-    r.ReadBytes(reg_, sizeof(reg_));
+    r.ReadBytes("reg", reg_, sizeof(reg_));
 }
 
 REGISTER_SERVICE_AS(Wm9713Codec, Ac97Codec);

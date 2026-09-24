@@ -29,5 +29,8 @@ public:
     void RestoreState(StateReader& r);
 
 private:
+    template <typename F>
+    static constexpr void VisitState(MipsCpuState& s, F& field);
+
     MipsCpuState state_{};
 };

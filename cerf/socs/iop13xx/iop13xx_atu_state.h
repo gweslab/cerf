@@ -15,6 +15,12 @@ public:
     struct MemoryWindow {
         uint32_t bar;
         uint32_t wtvr;
+
+        template <typename F>
+        static constexpr void Visit(MemoryWindow& win, F& field) {
+            field("bar", win.bar);
+            field("wtvr", win.wtvr);
+        }
     };
 
     static constexpr uint32_t kMemoryWindowCount = 4u;

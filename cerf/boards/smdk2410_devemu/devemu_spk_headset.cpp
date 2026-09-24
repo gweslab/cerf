@@ -37,11 +37,11 @@ public:
 
     void SaveState(StateWriter& w) override {
         std::lock_guard<std::mutex> lk(state_mutex_);
-        w.Write(speaker_phone_state_);
+        w.Write("speaker_phone_state", speaker_phone_state_);
     }
     void RestoreState(StateReader& r) override {
         std::lock_guard<std::mutex> lk(state_mutex_);
-        r.Read(speaker_phone_state_);
+        r.Read("speaker_phone_state", speaker_phone_state_);
     }
 
 private:

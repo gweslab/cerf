@@ -403,44 +403,49 @@ uint8_t* Iop13xxCp6::EmitRegisterTransfer(uint8_t* cursor, DecodedInsn* d, Block
 void Iop13xxCp6::SaveState(StateWriter& w) {
     std::lock_guard<std::mutex> guard(state_mutex_);
     AdvanceTimersLocked(TimerTicks());
-    w.WriteBytes(intctl_, sizeof(intctl_));
-    w.WriteBytes(intstr_, sizeof(intstr_));
-    w.WriteBytes(pending_, sizeof(pending_));
-    w.WriteBytes(shared_irq_levels_, sizeof(shared_irq_levels_));
-    w.Write(intbase_);
-    w.Write(intsize_);
-    w.Write(tisr_);
-    w.Write(rcsr_);
-    w.Write(wdtsr_);
-    w.Write(watchdog_elapsed_ticks_);
-    w.Write<uint8_t>(watchdog_enabled_ ? 1u : 0u);
-    w.Write<uint8_t>(watchdog_enable_armed_ ? 1u : 0u);
-    w.Write<uint8_t>(watchdog_disable_armed_ ? 1u : 0u);
-    w.WriteBytes(timer_, sizeof(timer_));
+    w.WriteBytes("intctl", intctl_, sizeof(intctl_));
+    w.WriteBytes("intstr", intstr_, sizeof(intstr_));
+    w.WriteBytes("pending", pending_, sizeof(pending_));
+    w.WriteBytes("shared_irq_levels", shared_irq_levels_, sizeof(shared_irq_levels_));
+    w.Write("intbase", intbase_);
+    w.Write("intsize", intsize_);
+    w.Write("tisr", tisr_);
+    w.Write("rcsr", rcsr_);
+    w.Write("wdtsr", wdtsr_);
+    w.Write("watchdog_elapsed_ticks", watchdog_elapsed_ticks_);
+    w.Write<uint8_t>("watchdog_enabled", watchdog_enabled_ ? 1u : 0u);
+    w.Write<uint8_t>("watchdog_enable_armed", watchdog_enable_armed_ ? 1u : 0u);
+    w.Write<uint8_t>("watchdog_disable_armed", watchdog_disable_armed_ ? 1u : 0u);
+    static_assert(StateVisitCoversAllBytes<Timer>(
+                      [](Timer& t, StateFieldBytes& f) { VisitTimer(t, f); }),
+                  "Iop13xxCp6::VisitTimer must name or skip every field of Timer");
+    StateWriteField field(w);
+    for (Timer& t : timer_) VisitTimer(t, field);
 }
 
 void Iop13xxCp6::RestoreState(StateReader& r) {
     std::lock_guard<std::mutex> guard(state_mutex_);
-    r.ReadBytes(intctl_, sizeof(intctl_));
-    r.ReadBytes(intstr_, sizeof(intstr_));
-    r.ReadBytes(pending_, sizeof(pending_));
-    r.ReadBytes(shared_irq_levels_, sizeof(shared_irq_levels_));
-    r.Read(intbase_);
-    r.Read(intsize_);
-    r.Read(tisr_);
-    r.Read(rcsr_);
-    r.Read(wdtsr_);
-    r.Read(watchdog_elapsed_ticks_);
+    r.ReadBytes("intctl", intctl_, sizeof(intctl_));
+    r.ReadBytes("intstr", intstr_, sizeof(intstr_));
+    r.ReadBytes("pending", pending_, sizeof(pending_));
+    r.ReadBytes("shared_irq_levels", shared_irq_levels_, sizeof(shared_irq_levels_));
+    r.Read("intbase", intbase_);
+    r.Read("intsize", intsize_);
+    r.Read("tisr", tisr_);
+    r.Read("rcsr", rcsr_);
+    r.Read("wdtsr", wdtsr_);
+    r.Read("watchdog_elapsed_ticks", watchdog_elapsed_ticks_);
     uint8_t enabled = 0;
     uint8_t enable_armed = 0;
     uint8_t disable_armed = 0;
-    r.Read(enabled);
-    r.Read(enable_armed);
-    r.Read(disable_armed);
+    r.Read("watchdog_enabled", enabled);
+    r.Read("watchdog_enable_armed", enable_armed);
+    r.Read("watchdog_disable_armed", disable_armed);
     watchdog_enabled_ = enabled != 0;
     watchdog_enable_armed_ = enable_armed != 0;
     watchdog_disable_armed_ = disable_armed != 0;
-    r.ReadBytes(timer_, sizeof(timer_));
+    StateReadField field(r);
+    for (Timer& t : timer_) VisitTimer(t, field);
 }
 
 void Iop13xxCp6::PostRestoreState() {

@@ -477,23 +477,23 @@ void Imx51Gpu2dRasterizer::FillRect(const Gpu2dFillTarget& t, int32_t x0, int32_
 
 void Imx51Gpu2dRasterizer::SaveState(StateWriter& w) const {
     const uint32_t np = static_cast<uint32_t>(pts_.size());
-    w.Write(np);
-    for (float f : pts_) w.Write(f);
+    w.Write("coordinate_count", np);
+    for (float f : pts_) w.Write("pts", f);
     const uint32_t ns = static_cast<uint32_t>(starts_.size());
-    w.Write(ns);
-    for (uint32_t s : starts_) w.Write(s);
-    for (uint8_t c : closed_) w.Write(c);
+    w.Write("subpath_count", ns);
+    for (uint32_t s : starts_) w.Write("starts", s);
+    for (uint8_t c : closed_) w.Write("closed", c);
 }
 
 void Imx51Gpu2dRasterizer::RestoreState(StateReader& r) {
     uint32_t np = 0;
-    r.Read(np);
+    r.Read("coordinate_count", np);
     pts_.resize(np);
-    for (uint32_t i = 0; i < np; ++i) r.Read(pts_[i]);
+    for (uint32_t i = 0; i < np; ++i) r.Read("pts", pts_[i]);
     uint32_t ns = 0;
-    r.Read(ns);
+    r.Read("subpath_count", ns);
     starts_.resize(ns);
-    for (uint32_t i = 0; i < ns; ++i) r.Read(starts_[i]);
+    for (uint32_t i = 0; i < ns; ++i) r.Read("starts", starts_[i]);
     closed_.resize(ns);
-    for (uint32_t i = 0; i < ns; ++i) r.Read(closed_[i]);
+    for (uint32_t i = 0; i < ns; ++i) r.Read("closed", closed_[i]);
 }

@@ -117,32 +117,36 @@ public:
     }
 
     void SaveState(StateWriter& writer) override {
-        writer.Write(icr_);
-        writer.Write(isr_);
-        writer.Write(isar_);
-        writer.Write(idbr_);
-        writer.Write(imbcr_);
-        writer.Write(device_selected_);
-        writer.Write(device_read_);
-        writer.Write(i2c_irq_line_asserted_);
+        writer.Write("icr", icr_);
+        writer.Write("isr", isr_);
+        writer.Write("isar", isar_);
+        writer.Write("idbr", idbr_);
+        writer.Write("imbcr", imbcr_);
+        writer.Write("device_selected", device_selected_);
+        writer.Write("device_read", device_read_);
+        writer.Write("i2c_irq_line_asserted", i2c_irq_line_asserted_);
         auto* device = emu_.TryGet<Iop13xxI2cDevice>();
         const bool has_device = device != nullptr;
-        writer.Write(has_device);
+        writer.Write("has_device", has_device);
         if (device) device->SaveState(writer);
     }
 
     void RestoreState(StateReader& reader) override {
-        reader.Read(icr_);
-        reader.Read(isr_);
-        reader.Read(isar_);
-        reader.Read(idbr_);
-        reader.Read(imbcr_);
-        reader.Read(device_selected_);
-        reader.Read(device_read_);
-        reader.Read(i2c_irq_line_asserted_);
+        reader.Read("icr", icr_);
+        reader.Read("isr", isr_);
+        reader.Read("isar", isar_);
+        reader.Read("idbr", idbr_);
+        reader.Read("imbcr", imbcr_);
+        reader.Read("device_selected", device_selected_);
+        reader.Read("device_read", device_read_);
+        reader.Read("i2c_irq_line_asserted", i2c_irq_line_asserted_);
         bool has_device = false;
-        reader.Read(has_device);
-        if (has_device) emu_.Get<Iop13xxI2cDevice>().RestoreState(reader);
+        reader.Read("has_device", has_device);
+        auto* device = emu_.TryGet<Iop13xxI2cDevice>();
+        if (has_device != (device != nullptr))
+            reader.Reject(has_device ? "the image has an I2C device this build does not have"
+                                     : "this build has an I2C device the image does not have");
+        if (device) device->RestoreState(reader);
         icr_ &= kIcrKnownMask & ~kIcrUnitReset;
         idbr_ &= 0xFFu;
         isar_ &= kIsarSaMask;

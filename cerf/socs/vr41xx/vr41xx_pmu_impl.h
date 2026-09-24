@@ -96,17 +96,17 @@ public:
     }
 
     void SaveState(StateWriter& w) override {
-        w.Write(IntReg());
-        w.Write(cntreg_);
-        w.Write(waitreg_);
+        w.Write("int_reg", IntReg());
+        w.Write("cntreg", cntreg_);
+        w.Write("waitreg", waitreg_);
     }
 
     void RestoreState(StateReader& r) override {
         uint16_t v = 0;
-        r.Read(v);
+        r.Read("int_reg", v);
         intreg_.store(v, std::memory_order_release);
-        r.Read(cntreg_);
-        r.Read(waitreg_);
+        r.Read("cntreg", cntreg_);
+        r.Read("waitreg", waitreg_);
     }
 
 protected:

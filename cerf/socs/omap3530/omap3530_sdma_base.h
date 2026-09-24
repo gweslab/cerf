@@ -49,23 +49,28 @@ public:
 
     void SaveState(StateWriter& w) override {
         std::lock_guard<std::recursive_mutex> lk(state_mu_);
-        w.WriteBytes(irqstatus_l_, sizeof(irqstatus_l_));
-        w.WriteBytes(irqenable_l_, sizeof(irqenable_l_));
-        w.Write(sysstatus_);
-        w.Write(ocp_sysconfig_);
-        w.Write(gcr_);
-        w.WriteBytes(channels_.data(), channels_.size() * sizeof(Channel));
-        w.WriteBytes(irq_line_high_, sizeof(irq_line_high_));
+        w.WriteBytes("irqstatus_l", irqstatus_l_, sizeof(irqstatus_l_));
+        w.WriteBytes("irqenable_l", irqenable_l_, sizeof(irqenable_l_));
+        w.Write("sysstatus", sysstatus_);
+        w.Write("ocp_sysconfig", ocp_sysconfig_);
+        w.Write("gcr", gcr_);
+        static_assert(StateVisitCoversAllBytes<Channel>(
+                          [](Channel& c, StateFieldBytes& f) { VisitChannel(c, f); }),
+                      "VisitChannel must name or skip every field of Channel");
+        StateWriteField field(w);
+        for (Channel& c : channels_) VisitChannel(c, field);
+        w.WriteBytes("irq_line_high", irq_line_high_, sizeof(irq_line_high_));
     }
     void RestoreState(StateReader& r) override {
         std::lock_guard<std::recursive_mutex> lk(state_mu_);
-        r.ReadBytes(irqstatus_l_, sizeof(irqstatus_l_));
-        r.ReadBytes(irqenable_l_, sizeof(irqenable_l_));
-        r.Read(sysstatus_);
-        r.Read(ocp_sysconfig_);
-        r.Read(gcr_);
-        r.ReadBytes(channels_.data(), channels_.size() * sizeof(Channel));
-        r.ReadBytes(irq_line_high_, sizeof(irq_line_high_));
+        r.ReadBytes("irqstatus_l", irqstatus_l_, sizeof(irqstatus_l_));
+        r.ReadBytes("irqenable_l", irqenable_l_, sizeof(irqenable_l_));
+        r.Read("sysstatus", sysstatus_);
+        r.Read("ocp_sysconfig", ocp_sysconfig_);
+        r.Read("gcr", gcr_);
+        StateReadField field(r);
+        for (Channel& c : channels_) VisitChannel(c, field);
+        r.ReadBytes("irq_line_high", irq_line_high_, sizeof(irq_line_high_));
     }
 
 protected:
@@ -96,7 +101,32 @@ private:
         uint32_t ccfn      = 0;
         uint32_t color     = 0;
         bool     active    = false;
+        uint8_t  pad[3]    = {};
     };
+
+    template <typename F>
+    static constexpr void VisitChannel(Channel& c, F& field) {
+        field("ccr", c.ccr);
+        field("clnk_ctrl", c.clnk_ctrl);
+        field("cicr", c.cicr);
+        field("csr", c.csr);
+        field("csdp", c.csdp);
+        field("cen", c.cen);
+        field("cfn", c.cfn);
+        field("cssa", c.cssa);
+        field("cdsa", c.cdsa);
+        field("csei", c.csei);
+        field("csfi", c.csfi);
+        field("cdei", c.cdei);
+        field("cdfi", c.cdfi);
+        field("csac", c.csac);
+        field("cdac", c.cdac);
+        field("ccen", c.ccen);
+        field("ccfn", c.ccfn);
+        field("color", c.color);
+        field("active", c.active);
+        field.Skip(c.pad);
+    }
 
     void RunSwTransfer(int ch);
     void ExecuteSyncUnit(int ch);

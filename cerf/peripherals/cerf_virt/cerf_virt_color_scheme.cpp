@@ -192,14 +192,14 @@ uint32_t CerfVirtColorScheme::ReadWord(uint32_t addr) {
 void CerfVirtColorScheme::WriteWord(uint32_t, uint32_t) {}
 
 void CerfVirtColorScheme::SaveState(StateWriter& w) {
-    w.Write<uint32_t>(present_ ? 1u : 0u);
-    w.Write<uint32_t>(count_);
-    for (uint32_t i = 0; i < CerfVirt::kColorSchemeMax; ++i) w.Write<uint32_t>(entries_[i]);
+    w.Write<uint32_t>("present", present_ ? 1u : 0u);
+    w.Write<uint32_t>("count", count_);
+    for (uint32_t i = 0; i < CerfVirt::kColorSchemeMax; ++i) w.Write<uint32_t>("entries", entries_[i]);
 }
 
 void CerfVirtColorScheme::RestoreState(StateReader& r) {
     uint32_t v;
-    r.Read(v); present_ = (v != 0u);
-    r.Read(v); count_ = v;
-    for (uint32_t i = 0; i < CerfVirt::kColorSchemeMax; ++i) { r.Read(v); entries_[i] = v; }
+    r.Read("present", v); present_ = (v != 0u);
+    r.Read("count", v); count_ = v;
+    for (uint32_t i = 0; i < CerfVirt::kColorSchemeMax; ++i) { r.Read("entries", v); entries_[i] = v; }
 }

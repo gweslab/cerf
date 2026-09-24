@@ -209,20 +209,20 @@ void CasioCassiopeiaEm500Touch::WorkerLoop() {
 
 void CasioCassiopeiaEm500Touch::SaveState(StateWriter& w) const {
     std::lock_guard<std::mutex> lk(mtx_);
-    w.Write(ctrl_300_);
-    w.Write(param_308_); w.Write(param_30C_); w.Write(param_310_); w.Write(param_318_);
-    w.Write(cfg_3C8_);
-    for (uint16_t v : adc0_) w.Write(v);
-    for (uint16_t v : adc1_) w.Write(v);
+    w.Write("ctrl_300", ctrl_300_);
+    w.Write("param_308", param_308_); w.Write("param_30C", param_30C_); w.Write("param_310", param_310_); w.Write("param_318", param_318_);
+    w.Write("cfg_3C8", cfg_3C8_);
+    for (uint16_t v : adc0_) w.Write("adc0", v);
+    for (uint16_t v : adc1_) w.Write("adc1", v);
 }
 
 void CasioCassiopeiaEm500Touch::RestoreState(StateReader& r) {
     std::lock_guard<std::mutex> lk(mtx_);
-    r.Read(ctrl_300_);
-    r.Read(param_308_); r.Read(param_30C_); r.Read(param_310_); r.Read(param_318_);
-    r.Read(cfg_3C8_);
-    for (uint16_t& v : adc0_) r.Read(v);
-    for (uint16_t& v : adc1_) r.Read(v);
+    r.Read("ctrl_300", ctrl_300_);
+    r.Read("param_308", param_308_); r.Read("param_30C", param_30C_); r.Read("param_310", param_310_); r.Read("param_318", param_318_);
+    r.Read("cfg_3C8", cfg_3C8_);
+    for (uint16_t& v : adc0_) r.Read("adc0", v);
+    for (uint16_t& v : adc1_) r.Read("adc1", v);
     pen_down_ = false;
     release_drain_ = 0;
     pending_down_ = false;

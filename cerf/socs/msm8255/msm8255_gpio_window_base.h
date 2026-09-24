@@ -135,7 +135,7 @@ public:
         uint32_t bad_off   = 0;
         uint32_t bad_value = 0;
         if (!banks_.Restore(r, bad_off, bad_value)) {
-            emu_.Get<Fatal>().Die(
+            r.Reject(
                 "Peripheral '%s': restored state at +0x%03X value 0x%08X "
                 "carries pins that bank does not have",
                 typeid(*this).name(), bad_off, bad_value);
@@ -146,17 +146,17 @@ public:
         case Msm8255GpioMuxAccess::Served:
             return;
         case Msm8255GpioMuxAccess::PinAbsent:
-            emu_.Get<Fatal>().Die(
+            r.Reject(
                 "Peripheral '%s': restored pin-mux state selects gpio %u, "
                 "which is not one this window serves",
                 typeid(*this).name(), bad);
         case Msm8255GpioMuxAccess::ConfigBitsAbsent:
-            emu_.Get<Fatal>().Die(
+            r.Reject(
                 "Peripheral '%s': restored pin-mux config 0x%08X sets bits "
                 "outside the 0x%03X the pull, function and drive fields "
                 "occupy", typeid(*this).name(), bad, MuxType::kConfigMask);
         case Msm8255GpioMuxAccess::DriveUndefined:
-            emu_.Get<Fatal>().Die(
+            r.Reject(
                 "Peripheral '%s': restored pin-mux config 0x%08X selects drive "
                 "strength %u, and only 0 through %u are named",
                 typeid(*this).name(), bad,

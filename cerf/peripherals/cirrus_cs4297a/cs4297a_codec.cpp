@@ -133,11 +133,11 @@ void Cs4297aCodec::WriteRegister(uint32_t reg, uint16_t value) {
 }
 
 void Cs4297aCodec::SaveState(StateWriter& writer) const {
-    writer.WriteBytes(registers_, sizeof(registers_));
+    writer.WriteBytes("registers", registers_, sizeof(registers_));
 }
 
 void Cs4297aCodec::RestoreState(StateReader& reader) {
-    reader.ReadBytes(registers_, sizeof(registers_));
+    reader.ReadBytes("registers", registers_, sizeof(registers_));
 }
 
 REGISTER_SERVICE(Cs4297aCodec);

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../core/service.h"
+#include "state_image_format.h"
 
 #define NOMINMAX
 #include <windows.h>
@@ -29,9 +30,6 @@ public:
     /* Signaled when the most recent SaveAsync/RestoreAsync worker finishes. */
     HANDLE DoneEvent() const { return done_event_; }
 
-    /* Empty path → DefaultStatePath. ram_only applies only the RAM
-       section (warm boot): cold-entry CPU/cp15/peripherals stay intact
-       for the kernel to re-init. */
     bool Save(const std::wstring& path);
     bool Restore(const std::wstring& path, bool ram_only = false,
                  bool cold_boot_on_failure = false);
@@ -45,11 +43,17 @@ public:
     void OnShutdown() override;
 
 private:
-    void     WriteHeader(StateWriter& w) const;
-    bool     ValidateHeader(StateReader& r);
-    void     RestorePeripherals(StateReader& r);
-    void     RestorePresentation(StateReader& r);
-    uint32_t PeripheralLayoutSig() const;
+    std::wstring     DeviceDirFile(const wchar_t* name) const;
+    StateImageHeader LiveHeader() const;
+    bool             WriteImage(const std::wstring& path);
+    void             SaveSection(StateWriter& w, StateSection section);
+    void             RestoreSection(StateReader& r, StateSection section);
+    void             ReadHeader(StateReader& r);
+    void             ApplyImage(StateReader& r, bool ram_only);
+    void             RollBack(const std::wstring& rollback_path);
+    void             RestorePeripherals(StateReader& r);
+    void             RestorePresentation(StateReader& r);
+    uint32_t         PeripheralLayoutSig() const;
     void     Progress(const char* fmt, ...);
     void     AwaitFailureAck(bool cold_boot);
     void     JoinWorker();

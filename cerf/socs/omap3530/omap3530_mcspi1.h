@@ -36,33 +36,28 @@ public:
        re-established by RegisterSlave at construction - not serialized. */
     void SaveState(StateWriter& w) override {
         std::lock_guard<std::mutex> lk(mu_);
-        w.Write(sysconfig_);
-        w.Write(irqstatus_);
-        w.Write(irqenable_);
-        w.Write(wakeupenable_);
-        w.Write(syst_);
-        w.Write(modulctrl_);
-        for (const Channel& c : channels_) {
-            w.Write(c.chconf);
-            w.Write(c.chctrl);
-            w.Write(c.rx);
-            w.Write(c.rx_full);
-        }
+        w.Write("sysconfig", sysconfig_);
+        w.Write("irqstatus", irqstatus_);
+        w.Write("irqenable", irqenable_);
+        w.Write("wakeupenable", wakeupenable_);
+        w.Write("syst", syst_);
+        w.Write("modulctrl", modulctrl_);
+        static_assert(StateVisitCoversAllBytes<Channel>(
+                          [](Channel& c, StateFieldBytes& f) { Channel::Visit(c, f); }),
+                      "Channel::Visit must name or skip every field of Channel");
+        StateWriteField field(w);
+        for (Channel& c : channels_) Channel::Visit(c, field);
     }
     void RestoreState(StateReader& r) override {
         std::lock_guard<std::mutex> lk(mu_);
-        r.Read(sysconfig_);
-        r.Read(irqstatus_);
-        r.Read(irqenable_);
-        r.Read(wakeupenable_);
-        r.Read(syst_);
-        r.Read(modulctrl_);
-        for (Channel& c : channels_) {
-            r.Read(c.chconf);
-            r.Read(c.chctrl);
-            r.Read(c.rx);
-            r.Read(c.rx_full);
-        }
+        r.Read("sysconfig", sysconfig_);
+        r.Read("irqstatus", irqstatus_);
+        r.Read("irqenable", irqenable_);
+        r.Read("wakeupenable", wakeupenable_);
+        r.Read("syst", syst_);
+        r.Read("modulctrl", modulctrl_);
+        StateReadField field(r);
+        for (Channel& c : channels_) Channel::Visit(c, field);
     }
 
 private:
@@ -71,7 +66,18 @@ private:
         uint32_t    chctrl  = 0;
         uint32_t    rx      = 0;
         bool        rx_full = false;
+        uint8_t     pad[3]  = {};
         McspiSlave* slave   = nullptr;
+
+        template <typename F>
+        static constexpr void Visit(Channel& c, F& field) {
+            field("chconf", c.chconf);
+            field("chctrl", c.chctrl);
+            field("rx", c.rx);
+            field("rx_full", c.rx_full);
+            field.Skip(c.pad);
+            field.Skip(c.slave);
+        }
     };
 
     void     PerformTransfer(uint32_t channel_index, uint32_t tx_word);

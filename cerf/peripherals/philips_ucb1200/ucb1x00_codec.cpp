@@ -110,13 +110,13 @@ void Ucb1x00Codec::Convert(uint16_t adc_cr) {
 }
 
 void Ucb1x00Codec::SaveState(StateWriter& w) {
-    w.WriteBytes(regs_.data(), sizeof(uint16_t) * regs_.size());
-    w.Write(adc_data_);
+    w.WriteBytes("regs", regs_.data(), sizeof(uint16_t) * regs_.size());
+    w.Write("adc_data", adc_data_);
 }
 
 void Ucb1x00Codec::RestoreState(StateReader& r) {
-    r.ReadBytes(regs_.data(), sizeof(uint16_t) * regs_.size());
-    r.Read(adc_data_);
+    r.ReadBytes("regs", regs_.data(), sizeof(uint16_t) * regs_.size());
+    r.Read("adc_data", adc_data_);
 }
 
 /* The board's pen_irq_armed_ is computed from a NEGINTEN write; RestoreState

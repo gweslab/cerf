@@ -38,14 +38,14 @@ public:
 
     /* JIT-thread-only register file (no worker thread). */
     void SaveState(StateWriter& w) override {
-        w.WriteBytes(mpr_,   sizeof(mpr_));
-        w.WriteBytes(sgpcr_, sizeof(sgpcr_));
-        w.WriteBytes(mgpcr_, sizeof(mgpcr_));
+        w.WriteBytes("mpr", mpr_,   sizeof(mpr_));
+        w.WriteBytes("sgpcr", sgpcr_, sizeof(sgpcr_));
+        w.WriteBytes("mgpcr", mgpcr_, sizeof(mgpcr_));
     }
     void RestoreState(StateReader& r) override {
-        r.ReadBytes(mpr_,   sizeof(mpr_));
-        r.ReadBytes(sgpcr_, sizeof(sgpcr_));
-        r.ReadBytes(mgpcr_, sizeof(mgpcr_));
+        r.ReadBytes("mpr", mpr_,   sizeof(mpr_));
+        r.ReadBytes("sgpcr", sgpcr_, sizeof(sgpcr_));
+        r.ReadBytes("mgpcr", mgpcr_, sizeof(mgpcr_));
     }
 
 private:

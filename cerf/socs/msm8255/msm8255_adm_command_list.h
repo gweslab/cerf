@@ -10,6 +10,7 @@ public:
 
     bool ShouldRegister() override;
 
+    bool IsModeledCmdPtr(uint32_t value) const;
     void RequireModeledCmdPtr(uint32_t value);
     uint32_t FirstCrci(uint32_t value);
     void Run(uint32_t value, uint32_t crci);

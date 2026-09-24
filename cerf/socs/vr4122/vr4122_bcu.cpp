@@ -73,8 +73,8 @@ public:
         HaltUnsupportedAccess("VR4122 BCU WriteHalf", addr, value);
     }
 
-    void SaveState(StateWriter& w) override { w.Write(cntreg1_); }
-    void RestoreState(StateReader& r) override { r.Read(cntreg1_); }
+    void SaveState(StateWriter& w) override { w.Write("cntreg1", cntreg1_); }
+    void RestoreState(StateReader& r) override { r.Read("cntreg1", cntreg1_); }
 
 private:
     /* VR4131 UM 7.2.7 p142: CLKSPEEDREG VTDIVMODE(10:8)/TDIVMODE(12) take PMUTCLKDIVREG's

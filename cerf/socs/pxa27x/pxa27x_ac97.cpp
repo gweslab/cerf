@@ -151,26 +151,26 @@ void Pxa27xAc97::WriteHalf(uint32_t addr, uint16_t value) {
 }
 
 void Pxa27xAc97::SaveState(StateWriter& w) {
-    w.Write(pocr_);   w.Write(pcmicr_); w.Write(mccr_);
-    w.Write(mocr_);   w.Write(micr_);   w.Write(gcr_);
-    w.Write(posr_);   w.Write(pcmisr_); w.Write(mcsr_);
-    w.Write(mosr_);   w.Write(misr_);   w.Write(gsr_);
-    w.Write(car_caip_);
-    w.Write(vra_);
-    w.Write(front_dac_rate_);
-    w.WriteBytes(codec_, sizeof(codec_));
+    w.Write("pocr", pocr_);   w.Write("pcmicr", pcmicr_); w.Write("mccr", mccr_);
+    w.Write("mocr", mocr_);   w.Write("micr", micr_);   w.Write("gcr", gcr_);
+    w.Write("posr", posr_);   w.Write("pcmisr", pcmisr_); w.Write("mcsr", mcsr_);
+    w.Write("mosr", mosr_);   w.Write("misr", misr_);   w.Write("gsr", gsr_);
+    w.Write("car_caip", car_caip_);
+    w.Write("vra", vra_);
+    w.Write("front_dac_rate", front_dac_rate_);
+    w.WriteBytes("codec", codec_, sizeof(codec_));
     if (auto* c = emu_.TryGet<Ac97Codec>()) c->SaveState(w);
 }
 
 void Pxa27xAc97::RestoreState(StateReader& r) {
-    r.Read(pocr_);   r.Read(pcmicr_); r.Read(mccr_);
-    r.Read(mocr_);   r.Read(micr_);   r.Read(gcr_);
-    r.Read(posr_);   r.Read(pcmisr_); r.Read(mcsr_);
-    r.Read(mosr_);   r.Read(misr_);   r.Read(gsr_);
-    r.Read(car_caip_);
-    r.Read(vra_);
-    r.Read(front_dac_rate_);
-    r.ReadBytes(codec_, sizeof(codec_));
+    r.Read("pocr", pocr_);   r.Read("pcmicr", pcmicr_); r.Read("mccr", mccr_);
+    r.Read("mocr", mocr_);   r.Read("micr", micr_);   r.Read("gcr", gcr_);
+    r.Read("posr", posr_);   r.Read("pcmisr", pcmisr_); r.Read("mcsr", mcsr_);
+    r.Read("mosr", mosr_);   r.Read("misr", misr_);   r.Read("gsr", gsr_);
+    r.Read("car_caip", car_caip_);
+    r.Read("vra", vra_);
+    r.Read("front_dac_rate", front_dac_rate_);
+    r.ReadBytes("codec", codec_, sizeof(codec_));
     if (auto* c = emu_.TryGet<Ac97Codec>()) c->RestoreState(r);
     audio_out_.SetFormat(front_dac_rate_, kChannels, kBitsPerSamp);
 }

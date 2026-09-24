@@ -15,7 +15,6 @@ from cli_console import attach_parent_console
 from install_options import parse_options
 from launcher_cli import run_cli
 from operations import BundleManager
-from transactional import TRANSACTIONAL_COMMAND, run_transactional
 from transactional_crash import (TRANSACTIONAL_CRASH_COMMAND,
                                  run_transactional_crash)
 from ui_theme import enable_dpi_awareness
@@ -33,7 +32,9 @@ def main(argv: List[str]) -> int:
 
     if UNINSTALL_FLAG in argv:
         enable_dpi_awareness()
-        return run_uninstall()
+        return run_uninstall(argv)
+
+    from transactional import TRANSACTIONAL_COMMAND, run_transactional
 
     upgraded = False
     if stage == POST_UPGRADE_STAGE:

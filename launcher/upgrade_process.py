@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import ctypes
+import os
 import subprocess
 import sys
 import time
@@ -20,12 +21,14 @@ INSTALL_FLAG = "--upgrade"
 FRESH_INSTALL_FLAG = "--install"
 POST_UPGRADE_FLAG = "--post-upgrade"
 UNINSTALL_FLAG = "--uninstall"
+UNINSTALL_DIR_PREFIX = "--uninstall-dir="
 DESKTOP_ICON_FLAG = "--create-desktop-icon"
 START_MENU_FLAG = "--create-start-menu-entry"
 NO_LAUNCH_FLAG = "--do-not-launch-after-install"
 WAIT_FOR_PID_PREFIX = "--wait-for-pid="
 
 _TH32CS_SNAPPROCESS = 0x00000002
+_PROCESS_QUERY_LIMITED_INFORMATION = 0x00001000
 _SYNCHRONIZE = 0x00100000
 _WAIT_TIMEOUT = 0x00000102
 _ERROR_ACCESS_DENIED = 5
@@ -51,7 +54,29 @@ class _ProcessEntry32W(ctypes.Structure):
     ]
 
 
-def running_cerf_pids() -> List[int]:
+def _image_path(pid: int) -> Optional[str]:
+    kernel32 = ctypes.windll.kernel32
+    handle = kernel32.OpenProcess(_PROCESS_QUERY_LIMITED_INFORMATION, False,
+                                  wintypes.DWORD(pid))
+    if not handle:
+        return None
+    try:
+        size = wintypes.DWORD(32768)
+        buffer = ctypes.create_unicode_buffer(size.value)
+        if not kernel32.QueryFullProcessImageNameW(handle, 0, buffer,
+                                                   ctypes.byref(size)):
+            return None
+        return buffer.value
+    finally:
+        kernel32.CloseHandle(handle)
+
+
+def _same_directory(a: str, b: Path) -> bool:
+    return (os.path.normcase(os.path.abspath(a))
+            == os.path.normcase(os.path.abspath(str(b))))
+
+
+def running_cerf_pids(install_dir: Path) -> List[int]:
     kernel32 = ctypes.windll.kernel32
     snapshot = kernel32.CreateToolhelp32Snapshot(_TH32CS_SNAPPROCESS, 0)
     if snapshot == _INVALID_HANDLE_VALUE:
@@ -64,16 +89,21 @@ def running_cerf_pids() -> List[int]:
             return pids
         while True:
             if entry.szExeFile.lower() == CERF_EXE_NAME:
-                pids.append(int(entry.th32ProcessID))
+                pid = int(entry.th32ProcessID)
+                image = _image_path(pid)
+                if image is None or _same_directory(os.path.dirname(image),
+                                                    install_dir):
+                    pids.append(pid)
             if not kernel32.Process32NextW(snapshot, ctypes.byref(entry)):
                 return pids
     finally:
         kernel32.CloseHandle(snapshot)
 
 
-def wait_for_cerf_exit(ask_retry: Callable[[str, str], bool]) -> bool:
+def wait_for_cerf_exit(ask_retry: Callable[[str, str], bool],
+                       install_dir: Path) -> bool:
     while True:
-        if not running_cerf_pids():
+        if not running_cerf_pids(install_dir):
             return True
         if not ask_retry(
                 "The emulator is running",

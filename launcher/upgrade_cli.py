@@ -58,7 +58,7 @@ def _install(window: UpgradeWindow, wait_pid: Optional[int],
             window.post_log("Waiting for the previous launcher (pid %d)"
                             % wait_pid)
             wait_for_pid_exit(wait_pid)
-        if not wait_for_cerf_exit(window.ask_retry):
+        if not wait_for_cerf_exit(window.ask_retry, install_dir):
             raise UpgradeError("cancelled while cerf.exe was running")
         install_upgrade(upgrade_dir, install_dir, window.post_log,
                         window.ask_retry)

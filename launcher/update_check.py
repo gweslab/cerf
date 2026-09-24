@@ -80,7 +80,7 @@ class UpdateCheck:
                                default="Cancel") == "Retry"
 
         try:
-            return wait_for_cerf_exit(ask_retry)
+            return wait_for_cerf_exit(ask_retry, exe_dir())
         except UpgradeError as exc:
             show_error(self.app, "Upgrade", str(exc))
             return False

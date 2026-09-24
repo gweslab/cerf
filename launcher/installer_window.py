@@ -28,6 +28,13 @@ DESKTOP_LABEL = "Create desktop icon"
 START_MENU_LABEL = "Create Start menu entry"
 LAUNCH_LABEL = "Launch after installation"
 
+UNSTABLE_LABEL = "Install unstable version"
+UNSTABLE_WARNING = (
+    "You picked an unstable build to install. This build might break on new "
+    "updates or clobber your installation directory. If you want to continue "
+    "receiving unstable channel updates, pick that channel in Settings "
+    "later.\n\nWould you like to continue?")
+
 
 class InstallerWindow:
     def __init__(self, root: tk.Tk) -> None:
@@ -59,6 +66,17 @@ class InstallerWindow:
         self._change = self._chrome.add_left_button("Change Directory",
                                                     self._pick_directory)
         self._cancel = self._chrome.add_button("Cancel", self._on_cancel)
+        self._more = ttk.Button(self._chrome.buttons, text="▾", width=2,
+                                style="Download.TButton",
+                                command=self._show_more)
+        self._more.pack(side="right")
+        self._more_menu = tk.Menu(self._root, tearoff=0, bd=0,
+                                  background=theme.BG_FIELD,
+                                  foreground=theme.FG,
+                                  activebackground=theme.BG_HOVER,
+                                  activeforeground=theme.FG)
+        self._more_menu.add_command(label=UNSTABLE_LABEL,
+                                    command=self._start_unstable)
         self._install = self._chrome.add_button("Install", self._start,
                                                 style="Download.TButton",
                                                 default=True)
@@ -98,7 +116,22 @@ class InstallerWindow:
             return
         self._root.quit()
 
-    def _start(self) -> None:
+    def _show_more(self) -> None:
+        button = self._more
+        try:
+            self._more_menu.tk_popup(button.winfo_rootx(),
+                                     button.winfo_rooty()
+                                     + button.winfo_height())
+        finally:
+            self._more_menu.grab_release()
+
+    def _start_unstable(self) -> None:
+        if self._running:
+            return
+        if ask_yesno(self._root, UNSTABLE_LABEL, UNSTABLE_WARNING):
+            self._start(unstable=True)
+
+    def _start(self, unstable: bool = False) -> None:
         if self._running:
             return
         self._running = True
@@ -106,6 +139,7 @@ class InstallerWindow:
 
         self._options.destroy()
         self._change.destroy()
+        self._more.destroy()
         self._install.destroy()
         self._cancel.configure(state="disabled")
         self._chrome.set_heading("Downloading " + PRODUCT_NAME + "…")
@@ -124,14 +158,14 @@ class InstallerWindow:
         self._progress.start(80)
         self._chrome.present()
 
-        threading.Thread(target=self._work, args=(options,),
+        threading.Thread(target=self._work, args=(options, unstable),
                          daemon=True).start()
         self._root.after(50, self._pump)
 
-    def _work(self, options: InstallOptions) -> None:
+    def _work(self, options: InstallOptions, unstable: bool) -> None:
         try:
             stage_release(self._install_dir, self._post_log,
-                          self._post_progress)
+                          self._post_progress, unstable)
             staged = self._install_dir / UPGRADE_DIR_NAME
             spawn_stage(launcher_exe_in(staged),
                         [WAIT_FOR_PID_PREFIX + str(os.getpid())]

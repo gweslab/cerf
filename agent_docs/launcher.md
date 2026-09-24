@@ -190,7 +190,7 @@ launcher lists and a board CERF boots can never disagree.
 `cerf_installer.exe` is what a user downloads from the website. It is a second
 PyInstaller build of the same `launcher/` tree. It belongs to no installation,
 so the build keeps it out of `bundled/` and out of the build output. CI uploads
-it to its own R2 prefix on every push to the main branch.
+it to its own R2 prefix.
 
 **An installer is as old as the day the user downloaded it. It therefore stages
 a release and hands control to the launcher in that release.** The installer
@@ -199,14 +199,19 @@ installation belongs to the launcher, so the newest build always decides it. A
 step that moves into the installer is a step that an old download performs its
 own way.
 
-The stage that puts the files in place is the one the self-update already uses.
-`--install` marks it as a first installation, and `--upgrade` marks it as a
-replacement. The installer also sends the choices that the user made.
+The stage that puts the files in place is the one the self-update already uses,
+marked as a first installation. The installer also sends the choices that the
+user made.
 
 `--uninstall` empties the installation directory. The user data in that
 directory stays, unless the user asked for it to go too. Windows locks a running
-image, so `launcher.exe` cannot delete itself. A detached `cmd.exe` waits for
-the process to exit, then removes the file.
+image, so `launcher.exe` cannot delete itself. It copies itself to `%TEMP%` and
+runs the uninstaller from that copy. The copy stays in `%TEMP%`.
+
+**The installer, and the copy of the uninstaller in `%TEMP%`, run outside an
+installation.** No installation data is beside them. The code that they reach
+must not load `db.json` or another file that an installation ships. An import of
+a module that loads such a file is enough to break them.
 
 ## Self-update
 

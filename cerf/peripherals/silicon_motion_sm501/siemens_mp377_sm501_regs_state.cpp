@@ -14,6 +14,7 @@ void SiemensMp377Sm501Regs::SaveState(StateWriter& w) {
     w.Write("panel_pitch_bytes", panel_pitch_bytes_);
 
     emu_.Get<SiemensMp377Sm501Blitter>().SaveState(w);
+    emu_.Get<SiemensMp377Sm501Video>().SaveState(w);
 
     emu_.Get<SiemensMp377Sm501Ac97>().SaveState(w);
     emu_.Get<SiemensMp377Sm501AudioMcu>().SaveState(w);
@@ -30,6 +31,7 @@ void SiemensMp377Sm501Regs::RestoreState(StateReader& r) {
     r.Read("panel_pitch_bytes", panel_pitch_bytes_);
 
     emu_.Get<SiemensMp377Sm501Blitter>().RestoreState(r);
+    emu_.Get<SiemensMp377Sm501Video>().RestoreState(r);
 
     emu_.Get<SiemensMp377Sm501Ac97>().RestoreState(r);
     emu_.Get<SiemensMp377Sm501AudioMcu>().RestoreState(r);

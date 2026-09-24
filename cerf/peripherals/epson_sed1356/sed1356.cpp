@@ -4,7 +4,6 @@
 #include "../../core/byte_order.h"
 #include "../../core/cerf_emulator.h"
 #include "../../core/log.h"
-#include "../../host/host_window.h"
 #include "../peripheral_dispatcher.h"
 #include "../../state/state_stream.h"
 
@@ -77,16 +76,11 @@ uint8_t Sed1356::VndStatusBit() const {
 }
 
 void Sed1356::PublishOnLcdEnableEdge() {
-    if (!LcdDisplayOn()) { enable_published_ = false; return; }
-    const uint32_t w = LcdGuestW(), h = LcdGuestH();
-    if (enable_published_ && w == published_w_ && h == published_h_) return;
-
-    enable_published_ = true;
-    published_w_ = w;
-    published_h_ = h;
+    const bool on = LcdDisplayOn();
+    const uint32_t w = on ? LcdGuestW() : 0u, h = on ? LcdGuestH() : 0u;
+    if (!mode_latch_.Publish(emu_, on, w, h)) return;
     LOG(Lcd, "Sed1356: LCD enabled %ux%u %ubpp start=0x%X stride=%u\n",
         w, h, LcdBpp(), LcdStartByte(), LcdStrideBytes());
-    emu_.Get<HostWindow>().OnLcdEnabled();
 }
 
 namespace {
@@ -334,9 +328,7 @@ void Sed1356::SaveState(StateWriter& w) {
     w.Write("lut_index", lut_index_);
     w.Write("lut_component", lut_component_);
     w.WriteBytes("lut_rgb_latch", lut_rgb_latch_, sizeof(lut_rgb_latch_));
-    w.Write<uint8_t>(enable_published_ ? 1u : 0u);
-    w.Write(published_w_);
-    w.Write(published_h_);
+    mode_latch_.SaveState(w);
     blt_.SaveState(w);
 }
 
@@ -348,9 +340,7 @@ void Sed1356::RestoreState(StateReader& r) {
     r.Read("lut_index", lut_index_);
     r.Read("lut_component", lut_component_);
     r.ReadBytes("lut_rgb_latch", lut_rgb_latch_, sizeof(lut_rgb_latch_));
-    uint8_t en = 0; r.Read(en); enable_published_ = (en != 0);
-    r.Read(published_w_);
-    r.Read(published_h_);
+    mode_latch_.RestoreState(r);
     blt_.RestoreState(r);
 }
 

@@ -6,7 +6,6 @@
 #include "../../core/byte_order.h"
 #include "../../core/cerf_emulator.h"
 #include "../../core/log.h"
-#include "../../host/host_window.h"
 #include "../peripheral_dispatcher.h"
 #include "../../state/state_stream.h"
 
@@ -96,17 +95,11 @@ uint32_t MediaQMq200::PaletteEntry(uint32_t index) const {
 }
 
 void MediaQMq200::PublishScreenSizeOnEnableEdge() {
-    if (!IsEnabled()) { enable_published_ = false; return; }
-
-    const uint32_t w = GetGuestW(), h = GetGuestH();
-    if (enable_published_ && w == published_w_ && h == published_h_) return;
-
-    enable_published_ = true;
-    published_w_ = w;
-    published_h_ = h;
+    const bool on = IsEnabled();
+    const uint32_t w = on ? GetGuestW() : 0u, h = on ? GetGuestH() : 0u;
+    if (!mode_latch_.Publish(emu_, on, w, h)) return;
     LOG(Lcd, "MediaQMq200: display enabled %ux%u %ubpp stride=%u fb_off=0x%X\n",
         w, h, Bpp(), Stride(), FbWindowOffset());
-    emu_.Get<HostWindow>().OnLcdEnabled();
 }
 
 /* Window layout: [0, kFbSize) framebuffer SRAM; [kRegWinOff, +kRegSize) the
@@ -177,18 +170,14 @@ void MediaQMq200::WriteWord(uint32_t addr, uint32_t value) {
 void MediaQMq200::SaveState(StateWriter& w) {
     w.WriteBytes("fb", fb_.data(), fb_.size());
     w.WriteBytes("reg", reg_.data(), reg_.size() * sizeof(uint32_t));
-    w.Write<uint8_t>(enable_published_ ? 1u : 0u);
-    w.Write(published_w_);
-    w.Write(published_h_);
+    mode_latch_.SaveState(w);
     ge_.SaveState(w);
 }
 
 void MediaQMq200::RestoreState(StateReader& r) {
     r.ReadBytes("fb", fb_.data(), fb_.size());
     r.ReadBytes("reg", reg_.data(), reg_.size() * sizeof(uint32_t));
-    uint8_t en = 0; r.Read(en); enable_published_ = (en != 0);
-    r.Read(published_w_);
-    r.Read(published_h_);
+    mode_latch_.RestoreState(r);
     ge_.RestoreState(r);
 }
 

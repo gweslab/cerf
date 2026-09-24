@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../peripheral_base.h"
+#include "../../lcd/display_mode_latch.h"
 #include "mediaq_mq200_ge.h"
 
 #include <cstdint>
@@ -89,7 +90,6 @@ private:
 
     std::vector<uint8_t>  fb_;
     std::vector<uint32_t> reg_;
-    bool     enable_published_ = false;
-    uint32_t published_w_ = 0, published_h_ = 0;
+    DisplayModeLatch mode_latch_;
     MediaQMq200Ge ge_{*this};
 };

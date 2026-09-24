@@ -6,6 +6,7 @@
 #include "../../boards/board_context.h"
 #include "../../boards/siemens_mp377/siemens_mp377_id.h"
 #include "../../core/cerf_emulator.h"
+#include "../../core/log.h"
 
 namespace siemens_mp377 {
 
@@ -94,6 +95,28 @@ uint32_t SiemensMp377Sm501Video::DisplayCursorColors12() {
 
 uint32_t SiemensMp377Sm501Video::DisplayCursorColor3() {
     return emu_.Get<SiemensMp377Sm501Regs>().ReadSm501Register(UsesCrt() ? 0x08023Cu : 0x0800FCu);
+}
+
+void SiemensMp377Sm501Video::PublishDisplayMode() {
+    /* SM502 MMCC Databook v1.00 section 5, Panel/CRT Display Control bit 2 (E);
+       QEMU hw/display/sm501.c sm501_update_display(). */
+    const bool on = (DisplayControl() & (1u << 2u)) != 0u;
+    const uint32_t w = on ? DisplayWidth() : 0u;
+    const uint32_t h = on ? DisplayHeight() : 0u;
+    if (!mode_latch_.Publish(emu_, on, w, h)) return;
+    LOG(Lcd, "SM501: %s plane enabled, timing %ux%u\n", UsesCrt() ? "CRT" : "panel", w, h);
+}
+
+void SiemensMp377Sm501Video::ResetDisplayMode() {
+    mode_latch_ = DisplayModeLatch{};
+}
+
+void SiemensMp377Sm501Video::SaveState(StateWriter& w) const {
+    mode_latch_.SaveState(w);
+}
+
+void SiemensMp377Sm501Video::RestoreState(StateReader& r) {
+    mode_latch_.RestoreState(r);
 }
 
 REGISTER_SERVICE(SiemensMp377Sm501Video);

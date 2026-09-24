@@ -1,8 +1,12 @@
 #pragma once
 
 #include "../../core/service.h"
+#include "../../lcd/display_mode_latch.h"
 
 #include <cstdint>
+
+class StateReader;
+class StateWriter;
 
 namespace siemens_mp377 {
 
@@ -34,6 +38,14 @@ public:
     uint32_t DisplayCursorLocation();
     uint32_t DisplayCursorColors12();
     uint32_t DisplayCursorColor3();
+
+    void PublishDisplayMode();
+    void ResetDisplayMode();
+    void SaveState(StateWriter& w) const;
+    void RestoreState(StateReader& r);
+
+private:
+    DisplayModeLatch mode_latch_;
 };
 
 } // namespace siemens_mp377

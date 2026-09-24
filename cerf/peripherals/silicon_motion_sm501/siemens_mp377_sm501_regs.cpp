@@ -55,6 +55,7 @@ void SiemensMp377Sm501Regs::ResetDevice(bool synchronize_audio) {
         panel_fb_raw_ = 0u;
         panel_pitch_bytes_ = 0u;
     }
+    emu_.Get<SiemensMp377Sm501Video>().ResetDisplayMode();
     emu_.Get<IrqController>().SetSharedIrqLevel(kMp377Sm501IrqSource, kMp377Sm501IrqContributor, false);
 }
 uint32_t SiemensMp377Sm501Regs::MmioBase() const {
@@ -275,10 +276,16 @@ void SiemensMp377Sm501Regs::WriteResolvedWord(uint32_t a, uint32_t off, uint32_t
     case 0x080000u:
         /* SM501 display controller, Panel Display Control. */
         regs_[off / 4u] = v & 0x0FFF73FFu;
+        emu_.Get<SiemensMp377Sm501Video>().PublishDisplayMode();
         return;
     case 0x080200u:
         /* QEMU v10.1 hw/display/sm501.c sm501_disp_ctrl_write(). */
         regs_[off / 4u] = v & 0x0003FFFFu;
+        emu_.Get<SiemensMp377Sm501Video>().PublishDisplayMode();
+        return;
+    case 0x080024u:
+    case 0x08002Cu:
+        emu_.Get<SiemensMp377Sm501Video>().PublishDisplayMode();
         return;
     case 0x080204u:
     case 0x080230u:
@@ -289,11 +296,13 @@ void SiemensMp377Sm501Regs::WriteResolvedWord(uint32_t a, uint32_t off, uint32_t
         return;
     case 0x08020Cu:
         regs_[off / 4u] = v & 0x0FFF0FFFu;
+        emu_.Get<SiemensMp377Sm501Video>().PublishDisplayMode();
         return;
     case 0x080214u:
         /* SM501 Databook v1.02 section 5, CRT Vertical Total:
            VT bits[26:16], VDE bits[10:0]. */
         regs_[off / 4u] = v & 0x07FF07FFu;
+        emu_.Get<SiemensMp377Sm501Video>().PublishDisplayMode();
         return;
     case 0x080210u:
         regs_[off / 4u] = v & 0x00FF0FFFu;

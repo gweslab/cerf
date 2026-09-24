@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../peripheral_base.h"
+#include "../../lcd/display_mode_latch.h"
 #include "mediaq_mq1188_ge.h"
 
 #include <cstdint>
@@ -89,7 +90,6 @@ private:
 
     std::vector<uint8_t> sram_;
     uint32_t reg_[kRegWindow / 4u] = {};   /* whole 8 KB register window. */
-    bool     enable_published_ = false;
-    uint32_t published_w_ = 0, published_h_ = 0;
+    DisplayModeLatch mode_latch_;
     MediaQMq1188Ge ge_{*this};
 };

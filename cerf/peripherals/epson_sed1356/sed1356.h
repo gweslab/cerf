@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../peripheral_base.h"
+#include "../../lcd/display_mode_latch.h"
 #include "sed1356_bitblt.h"
 
 #include <chrono>
@@ -108,8 +109,7 @@ private:
     uint8_t lut_component_ = 0;   /* 0=R 1=G 2=B, auto-increments (§8.3.13). */
     uint8_t lut_rgb_latch_[2] = {};
 
-    bool     enable_published_ = false;
-    uint32_t published_w_ = 0, published_h_ = 0;
+    DisplayModeLatch mode_latch_;
 
     /* Offsets whose dropped-write was already logged: log each undocumented
        register once (--log=Periph-recoverable in the field), never per-write. */

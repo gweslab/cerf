@@ -44,7 +44,7 @@ void DeviceNotFoundService::EnsureFound() {
 #if !CERF_DEV_MODE
     const std::wstring text =
         L"Device \"" + Utf8ToWide(cfg.device_name.c_str()) +
-        L"\" has no ROM on disk.\n\nOpen CE Runtime Foundation to install it.";
+        L"\" has no ROM on disk.\n\nOpen CE Runtime Foundation Launcher to install it.";
     MessageBoxW(nullptr, text.c_str(),
                 L"Device not found - CE Runtime Foundation",
                 MB_OK | MB_ICONERROR);

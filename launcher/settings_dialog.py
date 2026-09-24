@@ -21,15 +21,13 @@ CHANNEL_LABELS = (
 
 CHANNEL_HINTS = {
     CHANNEL_DISABLED:
-        "You won't be notified of any kind of new updates.",
+        "You won't receive new emulator update notifications.",
     CHANNEL_STABLE:
-        "You will be notified when a new CERF release arrives and you will "
+        "You will be notified when a new release arrives and you will "
         "receive a prompt to upgrade.",
     CHANNEL_UNSTABLE:
-        "You will receive a notification and an upgrade prompt on each "
-        "unfinished CERF build. These are experimental enough that they can "
-        "clobber or damage the current CERF installation. Use at your own "
-        "risk.",
+       "You will be notified when a new unstable release. Be careful - "
+        "an experimental build might damage your installation or devices.",
 }
 
 

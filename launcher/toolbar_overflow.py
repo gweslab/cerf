@@ -16,12 +16,11 @@ Label = Union[str, Callable[[], str]]
 
 class _Item:
     def __init__(self, widget: tk.Widget, column: int, gap: int,
-                 entries: Optional[EntriesFn], separator: bool) -> None:
+                 entries: Optional[EntriesFn]) -> None:
         self.widget = widget
         self.column = column
         self.gap = gap
         self.entries = entries
-        self.separator = separator
         self.visible = True
 
     def width(self) -> int:
@@ -29,8 +28,8 @@ class _Item:
 
 
 class OverflowBar:
-    def __init__(self, parent: tk.Misc, padding: Tuple[int, int] = (8, 6),
-                 gap: int = 8) -> None:
+    def __init__(self, parent: tk.Misc, padding: Tuple[int, int] = (2, 2),
+                 gap: int = 0) -> None:
         self.frame = ttk.Frame(parent, padding=padding)
         self._pad_x, self._gap = padding[0], gap
         self._items: List[_Item] = []
@@ -45,7 +44,8 @@ class OverflowBar:
                              activebackground=theme.BG_HOVER,
                              activeforeground=theme.FG)
         self._chevron = ttk.Button(self.frame, text=CHEVRON_TEXT, width=2,
-                                   takefocus=False, command=self._popup)
+                                   takefocus=False, style="Toolbar.TButton",
+                                   command=self._popup)
 
     def add(self, widget: tk.Widget, label: Optional[Label] = None,
             command: Optional[Callable[[], None]] = None,
@@ -57,11 +57,7 @@ class OverflowBar:
             self._add_spacer()
         gap = 0 if not self._items or self._pending_right else self._gap
         self._pending_right = False
-        self._place(_Item(widget, self._next_column(), gap, entries, False))
-
-    def add_separator(self) -> None:
-        sep = ttk.Separator(self.frame, orient="vertical")
-        self._place(_Item(sep, self._next_column(), self._gap, None, True))
+        self._place(_Item(widget, self._next_column(), gap, entries))
 
     def finish(self) -> None:
         self._chevron.grid(row=0, column=self._next_column(), sticky="ns",
@@ -101,7 +97,7 @@ class OverflowBar:
 
     def _place(self, item: _Item) -> None:
         item.widget.grid(row=0, column=item.column, sticky="ns",
-                         padx=(item.gap, 0), pady=2 if item.separator else 0)
+                         padx=(item.gap, 0))
         self._items.append(item)
 
     def _on_configure(self, event: tk.Event) -> None:
@@ -119,8 +115,6 @@ class OverflowBar:
                 break
             used += width
             keep = i + 1
-        while keep and self._items[keep - 1].separator:
-            keep -= 1
         return keep
 
     def _layout(self, avail: int) -> None:
@@ -140,7 +134,7 @@ class OverflowBar:
                 item.widget.grid()
             else:
                 item.widget.grid_remove()
-        if any(not item.separator for item in self._items[keep:]):
+        if keep < len(self._items):
             self._chevron.grid()
         else:
             self._chevron.grid_remove()
@@ -148,7 +142,7 @@ class OverflowBar:
     def _popup(self) -> None:
         self._menu.delete(0, "end")
         for item in self._items[max(self._keep, 0):]:
-            if item.separator or item.entries is None:
+            if item.entries is None:
                 continue
             for label, command, enabled in item.entries():
                 self._menu.add_command(label=label, command=command,

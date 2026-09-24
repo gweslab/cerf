@@ -198,9 +198,7 @@ if (Test-Path $launcherBuild) {
             $buildsFailed++
             $failedNames += "launcher"
         } else {
-            # Re-snapshot after the build: the build itself may touch inputs, and
-            # only a successful build should refresh the stamp.
-            Set-Content -Path $launcherStamp -Value (Get-LauncherInputSignature) -NoNewline
+            Set-Content -Path $launcherStamp -Value $launcherSig -NoNewline
             $buildsSucceeded++
         }
     }

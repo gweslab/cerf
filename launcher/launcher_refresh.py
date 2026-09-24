@@ -3,13 +3,12 @@ from __future__ import annotations
 from typing import Callable, List, Optional
 
 from bundles import ManifestVersionError
-from bundle_repositories import MAIN_REPOSITORY_URL, manifest_url_for
 from device_state import DeviceBundle
 from ui_dialogs import show_error, show_info
 
 
 class RefreshMixin:
-    def _refresh_manifest(self, silent: bool = False) -> None:
+    def _refresh_manifest(self) -> None:
         if self.busy or self.catalog_loading:
             return
         self._set_catalog_loading(True, "Fetching bundle catalog…")
@@ -19,17 +18,9 @@ class RefreshMixin:
             self._set_catalog_loading(False)
             if isinstance(exc, ManifestVersionError):
                 self._show_manifest_version_error(exc)
-            elif exc is not None and silent:
+            elif exc is not None:
                 self.status_bar.set_status(
                     "Bundle catalog unavailable - local devices only.")
-            elif exc is not None:
-                show_error(self, "Remote manifest unavailable",
-                           f"{exc}\n\nLocal devices remain available to launch. "
-                           f"Download / update require a reachable remote "
-                           f"manifest - try again later or check your network.\n\n"
-                           f"The catalog can also be fetched by hand, and the "
-                           f"bundles it lists downloaded manually, from:\n"
-                           f"{manifest_url_for(MAIN_REPOSITORY_URL)}")
             else:
                 self._surface_repo_errors()
             self._reload_device_list()

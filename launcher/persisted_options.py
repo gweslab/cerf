@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Iterable, Optional
+from typing import Iterable, Optional, Tuple
 
 from board_info import board_panel_size
 from cerf_user_json import read_persist_fields, write_persist_overrides
@@ -13,51 +13,36 @@ PERSIST_KEYS = ("network_enabled", "guest_additions", "color_scheme",
                 "full_screen", "width", "height", "dpi", "font_size", "bpp",
                 "share_folder")
 
+EXPLICIT_KEYS = ("width", "height", "bpp")
 
-def resolve_baseline(base: dict, default_width: Optional[int],
-                     default_height: Optional[int],
-                     board_id: object = None) -> dict:
+
+def auto_resolution(default_width: Optional[int],
+                    default_height: Optional[int],
+                    board_id: object) -> Tuple[int, int]:
     panel = board_panel_size(board_id)
-    if panel is not None:
-        default_width = default_width or panel[0]
-        default_height = default_height or panel[1]
+    width = default_width or (panel[0] if panel else DEFAULT_SCREEN_WIDTH)
+    height = default_height or (panel[1] if panel else DEFAULT_SCREEN_HEIGHT)
+    return width, height
+
+
+def resolve_baseline(base: dict) -> dict:
     b = {}
     b["network_enabled"] = base.get("network_enabled", True)
     b["guest_additions"] = base.get("guest_additions", False)
     b["color_scheme"] = base.get("color_scheme", "")
     b["full_screen"] = base.get("full_screen", False)
-    if "share_folder" in base:
-        b["share_folder"] = base["share_folder"]
-    if "width" in base:
-        b["width"] = base["width"]
-    elif default_width:
-        b["width"] = default_width
-    else:
-        b["width"] = DEFAULT_SCREEN_WIDTH
-    if "height" in base:
-        b["height"] = base["height"]
-    elif default_height:
-        b["height"] = default_height
-    else:
-        b["height"] = DEFAULT_SCREEN_HEIGHT
-    if "dpi" in base:
-        b["dpi"] = base["dpi"]
-    if "font_size" in base:
-        b["font_size"] = base["font_size"]
-    if "bpp" in base:
-        b["bpp"] = base["bpp"]
+    for key in ("share_folder", "dpi", "font_size"):
+        if key in base:
+            b[key] = base[key]
     return b
 
 
-def effective_values(device_dir: Optional[Path],
-                     default_width: Optional[int],
-                     default_height: Optional[int],
-                     board_id: object = None) -> tuple:
+def effective_values(device_dir: Optional[Path]) -> tuple:
     base = {}
     override = {}
     if device_dir is not None:
         base, override = read_persist_fields(device_dir)
-    baseline = resolve_baseline(base, default_width, default_height, board_id)
+    baseline = resolve_baseline(base)
     eff = dict(baseline)
     eff.update(override)
     return baseline, eff
@@ -69,6 +54,8 @@ def persist_subset(device_dir: Path, baseline: dict,
     merged = dict(override)
     for key in owned_keys:
         merged.pop(key, None)
-        if key in current and current[key] != baseline.get(key):
+        if key not in current:
+            continue
+        if key in EXPLICIT_KEYS or current[key] != baseline.get(key):
             merged[key] = current[key]
     write_persist_overrides(device_dir, merged)

@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import ctypes
-import os
 import queue
 import sys
 import threading
@@ -21,10 +20,12 @@ from download_window import DownloadWindow
 from feedback_window import FeedbackWindow
 from toolbar import Toolbar
 from details_panel import DetailsPanel
-from launch_options import LaunchOptionsPanel
+from config_preview import ConfigPreviewPanel
 from launcher_spawn import SpawnMixin
 from launcher_operations import OperationsMixin
+from launcher_properties import PropertiesMixin
 from launcher_refresh import RefreshMixin
+from saved_state_warning import SavedStateEditWarning
 from new_device_wizard import NewDeviceWizard
 from settings_dialog import SettingsDialog
 from user_device_create import UserDeviceSpec
@@ -33,8 +34,9 @@ from screen_geometry import fit_geometry
 from preview_tile import PreviewTile
 from status_bar import StatusBar
 from cerf_user_json import write_user_meta_name
-from ui_dialogs import (ask_text, ask_yesno, confirm_rom_license, show_error,
-                        show_info, show_sources_thanks)
+from ui_dialogs import (ask_text, ask_yesno, confirm_rom_license,
+                        open_device_directory, show_error, show_info,
+                        show_sources_thanks)
 from ui_large_download import gate_large_bundle
 from ui_scroll import ScrollColumn
 from update_check import UpdateCheck
@@ -45,7 +47,8 @@ _WM_SETTINGCHANGE = 0x001A
 _GWLP_WNDPROC = -4
 
 
-class LauncherApp(OperationsMixin, RefreshMixin, SpawnMixin, tk.Tk):
+class LauncherApp(OperationsMixin, RefreshMixin, SpawnMixin, PropertiesMixin,
+                  tk.Tk):
     def __init__(self, manager: BundleManager, cerf_exe: Optional[Path],
                  upgraded: bool = False):
         super().__init__()
@@ -78,6 +81,8 @@ class LauncherApp(OperationsMixin, RefreshMixin, SpawnMixin, tk.Tk):
         self.busy = False
         self.catalog_loading = False
         self._was_running = False
+        self._verbose_devices = set()
+        self._saved_state_warning = SavedStateEditWarning(self)
 
         self._build_ui()
         theme.apply_titlebar(self)
@@ -86,7 +91,7 @@ class LauncherApp(OperationsMixin, RefreshMixin, SpawnMixin, tk.Tk):
         self._pump_progress()
         self.manager.load_local()
         self._reload_device_list()
-        self.after(50, lambda: self._refresh_manifest(silent=True))
+        self.after(50, lambda: self._refresh_manifest())
         self.after(50, self.update_check.start)
         self.after(50, self._poll_runtime)
         if upgraded:
@@ -99,13 +104,15 @@ class LauncherApp(OperationsMixin, RefreshMixin, SpawnMixin, tk.Tk):
         self.protocol("WM_DELETE_WINDOW", self._on_close)
 
     def _build_ui(self) -> None:
-        self.status_bar = StatusBar(self)
+        self.status_bar = StatusBar(
+            self, on_search=lambda: self.tree_panel.toggle_search())
+        for seq in ("<Control-f>", "<Control-F>"):
+            self.bind(seq, lambda _e: self.tree_panel.toggle_search())
 
         self.toolbar = Toolbar(self, resolve_icons_dir(),
                                self.manager.devices_dir,
                                on_new=self._open_new_wizard,
-                               on_refresh=self._refresh_manifest,
-                               on_update=self._update,
+                               on_properties=lambda: self._open_properties(),
                                on_remove_selected=self._delete_selected,
                                on_discard_selected=self._discard_state,
                                on_launch=self._launch,
@@ -115,7 +122,7 @@ class LauncherApp(OperationsMixin, RefreshMixin, SpawnMixin, tk.Tk):
         self.toolbar.frame.pack(fill="x", side="top")
         self.split = self.toolbar.start
 
-        outer = ttk.Frame(self, padding=8)
+        outer = ttk.Frame(self)
         outer.pack(fill="both", expand=True)
 
         try:
@@ -124,12 +131,12 @@ class LauncherApp(OperationsMixin, RefreshMixin, SpawnMixin, tk.Tk):
             pscale = 1.0
 
         paned = tk.PanedWindow(outer, orient="horizontal", bg=theme.BORDER, bd=0,
-                               sashwidth=int(5 * pscale), sashrelief="flat",
+                               sashwidth=1, sashpad=0, sashrelief="flat",
                                showhandle=False, opaqueresize=True)
         paned.pack(fill="both", expand=True)
         self.paned = paned
 
-        left_pane = ttk.Frame(paned)
+        left_pane = ttk.Frame(paned, padding=(8, 8, 0, 0))
         left_pane.rowconfigure(0, weight=1)
         left_pane.columnconfigure(0, weight=1)
         self.tree_panel = DeviceCardList(
@@ -140,7 +147,7 @@ class LauncherApp(OperationsMixin, RefreshMixin, SpawnMixin, tk.Tk):
             icons_dir=resolve_icons_dir(),
             on_context=self._on_right_click)
 
-        right = ttk.Frame(paned, padding=(8, 0, 0, 0))
+        right = ttk.Frame(paned)
         right.columnconfigure(0, weight=1)
         right.rowconfigure(1, weight=1)
 
@@ -152,10 +159,12 @@ class LauncherApp(OperationsMixin, RefreshMixin, SpawnMixin, tk.Tk):
                                    int(300 * pscale), int(188 * pscale),
                                    int(24 * pscale), theme.BG, box_always=True,
                                    on_click=self._launch)
-        self.preview.canvas.grid(row=0, column=0, sticky="n", pady=(0, 8))
+        self.preview.canvas.grid(row=0, column=0, columnspan=2, sticky="n",
+                                 pady=8)
 
         def on_width(width: int) -> None:
             self.details.set_wraplength(max(120, width - 24))
+            self.config_preview.set_wraplength(max(120, width - 24))
         self.scroll = ScrollColumn(right, width=int(340 * pscale),
                                    on_width_changed=on_width)
         self.scroll.grid(row=1, column=0, sticky="nsew")
@@ -165,7 +174,9 @@ class LauncherApp(OperationsMixin, RefreshMixin, SpawnMixin, tk.Tk):
                                     bind_wheel=self.scroll.bind_wheel,
                                     on_package_action=self._package_action)
 
-        self.launch_options = LaunchOptionsPanel(inner, self, self.manager.devices_dir, row=7)
+        self.config_preview = ConfigPreviewPanel(
+            inner, first_row=4, on_open=self._open_properties,
+            bind_wheel=self.scroll.bind_wheel)
 
         self.scroll.bind_wheel(inner)
 
@@ -199,7 +210,6 @@ class LauncherApp(OperationsMixin, RefreshMixin, SpawnMixin, tk.Tk):
 
     def _set_catalog_loading(self, loading: bool, label: str = "") -> None:
         self.catalog_loading = loading
-        self.toolbar.set_catalog_loading(loading)
         if loading:
             self.status_bar.set_status(label or "Fetching bundle catalog…")
         elif not self.busy:
@@ -242,7 +252,7 @@ class LauncherApp(OperationsMixin, RefreshMixin, SpawnMixin, tk.Tk):
         sel = self.tree_panel.selection()
         running = self._running_status_for(sel.device) is not None
         if self._was_running and not running and sel.device is not None:
-            self.launch_options.set_device(sel.device)
+            self._show_config(sel.device)
         self._was_running = running
         self.split.set_running(running)
         self.preview.refresh()
@@ -289,12 +299,13 @@ class LauncherApp(OperationsMixin, RefreshMixin, SpawnMixin, tk.Tk):
         theme.apply_titlebar(self)
         self.paned.config(bg=theme.BORDER)
         self.scroll.retheme()
+        self.details.retheme()
+        self.config_preview.retheme()
         self.toolbar.retheme()
         self.split.retheme()
         self.status_bar.retheme()
         self.preview.retheme(theme.BG)
         self.tree_panel.retheme()
-        self.launch_options.refresh_resolution_state()
 
     def _open_new_wizard(self) -> None:
         if self.busy:
@@ -404,10 +415,7 @@ class LauncherApp(OperationsMixin, RefreshMixin, SpawnMixin, tk.Tk):
         self._reload_device_list()
 
     def _open_device_folder(self, d: DeviceBundle) -> None:
-        try:
-            os.startfile(str(self.manager.devices_dir / d.name))
-        except OSError as exc:
-            show_error(self, "Open folder", str(exc))
+        open_device_directory(self, self.manager.devices_dir / d.name)
 
     def _on_right_click(self, event: tk.Event) -> None:
         if self.busy:
@@ -423,15 +431,19 @@ class LauncherApp(OperationsMixin, RefreshMixin, SpawnMixin, tk.Tk):
             menu.add_command(label="Discard saved state",
                              command=self._discard_state,
                              state="disabled" if running else "normal")
-        menu.add_command(label="Rename…",
-                         command=lambda: self._rename_device(d))
-        menu.add_command(label="Open device folder",
-                         command=lambda: self._open_device_folder(d))
         if d.has_update or d.has_cerf_json_update:
             menu.add_command(label="Update", command=self._update_selected)
         menu.add_separator()
+        menu.add_command(label="Open device directory",
+                         command=lambda: self._open_device_folder(d))
+        menu.add_separator()
         menu.add_command(label="Remove", command=self._delete_selected,
                          state="disabled" if running else "normal")
+        menu.add_command(label="Rename…",
+                         command=lambda: self._rename_device(d))
+        menu.add_separator()
+        menu.add_command(label="Properties…",
+                         command=lambda: self._open_properties())
         try:
             menu.tk_popup(event.x_root, event.y_root)
         finally:
@@ -440,11 +452,10 @@ class LauncherApp(OperationsMixin, RefreshMixin, SpawnMixin, tk.Tk):
     def _on_tree_select(self, sel: TreeSelection) -> None:
         if sel.kind == "device" and sel.device is not None:
             self.details.show_device(sel.device)
-            self.launch_options.set_device(sel.device)
+            self._show_config(sel.device)
             self.split.set_device(sel.device)
             self.split.set_running(self._running_status_for(sel.device) is not None)
             self.preview.set_device(sel.device)
-            self.launch_options.frame.grid()
         self._refresh_selection_state()
 
     def _on_tree_activate(self, sel: TreeSelection) -> None:
@@ -454,23 +465,22 @@ class LauncherApp(OperationsMixin, RefreshMixin, SpawnMixin, tk.Tk):
     def _refresh_selection_state(self) -> None:
         sel = self.tree_panel.selection()
         if self.busy:
+            self.status_bar.set_bundle_updates(0, self._update_all)
             return
         d = sel.device
         running = self._running_status_for(d) is not None
-        any_updateable = not self.catalog_loading and any(
-            x.has_update or x.has_cerf_json_update or x.has_package_updates
-            for x in self.tree_panel.devices)
+        updateable = 0 if self.catalog_loading else sum(
+            1 for x in self.tree_panel.devices
+            if x.has_update or x.has_cerf_json_update or x.has_package_updates)
+        self.status_bar.set_bundle_updates(updateable, self._update_all)
         if sel.kind == "device" and d is not None:
             can_discard = (saved_state_info(self.manager.devices_dir / d.name)
                            is not None and not running)
-            self.toolbar.set_selection_enabled(
-                not self.catalog_loading
-                and (d.has_update or d.has_cerf_json_update), any_updateable,
-                d.is_installed and not running, can_discard)
+            self.toolbar.set_selection_enabled(d.is_installed,
+                                               d.is_installed and not running,
+                                               can_discard)
         else:
-            self.toolbar.set_selection_enabled(False, any_updateable,
-                                               False, False)
-        self.launch_options.set_locked(running)
+            self.toolbar.set_selection_enabled(False, False, False)
         self.details.set_addons_enabled(not running)
         self.split.set_enabled(d is not None and self.cerf_exe is not None)
 

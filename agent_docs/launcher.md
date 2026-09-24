@@ -41,38 +41,33 @@ The launcher owns three jobs:
 these files can contain.
 
 `cerf-user.json` holds the launcher link (`launcher.repository_url` +
-`name_on_repository`), the display-name override (`meta.name`), and the
-persisted launch options:
-
-    network.enabled
-    guest_additions.enabled
-    guest_additions.override_color_scheme
-    guest_additions.share_folder
-    full_screen
-    board.configurable_screen_width / _height / _dpi / _bpp
+`name_on_repository`) and every value of the Properties sheet.
 
 **A setting is written only when it differs from the `cerf.json` value.**
 `persisted_options.py` computes that difference. `resolve_baseline` builds the
 `cerf.json` values, and `persist_subset` writes the difference set. The launcher
 deletes the file when it becomes empty.
 
+**The screen size and the color depth have no baseline.** "Auto" is their
+absence from `cerf-user.json`. Any other value is written, including one equal
+to the Auto result.
+
 **`persist_subset` takes the keys its caller owns.** It reads the file, replaces
 only those keys, and writes the file back. A caller that owns four keys must not
 write the full set, because that removes the keys of every other caller.
 
-## Option blocks
+## The Properties sheet
 
-Two option blocks are shared. The side panel and the transactional dialogs build
-the same widgets from the same class, so the two places always agree.
+The per-device Properties sheet is the only place that edits a device setting.
+It holds one model of the device. A page loads its values from that model when
+the sheet shows it. The page stores them back when the user leaves it. Two pages
+can therefore edit the same key. OK writes the model. Cancel writes nothing. No control writes on change.
 
-- `customizations_block.py` - resolution, color depth, DPI, color scheme. Color
-  scheme is last.
-- `share_folder_block.py` - the guest-additions shared folder: one check box and
-  one path field.
+The side panel shows the same model read-only.
 
-`launch_options.py` puts both blocks in the side panel. It adds the
-guest-additions check box, the full-screen check box, and the log and network
-check boxes. It writes each change to disk immediately.
+`launcher.exe` never passes a persisted setting on the `cerf.exe` command line.
+`cerf.exe` reads it from `cerf-user.json`. The command line carries only what
+is not persisted.
 
 ## Transactional mode
 
@@ -86,15 +81,15 @@ The rule follows from file ownership. The launcher is the only writer of
 `cerf-user.json`. A dialog inside `cerf.exe` therefore has two possible
 outcomes, and both are bad. It loses what the user picked, or it becomes a
 second writer of the same file. A second copy of the same controls also needs
-manual work to stay in step with the side panel.
+manual work to stay in step with the Properties sheet.
 
 ### The protocol
 
 1. `cerf.exe` writes `devices/<device>/transactional-XXXXXXXX-XXXX.json`. Each
    top-level key names one dialog to run:
 
-        { "customizations": { "query": { "force_reboot": true,
-                                         "default_reset": "soft" } } }
+        { "live_customizations": { "query": { "force_reboot": true,
+                                              "default_reset": "soft" } } }
 
    `query` carries what the dialog cannot know by itself. It can be empty.
    More than one key runs more than one dialog, one after the other.
@@ -109,12 +104,16 @@ manual work to stay in step with the side panel.
 4. A dialog that must answer `cerf.exe` writes a `response` object into its own
    key of the same file:
 
-        { "customizations": { "query": { … },
-                              "response": { "reboot": "soft" } } }
+        { "live_customizations": { "query": { … },
+                                   "response": { "reboot": "soft" } } }
 
    `reboot` is `null`, `"soft"` or `"hard"`.
 
 5. `cerf.exe` reads the response and deletes the file.
+
+`live_customizations` opens the Properties sheet on its Guest Additions page,
+with every control that needs a restart of `cerf.exe` disabled. Every `cerf.exe`
+entry point that edits a Guest Additions setting sends this one request.
 
 ### What the refresh does
 
@@ -173,13 +172,12 @@ rejects any member that escapes the target directory.
 
 ## Starting cerf.exe
 
-`launcher_spawn.py` builds the argument list with
-`LaunchOptionsPanel.collect_args()` and starts `cerf.exe` detached.
+`launcher_spawn.py` starts `cerf.exe` detached.
 
 The launcher does not start a device that already runs. `cerf.exe` writes
 `devices/<name>/cerf-status.json` with its pid, window handle and a heartbeat.
 `device_state.running_status()` treats a heartbeat older than 7 seconds as dead.
-A running device locks its launch options in the side panel.
+The Properties sheet of a running device opens with every control disabled.
 
 ## Board data
 

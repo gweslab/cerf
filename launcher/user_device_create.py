@@ -1,7 +1,3 @@
-"""Create a user device: a devices/<name>/ directory built from the user's
-own ROM file, with a minimal cerf.json naming the board. The New-device
-wizard collects the input; BundleManager submits the creation to its worker
-pool."""
 from __future__ import annotations
 
 import shutil
@@ -12,16 +8,12 @@ from typing import Optional
 
 from bundle_download import CancelledError, ProgressFn
 from bundles import BundleError, DOWNLOAD_CHUNK, is_safe_bundle_name
+from cerf_user_json import CERF_USER_JSON_FILENAME
 from device_state import write_cerf_json
 
 
 @dataclass(frozen=True)
 class UserDeviceSpec:
-    """`name` is both the display name (cerf.json meta.name) and the device
-    directory name. `rom_path` is the user's ROM file; with `copy_rom` it is
-    copied into the directory and referenced by filename, otherwise cerf.json
-    references its absolute path."""
-
     name: str
     board_id: str
     rom_path: Path
@@ -83,7 +75,7 @@ def create_user_device(devices_dir: Path, spec: UserDeviceSpec,
             rom_ref = spec.rom_path.name
         else:
             rom_ref = str(spec.rom_path)
-        write_cerf_json(target / "cerf.json", {
+        write_cerf_json(target / CERF_USER_JSON_FILENAME, {
             "meta": {"name": spec.name},
             "rom": {"primary": rom_ref},
             "board": {"id": spec.board_id},

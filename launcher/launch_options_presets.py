@@ -1,6 +1,3 @@
-"""Static data tables for the launch-options resolution / DPI overrides: the
-preset resolution stops the slider snaps through and the override slider bounds.
-Kept out of launch_options.py so that panel file holds only behaviour."""
 from __future__ import annotations
 
 

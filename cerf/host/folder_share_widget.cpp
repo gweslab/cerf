@@ -3,14 +3,13 @@
 
 #include "../core/cerf_emulator.h"
 #include "../core/device_config.h"
-#include "../core/device_config_refresh.h"
 #include "../core/folder_share_config.h"
 #include "../core/service.h"
 #include "host_gdiplus.h"
 #include "host_widget.h"
 #include "host_widget_registry.h"
 #include "host_window.h"
-#include "launcher_transaction.h"
+#include "live_customizations_transaction.h"
 
 #include <string>
 #include <vector>
@@ -67,12 +66,8 @@ public:
 
 private:
     void Configure() {
-        nlohmann::json response;
-        if (!emu_.Get<LauncherTransaction>().Run(
-                emu_.Get<HostWindow>().Hwnd(), "share_folder",
-                nlohmann::json::object(), response))
-            return;
-        emu_.Get<DeviceConfigRefresh>().Refresh();
+        emu_.Get<LiveCustomizationsTransaction>().Open(
+            emu_.Get<HostWindow>().Hwnd(), false);
     }
 
     bool drawn_enabled_ = false;

@@ -2,8 +2,10 @@
 canned launcher dialog (ROM license, guest-additions help)."""
 from __future__ import annotations
 
+import os
 import tkinter as tk
 import webbrowser
+from pathlib import Path
 from tkinter import ttk
 from typing import Callable, Dict, Optional, Tuple
 
@@ -20,6 +22,13 @@ GUEST_ADDITIONS_URL = "https://cerf.cx/articles/guest-additions/"
 # Funding target, mirroring .github/FUNDING.yml (patreon: dz3n) - that file is
 # not shipped with the packaged launcher, so the handle is spelled out here.
 PATREON_URL = "https://www.patreon.com/dz3n"
+
+
+def open_device_directory(parent: tk.Misc, path: Path) -> None:
+    try:
+        os.startfile(str(path))
+    except OSError as exc:
+        show_error(parent, "Open device directory", str(exc))
 
 
 def _run_extra(dlg: tk.Toplevel, handler: Callable[[tk.Misc], None]) -> None:
@@ -168,12 +177,7 @@ def show_dpi_help(parent: tk.Misc) -> None:
         "Overrides the logical DPI (pixels-per-inch) the CERF guest display "
         "driver reports to the OS. It changes what the OS believes the screen "
         "density is - it most likely causes rendering artifacts and broken "
-        "graphics.\n\n"
-        "Known behaviour:\n"
-        "• Restores VGA (2×) mode on Device Emulator ROMs.\n"
-        "• Scales readable / printable text (documents, web pages) on older "
-        "CE versions.\n"
-        "• Works best on Alt-Controls (touch-style) ROMs."
+        "graphics."
     )
 
 
@@ -187,7 +191,7 @@ def show_bpp_help(parent: tk.Misc) -> None:
         "• 8 bpp - Should be used for Windows CE 2.0.\n"
         "• 16 bpp - Known to work best for Windows CE 2.11-3 era.\n"
         "• 24 bpp - Known to work best for all CE eras.\n"
-        "• 32 bpp - Supported by newer CE 2.11+ but often breaks rendering "
+        "• 32 bpp - Supported ~since CE 2.11+ but often breaks rendering "
         "in guest apps."
     )
 

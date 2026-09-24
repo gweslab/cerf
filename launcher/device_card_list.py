@@ -68,7 +68,7 @@ class DeviceCardList:
         self._heading_wrap = int(320 * scale)
 
         frame = ttk.Frame(parent)
-        frame.grid(row=0, column=0, sticky="nsew", padx=(0, 4))
+        frame.grid(row=0, column=0, sticky="nsew")
         frame.rowconfigure(1, weight=1)
         frame.columnconfigure(0, weight=1)
         self.frame = frame
@@ -76,10 +76,15 @@ class DeviceCardList:
         filter_bar = ttk.Frame(frame)
         filter_bar.grid(row=0, column=0, columnspan=2, sticky="ew", pady=(0, 4))
         self.var_search = tk.StringVar(value="")
-        ttk.Entry(filter_bar, textvariable=self.var_search, width=22).pack(
-            side="right")
+        self._search_entry = ttk.Entry(filter_bar, textvariable=self.var_search,
+                                       width=22)
+        self._search_entry.pack(side="right")
         ttk.Label(filter_bar, text="Search:").pack(side="right", padx=(0, 4))
         self.var_search.trace_add("write", lambda *_: self._refill())
+        self._search_entry.bind("<Escape>", lambda _e: self.toggle_search())
+        self._filter_bar = filter_bar
+        self._search_shown = False
+        filter_bar.grid_remove()
 
         canvas = tk.Canvas(frame, bg=theme.BG, highlightthickness=0)
         canvas.grid(row=1, column=0, sticky="nsew")
@@ -99,6 +104,16 @@ class DeviceCardList:
 
     def set_busy(self, busy: bool) -> None:
         pass
+
+    def toggle_search(self) -> None:
+        self._search_shown = not self._search_shown
+        if self._search_shown:
+            self._filter_bar.grid()
+            self._search_entry.focus_set()
+            return
+        self._filter_bar.grid_remove()
+        self.var_search.set("")
+        self._canvas.focus_set()
 
     def selection(self) -> TreeSelection:
         if self._selected and self._selected in self._cards:
@@ -307,10 +322,6 @@ class DeviceCardList:
             w.bind("<Double-1>", lambda _e, n=d.name: self._activate(n))
             w.bind("<Button-3>", lambda e, n=d.name: self._context(n, e))
             self._bind_wheel(w)
-        # The preview tile shows a hand cursor: single click activates (like the
-        # sidebar preview). The Double-1 binding must exist so Tk reports the
-        # second click of a double as Double-1 (swallowed) rather than a second
-        # Button-1, which would launch a non-running device twice.
         tile.canvas.bind("<Button-1>", lambda _e, n=d.name: self._activate(n))
         tile.canvas.bind("<Double-1>", lambda _e: "break")
         tile.canvas.bind("<Button-3>", lambda e, n=d.name: self._context(n, e))

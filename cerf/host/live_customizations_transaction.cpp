@@ -1,5 +1,5 @@
 #define NOMINMAX
-#include "customizations_transaction.h"
+#include "live_customizations_transaction.h"
 
 #include "../boards/board_context.h"
 #include "../boot/guest_cold_boot.h"
@@ -14,13 +14,13 @@
 #include "host_window.h"
 #include "launcher_transaction.h"
 
-REGISTER_SERVICE(CustomizationsTransaction);
+REGISTER_SERVICE(LiveCustomizationsTransaction);
 
-bool CustomizationsTransaction::ShouldRegister() {
+bool LiveCustomizationsTransaction::ShouldRegister() {
     return emu_.Get<DeviceConfig>().guest_additions;
 }
 
-bool CustomizationsTransaction::Open(HWND owner, bool force_reboot) {
+bool LiveCustomizationsTransaction::Open(HWND owner, bool force_reboot) {
     const bool soft_default =
         force_reboot || emu_.Get<GuestAdditionsUiPolicy>().DefaultResetIsSoft();
 
@@ -28,9 +28,13 @@ bool CustomizationsTransaction::Open(HWND owner, bool force_reboot) {
     query["force_reboot"]  = force_reboot;
     query["default_reset"] = soft_default ? "soft" : "none";
 
+    auto& cfg = emu_.Get<DeviceConfig>();
+    const uint32_t prev_w = cfg.board_configurable_screen_width;
+    const uint32_t prev_h = cfg.board_configurable_screen_height;
+
     nlohmann::json response;
-    if (!emu_.Get<LauncherTransaction>().Run(owner, "customizations", query,
-                                             response))
+    if (!emu_.Get<LauncherTransaction>().Run(owner, "live_customizations",
+                                             query, response))
         return false;
 
     emu_.Get<DeviceConfigRefresh>().Refresh();
@@ -42,11 +46,12 @@ bool CustomizationsTransaction::Open(HWND owner, bool force_reboot) {
     std::string reboot;
     if (response["reboot"].is_string())
         reboot = response["reboot"].get<std::string>();
-    Apply(std::move(reboot));
+    Apply(std::move(reboot), prev_w, prev_h);
     return true;
 }
 
-void CustomizationsTransaction::Apply(std::string reboot) {
+void LiveCustomizationsTransaction::Apply(std::string reboot, uint32_t prev_w,
+                                          uint32_t prev_h) {
     auto& cfg = emu_.Get<DeviceConfig>();
     const uint32_t w = cfg.board_configurable_screen_width;
     const uint32_t h = cfg.board_configurable_screen_height;
@@ -65,7 +70,7 @@ void CustomizationsTransaction::Apply(std::string reboot) {
         win.SetGuestResolution(w, h);
         win.FitToResolution(w, h);
         emu_.Get<GuestColdBoot>().RequestHardReset();
-    } else {
+    } else if (w != prev_w || h != prev_h) {
         win.FitToResolution(w, h);
         emu_.Get<CerfVirtResize>().RequestResize(w, h);
     }

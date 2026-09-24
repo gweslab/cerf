@@ -8,11 +8,11 @@
 #include "../core/log.h"
 #include "../core/user_config_writer.h"
 #include "../peripherals/cerf_virt/cerf_virt_resize.h"
-#include "customizations_transaction.h"
 #include "guest_additions_ui_policy.h"
 #include "host_icon_cache.h"
 #include "host_widget_registry.h"
 #include "host_window.h"
+#include "live_customizations_transaction.h"
 #include "task_manager_window.h"
 
 #include <string>
@@ -76,7 +76,7 @@ std::vector<WidgetMenuItem> HostAutoResize::BuildMenu() {
     WidgetMenuItem chres;
     chres.label    = L"Resolution / Customizations…";
     chres.on_click = [this] {
-        emu_.Get<CustomizationsTransaction>().Open(
+        emu_.Get<LiveCustomizationsTransaction>().Open(
             emu_.Get<HostWindow>().Hwnd(), false);
     };
     items.push_back(std::move(chres));

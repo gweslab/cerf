@@ -8,10 +8,30 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
 
-from device_state import _load_json_object, _str_or_empty, write_cerf_json
+from device_state import (DeviceMeta, _load_json_object,
+                          parse_cerf_json_object, write_cerf_json)
 
 CERF_USER_JSON_FILENAME = "cerf-user.json"
 LAUNCHER_LINK_KEY = "launcher"
+
+
+def _merge_layer(base: dict, over: dict) -> dict:
+    out = dict(base)
+    for key, value in over.items():
+        if isinstance(value, dict) and isinstance(out.get(key), dict):
+            out[key] = _merge_layer(out[key], value)
+        else:
+            out[key] = value
+    return out
+
+
+def read_device_meta(device_dir: Path
+                     ) -> tuple[DeviceMeta, Optional[int], Optional[int]]:
+    base = _load_json_object(device_dir / "cerf.json") or {}
+    user = _load_json_object(device_dir / CERF_USER_JSON_FILENAME) or {}
+    meta, _w, _h = parse_cerf_json_object(_merge_layer(base, user))
+    _meta, width, height = parse_cerf_json_object(base)
+    return meta, width, height
 
 
 @dataclass(frozen=True)
@@ -64,16 +84,6 @@ def write_launcher_link(device_dir: Path, link: LauncherLink) -> None:
     update_user_json(device_dir, mutate)
 
 
-def read_user_meta_name(device_dir: Path) -> str:
-    obj = _load_json_object(device_dir / CERF_USER_JSON_FILENAME)
-    if obj is None:
-        return ""
-    m = obj.get("meta")
-    if not isinstance(m, dict):
-        return ""
-    return _str_or_empty(m.get("name"))
-
-
 def write_user_meta_name(device_dir: Path, name: str) -> None:
     """Set (or, with an empty name, drop) the user's display-name override."""
     def mutate(obj: dict) -> None:
@@ -89,20 +99,56 @@ def write_user_meta_name(device_dir: Path, name: str) -> None:
     update_user_json(device_dir, mutate)
 
 
-def read_rom_primary(device_dir: Path) -> str:
-    """rom.primary with the cerf-user.json override applied; "" when neither
-    file names one."""
-    primary = ""
-    for name in ("cerf.json", CERF_USER_JSON_FILENAME):
+def _read_layered_string(device_dir: Path, block: str, key: str,
+                         layers: tuple) -> str:
+    value = ""
+    for name in layers:
         obj = _load_json_object(device_dir / name)
         if obj is None:
             continue
-        rom = obj.get("rom")
-        if isinstance(rom, dict):
-            v = rom.get("primary")
+        sub = obj.get(block)
+        if isinstance(sub, dict):
+            v = sub.get(key)
             if isinstance(v, str) and v:
-                primary = v
-    return primary
+                value = v
+    return value
+
+
+_BOTH_LAYERS = ("cerf.json", CERF_USER_JSON_FILENAME)
+
+
+def read_rom_primary(device_dir: Path) -> str:
+    """rom.primary with the cerf-user.json override applied; "" when neither
+    file names one."""
+    return _read_layered_string(device_dir, "rom", "primary", _BOTH_LAYERS)
+
+
+def read_board_id(device_dir: Path) -> str:
+    return _read_layered_string(device_dir, "board", "id", _BOTH_LAYERS)
+
+
+def write_board_rom_overrides(device_dir: Path, board_id: str,
+                              rom_primary: str) -> None:
+    base_board = _read_layered_string(device_dir, "board", "id",
+                                      ("cerf.json",))
+    base_rom = _read_layered_string(device_dir, "rom", "primary",
+                                    ("cerf.json",))
+
+    def put(obj: dict, block: str, key: str, value: str, base: str) -> None:
+        sub = obj.get(block) if isinstance(obj.get(block), dict) else {}
+        if value and value != base:
+            sub[key] = value
+        else:
+            sub.pop(key, None)
+        if sub:
+            obj[block] = sub
+        else:
+            obj.pop(block, None)
+
+    def mutate(obj: dict) -> None:
+        put(obj, "board", "id", board_id, base_board)
+        put(obj, "rom", "primary", rom_primary, base_rom)
+    update_user_json(device_dir, mutate)
 
 
 def _extract_persist_fields(obj) -> dict:

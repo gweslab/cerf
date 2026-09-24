@@ -1,6 +1,3 @@
-"""Right-side info panels: device metadata, feature icons, description and
-notes - plus the additional-package details view shown when a package row
-is selected in the device tree."""
 from __future__ import annotations
 
 import tkinter as tk
@@ -9,13 +6,10 @@ from pathlib import Path
 from tkinter import ttk
 from typing import Callable, Dict, List, Optional
 
-from device_state import (
-    DeviceBundle,
-    PackageStatus,
-    format_size,
-)
+from device_state import DeviceBundle
 from board_database import FEATURE_SPECS
 from board_info import board_extra_notes, board_features
+from side_block import SideBlock
 from ui_dialogs import bind_tooltip
 import ui_theme as theme
 
@@ -34,10 +28,9 @@ class DetailsPanel:
         self._addon_buttons: List[ttk.Button] = []
         self._addons_enabled = True
 
-        meta = ttk.LabelFrame(inner, text="Description", padding=8)
-        meta.grid(row=0, column=0, sticky="ew", pady=(0, 8))
+        self.meta_block = SideBlock(inner, "Description", row=0)
+        meta = self.meta_block.body
         meta.columnconfigure(1, weight=1)
-        self.meta_frame = meta
 
         self.desc_label = ttk.Label(meta, text="", wraplength=220,
                                     justify="left")
@@ -51,65 +44,46 @@ class DetailsPanel:
         self._source_url: Optional[str] = None
         self.source_value.bind("<Button-1>", self._on_source_click)
 
-        package = ttk.LabelFrame(inner, text="Package", padding=8)
-        package.grid(row=1, column=0, sticky="ew", pady=(0, 8))
-        package.columnconfigure(1, weight=1)
-        self.package_frame = package
-        self.package_vars: Dict[str, tk.StringVar] = {}
-        pkg_rows = [("Name",     "name"),
-                    ("Device",   "device"),
-                    ("Category", "category"),
-                    ("Size",     "size"),
-                    ("Download", "download_size"),
-                    ("State",    "state")]
-        for i, (label, key) in enumerate(pkg_rows):
-            ttk.Label(package, text=label + ":").grid(row=i, column=0, sticky="w", padx=(0, 8))
-            var = tk.StringVar(value="-")
-            self.package_vars[key] = var
-            ttk.Label(package, textvariable=var, wraplength=220,
-                      justify="left").grid(row=i, column=1, sticky="w")
-
-        self.features_frame = ttk.LabelFrame(inner, text="Features", padding=8)
-        self.features_frame.grid(row=2, column=0, sticky="ew", pady=(0, 8))
-        self.features_icons = ttk.Frame(self.features_frame)
+        self.features_block = SideBlock(inner, "Features", row=1)
+        self.features_icons = ttk.Frame(self.features_block.body)
         self.features_icons.pack(anchor="w")
 
-        self.notes_frame = ttk.LabelFrame(inner, text="⚠ Notes & quirks",
-                                          style="Warn.TLabelframe", padding=8)
-        self.notes_frame.grid(row=5, column=0, sticky="ew", pady=(0, 8))
-        self.notes_frame.columnconfigure(0, weight=1)
-        self.notes_label = ttk.Label(self.notes_frame, text="", wraplength=260,
-                                     justify="left")
+        self.notes_block = SideBlock(inner, "⚠ Notes & quirks", row=2,
+                                     warn=True)
+        self.notes_label = ttk.Label(self.notes_block.body, text="",
+                                     wraplength=260, justify="left")
         self.notes_label.grid(row=0, column=0, sticky="w")
 
-        self.addons_frame = ttk.LabelFrame(inner, text="Add-ons", padding=8)
-        self.addons_frame.grid(row=6, column=0, sticky="ew", pady=(0, 8))
-        self.addons_frame.columnconfigure(0, weight=1)
-        self.addons_body = ttk.Frame(self.addons_frame)
+        self.addons_block = SideBlock(inner, "Add-ons", row=3)
+        self.addons_body = ttk.Frame(self.addons_block.body)
         self.addons_body.grid(row=0, column=0, sticky="ew")
         self.addons_body.columnconfigure(0, weight=1)
 
-        self.package_frame.grid_remove()
-        self.features_frame.grid_remove()
+        self._blocks = [self.meta_block, self.features_block,
+                        self.notes_block, self.addons_block]
+        self.features_block.grid_remove()
         self.desc_label.grid_remove()
-        self.notes_frame.grid_remove()
-        self.addons_frame.grid_remove()
+        self.notes_block.grid_remove()
+        self.addons_block.grid_remove()
 
     def set_wraplength(self, wrap: int) -> None:
         self.desc_label.config(wraplength=wrap)
         self.notes_label.config(wraplength=wrap)
 
+    def retheme(self) -> None:
+        for block in self._blocks:
+            block.retheme()
+
     def show_device(self, device: DeviceBundle) -> None:
-        self.package_frame.grid_remove()
         self._update_source(device)
         self._update_description(device)
         has_desc = bool(device.meta.description.strip())
         has_source = (device.meta.source is not None
                       and bool(device.meta.source.name))
         if has_desc or has_source:
-            self.meta_frame.grid()
+            self.meta_block.grid()
         else:
-            self.meta_frame.grid_remove()
+            self.meta_block.grid_remove()
         self._update_features(device)
         self._update_notes(device)
         self._update_packages(device)
@@ -119,9 +93,9 @@ class DetailsPanel:
             child.destroy()
         self._addon_buttons = []
         if not device.packages:
-            self.addons_frame.grid_remove()
+            self.addons_block.grid_remove()
             return
-        self.addons_frame.grid()
+        self.addons_block.grid()
         last_cat = None
         r = 0
         for ps in device.packages:
@@ -166,22 +140,6 @@ class DetailsPanel:
         if self._on_package_action is not None:
             self._on_package_action(device, ps, action)
 
-    def show_package(self, device: DeviceBundle, ps: PackageStatus) -> None:
-        self.meta_frame.grid_remove()
-        self.features_frame.grid_remove()
-        self.notes_frame.grid_remove()
-        self.package_frame.grid()
-        self.package_vars["name"].set(ps.remote.name)
-        self.package_vars["device"].set(device.meta.device_name or device.name)
-        self.package_vars["category"].set(ps.category_label)
-        self.package_vars["size"].set(format_size(ps.remote.unpacked_size) or "-")
-        self.package_vars["download_size"].set(
-            format_size(ps.remote.archive_size) or "-")
-        state = ps.state_label
-        if not device.is_installed:
-            state += " (install device first)"
-        self.package_vars["state"].set(state)
-
     def _update_source(self, device: DeviceBundle) -> None:
         src = device.meta.source
         if src is None or not src.name:
@@ -216,9 +174,9 @@ class DetailsPanel:
         notes += board_extra_notes(device.meta.board_id)
         if notes:
             self.notes_label.config(text="\n".join(f"• {n}" for n in notes))
-            self.notes_frame.grid()
+            self.notes_block.grid()
         else:
-            self.notes_frame.grid_remove()
+            self.notes_block.grid_remove()
 
     def _update_features(self, device: DeviceBundle) -> None:
         for child in self.features_icons.winfo_children():
@@ -226,23 +184,23 @@ class DetailsPanel:
         features = board_features(device.meta.board_id)
         shown = 0
         for key, stem, label in FEATURE_SPECS:
-            if key not in features:  # absent -> board has no such hardware
+            if key not in features:
                 continue
             supported = features[key]
             icon = self._feature_icon(stem, gray=not supported)
             if icon is None:
                 continue
             lbl = ttk.Label(self.features_icons, image=icon)
-            lbl.image = icon  # keep a ref so Tk doesn't GC it
+            lbl.image = icon
             lbl.pack(side="left", padx=(0, 8))
             tip = label if supported else f"{label} (unsupported)"
             bind_tooltip(lbl, tip)
             shown += 1
         self._bind_wheel(self.features_icons)
         if shown:
-            self.features_frame.grid()
+            self.features_block.grid()
         else:
-            self.features_frame.grid_remove()
+            self.features_block.grid_remove()
 
     def _feature_icon(self, stem: str, gray: bool) -> Optional[tk.PhotoImage]:
         cache_key = (stem, gray)

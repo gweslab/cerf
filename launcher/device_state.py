@@ -300,15 +300,6 @@ def parse_cerf_json_object(obj) -> tuple[DeviceMeta, Optional[int], Optional[int
     return meta, width, height
 
 
-def parse_cerf_json(path: Path) -> tuple[DeviceMeta, Optional[int], Optional[int]]:
-    try:
-        with path.open("r", encoding="utf-8") as f:
-            obj = json.load(f)
-    except (OSError, json.JSONDecodeError):
-        return DeviceMeta(), None, None
-    return parse_cerf_json_object(obj)
-
-
 def _str_or_empty(v) -> str:
     return v if isinstance(v, str) else ""
 

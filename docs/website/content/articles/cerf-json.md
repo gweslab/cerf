@@ -62,8 +62,8 @@ survive.
 
 ## Layer 2 - the device `cerf.json`
 
-This file lives inside the device directory next to the ROM. It is what makes a directory of files
-a bootable device.
+This file lives inside the device directory next to the ROM. It comes with a ROM bundle and
+describes the device as shipped. Nothing that you change goes into it.
 
 !!! note "Global vs scoped parameters"
 
@@ -165,22 +165,21 @@ file is lost. The launcher therefore writes your choices here instead:
 
 - **`launcher`** - the repository that this device directory came from, and its name there. This
   block is the update link: the launcher uses it to know that a newer bundle applies to this
-  directory. A device that you created from your own dump has no such block.
-- **`meta.name`** - your display-name override, from **Rename** in the launcher.
-- **The launch options** - every switch in the launcher's *Configuration* panel: Guest Additions
-  and its color scheme, the resolution and DPI override, full screen, and the network toggle. The
-  launcher stores only the ones that you changed away from the device's own default.
+  directory. A device that you created from your own dump has no such block, and it has no
+  layer 2 file either. Its board and ROM live here.
+- **`meta.name`** - your display-name override.
+- **Everything that you set in the device's *Properties***. The launcher stores only the values
+  that you changed away from the device's own default.
 
 A ROM upgrade replaces the ROM and rewrites `cerf.json`. It does not touch `cerf-user.json`, so
 your configuration is still there afterwards.
 
-!!! note "Configuration here, ROM in layer 2"
+!!! note "A ROM you picked outlives upgrades"
 
     `cerf-user.json` goes through the same loader as `cerf.json`, so any key from layer 2 is legal
-    in it. This includes `rom.primary`. But a ROM pointer here outlives the bundle that it belongs
-    to. After an upgrade replaces the ROM file, the pointer still names the old file, and it wins.
-    The device then does not boot. Keep this file for your own configuration, and let layer 2
-    describe the ROM.
+    in it. When you pick another ROM in *Properties*, the launcher writes `rom.primary` here. A
+    bundle upgrade does not replace that choice, so the device keeps booting your ROM. When you
+    pick the file of the bundle again, the launcher removes your choice.
 
 ## Order of application
 
@@ -190,5 +189,4 @@ global cerf.json  ->  devices/<name>/cerf.json  ->  devices/<name>/cerf-user.jso
 
 Later wins.
 
-A hand-written device needs neither layer 1 nor layer 3.
-[Running your own ROM](own-rom.md) shows the two-key `cerf.json` that boots a dump.
+[Running your own ROM](own-rom.md) shows the two-key `cerf-user.json` that boots a dump.

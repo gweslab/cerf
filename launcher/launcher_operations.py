@@ -5,8 +5,8 @@ from typing import Callable, List, Optional, Tuple
 
 from device_state import DeviceBundle, PackageStatus
 from bundle_download import CancelledError
-from ui_dialogs import (ask_yesno, confirm_rom_license, show_dialog,
-                        show_error, show_info)
+from ui_dialogs import (ask_yesno, confirm_rom_license, show_error,
+                        show_info)
 from ui_large_download import (filter_update_all_targets, gate_bundle_download,
                                gate_package_download)
 
@@ -68,36 +68,6 @@ class OperationsMixin:
         f = self.manager.submit_refresh_cerf_json(d.name)
         self._await_future(f, lambda exc: self._after_op(
             exc, f"Updated {d.name} config"))
-
-    def _update(self) -> None:
-        if self.busy or self.catalog_loading:
-            return
-        sel = self.tree_panel.selection()
-        d = sel.device
-        update_devices = [x for x in self.tree_panel.devices
-                          if x.has_update or x.has_cerf_json_update]
-        if not (sel.kind == "device" and d is not None
-                and (d.has_update or d.has_cerf_json_update)):
-            self._update_all()
-            return
-        others = [x for x in update_devices if x is not d]
-        if not others:
-            self._apply_device_update(d)
-            return
-        n = len(update_devices)
-        more = len(others)
-        all_label = f"Update {n} devices"
-        one_label = "Update only this device"
-        choice = show_dialog(
-            self, "Update bundles",
-            f"Except this device there are {more} more "
-            f"{'devices' if more != 1 else 'device'} ready to update. "
-            f"Would you like to update all or only this one?",
-            (all_label, one_label, "Cancel"), default="Cancel")
-        if choice == one_label:
-            self._apply_device_update(d)
-        elif choice == all_label:
-            self._update_all()
 
     def _delete_package(self, d: DeviceBundle, ps: PackageStatus) -> None:
         if self.busy:

@@ -11,7 +11,6 @@ from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
 from bundle_download import (
-    CancelledError,
     ProgressFn,
     download_extract,
     remove_artifact,
@@ -28,9 +27,9 @@ from bundle_repositories import read_repositories
 from cerf_user_json import (
     CERF_USER_JSON_FILENAME,
     LauncherLink,
+    read_device_meta,
     read_launcher_link,
     read_rom_primary,
-    read_user_meta_name,
     write_launcher_link,
 )
 from update_source import fetch_update
@@ -44,7 +43,6 @@ from device_state import (
     load_local_manifest,
     package_artifact_present,
     cerf_json_differs,
-    parse_cerf_json,
     parse_cerf_json_object,
     save_local_manifest,
     write_cerf_json,
@@ -187,10 +185,7 @@ class BundleManager:
         claimed: set = set()
 
         for entry in self._local_device_dirs():
-            meta, w, h = parse_cerf_json(entry / "cerf.json")
-            user_name = read_user_meta_name(entry)
-            if user_name:
-                meta.name = user_name
+            meta, w, h = read_device_meta(entry)
             record = self.installed.get(entry.name)
             d = DeviceBundle(
                 name=entry.name,

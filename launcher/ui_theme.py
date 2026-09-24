@@ -289,6 +289,25 @@ def apply_theme(root: tk.Tk) -> None:
               bordercolor=[("disabled", BORDER),
                            ("focus", LAUNCH_FG)])
 
+    for name, fg in (("Toolbar.TButton", FG),
+                     ("ToolbarLaunch.TButton", LAUNCH_FG)):
+        style.configure(name,
+                        background=BG, foreground=fg,
+                        bordercolor=BG, lightcolor=BG, darkcolor=BG,
+                        focuscolor=BG, focusthickness=0, padding=(3, 1),
+                        width=0, borderwidth=1)
+        style.map(name,
+                  background=[("pressed", BG_SELECTED),
+                              ("active", BG_HOVER),
+                              ("disabled", BG)],
+                  bordercolor=[("pressed", BORDER), ("active", BORDER),
+                               ("disabled", BG)],
+                  lightcolor=[("pressed", BG_SELECTED), ("active", BG_HOVER),
+                              ("disabled", BG)],
+                  darkcolor=[("pressed", BG_SELECTED), ("active", BG_HOVER),
+                             ("disabled", BG)],
+                  foreground=[("disabled", FG_DIM)])
+
     style.configure("TCheckbutton",
                     background=BG, foreground=FG,
                     focuscolor=BG, indicatorcolor=BG_FIELD)

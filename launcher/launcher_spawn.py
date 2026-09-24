@@ -32,9 +32,9 @@ class SpawnMixin:
         AboutWindow(self).wait()
 
     def _spawn_cerf(self, d: DeviceBundle, boot: Optional[str] = None) -> None:
-        tail = self.launch_options.collect_args(d)
-        if tail is None:
-            return
+        tail = [f"--device={d.name}"]
+        if d.name in self._verbose_devices:
+            tail.append("--log=ALL")
         tail.append(f"--boot={boot or 'resume'}")
         argv: List[str] = [str(self.cerf_exe)] + tail
         try:

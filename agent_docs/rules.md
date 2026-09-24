@@ -43,7 +43,7 @@ Every new code and change in JIT/MMU must be done through this workflow. Every S
 
 **There are ZERO known/pre-existing bugs in JIT/MMU/etc** - if you found a bug that you did not discuss with the user - stop and give the user data. This is extremely important. This rule also spreads to the rest of the code, not only JIT/MMU.
 
-Heuristics and similar ambiguous approaches are forbidden in JIT/MMU. They are forbidden at any level where the problem obviously cannot be handled at 100%. Consider such a heuristic approach an architecture damage. It is fine, for example, in the board detector, where we scan the ROM to find something that points at a specific board. But at JIT level that is clear architecture damage.
+Heuristics and similar ambiguous approaches are forbidden in JIT/MMU. They are forbidden at any level where the problem obviously cannot be handled at 100%. JIT/peripherals/whatever - no heuristics anywhere. Consider such a heuristic approach an architecture damage.
 
 ## Reference Licence Hygiene
 

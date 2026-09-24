@@ -9,6 +9,13 @@ from typing import Callable, Optional
 import ui_theme as theme
 
 
+def fit_scrollregion(canvas: tk.Canvas) -> None:
+    box = canvas.bbox("all")
+    width = box[2] if box else 0
+    height = max(box[3] if box else 0, canvas.winfo_height())
+    canvas.configure(scrollregion=(0, 0, width, height))
+
+
 class ScrollColumn:
     """A fixed-width, vertically scrollable content column. Build content
     into `.inner`; call `bind_wheel(widget)` after adding dynamic children
@@ -27,12 +34,12 @@ class ScrollColumn:
                                                     anchor="nw")
         self.inner.columnconfigure(0, weight=1)
 
-        def _on_inner_config(_e: object) -> None:
-            self._canvas.configure(scrollregion=self._canvas.bbox("all"))
-        self.inner.bind("<Configure>", _on_inner_config)
+        self.inner.bind("<Configure>",
+                        lambda _e: fit_scrollregion(self._canvas))
 
         def _on_canvas_config(e: object) -> None:
             self._canvas.itemconfigure(self._inner_id, width=e.width)
+            fit_scrollregion(self._canvas)
             if on_width_changed is not None:
                 on_width_changed(e.width)
         self._canvas.bind("<Configure>", _on_canvas_config)

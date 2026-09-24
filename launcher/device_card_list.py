@@ -12,6 +12,7 @@ from device_model import (TreeSelection, _board_group_key, _device_sort_key,
                           _device_search_haystack, _os_name_has_version,
                           _table_device_label)
 from preview_tile import PreviewTile
+from ui_scroll import fit_scrollregion
 from board_info import board_soc_cpu, board_soc_label
 import ui_theme as theme
 
@@ -97,7 +98,7 @@ class DeviceCardList:
                                               anchor="nw")
         self._inner.bind(
             "<Configure>",
-            lambda _e: canvas.configure(scrollregion=canvas.bbox("all")))
+            lambda _e: fit_scrollregion(canvas))
         canvas.bind("<Configure>", self._on_canvas_config)
         self._bind_wheel(canvas)
         self._bind_wheel(self._inner)
@@ -410,6 +411,7 @@ class DeviceCardList:
 
     def _on_canvas_config(self, e: tk.Event) -> None:
         self._canvas.itemconfigure(self._inner_id, width=e.width)
+        fit_scrollregion(self._canvas)
         self._heading_wrap = max(160, e.width - self._tile_w - 40)
         for card in self._cards.values():
             card.name.config(wraplength=self._heading_wrap)

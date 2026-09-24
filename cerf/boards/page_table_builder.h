@@ -59,6 +59,8 @@ public:
        by the real peripheral mapping so the stub bytes are never served. */
     virtual std::vector<DramRegion> MappedVaSpans() const = 0;
 
+    virtual DramRegion EntryXipRomRegion() const;
+
     /* True iff `va` lies inside any cached-DRAM band. Default impl
        walks CachedDramRegions(); SoC overrides not needed. */
     bool IsInCachedDram(uint32_t va) const {

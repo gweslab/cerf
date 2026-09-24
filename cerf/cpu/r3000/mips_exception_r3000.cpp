@@ -8,6 +8,7 @@
 #include "../../core/cerf_emulator.h"
 #include "../../jit/mips/mips_cpu.h"
 #include "../../jit/mips/mips_cpu_state.h"
+#include "../../jit/mips/mips_mmu.h"
 
 namespace {
 
@@ -26,10 +27,6 @@ constexpr uint32_t kVecUtlbRefill    = 0x80000000u;
 constexpr uint32_t kVecGeneral       = 0x80000080u;
 constexpr uint32_t kVecUtlbRefillBev = 0xBFC00100u;
 constexpr uint32_t kVecGeneralBev    = 0xBFC00180u;
-
-/* kuseg is the mapped user segment; a refill from it vectors to UTLB Refill, one from
-   a mapped kernel segment to the general vector (Table 6-2). */
-constexpr uint32_t kKusegLimit = 0x80000000u;
 
 /* Context: PTEBase<31:21> belongs to software, BadVPN<20:2> holds the faulting VPN
    (MIPS1_CNTXT_PTE_BASE / MIPS1_CNTXT_BAD_VPN, netbsd cpuregs.h). */
@@ -84,7 +81,9 @@ public:
                        ((s.cp0_status << 2) & kModePushMask);
 
         /* SetMmuFaultRegs latched BadVAddr before every refill-eligible call. */
-        const bool utlb = refill_eligible && s.cp0_badvaddr < kKusegLimit;
+        /* kuseg is the mapped user segment; a refill from it vectors to UTLB Refill, one from
+           a mapped kernel segment to the general vector (Table 6-2). */
+        const bool utlb = refill_eligible && s.cp0_badvaddr < MipsSeg::kKusegEnd;
         const bool bev  = ((s.cp0_status >> MipsStatusBit::kBEV) & 1u) != 0u;
         if (bev) {
             s.pc = utlb ? kVecUtlbRefillBev : kVecGeneralBev;

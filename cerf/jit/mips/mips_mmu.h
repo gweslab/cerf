@@ -14,6 +14,11 @@ namespace MipsSeg {
     constexpr uint32_t kKseg1Base    = 0xA0000000;  /* kseg0  ..0x9FFFFFFF, unmapped cached */
     constexpr uint32_t kKseg2Base    = 0xC0000000;  /* kseg1  ..0xBFFFFFFF, unmapped uncached */
     constexpr uint32_t kUnmappedMask = 0x1FFFFFFF;  /* kseg0/1 VA -> PA */
+
+    constexpr bool IsUnmapped(uint32_t va) {
+        return va >= kKusegEnd && va < kKseg2Base;
+    }
+    constexpr uint32_t UnmappedPa(uint32_t va) { return va & kUnmappedMask; }
 }
 
 /* EntryLo0/1 bit layout (R4000), per QEMU tlb_helper.c r4k_fill_tlb. */
@@ -53,25 +58,18 @@ public:
             *pa = injection_band_pa_ + (va - injection_band_va_);
             return MipsTlbResult::kMatch;
         }
-        if (va < MipsSeg::kKusegEnd) {
-            return MapAddress(st, va, acc, pa);         /* kuseg */
-        }
-        if (va < MipsSeg::kKseg1Base) {                 /* kseg0: unmapped cached */
-            *pa = va & MipsSeg::kUnmappedMask;
+        if (MipsSeg::IsUnmapped(va)) {
+            *pa = MipsSeg::UnmappedPa(va);
             return MipsTlbResult::kMatch;
         }
-        if (va < MipsSeg::kKseg2Base) {                 /* kseg1: unmapped uncached */
-            *pa = va & MipsSeg::kUnmappedMask;
-            return MipsTlbResult::kMatch;
-        }
-        return MapAddress(st, va, acc, pa);             /* kseg2/kseg3 */
+        return MapAddress(st, va, acc, pa);
     }
 
     /* True iff va's page is global (kseg0/kseg1, or a TLB entry with G=1). The
        JIT routes a global page's block to the shared `global` index, else to
        per_asid[EntryHi.ASID]. */
     bool ExecPageGlobal(MipsCpuState* st, uint32_t va) {
-        if (va >= MipsSeg::kKusegEnd && va < MipsSeg::kKseg2Base) {
+        if (MipsSeg::IsUnmapped(va)) {
             return true;
         }
         return MappedPageGlobal(st, va);

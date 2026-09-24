@@ -1,10 +1,9 @@
 #include "../intel_command_set_flash.h"
 
 #include "../../boards/board_context.h"
+#include "../../boards/page_table_builder.h"
 #include "../../boards/philips_nino_300/philips_nino_300_id.h"
-#include "../../boot/rom_parser_service.h"
 #include "../../core/cerf_emulator.h"
-#include "../../core/log.h"
 
 #include <cstdint>
 
@@ -18,7 +17,6 @@ constexpr uint32_t kIdentWordMfr = 0xB000B000u;   /* mfr 00B0h, lanes crossed */
 constexpr uint32_t kIdentWordDev = 0x88668866u;   /* device 6688h, lanes crossed */
 constexpr uint32_t kIdentOffMfr  = 0u;
 constexpr uint32_t kIdentOffDev  = 4u;
-constexpr uint32_t kKsegUnmask   = 0x1FFFFFFFu;
 
 class SharpLh28F016Su : public IntelCommandSetFlash {
 public:
@@ -30,14 +28,9 @@ public:
     }
 
     void OnReady() override {
-        auto& rom = emu_.Get<RomParserService>();
-        if (!rom.Ok() || rom.Loaded().empty() || rom.Primary().xips.empty()) {
-            LOG(Caution, "SharpLh28F016Su: ROM not parsed\n");
-            CerfFatalExit(CERF_FATAL_RUNTIME_ERROR);
-        }
-        const ParsedROMHDR& hdr = rom.Primary().xips.front().toc.romhdr;
-        base_ = hdr.physfirst & kKsegUnmask;
-        size_ = hdr.physlast - hdr.physfirst;
+        const DramRegion rom = emu_.Get<PageTableBuilder>().EntryXipRomRegion();
+        base_ = rom.pa_base;
+        size_ = rom.size;
         IntelCommandSetFlash::OnReady();
     }
 

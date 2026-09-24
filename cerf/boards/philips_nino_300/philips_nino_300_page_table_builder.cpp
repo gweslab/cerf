@@ -1,20 +1,12 @@
-#include "../page_table_builder.h"
+#include "../mips_kseg_dram_rom_page_table_builder.h"
 
-#include "../../boot/rom_parser_service.h"
 #include "../../core/cerf_emulator.h"
-#include "../../core/log.h"
 #include "../board_context.h"
 #include "philips_nino_300_id.h"
 
 #include <cstdint>
-#include <vector>
 
 namespace {
-
-constexpr uint32_t kKseg0Base  = 0x80000000u;
-constexpr uint32_t kKseg1Base  = 0xA0000000u;
-constexpr uint32_t kKseg2Base  = 0xC0000000u;
-constexpr uint32_t kUnmaskKseg = 0x1FFFFFFFu;
 
 constexpr uint32_t kDramVaBase = 0x80000000u;
 
@@ -32,84 +24,17 @@ constexpr uint32_t kDramSize = 0x00400000u;
    nk.exe sub_9F4117B4 reads PA 0x00C00000 back to size the part. */
 constexpr uint32_t kDramDecodeSpan = 0x02000000u;
 
-class PhilipsNino300PageTableBuilder : public PageTableBuilder {
+class PhilipsNino300PageTableBuilder : public MipsKsegDramRomPageTableBuilder {
 public:
-    using PageTableBuilder::PageTableBuilder;
+    explicit PhilipsNino300PageTableBuilder(CerfEmulator& emu)
+        : MipsKsegDramRomPageTableBuilder(emu, {
+              { kDramVaBase, kDramPaBase, kDramSize }, kDramDecodeSpan, kDramDecodeSpan,
+          }) {}
 
     bool ShouldRegister() override {
         auto* bd = emu_.TryGet<BoardContext>();
         return bd && bd->GetBoardId() == BoardId::PhilipsNino300;
     }
-
-    void OnReady() override {
-        auto& rom = emu_.Get<RomParserService>();
-        if (!rom.Ok() || rom.Loaded().empty() || rom.Primary().xips.empty()) {
-            LOG(Caution, "PhilipsNino300PageTableBuilder: ROM not parsed\n");
-            CerfFatalExit(CERF_FATAL_RUNTIME_ERROR);
-        }
-
-        const ParsedRom&    prim = rom.Primary();
-        const ParsedROMHDR* hdr  = prim.XipHeaderContaining(prim.entry_va);
-        if (!hdr) {
-            hdr = &prim.xips.front().toc.romhdr;
-        }
-
-        if (hdr->physfirst < kKseg0Base || hdr->physlast <= hdr->physfirst ||
-            hdr->physlast > kKseg1Base) {
-            LOG(Caution, "PhilipsNino300PageTableBuilder: ROM outside kseg0: "
-                    "physfirst=0x%08X physlast=0x%08X\n",
-                hdr->physfirst, hdr->physlast);
-            CerfFatalExit(CERF_FATAL_RUNTIME_ERROR);
-        }
-        if (hdr->ulRAMEnd <= kDramVaBase ||
-            hdr->ulRAMEnd - kDramVaBase > kDramSize) {
-            LOG(Caution, "PhilipsNino300PageTableBuilder: ROMHDR ulRAMEnd 0x%08X "
-                    "does not fit DRAM BANK 0 (0x%X bytes)\n",
-                hdr->ulRAMEnd, kDramSize);
-            CerfFatalExit(CERF_FATAL_RUNTIME_ERROR);
-        }
-
-        rom_va_base_ = hdr->physfirst;
-        rom_pa_base_ = hdr->physfirst & kUnmaskKseg;
-        rom_size_    = hdr->physlast - hdr->physfirst;
-
-        LOG(Boot, "PhilipsNino300PageTableBuilder: ROM kva=0x%08X pa=0x%08X size=0x%X, "
-                  "DRAM pa=0x%08X size=0x%X (ulRAMEnd=0x%08X)\n",
-            rom_va_base_, rom_pa_base_, rom_size_, kDramPaBase, kDramSize,
-            hdr->ulRAMEnd);
-    }
-
-    uint32_t VaToPa(uint32_t va) const override {
-        if (va >= kKseg0Base && va < kKseg2Base) {
-            return va & kUnmaskKseg;
-        }
-        LOG(Caution, "PhilipsNino300PageTableBuilder::VaToPa: VA 0x%08X is "
-                "outside the kseg0/kseg1 unmapped windows\n", va);
-        CerfFatalExit(CERF_FATAL_RUNTIME_ERROR);
-    }
-
-    std::vector<DramRegion> CachedDramRegions() const override {
-        return { { kDramVaBase, kDramPaBase, kDramSize } };
-    }
-
-    std::vector<BackedRegion> BackedMemoryRegions() const override {
-        return {
-            { kDramVaBase,  kDramPaBase,  kDramSize, PAGE_READWRITE, kDramDecodeSpan },
-            { rom_va_base_, rom_pa_base_, rom_size_, PAGE_EXECUTE_READ },
-        };
-    }
-
-    std::vector<DramRegion> MappedVaSpans() const override {
-        return {
-            { kDramVaBase,  kDramPaBase,  kDramDecodeSpan },
-            { rom_va_base_, rom_pa_base_, rom_size_ },
-        };
-    }
-
-private:
-    uint32_t rom_va_base_ = 0;
-    uint32_t rom_pa_base_ = 0;
-    uint32_t rom_size_    = 0;
 };
 
 }  /* namespace */

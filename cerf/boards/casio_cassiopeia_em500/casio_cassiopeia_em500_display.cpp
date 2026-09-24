@@ -5,6 +5,7 @@
 #include "../../core/fatal.h"
 #include "../../core/log.h"
 #include "../../cpu/emulated_memory.h"
+#include "../../jit/mips/mips_mmu.h"
 #include "../../state/state_stream.h"
 
 #include <cstring>
@@ -36,10 +37,6 @@ constexpr uint32_t kOffFillGo      = 0x0234u;
 
 /* ddi.dll sub_FC4E38 @0xFC4F04 li $t0, 0x81; @0xFC4F38 sw $t0, 4($v0). */
 constexpr uint32_t kBlitOpCopy = 0x81u;
-
-/* VR4102 UM ch.5 p131 "(3) kseg1": references are not mapped through TLB and the
-   physical address is the virtual address minus 0xA0000000. */
-constexpr uint32_t kPaMask = 0x1FFFFFFFu;
 
 }  /* namespace */
 
@@ -143,7 +140,9 @@ void CasioCassiopeiaEm500Display::RunBlit() {
     }
     const uint32_t bytes = blit_len_words_ * 4u;
     if (bytes == 0u) return;
-    const uint32_t src_pa = blit_src_ & kPaMask;
+    /* VR4102 UM ch.5 p131 "(3) kseg1": references are not mapped through TLB and the
+       physical address is the virtual address minus 0xA0000000. */
+    const uint32_t src_pa = MipsSeg::UnmappedPa(blit_src_);
     if (static_cast<uint64_t>(blit_dst_) + bytes > kFbSize) {
         LOG(Caution, "EM-500 display blit dst=0x%X len=%u exceeds framebuffer\n",
             blit_dst_, bytes);

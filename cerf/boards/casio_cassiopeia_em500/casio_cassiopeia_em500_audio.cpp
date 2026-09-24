@@ -4,6 +4,7 @@
 #include "../../core/log.h"
 #include "../../cpu/emulated_memory.h"
 #include "../../host/audio_activity_widget.h"
+#include "../../jit/mips/mips_mmu.h"
 #include "../../state/emulation_freeze.h"
 #include "../../state/state_stream.h"
 
@@ -57,10 +58,6 @@ constexpr uint32_t kOffAckR8CC = 0x08CCu;
 /* loc_F62984 @0xF629CE li $a2, 0x71 / neg -> 0xFFFFFF8F, so the select is
    bits[6:4]. */
 constexpr uint32_t kRateSelectMask = 0x70u;
-
-/* VR4102 UM ch.5 p131 "(3) kseg1": references are not mapped through TLB and the
-   physical address is the virtual address minus 0xA0000000. */
-constexpr uint32_t kPaMask = 0x1FFFFFFFu;
 
 /* Every loc_F61998 converter stores with sh into the DMA buffer whatever the
    source width: @0xF61D3A (case 0, lbu source), @0xF61C92 (case 1, lh source),
@@ -278,7 +275,9 @@ void CasioCassiopeiaEm500Audio::QueueDescriptor(uint32_t start_index,
     }
     const uint32_t length = static_cast<uint32_t>(span);
     std::vector<uint8_t> block(length);
-    emu_->Get<EmulatedMemory>().CopyOut(start_va & kPaMask, block.data(), length);
+    /* VR4102 UM ch.5 p131 "(3) kseg1": references are not mapped through TLB and the
+       physical address is the virtual address minus 0xA0000000. */
+    emu_->Get<EmulatedMemory>().CopyOut(MipsSeg::UnmappedPa(start_va), block.data(), length);
     if (frozen.owns_lock()) frozen.unlock();
 
     emu_->Get<AudioActivityWidget>().MarkTx();

@@ -1,12 +1,10 @@
-#include "../page_table_builder.h"
+#include "../mips_kseg_dram_rom_page_table_builder.h"
 
 #include "../../core/cerf_emulator.h"
-#include "../../core/log.h"
 #include "../board_context.h"
 #include "casio_cassiopeia_em500_id.h"
 
 #include <cstdint>
-#include <vector>
 
 namespace {
 
@@ -25,45 +23,16 @@ constexpr uint32_t kRomVaBase  = 0x9F000000u;
 constexpr uint32_t kRomPaBase  = 0x1F000000u;
 constexpr uint32_t kRomSize    = 0x01000000u;
 
-constexpr uint32_t kKseg0Base  = 0x80000000u;
-constexpr uint32_t kKseg2Base  = 0xC0000000u;
-constexpr uint32_t kUnmaskKseg = 0x1FFFFFFFu;
-
-class CasioCassiopeiaEm500PageTableBuilder : public PageTableBuilder {
+class CasioCassiopeiaEm500PageTableBuilder : public MipsKsegDramRomPageTableBuilder {
 public:
-    using PageTableBuilder::PageTableBuilder;
+    explicit CasioCassiopeiaEm500PageTableBuilder(CerfEmulator& emu)
+        : MipsKsegDramRomPageTableBuilder(emu, {
+              { kDramVaBase, kDramPaBase, kDramSize }, 0u, kDramSize,
+          }, { kRomVaBase, kRomPaBase, kRomSize }) {}
 
     bool ShouldRegister() override {
         auto* bd = emu_.TryGet<BoardContext>();
         return bd && bd->GetBoardId() == BoardId::CasioCassiopeiaEm500;
-    }
-
-    uint32_t VaToPa(uint32_t va) const override {
-        if (va >= kKseg0Base && va < kKseg2Base) {
-            return va & kUnmaskKseg;
-        }
-        LOG(Caution, "CasioCassiopeiaEm500PageTableBuilder::VaToPa: VA 0x%08X is "
-                "outside the kseg0/kseg1 unmapped windows (ROM placement only "
-                "feeds kseg VAs)\n", va);
-        CerfFatalExit(CERF_FATAL_RUNTIME_ERROR);
-    }
-
-    std::vector<DramRegion> CachedDramRegions() const override {
-        return { { kDramVaBase, kDramPaBase, kDramSize } };
-    }
-
-    std::vector<BackedRegion> BackedMemoryRegions() const override {
-        return {
-            { kDramVaBase, kDramPaBase, kDramSize, PAGE_READWRITE },
-            { kRomVaBase,  kRomPaBase,  kRomSize,  PAGE_EXECUTE_READ },
-        };
-    }
-
-    std::vector<DramRegion> MappedVaSpans() const override {
-        return {
-            { kDramVaBase, kDramPaBase, kDramSize },
-            { kRomVaBase,  kRomPaBase,  kRomSize  },
-        };
     }
 };
 

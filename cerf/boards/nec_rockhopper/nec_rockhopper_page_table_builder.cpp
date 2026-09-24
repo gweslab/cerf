@@ -1,7 +1,7 @@
-#include "../page_table_builder.h"
+#include "../mips_kseg_page_table_builder.h"
 
 #include "../../core/cerf_emulator.h"
-#include "../../core/log.h"
+#include "../../jit/mips/mips_mmu.h"
 #include "../board_context.h"
 #include "nec_rockhopper_id.h"
 
@@ -12,39 +12,27 @@ namespace {
 
 constexpr uint32_t kDramPaBase = 0x00000000u;
 constexpr uint32_t kDramSize   = 0x08000000u;   /* 128 MB */
-constexpr uint32_t kKseg0Base  = 0x80000000u;
-constexpr uint32_t kKseg2Base  = 0xC0000000u;
-constexpr uint32_t kUnmaskKseg = 0x1FFFFFFFu;
+constexpr uint32_t kDramVaBase = MipsSeg::kKusegEnd | kDramPaBase;
 
-class NecRockhopperPageTableBuilder : public PageTableBuilder {
+class NecRockhopperPageTableBuilder : public MipsKsegPageTableBuilder {
 public:
-    using PageTableBuilder::PageTableBuilder;
+    using MipsKsegPageTableBuilder::MipsKsegPageTableBuilder;
 
     bool ShouldRegister() override {
         auto* bd = emu_.TryGet<BoardContext>();
         return bd && bd->GetBoardId() == BoardId::NecRockhopper;
     }
 
-    uint32_t VaToPa(uint32_t va) const override {
-        if (va >= kKseg0Base && va < kKseg2Base) {
-            return va & kUnmaskKseg;
-        }
-        LOG(Caution, "NecRockhopperPageTableBuilder::VaToPa: VA 0x%08X is "
-                "outside the kseg0/kseg1 unmapped windows (ROM placement only "
-                "feeds kseg VAs)\n", va);
-        CerfFatalExit(CERF_FATAL_RUNTIME_ERROR);
-    }
-
     std::vector<DramRegion> CachedDramRegions() const override {
-        return { { kKseg0Base, kDramPaBase, kDramSize } };
+        return { { kDramVaBase, kDramPaBase, kDramSize } };
     }
 
     std::vector<BackedRegion> BackedMemoryRegions() const override {
-        return { { kKseg0Base, kDramPaBase, kDramSize, PAGE_READWRITE } };
+        return { { kDramVaBase, kDramPaBase, kDramSize, PAGE_READWRITE } };
     }
 
     std::vector<DramRegion> MappedVaSpans() const override {
-        return { { kKseg0Base, kDramPaBase, kDramSize } };
+        return { { kDramVaBase, kDramPaBase, kDramSize } };
     }
 };
 

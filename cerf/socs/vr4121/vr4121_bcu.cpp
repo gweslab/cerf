@@ -16,7 +16,7 @@ using cerf_vr41xx_reg_window_detail::WriteKind;
 constexpr Vr41xxRegWindowModel kModel = {
     /*base=*/0x0B000000u,
     /*size=*/0x20u,
-    14u,
+    16u,
     /*word_pairs=*/false,
     {
         /* 0x00 BCUCNTREG1 (UM 11.2.1): R/W bits D15/14/13/12/10/8/6/4/3/2/1/0,
@@ -49,6 +49,9 @@ constexpr Vr41xxRegWindowModel kModel = {
         /* 0x1A SDRAMMODEREG (UM 11.2.12): R/W D15 SCLK, D6:4 LTMODE; D3 WT, D2:0 BL read
            1 and 001; D14:7 RFU read 0; RTCRST 0x8039; After-reset "retained". */
         { ReadKind::kStored, WriteKind::kStored, 0x8070u, 0x8039u, 0u, OtherReset::kRetain },
+        {},
+        { ReadKind::kFatal, WriteKind::kStored, 0x0F77u, 0x0944u, 0u, OtherReset::kReset,
+          0x0F77u },
     },
 };
 
@@ -58,12 +61,23 @@ static_assert((0xF887u & 0x0778u) == 0u,
               "BCUCNTREG3 writable and read-0 RFU bits overlap");
 static_assert((0x8070u & 0x7F80u) == 0u,
               "SDRAMMODEREG writable and read-0 RFU bits overlap");
+static_assert((0x0F77u & 0xF088u) == 0u,
+              "SDRAMCNTREG writable and RFU/SMODE bits overlap");
 
 constexpr uint32_t kOffSdramMode = 0x1Au;
+constexpr uint32_t kOffSdramCnt  = 0x1Eu;
 
 constexpr bool LtmodeDefined(uint16_t value) {
     const uint16_t ltmode = static_cast<uint16_t>((value >> 4) & 0x7u);
     return ltmode == 0x2u || ltmode == 0x3u;
+}
+
+constexpr bool SdramCntDefined(uint16_t value) {
+    const uint16_t trc  = static_cast<uint16_t>((value >> 8) & 0xFu);
+    const uint16_t tdal = static_cast<uint16_t>((value >> 4) & 0x7u);
+    const uint16_t trcd = static_cast<uint16_t>(value & 0x7u);
+    return trc >= 0x3u && trc <= 0x9u && tdal >= 0x2u && tdal <= 0x4u &&
+           trcd >= 0x2u && trcd <= 0x4u;
 }
 
 class Vr4121Bcu : public Vr41xxRegWindowBase<SocId::Vr4121, kModel> {
@@ -73,6 +87,9 @@ public:
     void WriteHalf(uint32_t addr, uint16_t value) override {
         if (addr - kModel.base == kOffSdramMode && !LtmodeDefined(value)) {
             HaltUnsupportedAccess("SDRAMMODEREG WriteHalf with an RFU LTMODE", addr, value);
+        }
+        if (addr - kModel.base == kOffSdramCnt && !SdramCntDefined(value)) {
+            HaltUnsupportedAccess("SDRAMCNTREG WriteHalf with an RFU TRC/TDAL/TRCD", addr, value);
         }
         Vr41xxRegWindowBase::WriteHalf(addr, value);
     }

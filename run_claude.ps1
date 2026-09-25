@@ -291,7 +291,7 @@ do {
     $asyncClangd = $psClangd.BeginInvoke()
 
     try {
-        & claude --effort high `
+        & claude --effort xhigh `
                  --allow-dangerously-skip-permissions `
                  --permission-mode bypassPermissions `
                  --system-prompt-file $tempFile `

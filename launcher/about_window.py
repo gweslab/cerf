@@ -21,6 +21,7 @@ EVERYONE_ELSE = "everyone else who helped"
 SEPARATOR = "   •   "
 MARQUEE_DIP_PER_SEC = 34
 MARQUEE_FRAME_MS = 16
+MARQUEE_START_DELAY_MS = 2500
 
 
 def contributors() -> str:
@@ -58,7 +59,7 @@ class Marquee(tk.Canvas):
                            self.create_text(self._cycle_w, 0, anchor="nw",
                                             text=self._cycle, fill=theme.FG,
                                             font=self._font)]
-            self.after(MARQUEE_FRAME_MS, self._tick)
+            self.after(MARQUEE_START_DELAY_MS, self._tick)
         else:
             self.create_text(0, 0, anchor="nw", text=text, fill=theme.FG,
                              font=self._font)
@@ -96,16 +97,19 @@ class AboutWindow:
         version_font.configure(size=max(7, int(round(abs(base.cget("size"))
                                                      * 0.95))))
 
-        ttk.Label(chrome.head, text=PRODUCT_NAME, font=title_font).pack(
+        identity = ttk.Frame(chrome.head)
+        identity.pack(side="left", anchor="n", fill="x", expand=True)
+        title_row = ttk.Frame(identity)
+        title_row.pack(anchor="w")
+        ttk.Label(title_row, text=PRODUCT_NAME, font=title_font).pack(
             side="left", anchor="n")
         if version:
-            ttk.Label(chrome.head, text="v" + version, font=version_font,
+            ttk.Label(title_row, text="v" + version, font=version_font,
                       style="Hint.TLabel").pack(side="left", anchor="n",
                                                 padx=(scaled(self._dlg, 5), 0))
         if build:
-            ttk.Label(body, text=build, style="Hint.TLabel",
-                      wraplength=text_w, justify="left").pack(anchor="w",
-                                                              pady=(0, gap))
+            ttk.Label(identity, text=build, style="Hint.TLabel",
+                      wraplength=text_w, justify="left").pack(anchor="w")
 
         links = ttk.Frame(body)
         links.pack(anchor="w")

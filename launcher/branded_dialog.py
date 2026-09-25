@@ -6,6 +6,7 @@ from tkinter import ttk
 from typing import Callable, Optional
 
 from app_paths import resolve_asset, resolve_icons_dir
+from dialog_buttons import ACCENT_STYLE
 import ui_theme as theme
 
 
@@ -128,7 +129,10 @@ class BrandedDialog:
         self.heading.configure(text=text)
 
     def add_button(self, label: str, command: Callable[[], None],
-                   style: str = "TButton", default: bool = False) -> ttk.Button:
+                   style: Optional[str] = None,
+                   default: bool = False) -> ttk.Button:
+        if style is None:
+            style = ACCENT_STYLE if default else "TButton"
         btn = ttk.Button(self.buttons, text=label, command=command, style=style)
         btn.pack(side="right", padx=(scaled(self.window, 6), 0))
         if default:

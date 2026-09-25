@@ -4,6 +4,7 @@ import tkinter as tk
 from tkinter import ttk
 from typing import Optional
 
+from dialog_buttons import pack_actions
 from properties_dialog import MODE_LIVE, PropertiesDialog
 from properties_model import PropertiesModel, PropertiesSubject
 from properties_page_ga import PAGE_GUEST_ADDITIONS
@@ -45,12 +46,8 @@ class _ResetConfirmDialog:
                                                           sticky="w")
         buttons = ttk.Frame(body)
         buttons.grid(row=4, column=0, sticky="e", pady=(14, 0))
-        ok = ttk.Button(buttons, text="OK", style="Accent.TButton",
-                        command=self._on_ok)
-        ok.pack(side="left")
-        ttk.Button(buttons, text="Cancel", command=dlg.destroy).pack(
-            side="left", padx=(6, 0))
-        ok.focus_set()
+        pack_actions(buttons, [("OK", self._on_ok),
+                               ("Cancel", dlg.destroy)])[0].focus_set()
         dlg.bind("<Escape>", lambda _e: dlg.destroy())
 
     def run(self) -> Optional[str]:

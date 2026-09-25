@@ -4,6 +4,7 @@ import tkinter as tk
 from tkinter import ttk
 from typing import Callable, List, Optional, Tuple
 
+from dialog_buttons import pack_actions
 import ui_theme as theme
 
 ContactsFn = Callable[[], List[Tuple[str, Optional[str]]]]
@@ -67,9 +68,7 @@ class CopyrightRemovalDialog:
 
         btns = ttk.Frame(body)
         btns.pack(anchor="e", pady=(14, 0))
-        close = ttk.Button(btns, text="Close", command=dlg.destroy)
-        close.pack(side="left")
-        close.focus_set()
+        pack_actions(btns, [("Close", dlg.destroy)])[0].focus_set()
         dlg.bind("<Return>", lambda _e: dlg.destroy())
         dlg.bind("<Escape>", lambda _e: dlg.destroy())
 

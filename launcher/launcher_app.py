@@ -204,8 +204,7 @@ class LauncherApp(OperationsMixin, RefreshMixin, SpawnMixin, PropertiesMixin,
         if busy:
             self.status_bar.set_status(label or "Working…")
         else:
-            self.status_bar.set_status("Ready.")
-            self.status_bar.reset_progress()
+            self.status_bar.set_idle()
         self._refresh_selection_state()
 
     def _set_catalog_loading(self, loading: bool, label: str = "") -> None:
@@ -213,7 +212,7 @@ class LauncherApp(OperationsMixin, RefreshMixin, SpawnMixin, PropertiesMixin,
         if loading:
             self.status_bar.set_status(label or "Fetching bundle catalog…")
         elif not self.busy:
-            self.status_bar.set_status("Ready.")
+            self.status_bar.set_idle()
         self._refresh_selection_state()
 
     def _await_future(self, future: Future, done: Callable[[Optional[BaseException]], None]) -> None:

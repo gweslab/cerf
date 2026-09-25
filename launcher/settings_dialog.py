@@ -7,6 +7,7 @@ from typing import Callable, Optional
 from app_settings import (CHANNEL_DISABLED, CHANNEL_STABLE, CHANNEL_UNSTABLE,
                           read_discord_rich_presence, read_update_channel,
                           write_discord_rich_presence, write_update_channel)
+from dialog_buttons import pack_actions
 from host_key import write_host_key
 from host_key_block import HostKeyBlock
 from screen_geometry import fit_geometry
@@ -52,9 +53,7 @@ class SettingsDialog:
 
         actions = ttk.Frame(body)
         actions.pack(side="bottom", anchor="e", pady=(18, 0))
-        ttk.Button(actions, text="Cancel", command=dlg.destroy).pack(
-            side="left", padx=(0, 6))
-        ttk.Button(actions, text="OK", command=self._ok).pack(side="left")
+        pack_actions(actions, [("OK", self._ok), ("Cancel", dlg.destroy)])
 
         ttk.Label(body, text="Host key").pack(anchor="w", pady=(0, 2))
         self._host_key = HostKeyBlock(body)

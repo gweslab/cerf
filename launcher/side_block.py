@@ -14,14 +14,6 @@ _HEADING_PAD_X = 8
 _HEADING_PAD_Y = 4
 
 
-def _blend(color: str, target: str, t: float) -> str:
-    def channel(i: int) -> int:
-        a = int(color[i:i + 2], 16)
-        b = int(target[i:i + 2], 16)
-        return max(0, min(255, int(round(a + (b - a) * t))))
-    return "#{:02x}{:02x}{:02x}".format(channel(1), channel(3), channel(5))
-
-
 class SideBlock:
     def __init__(self, parent: tk.Misc, title: str, row: int,
                  warn: bool = False,
@@ -80,7 +72,7 @@ class SideBlock:
                     else _GRADIENT_STRENGTH_LIGHT)
         for y in range(h):
             t = strength * (1.0 - y / float(h))
-            c.create_line(0, y, w, y, fill=_blend(theme.BG, "#ffffff", t))
+            c.create_line(0, y, w, y, fill=theme.blend(theme.BG, "#ffffff", t))
         if self._on_click is not None:
             fill = theme.LINK_FG
         elif self._warn:

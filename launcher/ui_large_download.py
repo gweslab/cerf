@@ -15,6 +15,7 @@ from typing import List, Optional, Tuple
 
 from bundles import BundleError, is_large_download
 from device_state import DeviceBundle, PackageStatus, format_size
+from dialog_buttons import pack_actions
 from ui_dialogs import (confirm_rom_license, show_dialog, show_error, show_info,
                         show_source_thanks)
 import ui_theme as theme
@@ -55,13 +56,10 @@ def _ask_large(parent: tk.Misc, *, headline: str, link_url: str,
 
     btns = ttk.Frame(body)
     btns.pack(anchor="e")
-    ttk.Button(btns, text="Continue download via launcher",
-               command=lambda: choose(_LAUNCHER),
-               style="Accent.TButton").pack(side="left", padx=(6, 0))
-    ttk.Button(btns, text="Open download link in browser",
-               command=lambda: choose(_MANUAL)).pack(side="left", padx=(6, 0))
-    ttk.Button(btns, text="Cancel",
-               command=lambda: choose(_CANCEL)).pack(side="left", padx=(6, 0))
+    pack_actions(btns, [
+        ("Continue download via launcher", lambda: choose(_LAUNCHER)),
+        ("Open download link in browser", lambda: choose(_MANUAL)),
+        ("Cancel", lambda: choose(_CANCEL))])
     dlg.bind("<Escape>", lambda _e: choose(_CANCEL))
 
     dlg.update_idletasks()

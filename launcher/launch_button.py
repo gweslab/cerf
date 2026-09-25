@@ -27,7 +27,7 @@ class LaunchSplitButton:
         self.frame = ttk.Frame(parent)
         self.btn_launch = ttk.Button(self.frame, text="Start", image=icon,
                                      compound="top",
-                                     style="ToolbarLaunch.TButton",
+                                     style="Toolbar.TButton",
                                      takefocus=False,
                                      command=lambda: on_launch(None))
         self.btn_launch.grid(row=0, column=0, sticky="ns")
@@ -42,7 +42,7 @@ class LaunchSplitButton:
                                command=lambda: on_launch("cold"))
         self._btn_boot = ttk.Button(self.frame, text="▾", width=2,
                                      takefocus=False,
-                                     style="ToolbarLaunch.TButton",
+                                     style="Toolbar.TButton",
                                      command=self._popup)
         self._btn_boot.grid(row=0, column=1, sticky="ns")
         self._btn_boot.grid_remove()

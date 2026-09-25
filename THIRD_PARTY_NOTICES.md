@@ -15,13 +15,14 @@ are too long to inline are in `licenses/`.
 | [PCRE2](https://github.com/PCRE2Project/pcre2) | 10.47 | BSD-3-Clause | (c) 1997-2007 University of Cambridge; (c) 2007-2024 Philip Hazel; JIT written by Zoltan Herczeg |
 | [GNU libiconv](https://www.gnu.org/software/libiconv/) | 1.18 | LGPL-2.1-or-later | (c) Free Software Foundation |
 | [GNU gettext (libintl)](https://www.gnu.org/software/gettext/) | 0.22.5 | LGPL-2.1-or-later | (c) Free Software Foundation |
+| [Sun Valley ttk theme (sv-ttk)](https://github.com/rdbende/Sun-Valley-ttk-theme) | 2.5.5 | MIT | (c) rdbende |
 
 GLib, PCRE2, libiconv and libintl are pulled in transitively by libslirp and form its
 static link closure.
 
 ---
 
-### MIT (nlohmann-json, YY-Thunks)
+### MIT (nlohmann-json, YY-Thunks, sv-ttk)
 
 > Permission is hereby granted, free of charge, to any person obtaining a copy of this
 > software and associated documentation files (the "Software"), to deal in the Software

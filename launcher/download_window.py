@@ -12,6 +12,7 @@ from device_model import (GROUP_IID_PREFIX, _device_group_key,
 from board_info import board_soc_label, board_support_state
 from copyright_removal_dialog import (BUTTON_LABEL as COPYRIGHT_BUTTON_LABEL,
                                       ContactsFn, show_copyright_removal)
+from dialog_buttons import pack_actions
 from screen_geometry import fit_geometry
 from sources_dialog import SourcesDialog
 import ui_theme as theme
@@ -103,12 +104,10 @@ class DownloadWindow:
             row=0, column=0, sticky="w")
         self.summary = ttk.Label(footer, text="")
         self.summary.grid(row=0, column=1, sticky="w", padx=(12, 0))
-        ttk.Button(footer, text="Cancel", command=dlg.destroy).grid(
-            row=0, column=2, padx=(0, 6))
-        self.btn_download = ttk.Button(footer, text="Download",
-                                       style="Download.TButton",
-                                       command=self._confirm)
-        self.btn_download.grid(row=0, column=3)
+        actions = ttk.Frame(footer)
+        actions.grid(row=0, column=2)
+        self.btn_download = pack_actions(actions, [
+            ("Download", self._confirm), ("Cancel", dlg.destroy)])[0]
 
         self._refill()
         dlg.update_idletasks()

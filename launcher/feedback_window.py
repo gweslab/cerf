@@ -7,6 +7,7 @@ import webbrowser
 from tkinter import ttk
 from typing import Dict, List
 
+from dialog_buttons import pack_actions
 from github_issues import GithubIssue, fetch_open_issues
 from screen_geometry import fit_geometry
 import ui_theme as theme
@@ -64,11 +65,11 @@ class FeedbackWindow:
         footer = ttk.Frame(body)
         footer.grid(row=2, column=0, columnspan=2, sticky="ew", pady=(10, 0))
         footer.columnconfigure(0, weight=1)
-        ttk.Button(footer, text=CREATE_TEXT, style="Launch.TButton",
-                   command=lambda: webbrowser.open(FEEDBACK_URL)).grid(
-            row=0, column=0, sticky="w")
-        ttk.Button(footer, text="Close", command=dlg.destroy).grid(
-            row=0, column=1, sticky="e")
+        actions = ttk.Frame(footer)
+        actions.grid(row=0, column=0, sticky="e")
+        pack_actions(actions, [
+            (CREATE_TEXT, lambda: webbrowser.open(FEEDBACK_URL)),
+            ("Close", dlg.destroy)])
 
         self._note(LOADING_TEXT)
         dlg.update_idletasks()

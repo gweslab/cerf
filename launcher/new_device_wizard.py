@@ -9,6 +9,7 @@ from tkinter import ttk
 from typing import Callable, List, Optional
 
 from board_rom_form import BoardRomForm
+from rounded_style import rounded_frame, rounded_style
 from screen_geometry import fit_geometry
 from ui_dialogs import show_error
 from user_device_create import UserDeviceSpec, validate_device_name
@@ -22,13 +23,11 @@ class _PivotButton:
     def __init__(self, parent: tk.Misc, icon: Optional[tk.PhotoImage],
                  title: str, description: str,
                  command: Callable[[], None]) -> None:
-        self.frame = tk.Frame(parent, bg=theme.BG_LIGHTER,
-                              highlightthickness=1,
-                              highlightbackground=theme.BORDER,
-                              cursor="hand2")
+        self.frame = rounded_frame(parent, theme.BG_LIGHTER, theme.BORDER,
+                                   theme.BG, cursor="hand2")
         inner = tk.Frame(self.frame, bg=theme.BG_LIGHTER)
         inner.place(relx=0.5, rely=0.5, anchor="center")
-        widgets: List[tk.Widget] = [self.frame, inner]
+        widgets: List[tk.Widget] = [inner]
         if icon is not None:
             icon_lbl = tk.Label(inner, image=icon, bg=theme.BG_LIGHTER)
             icon_lbl.image = icon
@@ -42,14 +41,17 @@ class _PivotButton:
                             justify="center", font=("Segoe UI", 9))
         desc_lbl.pack(pady=(6, 0))
         widgets += [title_lbl, desc_lbl]
-        for w in widgets:
+        for w in widgets + [self.frame]:
             w.bind("<Button-1>", lambda _e: command())
             w.bind("<Enter>", lambda _e: self._hover(True))
             w.bind("<Leave>", lambda _e: self._hover(False))
         self._widgets = widgets
+        self._hover(False)
 
     def _hover(self, on: bool) -> None:
         bg = theme.BG_HOVER if on else theme.BG_LIGHTER
+        self.frame.config(style=rounded_style(self.frame, bg, theme.BORDER,
+                                              theme.BG))
         for w in self._widgets:
             w.config(bg=bg)
 

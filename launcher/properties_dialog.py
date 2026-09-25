@@ -5,6 +5,7 @@ from tkinter import ttk
 from typing import Callable, Dict, List, Optional
 
 from color_schemes import color_scheme_supported_for_os
+from dialog_buttons import pack_actions
 from properties_model import PropertiesModel
 from properties_page_board import BoardRomPage, PAGE_BOARD
 from properties_page_display import DisplayPage, PAGE_DISPLAY
@@ -42,11 +43,10 @@ class PropertiesDialog:
         footer.pack(fill="x", side="bottom")
         tk.Frame(dlg, height=1, bg=theme.SEPARATOR).pack(fill="x",
                                                          side="bottom")
-        ttk.Button(footer, text="Cancel", command=self._on_cancel).pack(
-            side="right")
-        self._ok = ttk.Button(footer, text="OK", style="Accent.TButton",
-                              command=self._on_ok)
-        self._ok.pack(side="right", padx=(0, 6))
+        actions = ttk.Frame(footer)
+        actions.pack(side="right")
+        self._ok = pack_actions(actions, [("OK", self._on_ok),
+                                          ("Cancel", self._on_cancel)])[0]
         ttk.Button(footer, text="Open device directory",
                    command=lambda: open_device_directory(
                        dlg, self._subject.device_dir)).pack(side="left")

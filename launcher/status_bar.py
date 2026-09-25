@@ -33,15 +33,23 @@ class StatusBar:
         self.bundle_link.grid_remove()
         self.bundle_link.bind("<Button-1>", self._on_bundle_link_click)
 
-        self.status_var = tk.StringVar(value="Ready.")
-        ttk.Label(bar, textvariable=self.status_var, anchor="e").grid(
-            row=0, column=4, sticky="e", padx=(8, 8))
+        self.status_var = tk.StringVar(value="")
+        self.status_label = ttk.Label(bar, textvariable=self.status_var,
+                                      anchor="e")
+        self.status_label.grid(row=0, column=4, sticky="e", padx=(8, 8))
         self.progress = ttk.Progressbar(bar, orient="horizontal", length=220,
                                         mode="determinate")
         self.progress.grid(row=0, column=5, sticky="e")
+        self.set_idle()
 
     def set_status(self, text: str) -> None:
         self.status_var.set(text)
+        self.status_label.grid()
+
+    def set_idle(self) -> None:
+        self.status_var.set("")
+        self.status_label.grid_remove()
+        self.reset_progress()
 
     def set_update_status(self, text: str, color: str, link: bool,
                           on_click: Optional[Callable[[], None]] = None) -> None:
@@ -79,7 +87,10 @@ class StatusBar:
             self._bundle_click()
 
     def show_progress(self, done: int, total: Optional[int]) -> None:
+        self.progress.grid()
         if total:
+            if str(self.progress.cget("mode")) != "determinate":
+                self.progress.stop()
             self.progress.config(mode="determinate", maximum=total, value=done)
         else:
             if str(self.progress.cget("mode")) != "indeterminate":
@@ -87,4 +98,6 @@ class StatusBar:
                 self.progress.start(80)
 
     def reset_progress(self) -> None:
+        self.progress.stop()
         self.progress.config(value=0, mode="determinate")
+        self.progress.grid_remove()

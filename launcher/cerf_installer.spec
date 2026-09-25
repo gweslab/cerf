@@ -9,6 +9,7 @@ REPO_ROOT = THIS_DIR.parent
 if str(THIS_DIR) not in sys.path:
     sys.path.insert(0, str(THIS_DIR))
 import exe_version
+from PyInstaller.utils.hooks import collect_data_files
 
 ASSETS       = REPO_ROOT / "cerf" / "assets"
 ICON_PATH    = str(ASSETS / "cerf_setup.ico")
@@ -31,7 +32,8 @@ a = Analysis(
     [str(THIS_DIR / "cerf_installer.py")],
     pathex=[str(THIS_DIR)],
     binaries=UCRT_BINARIES,
-    datas=[(ICON_PATH, "."), (VERSION_PATH, ".")] + BAND_FILES + DIALOG_ICONS,
+    datas=[(ICON_PATH, "."), (VERSION_PATH, ".")] + BAND_FILES + DIALOG_ICONS
+          + collect_data_files("sv_ttk"),
     hiddenimports=[],
     hookspath=[],
     runtime_hooks=[],

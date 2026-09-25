@@ -43,8 +43,7 @@ class GuestAdditionsPage:
         head.grid(row=0, column=0, sticky="ew")
         self.check = ttk.Checkbutton(head, text="Enable Guest Additions",
                                      variable=self.var_enabled,
-                                     command=self._on_check,
-                                     style="Guest.TCheckbutton")
+                                     command=self._on_check)
         self.check.grid(row=0, column=0, sticky="w")
         head.columnconfigure(0, weight=1)
         RichText(head, [

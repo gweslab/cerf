@@ -6,6 +6,7 @@ from typing import Callable, List
 
 from bundle_repositories import (BundleRepository, read_repositories,
                                  write_repositories)
+from dialog_buttons import pack_actions
 from screen_geometry import fit_geometry
 from ui_dialogs import ask_text, show_info
 import ui_theme as theme
@@ -50,9 +51,7 @@ class SourcesDialog:
 
         actions = ttk.Frame(body)
         actions.grid(row=2, column=0, columnspan=2, sticky="e", pady=(10, 0))
-        ttk.Button(actions, text="Cancel", command=dlg.destroy).pack(
-            side="left", padx=(0, 6))
-        ttk.Button(actions, text="OK", command=self._ok).pack(side="left")
+        pack_actions(actions, [("OK", self._ok), ("Cancel", dlg.destroy)])
 
         self._reload_table()
         theme.apply_titlebar(dlg)

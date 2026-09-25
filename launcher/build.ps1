@@ -18,6 +18,7 @@ $PY37_VERSION = "3.7.9"
 $PY37_SHA256  = "769bb7c74ad1df6d7d74071cc16a984ff6182e4016e11b8949b93db487977220"
 $PY37_URL     = "https://www.python.org/ftp/python/$PY37_VERSION/python-$PY37_VERSION.exe"
 $PYINSTALLER  = "5.13.2"
+$SV_TTK       = "2.5.5"
 
 function Get-LauncherPython {
     $repoRoot  = Split-Path $PSScriptRoot -Parent
@@ -85,6 +86,16 @@ if ($LASTEXITCODE -ne 0) {
     & $python -m pip install --quiet --disable-pip-version-check "pyinstaller==$PYINSTALLER"
     if ($LASTEXITCODE -ne 0) {
         Write-Host "[LAUNCHER] FAILED! pip install pyinstaller==$PYINSTALLER returned $LASTEXITCODE"
+        [Environment]::Exit(1)
+    }
+}
+
+$svTtkHave = & $python -c "import pkg_resources; print(pkg_resources.get_distribution('sv-ttk').version)" 2>$null
+if ($LASTEXITCODE -ne 0 -or $svTtkHave -ne $SV_TTK) {
+    Write-Host "[LAUNCHER] Installing sv-ttk==$SV_TTK into cached Python..."
+    & $python -m pip install --quiet --disable-pip-version-check "sv-ttk==$SV_TTK"
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "[LAUNCHER] FAILED! pip install sv-ttk==$SV_TTK returned $LASTEXITCODE"
         [Environment]::Exit(1)
     }
 }

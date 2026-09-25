@@ -12,6 +12,7 @@ from typing import Callable, Dict, Optional, Tuple
 from copyright_removal_dialog import (BUTTON_LABEL as COPYRIGHT_BUTTON_LABEL,
                                       ContactsFn, show_copyright_removal)
 from device_state import DeviceSource
+from dialog_buttons import pack_actions
 import ui_theme as theme
 
 
@@ -66,15 +67,15 @@ def show_dialog(parent: tk.Misc, title: str, message: str,
 
     btns = ttk.Frame(row)
     btns.pack(side="right")
-    for i, label in enumerate(buttons):
-        def click(l=label):
-            result["value"] = l
-            dlg.destroy()
-        b = ttk.Button(btns, text=label, command=click)
-        b.pack(side="left", padx=(6, 0))
-        if i == 0:
-            b.focus_set()
-        dlg.bind("<Return>", lambda _e, l=label: click(l)) if i == 0 else None
+
+    def click(label: str) -> None:
+        result["value"] = label
+        dlg.destroy()
+
+    primary = pack_actions(btns, [(label, lambda l=label: click(l))
+                                  for label in buttons])[0]
+    primary.focus_set()
+    dlg.bind("<Return>", lambda _e: click(buttons[0]))
     dlg.bind("<Escape>", lambda _e: dlg.destroy())
 
     dlg.update_idletasks()
@@ -116,9 +117,7 @@ def ask_text(parent: tk.Misc, title: str, prompt: str,
 
     btns = ttk.Frame(body)
     btns.pack(anchor="e", pady=(14, 0))
-    ttk.Button(btns, text="OK", command=accept).pack(side="left", padx=(6, 0))
-    ttk.Button(btns, text="Cancel", command=dlg.destroy).pack(side="left",
-                                                              padx=(6, 0))
+    pack_actions(btns, [("OK", accept), ("Cancel", dlg.destroy)])
     dlg.bind("<Return>", lambda _e: accept())
     dlg.bind("<Escape>", lambda _e: dlg.destroy())
 
@@ -267,9 +266,7 @@ def show_sources_thanks(parent: tk.Misc, sources) -> None:
 
     btns = ttk.Frame(body)
     btns.pack(anchor="e", pady=(14, 0))
-    ok = ttk.Button(btns, text="OK", command=dlg.destroy)
-    ok.pack(side="left")
-    ok.focus_set()
+    pack_actions(btns, [("OK", dlg.destroy)])[0].focus_set()
     dlg.bind("<Return>", lambda _e: dlg.destroy())
     dlg.bind("<Escape>", lambda _e: dlg.destroy())
 

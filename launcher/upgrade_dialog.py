@@ -4,6 +4,7 @@ import tkinter as tk
 from tkinter import ttk
 
 from available_update import AvailableUpdate
+from dialog_buttons import pack_actions
 from ui_dialogs import HIBERNATION_WARNING_URL, link_label
 import ui_theme as theme
 
@@ -57,13 +58,10 @@ def show_release_available(parent: tk.Misc, release: AvailableUpdate) -> str:
         choice["value"] = value
         dlg.destroy()
 
-    ttk.Button(btns, text="Cancel",
-               command=lambda: pick(CANCEL)).pack(side="right", padx=(6, 0))
-    ttk.Button(btns, text="Open in browser",
-               command=lambda: pick(BROWSER)).pack(side="right", padx=(6, 0))
-    upgrade = ttk.Button(btns, text="Upgrade", style="Download.TButton",
-                         command=lambda: pick(UPGRADE))
-    upgrade.pack(side="right")
+    upgrade = pack_actions(btns, [
+        ("Upgrade", lambda: pick(UPGRADE)),
+        ("Open in browser", lambda: pick(BROWSER)),
+        ("Cancel", lambda: pick(CANCEL))])[0]
     upgrade.focus_set()
 
     dlg.bind("<Return>", lambda _e: pick(UPGRADE))

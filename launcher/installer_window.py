@@ -13,6 +13,7 @@ from branding import PRODUCT_NAME
 from install_options import InstallOptions
 from installer_download import stage_release
 from installer_target import CHANGE_DIRECTORY_WARNING, default_install_dir
+from sv_elements import SPLIT_DROP_STYLE, SPLIT_MAIN_STYLE
 from ui_dialogs import ask_yesno, show_error
 from upgrade_process import (UPGRADE_DIR_NAME, WAIT_FOR_PID_PREFIX,
                              launcher_exe_in, spawn_stage)
@@ -67,9 +68,9 @@ class InstallerWindow:
                                                     self._pick_directory)
         self._cancel = self._chrome.add_button("Cancel", self._on_cancel)
         self._more = ttk.Button(self._chrome.buttons, text="▾", width=2,
-                                style="Download.TButton",
+                                style=SPLIT_DROP_STYLE,
                                 command=self._show_more)
-        self._more.pack(side="right")
+        self._more.pack(side="right", padx=(1, 0))
         self._more_menu = tk.Menu(self._root, tearoff=0, bd=0,
                                   background=theme.BG_FIELD,
                                   foreground=theme.FG,
@@ -78,7 +79,7 @@ class InstallerWindow:
         self._more_menu.add_command(label=UNSTABLE_LABEL,
                                     command=self._start_unstable)
         self._install = self._chrome.add_button("Install", self._start,
-                                                style="Download.TButton",
+                                                style=SPLIT_MAIN_STYLE,
                                                 default=True)
         root.protocol("WM_DELETE_WINDOW", self._on_cancel)
 

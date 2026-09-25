@@ -12,9 +12,12 @@ from device_model import (TreeSelection, _board_group_key, _device_sort_key,
                           _device_search_haystack, _os_name_has_version,
                           _table_device_label)
 from preview_tile import PreviewTile
+from rounded_style import rounded_frame, rounded_style
 from ui_scroll import fit_scrollregion
 from board_info import board_soc_cpu, board_soc_label
 import ui_theme as theme
+
+HOVER_BLEND = 0.5
 
 
 def _lighten(color: str, delta: int) -> str:
@@ -25,7 +28,7 @@ def _lighten(color: str, delta: int) -> str:
 
 
 class _Card:
-    def __init__(self, device: DeviceBundle, frame: tk.Frame,
+    def __init__(self, device: DeviceBundle, frame: ttk.Frame,
                  children: List[tk.Widget], status: tk.Label, name: tk.Label,
                  prefix_lbl: tk.Label, soc_lbl: tk.Label, suffix_lbl: tk.Label,
                  tile: PreviewTile):
@@ -57,6 +60,7 @@ class DeviceCardList:
         self._cards: Dict[str, _Card] = {}
         self._rows: Dict[str, tk.Widget] = {}
         self._selected: Optional[str] = None
+        self._hovered: Optional[str] = None
 
         try:
             dpi = float(parent.winfo_fpixels("1i"))
@@ -277,14 +281,13 @@ class DeviceCardList:
                                 self._badge_cache)
 
     def _build_card(self, d: DeviceBundle, collide: bool) -> tk.Widget:
-        card = tk.Frame(self._inner, bg=theme.BG_LIGHTER, highlightthickness=1,
-                        highlightbackground=theme.BORDER,
-                        highlightcolor=theme.BORDER)
+        card = rounded_frame(self._inner, theme.BG_LIGHTER, theme.BORDER,
+                             theme.BG)
         card.pack(fill="x", padx=2, pady=2)
 
         tile = PreviewTile(card, self._devices_dir, self._tile_w, self._tile_h,
                            self._glyph, theme.BG_LIGHTER)
-        tile.canvas.pack(side="left", padx=(6, 4), pady=5)
+        tile.canvas.pack(side="left", padx=(4, 4), pady=3)
 
         textcol = tk.Frame(card, bg=theme.BG_LIGHTER)
         textcol.pack(side="left", fill="both", expand=True)
@@ -293,7 +296,7 @@ class DeviceCardList:
                         bg=theme.BG_LIGHTER, fg=theme.FG, anchor="w",
                         justify="left", wraplength=self._heading_wrap,
                         font=("Segoe UI", 11, "bold"))
-        name.pack(fill="x", padx=6, pady=(4, 0))
+        name.pack(fill="x", padx=6, pady=(2, 0))
 
         detail = tk.Frame(textcol, bg=theme.BG_LIGHTER)
         detail.pack(fill="x", padx=6)
@@ -314,7 +317,7 @@ class DeviceCardList:
         label, fg = self._status_text(d)
         status = tk.Label(textcol, text=label, bg=theme.BG_LIGHTER, fg=fg,
                           anchor="w", font=("Segoe UI", 9))
-        status.pack(fill="x", padx=6, pady=(0, 4))
+        status.pack(fill="x", padx=6, pady=(0, 2))
 
         bg_children = [card, textcol, detail, name, prefix_lbl, soc_lbl,
                        suffix_lbl, status]
@@ -327,6 +330,11 @@ class DeviceCardList:
         tile.canvas.bind("<Double-1>", lambda _e: "break")
         tile.canvas.bind("<Button-3>", lambda e, n=d.name: self._context(n, e))
         self._bind_wheel(tile.canvas)
+        for w in bg_children + [tile.canvas]:
+            w.bind("<Enter>", lambda _e, n=d.name: self._set_hovered(n),
+                   add="+")
+            w.bind("<Leave>", lambda e, n=d.name: self._on_card_leave(n, e),
+                   add="+")
         c = _Card(d, card, bg_children, status, name, prefix_lbl, soc_lbl,
                   suffix_lbl, tile)
         self._cards[d.name] = c
@@ -377,12 +385,16 @@ class DeviceCardList:
     def _card_bg(self, d: DeviceBundle) -> str:
         return self._card_colors(d)[0]
 
-    def _paint_card(self, card: _Card, selected: bool) -> None:
+    def _paint_card(self, card: _Card, selected: bool, hovered: bool) -> None:
         base, bright = self._card_colors(card.device)
-        fill = bright if selected else base
-        border = _lighten(bright, 30) if selected else bright
-        card.frame.config(bg=fill, highlightbackground=border,
-                          highlightcolor=border)
+        if selected:
+            fill, border = bright, _lighten(bright, 30)
+        elif hovered:
+            fill, border = theme.blend(base, bright, HOVER_BLEND), bright
+        else:
+            fill, border = base, bright
+        card.frame.config(style=rounded_style(self._inner, fill, border,
+                                              theme.BG))
         for w in card.children:
             if w is not card.frame:
                 w.config(bg=fill)
@@ -390,7 +402,27 @@ class DeviceCardList:
 
     def _repaint_all(self) -> None:
         for n, card in self._cards.items():
-            self._paint_card(card, n == self._selected)
+            self._paint_card(card, n == self._selected, n == self._hovered)
+
+    def _set_hovered(self, name: Optional[str]) -> None:
+        previous = self._hovered
+        if previous == name:
+            return
+        self._hovered = name
+        for n in (previous, name):
+            card = self._cards.get(n) if n is not None else None
+            if card is not None:
+                self._paint_card(card, n == self._selected, n == name)
+
+    def _on_card_leave(self, name: str, event: tk.Event) -> None:
+        card = self._cards.get(name)
+        under = self._inner.winfo_containing(event.x_root, event.y_root)
+        if card is not None and under is not None:
+            path, frame = str(under), str(card.frame)
+            if path == frame or path.startswith(frame + "."):
+                return
+        if self._hovered == name:
+            self._set_hovered(None)
 
     def _set_selected(self, name: str, notify: bool = True) -> None:
         if name not in self._cards:

@@ -79,7 +79,7 @@ private:
     struct Region {
         uint32_t              base         = 0;
         uint32_t              size         = 0;   /* backed bytes */
-        uint32_t              span         = 0;   /* decoded bytes; >= size */
+        uint32_t              span         = 0;
         uint32_t              wrap_mask    = 0xFFFFFFFFu;
         DWORD                 page_protect = 0;
         std::atomic<uint8_t*> host_ptr{nullptr};  /* lazy first-touch */

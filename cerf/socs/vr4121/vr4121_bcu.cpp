@@ -1,6 +1,13 @@
 #include "../vr41xx/vr41xx_reg_window_impl.h"
 
+#include "../../core/cerf_emulator.h"
+#include "../../core/fatal.h"
+#include "vr4121_bcu_board.h"
+#include "vr4121_bcu_regs.h"
+#include "vr4121_dram_decode.h"
+
 #include <cstdint>
+#include <string>
 #include "vr4121_id.h"
 
 namespace {
@@ -19,19 +26,16 @@ constexpr Vr41xxRegWindowModel kModel = {
     16u,
     /*word_pairs=*/false,
     {
-        /* 0x00 BCUCNTREG1 (UM 11.2.1): R/W bits D15/14/13/12/10/8/6/4/3/2/1/0,
-           RFU-read-0 D11/9/7/5; RTCRST/After-reset 0 except D14 (Note 1 board DRAM
-           strap, unmodeled). casio_toricomail_ce212 MMCRestore.exe 0x12B7C RMWs it
-           without branching (set D6 ROMWEN2, clear D10 PAGEROM2). */
+        /* 0x00 BCUCNTREG1 (UM 11.2.1): R/W D15/14/13/12/10/8/6/4/3/2/1/0, RFU-read-0 D11/9/7/5;
+           RTCRST/After-reset 0 except D14 (Note 1). casio_toricomail_ce212 MMCRestore.exe
+           0x12B7C RMWs it without branching (set D6 ROMWEN2, clear D10 PAGEROM2). */
         { ReadKind::kStored, WriteKind::kStored, 0xF55Fu, 0x0000u, 0u },
         {},
         {},
+        { ReadKind::kFatal, WriteKind::kStored, vr4121_bcu::kRamSizeWmask, 0x0000u, 0u,
+          OtherReset::kReset },
         {},
         {},
-        {},
-        /* 0x0C BCUERRSTREG (UM 11.2.6): D0 BERRST, "Bus error status. Clear to 0 when
-           1 is written."; D15:1 RFU, "Write 0 to these bits. 0 is returned after a
-           read." CERF raises no bus errors, so a read has no grounded value. */
         { ReadKind::kFatal, WriteKind::kClear, 0x0001u, 0x0000u, 0u },
         /* 0x0E BCURFCNTREG (UM 11.2.7): D13:0 BRF(13:0), "Number of DRAM refresh
            cycles (with TClock cycle)"; D15:14 RFU read 0. RTCRST column = BRF9; the
@@ -40,10 +44,9 @@ constexpr Vr41xxRegWindowModel kModel = {
         {},
         {},
         {},
-        /* 0x16 BCUCNTREG3 (UM 11.2.11): R/W D15:11/D7; D2:0 print "R" but UM 11.4.6 +
-           casio_toricomail_ce212 nk.exe 0x9F0B5B80 (`lhu;ori 7;sh`) write LCDSEL/BSEL;
-           D10:8/D6:3 RFU read-0; RTCRST 0 except D14 (Note 1 SDRAM strap, unmodeled);
-           After-reset row "Value before reset is retained". */
+        /* 0x16 BCUCNTREG3 (UM 11.2.11): R/W D15:11/D7; D2:0 print "R" but UM 11.4.6 + casio_toricomail_ce212
+           nk.exe 0x9F0B5B80 (`lhu;ori 7;sh`) write LCDSEL/BSEL; D10:8/D6:3 RFU read-0;
+           RTCRST 0 except D14 (Note 1); After-reset row "Value before reset is retained". */
         { ReadKind::kStored, WriteKind::kStored, 0xF887u, 0x0000u, 0u, OtherReset::kRetain },
         {},
         /* 0x1A SDRAMMODEREG (UM 11.2.12): R/W D15 SCLK, D6:4 LTMODE; D3 WT, D2:0 BL read
@@ -80,18 +83,106 @@ constexpr bool SdramCntDefined(uint16_t value) {
            trcd >= 0x2u && trcd <= 0x4u;
 }
 
+const char* RfuEncoding(uint32_t off, uint16_t value) {
+    if (off == kOffSdramMode && !LtmodeDefined(value)) {
+        return "SDRAMMODEREG write with an RFU LTMODE";
+    }
+    if (off == kOffSdramCnt && !SdramCntDefined(value)) {
+        return "SDRAMCNTREG write with an RFU TRC/TDAL/TRCD";
+    }
+    return nullptr;
+}
+
+using namespace vr4121_bcu;
+
+constexpr uint32_t kIdxCnt1    = kOffCnt1 / 2u;
+constexpr uint32_t kIdxRamSize = kOffRamSize / 2u;
+constexpr uint32_t kIdxCnt3    = kOffCnt3 / 2u;
+
 class Vr4121Bcu : public Vr41xxRegWindowBase<SocId::Vr4121, kModel> {
 public:
     using Vr41xxRegWindowBase::Vr41xxRegWindowBase;
 
+    void OnReady() override {
+        Vr41xxRegWindowBase::OnReady();
+        ApplyKernelEntryWrites();
+        emu_.Get<Vr4121DramDecode>().Begin(StoredReg(kIdxCnt1), StoredReg(kIdxCnt3),
+                                           StoredReg(kIdxRamSize));
+    }
+
     void WriteHalf(uint32_t addr, uint16_t value) override {
-        if (addr - kModel.base == kOffSdramMode && !LtmodeDefined(value)) {
-            HaltUnsupportedAccess("SDRAMMODEREG WriteHalf with an RFU LTMODE", addr, value);
+        const uint32_t off = addr - kModel.base;
+        if (const char* why = RfuEncoding(off, value)) HaltUnsupportedAccess(why, addr, value);
+        if (off == kOffCnt1 &&
+            ((value ^ StoredReg(kIdxCnt1)) & (kCnt1Rom64 | kCnt1Rd64d)) != 0u) {
+            HaltUnsupportedAccess("BCUCNTREG1 WriteHalf changes ROM64 or RD64D", addr, value);
         }
-        if (addr - kModel.base == kOffSdramCnt && !SdramCntDefined(value)) {
-            HaltUnsupportedAccess("SDRAMCNTREG WriteHalf with an RFU TRC/TDAL/TRCD", addr, value);
+        if (off == kOffRamSize && (StoredReg(kIdxCnt1) & kCnt1Rd64d) == 0u) {
+            HaltUnsupportedAccess("RAMSIZEREG WriteHalf with RD64D = 0", addr, value);
         }
         Vr41xxRegWindowBase::WriteHalf(addr, value);
+        if (off == kOffCnt1 || off == kOffRamSize || off == kOffCnt3) CheckDecode();
+    }
+
+    void RestoreState(StateReader& r) override {
+        Vr41xxRegWindowBase::RestoreState(r);
+        const std::string why = emu_.Get<Vr4121DramDecode>().Mismatch(
+            StoredReg(kIdxCnt1), StoredReg(kIdxCnt3), StoredReg(kIdxRamSize));
+        if (!why.empty()) r.Reject("Vr4121Bcu: %s", why.c_str());
+    }
+
+protected:
+    uint16_t ResetValue(uint32_t i, bool rtc) const override {
+        const uint16_t reset = Vr41xxRegWindowBase::ResetValue(i, rtc);
+        const bool sdram = emu_.Get<Vr4121BcuBoard>().Sdram();
+        if (i == kIdxCnt1) return sdram ? static_cast<uint16_t>(reset | kCnt1Dram64) : reset;
+        if (i == kIdxCnt3) return sdram ? static_cast<uint16_t>(reset | kCnt3ExtDram64) : reset;
+        if (i == kIdxRamSize) return RamSizeReset(rtc);
+        return reset;
+    }
+
+    void AfterReset() override {
+        ApplyKernelEntryWrites();
+        CheckDecode();
+    }
+
+private:
+    uint16_t RamSizeReset(bool rtc) const {
+        auto& board = emu_.Get<Vr4121BcuBoard>();
+        const auto wiring = board.DramWiring();
+        if (!wiring) {
+            for (const Vr4121BcuBootWrite& w : board.KernelEntryWrites()) {
+                if (w.offset == kOffRamSize) return w.value;
+            }
+            emu_.Get<Fatal>().Die("Vr4121Bcu: RAMSIZEREG reset depends on the DBUS32 strap, "
+                                  "which this board does not declare");
+        }
+        const bool sdram = board.Sdram();
+        const uint16_t note1 = wiring->dbus32 ? (sdram ? 3u : 1u) : (sdram ? 2u : 0u);
+        const uint16_t note2 = (wiring->dbus32 && !sdram)
+            ? ((StoredReg(kIdxCnt3) & kCnt3ExtDram64) ? 3u : 1u) : note1;
+        const uint16_t hi = rtc ? note1 : note2;
+        return static_cast<uint16_t>((hi << 12) | (hi << 8) | (note1 << 4) | note1);
+    }
+
+    void ApplyKernelEntryWrites() {
+        for (const Vr4121BcuBootWrite& w : emu_.Get<Vr4121BcuBoard>().KernelEntryWrites()) {
+            const uint32_t i = w.offset / 2u;
+            if (i < kModel.num_regs && kModel.reg[i].read == ReadKind::kFatal &&
+                kModel.reg[i].write == WriteKind::kFatal) {
+                continue;
+            }
+            if (const char* why = RfuEncoding(w.offset, w.value)) {
+                emu_.Get<Fatal>().Die("Vr4121Bcu: kernel-entry %s (0x%04X at 0x%02X)", why,
+                                      w.value, w.offset);
+            }
+            ApplyStoredWrite(w.offset, w.value);
+        }
+    }
+
+    void CheckDecode() const {
+        emu_.Get<Vr4121DramDecode>().Check(StoredReg(kIdxCnt1), StoredReg(kIdxCnt3),
+                                           StoredReg(kIdxRamSize));
     }
 };
 

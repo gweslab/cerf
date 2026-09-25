@@ -69,12 +69,24 @@ Use the Agent tool with:
 - `subagent_type: Explore` - read-only by construction, with no Edit, Write or Agent tool. This matches the hostile-reviewer role and stops the reviewer from modifying anything.
 - `model: opus` - **mandatory, never omitted.** Without it the reviewer runs on whatever the agent definition or the parent session supplies, which can be a smaller model. This review is the gate for guessed implementations, fabricated IDA citations and reader-side suppression. A weaker reviewer waves those through with a confident `LEGIT`. A false `LEGIT` is worse than no review, because the main agent then treats the target as cleared.
 - `description` - short, for example `Reality-check on <short target>`.
-- `prompt` - a short, neutral brief that points the subagent at `.claude/VERIFY_INSTRUCTION.md`. See the shape below.
+- `prompt` - the pointer to the prompt file, and nothing else. See § The prompt file below.
 - `run_in_background: true` - **the preferred default.** A review reads CLAUDE.md plus every page under `agent_docs/`, greps the codebase, and often runs IDA decompiles, so it routinely takes minutes. Spawn it in the background and advance other work, because the harness signals you when the verdict is ready. **Do NOT poll it, sleep, or check its progress.** CLAUDE.md § Background tasks makes the signal the contract, so polling a backgrounded task violates the rules. Use the foreground only when your strict next step depends on the verdict and no other work exists, such as a hand-back to the user. When in doubt, background it, because an idle wait on the signal costs less than a blocked foreground call.
 
-**Keep the subagent prompt minimal.** Do NOT paraphrase the operating manual, summarize its rules, or hand-pick which categories to include. The subagent reads the authoritative file itself. A long explanatory prompt from the main agent gives bias a way in.
+### The prompt file
 
-The prompt carries these four items, in this order, and nothing else:
+The whole spawn prompt lives on disk, in `tmp/verify/<slug>.md` under the repo root. `<slug>` names the body of work. One file serves one body of work across every round.
+
+Before you create the file, list `tmp/verify/`. If a file with your slug holds other work, pick another slug. Never overwrite a file you did not write.
+
+Give the Agent call this text as its `prompt`, and nothing else. Replace the path placeholder with the absolute path:
+
+*"Your full spawn prompt is the file `<absolute path of tmp/verify/<slug>.md>`. Read the whole file before anything else. If one Read cannot hold it, read it in slices to the end. Its contents are your prompt, verbatim."*
+
+Everywhere below, "the prompt" means the contents of that file.
+
+**Keep the prompt minimal.** Do NOT paraphrase the operating manual, summarize its rules, or hand-pick which categories to include. The subagent reads the authoritative file itself. A long explanatory prompt from the main agent gives bias a way in.
+
+The prompt file carries these four items, in this order, and nothing else:
 
 1. **The pointer to the operating manual, on the first line.** Use this text: *"START WITH READING `.claude/VERIFY_INSTRUCTION.md` TO UNDERSTAND WHY YOU WERE SPAWNED AND WHAT IS YOUR OBJECTIVE. That file is your operating manual and is authoritative over anything in this prompt - if this prompt and the file disagree, the file wins. READING THAT FILE IS MANDATORY. Check pwd if not found. It is at repo root (INSERT PWD/REPO ROOT PATH)"*
 2. **The target material verbatim.** Claim text, file contents, diff, or all of them, unmodified. No preface that softens it. No "I think this is probably fine" framing.
@@ -107,9 +119,9 @@ The reviewer is forbidden to report a missing comment. A target with no comments
 
 To study another project's model is legitimate and expected. To copy its code into CERF is a licensing breach that no later verdict undoes. From a prompt alone the two look identical, and the reviewer cannot diff against a source it does not have. A disclosed port with no local path therefore makes the reviewer halt with `CRITICAL PROBLEM FOUND. [LICENSE VIOLATION]`, and it performs no audit. If the source is not on disk, fetch it into `references/` before you spawn. Concealed provenance is worse than a missing path, because it puts the breach past review entirely.
 
-**Special case - a re-spawn after a `CRITICAL` verdict keeps the first prompt and appends the round history.** A `CRITICAL PROBLEM FOUND` sends the same body of work back for another round. **The prompt you wrote for round 1 is the base. Every later round reuses that text verbatim.** Copy the base unchanged. It holds the manual pointer, the target description, and the context that cuts against you. It also holds any `AUDIT MODE:` or `PORTED MODEL:` line, and the closing line. Never rewrite the base to describe the last fix. Never shrink the target to the files of one round.
+**Special case - a re-spawn after a `CRITICAL` verdict keeps the first prompt file and appends the round history.** A `CRITICAL PROBLEM FOUND` sends the same body of work back for another round. **The prompt file you wrote for round 1 holds the base. Every later round reuses that file, and the base text in it stays verbatim.** The base holds the manual pointer, the target description, and the context that cuts against you. It also holds any `AUDIT MODE:` or `PORTED MODEL:` line, and the closing line. Never rewrite the base to describe the last fix. Never shrink the target to the files of one round. Never start a second file for the same body of work. Spawn a fresh reviewer for each round, with the same pointer.
 
-Then append one `ROUND HISTORY` block directly above the closing neutral line. Write one entry per round that returned `CRITICAL`, oldest first:
+Then add one `ROUND HISTORY` block to the file, directly above the closing neutral line. Write one entry per round that returned `CRITICAL`, oldest first:
 
 ```
 ROUND HISTORY - this is round <N>. Rounds 1-<N-1> returned CRITICAL.
@@ -123,7 +135,9 @@ Each round appends its own entry and edits nothing above that entry. The block g
 
 The base stays frozen for two reasons. The reviewer is a fresh subagent with no memory of any earlier round. A prompt that shrinks to the last fix leaves the rest of the work unreviewed. Fixes also regress. A change in round 4 can reintroduce the defect of round 1. Only a reviewer that holds the whole target and the whole history finds that regression.
 
-The base must survive a compaction. Nothing in the harness stores it for you, and a base rebuilt from memory is the drift that this rule removes. Carry the base text into your compaction summary. When the work has a tracking document, the base also belongs in the block that a user-invoked `/tracking update` writes. Never raise that document yourself, because `.claude/skills/tracking/SKILL.md` treats an agent-initiated mention as a bailout.
+The prompt file carries the base across a compaction and a session boundary. Carry the path of the file into your compaction summary. When the work has a tracking document, the path also belongs in the block that a user-invoked `/tracking update` writes. Never raise that document yourself. After a compaction or in a new session, Read the file before the next round. Never rebuild the base from the summary.
+
+Never edit the file while a review of it runs. The reviewer reads the file at its own pace, and an edit during the review gives it a target that no round wrote. A `LEGIT` verdict closes the file. New work gets a new file.
 
 The block is a record, never an instruction. Write no clause that tells the reviewer what to skip, what is settled, or what not to re-derive. Phrases that make the spawn invalid: "already cleared, do not re-open", "settled, not a question for you", "nothing new to verify there". Each phrase narrows the scope of the reviewer. `.claude/VERIFY_INSTRUCTION.md` rejects a spawn that carries one, and the round costs a trip for nothing. The reviewer alone decides what it re-derives.
 
@@ -154,12 +168,13 @@ A `SUMMARY` block precedes both. The full output format and the category list li
   4. Sort the reviewer's action items into two kinds. Research that closes the flagged gaps, such as a decompile, a grep or a code read, runs immediately in this turn. Code changes that need a judgment about scope or direction wait for the user. Assume the reviewer caught real damage, and assume the gap-closing research is the right next step. The user redirects you only for a different shape entirely.
 - **Never go passive after a CRITICAL verdict.** To stop the flawed work is not to stop all work. Findings that carry a concrete instruction, such as `Action required: decompile X / grep Y / read Z`, are the direction. Run them now.
 - **Never hide a `CRITICAL PROBLEM FOUND` verdict from the user**, even when you disagree with it.
-- **A later re-spawn keeps the prompt of round 1.** Once the findings are closed, § Protocol step 2 governs the new prompt: the frozen base plus one appended `ROUND HISTORY` entry.
+- **A later re-spawn keeps the prompt file of round 1.** Once the findings are closed, § Protocol step 2 governs the file: the frozen base plus one appended `ROUND HISTORY` entry.
 
 ## Anti-patterns (forbidden)
 
 - Re-spawning after a `CRITICAL PROBLEM FOUND` while the target still carries the findings, in the hope of a `LEGIT`. That is gaslighting. One verdict per target. A re-spawn is valid only once the findings are closed in the tree.
-- Rewriting the base prompt on a re-spawn, so the target becomes the last fix instead of the whole body of work.
+- Rewriting the base in the prompt file on a re-spawn, so the target becomes the last fix instead of the whole body of work.
+- Pasting the prompt inline into the Agent call instead of the pointer to the prompt file.
 - Attaching "already cleared", "settled" or "do not re-open" to a round-history entry, which turns a record into a scope limit.
 - Softening or paraphrasing the target claim on its way to the subagent.
 - Adding "but here's why it's actually fine", or any other defense of the claim, into the subagent's prompt.

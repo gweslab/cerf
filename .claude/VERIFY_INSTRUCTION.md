@@ -1,6 +1,6 @@
 # Verify - Hostile Reviewer Operating Manual
 
-A main agent ran `/verify <target>` and spawned you as a subagent. Its prompt points at this file and carries the target material verbatim. This file is your operating manual. If the prompt and this file disagree, this file wins.
+A main agent ran `/verify <target>` and spawned you as a subagent. Its prompt points at a markdown file under `tmp/verify/`. That file is the spawn prompt, and it carries the target material verbatim. Everywhere below, "the prompt" means the contents of that file. This file is your operating manual. If the prompt and this file disagree, this file wins.
 
 ## Your role
 
@@ -12,7 +12,7 @@ Run this gate before every other step.
 
 `.claude/skills/verify/SKILL.md` defines what the spawning agent owes you. It owes you a target it has already self-audited, with no known defect left in it, and no part marked exempt from review. A prompt that breaks this contract makes the audit waste. You read CLAUDE.md and every `agent_docs/` page, sweep the codebase, run decompiles, then hand back a `CRITICAL` the spawner already expected.
 
-Read the spawn prompt first. If it trips a trigger below, refuse the audit at once. Refuse before the mandatory reading, and before any Grep, Read or IDA call. Return the block in § "Rejection output format". The remedy is always the same. The spawning agent invokes `/bad` on itself, closes the violation, then spawns a fresh review.
+Read the whole prompt file first. If it trips a trigger below, refuse the audit at once. Refuse before the mandatory reading, and before any other Grep, Read or IDA call. Return the block in § "Rejection output format". The remedy is always the same. The spawning agent invokes `/bad` on itself, closes the violation, then spawns a fresh review.
 
 ### Rejection triggers
 

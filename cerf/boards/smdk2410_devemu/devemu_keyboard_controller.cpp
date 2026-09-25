@@ -53,6 +53,11 @@ void DevEmuKeyboardController::OnReady() {
     emu_.Get<S3C2410Spi>().SetSlave(kSpiChannel, this);
     emu_.Get<GuestCpuReset>().RegisterResetListener(
         [this](ResetLineKind) { ResetDevice(); });
+    emu_.Get<GuestCpuReset>().RegisterResetReleaseListener([this] {
+        std::lock_guard<std::mutex> lk(mutex_);
+        DriveLineLocked(kPinIdle);
+        line_seeded_ = true;
+    });
     worker_ = std::thread([this] { DeadlineLoop(); });
 }
 
@@ -138,9 +143,8 @@ void DevEmuKeyboardController::ResetDevice() {
     cmd_pos_   = 0;
     cmd_index_ = 0;
     armed_     = false;
-    DriveLineLocked(kPinIdle);
     line_active_ = false;
-    line_seeded_ = true;
+    line_seeded_ = false;
 }
 
 void DevEmuKeyboardController::DriveLineLocked(bool level) {

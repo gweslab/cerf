@@ -245,5 +245,9 @@ void GuestCycleClock::LogSecond() {
 void GuestCycleClock::OnCyclesRestored() {
     ref_cycle_   = CyclesNow();
     ref_wall_ns_ = wall_->NowNs();
+#if CERF_DEV_MODE
+    stat_cycle_mark_   = ref_cycle_;
+    stat_wall_mark_ns_ = ref_wall_ns_;
+#endif
     Arm(throttle_, ref_cycle_ + NsToCycles(kThrottleSliceNs));
 }

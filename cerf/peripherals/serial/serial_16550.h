@@ -84,7 +84,9 @@ public:
        or a card's PcmciaSlot. Set once by the owner before any traffic flows. */
     void SetActivityWidget(HostWidget* w) { activity_ = w; }
 
-    void Reset();                /* power-on / socket-reset defaults */
+    void Reset();
+    void ResetRegisters();
+    void ResendEndpointInputs();
 
     /* Re-drive the INTR line from restored register state. Call only once every
        peripheral is restored: an edge-latching INTC whose own registers are not back yet

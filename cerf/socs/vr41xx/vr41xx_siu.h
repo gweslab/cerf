@@ -39,9 +39,12 @@ public:
            SIUIRSEL's RTCRST and After-reset rows are both 0 (VR4121 UM 25.2.13 p568 /
            VR4102 UM 24.2.13 p478). */
         emu_.Get<GuestCpuReset>().RegisterResetListener([this](ResetLineKind) {
-            Serial16550::Reset();
+            Serial16550::ResetRegisters();
             irsel_ = 0;
             ResetChip();
+        });
+        emu_.Get<GuestCpuReset>().RegisterResetReleaseListener([this] {
+            ResendEndpointInputs();
         });
 
         auto* wiring = emu_.TryGet<Vr41xxSerialWiring>();

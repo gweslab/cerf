@@ -41,8 +41,10 @@ bool Pm8058Irq::ShouldRegister() {
 
 void Pm8058Irq::OnReady() {
     Reset();
+    RepublishOutput();
     emu_.Get<GuestCpuReset>().RegisterResetListener(
         [this](ResetLineKind) { Reset(); });
+    emu_.Get<GuestCpuReset>().RegisterResetReleaseListener([this] { RepublishOutput(); });
 }
 
 void Pm8058Irq::Reset() {
@@ -58,7 +60,6 @@ void Pm8058Irq::Reset() {
     }
     blk_sel_       = 0;
     config_shadow_ = 0;
-    Republish();
 }
 
 uint8_t Pm8058Irq::ReadMasterLocked(uint32_t master) const {

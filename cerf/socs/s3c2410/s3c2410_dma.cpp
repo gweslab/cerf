@@ -103,6 +103,7 @@ uint32_t S3C2410Dma::ReadWord(uint32_t addr) {
     const uint32_t reg = off % kStride;
     if (n >= kChannelCount) HaltUnsupportedAccess("ReadWord", addr, 0);
 
+    NotifyRequestersOfAccess();
     std::lock_guard<std::mutex> lk(mutex_);
     const Channel& c = ch_[n];
     switch (reg) {
@@ -126,6 +127,7 @@ void S3C2410Dma::WriteWord(uint32_t addr, uint32_t value) {
     const uint32_t reg = off % kStride;
     if (n >= kChannelCount) HaltUnsupportedAccess("WriteWord", addr, value);
 
+    NotifyRequestersOfAccess();
     bool                 software_trigger = false;
     S3C2410DmaRequester* armed_requester  = nullptr;
     {
@@ -162,6 +164,17 @@ void S3C2410Dma::WriteWord(uint32_t addr, uint32_t value) {
             armed_requester = RequesterFor(ChannelSource(n, c));
     }
     if (armed_requester) armed_requester->OnDmaChannelArmed();
+    else                 NotifyRequestersOfAccess();
+}
+
+void S3C2410Dma::NotifyRequestersOfAccess() {
+    std::array<S3C2410DmaRequester*, kRequesterCount> requesters{};
+    {
+        std::lock_guard<std::mutex> lk(mutex_);
+        requesters = requesters_;
+    }
+    for (S3C2410DmaRequester* r : requesters)
+        if (r != nullptr) r->OnDmaAccess();
 }
 
 void S3C2410Dma::RegisterRequester(S3C2410DmaSource source,
@@ -183,18 +196,22 @@ S3C2410DmaSource S3C2410Dma::ChannelSource(uint32_t n, const Channel& c) {
     return kRequestSources[n][sel];
 }
 
+bool S3C2410Dma::ServesLocked(uint32_t n, const Channel& c, S3C2410DmaSource source) {
+    /* S3C2410A User Manual, printed p. 8-13: with ON_OFF 0 the "DMA request
+       to this channel is ignored". */
+    if ((c.mask & kTrigOnOff) == 0u) return false;
+    /* S3C2410A User Manual, printed p. 8-10: HWSRCSEL has meaning only in
+       H/W request mode, selected by SWHW_SEL. */
+    if ((c.dcon & kConSwhwSel) == 0u) return false;
+    return ChannelSource(n, c) == source;
+}
+
 bool S3C2410Dma::ServiceRequest(S3C2410DmaSource source) {
     std::lock_guard<std::mutex> lk(mutex_);
     bool moved = false;
     for (uint32_t n = 0; n < kChannelCount; ++n) {
         Channel& c = ch_[n];
-        /* S3C2410A User Manual, printed p. 8-13: with ON_OFF 0 the "DMA request
-           to this channel is ignored". */
-        if ((c.mask & kTrigOnOff) == 0u) continue;
-        /* S3C2410A User Manual, printed p. 8-10: HWSRCSEL has meaning only in
-           H/W request mode, selected by SWHW_SEL. */
-        if ((c.dcon & kConSwhwSel) == 0u) continue;
-        if (ChannelSource(n, c) != source) continue;
+        if (!ServesLocked(n, c, source)) continue;
         /* S3C2410A User Manual, printed p. 8-10: with SERVMODE 1 "one request
            gets atomic transfers to be repeated until the transfer count
            reaches to 0", which no requester in the tree can absorb. */
@@ -206,6 +223,33 @@ bool S3C2410Dma::ServiceRequest(S3C2410DmaSource source) {
         moved = RunChannelLocked(n, c) || moved;
     }
     return moved;
+}
+
+S3C2410DmaAtomicTransfer S3C2410Dma::AtomicTransfer(S3C2410DmaSource source) {
+    std::lock_guard<std::mutex> lk(mutex_);
+    S3C2410DmaAtomicTransfer t;
+    for (uint32_t n = 0; n < kChannelCount; ++n) {
+        const Channel& c = ch_[n];
+        if (!ServesLocked(n, c, source)) continue;
+        ++t.channels;
+        t.bytes    += Beats(c) * UnitBytes(c);
+        t.burst     = t.burst || Beats(c) != 1u;
+        t.dst       = c.didst;
+        t.dst_fixed = (c.didstc & kIncFixed) != 0u;
+    }
+    return t;
+}
+
+uint32_t S3C2410Dma::TransfersToTerminalCount(S3C2410DmaSource source) {
+    std::lock_guard<std::mutex> lk(mutex_);
+    uint32_t fewest = 0u;
+    for (uint32_t n = 0; n < kChannelCount; ++n) {
+        const Channel& c = ch_[n];
+        if (!ServesLocked(n, c, source)) continue;
+        const uint32_t left = c.curr_tc != 0u ? c.curr_tc : (c.dcon & kConTcMask);
+        if (left != 0u && (fewest == 0u || left < fewest)) fewest = left;
+    }
+    return fewest;
 }
 
 bool S3C2410Dma::RunChannelLocked(uint32_t n, Channel& c) {
@@ -247,18 +291,24 @@ void S3C2410Dma::TerminalCountLocked(uint32_t n, Channel& c) {
     if (c.dcon & kConReload) c.mask &= ~kTrigOnOff;
 }
 
-bool S3C2410Dma::RunAtomicLocked(Channel& c) {
-    /* S3C2410A User Manual, printed p. 8-10 DSZ and printed p. 8-9 TSZ: an
-       atomic transfer is one unit or a burst of length four. */
+/* S3C2410A User Manual, printed p. 8-10 DSZ and printed p. 8-9 TSZ: an atomic
+   transfer is one unit or a burst of length four. */
+uint32_t S3C2410Dma::UnitBytes(const Channel& c) {
     const uint32_t dsz = (c.dcon >> kConDszShift) & kConDszMask;
     if (dsz == 3u)
         emu_.Get<Fatal>().Die(
             "S3C2410Dma: DSZ 11 is reserved (DCON=0x%08X)", c.dcon);
-    const BusWidth width = (dsz == 0u) ? BusWidth::Byte
-                         : (dsz == 1u) ? BusWidth::Half
-                                       : BusWidth::Word;
-    const uint32_t width_bytes = static_cast<uint32_t>(width);
-    const uint32_t beats = (c.dcon & kConTsz) ? 4u : 1u;
+    return 1u << dsz;
+}
+
+uint32_t S3C2410Dma::Beats(const Channel& c) {
+    return (c.dcon & kConTsz) ? 4u : 1u;
+}
+
+bool S3C2410Dma::RunAtomicLocked(Channel& c) {
+    const uint32_t width_bytes = UnitBytes(c);
+    const BusWidth width       = static_cast<BusWidth>(width_bytes);
+    const uint32_t beats       = Beats(c);
 
     auto& bus = emu_.Get<PhysicalBus>();
     const uint32_t src_start = c.curr_src;
@@ -305,6 +355,24 @@ void S3C2410Dma::RestoreState(StateReader& r) {
     std::lock_guard<std::mutex> lk(mutex_);
     StateReadField field(r);
     for (Channel& c : ch_) Channel::Visit(c, field);
+    for (uint32_t n = 0; n < kChannelCount; ++n) {
+        const Channel& c = ch_[n];
+        if ((c.disrc | c.didst | c.curr_src | c.curr_dst) & ~kAddrMask)
+            r.Reject("channel %u address past bit 30", n);
+        if (((c.disrcc | c.didstc) & ~kLocIncMask) != 0u ||
+            (c.mask & ~(kTrigMask & ~kTrigSwTrig)) != 0u)
+            r.Reject("channel %u DISRCC 0x%X DIDSTC 0x%X DMASKTRIG 0x%X",
+                     n, c.disrcc, c.didstc, c.mask);
+        if (c.curr_tc > kCurrTcMask)
+            r.Reject("channel %u CURR_TC 0x%X past 20 bits", n, c.curr_tc);
+        const bool hw_on = (c.mask & kTrigOnOff) != 0u && (c.dcon & kConSwhwSel) != 0u;
+        if (!hw_on) continue;
+        if (((c.dcon >> kConDszShift) & kConDszMask) == 3u ||
+            ((c.dcon >> kConHwSrcShift) & kConHwSrcMask) > 4u ||
+            (c.dcon & kConServmode) != 0u)
+            r.Reject("channel %u DCON 0x%08X on a hardware request: DSZ 11, unallocated "
+                     "HWSRCSEL or whole service", n, c.dcon);
+    }
 }
 
 void S3C2410Dma::PostRestore() {

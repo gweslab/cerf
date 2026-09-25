@@ -249,6 +249,15 @@ boots, but it hangs on guest reboot. A startup that reads the reset cause
 takes the sleep-resume path, and warm peripheral state fails driver
 re-probes.
 
+**The result of a reset must not depend on the order of the reset
+listeners.** The reset line holds every unit in reset at the same time, but
+the listeners run one after another. A write from one reset listener into
+another unit therefore reaches that unit before its own reset or after it.
+When the two results differ, the write goes in a release listener. Examples
+are a new clock rate, a pin level that the other unit latches, and a value
+that a skipped bootloader leaves in another unit. Release listeners run after
+every reset listener and after the cold boot.
+
 - `cerf/socs/guest_cpu_reset.{h,cpp}`
 
 **`GuestColdBoot`** implements hard reset (cold boot). At reset

@@ -21,8 +21,8 @@ public:
 
     void OnReady() override {
         emu_.Get<Pr31x00Intc>().SetGlobalEnable();
-        emu_.Get<GuestCpuReset>().RegisterResetListener(
-            [this](ResetLineKind) { emu_.Get<Pr31x00Intc>().SetGlobalEnable(); });
+        emu_.Get<GuestCpuReset>().RegisterResetReleaseListener(
+            [this] { emu_.Get<Pr31x00Intc>().SetGlobalEnable(); });
     }
 };
 

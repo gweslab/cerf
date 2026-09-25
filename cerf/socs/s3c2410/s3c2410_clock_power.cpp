@@ -65,8 +65,8 @@ public:
         emu_.Get<ArmMmu>().RegisterControlRegisterListener([this] { ApplyRates(); });
         emu_.Get<GuestCpuReset>().RegisterResetListener([this](ResetLineKind) {
             ResetRegisters();
-            ApplyRates();
         });
+        emu_.Get<GuestCpuReset>().RegisterResetReleaseListener([this] { ApplyRates(); });
     }
 
     uint64_t FclkHz()      const override { return fclk_hz_; }

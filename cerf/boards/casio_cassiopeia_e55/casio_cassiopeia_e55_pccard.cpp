@@ -48,6 +48,8 @@ void CasioCassiopeiaE55PcCard::OnReady() {
     emu_.Get<GuestCpuReset>().RegisterResetListener([this](ResetLineKind) {
         reg_space_ = false;
         in_reset_  = false;
+    });
+    emu_.Get<GuestCpuReset>().RegisterResetReleaseListener([this] {
         slot0_.SetPowered(false);
         emu_.Get<Vr41xxGiu>().SetPinLevel(kCardIreqGiuPin, true);
     });

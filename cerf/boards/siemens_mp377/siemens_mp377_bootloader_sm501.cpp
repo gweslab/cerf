@@ -32,7 +32,7 @@ public:
 
     void OnReady() override {
         ApplyPreset();
-        emu_.Get<GuestCpuReset>().RegisterResetListener([this](ResetLineKind) {
+        emu_.Get<GuestCpuReset>().RegisterResetReleaseListener([this] {
             if (!emu_.Get<GuestCpuReset>().DeliveredResetWasResume()) ApplyPreset();
         });
     }

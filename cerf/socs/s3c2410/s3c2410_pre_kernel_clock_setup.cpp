@@ -26,9 +26,7 @@ public:
 
     void OnReady() override {
         Apply();
-        emu_.Get<GuestCpuReset>().RegisterResetListener([this](ResetLineKind) {
-            Apply();
-        });
+        emu_.Get<GuestCpuReset>().RegisterResetReleaseListener([this] { Apply(); });
     }
 
 private:

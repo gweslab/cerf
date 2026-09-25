@@ -48,6 +48,7 @@ public:
        reset line (RESET_OUT): they run at reset delivery on the JIT
        thread, for every delivered reset regardless of source. */
     void RegisterResetListener(std::function<void(ResetLineKind)> fn);
+    void RegisterResetReleaseListener(std::function<void()> fn);
 
     void SetPendingResume(bool is_resume);
 
@@ -63,6 +64,7 @@ public:
 private:
     ResetCauseLatch*                                latch_ = nullptr;
     std::vector<std::function<void(ResetLineKind)>> reset_listeners_;
+    std::vector<std::function<void()>>              release_listeners_;
     std::atomic<ResetLineKind>                      pending_kind_{ResetLineKind::Other};
     std::atomic<bool>                               pending_is_resume_{false};
     bool                                            delivered_is_resume_ = false;

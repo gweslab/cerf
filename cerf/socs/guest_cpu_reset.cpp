@@ -42,6 +42,10 @@ void GuestCpuReset::RegisterResetListener(std::function<void(ResetLineKind)> fn)
     reset_listeners_.push_back(std::move(fn));
 }
 
+void GuestCpuReset::RegisterResetReleaseListener(std::function<void()> fn) {
+    release_listeners_.push_back(std::move(fn));
+}
+
 void GuestCpuReset::SetPendingResume(bool is_resume) {
     pending_is_resume_.store(is_resume, std::memory_order_release);
 }
@@ -69,4 +73,5 @@ void GuestCpuReset::OnResetDelivered() {
     delivered_is_resume_ = pending_is_resume_.exchange(false, std::memory_order_acq_rel);
     for (auto& fn : reset_listeners_) fn(kind);
     emu_.Get<GuestColdBoot>().ExecuteIfPending();
+    for (auto& fn : release_listeners_) fn();
 }

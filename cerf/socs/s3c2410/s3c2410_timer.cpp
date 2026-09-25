@@ -5,16 +5,15 @@
 #include "../../core/cerf_emulator.h"
 #include "../../core/fatal.h"
 #include "../../core/log.h"
-#include "../../core/tick_scale.h"
 #include "../../jit/guest_cycle_clock.h"
 #include "../../peripherals/peripheral_dispatcher.h"
 #include "../../state/state_stream.h"
+#include "../cycle_anchored_counter.h"
 #include "../guest_cpu_reset.h"
 #include "../irq_controller.h"
 #include "s3c2410_clocks.h"
 
 #include <cstdint>
-#include <numeric>
 
 namespace {
 
@@ -51,7 +50,7 @@ public:
             event_[i] = clock_->Add([this, i] { OnMatch(i); });
             SetUnits(i);
         }
-        clocks_->RegisterRateListener([this] { OnRateChange(); });
+        clocks_->RegisterRateListener([this] { Reconfigure(tcfg0_, tcfg1_, Now()); });
         emu_.Get<GuestCpuReset>().RegisterResetListener([this](ResetLineKind) {
             OnResetLine();
         });
@@ -74,31 +73,34 @@ private:
     static DecodedReg DecodeReg(uint32_t offset);
 
     struct TimerState {
-        uint32_t tcntb         = 0;
-        uint32_t tcmpb         = 0;
-        bool     running       = false;
-        bool     auto_reload   = false;
-        uint32_t count         = 0;
-        uint64_t origin_cycles = 0;
-        uint64_t zero_tick     = 0;
-        uint64_t tk_unit       = 1;
-        uint64_t cyc_unit      = 1;
+        uint32_t tcntb          = 0;
+        uint32_t tcmpb          = 0;
+        bool     running        = false;
+        bool     auto_reload    = false;
+        bool     reload_pending = false;
+        uint32_t count          = 0;
+        uint64_t start_tick     = 0;
+        uint64_t epoch_tick     = 0;
+        uint64_t ratio_cycles   = 0;
+        uint64_t ratio_ticks    = 0;
+        uint64_t freeze_cycle   = 0;
+        CycleAnchoredCounter epoch;
     };
 
     uint64_t Now() const { return clock_->Cycles(); }
 
     void     SetUnits(int n);
-    uint64_t TicksSince(const TimerState& t, uint64_t now) const {
-        return ScaleU64(now - t.origin_cycles, t.tk_unit, t.cyc_unit);
-    }
+    uint64_t ChannelDivisor(int n) const;
+    uint64_t TickAt(const TimerState& t, uint64_t cycles) const;
+    uint64_t EdgeCycles(const TimerState& t, uint64_t tick) const;
     uint32_t CountAt(int n, uint64_t now) const;
-    void     SetCount(int n, uint64_t now, uint32_t count);
-    void     Reanchor(int n, uint64_t now) { SetCount(n, now, CountAt(n, now)); }
+    void     StartPeriod(int n, uint64_t now);
+    void     Reanchor(int n, uint64_t now);
     void     ArmTimer(int n);
     void     ApplyTconWrite(uint32_t new_tcon, uint64_t now);
 
     void OnMatch(int n);
-    void OnRateChange();
+    void Reconfigure(uint32_t tcfg0, uint32_t tcfg1, uint64_t now);
     void OnResetLine();
 
     S3C2410Clocks*          clocks_   = nullptr;
@@ -130,44 +132,77 @@ S3C2410Timer::DecodedReg S3C2410Timer::DecodeReg(uint32_t offset) {
     return { RegKind::OutOfRange, 0 };
 }
 
-void S3C2410Timer::SetUnits(int n) {
+uint64_t S3C2410Timer::ChannelDivisor(int n) const {
     const uint64_t presc = (n <= 1)
         ? ((tcfg0_      ) & 0xFFu) + 1u
         : ((tcfg0_ >> 8 ) & 0xFFu) + 1u;
+    const uint32_t mux = (tcfg1_ >> (n * 4)) & 0xFu;
+    return presc * (1ull << (mux + 1));
+}
 
+void S3C2410Timer::SetUnits(int n) {
     const uint32_t mux = (tcfg1_ >> (n * 4)) & 0xFu;
     if (mux >= 4u) {
         emu_.Get<Fatal>().Die("S3C2410Timer: timer %d MUX %u selects external "
                               "TCLK, which CERF does not model", n, mux);
     }
-    const uint64_t pclk = clocks_->PclkHz();
-    const uint64_t cycles_per_tick_num = clock_->CpuHz() * presc * (1ull << (mux + 1));
-    const uint64_t g = std::gcd(pclk, cycles_per_tick_num);
     TimerState& t = timers_[n];
-    t.tk_unit  = pclk / g;
-    t.cyc_unit = cycles_per_tick_num / g;
-    if ((t.cyc_unit - 1u) > UINT64_MAX / t.tk_unit ||
-        (t.tk_unit - 1u) > (UINT64_MAX - t.tk_unit) / t.cyc_unit) {
+    t.ratio_ticks  = clocks_->PclkHz();
+    t.ratio_cycles = clocks_->CoreClockHz() * ChannelDivisor(n);
+    if (!t.epoch.SetRatio(t.ratio_cycles, t.ratio_ticks)) {
         emu_.Get<Fatal>().Die("S3C2410Timer: timer %d tick ratio %llu:%llu "
                               "overflows the 64-bit scale", n,
-                              static_cast<unsigned long long>(t.tk_unit),
-                              static_cast<unsigned long long>(t.cyc_unit));
+                              static_cast<unsigned long long>(t.ratio_ticks),
+                              static_cast<unsigned long long>(t.ratio_cycles));
     }
 }
 
-uint32_t S3C2410Timer::CountAt(int n, uint64_t now) const {
-    const TimerState& t = timers_[n];
-    if (!t.running || gated_) return t.count;
-    const uint64_t since = TicksSince(t, now);
-    if (since >= t.zero_tick) return 0;
-    return static_cast<uint32_t>(t.zero_tick - since);
+/* S3C2410A UM printed p. 7-21 CLKCON [8]: "Control PCLK into PWMTIMER block". */
+uint64_t S3C2410Timer::TickAt(const TimerState& t, uint64_t cycles) const {
+    if (gated_ && cycles > t.freeze_cycle) cycles = t.freeze_cycle;
+    if (cycles < t.epoch.AnchorCycle()) return t.epoch_tick - 1u;
+    return t.epoch_tick + t.epoch.TicksSince(cycles);
 }
 
-void S3C2410Timer::SetCount(int n, uint64_t now, uint32_t count) {
+uint64_t S3C2410Timer::EdgeCycles(const TimerState& t, uint64_t tick) const {
+    if (tick < t.epoch_tick) {
+        emu_.Get<Fatal>().Die("S3C2410Timer: edge %llu precedes the epoch edge %llu",
+                              static_cast<unsigned long long>(tick),
+                              static_cast<unsigned long long>(t.epoch_tick));
+    }
+    return t.epoch.CycleOfTick(tick - t.epoch_tick);
+}
+
+/* S3C2410A UM p.10-3 Figure 10-2: TCNTn holds its loaded value until the
+   next timer-clock edge, steps down once per edge, and requests the interrupt
+   as it reaches 0; an auto reload takes effect one edge after the 0. */
+uint32_t S3C2410Timer::CountAt(int n, uint64_t now) const {
+    const TimerState& t = timers_[n];
+    if (!t.running) return t.count;
+    const uint64_t tick = TickAt(t, now);
+    if (tick < t.start_tick) return t.reload_pending ? 0u : t.count;
+    const uint64_t since = tick - t.start_tick;
+    if (since >= t.count) return 0;
+    return static_cast<uint32_t>(t.count - since);
+}
+
+void S3C2410Timer::StartPeriod(int n, uint64_t now) {
+    TimerState& t    = timers_[n];
+    t.start_tick     = TickAt(t, now) + 1u;
+    t.reload_pending = false;
+}
+
+void S3C2410Timer::Reanchor(int n, uint64_t now) {
     TimerState& t = timers_[n];
-    t.count         = count;
-    t.origin_cycles = now;
-    t.zero_tick     = count;
+    const bool pending = t.running && TickAt(t, now) < t.start_tick;
+    if (!pending) {
+        t.count          = CountAt(n, now);
+        t.reload_pending = false;
+    }
+    t.epoch.Anchor(now, 0u);
+    t.epoch_tick   = 0;
+    t.freeze_cycle = now;
+    t.start_tick = pending ? 1u : 0u;
 }
 
 void S3C2410Timer::ArmTimer(int n) {
@@ -176,8 +211,8 @@ void S3C2410Timer::ArmTimer(int n) {
         clock_->Disarm(event_[n]);
         return;
     }
-    clock_->Arm(event_[n],
-                t.origin_cycles + ScaleU64Ceil(t.zero_tick, t.cyc_unit, t.tk_unit));
+    const uint64_t zero = t.start_tick + t.count;
+    clock_->Arm(event_[n], zero < t.epoch_tick ? Now() : EdgeCycles(t, zero));
 }
 
 void S3C2410Timer::ApplyTconWrite(uint32_t new_tcon, uint64_t now) {
@@ -189,12 +224,18 @@ void S3C2410Timer::ApplyTconWrite(uint32_t new_tcon, uint64_t now) {
 
         t.auto_reload = ((new_tcon >> bits.auto_reload) & 1u) != 0;
 
-        if (manual) SetCount(i, now, t.tcntb);
+        if (manual) {
+            t.count = t.tcntb;
+            if (t.running) StartPeriod(i, now);
+        }
         if (!start) {
-            if (t.running) Reanchor(i, now);
+            if (t.running) {
+                t.count          = CountAt(i, now);
+                t.reload_pending = false;
+            }
             t.running = false;
         } else if (!t.running && t.count != 0) {
-            SetCount(i, now, t.count);
+            StartPeriod(i, now);
             t.running = true;
         }
         ArmTimer(i);
@@ -208,28 +249,41 @@ void S3C2410Timer::OnResetLine() {
     tcfg1_ = 0;
     tcon_  = 0;
     gated_ = !clocks_->PwmTimerClockOn();
+    const uint64_t now = Now();
     for (int i = 0; i < 5; ++i) {
         timers_[i] = TimerState{};
+        timers_[i].epoch.Anchor(now, 0u);
+        timers_[i].freeze_cycle = now;
         SetUnits(i);
         ArmTimer(i);
     }
 }
 
-void S3C2410Timer::OnRateChange() {
-    const uint64_t now = Now();
-    for (int i = 0; i < 5; ++i) Reanchor(i, now);
-    gated_ = !clocks_->PwmTimerClockOn();
+void S3C2410Timer::Reconfigure(uint32_t tcfg0, uint32_t tcfg1, uint64_t now) {
+    const bool gated = !clocks_->PwmTimerClockOn();
+    tcfg0_ = tcfg0;
+    tcfg1_ = tcfg1;
     for (int i = 0; i < 5; ++i) {
+        TimerState& t = timers_[i];
+        const TimerState before = t;
         SetUnits(i);
-        ArmTimer(i);
+        if (gated == gated_ && t.ratio_cycles == before.ratio_cycles &&
+            t.ratio_ticks == before.ratio_ticks)
+            continue;
+        t = before;
+        Reanchor(i, now);
+        SetUnits(i);
     }
+    gated_ = gated;
+    for (int i = 0; i < 5; ++i) ArmTimer(i);
 }
 
 void S3C2410Timer::OnMatch(int n) {
     TimerState& t = timers_[n];
     if (t.auto_reload && t.tcntb != 0u) {
-        t.zero_tick += t.tcntb;
-        t.count      = t.tcntb;
+        t.start_tick     = t.start_tick + t.count + 1u;
+        t.count          = t.tcntb;
+        t.reload_pending = true;
     } else {
         t.count   = 0;
         t.running = false;
@@ -262,13 +316,7 @@ void S3C2410Timer::WriteWord(uint32_t addr, uint32_t value) {
     switch (dec.kind) {
         case RegKind::Tcfg0: {
             LOG(SocTimer, "S3C2410Timer: TCFG0 <- 0x%08X\n", value);
-            const uint64_t now = Now();
-            for (int i = 0; i < 5; ++i) Reanchor(i, now);
-            tcfg0_ = value;
-            for (int i = 0; i < 5; ++i) {
-                SetUnits(i);
-                ArmTimer(i);
-            }
+            Reconfigure(value, tcfg1_, Now());
             break;
         }
         case RegKind::Tcfg1: {
@@ -280,13 +328,7 @@ void S3C2410Timer::WriteWord(uint32_t addr, uint32_t value) {
                     "to the DMA controller, which CERF does not model",
                     dma_mode);
             }
-            const uint64_t now = Now();
-            for (int i = 0; i < 5; ++i) Reanchor(i, now);
-            tcfg1_ = value;
-            for (int i = 0; i < 5; ++i) {
-                SetUnits(i);
-                ArmTimer(i);
-            }
+            Reconfigure(tcfg0_, value, Now());
             break;
         }
         case RegKind::Tcon:
@@ -319,12 +361,19 @@ void S3C2410Timer::SaveState(StateWriter& w) {
     w.Write("tcfg1", tcfg1_);
     w.Write("tcon", tcon_);
     for (int i = 0; i < 5; ++i) {
-        const TimerState& t = timers_[i];
+        const TimerState& t    = timers_[i];
+        const uint64_t    tick = TickAt(t, now);
+        const bool pending = t.running && tick < t.start_tick;
         w.Write("tcntb", t.tcntb);
         w.Write("tcmpb", t.tcmpb);
         w.Write<uint8_t>("running", t.running ? 1u : 0u);
         w.Write<uint8_t>("auto_reload", t.auto_reload ? 1u : 0u);
-        w.Write<uint32_t>("count", CountAt(i, now));
+        w.Write<uint8_t>("pending", pending ? 1u : 0u);
+        w.Write<uint8_t>("reload_pending", t.reload_pending ? 1u : 0u);
+        w.Write<uint32_t>("count", pending ? t.count : CountAt(i, now));
+        w.Write<uint64_t>("to_next_edge",
+                          gated_ ? t.epoch.CycleOfTick(1u) - t.epoch.AnchorCycle()
+                                 : EdgeCycles(t, tick + 1u) - now);
     }
 }
 
@@ -334,18 +383,45 @@ void S3C2410Timer::RestoreState(StateReader& r) {
     r.Read("tcfg1", tcfg1_);
     r.Read("tcon", tcon_);
     for (int i = 0; i < 5; ++i) {
+        const uint32_t mux = (tcfg1_ >> (i * 4)) & 0xFu;
+        if (mux >= 4u) r.Reject("timer %d MUX %u selects external TCLK", i, mux);
+    }
+    const uint32_t dma_mode = (tcfg1_ >> 20) & 0xFu;
+    if (dma_mode != 0u) r.Reject("TCFG1 DMA mode %u", dma_mode);
+    gated_ = !clocks_->PwmTimerClockOn();
+    for (int i = 0; i < 5; ++i) {
         TimerState& t = timers_[i];
         r.Read("tcntb", t.tcntb);
         r.Read("tcmpb", t.tcmpb);
-        uint8_t running = 0, auto_reload = 0;
+        uint8_t running = 0, auto_reload = 0, pending = 0, reload_pending = 0;
         r.Read("running", running);
         r.Read("auto_reload", auto_reload);
-        uint32_t count = 0;
+        r.Read("pending", pending);
+        r.Read("reload_pending", reload_pending);
+        uint32_t count        = 0;
+        uint64_t to_next_edge = 0;
         r.Read("count", count);
-        t.running     = (running != 0);
-        t.auto_reload = (auto_reload != 0);
+        r.Read("to_next_edge", to_next_edge);
+        if (t.tcntb > kCountMask || count > kCountMask)
+            r.Reject("timer %d count 0x%X or TCNTB 0x%X is past 16 bits", i, count, t.tcntb);
+        const bool tcon_reload = ((tcon_ >> kTcon[i].auto_reload) & 1u) != 0u;
+        if ((auto_reload != 0u) != tcon_reload)
+            r.Reject("timer %d auto reload %u disagrees with TCON 0x%08X", i, auto_reload, tcon_);
         SetUnits(i);
-        SetCount(i, now, count);
+        t.epoch.Anchor(0u, 0u);
+        const uint64_t edge = t.epoch.CycleOfTick(1u);
+        if (to_next_edge == 0u || to_next_edge > edge)
+            r.Reject("timer %d next edge %llu cycles away is outside one edge period of %llu",
+                     i, static_cast<unsigned long long>(to_next_edge),
+                     static_cast<unsigned long long>(edge));
+        t.running        = (running != 0);
+        t.auto_reload    = (auto_reload != 0);
+        t.reload_pending = (reload_pending != 0) && (pending != 0);
+        t.count          = count;
+        t.epoch.Anchor(now + to_next_edge, 0u);
+        t.epoch_tick     = 1;
+        t.freeze_cycle   = now;
+        t.start_tick     = pending != 0 ? 1u : 0u;
         ArmTimer(i);
     }
 }

@@ -80,15 +80,21 @@ void Serial16550::SetEndpoint(SerialEndpoint* endpoint) {
 }
 
 void Serial16550::Reset() {
-    {
-        std::lock_guard<std::mutex> lk(mu_);
-        ier_ = fcr_ = lcr_ = mcr_ = lsr_ = msr_ = scr_ = 0;
-        dll_ = dlm_ = 0;
-        thre_armed_ = false;
-        rx_.clear();
-        rx_pos_ = 0;
-        if (last_irq_level_) { last_irq_level_ = false; irq_line_(false); }
-    }
+    ResetRegisters();
+    ResendEndpointInputs();
+}
+
+void Serial16550::ResetRegisters() {
+    std::lock_guard<std::mutex> lk(mu_);
+    ier_ = fcr_ = lcr_ = mcr_ = lsr_ = msr_ = scr_ = 0;
+    dll_ = dlm_ = 0;
+    thre_armed_ = false;
+    rx_.clear();
+    rx_pos_ = 0;
+    if (last_irq_level_) { last_irq_level_ = false; irq_line_(false); }
+}
+
+void Serial16550::ResendEndpointInputs() {
     std::lock_guard<std::recursive_mutex> elk(endpoint_mu_);
     if (endpoint_) endpoint_->ResendModemInputs();
 }

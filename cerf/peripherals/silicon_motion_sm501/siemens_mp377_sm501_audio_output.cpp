@@ -68,7 +68,7 @@ void SiemensMp377Sm501AudioOutput::HandleDacPowerDown() {
         host_packet_frames_ = 0u;
         host_packet_.fill(0u);
     }
-    output_.StopAudioOut();
+    output_.FinishAudioOut();
     SetPacerEnabled(capture_active_.load(std::memory_order_acquire));
 }
 
@@ -91,7 +91,7 @@ void SiemensMp377Sm501AudioOutput::SetPlaybackEnabled(bool enabled) {
             host_packet_.fill(0u);
             host_packet_frames_ = 0u;
         }
-        output_.StopAudioOut();
+        output_.FinishAudioOut();
         SetPacerEnabled(capture_active_.load(std::memory_order_acquire));
     }
 }
@@ -124,8 +124,10 @@ void SiemensMp377Sm501AudioOutput::RestoreState(StateReader& r) {
         std::lock_guard<std::mutex> lock(pcm_mutex_);
         r.ReadBytes("host_packet", host_packet_.data(), host_packet_.size());
         r.Read("host_packet_frames", host_packet_frames_);
-        if (host_packet_frames_ > kHostPacketFrames) host_packet_frames_ = 0u;
+        if (host_packet_frames_ > kHostPacketFrames)
+            r.Reject("host packet frames %u past %u", host_packet_frames_, kHostPacketFrames);
     }
+    output_.StopAudioOut();
     if (active_.load(std::memory_order_acquire)) {
         output_.SetFormat(kDefaultRateHz, 2, 16);
         output_.BeginAudioOut({});

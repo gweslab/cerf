@@ -42,6 +42,7 @@ void GuestCycleClock::SetUnits(uint64_t hz) {
 void GuestCycleClock::SetClockHz(uint64_t hz) {
     if (hz == cpu_hz_) return;
     const uint64_t now = CyclesNow();
+    RunDue(now);
     ref_wall_ns_ = TargetWallNs(now);
     ref_cycle_   = now;
     SetUnits(hz);
@@ -90,6 +91,10 @@ void GuestCycleClock::Arm(Event* e, uint64_t at_cycle) {
 void GuestCycleClock::Disarm(Event* e) {
     e->armed_ = false;
     Publish(CyclesNow());
+}
+
+bool GuestCycleClock::IsDue(const Event* e, uint64_t now) const {
+    return e->armed_ && e->at_ <= now;
 }
 
 uint64_t GuestCycleClock::NextArmed() const {

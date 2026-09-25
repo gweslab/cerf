@@ -6,7 +6,10 @@
 #include "../../core/cerf_emulator.h"
 #include "../../core/log.h"
 #include "../../peripherals/peripheral_dispatcher.h"
+#include "../guest_cycle_clock.h"
+#include "arm_cpu.h"
 #include "arm_mmu.h"
+#include "cpu_state.h"
 #include "arm_page_walker.h"
 
 REGISTER_SERVICE(ArmRoutedAccess);
@@ -19,6 +22,12 @@ void ArmRoutedAccess::OnReady() {
     mmu_        = &emu_.Get<ArmMmu>();
     walker_     = &emu_.Get<ArmPageWalker>();
     dispatcher_ = &emu_.Get<PeripheralDispatcher>();
+    clock_      = &emu_.Get<GuestCycleClock>();
+    cpu_state_  = emu_.Get<ArmCpu>().State();
+}
+
+void ArmRoutedAccess::DeliverDueClockEvents() {
+    if (ArmCycleDeadlineReached(*cpu_state_)) clock_->OnDispatch();
 }
 
 void ArmRoutedAccess::HaltUnalignedRouted(uint32_t guest_pc, uint32_t va,
@@ -41,6 +50,7 @@ void ArmRoutedAccess::HaltRoutedWidth(uint32_t guest_pc, uint32_t va,
 
 uint32_t ArmRoutedAccess::DispatchRead(uint32_t pa, uint32_t bytes,
                                        uint32_t guest_pc, uint32_t va) {
+    DeliverDueClockEvents();
     switch (bytes) {
     case 1u: return dispatcher_->Read(pa, MmioWidth::kByte);
     case 2u: return dispatcher_->Read(pa, MmioWidth::kHalf);
@@ -51,6 +61,7 @@ uint32_t ArmRoutedAccess::DispatchRead(uint32_t pa, uint32_t bytes,
 
 void ArmRoutedAccess::DispatchWrite(uint32_t pa, uint32_t bytes, uint32_t value,
                                     uint32_t guest_pc, uint32_t va) {
+    DeliverDueClockEvents();
     switch (bytes) {
     case 1u: dispatcher_->Write(pa, value, MmioWidth::kByte); return;
     case 2u: dispatcher_->Write(pa, value, MmioWidth::kHalf); return;

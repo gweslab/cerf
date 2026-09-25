@@ -161,6 +161,11 @@ inline void ArmItStoreToCpsr(ArmCpuState& state, uint32_t it) {
     state.cpsr.bits.it_low  = it & 0x3u;
 }
 
+inline bool ArmCycleDeadlineReached(const ArmCpuState& state) {
+    return static_cast<int32_t>(state.guest_cycle_counter -
+                                state.guest_cycle_deadline) >= 0;
+}
+
 constexpr int32_t ArmNfDisp() {
     return static_cast<int32_t>(offsetof(ArmCpuState, nf));
 }

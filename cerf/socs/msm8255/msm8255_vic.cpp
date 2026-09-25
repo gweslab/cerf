@@ -80,6 +80,7 @@ public:
     void AssertIrq   (int source_bit)            override;
     void AssertSubIrq(int main_bit, int sub_bit) override;
     void DeAssertIrq (int source_bit)            override;
+    void PulseIrq    (int source_bit)            override;
     uint32_t ReadPendingVector()                 override;
 
     uint32_t ReadReg (uint32_t off);
@@ -90,6 +91,13 @@ public:
     void PostRestore();
 
 private:
+    struct SourceLine {
+        uint32_t bank;
+        uint32_t mask;
+    };
+
+    SourceLine CheckedLine(int source_bit, const char* op) const;
+    void       RequireActiveHigh(const SourceLine& line, int source_bit) const;
     uint32_t PendingBank(uint32_t bank) const;
     uint32_t IrqBank(uint32_t bank) const;
     uint32_t FiqBank(uint32_t bank) const;
@@ -151,33 +159,51 @@ void Msm8255Vic::Republish() {
     else                 jit.ClearInterruptPending();
 }
 
-void Msm8255Vic::AssertIrq(int source_bit) {
+Msm8255Vic::SourceLine Msm8255Vic::CheckedLine(int source_bit, const char* op) const {
     if (source_bit < 0 || source_bit >= static_cast<int>(kSourceCount)) {
-        emu_.Get<Fatal>().Die("msm8255 vic: AssertIrq source %d outside 0..%u",
-                              source_bit, kSourceCount - 1u);
+        emu_.Get<Fatal>().Die("msm8255 vic: %s source %d outside 0..%u",
+                              op, source_bit, kSourceCount - 1u);
     }
-    std::lock_guard<std::mutex> lk(state_mutex_);
-    const uint32_t bank = static_cast<uint32_t>(source_bit) / kBitsPerBank;
-    const uint32_t mask = 1u << (static_cast<uint32_t>(source_bit) % kBitsPerBank);
-    if ((polarity_[bank] & mask) != 0u) {
+    return { static_cast<uint32_t>(source_bit) / kBitsPerBank,
+             1u << (static_cast<uint32_t>(source_bit) % kBitsPerBank) };
+}
+
+void Msm8255Vic::RequireActiveHigh(const SourceLine& line, int source_bit) const {
+    if ((polarity_[line.bank] & line.mask) != 0u) {
         emu_.Get<Fatal>().Die(
             "msm8255 vic: source %d is programmed active-low; CERF sources "
             "assert logically and the inverted sense is not modelled",
             source_bit);
     }
-    if ((raw_[bank] & mask) == 0u) latch_[bank] |= mask;
-    raw_[bank] |= mask;
+}
+
+void Msm8255Vic::AssertIrq(int source_bit) {
+    const SourceLine line = CheckedLine(source_bit, "AssertIrq");
+    std::lock_guard<std::mutex> lk(state_mutex_);
+    RequireActiveHigh(line, source_bit);
+    if ((raw_[line.bank] & line.mask) == 0u) latch_[line.bank] |= line.mask;
+    raw_[line.bank] |= line.mask;
     Republish();
 }
 
 void Msm8255Vic::DeAssertIrq(int source_bit) {
-    if (source_bit < 0 || source_bit >= static_cast<int>(kSourceCount)) {
-        emu_.Get<Fatal>().Die("msm8255 vic: DeAssertIrq source %d outside 0..%u",
-                              source_bit, kSourceCount - 1u);
-    }
+    const SourceLine line = CheckedLine(source_bit, "DeAssertIrq");
     std::lock_guard<std::mutex> lk(state_mutex_);
-    const uint32_t bank = static_cast<uint32_t>(source_bit) / kBitsPerBank;
-    raw_[bank] &= ~(1u << (static_cast<uint32_t>(source_bit) % kBitsPerBank));
+    raw_[line.bank] &= ~line.mask;
+    Republish();
+}
+
+void Msm8255Vic::PulseIrq(int source_bit) {
+    const SourceLine line = CheckedLine(source_bit, "PulseIrq");
+    std::lock_guard<std::mutex> lk(state_mutex_);
+    RequireActiveHigh(line, source_bit);
+    if ((type_[line.bank] & line.mask) == 0u) {
+        emu_.Get<Fatal>().Die(
+            "msm8255 vic: source %d delivered a zero-width pulse while its "
+            "TYPE bit selects level; a pulse on a level line is not modelled",
+            source_bit);
+    }
+    if ((raw_[line.bank] & line.mask) == 0u) latch_[line.bank] |= line.mask;
     Republish();
 }
 

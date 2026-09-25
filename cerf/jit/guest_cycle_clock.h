@@ -34,6 +34,7 @@ public:
     Event* Add(std::function<void()> fn);
     void   Arm(Event* e, uint64_t at_cycle);
     void   Disarm(Event* e);
+    bool   IsDue(const Event* e, uint64_t now) const;
 
     uint64_t Cycles() { return CyclesNow(); }
     uint64_t CpuHz() const { return cpu_hz_; }

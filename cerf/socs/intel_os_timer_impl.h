@@ -2,18 +2,17 @@
 
 #include "../peripherals/peripheral_base.h"
 
+#include "cycle_anchored_counter.h"
 #include "guest_cpu_reset.h"
 
 #include "../core/cerf_emulator.h"
 #include "../core/fatal.h"
-#include "../core/tick_scale.h"
 #include "../jit/guest_cycle_clock.h"
 #include "../jit/guest_engine.h"
 #include "../peripherals/peripheral_dispatcher.h"
 #include "../state/state_stream.h"
 
 #include <cstdint>
-#include <numeric>
 
 #include "intel_os_timer_census.h"
 
@@ -32,7 +31,7 @@ public:
         for (int n = 0; n < 4; ++n) {
             event_[n] = clock_->Add([this, n] { OnMatch(n); });
         }
-        SetAnchor(clock_->Cycles(), 0u);
+        counter_.Anchor(clock_->Cycles(), 0u);
         ArmAll();
         clock_->RegisterRateListener([this] { OnRateChange(); });
         emu_.Get<GuestCpuReset>().RegisterResetListener([this](ResetLineKind) {
@@ -59,11 +58,17 @@ public:
     }
 
     void SaveState(StateWriter& w) override {
+        const uint64_t now = clock_->Cycles();
         for (int n = 0; n < 4; ++n) w.Write<uint32_t>("osmr", osmr_[n]);
         w.Write<uint32_t>("ossr", ossr_);
         w.Write<uint32_t>("ower", ower_);
         w.Write<uint32_t>("oier", oier_);
-        w.Write<uint32_t>("oscr", Oscr(clock_->Cycles()));
+        w.Write<uint32_t>("oscr", Oscr(now));
+        w.Write<uint64_t>("oscr_phase", counter_.PhaseAt(now));
+        w.Write<uint64_t>("oscr_phase_den", counter_.PhaseDenominator());
+        for (int n = 0; n < 4; ++n) {
+            w.Write<uint8_t>("match_due", clock_->IsDue(event_[n], now) ? 1u : 0u);
+        }
         for (int n = 0; n < 4; ++n) w.Write<uint32_t>("last_match_oscr", last_match_oscr_[n]);
         for (int n = 0; n < 4; ++n) w.Write<uint8_t>("have_match", have_match_[n] ? 1u : 0u);
         w.Write<uint8_t>("pair_oscr_read", pair_oscr_read_ ? 1u : 0u);
@@ -87,6 +92,18 @@ public:
         r.Read("oier", oier_);
         uint32_t oscr = 0;
         r.Read("oscr", oscr);
+        uint64_t phase = 0, phase_den = 0;
+        r.Read("oscr_phase", phase);
+        r.Read("oscr_phase_den", phase_den);
+        bool due[4] = {};
+        for (int n = 0; n < 4; ++n) {
+            uint8_t v = 0;
+            r.Read("match_due", v);
+            if (v > 1u) {
+                r.Reject("IntelOsTimer: restored match_due flag %u is not 0 or 1", v);
+            }
+            due[n] = v != 0u;
+        }
         for (int n = 0; n < 4; ++n) r.Read("last_match_oscr", last_match_oscr_[n]);
         for (int n = 0; n < 4; ++n) {
             uint8_t v = 0;
@@ -114,8 +131,17 @@ public:
         last_write_rephased_ = flag != 0u;
         r.Read("oscr_read_any", flag);
         oscr_read_any_ = flag != 0u;
-        SetAnchor(clock_->Cycles(), oscr);
-        ArmAll();
+        const uint64_t now = clock_->Cycles();
+        if (!counter_.AnchorAtPhase(now, oscr, phase, phase_den)) {
+            r.Reject("IntelOsTimer: restored OSCR phase %llu/%llu is not a fraction of "
+                     "one tick this build can place",
+                     static_cast<unsigned long long>(phase),
+                     static_cast<unsigned long long>(phase_den));
+        }
+        for (int n = 0; n < 4; ++n) {
+            if (due[n]) clock_->Arm(event_[n], now);
+            else        ArmChannel(n);
+        }
     }
 
     void PostRestore() override { PushMatchLevel(); }
@@ -137,7 +163,7 @@ protected:
         for (int n = 0; n < 4; ++n) osmr_[n] = 0u;
         ossr_ = 0u;
         oier_ = 0u;
-        SetAnchor(clock_->Cycles(), 0u);
+        counter_.SetCountAt(clock_->Cycles(), 0u);
         ArmAll();
         PushMatchLevel();
     }
@@ -162,47 +188,34 @@ private:
         static_cast<IntelOsTimerBase*>(ctx)->FastWrite(off, value, width);
     }
 
-    void SetAnchor(uint64_t cycles, uint32_t oscr) {
-        anchor_cycles_ = cycles;
-        anchor_oscr_   = oscr;
+    void SetUnits() {
+        RequireUnits(counter_.SetRatio(clock_->CpuHz(), kOscrHz));
     }
 
-    void SetUnits() {
-        const uint64_t g = std::gcd(clock_->CpuHz(), static_cast<uint64_t>(kOscrHz));
-        cyc_unit_ = clock_->CpuHz() / g;
-        tk_unit_  = kOscrHz / g;
+    void RequireUnits(bool ok) {
+        if (!ok) {
+            emu_.Get<Fatal>().Die(
+                "IntelOsTimer: OSCR rate %u Hz against the %llu Hz core overflows "
+                "the 64-bit scale", kOscrHz,
+                static_cast<unsigned long long>(clock_->CpuHz()));
+        }
     }
 
     void OnRateChange() {
-        const uint64_t now = clock_->Cycles();
-        SetAnchor(now, Oscr(now));
-        SetUnits();
+        RequireUnits(counter_.Rescale(clock_->Cycles(), clock_->CpuHz(), kOscrHz));
         ArmAll();
-    }
-
-    uint64_t TicksSince(uint64_t cycles) const {
-        return ScaleU64(cycles - anchor_cycles_, tk_unit_, cyc_unit_);
-    }
-
-    uint64_t CyclesForTicks(uint64_t ticks) const {
-        return ScaleU64Ceil(ticks, cyc_unit_, tk_unit_);
     }
 
     /* SA-1110 §9.4.1: the OSCR increments on rising edges of the 3.6864-MHz
        clock. */
     uint32_t Oscr(uint64_t cycles) const {
-        return anchor_oscr_ + static_cast<uint32_t>(TicksSince(cycles));
+        return counter_.CountAt(cycles);
     }
 
     /* SA-1110 §9.4.2: each OSMR is compared against the OSCR following every
        rising edge of the 3.6864-MHz clock. */
     void ArmChannel(int n) {
-        const uint64_t now   = clock_->Cycles();
-        const uint64_t since = TicksSince(now);
-        const uint32_t d     = osmr_[n] - (anchor_oscr_ + static_cast<uint32_t>(since));
-        const uint64_t ahead = d != 0u ? d : 0x100000000ull;
-        const uint64_t at    = anchor_cycles_ + CyclesForTicks(since + ahead);
-        clock_->Arm(event_[n], at);
+        clock_->Arm(event_[n], counter_.NextMatchCycle(osmr_[n], clock_->Cycles()));
     }
 
     void ArmAll() {
@@ -240,7 +253,7 @@ private:
             if (c != n && d != 0u && d <= phase) crossed |= 1u << c;
         }
         census_.OnAbsorb(phase);
-        anchor_oscr_ += phase;
+        counter_.Anchor(counter_.AnchorCycle(), counter_.AnchorCount() + phase);
         last_match_oscr_[n] = oscr + phase;
         for (int c = 0; c < 4; ++c) {
             if ((crossed & (1u << c)) != 0u) OnMatch(c);
@@ -397,7 +410,7 @@ private:
             }
             case 0x10:
                 ForgetCounterDomain();
-                SetAnchor(clock_->Cycles(), value);
+                counter_.SetCountAt(clock_->Cycles(), value);
                 ArmAll();
                 return;
             /* SA-1110 §9.4.4: an OSSR bit is cleared by writing a one to it;
@@ -434,10 +447,7 @@ private:
     RateProbe*              rate_probe_ = nullptr;
     GuestCycleClock::Event* event_[4]   = {};
 
-    uint64_t cyc_unit_      = 1;
-    uint64_t tk_unit_       = 1;
-    uint64_t anchor_cycles_ = 0;
-    uint32_t anchor_oscr_   = 0;
+    CycleAnchoredCounter counter_;
 
     uint32_t last_match_oscr_[4] = {};
     bool     have_match_[4]      = {};

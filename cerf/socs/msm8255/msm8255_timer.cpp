@@ -4,22 +4,16 @@
 #include "msm8255_id.h"
 #include "../../core/cerf_emulator.h"
 #include "../../core/fatal.h"
-#include "../../core/virtual_clock.h"
-#include "../../core/virtual_timer_list.h"
+#include "../../jit/guest_cycle_clock.h"
 #include "../../peripherals/peripheral_dispatcher.h"
 #include "../../state/state_stream.h"
-#include "../free_run_counter.h"
+#include "../cycle_anchored_counter.h"
 #include "../guest_cpu_reset.h"
 #include "../irq_controller.h"
 
-#include <atomic>
 #include <cstdint>
-#include <mutex>
 
 namespace {
-
-using cerf_free_run_counter::FreeRunCounter;
-using cerf_free_run_counter::TickScale;
 
 /* Linux arch/arm/mach-msm/include/mach/msm_iomap-7x30.h: MSM7X30_CSR_PHYS
    0xC0100000, MSM7X30_CSR_SIZE SZ_4K; MSM_ACC_PHYS is the next 4K at
@@ -27,8 +21,6 @@ using cerf_free_run_counter::TickScale;
 constexpr uint32_t kCsrBase = 0xC0100000u;
 constexpr uint32_t kCsrSize = 0x00001000u;
 
-/* Ganbold Tsagaankhuu's FreeBSD Qualcomm MSM timer driver, timer.c:
-   DGT_ENABLE_EN 1, DGT_ENABLE_CLR_ON_MATCH_EN 2, GPT_TIMER_CLKSRC 32768. */
 constexpr uint32_t kGptMatch   = 0x04u;
 constexpr uint32_t kGptCount   = 0x08u;
 constexpr uint32_t kGptEnable  = 0x0Cu;
@@ -44,8 +36,6 @@ constexpr uint32_t kGptHz      = 32768u;
 
 constexpr uint32_t kDgtSrcHz = 12288000u;
 
-/* The same FreeBSD timer.c: enum { DGT_CLK_CTL_DIV_1 = 0, DGT_CLK_CTL_DIV_2 = 1,
-   DGT_CLK_CTL_DIV_3 = 2, DGT_CLK_CTL_DIV_4 = 3 }. */
 constexpr uint32_t kDgtClkCtlMax = 3u;
 
 constexpr uint32_t kDgtClkCtlUnwritten = 0xFFFFFFFFu;
@@ -53,13 +43,7 @@ constexpr uint32_t kDgtClkCtlUnwritten = 0xFFFFFFFFu;
 constexpr int kGptVicLine = 1;
 constexpr int kDgtVicLine = 0;
 
-constexpr TickScale kGptScale{kGptHz};
-constexpr TickScale kDgtScales[kDgtClkCtlMax + 1u] = {
-    TickScale(kDgtSrcHz / 1u),
-    TickScale(kDgtSrcHz / 2u),
-    TickScale(kDgtSrcHz / 3u),
-    TickScale(kDgtSrcHz / 4u),
-};
+const char* ChannelName(int n) { return n == 0 ? "GPT" : "DGT"; }
 
 class Msm8255Timer : public Peripheral {
 public:
@@ -70,14 +54,15 @@ public:
     }
 
     void OnReady() override {
-        auto& timers = emu_.Get<VirtualTimerList>();
-        const int64_t now = NowNs();
+        clock_ = &emu_.Get<GuestCycleClock>();
+        irq_   = &emu_.Get<IrqController>();
+        const uint64_t now = clock_->Cycles();
         for (int n = 0; n < 2; ++n) {
-            ch_[n].entry = timers.Add([this, n] { OnMatch(n); });
-            ch_[n].counter.Set(now, 0u);
+            ch_[n].event = clock_->Add([this, n] { OnMatch(n); });
         }
+        StartGrid(0, now);
+        clock_->RegisterRateListener([this] { OnRateChange(); });
         emu_.Get<GuestCpuReset>().RegisterResetListener([this](ResetLineKind) {
-            std::lock_guard<std::mutex> g(mtx_);
             OnResetLine();
         });
         emu_.Get<PeripheralDispatcher>().Register(this);
@@ -97,19 +82,24 @@ public:
     }
 
     void SaveState(StateWriter& w) override {
-        std::lock_guard<std::mutex> g(mtx_);
-        const int64_t now = NowNs();
-        w.Write<uint32_t>("dgt_clk_ctl", dgt_clk_ctl_.load(std::memory_order_acquire));
+        const uint64_t now = Now();
+        w.Write<uint32_t>("dgt_clk_ctl", dgt_clk_ctl_);
         for (int n = 0; n < 2; ++n) {
-            w.Write<uint32_t>("match", ch_[n].match.load(std::memory_order_acquire));
-            w.Write<uint32_t>("enable", ch_[n].enable.load(std::memory_order_acquire));
-            w.Write<uint32_t>("count", CountAt(ch_[n], n, now));
+            const bool grid = DivideSelected(n);
+            w.Write<uint32_t>("match", ch_[n].match);
+            w.Write<uint32_t>("match_written", ch_[n].match_written ? 1u : 0u);
+            w.Write<uint32_t>("enable", ch_[n].enable);
+            w.Write<uint32_t>("enable_written", ch_[n].enable_written ? 1u : 0u);
+            w.Write<uint32_t>("count", Count(n, now));
+            w.Write<uint64_t>("grid_phase", grid ? ch_[n].counter.PhaseAt(now) : 0u);
+            w.Write<uint64_t>("grid_phase_den",
+                              grid ? ch_[n].counter.PhaseDenominator() : 1u);
+            w.Write<uint32_t>("match_due", MatchDue(n, now) ? 1u : 0u);
         }
     }
 
     void RestoreState(StateReader& r) override {
-        std::lock_guard<std::mutex> g(mtx_);
-        const int64_t now = NowNs();
+        const uint64_t now = Now();
         uint32_t clk_ctl = 0;
         r.Read("dgt_clk_ctl", clk_ctl);
         if (clk_ctl > kDgtClkCtlMax && clk_ctl != kDgtClkCtlUnwritten) {
@@ -117,39 +107,78 @@ public:
                 "msm8255 timer: restored DGT_CLK_CTL 0x%08X exceeds the "
                 "two-bit divide select", clk_ctl);
         }
-        dgt_clk_ctl_.store(clk_ctl, std::memory_order_release);
+        dgt_clk_ctl_ = clk_ctl;
         for (int n = 0; n < 2; ++n) {
-            uint32_t match = 0, enable = 0, count = 0;
+            uint32_t match = 0, match_written = 0, enable = 0, enable_written = 0;
+            uint32_t count = 0, due = 0;
+            uint64_t phase = 0, phase_den = 0;
             r.Read("match", match);
+            r.Read("match_written", match_written);
             r.Read("enable", enable);
+            r.Read("enable_written", enable_written);
             r.Read("count", count);
-            ch_[n].match.store(match, std::memory_order_release);
-            ch_[n].enable.store(enable, std::memory_order_release);
-            ch_[n].frozen.store(count, std::memory_order_release);
-            ch_[n].counter.Set(now, count);
-            Arm(ch_[n], n, now);
+            r.Read("grid_phase", phase);
+            r.Read("grid_phase_den", phase_den);
+            r.Read("match_due", due);
+            if (match_written > 1u || enable_written > 1u || due > 1u) {
+                r.Reject("msm8255 timer: restored %s flag word is not 0 or 1",
+                         ChannelName(n));
+            }
+            if ((enable & ~kEnableEn) != 0u) {
+                r.Reject("msm8255 timer: restored TIMER_ENABLE 0x%08X sets a bit "
+                         "this timer does not model", enable);
+            }
+            if (enable_written == 0u && enable != 0u) {
+                r.Reject("msm8255 timer: restored %s TIMER_ENABLE 0x%08X was "
+                         "never written", ChannelName(n), enable);
+            }
+            if (match_written == 0u && match != 0u) {
+                r.Reject("msm8255 timer: restored %s MATCH 0x%08X was never "
+                         "written", ChannelName(n), match);
+            }
+            if (due != 0u && ((enable & kEnableEn) == 0u || match_written == 0u)) {
+                r.Reject("msm8255 timer: restored %s carries a due match while "
+                         "stopped", ChannelName(n));
+            }
+            if (n == 1 && (enable & kEnableEn) != 0u &&
+                clk_ctl == kDgtClkCtlUnwritten) {
+                r.Reject("msm8255 timer: restored DGT counts with no DGT_CLK_CTL "
+                         "divide select");
+            }
+            ch_[n].match          = match;
+            ch_[n].match_written  = match_written != 0u;
+            ch_[n].enable         = enable;
+            ch_[n].enable_written = enable_written != 0u;
+            ch_[n].stopped_count  = count;
+            if (!DivideSelected(n)) {
+                if (phase != 0u || phase_den != 1u) {
+                    r.Reject("msm8255 timer: restored %s carries a grid phase with no "
+                             "divide select", ChannelName(n));
+                }
+            } else {
+                ApplyRatio(n);
+                if (!ch_[n].counter.AnchorAtPhase(now, count, phase, phase_den)) {
+                    r.Reject("msm8255 timer: restored %s grid phase %llu/%llu is not "
+                             "a fraction of one tick this build can place",
+                             ChannelName(n), static_cast<unsigned long long>(phase),
+                             static_cast<unsigned long long>(phase_den));
+                }
+            }
+            if (due != 0u) ArmAt(n, now);
+            else           Arm(n, now);
         }
     }
 
 private:
     struct Channel {
-        FreeRunCounter counter;
-        std::atomic<uint32_t> match{0};
-        std::atomic<uint32_t> enable{0};
-        std::atomic<uint32_t> frozen{0};
-        VirtualTimerList::Entry* entry = nullptr;
+        uint32_t             match          = 0;
+        bool                 match_written  = false;
+        uint32_t             enable         = 0;
+        bool                 enable_written = false;
+        uint32_t             stopped_count  = 0;
+        CycleAnchoredCounter counter;
+        GuestCycleClock::Event* event       = nullptr;
     };
-
-    const TickScale& ScaleFor(int n) const {
-        if (n == 0) return kGptScale;
-        const uint32_t sel = dgt_clk_ctl_.load(std::memory_order_acquire);
-        if (sel > kDgtClkCtlMax) {
-            emu_.Get<Fatal>().Die(
-                "msm8255 timer: the DGT is counting before DGT_CLK_CTL was "
-                "written; its power-on divide select is not modelled");
-        }
-        return kDgtScales[sel];
-    }
 
     static uint32_t FastReadThunk(void* ctx, uint32_t off, uint32_t width) {
         return static_cast<Msm8255Timer*>(ctx)->FastRead(off, width);
@@ -161,12 +190,12 @@ private:
     uint32_t FastRead(uint32_t off, uint32_t width) {
         if (width != 4u) HaltUnsupportedAccess("FastRead", MmioBase() + off, 0);
         switch (off) {
-            case kGptCount:  return CountAt(ch_[0], 0, NowNs());
-            case kDgtCount:  return CountAt(ch_[1], 1, NowNs());
-            case kGptMatch:  return ch_[0].match.load(std::memory_order_acquire);
-            case kDgtMatch:  return ch_[1].match.load(std::memory_order_acquire);
-            case kGptEnable: return ch_[0].enable.load(std::memory_order_acquire);
-            case kDgtEnable: return ch_[1].enable.load(std::memory_order_acquire);
+            case kGptCount:  return Count(0, Now());
+            case kDgtCount:  return Count(1, Now());
+            case kGptMatch:  return ReadMatch(0);
+            case kDgtMatch:  return ReadMatch(1);
+            case kGptEnable: return ReadEnable(0);
+            case kDgtEnable: return ReadEnable(1);
             default: break;
         }
         HaltUnsupportedAccess("FastRead", MmioBase() + off, 0);
@@ -174,119 +203,206 @@ private:
 
     void FastWrite(uint32_t off, uint32_t value, uint32_t width) {
         if (width != 4u) HaltUnsupportedAccess("FastWrite", MmioBase() + off, value);
-        std::lock_guard<std::mutex> g(mtx_);
-        const int64_t now = NowNs();
+        const uint64_t now = Now();
         switch (off) {
-            case kGptMatch: SetMatch(ch_[0], 0, value, now); return;
-            case kDgtMatch: SetMatch(ch_[1], 1, value, now); return;
-            case kGptEnable: SetEnable(ch_[0], 0, value, now); return;
-            case kDgtEnable: SetEnable(ch_[1], 1, value, now); return;
-            case kGptClear: SetCount(ch_[0], 0, 0u, now); return;
-            case kDgtClear: SetCount(ch_[1], 1, 0u, now); return;
-            case kDgtClkCtl: {
-                if (value > kDgtClkCtlMax) {
-                    emu_.Get<Fatal>().Die(
-                        "msm8255 timer: DGT_CLK_CTL write 0x%08X exceeds the "
-                        "two-bit divide select", value);
-                }
-                const uint32_t count = CountAt(ch_[1], 1, now);
-                dgt_clk_ctl_.store(value, std::memory_order_release);
-                Reanchor(ch_[1], 1, count, now);
-                return;
-            }
+            case kGptMatch:  SetMatch(0, value, now); return;
+            case kDgtMatch:  SetMatch(1, value, now); return;
+            case kGptEnable: SetEnable(0, value, now); return;
+            case kDgtEnable: SetEnable(1, value, now); return;
+            case kGptClear:  Clear(0, now); return;
+            case kDgtClear:  Clear(1, now); return;
+            case kDgtClkCtl: SetDgtClkCtl(value, now); return;
             default: break;
         }
         HaltUnsupportedAccess("FastWrite", MmioBase() + off, value);
     }
 
-    int64_t NowNs() const { return emu_.Get<VirtualClock>().NowNs(); }
+    uint64_t Now() { return clock_->Cycles(); }
 
-    uint32_t CountAt(const Channel& c, int n, int64_t now) const {
-        if ((c.enable.load(std::memory_order_acquire) & kEnableEn) == 0u) {
-            return c.frozen.load(std::memory_order_acquire);
+    bool Counting(int n) const { return (ch_[n].enable & kEnableEn) != 0u; }
+
+    bool DivideSelected(int n) const {
+        return n == 0 || dgt_clk_ctl_ <= kDgtClkCtlMax;
+    }
+
+    uint32_t ReadMatch(int n) const {
+        if (!ch_[n].match_written) {
+            emu_.Get<Fatal>().Die(
+                "msm8255 timer: %s MATCH read before any write; its power-on "
+                "value is not modelled", ChannelName(n));
         }
-        return c.counter.At(now, ScaleFor(n));
+        return ch_[n].match;
     }
 
-    void Reanchor(Channel& c, int n, uint32_t count, int64_t now) {
-        c.frozen.store(count, std::memory_order_release);
-        c.counter.Set(now, count);
-        Arm(c, n, now);
+    uint32_t ReadEnable(int n) const {
+        if (!ch_[n].enable_written) {
+            emu_.Get<Fatal>().Die(
+                "msm8255 timer: %s TIMER_ENABLE read before any write; its "
+                "power-on value is not modelled", ChannelName(n));
+        }
+        return ch_[n].enable;
     }
 
-    void SetCount(Channel& c, int n, uint32_t count, int64_t now) {
-        DropIrq(n);
-        Reanchor(c, n, count, now);
+    void StartGrid(int n, uint64_t now) {
+        ch_[n].counter.Anchor(now, 0u);
+        ApplyRatio(n);
     }
 
-    void SetMatch(Channel& c, int n, uint32_t value, int64_t now) {
-        c.match.store(value, std::memory_order_release);
-        DropIrq(n);
-        Arm(c, n, now);
+    void ApplyRatio(int n) {
+        if (!DivideSelected(n)) return;
+        RequireRatio(n, ch_[n].counter.SetRatio(clock_->CpuHz(), TickHz(n)));
     }
 
-    void DropIrq(int n) {
-        emu_.Get<IrqController>().DeAssertIrq(n == 0 ? kGptVicLine : kDgtVicLine);
+    uint64_t TickHz(int n) const {
+        return n == 0 ? kGptHz : kDgtSrcHz / (dgt_clk_ctl_ + 1u);
     }
 
-    void SetEnable(Channel& c, int n, uint32_t value, int64_t now) {
+    void RequireRatio(int n, bool ok) const {
+        if (!ok) {
+            emu_.Get<Fatal>().Die(
+                "msm8255 timer: %s rate %llu Hz against the %llu Hz core "
+                "overflows the 64-bit scale", ChannelName(n),
+                static_cast<unsigned long long>(TickHz(n)),
+                static_cast<unsigned long long>(clock_->CpuHz()));
+        }
+    }
+
+    uint32_t Count(int n, uint64_t now) const {
+        if (!Counting(n)) return ch_[n].stopped_count;
+        return ch_[n].counter.CountAt(now);
+    }
+
+    bool MatchDue(int n, uint64_t now) const {
+        return clock_->IsDue(ch_[n].event, now);
+    }
+
+    void ArmAt(int n, uint64_t cycle) {
+        clock_->Arm(ch_[n].event, cycle);
+    }
+
+    void Disarm(int n) {
+        clock_->Disarm(ch_[n].event);
+    }
+
+    void Arm(int n, uint64_t now) {
+        if (!Counting(n) || !ch_[n].match_written) {
+            Disarm(n);
+            return;
+        }
+        ArmAt(n, ch_[n].counter.NextMatchCycle(ch_[n].match, now));
+    }
+
+    void RequireMatchAhead(int n, uint64_t now, const char* write) const {
+        if (Counting(n) && ch_[n].match_written && ch_[n].match == Count(n, now)) {
+            emu_.Get<Fatal>().Die(
+                "msm8255 timer: %s %s leaves MATCH 0x%08X equal to the running "
+                "count; whether the comparator fires on that tick is not "
+                "modelled", ChannelName(n), write, ch_[n].match);
+        }
+    }
+
+    void OnRateChange() {
+        const uint64_t now = Now();
+        for (int n = 0; n < 2; ++n) {
+            if (DivideSelected(n)) {
+                RequireRatio(n, ch_[n].counter.Rescale(now, clock_->CpuHz(), TickHz(n)));
+            }
+            Arm(n, now);
+        }
+    }
+
+    void SetDgtClkCtl(uint32_t value, uint64_t now) {
+        if (value > kDgtClkCtlMax) {
+            emu_.Get<Fatal>().Die(
+                "msm8255 timer: DGT_CLK_CTL write 0x%08X exceeds the two-bit "
+                "divide select", value);
+        }
+        if (value == dgt_clk_ctl_) return;
+        if (DivideSelected(1)) {
+            emu_.Get<Fatal>().Die(
+                "msm8255 timer: DGT_CLK_CTL write 0x%08X changes the divide select "
+                "0x%08X; the divider phase across that change is not modelled",
+                value, dgt_clk_ctl_);
+        }
+        dgt_clk_ctl_ = value;
+        StartGrid(1, now);
+    }
+
+    void SetCount(int n, uint64_t now, uint32_t count) {
+        if (Counting(n)) ch_[n].counter.SetCountAt(now, count);
+        else             ch_[n].stopped_count = count;
+    }
+
+    void Clear(int n, uint64_t now) {
+        SetCount(n, now, 0u);
+        RequireMatchAhead(n, now, "CLEAR");
+        Arm(n, now);
+    }
+
+    void SetMatch(int n, uint32_t value, uint64_t now) {
+        ch_[n].match         = value;
+        ch_[n].match_written = true;
+        RequireMatchAhead(n, now, "MATCH write");
+        Arm(n, now);
+    }
+
+    void SetEnable(int n, uint32_t value, uint64_t now) {
         if ((value & kEnableClrOnMatch) != 0u) {
             emu_.Get<Fatal>().Die(
                 "msm8255 timer: %s TIMER_ENABLE_CLR_ON_MATCH_EN is not modeled "
-                "(write 0x%08X)", n == 0 ? "GPT" : "DGT", value);
+                "(write 0x%08X)", ChannelName(n), value);
         }
         if ((value & ~(kEnableEn | kEnableClrOnMatch)) != 0u) {
             emu_.Get<Fatal>().Die(
                 "msm8255 timer: %s TIMER_ENABLE write 0x%08X sets bits outside "
-                "EN and CLR_ON_MATCH", n == 0 ? "GPT" : "DGT", value);
+                "EN and CLR_ON_MATCH", ChannelName(n), value);
         }
-        const bool was_on = (c.enable.load(std::memory_order_acquire) & kEnableEn) != 0u;
-        const bool now_on = (value & kEnableEn) != 0u;
-        if (was_on && !now_on) {
-            c.frozen.store(c.counter.At(now, ScaleFor(n)), std::memory_order_release);
-        } else if (!was_on && now_on) {
-            c.counter.Set(now, c.frozen.load(std::memory_order_acquire));
+        const bool was_counting = Counting(n);
+        if (!was_counting && (value & kEnableEn) != 0u && !DivideSelected(n)) {
+            emu_.Get<Fatal>().Die(
+                "msm8255 timer: DGT TIMER_ENABLE write 0x%08X starts the DGT "
+                "before DGT_CLK_CTL was written; its power-on divide select is "
+                "not modelled", value);
         }
-        c.enable.store(value, std::memory_order_release);
-        Arm(c, n, now);
+        const uint32_t count = Count(n, now);
+        ch_[n].enable         = value;
+        ch_[n].enable_written = true;
+        if (was_counting == Counting(n)) return;
+        SetCount(n, now, count);
+        if (!was_counting) RequireMatchAhead(n, now, "TIMER_ENABLE write");
+        Arm(n, now);
     }
 
-    void Arm(Channel& c, int n, int64_t now) {
-        if ((c.enable.load(std::memory_order_acquire) & kEnableEn) == 0u) {
-            c.entry->Arm(VirtualTimerList::kNoDeadline);
-            return;
-        }
-        c.entry->Arm(ScaleFor(n).NextMatchNs(
-            c.match.load(std::memory_order_acquire), CountAt(c, n, now), now));
+    void Pulse(int n) {
+        irq_->PulseIrq(n == 0 ? kGptVicLine : kDgtVicLine);
     }
 
     void OnMatch(int n) {
-        std::lock_guard<std::mutex> g(mtx_);
-        Channel& c = ch_[n];
-        if (c.entry->DeadlineNs() != VirtualTimerList::kNoDeadline) return;
-        if ((c.enable.load(std::memory_order_acquire) & kEnableEn) == 0u) return;
-        const int64_t  now   = NowNs();
-        const uint32_t match = c.match.load(std::memory_order_acquire);
-        if (static_cast<int32_t>(match - CountAt(c, n, now)) > 0) {
-            Arm(c, n, now);
-            return;
+        if (!Counting(n)) {
+            emu_.Get<Fatal>().Die(
+                "msm8255 timer: %s match event fired while the channel is stopped",
+                ChannelName(n));
         }
-        emu_.Get<IrqController>().AssertIrq(n == 0 ? kGptVicLine : kDgtVicLine);
+        Pulse(n);
+        Arm(n, Now());
     }
 
     void OnResetLine() {
-        dgt_clk_ctl_.store(kDgtClkCtlUnwritten, std::memory_order_release);
-        const int64_t now = NowNs();
+        dgt_clk_ctl_ = kDgtClkCtlUnwritten;
         for (int n = 0; n < 2; ++n) {
-            ch_[n].match.store(0u, std::memory_order_release);
-            ch_[n].enable.store(0u, std::memory_order_release);
-            SetCount(ch_[n], n, 0u, now);
+            ch_[n].match          = 0u;
+            ch_[n].match_written  = false;
+            ch_[n].enable         = 0u;
+            ch_[n].enable_written = false;
+            ch_[n].stopped_count  = 0u;
+            Disarm(n);
         }
     }
 
-    std::mutex mtx_;
-    Channel    ch_[2];
-    std::atomic<uint32_t> dgt_clk_ctl_{kDgtClkCtlUnwritten};
+    Channel          ch_[2];
+    uint32_t         dgt_clk_ctl_ = kDgtClkCtlUnwritten;
+    GuestCycleClock* clock_       = nullptr;
+    IrqController*   irq_         = nullptr;
 };
 
 }  // namespace

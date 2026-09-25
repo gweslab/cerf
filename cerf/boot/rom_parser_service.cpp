@@ -12,6 +12,7 @@
 #include "../core/byte_order.h"
 #include "../core/cerf_emulator.h"
 #include "../core/device_config.h"
+#include "../core/host_file_bytes.h"
 #include "../core/log.h"
 #include "../core/no_emulation_runtime_service.h"
 #include "../core/cerf_paths.h"
@@ -20,7 +21,6 @@
 #include <windows.h>
 
 #include <cstring>
-#include <fstream>
 
 REGISTER_SERVICE(RomParserService);
 
@@ -51,16 +51,6 @@ using cerf::rom_image_parse::kB000FFSignature;
 using cerf::rom_image_parse::kIpaqNbfSignature;
 using cerf::rom_image_parse::kNosajSignature;
 
-std::vector<uint8_t> ReadWholeFile(const std::string& path) {
-    std::ifstream f(path, std::ios::binary | std::ios::ate);
-    if (!f.is_open()) return {};
-    const auto sz = f.tellg();
-    std::vector<uint8_t> bytes(static_cast<size_t>(sz));
-    f.seekg(0);
-    f.read(reinterpret_cast<char*>(bytes.data()), sz);
-    return bytes;
-}
-
 }  /* namespace */
 
 bool RomParserService::ShouldRegister() {
@@ -87,7 +77,7 @@ bool RomParserService::ParseCe1Xips(ParsedRom& rom) {
 }
 
 bool RomParserService::ParseOne(ParsedRom& rom) {
-    rom.raw = ReadWholeFile(rom.path);
+    rom.raw = ReadHostFileBytes(rom.path);
     if (rom.raw.empty()) {
         LOG(Caution, "RomParser: failed to read %s\n", rom.path.c_str());
         return false;

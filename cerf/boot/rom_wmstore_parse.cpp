@@ -12,30 +12,59 @@ namespace {
 
 using cerf::le::U16;
 using cerf::le::U32;
+using cerf::le::UN;
 
 struct EscoPayload {
     size_t off   = 0;
     size_t bytes = 0;
 };
 
-bool EscoPayloadSpan(std::span<const uint8_t> raw, EscoPayload& out) {
-    if (raw.size() < kZipLocalHeaderSize ||
-        std::memcmp(raw.data(), kEscoZipLocalSignature,
-                    sizeof(kEscoZipLocalSignature)) != 0) {
-        out = {0, raw.size()};
-        return true;
-    }
-    const uint8_t* h = raw.data();
+bool LocalHeaderAt(std::span<const uint8_t> raw, size_t at) {
+    return raw.size() - at >= sizeof(kEscoZipLocalSignature) &&
+           std::memcmp(raw.data() + at, kEscoZipLocalSignature,
+                       sizeof(kEscoZipLocalSignature)) == 0;
+}
+
+bool EscoStoredMemberAt(std::span<const uint8_t> raw, size_t at, EscoMember& out) {
+    if (raw.size() - at < kZipLocalHeaderSize || !LocalHeaderAt(raw, at)) return false;
+    const uint8_t* h = raw.data() + at;
     if (U16(h, kZipMethodOff) != kZipMethodStore) return false;
     if ((U16(h, kZipFlagsOff) & kZipFlagDataDescriptor) != 0) return false;
     const uint32_t stored = U32(h, kZipCompressedSizeOff);
     if (stored != U32(h, kZipUncompressedSizeOff)) return false;
-    const size_t off = kZipLocalHeaderSize
-                     + size_t(U16(h, kZipNameLenOff))
-                     + size_t(U16(h, kZipExtraLenOff));
-    if (off >= raw.size() || uint64_t(off) + stored > raw.size()) return false;
-    out = {off, stored};
+    const size_t name_len = U16(h, kZipNameLenOff);
+    const uint64_t data = uint64_t(at) + kZipLocalHeaderSize + name_len
+                        + U16(h, kZipExtraLenOff);
+    if (data >= raw.size() || data + stored > raw.size()) return false;
+    out.name.assign(reinterpret_cast<const char*>(h + kZipLocalHeaderSize), name_len);
+    out.off   = size_t(data);
+    out.bytes = stored;
     return true;
+}
+
+bool EscoPayloadSpan(std::span<const uint8_t> raw, EscoPayload& out) {
+    if (raw.size() < kZipLocalHeaderSize || !LocalHeaderAt(raw, 0)) {
+        out = {0, raw.size()};
+        return true;
+    }
+    EscoMember first;
+    if (!EscoStoredMemberAt(raw, 0, first)) return false;
+    out = {first.off, first.bytes};
+    return true;
+}
+
+bool CertRange(std::span<const uint8_t> cert, uint32_t type, EscoRange& out) {
+    if (cert.size() < kEscoCertBodyOff + kEscoCertRangeOff + kEscoCertRangeBytes)
+        return false;
+    const uint8_t* body = cert.data() + kEscoCertBodyOff;
+    if (U32(body, kEscoCertRangeLenOff) != kEscoCertRangeBytes) return false;
+    const uint8_t* rec = body + kEscoCertRangeOff;
+    if (U32(rec) != type) return false;
+    out.target = U32(rec, kEscoRangeTargetOff);
+    out.drive  = U32(rec, kEscoRangeDriveOff);
+    out.start = UN(rec + kEscoRangeStartOff, sizeof(uint64_t));
+    out.size  = UN(rec + kEscoRangeSizeOff, sizeof(uint64_t));
+    return out.size != 0u;
 }
 
 std::string PartitionName(const uint8_t* entry) {
@@ -103,6 +132,38 @@ bool WmstoreLocateOsXip(std::span<const uint8_t> raw, WmstoreOsXip& out) {
         return true;
     }
     return false;
+}
+
+bool EscoStoredMembers(std::span<const uint8_t> raw, std::vector<EscoMember>& out) {
+    out.clear();
+    for (size_t at = 0; LocalHeaderAt(raw, at);) {
+        EscoMember m;
+        if (!EscoStoredMemberAt(raw, at, m)) return false;
+        at = m.off + m.bytes;
+        out.push_back(std::move(m));
+    }
+    return !out.empty();
+}
+
+bool EscoImageRange(std::span<const uint8_t> raw, EscoRange& out) {
+    std::vector<EscoMember> members;
+    if (!EscoStoredMembers(raw, members)) return false;
+    const std::string cert_name = members[0].name + kEscoCertSuffix;
+    for (const auto& m : members) {
+        if (m.name != cert_name) continue;
+        if (!CertRange(raw.subspan(m.off, m.bytes), kEscoRangeImageWrite, out))
+            return false;
+        return out.size == members[0].bytes;
+    }
+    return false;
+}
+
+bool EscoEraseRange(std::span<const uint8_t> raw, EscoRange& out) {
+    std::vector<EscoMember> members;
+    if (!EscoStoredMembers(raw, members) || members.size() != 1u) return false;
+    const EscoMember& m = members[0];
+    if (!m.name.ends_with(kEscoCertSuffix)) return false;
+    return CertRange(raw.subspan(m.off, m.bytes), kEscoRangeErase, out);
 }
 
 }  /* namespace cerf::rom_image_parse */

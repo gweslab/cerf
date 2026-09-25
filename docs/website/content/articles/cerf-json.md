@@ -108,8 +108,9 @@ the file that boots. Everything else is optional.
 | `extensions` | array of strings | Extra ROM partitions that CERF loads after the primary one. |
 | `recovery` | string | An alternative image. CERF boots it only with `--recovery`. |
 | `eeprom` | string | A serial configuration EEPROM image, for a board that has one. |
+| `lumia800_user_area_erase` | string | The erase package for the user area. It is in the same firmware package as `primary`. |
 
-The `rom` block is where the boards stop looking alike. Most devices need one line - `primary`.
+The boards are different in the `rom` block. Most devices need one line - `primary`.
 Some need more, because the hardware has more. The Jornada 720 has a configuration EEPROM on its
 SSP bus, and its EEPROM peripheral loads `rom.eeprom` to serve it. The Zune 30 ships a recovery
 image next to its main one. **What a device can declare here follows from what its board

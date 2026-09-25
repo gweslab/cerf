@@ -168,6 +168,9 @@ void LoadRom(const json& root, DeviceConfig& config, const std::string& path) {
         config.rom_primary = CfgReadOptString(r, "primary", path, "rom");
     if (r.contains("eeprom"))
         config.rom_eeprom = CfgReadOptString(r, "eeprom", path, "rom");
+    if (r.contains("lumia800_user_area_erase"))
+        config.rom_lumia800_user_area_erase =
+            CfgReadOptString(r, "lumia800_user_area_erase", path, "rom");
     if (r.contains("recovery"))
         config.rom_recovery = CfgReadOptString(r, "recovery", path, "rom");
     if (r.contains("extensions")) {

@@ -102,6 +102,8 @@ struct DeviceConfig : public Service {
        when the device has none. */
     std::string              rom_eeprom;
 
+    std::string              rom_lumia800_user_area_erase;
+
     /* Optional CF images bundled with the ROM (cerf.json
        "additional_packages.compact_flash_cards"); the CF insert menu offers
        each entry whose file is present in the device directory. */

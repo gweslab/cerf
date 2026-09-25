@@ -10,33 +10,16 @@ using namespace cerf_mmc;
 
 namespace {
 
-constexpr uint32_t kCsdStructure   = 3u;
-constexpr uint32_t kSpecVers       = 4u;
-constexpr uint32_t kTaac           = 0x0Eu;
-constexpr uint32_t kNsac           = 0x00u;
-constexpr uint32_t kTranSpeed      = 0x32u;
-constexpr uint32_t kCcc            = 0x0F5u;
-constexpr uint32_t kReadBlLen      = 0x09u;
-constexpr uint32_t kWriteBlLen     = 0x09u;
-constexpr uint32_t kCSizeSaturated = 0xFFFu;
-constexpr uint32_t kCSizeMult      = 7u;
-constexpr uint32_t kEraseGrpSize   = 31u;
-constexpr uint32_t kEraseGrpMult   = 31u;
-constexpr uint32_t kWpGrpSize      = 0u;
-constexpr uint32_t kWpGrpEnable    = 1u;
-constexpr uint32_t kR2wFactor      = 4u;
+constexpr uint32_t kExtCsdBytes    = 512u;
+constexpr uint32_t kExtCsdSecCount = 212u;
+constexpr uint32_t kSecCountBytes  = 4u;
 
-constexpr uint32_t kWpGroupSectors =
-    (kWpGrpSize + 1u) * (kEraseGrpSize + 1u) * (kEraseGrpMult + 1u);
-
-constexpr uint32_t kExtCsdBytes          = 512u;
-constexpr uint32_t kExtCsdRev            = 192u;
-constexpr uint32_t kExtCsdStructure      = 194u;
-constexpr uint32_t kExtCsdCardType       = 196u;
-constexpr uint32_t kExtCsdSecCount       = 212u;
-constexpr uint8_t  kExtCsdRevValue       = 5u;
-constexpr uint8_t  kExtCsdStructureValue = 2u;
-constexpr uint8_t  kExtCsdCardTypeValue  = 1u;
+bool IsCardOwnedExtCsdByte(uint32_t offset) {
+    return offset >= kExtCsdBytes || offset == kExtCsdHsTiming ||
+           offset == kExtCsdUserWp || offset == kExtCsdBusWidth ||
+           offset == kExtCsdErasedMemCont ||
+           (offset >= kExtCsdSecCount && offset < kExtCsdSecCount + kSecCountBytes);
+}
 
 void PutBits(uint32_t out[4], uint32_t start, uint32_t width, uint32_t value) {
     const uint32_t mask  = (width < 32u) ? ((1u << width) - 1u) : 0xFFFFFFFFu;
@@ -263,16 +246,26 @@ void EmmcCardBase::Reset() {
     read_data_.clear();
 }
 
+// JEDEC JESD84-A43 printed pp. 84-85, ERASE_GRP_SIZE and WP_GRP_SIZE
+uint32_t EmmcCardBase::WpGroupSectors() const {
+    const EmmcCsdFields csd = Csd();
+    return (uint32_t(csd.wp_grp_size) + 1u) *
+           (uint32_t(csd.erase_grp_size) + 1u) *
+           (uint32_t(csd.erase_grp_mult) + 1u);
+}
+
 uint32_t EmmcCardBase::WpGroupCount() const {
-    return (SectorCount() + kWpGroupSectors - 1u) / kWpGroupSectors;
+    const uint32_t group = WpGroupSectors();
+    return (SectorCount() + group - 1u) / group;
 }
 
 void EmmcCardBase::SetWriteProtect(uint32_t sector) {
-    if (sector % kWpGroupSectors != 0u) {
+    const uint32_t group = WpGroupSectors();
+    if (sector % group != 0u) {
         emu_.Get<Fatal>().Die(
             "eMMC card in slot %u: SET_WRITE_PROT addresses sector %u, which is "
             "not on a %u-sector write protect group boundary", SlotIndex(),
-            sector, kWpGroupSectors);
+            sector, group);
     }
     if ((user_wp_ & kUserWpPwrWpEn) == 0u) {
         emu_.Get<Fatal>().Die(
@@ -280,21 +273,43 @@ void EmmcCardBase::SetWriteProtect(uint32_t sector) {
             "temporary write protection, which is not modeled", SlotIndex(),
             static_cast<unsigned>(user_wp_));
     }
-    power_on_wp_[sector / kWpGroupSectors] = 1u;
+    power_on_wp_[sector / group] = 1u;
 }
 
 void EmmcCardBase::BuildExtCsd() {
     read_data_.assign(kExtCsdBytes, 0u);
+    for (const EmmcExtCsdByte& property : ExtCsdProperties()) {
+        if (IsCardOwnedExtCsdByte(property.offset)) {
+            emu_.Get<Fatal>().Die(
+                "eMMC card in slot %u: the part lists extended CSD byte %u, which "
+                "the card serves from its own state", SlotIndex(),
+                static_cast<unsigned>(property.offset));
+        }
+        read_data_[property.offset] = property.value;
+    }
     const uint32_t sectors = SectorCount();
-    for (uint32_t i = 0; i < 4u; ++i) {
+    for (uint32_t i = 0; i < kSecCountBytes; ++i) {
         read_data_[kExtCsdSecCount + i] =
             static_cast<uint8_t>(sectors >> (8u * i));
     }
-    read_data_[kExtCsdRev]       = kExtCsdRevValue;
-    read_data_[kExtCsdStructure] = kExtCsdStructureValue;
-    read_data_[kExtCsdCardType]  = kExtCsdCardTypeValue;
-    read_data_[kExtCsdHsTiming]  = hs_timing_;
-    read_data_[kExtCsdUserWp]    = user_wp_;
+    read_data_[kExtCsdHsTiming]      = hs_timing_;
+    read_data_[kExtCsdUserWp]        = user_wp_;
+    read_data_[kExtCsdErasedMemCont] = CheckedErasedMemCont();
+}
+
+// JEDEC JESD84-A43 section 7.5.8, Table 69
+uint8_t EmmcCardBase::CheckedErasedMemCont() const {
+    const uint8_t code = ErasedMemCont();
+    if (code > kErasedMemContOnes) {
+        emu_.Get<Fatal>().Die(
+            "eMMC card in slot %u: the part declares erased memory content code "
+            "%u, which is reserved", SlotIndex(), static_cast<unsigned>(code));
+    }
+    return code;
+}
+
+uint8_t EmmcCardBase::ErasedByte() const {
+    return CheckedErasedMemCont() == kErasedMemContOnes ? 0xFFu : 0x00u;
 }
 
 uint32_t EmmcCardBase::StatusWord(MmcState before) const {
@@ -308,22 +323,27 @@ void EmmcCardBase::BuildCid(uint32_t out[4]) const {
 }
 
 void EmmcCardBase::BuildCsd(uint32_t out[4]) const {
+    const EmmcCsdFields csd = Csd();
     out[0] = out[1] = out[2] = out[3] = 0u;
-    PutBits(out, 126u, 2u,  kCsdStructure);
-    PutBits(out, 122u, 4u,  kSpecVers);
-    PutBits(out, 112u, 8u,  kTaac);
-    PutBits(out, 104u, 8u,  kNsac);
-    PutBits(out,  96u, 8u,  kTranSpeed);
-    PutBits(out,  84u, 12u, kCcc);
-    PutBits(out,  80u, 4u,  kReadBlLen);
-    PutBits(out,  62u, 12u, kCSizeSaturated);
-    PutBits(out,  47u, 3u,  kCSizeMult);
-    PutBits(out,  42u, 5u,  kEraseGrpSize);
-    PutBits(out,  37u, 5u,  kEraseGrpMult);
-    PutBits(out,  32u, 5u,  kWpGrpSize);
-    PutBits(out,  31u, 1u,  kWpGrpEnable);
-    PutBits(out,  26u, 3u,  kR2wFactor);
-    PutBits(out,  22u, 4u,  kWriteBlLen);
+    PutBits(out, 126u, 2u,  csd.csd_structure);
+    PutBits(out, 122u, 4u,  csd.spec_vers);
+    PutBits(out, 112u, 8u,  csd.taac);
+    PutBits(out, 104u, 8u,  csd.nsac);
+    PutBits(out,  96u, 8u,  csd.tran_speed);
+    PutBits(out,  84u, 12u, csd.ccc);
+    PutBits(out,  80u, 4u,  csd.read_bl_len);
+    PutBits(out,  62u, 12u, csd.c_size);
+    PutBits(out,  59u, 3u,  csd.vdd_r_curr_min);
+    PutBits(out,  56u, 3u,  csd.vdd_r_curr_max);
+    PutBits(out,  53u, 3u,  csd.vdd_w_curr_min);
+    PutBits(out,  50u, 3u,  csd.vdd_w_curr_max);
+    PutBits(out,  47u, 3u,  csd.c_size_mult);
+    PutBits(out,  42u, 5u,  csd.erase_grp_size);
+    PutBits(out,  37u, 5u,  csd.erase_grp_mult);
+    PutBits(out,  32u, 5u,  csd.wp_grp_size);
+    PutBits(out,  31u, 1u,  csd.wp_grp_enable);
+    PutBits(out,  26u, 3u,  csd.r2w_factor);
+    PutBits(out,  22u, 4u,  csd.write_bl_len);
     SealCrc7(out);
 }
 
@@ -343,6 +363,11 @@ void EmmcCardBase::ApplySwitch(uint32_t argument) {
             SlotIndex(), access);
     }
     if (index == kExtCsdBusWidth) {
+        if (value == kBusWidth4BitDdr || value == kBusWidth8BitDdr) {
+            emu_.Get<Fatal>().Die(
+                "eMMC card in slot %u: SWITCH selects dual data rate bus mode %u, "
+                "which is not modeled", SlotIndex(), value);
+        }
         if (value > kBusWidth8Bit) {
             emu_.Get<Fatal>().Die(
                 "eMMC card in slot %u: SWITCH selects bus mode %u, which is "

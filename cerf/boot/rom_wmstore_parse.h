@@ -4,6 +4,8 @@
 
 #include <cstdint>
 #include <span>
+#include <string>
+#include <vector>
 
 namespace cerf::rom_image_parse {
 
@@ -42,5 +44,36 @@ struct WmstoreOsXip {
 };
 
 bool WmstoreLocateOsXip(std::span<const uint8_t> raw, WmstoreOsXip& out);
+
+struct EscoMember {
+    std::string name;
+    size_t      off   = 0;
+    size_t      bytes = 0;
+};
+
+bool EscoStoredMembers(std::span<const uint8_t> raw, std::vector<EscoMember>& out);
+
+constexpr size_t   kEscoCertBodyOff     = 0x1Cu;
+constexpr size_t   kEscoCertRangeLenOff = 0x38u;
+constexpr size_t   kEscoCertRangeOff    = 0x3Cu;
+constexpr uint32_t kEscoCertRangeBytes  = 0x1Cu;
+constexpr size_t   kEscoRangeTargetOff  = 0x04u;
+constexpr size_t   kEscoRangeDriveOff   = 0x08u;
+constexpr size_t   kEscoRangeStartOff   = 0x0Cu;
+constexpr size_t   kEscoRangeSizeOff    = 0x14u;
+constexpr uint32_t kEscoRangeImageWrite = 0u;
+constexpr uint32_t kEscoRangeErase      = 1u;
+constexpr char     kEscoCertSuffix[]    = ".cert";
+
+struct EscoRange {
+    uint32_t target = 0;
+    uint32_t drive  = 0;
+    uint64_t start  = 0;
+    uint64_t size   = 0;
+};
+
+bool EscoImageRange(std::span<const uint8_t> raw, EscoRange& out);
+
+bool EscoEraseRange(std::span<const uint8_t> raw, EscoRange& out);
 
 }  /* namespace cerf::rom_image_parse */

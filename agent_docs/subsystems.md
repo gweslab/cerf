@@ -591,6 +591,13 @@ is `Nkdbg`.
 
 - `cerf/tracing/kernel_debug_sink.{h,cpp}`, `Nkdbg` log channel
 
+## Byte order
+
+`cerf/core/byte_order.h` holds the only code that reads and writes multi-byte
+values in a byte buffer. It contains little-endian and big-endian loads, stores
+and vector appends. It also contains byte swaps and the mask for an access
+width. Do not write a local shift-and-or or a local `Put32`.
+
 ## Bundled device tree
 
 `bundled/devices/<name>/` is the input that CERF reads at boot:

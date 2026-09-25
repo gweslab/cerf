@@ -5,9 +5,11 @@
 /guides/*       /articles/:splat           301
 /assets/guides/*  /assets/articles/:splat  301
 
-/getting-online   /articles/networking/   302
-/getting-online/  /articles/networking/   302
-/activesync       /articles/activesync/   302
-/activesync/      /articles/activesync/   302
-/feedback         https://github.com/gweslab/cerf/issues   302
-/feedback/        https://github.com/gweslab/cerf/issues   302
+/getting-online       /articles/networking/   302
+/getting-online/      /articles/networking/   302
+/activesync           /articles/activesync/   302
+/activesync/          /articles/activesync/   302
+/hibernation-warning  /articles/hibernation/#cerf-upgrades-will-break-your-saved-state  302
+/hibernation-warning/ /articles/hibernation/#cerf-upgrades-will-break-your-saved-state  302
+/feedback             https://github.com/gweslab/cerf/issues   302
+/feedback/            https://github.com/gweslab/cerf/issues   302

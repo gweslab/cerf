@@ -24,6 +24,7 @@ private:
 
     int  SelectedAction() const;
     void SyncActionBlock();
+    void LayoutSaveRow();
     void CommitOk();
     void StopTimer();
     int  BarFillWidth() const;
@@ -33,6 +34,8 @@ private:
 
     HWND combo_        = nullptr;
     HWND chk_save_     = nullptr;
+    HWND save_link_    = nullptr;
+    HWND save_tail_    = nullptr;
     HWND chk_remember_ = nullptr;
     HWND desc_         = nullptr;
 

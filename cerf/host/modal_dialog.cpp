@@ -5,6 +5,9 @@
 #include "../core/log.h"
 #include "host_dark_mode.h"
 #include "host_dpi.h"
+#include "host_link_opener.h"
+
+#include <commctrl.h>
 
 void ModalDialog::PostDismiss() {
     if (hwnd_) PostMessageW(hwnd_, WM_CLOSE, 0, 0);
@@ -27,6 +30,9 @@ void ModalDialog::RunModal(HWND owner, const wchar_t* class_name,
     wc.hbrBackground = (HBRUSH)(COLOR_BTNFACE + 1);
     wc.lpszClassName = class_name;
     RegisterClassExW(&wc);
+
+    INITCOMMONCONTROLSEX icc = { sizeof(icc), ICC_LINK_CLASS };
+    InitCommonControlsEx(&icc);
 
     done_ = false;
     dpi_  = emu_.Get<HostDpi>().ForWindow(owner);
@@ -104,6 +110,23 @@ LRESULT ModalDialog::WndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
         case WM_COMMAND:
             OnCommand(LOWORD(wp), HIWORD(wp));
             return 0;
+
+        case WM_NOTIFY: {
+            const auto* nh = reinterpret_cast<const NMHDR*>(lp);
+            wchar_t cls[16] = {};
+            GetClassNameW(nh->hwndFrom, cls, 16);
+            if (lstrcmpiW(cls, WC_LINK) != 0) break;
+            if (nh->code == NM_CLICK || nh->code == NM_RETURN) {
+                emu_.Get<HostLinkOpener>().OpenNotified(hwnd, lp);
+                return 0;
+            }
+            if (nh->code == NM_CUSTOMDRAW) {
+                LRESULT out = 0;
+                if (emu_.Get<HostDarkMode>().HandleLinkCustomDraw(lp, out))
+                    return out;
+            }
+            break;
+        }
 
         case WM_CLOSE:
             done_ = true;

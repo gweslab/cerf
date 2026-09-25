@@ -9,7 +9,9 @@
 #include "../host/host_dark_mode.h"
 #include "../host/host_dpi.h"
 #include "../host/host_window.h"
+#include "../version.h"
 
+#include <commctrl.h>
 #include <cstdio>
 
 REGISTER_SERVICE(ShutdownDialog);
@@ -42,7 +44,13 @@ constexpr int kBtnGap     = 8;
 constexpr int kMarginR    = 20;
 constexpr int kBtnBottom  = 44;
 
-enum : int { IDC_ACTION = 3000, IDC_SAVE, IDC_REMEMBER, IDC_DESC };
+enum : int { IDC_ACTION = 3000, IDC_SAVE, IDC_SAVE_LINK, IDC_REMEMBER, IDC_DESC };
+
+constexpr wchar_t kSaveLinkMarkup[] =
+    L"<a href=\"https://cerf.cx/hibernation-warning\">only for CERF v"
+    CERF_VERSION_WSTR L"</a>";
+
+constexpr wchar_t kSaveTail[] = L")";
 
 constexpr wchar_t kSoftText[] =
     L"The guest operating system restarts and keeps everything in RAM, so the "
@@ -93,6 +101,8 @@ void ShutdownDialog::SyncActionBlock() {
     const int action = SelectedAction();
     const bool exiting = (action == 0);
     ShowWindow(chk_save_, exiting ? SW_SHOW : SW_HIDE);
+    ShowWindow(save_link_, exiting ? SW_SHOW : SW_HIDE);
+    ShowWindow(save_tail_, exiting ? SW_SHOW : SW_HIDE);
     ShowWindow(chk_remember_, exiting ? SW_SHOW : SW_HIDE);
     ShowWindow(desc_, exiting ? SW_HIDE : SW_SHOW);
     if (!exiting)
@@ -152,13 +162,18 @@ void ShutdownDialog::BuildControls(HWND hwnd) {
     const unsigned long long mb =
         emu_.Get<EmulatedMemory>().VolatileByteCount() >> 20;
     wchar_t save_text[64];
-    swprintf(save_text, 64, L"Save the state (%llu MB)", mb);
+    swprintf(save_text, 64, L"Save the state (%llu MB, ", mb);
     chk_save_ = mk(L"BUTTON", save_text, BS_AUTOCHECKBOX | WS_TABSTOP,
                    S(kTextX), block_y, cw - S(kTextX) - S(kMarginR),
                    S(kRowH), IDC_SAVE);
     SendMessageW(chk_save_, BM_SETCHECK,
                  emu_.Get<DeviceConfig>().last_save_state_mode
                      ? BST_CHECKED : BST_UNCHECKED, 0);
+
+    save_link_ = mk(WC_LINK, kSaveLinkMarkup, WS_TABSTOP, S(kTextX), block_y,
+                    S(kRowH), S(kRowH), IDC_SAVE_LINK);
+    save_tail_ = mk(L"STATIC", kSaveTail, SS_LEFT, S(kTextX), block_y,
+                    S(kRowH), S(kRowH), -1);
 
     chk_remember_ = mk(L"BUTTON", L"Remember this choice",
                        BS_AUTOCHECKBOX | WS_TABSTOP, S(kTextX),
@@ -184,7 +199,37 @@ void ShutdownDialog::BuildControls(HWND hwnd) {
     }
 }
 
+void ShutdownDialog::LayoutSaveRow() {
+    const int block_y = band_h_ + S(kBlockDy);
+    const int row_h   = S(kRowH);
+
+    SIZE chk = {};
+    SendMessageW(chk_save_, BCM_GETIDEALSIZE, 0, (LPARAM)&chk);
+    SetWindowPos(chk_save_, nullptr, S(kTextX), block_y, chk.cx, row_h,
+                 SWP_NOZORDER | SWP_NOACTIVATE);
+
+    RECT rc;
+    GetClientRect(Hwnd(), &rc);
+    const int link_x = S(kTextX) + chk.cx;
+    SIZE link = {};
+    SendMessageW(save_link_, LM_GETIDEALSIZE,
+                 rc.right - S(kMarginR) - link_x, (LPARAM)&link);
+    const int link_y = block_y + (row_h - link.cy) / 2;
+    SetWindowPos(save_link_, nullptr, link_x, link_y, link.cx, link.cy,
+                 SWP_NOZORDER | SWP_NOACTIVATE);
+
+    SIZE tail = {};
+    HDC dc = GetDC(save_tail_);
+    HGDIOBJ old = SelectObject(dc, (HFONT)SendMessageW(save_tail_, WM_GETFONT, 0, 0));
+    GetTextExtentPoint32W(dc, kSaveTail, lstrlenW(kSaveTail), &tail);
+    SelectObject(dc, old);
+    ReleaseDC(save_tail_, dc);
+    SetWindowPos(save_tail_, nullptr, link_x + link.cx, link_y, tail.cx,
+                 link.cy, SWP_NOZORDER | SWP_NOACTIVATE);
+}
+
 void ShutdownDialog::OnShown() {
+    LayoutSaveRow();
     SetFocus(combo_);
 }
 
@@ -249,10 +294,16 @@ void ShutdownDialog::OnCommand(int id, int notify) {
 }
 
 bool ShutdownDialog::OnMessage(UINT msg, WPARAM wp, LPARAM lp) {
-    (void)lp;
     if (msg == WM_LBUTTONDOWN) {
         StopTimer();
         return true;
+    }
+    if (msg == WM_NOTIFY) {
+        const auto* nh = reinterpret_cast<const NMHDR*>(lp);
+        if (nh->hwndFrom == save_link_ &&
+            (nh->code == NM_CLICK || nh->code == NM_RETURN))
+            StopTimer();
+        return false;
     }
     if (msg != WM_TIMER || wp != kTimerId) return false;
 

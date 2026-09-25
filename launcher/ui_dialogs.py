@@ -18,6 +18,7 @@ import ui_theme as theme
 DISCORD_URL = "https://discord.gg/QREE9Y2v2d"
 WEBSITE_URL = "https://cerf.cx"
 GUEST_ADDITIONS_URL = "https://cerf.cx/articles/guest-additions/"
+HIBERNATION_WARNING_URL = "https://cerf.cx/hibernation-warning"
 
 # Funding target, mirroring .github/FUNDING.yml (patreon: dz3n) - that file is
 # not shipped with the packaged launcher, so the handle is spelled out here.

@@ -89,7 +89,7 @@ void ArmInterruptChannel::WaitForInterrupt() {
         if (state->reset_pending || state->deep_sleep) return;
         const uint32_t exits = std::atomic_ref<uint32_t>(state->chain_exit_request)
                                    .load(std::memory_order_acquire);
-        if ((exits & ~kChainExitIrq) != 0u) return;
+        if ((exits & ~(kChainExitIrq | kChainExitFlush)) != 0u) return;
         if (irq_line_.load(std::memory_order_acquire) != 0u) return;
         /* SA-1110 Dev Man §9.5.2.2: with ICCR.DIM = 0 any enabled interrupt, masked
            or unmasked, ends idle mode; the WFI completes and execution resumes. */

@@ -16,6 +16,8 @@ constexpr Vr41xxKiuModel kModel = {
     .scanstart_auto_clear     = true,
     .keyen_scanline_interlock = true,
     .keyen_stop_deferred      = true,
+    .gpen_retained_on_other_reset = true,
+    .gpen_survives_kiurst         = true,
 };
 
 class Vr4121Kiu : public Vr41xxKiu {

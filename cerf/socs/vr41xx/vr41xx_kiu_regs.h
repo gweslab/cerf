@@ -65,4 +65,6 @@ constexpr uint32_t kTimeUnitUs  = 30u;
 constexpr uint16_t kScanLineMask = 0x0003u;
 constexpr uint16_t kScanLineNone = 0x0003u;
 
+constexpr uint16_t kGpenMask = 0x0FFFu;
+
 }

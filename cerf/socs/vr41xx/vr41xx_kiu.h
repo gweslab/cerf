@@ -18,6 +18,8 @@ struct Vr41xxKiuModel {
     bool     scanstart_auto_clear;
     bool     keyen_scanline_interlock;
     bool     keyen_stop_deferred;
+    bool     gpen_retained_on_other_reset;
+    bool     gpen_survives_kiurst;
 };
 
 /* NEC VR41xx KIU (Keyboard Interface Unit): VR4102 UM ch.21, VR4111 UM ch.22, VR4121 UM
@@ -82,6 +84,7 @@ private:
     /* SCANLINE LINE[1:0], both reset rows 0 (VR4111 UM 22.2.9 p472, VR4102 UM 21.2.9 p434,
        VR4121 UM 22.2.9 p524). */
     uint16_t scanline_  = 0;
+    uint16_t gpen_      = 0;
     /* Scans whose data stayed 0, against KIUSCANREP STPREP[5:0] (VR4111 UM 22.2.2 p463,
        VR4102 UM 21.2.2 p425, VR4121 UM 22.2.2 p514). */
     uint16_t zero_scans_ = 0;

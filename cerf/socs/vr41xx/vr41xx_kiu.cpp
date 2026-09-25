@@ -15,8 +15,9 @@ using namespace cerf_vr41xx_kiu_regs;
 
 void Vr41xxKiu::OnReady() {
     emu_.Get<PeripheralDispatcher>().Register(this);
-    emu_.Get<GuestCpuReset>().RegisterResetListener([this](ResetLineKind) {
+    emu_.Get<GuestCpuReset>().RegisterResetListener([this](ResetLineKind kind) {
         std::lock_guard<std::mutex> lk(mtx_);
+        if (kind == ResetLineKind::Rtc || !Model().gpen_retained_on_other_reset) gpen_ = 0;
         ApplyResetLocked();
     });
     worker_ = std::thread([this] { WorkerLoop(); });
@@ -46,13 +47,18 @@ bool Vr41xxKiu::EnabledLocked() const { return (scanrep_ & kKeyen) != 0; }
 /* SCANLINE selects the scan-line count (VR4111 UM 22.2.9 p472, VR4102 UM 21.2.9 p434,
    VR4121 UM 22.2.9 p524). */
 uint32_t Vr41xxKiu::ScanLinesLocked() {
+    uint32_t lines = 0;
     switch (scanline_ & kScanLineMask) {
-        case 0x0000u: return 12u;
-        case 0x0001u: return 10u;
-        case 0x0002u: return 8u;
+        case 0x0000u: lines = 12u; break;
+        case 0x0001u: lines = 10u; break;
+        case 0x0002u: lines = 8u;  break;
         default:      HaltUnsupportedAccess("KIU scan with SCANLINE = 11", kBase + kOffScanLine,
                                             scanline_);
     }
+    if (gpen_ & ((1u << lines) - 1u))
+        HaltUnsupportedAccess("KIU scan over KSCAN lines KIUGPEN selects as output ports",
+                              kBase + kOffGpen, gpen_);
+    return lines;
 }
 
 uint32_t Vr41xxKiu::ScanRegsLocked() { return ScanLinesLocked() / 2u; }
@@ -241,6 +247,7 @@ uint16_t Vr41xxKiu::ReadHalf(uint32_t addr) {
         case kOffWki:      return wintvl_;
         case kOffInt:      return causes_;
         case kOffScanLine: return scanline_;
+        case kOffGpen:     return gpen_;
         default:           HaltUnsupportedAccess("KIU ReadHalf", addr, 0);
     }
 }
@@ -265,7 +272,10 @@ void Vr41xxKiu::WriteHalf(uint32_t addr, uint16_t value) {
            "Write 0 to these bits.  0 is returned after a read." (VR4111 UM 22.2.7 p469,
            VR4121 UM 22.2.7 p521; VR4102 UM 21.2.7 p432 words it "Write 0 when writing"). */
         case kOffRst:
-            if (value & kKiuRst) ApplyResetLocked();
+            if (value & kKiuRst) {
+                if (!Model().gpen_survives_kiurst) gpen_ = 0;
+                ApplyResetLocked();
+            }
             NotifyWorker();
             return;
         case kOffWki:
@@ -299,7 +309,9 @@ void Vr41xxKiu::WriteHalf(uint32_t addr, uint16_t value) {
         /* KIUGPEN routes KSCAN[n] to GPIO[32+n], output value from the GIU's GIUPODATL
            (VR4111 UM 22.2.8 p470, VR4102 UM 21.2.8 p433; VR4121 UM 22.2.8 p523 names that
            register GIUPIODL). */
-        case kOffGpen:     return;
+        case kOffGpen:
+            gpen_ = value & kGpenMask;
+            return;
         default:           HaltUnsupportedAccess("KIU WriteHalf", addr, value);
     }
 }
@@ -333,6 +345,7 @@ void Vr41xxKiu::SaveState(StateWriter& w) {
     w.Write("wintvl", wintvl_);
     w.Write("wks", wks_);
     w.Write("scanline", scanline_);
+    w.Write("gpen", gpen_);
     w.Write("zero_scans", zero_scans_);
     w.Write<uint8_t>("data_unread", data_unread_ ? 1u : 0u);
     w.Write<uint8_t>("stop_after_scan", stop_after_scan_ ? 1u : 0u);
@@ -349,6 +362,7 @@ void Vr41xxKiu::RestoreState(StateReader& r) {
     r.Read("wintvl", wintvl_);
     r.Read("wks", wks_);
     r.Read("scanline", scanline_);
+    r.Read("gpen", gpen_);
     r.Read("zero_scans", zero_scans_);
     uint8_t unread = 0, stopping = 0, scanstart_held = 0, scanstp_held = 0;
     r.Read("data_unread", unread);

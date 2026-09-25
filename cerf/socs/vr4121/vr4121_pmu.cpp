@@ -42,9 +42,27 @@ constexpr Vr41xxPmuModel kModel = {
 constexpr uint16_t kIntRstSw = 0x0008u;   /* PMUINTREG D3 RSTSW  */
 constexpr uint16_t kIntDmsRst = 0x0004u;  /* PMUINTREG D2 DMSRST */
 
+constexpr uint32_t kOffDivReg   = 0x0Cu;
+constexpr uint16_t kDivWritable = 0x000Fu;
+
+constexpr bool DivModeDefined(uint16_t value) {
+    const uint16_t div = static_cast<uint16_t>(value & kDivWritable);
+    return div <= 0x6u || div == 0x9u || div == 0xAu;
+}
+
 class Vr4121Pmu : public Vr41xxPmuBase<SocId::Vr4121, kModel> {
 public:
     using Vr41xxPmuBase::Vr41xxPmuBase;
+
+    void SaveState(StateWriter& w) override {
+        Vr41xxPmuBase::SaveState(w);
+        w.Write("divreg", divreg_);
+    }
+
+    void RestoreState(StateReader& r) override {
+        Vr41xxPmuBase::RestoreState(r);
+        r.Read("divreg", divreg_);
+    }
 
     /* A deadman's SW shutdown sets DMSRST and RSTSW (UM 16.2.1, 16.1.2(2)); the Casio
        IOCTL_HAL_REBOOT (ASIC 0x1118/0x111A) routes here. nk.exe StartUp's reset gate
@@ -56,6 +74,28 @@ public:
        (UM 16.2.1). */
     void LatchSleepWakeCause() override {}
     void ClearSleepWakeCause() override {}
+
+protected:
+    void ResetExt() override { divreg_ = 0; }
+
+    uint16_t ReadHalfExt(uint32_t addr) override {
+        if (addr - kModel.base == kOffDivReg) return divreg_;
+        return Vr41xxPmuBase::ReadHalfExt(addr);
+    }
+
+    void WriteHalfExt(uint32_t addr, uint16_t value) override {
+        if (addr - kModel.base != kOffDivReg) {
+            Vr41xxPmuBase::WriteHalfExt(addr, value);
+            return;
+        }
+        if (!DivModeDefined(value)) {
+            HaltUnsupportedAccess("PMUDIVREG WriteHalf with an RFU DIV mode", addr, value);
+        }
+        divreg_ = static_cast<uint16_t>(value & kDivWritable);
+    }
+
+private:
+    uint16_t divreg_ = 0;
 };
 
 }  /* namespace */

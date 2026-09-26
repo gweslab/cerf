@@ -111,10 +111,16 @@ the file that boots. Everything else is optional.
 | `lumia800_user_area_erase` | string | The erase package for the user area. It is in the same firmware package as `primary`. |
 
 The boards are different in the `rom` block. Most devices need one line - `primary`.
-Some need more, because the hardware has more. The Jornada 720 has a configuration EEPROM on its
-SSP bus, and its EEPROM peripheral loads `rom.eeprom` to serve it. The Zune 30 ships a recovery
-image next to its main one. **What a device can declare here follows from what its board
-implementation reads.**
+Some need more, because the hardware has more. **The board implementation decides which keys a
+device can declare here.**
+
+### `storage`
+
+| Key | Type | Meaning |
+| --- | --- | --- |
+| `nand` | string | A NAND flash image, relative to the device directory. Absent, `nand.img`. |
+| `hdd` | string | A hard disk image, relative to the device directory. Absent, `hdd.img`. |
+| `emmc` | string | An eMMC image, relative to the device directory. Absent, `emmc.img`. |
 
 ### The rest
 
@@ -175,12 +181,12 @@ file is lost. The launcher therefore writes your choices here instead:
 A ROM upgrade replaces the ROM and rewrites `cerf.json`. It does not touch `cerf-user.json`, so
 your configuration is still there afterwards.
 
-!!! note "A ROM you picked outlives upgrades"
+!!! note "A file you picked stays picked after upgrades"
 
     `cerf-user.json` goes through the same loader as `cerf.json`, so any key from layer 2 is legal
-    in it. When you pick another ROM in *Properties*, the launcher writes `rom.primary` here. A
-    bundle upgrade does not replace that choice, so the device keeps booting your ROM. When you
-    pick the file of the bundle again, the launcher removes your choice.
+    in it. When you pick another ROM or storage file in *Properties*, the launcher writes that key
+    here. A bundle upgrade does not replace that choice. When you pick the default file again, the
+    launcher removes your choice.
 
 ## Order of application
 

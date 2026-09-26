@@ -2,9 +2,11 @@ from __future__ import annotations
 
 import tkinter as tk
 from pathlib import Path
-from typing import Callable
+from typing import Callable, Dict
 
 from board_rom_form import BoardRomForm
+from cerf_user_json import ROM_BLOCK, STORAGE_BLOCK
+from device_file_types import FileKey
 from ui_dialogs import show_error
 
 PAGE_BOARD = "board"
@@ -24,23 +26,28 @@ class BoardRomPage:
         self.frame = self.form.frame
 
     def load(self, model: dict) -> None:
+        files: Dict[FileKey, str] = {}
+        for section in (ROM_BLOCK, STORAGE_BLOCK):
+            for key, value in model.get(section, {}).items():
+                files[(section, key)] = value
         self.form.set_values(model.get("board_id", ""), model.get("name", ""),
-                             model.get("rom_primary", ""))
+                             files)
         self._board_id = self.form.board_id()
 
     def store(self, model: dict) -> None:
         model["board_id"] = self.form.board_id()
         model["name"] = self.form.name()
-        model["rom_primary"] = self.form.rom()
+        rom: Dict[str, str] = {}
+        storage: Dict[str, str] = {}
+        for (section, key), value in self.form.files().items():
+            (storage if section == STORAGE_BLOCK else rom)[key] = value
+        model["rom"] = rom
+        model["storage"] = storage
 
     def validate(self) -> bool:
-        if not self.form.board_id():
-            show_error(self._window, "Board", "Pick a board.")
-            return False
-        if not self.form.rom_path().is_file():
-            show_error(self._window, "ROM file",
-                       "ROM file not found:\n{}".format(self.form.rom_path()))
-            self.form.rom_entry.focus_set()
+        reason = self.form.problem()
+        if reason is not None:
+            show_error(self._window, "Board/ROM", reason)
             return False
         return True
 

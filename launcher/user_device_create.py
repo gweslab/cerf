@@ -4,7 +4,7 @@ import shutil
 import threading
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional
+from typing import Dict, Optional
 
 from bundle_download import CancelledError, ProgressFn
 from bundles import BundleError, DOWNLOAD_CHUNK, is_safe_bundle_name
@@ -16,7 +16,8 @@ from device_state import write_cerf_json
 class UserDeviceSpec:
     name: str
     board_id: str
-    rom_path: Path
+    rom_files: Dict[str, Path]
+    storage: Dict[str, str]
     copy_rom: bool
 
 
@@ -62,24 +63,35 @@ def create_user_device(devices_dir: Path, spec: UserDeviceSpec,
     reason = validate_device_name(devices_dir, spec.name)
     if reason is not None:
         raise BundleError(reason)
-    if not spec.rom_path.is_file():
-        raise BundleError(f"ROM file not found: {spec.rom_path}")
+    for path in spec.rom_files.values():
+        if not path.is_file():
+            raise BundleError(f"ROM file not found: {path}")
+    if spec.copy_rom:
+        names = [p.name.casefold() for p in spec.rom_files.values()]
+        if len(set(names)) != len(names):
+            raise BundleError("Two ROM files have the same name, so both "
+                              "cannot be copied to the device directory.")
 
     target = devices_dir / spec.name
     target.mkdir(parents=True)
     try:
-        if spec.copy_rom:
-            _copy_with_progress(spec.rom_path, target / spec.rom_path.name,
-                                f"Copying {spec.rom_path.name}",
-                                progress, cancel_event)
-            rom_ref = spec.rom_path.name
-        else:
-            rom_ref = str(spec.rom_path)
-        write_cerf_json(target / CERF_USER_JSON_FILENAME, {
+        rom: Dict[str, str] = {}
+        for key, path in spec.rom_files.items():
+            if spec.copy_rom:
+                _copy_with_progress(path, target / path.name,
+                                    f"Copying {path.name}",
+                                    progress, cancel_event)
+                rom[key] = path.name
+            else:
+                rom[key] = str(path)
+        obj: dict = {
             "meta": {"name": spec.name},
-            "rom": {"primary": rom_ref},
+            "rom": rom,
             "board": {"id": spec.board_id},
-        })
+        }
+        if spec.storage:
+            obj["storage"] = dict(spec.storage)
+        write_cerf_json(target / CERF_USER_JSON_FILENAME, obj)
     except BaseException:
         shutil.rmtree(target, ignore_errors=True)
         raise

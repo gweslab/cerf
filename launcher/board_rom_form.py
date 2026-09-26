@@ -3,13 +3,14 @@ from __future__ import annotations
 import tkinter as tk
 from pathlib import Path
 from tkinter import filedialog, ttk
-from typing import Callable, List, Optional
+from typing import Callable, Dict, List, Optional
 
-from board_database import ROM_PLACING_IMX51_NAND
-from board_info import board_display_name, board_storage_type, supported_boards
+from board_info import board_display_name, supported_boards
+from cerf_user_json import resolve_device_file
+from device_file_types import (DeviceFileType, FileKey, device_file_types,
+                               file_problem)
 
-_SEC_NOTE = ("NAND image will be created in device directory and will take "
-             "~same size as factory recovery image")
+_FIRST_FILE_ROW = 2
 
 
 class BoardRomForm:
@@ -23,6 +24,11 @@ class BoardRomForm:
         self._base_dir = base_dir
         self._prefilled_name: Optional[str] = None
         self._boards: List[dict] = list(supported_boards())
+        self._types: List[DeviceFileType] = []
+        self._vars: Dict[FileKey, tk.StringVar] = {}
+        self._file_widgets: List[tk.Widget] = []
+        self._inputs: List[tk.Widget] = []
+        self._enabled = True
 
         self.frame = ttk.Frame(parent)
         self.frame.columnconfigure(1, weight=1)
@@ -43,22 +49,6 @@ class BoardRomForm:
         self.name_entry = ttk.Entry(self.frame, textvariable=self.var_name)
         self.name_entry.grid(row=1, column=1, columnspan=2, sticky="ew",
                              pady=(0, 8))
-
-        self.rom_label = ttk.Label(self.frame, text="")
-        self.rom_label.grid(row=2, column=0, sticky="w", padx=(0, 8))
-        self.var_rom = tk.StringVar()
-        self.var_rom.trace_add("write", lambda *_: self._on_change())
-        self.rom_entry = ttk.Entry(self.frame, textvariable=self.var_rom)
-        self.rom_entry.grid(row=2, column=1, sticky="ew")
-        self.browse = ttk.Button(self.frame, text="Browse…",
-                                 command=self._browse)
-        self.browse.grid(row=2, column=2, sticky="e", padx=(6, 0))
-
-        self.sec_note = ttk.Label(self.frame, text=_SEC_NOTE,
-                                  style="Hint.TLabel", wraplength=430,
-                                  justify="left")
-        self.sec_note.grid(row=3, column=1, columnspan=2, sticky="w",
-                           pady=(4, 0))
         self._fill_combo()
 
     def select_first_board(self) -> None:
@@ -66,7 +56,8 @@ class BoardRomForm:
             self.board_combo.current(0)
         self._on_board_changed()
 
-    def set_values(self, board_id: str, name: str, rom: str) -> None:
+    def set_values(self, board_id: str, name: str,
+                   files: Dict[FileKey, str]) -> None:
         if board_id and all(b["id"] != board_id for b in self._boards):
             self._boards.insert(0, {"id": board_id,
                                     "name": board_display_name(board_id)
@@ -76,8 +67,9 @@ class BoardRomForm:
             if b["id"] == board_id:
                 self.board_combo.current(i)
         self.var_name.set(name)
-        self.var_rom.set(rom)
-        self._sync_rom_kind()
+        for key, value in files.items():
+            self._var(key, "").set(value)
+        self._rebuild_files()
 
     def board_id(self) -> str:
         board = self._selected_board()
@@ -86,19 +78,28 @@ class BoardRomForm:
     def name(self) -> str:
         return self.var_name.get().strip()
 
-    def rom(self) -> str:
-        return self.var_rom.get().strip()
+    def file_types(self) -> List[DeviceFileType]:
+        return list(self._types)
 
-    def rom_path(self) -> Path:
-        path = Path(self.rom())
-        if not path.is_absolute() and self._base_dir is not None:
-            path = self._base_dir / path
-        return path
+    def files(self) -> Dict[FileKey, str]:
+        return {t.key: self._vars[t.key].get().strip() for t in self._types}
+
+    def problem(self) -> Optional[str]:
+        if not self.board_id():
+            return "Pick a board."
+        values = self.files()
+        for ftype in self._types:
+            reason = file_problem(ftype, values, self._base_dir)
+            if reason is not None:
+                return reason
+        return None
 
     def set_enabled(self, enabled: bool) -> None:
+        self._enabled = enabled
         state = "normal" if enabled else "disabled"
         self.board_combo.config(state="readonly" if enabled else "disabled")
-        for w in (self.name_entry, self.rom_entry, self.browse):
+        self.name_entry.config(state=state)
+        for w in self._inputs:
             w.config(state=state)
 
     def _fill_combo(self) -> None:
@@ -111,17 +112,44 @@ class BoardRomForm:
                 return b
         return None
 
-    def _is_sec(self) -> bool:
-        return board_storage_type(self.board_id()) == ROM_PLACING_IMX51_NAND
+    def _var(self, key: FileKey, default: str) -> tk.StringVar:
+        var = self._vars.get(key)
+        if var is None:
+            var = tk.StringVar(value=default)
+            var.trace_add("write", lambda *_: self._on_change())
+            self._vars[key] = var
+        return var
 
-    def _sync_rom_kind(self) -> None:
-        sec = self._is_sec()
-        self.rom_label.config(text="Factory recovery image (.sec file):"
-                              if sec else "NK/XIP/NB0/etc:")
-        if sec:
-            self.sec_note.grid()
-        else:
-            self.sec_note.grid_remove()
+    def _rebuild_files(self) -> None:
+        for w in self._file_widgets:
+            w.destroy()
+        self._file_widgets = []
+        self._inputs = []
+        self._types = device_file_types(self.board_id())
+        row = _FIRST_FILE_ROW
+        for ftype in self._types:
+            var = self._var(ftype.key, ftype.default_value())
+            label = ttk.Label(self.frame, text=ftype.name + ":")
+            label.grid(row=row, column=0, sticky="w", padx=(0, 8), pady=(0, 8))
+            entry = ttk.Entry(self.frame, textvariable=var)
+            entry.grid(row=row, column=1, sticky="ew", pady=(0, 8))
+            browse = ttk.Button(self.frame, text="Browse…",
+                                command=lambda t=ftype: self._browse(t))
+            browse.grid(row=row, column=2, sticky="e", padx=(6, 0), pady=(0, 8))
+            self._file_widgets += [label, entry, browse]
+            self._inputs += [entry, browse]
+            row += 1
+            if ftype.note:
+                note = ttk.Label(self.frame, text=ftype.note,
+                                 style="Hint.TLabel", wraplength=1,
+                                 justify="left")
+                note.grid(row=row, column=1, columnspan=2, sticky="ew",
+                          pady=(0, 8))
+                note.bind("<Configure>",
+                          lambda e, n=note: n.config(wraplength=max(1, e.width)))
+                self._file_widgets.append(note)
+                row += 1
+        self.set_enabled(self._enabled)
 
     def _on_board_changed(self, _event: object = None) -> None:
         board = self._selected_board()
@@ -132,22 +160,38 @@ class BoardRomForm:
             if not current.strip() or current == self._prefilled_name:
                 self.var_name.set(board["name"])
             self._prefilled_name = board["name"]
-        self._sync_rom_kind()
+        self._rebuild_files()
         self._on_change()
 
-    def _browse(self) -> None:
-        types = ([("Factory recovery image", "*.sec")] if self._is_sec() else
-                 [("ROM images", "*.nb0 *.bin *.nb *.img *.rom *.raw"),
-                  ("All files", "*.*")])
-        options = {"parent": self._window, "title": "Pick your ROM file",
-                   "filetypes": types}
-        if self.rom() and self.rom_path().parent.is_dir():
-            options["initialdir"] = str(self.rom_path().parent)
-        path = filedialog.askopenfilename(**options)
+    def _browse(self, ftype: DeviceFileType) -> None:
+        var = self._vars[ftype.key]
+        value = var.get().strip()
+        current = resolve_device_file(value, self._base_dir) if value else None
+        types = []
+        if ftype.formats:
+            types.append((ftype.name,
+                          " ".join("*." + f for f in ftype.formats)))
+        types.append(("All files", "*.*"))
+        options = {"parent": self._window, "filetypes": types}
+        if current is not None and current.parent.is_dir():
+            options["initialdir"] = str(current.parent)
+        elif self._base_dir is not None and self._base_dir.is_dir():
+            options["initialdir"] = str(self._base_dir)
+        if ftype.is_storage:
+            options["title"] = "Pick or name the {} image".format(ftype.name)
+            options["initialfile"] = (current.name if current is not None
+                                      else ftype.default_value())
+            options["confirmoverwrite"] = False
+            if ftype.formats:
+                options["defaultextension"] = "." + ftype.formats[0]
+            path = filedialog.asksaveasfilename(**options)
+        else:
+            options["title"] = "Pick the {}".format(ftype.name)
+            path = filedialog.askopenfilename(**options)
         if not path:
             return
         picked = Path(path)
         if self._base_dir is not None and picked.parent == self._base_dir:
-            self.var_rom.set(picked.name)
+            var.set(picked.name)
         else:
-            self.var_rom.set(str(picked))
+            var.set(str(picked))

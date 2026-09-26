@@ -7,6 +7,7 @@
 #include "../../core/cerf_emulator.h"
 #include "../../core/cerf_paths.h"
 #include "../../core/device_config.h"
+#include "../../core/host_file_bytes.h"
 #include "../../core/log.h"
 #include "../../host/host_widget_registry.h"
 
@@ -16,13 +17,12 @@
 REGISTER_SERVICE(Imx51NandStore);
 
 std::string Imx51NandStore::ImagePath() const {
-    return GetDeviceDir(emu_.Get<DeviceConfig>().device_name) + "nand.img";
+    const DeviceConfig& cfg = emu_.Get<DeviceConfig>();
+    return ResolveDeviceFile(cfg.device_name, cfg.storage_nand);
 }
 
-static bool FileNonEmpty(const std::string& path) {
-    WIN32_FILE_ATTRIBUTE_DATA fad{};
-    return GetFileAttributesExA(path.c_str(), GetFileExInfoStandard, &fad) &&
-           (((uint64_t(fad.nFileSizeHigh) << 32) | fad.nFileSizeLow) > 0);
+std::wstring Imx51NandStore::Tooltip() const {
+    return L"NAND Flash storage (" + Utf8ToWide(ImagePath().c_str()) + L")";
 }
 
 bool Imx51NandStore::ShouldRegister() {
@@ -30,14 +30,14 @@ bool Imx51NandStore::ShouldRegister() {
     if (!bd || bd->GetSocId() != SocId::Imx51) return false;
     auto* sf = emu_.TryGet<SecFlash>();
     if (sf && sf->IsPresent()) return true;   /* can seed/flash from the `.sec` */
-    return FileNonEmpty(ImagePath());         /* else: an already-flashed nand.img */
+    return HostFileNonEmpty(ImagePath());
 }
 
 void Imx51NandStore::OnReady() {
     device_pages_ = kDeviceBytes / kMainBytes;
 
     const std::string path = ImagePath();
-    const bool existed = FileNonEmpty(path);
+    const bool existed = HostFileNonEmpty(path);
 
     if (!img_.Open(path, device_pages_ * kPageStride)) {
         LOG(Caution, "Imx51NandStore: cannot open '%s'\n", path.c_str());

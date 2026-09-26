@@ -8,9 +8,6 @@ from app_paths import exe_dir
 
 DB_FILENAME = "db.json"
 
-ROM_PLACING_FLAT_CONTAINER = "flat_container"
-ROM_PLACING_IMX51_NAND = "imx51_nand"
-
 
 def _db_path() -> Optional[Path]:
     candidates = [exe_dir() / DB_FILENAME,
@@ -28,12 +25,17 @@ class BoardDatabaseError(RuntimeError):
 def _load() -> dict:
     path = _db_path()
     if path is None:
-        raise BoardDatabaseError(
-            "{} is missing: the installation is damaged".format(DB_FILENAME))
+        return {}
     try:
         with path.open("r", encoding="utf-8-sig") as f:
-            obj = json.load(f)
-    except (OSError, json.JSONDecodeError) as exc:
+            text = f.read()
+    except OSError as exc:
+        raise BoardDatabaseError("{} is unreadable: {}".format(path, exc))
+    if not text.strip():
+        return {}
+    try:
+        obj = json.loads(text)
+    except json.JSONDecodeError as exc:
         raise BoardDatabaseError("{} is unreadable: {}".format(path, exc))
     if not isinstance(obj, dict):
         raise BoardDatabaseError(
@@ -60,6 +62,8 @@ SOCS = _by_id("socs")
 DEVICE_FEATURES = _rows("device_features")
 DEVICES = _rows("devices")
 DEVICES_BY_ID = _by_id("devices")
+ROM_TYPES = _rows("rom_types")
+STORAGE_TYPES = _rows("storage_types")
 
 FEATURE_SPECS = [(f["id"], f.get("icon", f["id"]), f.get("name", f["id"]))
                  for f in DEVICE_FEATURES]

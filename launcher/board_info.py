@@ -2,8 +2,7 @@ from __future__ import annotations
 
 from typing import List, Optional
 
-from board_database import (ROM_PLACING_FLAT_CONTAINER, DEVICES, device,
-                            soc_family_of, soc_of, sort_text)
+from board_database import DEVICES, device, soc_family_of, soc_of, sort_text
 
 
 def board_sort_key(board_name: object) -> tuple[int, str]:
@@ -40,14 +39,6 @@ def board_soc_cpu(board_id: str) -> Optional[str]:
         return None
     arch = family.get("arch")
     return arch if isinstance(arch, str) else None
-
-
-def board_storage_type(board_id: str) -> str:
-    entry = device(board_id)
-    if entry is None:
-        return ROM_PLACING_FLAT_CONTAINER
-    mode = entry.get("rom_placing_mode")
-    return mode if isinstance(mode, str) and mode else ROM_PLACING_FLAT_CONTAINER
 
 
 def board_display_name(board_id: str) -> str:

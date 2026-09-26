@@ -20,8 +20,8 @@ REGISTER_SERVICE(ConfigLoader);
 
 namespace {
 
-void SetMetaString(std::string& field, const json& obj, const char* key,
-                   const std::string& path, const std::string& ctx) {
+void SetNonEmptyString(std::string& field, const json& obj, const char* key,
+                       const std::string& path, const std::string& ctx) {
     std::string v = CfgReadOptString(obj, key, path, ctx);
     if (!v.empty()) field = std::move(v);
 }
@@ -38,15 +38,15 @@ void LoadMeta(const json& root, DeviceMeta& meta, const std::string& path) {
     if (!m.is_object())
         CfgFatal(path, "'meta' must be an object");
 
-    SetMetaString(meta.name,        m, "name",        path, "meta");
-    SetMetaString(meta.device_name, m, "device_name", path, "meta");
+    SetNonEmptyString(meta.name,        m, "name",        path, "meta");
+    SetNonEmptyString(meta.device_name, m, "device_name", path, "meta");
     SetMetaInt   (meta.device_year, m, "device_year", path, "meta");
 
     if (m.contains("os")) {
         const auto& o = m["os"];
         if (!o.is_object())
             CfgFatal(path, "'meta.os' must be an object");
-        SetMetaString(meta.os_name,      o, "name",      path, "meta.os");
+        SetNonEmptyString(meta.os_name,  o, "name",      path, "meta.os");
         SetMetaInt   (meta.os_ver_major, o, "ver_major", path, "meta.os");
         SetMetaInt   (meta.os_ver_minor, o, "ver_minor", path, "meta.os");
     }
@@ -188,6 +188,17 @@ void LoadRom(const json& root, DeviceConfig& config, const std::string& path) {
             CfgFatal(path, "rom.extensions must be a string or array of strings");
         }
     }
+}
+
+void LoadStorage(const json& root, DeviceConfig& config, const std::string& path) {
+    if (!root.contains("storage")) return;
+    const auto& s = root["storage"];
+    if (!s.is_object())
+        CfgFatal(path, "'storage' must be an object");
+
+    SetNonEmptyString(config.storage_nand, s, "nand", path, "storage");
+    SetNonEmptyString(config.storage_hdd,  s, "hdd",  path, "storage");
+    SetNonEmptyString(config.storage_emmc, s, "emmc", path, "storage");
 }
 
 void LoadUsbMedia(const json& packages, const char* key, bool sd,
@@ -363,6 +374,7 @@ void ConfigLoader::LoadInto(DeviceConfig& config) {
         LoadBoard   (dev, config,      dev_path);
         LoadNetwork (dev, config,      dev_path);
         LoadRom     (dev, config,      dev_path);
+        LoadStorage (dev, config,      dev_path);
         LoadFeatures(dev, config,      dev_path);
         LoadAdditionalPackages(dev, config, dev_path);
     }
@@ -375,6 +387,7 @@ void ConfigLoader::LoadInto(DeviceConfig& config) {
         LoadBoard   (user, config,      user_path);
         LoadNetwork (user, config,      user_path);
         LoadRom     (user, config,      user_path);
+        LoadStorage (user, config,      user_path);
         LoadFeatures(user, config,      user_path);
         LoadAdditionalPackages(user, config, user_path);
     }

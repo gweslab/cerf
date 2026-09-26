@@ -6,9 +6,10 @@ from __future__ import annotations
 import tkinter as tk
 from pathlib import Path
 from tkinter import ttk
-from typing import Callable, List, Optional
+from typing import Callable, Dict, List, Optional
 
 from board_rom_form import BoardRomForm
+from cerf_user_json import resolve_device_file
 from rounded_style import rounded_frame, rounded_style
 from screen_geometry import fit_geometry
 from ui_dialogs import show_error
@@ -144,7 +145,7 @@ class NewDeviceWizard:
         self.form.select_first_board()
 
     def _sync_create_state(self) -> None:
-        ok =bool(self.form.name()) and self.form.rom_path().is_file()
+        ok = bool(self.form.name()) and self.form.problem() is None
         self.btn_create.config(state="normal" if ok else "disabled")
 
     def _show_step1(self) -> None:
@@ -165,16 +166,24 @@ class NewDeviceWizard:
         if not board_id:
             return
         name = self.form.name()
-        rom = self.form.rom_path()
         reason = validate_device_name(self._devices_dir, name)
+        if reason is None:
+            reason = self.form.problem()
         if reason is not None:
             show_error(self._dlg, "Cannot create device", reason)
             return
-        if not rom.is_file():
-            show_error(self._dlg, "Cannot create device",
-                       f"ROM file not found:\n{rom}")
-            return
+        rom_files: Dict[str, Path] = {}
+        storage: Dict[str, str] = {}
+        values = self.form.files()
+        for ftype in self.form.file_types():
+            value = values[ftype.key]
+            if ftype.is_storage:
+                if value and value != ftype.default_value():
+                    storage[ftype.id] = value
+            elif value:
+                rom_files[ftype.id] = resolve_device_file(value, None)
         spec = UserDeviceSpec(name=name, board_id=board_id,
-                              rom_path=rom, copy_rom=self.var_copy.get())
+                              rom_files=rom_files, storage=storage,
+                              copy_rom=self.var_copy.get())
         self._dlg.destroy()
         self._on_create(spec)

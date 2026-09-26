@@ -160,9 +160,9 @@ reads the repository list from the global `cerf.json`. The default repository is
 `https://cerf-bundles.dz3n.net/cerf-bundles`. Each repository serves
 `manifest.json` (version 2 only) and `analytics.json`.
 
-`operations.py` (`BundleManager`) installs into a temporary directory, then
-replaces the device directory with it. An update **keeps** `cerf-user.json` and
-every installed add-on package. It then writes `cerf.json` from the manifest.
+A bundle update replaces the device directory with the new bundle. The update
+**keeps** `cerf-user.json`, every installed add-on package and every storage file
+inside the device directory.
 `devices/manifest.json` records what is installed, keyed by directory name. A
 bundle is out of date when its recorded archive SHA-256 differs from the remote
 one.

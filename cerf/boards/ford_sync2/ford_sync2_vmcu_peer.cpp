@@ -10,8 +10,10 @@
 #include "../../core/byte_order.h"
 #include "../../core/cerf_emulator.h"
 #include "../../core/log.h"
+#include "../../core/string_utils.h"
 #include "../../boards/board_context.h"
 #include "ford_sync_2_id.h"
+#include "../../socs/imx51/imx51_nand_store.h"
 #include "../../socs/imx51/imx51_uart2.h"
 #include "../../state/state_stream.h"
 
@@ -175,24 +177,24 @@ void FordSync2VmcuPeer::HandlePmInbound(const uint8_t* pm, std::size_t n) {
             /* PetActivityTimer keep-alive (IPC_PetActivityTimer sub_C028A69C) -
                fire-and-forget; CERF's always-on VMCU has no inactivity timer. */
             break;
-        case 0x02u:
+        case 0x02u: {
             /* IPC_SendRebootRequest (pm.dll sub_C028A22C, AUTOPM sub_C028765C cmd 5). */
-            LOG(Caution,
-                "Sync 2 has requested reboot over VMCU (pm type=0x%02X len=%zu). "
-                "This is a known PANIC reboot, read NKDBG above or debug. Normal case is a corrupted nand.img. "
-                "CERF does not restart the guest, so it stays alive for debugging.\n",
-                static_cast<unsigned>(pm[0]), n);
+            const std::string nand = emu_.Get<Imx51NandStore>().ImagePath();
+            LOG(Caution, "[VMCU] reboot request (pm type=0x%02X len=%zu), storage.nand %s\n",
+                static_cast<unsigned>(pm[0]), n, nand.c_str());
 #if !CERF_DEV_MODE
-            MessageBoxA(nullptr,
-                        "Sync 2 has panicked and requested a reboot over VMCU.\n\n"
-                        "One possibility is a dirty/corrupted nand.img: delete it "
-                        "from the device directory and try flashing again.\n\n"
-                        "CERF does not restart the guest, so it "
-                        "stays alive for debugging.",
-                        "Sync 2 panic reboot - CE Runtime Foundation",
+            const std::wstring text =
+                L"Sync 2 has panicked and requested a reboot over VMCU.\n\n"
+                L"One possibility is a dirty/corrupted NAND image: delete " +
+                Utf8ToWide(nand.c_str()) +
+                L" and try flashing again.\n\n"
+                L"CERF does not restart the guest, so it stays alive for debugging.";
+            MessageBoxW(nullptr, text.c_str(),
+                        L"Sync 2 panic reboot - CE Runtime Foundation",
                         MB_OK | MB_ICONWARNING | MB_TASKMODAL | MB_TOPMOST);
 #endif
             break;
+        }
         default:
             LOG(Caution, "[VMCU] unmodelled inbound pm message type=0x%02X len=%zu\n",
                 static_cast<unsigned>(pm[0]), n);

@@ -38,8 +38,8 @@ bool Imx51NandImgfsView::ShouldRegister() {
 
 void Imx51NandImgfsView::OnReady() {
     if (!LocateVolume()) {
-        LOG(GuestAdditions, "[NandImgfs] IMGFS volume not found in NAND - boot "
-            "once to provision nand.img, then restart with --guest-additions\n");
+        LOG(GuestAdditions, "[NandImgfs] IMGFS volume not found in storage.nand %s\n",
+            emu_.Get<Imx51NandStore>().ImagePath().c_str());
         return;
     }
     ReconstructAndWalk();

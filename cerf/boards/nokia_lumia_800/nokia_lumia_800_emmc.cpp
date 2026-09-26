@@ -2,17 +2,20 @@
 
 #include "../../boot/rom_parser_service.h"
 #include "../../boot/rom_wmstore_parse.h"
+#include "../../core/byte_order.h"
 #include "../../core/cerf_emulator.h"
 #include "../../core/cerf_paths.h"
 #include "../../core/device_config.h"
 #include "../../core/fatal.h"
 #include "../../core/host_file_bytes.h"
 #include "../../core/log.h"
+#include "../../storage/disk_image.h"
 #include "../board_context.h"
 #include "nokia_lumia_800_id.h"
 
 #include <algorithm>
 #include <cstring>
+#include <vector>
 
 namespace {
 
@@ -20,9 +23,9 @@ namespace ri = cerf::rom_image_parse;
 
 constexpr uint32_t kEmmcSlotIndex = 0u;
 
-constexpr uint8_t  kUnshippedSectorFill   = 0x00u;
 constexpr uint64_t kFlasherEraseUnit      = 0x800000u;
 constexpr uint8_t  kFlasherWriteEraseFill = 0xFFu;
+constexpr uint32_t kSeedChunkSectors      = 2048u;
 
 constexpr uint32_t kMbrEntryTypeOff    = 450u;
 constexpr uint32_t kMbrEntryLbaOff     = 454u;
@@ -34,9 +37,12 @@ constexpr uint8_t  kPartitionStore     = 0x48u;
 constexpr uint32_t kEbrStoreRelativeLba = 1u;
 constexpr uint32_t kMinStoreContainerOrigin = 2u;
 
-void PutLe32(uint8_t* at, uint32_t value) {
-    for (uint32_t i = 0; i < 4u; ++i) at[i] = static_cast<uint8_t>(value >> (8u * i));
-}
+constexpr uint32_t kHoleMarkerSector = 1u;
+constexpr char     kHoleMarkerMagic[] = "CERF-UNMODELED:";
+constexpr uint32_t kHoleMarkerMagicBytes = sizeof(kHoleMarkerMagic);
+constexpr uint32_t kHoleMarkerEndOff = kHoleMarkerMagicBytes;
+constexpr uint32_t kHoleMarkerBytes  = kHoleMarkerEndOff + 4u;
+static_assert(kHoleMarkerMagicBytes == 16u);
 
 class NokiaLumia800Emmc : public SkHynixH26m52002ckr {
 public:
@@ -50,31 +56,23 @@ public:
     uint32_t SlotIndex() const override { return kEmmcSlotIndex; }
 
     void OnReady() override {
-        LoadImageOrigin();
         SkHynixH26m52002ckr::OnReady();
-        LoadUserAreaErase();
+        OpenStore();
     }
 
 protected:
     void ReadBlock(uint32_t sector, uint8_t* out) override {
-        if (sector < image_origin_) {
-            ReadStoreContainerSector(sector, out);
-            return;
-        }
-        const ParsedRom& rom = emu_.Get<RomParserService>().Primary();
-        const uint64_t rel = uint64_t(sector - image_origin_) * cerf_mmc::kBlockBytes;
-        if (rel + cerf_mmc::kBlockBytes <= rom.wmstore_payload_bytes) {
-            std::memcpy(out, rom.raw.data() + rom.wmstore_payload_off + size_t(rel),
-                        cerf_mmc::kBlockBytes);
-            return;
-        }
-        if (rel < rom.wmstore_payload_bytes) {
+        if (sector >= kHoleMarkerSector && sector < hole_end_) {
             emu_.Get<Fatal>().Die(
-                "eMMC card in slot %u: sector %u straddles the end of the %zu "
-                "payload bytes of %s", kEmmcSlotIndex, sector,
-                rom.wmstore_payload_bytes, rom.filename.c_str());
+                "eMMC card in slot %u: sector %u lies in [%u, %u), which the seed of "
+                "storage.emmc %s did not model", kEmmcSlotIndex, sector,
+                kHoleMarkerSector, hole_end_, store_path_.c_str());
         }
-        std::memset(out, UnshippedByte(sector), cerf_mmc::kBlockBytes);
+        if (!store_.ReadSectors(sector, 1u, out)) {
+            emu_.Get<Fatal>().Die(
+                "eMMC card in slot %u: sector %u cannot be read from %s",
+                kEmmcSlotIndex, sector, store_path_.c_str());
+        }
     }
 
 private:
@@ -127,6 +125,92 @@ private:
         image_end_     = static_cast<uint32_t>(origin + payload_sectors);
         LOG(Boot, "eMMC card in slot %u: %s is written at part sector %u\n",
             kEmmcSlotIndex, rom.filename.c_str(), image_origin_);
+    }
+
+    void OpenStore() {
+        const DeviceConfig& cfg = emu_.Get<DeviceConfig>();
+        store_path_ = ResolveDeviceFile(cfg.device_name, cfg.storage_emmc);
+        if (HostFileNonEmpty(store_path_)) {
+            LOG(Boot, "eMMC card in slot %u: using storage.emmc %s\n",
+                kEmmcSlotIndex, store_path_.c_str());
+        } else {
+            SeedStore();
+        }
+        OpenCardImage(store_, store_path_);
+        LoadHoleMarker();
+    }
+
+    void LoadHoleMarker() {
+        uint8_t sector[cerf_mmc::kBlockBytes];
+        if (!store_.ReadSectors(kHoleMarkerSector, 1u, sector)) {
+            emu_.Get<Fatal>().Die(
+                "eMMC card in slot %u: sector %u cannot be read from storage.emmc %s",
+                kEmmcSlotIndex, kHoleMarkerSector, store_path_.c_str());
+        }
+        if (std::memcmp(sector, kHoleMarkerMagic, kHoleMarkerMagicBytes) != 0) return;
+        const uint32_t end = cerf::le::U32(sector, kHoleMarkerEndOff);
+        const bool tail_clear = std::all_of(sector + kHoleMarkerBytes, std::end(sector),
+                                            [](uint8_t b) { return b == 0u; });
+        if (end <= kHoleMarkerSector || end > SectorCount() || !tail_clear) {
+            emu_.Get<Fatal>().Die(
+                "eMMC card in slot %u: sector %u of storage.emmc %s starts with the "
+                "seed marker, and the rest of it is not a marker for the %u sectors "
+                "of the card", kEmmcSlotIndex, kHoleMarkerSector, store_path_.c_str(),
+                SectorCount());
+        }
+        hole_end_ = end;
+        LOG(Boot, "eMMC card in slot %u: storage.emmc %s marks sectors [%u, %u) as "
+                  "not modeled by its seed\n", kEmmcSlotIndex, store_path_.c_str(),
+            kHoleMarkerSector, hole_end_);
+    }
+
+    void OpenCardImage(DiskImage& image, const std::string& path) {
+        if (!image.Open(path, uint64_t(SectorCount()) * cerf_mmc::kBlockBytes)) {
+            emu_.Get<Fatal>().Die(
+                "eMMC card in slot %u: storage.emmc %s cannot be opened",
+                kEmmcSlotIndex, path.c_str());
+        }
+        if (image.SectorCount() != SectorCount()) {
+            emu_.Get<Fatal>().Die(
+                "eMMC card in slot %u: storage.emmc %s holds %llu sectors, and the "
+                "card has %u", kEmmcSlotIndex, path.c_str(),
+                static_cast<unsigned long long>(image.SectorCount()), SectorCount());
+        }
+    }
+
+    void SeedStore() {
+        const std::string seeding = store_path_ + ".seeding";
+        LOG(Boot, "eMMC card in slot %u: seeding storage.emmc %s\n",
+            kEmmcSlotIndex, store_path_.c_str());
+        LoadImageOrigin();
+        LoadUserAreaErase();
+        const std::wstring seeding_w = Utf8ToWide(seeding.c_str());
+        if (!DeleteFileW(seeding_w.c_str())) {
+            const DWORD err = GetLastError();
+            if (err != ERROR_FILE_NOT_FOUND && err != ERROR_PATH_NOT_FOUND) {
+                emu_.Get<Fatal>().Die(
+                    "eMMC card in slot %u: %s is left from an earlier seed and "
+                    "cannot be deleted (error %lu)", kEmmcSlotIndex, seeding.c_str(),
+                    static_cast<unsigned long>(err));
+            }
+        }
+        {
+            DiskImage image;
+            OpenCardImage(image, seeding);
+            SeedStoreContainer(image);
+            SeedHoleMarker(image);
+            SeedPayload(image);
+            SeedErase(image);
+        }
+        if (!MoveFileExW(seeding_w.c_str(), Utf8ToWide(store_path_.c_str()).c_str(),
+                         MOVEFILE_REPLACE_EXISTING)) {
+            emu_.Get<Fatal>().Die(
+                "eMMC card in slot %u: the seeded card image %s cannot be moved to "
+                "storage.emmc %s", kEmmcSlotIndex, seeding.c_str(),
+                store_path_.c_str());
+        }
+        LOG(Boot, "eMMC card in slot %u: storage.emmc %s seeded\n",
+            kEmmcSlotIndex, store_path_.c_str());
     }
 
     void LoadUserAreaErase() {
@@ -197,30 +281,79 @@ private:
             erase_end_, hw_erase_start_, hw_erase_end_);
     }
 
-    uint8_t UnshippedByte(uint32_t sector) const {
-        if (sector < erase_start_ || sector >= erase_end_) return kUnshippedSectorFill;
-        if (sector >= hw_erase_start_ && sector < hw_erase_end_) return ErasedByte();
-        return kFlasherWriteEraseFill;
+    void SeedStoreContainer(DiskImage& image) {
+        uint8_t mbr[cerf_mmc::kBlockBytes] = {};
+        mbr[kMbrEntryTypeOff] = kPartitionExtended;
+        cerf::le::Put32(mbr + kMbrEntryLbaOff, image_origin_ - 1u);
+        mbr[kMbrSignatureOff]      = kMbrSignature0;
+        mbr[kMbrSignatureOff + 1u] = kMbrSignature1;
+        WriteSeed(image, 0u, 1u, mbr);
+
+        uint8_t ebr[cerf_mmc::kBlockBytes] = {};
+        ebr[kMbrEntryTypeOff] = kPartitionStore;
+        cerf::le::Put32(ebr + kMbrEntryLbaOff, kEbrStoreRelativeLba);
+        ebr[kMbrSignatureOff]      = kMbrSignature0;
+        ebr[kMbrSignatureOff + 1u] = kMbrSignature1;
+        WriteSeed(image, image_origin_ - 1u, 1u, ebr);
     }
 
-    void ReadStoreContainerSector(uint32_t sector, uint8_t* out) {
-        std::memset(out, 0, cerf_mmc::kBlockBytes);
-        if (sector == 0u) {
-            out[kMbrEntryTypeOff] = kPartitionExtended;
-            PutLe32(out + kMbrEntryLbaOff, image_origin_ - 1u);
-        } else if (sector == image_origin_ - 1u) {
-            out[kMbrEntryTypeOff] = kPartitionStore;
-            PutLe32(out + kMbrEntryLbaOff, kEbrStoreRelativeLba);
-        } else {
+    void SeedHoleMarker(DiskImage& image) {
+        const uint32_t end = image_origin_ - 1u;
+        if (end <= kHoleMarkerSector) return;
+        uint8_t marker[cerf_mmc::kBlockBytes] = {};
+        std::memcpy(marker, kHoleMarkerMagic, kHoleMarkerMagicBytes);
+        cerf::le::Put32(marker + kHoleMarkerEndOff, end);
+        WriteSeed(image, kHoleMarkerSector, 1u, marker);
+    }
+
+    void SeedPayload(DiskImage& image) {
+        const ParsedRom& rom = PackagePrimary();
+        if (rom.wmstore_payload_bytes % cerf_mmc::kBlockBytes != 0u) {
             emu_.Get<Fatal>().Die(
-                "eMMC card in slot %u: sector %u lies ahead of the store at "
-                "sector %u, and only its partition table is modeled",
-                kEmmcSlotIndex, sector, image_origin_);
+                "eMMC card in slot %u: the %zu payload bytes of %s end inside a "
+                "sector, and the rest of that sector is not modeled",
+                kEmmcSlotIndex, rom.wmstore_payload_bytes, rom.filename.c_str());
         }
-        out[kMbrSignatureOff]      = kMbrSignature0;
-        out[kMbrSignatureOff + 1u] = kMbrSignature1;
+        const uint8_t* payload = rom.raw.data() + rom.wmstore_payload_off;
+        const uint32_t sectors =
+            static_cast<uint32_t>(rom.wmstore_payload_bytes / cerf_mmc::kBlockBytes);
+        for (uint32_t done = 0; done < sectors;) {
+            const uint32_t n = (std::min)(kSeedChunkSectors, sectors - done);
+            WriteSeed(image, image_origin_ + done, n,
+                      payload + size_t(done) * cerf_mmc::kBlockBytes);
+            done += n;
+        }
     }
 
+    void SeedErase(DiskImage& image) {
+        FillSeed(image, erase_start_, hw_erase_start_, kFlasherWriteEraseFill);
+        FillSeed(image, hw_erase_start_, hw_erase_end_, ErasedByte());
+        FillSeed(image, hw_erase_end_, erase_end_, kFlasherWriteEraseFill);
+    }
+
+    void FillSeed(DiskImage& image, uint32_t first, uint32_t end, uint8_t fill) {
+        if (first >= end || fill == 0u) return;
+        const std::vector<uint8_t> chunk(size_t(kSeedChunkSectors) * cerf_mmc::kBlockBytes,
+                                         fill);
+        for (uint32_t at = first; at < end;) {
+            const uint32_t n = (std::min)(kSeedChunkSectors, end - at);
+            WriteSeed(image, at, n, chunk.data());
+            at += n;
+        }
+    }
+
+    void WriteSeed(DiskImage& image, uint32_t sector, uint32_t count,
+                   const void* src) {
+        if (!image.WriteSectors(sector, count, src)) {
+            emu_.Get<Fatal>().Die(
+                "eMMC card in slot %u: the card image for storage.emmc %s cannot be "
+                "written at sector %u", kEmmcSlotIndex, store_path_.c_str(), sector);
+        }
+    }
+
+    DiskImage   store_;
+    std::string store_path_;
+    uint32_t hole_end_       = 0u;
     uint32_t image_target_   = 0u;
     uint32_t image_drive_    = 0u;
     uint32_t image_origin_   = 0u;

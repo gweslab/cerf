@@ -6,7 +6,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional
+from typing import Dict, Optional, Tuple
 
 from device_state import (DeviceMeta, _load_json_object,
                           parse_cerf_json_object, write_cerf_json)
@@ -99,19 +99,35 @@ def write_user_meta_name(device_dir: Path, name: str) -> None:
     update_user_json(device_dir, mutate)
 
 
-def _read_layered_string(device_dir: Path, block: str, key: str,
-                         layers: tuple) -> str:
-    value = ""
+ROM_BLOCK = "rom"
+STORAGE_BLOCK = "storage"
+STORAGE_DEFAULT_EXTENSION = ".img"
+
+
+def storage_default_file(storage_id: str) -> str:
+    return storage_id + STORAGE_DEFAULT_EXTENSION
+
+
+def resolve_device_file(value: str, base_dir: Optional[Path]) -> Path:
+    path = Path(value)
+    if not path.is_absolute() and base_dir is not None:
+        path = base_dir / path
+    return path
+
+
+def _read_layered_block(device_dir: Path, block: str,
+                        layers: tuple) -> Dict[str, str]:
+    values: Dict[str, str] = {}
     for name in layers:
         obj = _load_json_object(device_dir / name)
         if obj is None:
             continue
         sub = obj.get(block)
         if isinstance(sub, dict):
-            v = sub.get(key)
-            if isinstance(v, str) and v:
-                value = v
-    return value
+            for key, v in sub.items():
+                if isinstance(v, str) and v:
+                    values[key] = v
+    return values
 
 
 _BOTH_LAYERS = ("cerf.json", CERF_USER_JSON_FILENAME)
@@ -120,19 +136,27 @@ _BOTH_LAYERS = ("cerf.json", CERF_USER_JSON_FILENAME)
 def read_rom_primary(device_dir: Path) -> str:
     """rom.primary with the cerf-user.json override applied; "" when neither
     file names one."""
-    return _read_layered_string(device_dir, "rom", "primary", _BOTH_LAYERS)
+    return _read_layered_block(device_dir, ROM_BLOCK, _BOTH_LAYERS).get(
+        "primary", "")
 
 
 def read_board_id(device_dir: Path) -> str:
-    return _read_layered_string(device_dir, "board", "id", _BOTH_LAYERS)
+    return _read_layered_block(device_dir, "board", _BOTH_LAYERS).get("id", "")
 
 
-def write_board_rom_overrides(device_dir: Path, board_id: str,
-                              rom_primary: str) -> None:
-    base_board = _read_layered_string(device_dir, "board", "id",
-                                      ("cerf.json",))
-    base_rom = _read_layered_string(device_dir, "rom", "primary",
-                                    ("cerf.json",))
+def read_device_files(device_dir: Path) -> Tuple[Dict[str, str],
+                                                 Dict[str, str]]:
+    return (_read_layered_block(device_dir, ROM_BLOCK, _BOTH_LAYERS),
+            _read_layered_block(device_dir, STORAGE_BLOCK, _BOTH_LAYERS))
+
+
+def write_board_file_overrides(device_dir: Path, board_id: str,
+                               rom: Dict[str, str],
+                               storage: Dict[str, str]) -> None:
+    only_base = ("cerf.json",)
+    base_board = _read_layered_block(device_dir, "board", only_base).get("id", "")
+    base_rom = _read_layered_block(device_dir, ROM_BLOCK, only_base)
+    base_storage = _read_layered_block(device_dir, STORAGE_BLOCK, only_base)
 
     def put(obj: dict, block: str, key: str, value: str, base: str) -> None:
         sub = obj.get(block) if isinstance(obj.get(block), dict) else {}
@@ -147,7 +171,11 @@ def write_board_rom_overrides(device_dir: Path, board_id: str,
 
     def mutate(obj: dict) -> None:
         put(obj, "board", "id", board_id, base_board)
-        put(obj, "rom", "primary", rom_primary, base_rom)
+        for key, value in rom.items():
+            put(obj, ROM_BLOCK, key, value, base_rom.get(key, ""))
+        for key, value in storage.items():
+            put(obj, STORAGE_BLOCK, key, value,
+                base_storage.get(key, storage_default_file(key)))
     update_user_json(device_dir, mutate)
 
 

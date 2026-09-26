@@ -9,10 +9,6 @@
 #include <string>
 #include <unordered_map>
 
-/* The Ford SYNC2 writable NAND, persisted as `nand.img` (composes `DiskImage`).
-   Backing bytes are the bitwise complement of the NAND contents, so a never-written
-   sparse hole (DiskImage reads 0x00) presents as the 0xFF erased state the FAL/IPL
-   block scans expect. */
 class Imx51NandStore : public Service, public HostWidget {
 public:
     using Service::Service;
@@ -39,6 +35,8 @@ public:
     /* Total device page count (4 KB main pages), valid after OnReady. */
     uint64_t DevicePages() const { return device_pages_; }
 
+    std::string ImagePath() const;
+
     /* Register an in-memory page ReadPage returns for `page_index` (raw
        main+spare), used by guest-additions IMGFS injection. */
     void SetReadOverlayPage(uint64_t page_index, const uint8_t* main,
@@ -46,7 +44,7 @@ public:
 
     std::wstring WidgetName() const override { return L"NAND Flash"; }
     WidgetGroup  Group() const override { return WidgetGroup::Storage; }
-    std::wstring Tooltip() const override { return L"NAND Flash storage (nand.img)"; }
+    std::wstring Tooltip() const override;
     void         DrawIcon(HDC dc, const RECT& box) const override;
 
 private:
@@ -58,7 +56,6 @@ private:
     static constexpr uint32_t kPagesPerBlock = kBlock / kMainBytes;          /* 128 */
 
     void Seed();
-    std::string ImagePath() const;
     static uint32_t MainPopcount(const uint8_t* main);
 
     DiskImage img_;

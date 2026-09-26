@@ -7,6 +7,7 @@ from typing import Callable, List, Tuple
 
 from board_info import board_display_name
 from color_schemes import CS_KEY_TO_LABEL, color_scheme_supported_for_os
+from device_file_types import device_file_types
 from properties_model import PropertiesModel
 from properties_page_board import PAGE_BOARD
 from properties_page_display import PAGE_DISPLAY
@@ -69,10 +70,14 @@ class ConfigPreviewPanel:
         board_id = values.get("board_id", "")
         auto_size = subject.auto_size(board_id)
 
-        rom = values.get("rom_primary", "")
-        self._fill(self.board, [
-            ("Board", board_display_name(board_id) or board_id or "-"),
-            ("ROM", PureWindowsPath(rom).name if rom else "-")])
+        board_rows: Rows = [
+            ("Board", board_display_name(board_id) or board_id or "-")]
+        for ftype in device_file_types(board_id):
+            value = (values.get(ftype.section, {}).get(ftype.id, "")
+                     or ftype.default_value())
+            board_rows.append((ftype.name,
+                               PureWindowsPath(value).name if value else "-"))
+        self._fill(self.board, board_rows)
 
         if subject.guest_additions_available(board_id):
             self._fill(self.ga, self._ga_rows(subject, values, auto_size))

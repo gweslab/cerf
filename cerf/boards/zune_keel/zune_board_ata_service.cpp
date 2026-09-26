@@ -5,6 +5,7 @@
 #include "../../core/byte_order.h"
 #include "../../core/cerf_emulator.h"
 #include "../../core/device_config.h"
+#include "../../core/host_file_bytes.h"
 #include "../../core/log.h"
 #include "../../core/cerf_paths.h"
 #include "../../core/string_utils.h"
@@ -57,18 +58,14 @@ public:
     }
 
     std::string GetImagePath() override {
-        return GetDeviceDir(emu_.Get<DeviceConfig>().device_name) + "hdd.img";
+        const DeviceConfig& cfg = emu_.Get<DeviceConfig>();
+        return ResolveDeviceFile(cfg.device_name, cfg.storage_hdd);
     }
     uint64_t GetCapacityBytes() const override { return kCapacityBytes; }
 
     void EnsureExists() override {
         const std::string path = GetImagePath();
-        WIN32_FILE_ATTRIBUTE_DATA fad{};
-        if (GetFileAttributesExA(path.c_str(), GetFileExInfoStandard, &fad)) {
-            const uint64_t sz =
-                (uint64_t(fad.nFileSizeHigh) << 32) | fad.nFileSizeLow;
-            if (sz > 0) return;  /* user's disk - never touch */
-        }
+        if (HostFileNonEmpty(path)) return;
         LOG(Boot, "[ZUNE-HDD] no disk image; synthesizing blank Zune 30 HDD "
                   "(MBR + 2 empty FAT32 partitions) at '%s'\n", path.c_str());
         DiskImage img;

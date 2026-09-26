@@ -227,11 +227,6 @@
   ],
   "device_features": [
     {
-      "id": "display",
-      "name": "Display",
-      "icon": "display"
-    },
-    {
       "id": "touch",
       "name": "Touch",
       "icon": "stylus"
@@ -303,10 +298,6 @@
       ],
       "device_features": [
         {
-          "feature_id": "display",
-          "supported": true
-        },
-        {
           "feature_id": "sound",
           "supported": true
         },
@@ -362,10 +353,6 @@
       ],
       "device_features": [
         {
-          "feature_id": "display",
-          "supported": true
-        },
-        {
           "feature_id": "sound",
           "supported": true
         },
@@ -420,10 +407,6 @@
         "pocket_pc_2002"
       ],
       "device_features": [
-        {
-          "feature_id": "display",
-          "supported": true
-        },
         {
           "feature_id": "sound",
           "supported": true
@@ -481,10 +464,6 @@
         "handheld_pc_pro"
       ],
       "device_features": [
-        {
-          "feature_id": "display",
-          "supported": true
-        },
         {
           "feature_id": "sound",
           "supported": true
@@ -545,10 +524,6 @@
         "linux"
       ],
       "device_features": [
-        {
-          "feature_id": "display",
-          "supported": true
-        },
         {
           "feature_id": "sound",
           "supported": true
@@ -611,10 +586,6 @@
       ],
       "device_features": [
         {
-          "feature_id": "display",
-          "supported": true
-        },
-        {
           "feature_id": "sound",
           "supported": true
         },
@@ -658,10 +629,6 @@
       ],
       "device_features": [
         {
-          "feature_id": "display",
-          "supported": true
-        },
-        {
           "feature_id": "sound",
           "supported": true
         },
@@ -699,10 +666,6 @@
       ],
       "device_features": [
         {
-          "feature_id": "display",
-          "supported": true
-        },
-        {
           "feature_id": "sound",
           "supported": true
         },
@@ -720,7 +683,7 @@
         }
       ],
       "notes": [
-        "CERF auto-generates HDD on first boot if there was no (hdd.img in device dir)",
+        "CERF creates a blank HDD image on first boot when the HDD file does not exist",
         "Guest additions: You can open apps through shared storage + task manager, only extremely simple apps will run (like literally blank Win32 skeletons)"
       ],
       "lcd_panel_size": {
@@ -741,10 +704,6 @@
         "windows_ce_net"
       ],
       "device_features": [
-        {
-          "feature_id": "display",
-          "supported": true
-        },
         {
           "feature_id": "sound",
           "supported": true
@@ -793,10 +752,6 @@
         "windows_ce_net"
       ],
       "device_features": [
-        {
-          "feature_id": "display",
-          "supported": true
-        },
         {
           "feature_id": "sound",
           "supported": true
@@ -854,10 +809,6 @@
         "windows_ce_2"
       ],
       "device_features": [
-        {
-          "feature_id": "display",
-          "supported": true
-        },
         {
           "feature_id": "touch",
           "supported": true
@@ -931,10 +882,6 @@
       ],
       "device_features": [
         {
-          "feature_id": "display",
-          "supported": true
-        },
-        {
           "feature_id": "touch",
           "supported": true
         },
@@ -989,10 +936,6 @@
         "pocket_pc_2000"
       ],
       "device_features": [
-        {
-          "feature_id": "display",
-          "supported": true
-        },
         {
           "feature_id": "touch",
           "supported": true
@@ -1049,10 +992,6 @@
       ],
       "device_features": [
         {
-          "feature_id": "display",
-          "supported": true
-        },
-        {
           "feature_id": "touch",
           "supported": true
         },
@@ -1102,10 +1041,6 @@
       ],
       "device_features": [
         {
-          "feature_id": "display",
-          "supported": true
-        },
-        {
           "feature_id": "mouse",
           "supported": true
         },
@@ -1154,10 +1089,6 @@
         "palm_size_pc"
       ],
       "device_features": [
-        {
-          "feature_id": "display",
-          "supported": true
-        },
         {
           "feature_id": "touch",
           "supported": true
@@ -1210,10 +1141,6 @@
         "windows_ce_2"
       ],
       "device_features": [
-        {
-          "feature_id": "display",
-          "supported": true
-        },
         {
           "feature_id": "touch",
           "supported": true
@@ -1270,10 +1197,6 @@
       ],
       "device_features": [
         {
-          "feature_id": "display",
-          "supported": true
-        },
-        {
           "feature_id": "touch",
           "supported": true
         },
@@ -1329,10 +1252,6 @@
       ],
       "device_features": [
         {
-          "feature_id": "display",
-          "supported": true
-        },
-        {
           "feature_id": "touch",
           "supported": true
         },
@@ -1372,10 +1291,6 @@
       ],
       "device_features": [
         {
-          "feature_id": "display",
-          "supported": true
-        },
-        {
           "feature_id": "touch",
           "supported": true
         },
@@ -1406,10 +1321,6 @@
         "windows_ce_net"
       ],
       "device_features": [
-        {
-          "feature_id": "display",
-          "supported": true
-        },
         {
           "feature_id": "touch",
           "supported": true
@@ -1462,10 +1373,6 @@
       ],
       "device_features": [
         {
-          "feature_id": "display",
-          "supported": true
-        },
-        {
           "feature_id": "touch",
           "supported": true
         },
@@ -1480,10 +1387,10 @@
       ],
       "notes": [
         "THIS BOARD IS NOT EMULATED WELL AT ALL! All it can do is a boot to a glitching home screen and that's it",
-        "On the first boot, guest flashes ~2GB NAND inside device dir from .sec file. It will take some time and x2 disk space. After first boot, you can remove .sec file if you are not going to re-flash.",
+        "On the first boot, guest flashes the ~2GB NAND image from .sec file. It will take some time and x2 disk space. After first boot, you can remove .sec file if you are not going to re-flash.",
         "GPU has severe visual artifacts.",
         "A click on screen will likely crash CERF due to missing GPU implementation",
-        "Guest additions are launching if re-run with complete nand.img. Sync2UI is automatically hijacked and replaced with CE Explorer. OpenVG/Sync2 UI wont render."
+        "Guest additions are launching if re-run with complete NAND image. Sync2UI is automatically hijacked and replaced with CE Explorer. OpenVG/Sync2 UI wont render."
       ],
       "lcd_panel_size": {
         "width": 800,
@@ -1502,10 +1409,6 @@
         "windows_ce_5"
       ],
       "device_features": [
-        {
-          "feature_id": "display",
-          "supported": true
-        },
         {
           "feature_id": "touch",
           "supported": true
@@ -1552,6 +1455,113 @@
       },
       "ga_color_depth": 24,
       "rom_placing_mode": "flat_container"
+    }
+  ],
+  "rom_types": [
+    {
+      "id": "primary",
+      "name": "Generic NK/XIP/NB0",
+      "formats": [
+        "bin",
+        "nb0"
+      ]
+    },
+    {
+      "id": "primary",
+      "name": "SmartBook Upgrade Package",
+      "board_ids": [
+        "smartbook_g138"
+      ],
+      "formats": [
+        "fim"
+      ]
+    },
+    {
+      "id": "primary",
+      "name": "SYNC 2 Upgrade Package",
+      "board_ids": [
+        "ford_sync_2"
+      ],
+      "formats": [
+        "sec"
+      ],
+      "optional_for_storage_ids": [
+        "nand"
+      ],
+      "note": "If you don't have a NAND image, CERF will use this package to seed the bootloader, enter factory recovery mode and will transfer it fully into the recovery program via USB."
+    },
+    {
+      "id": "primary",
+      "name": "Mk500 Flash Dump",
+      "board_ids": [
+        "symbol_mk500"
+      ],
+      "formats": [
+        "bin"
+      ]
+    },
+    {
+      "id": "primary",
+      "name": "Simpad Upgrade Package",
+      "board_ids": [
+        "simpad_sl4"
+      ]
+    },
+    {
+      "id": "primary",
+      "name": "Lumia 800 Upgrade ROM",
+      "board_ids": [
+        "nokia_lumia_800"
+      ],
+      "formats": [
+        "esco"
+      ]
+    },
+    {
+      "id": "lumia800_user_area_erase",
+      "name": "User Area Erase Image",
+      "board_ids": [
+        "nokia_lumia_800"
+      ],
+      "formats": [
+        "esco"
+      ]
+    }
+  ],
+  "storage_types": [
+    {
+      "id": "nand",
+      "name": "NAND",
+      "picker_type": "existing_or_point",
+      "board_ids": [
+        "ford_sync_2"
+      ],
+      "formats": [
+        "img"
+      ]
+    },
+    {
+      "id": "hdd",
+      "name": "HDD",
+      "picker_type": "existing_or_point",
+      "board_ids": [
+        "zune_30"
+      ],
+      "formats": [
+        "img"
+      ],
+      "note": "HDD image with Zune 30 system/user storage partitions. CERF does not boot from it unlike real hardware - the operating system stored in your dump is inert for CERF."
+    },
+    {
+      "id": "emmc",
+      "name": "eMMC",
+      "picker_type": "existing_or_point",
+      "board_ids": [
+        "nokia_lumia_800"
+      ],
+      "formats": [
+        "img"
+      ]
     }
   ]
 }

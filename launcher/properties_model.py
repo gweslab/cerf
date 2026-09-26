@@ -5,8 +5,8 @@ from pathlib import Path
 from typing import Iterable, Optional, Tuple
 
 from board_info import board_configurable_screen, board_features
-from cerf_user_json import (read_board_id, read_device_meta, read_rom_primary,
-                            write_board_rom_overrides, write_user_meta_name)
+from cerf_user_json import (read_board_id, read_device_files, read_device_meta,
+                            write_board_file_overrides, write_user_meta_name)
 from device_state import DeviceBundle
 from persisted_options import (PERSIST_KEYS, auto_resolution,
                                effective_values, persist_subset)
@@ -72,7 +72,8 @@ class PropertiesModel:
         self._baseline, eff = effective_values(subject.device_dir)
         self.values = dict(eff)
         self.values["board_id"] = read_board_id(subject.device_dir)
-        self.values["rom_primary"] = read_rom_primary(subject.device_dir)
+        self.values["rom"], self.values["storage"] = read_device_files(
+            subject.device_dir)
         self.values["name"] = subject.display_name
         self.values["verbose_logs"] = verbose_logs
         self.initial = dict(self.values)
@@ -87,8 +88,8 @@ class PropertiesModel:
             values["guest_additions"] = False
         device_dir = self.subject.device_dir
         if board_rom:
-            write_board_rom_overrides(device_dir, values["board_id"],
-                                      values["rom_primary"])
+            write_board_file_overrides(device_dir, values["board_id"],
+                                       values["rom"], values["storage"])
             if values["name"] != self.initial["name"]:
                 write_user_meta_name(device_dir, values["name"])
         persist_subset(device_dir, self._baseline, owned_keys, values)

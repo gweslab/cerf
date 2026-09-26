@@ -65,6 +65,46 @@ function Get-UcrtRedistDir {
     return $null
 }
 
+function Build-LauncherStub([string]$python, [string]$outDir) {
+    $vswhere = Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio\Installer\vswhere.exe'
+    if (-not (Test-Path $vswhere)) {
+        Write-Host "[LAUNCHER] FAILED! vswhere.exe not found at $vswhere."
+        return $null
+    }
+    $vs = & $vswhere -latest -prerelease -property installationPath | Select-Object -First 1
+    $vcvars = Join-Path $vs "VC\Auxiliary\Build\vcvars32.bat"
+    if (-not (Test-Path $vcvars)) {
+        Write-Host "[LAUNCHER] FAILED! vcvars32.bat not found under $vs."
+        return $null
+    }
+    New-Item -ItemType Directory -Force -Path $outDir | Out-Null
+    $repo    = Split-Path $PSScriptRoot -Parent
+    $assets  = Join-Path $repo "cerf\assets"
+    $rc      = Join-Path $outDir "launcher_stub.rc"
+    $res     = Join-Path $outDir "launcher_stub.res"
+    $obj     = Join-Path $outDir "launcher_stub.obj"
+    $out     = Join-Path $outDir "launcher.exe"
+    $src     = Join-Path $PSScriptRoot "stub\launcher_stub.c"
+    & $python -c "import sys, exe_version; open(sys.argv[1], 'w', encoding='utf-8').write(exe_version.rc_script(sys.argv[2], 'launcher.exe', 'launcher', 'Universal Windows CE emulator', sys.argv[3:]))" `
+        $rc (Join-Path $repo "cerf\version.h") (Join-Path $assets "cerf.ico") (Join-Path $assets "cerf_error.ico")
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "[LAUNCHER] FAILED! stub resource script generation returned $LASTEXITCODE"
+        return $null
+    }
+    $cmd = "`"$vcvars`" >nul" +
+           " && rc /nologo /c65001 /fo `"$res`" `"$rc`"" +
+           " && cl /nologo /O1 /GS- /W4 /c `"$src`" /Fo`"$obj`"" +
+           " && link /nologo /NODEFAULTLIB /ENTRY:StubEntry /SUBSYSTEM:WINDOWS,6.00" +
+           " /MANIFEST:EMBED /MANIFESTUAC:`"level='asInvoker' uiAccess='false'`"" +
+           " /OUT:`"$out`" `"$obj`" `"$res`" kernel32.lib user32.lib"
+    cmd /c $cmd
+    if ($LASTEXITCODE -ne 0 -or -not (Test-Path $out)) {
+        Write-Host "[LAUNCHER] FAILED! stub build returned $LASTEXITCODE"
+        return $null
+    }
+    return $out
+}
+
 $python = Get-LauncherPython
 if (-not $python) { [Environment]::Exit(1) }
 $name = "launcher"
@@ -112,20 +152,26 @@ if ($LASTEXITCODE -ne 0) {
     [Environment]::Exit(1)
 }
 
-$built = Join-Path $dist "$name.exe"
-if (-not (Test-Path $built)) {
-    Write-Host "[LAUNCHER] FAILED! Expected $built not produced."
+$built = Join-Path $dist $name
+if (-not (Test-Path (Join-Path $built "$name.exe"))) {
+    Write-Host "[LAUNCHER] FAILED! Expected $built\$name.exe not produced."
     [Environment]::Exit(1)
 }
 
 $bundledDir = Join-Path $PSScriptRoot "..\bundled"
 if (-not (Test-Path $bundledDir)) { New-Item -ItemType Directory -Path $bundledDir -Force | Out-Null }
-$bundledExe = Join-Path $bundledDir "$name.exe"
-Copy-Item $built $bundledExe -Force
+$bundledLauncher = Join-Path $bundledDir $name
+if (Test-Path $bundledLauncher) { Remove-Item $bundledLauncher -Recurse -Force }
+Copy-Item $built $bundledLauncher -Recurse
+$fileCount = (Get-ChildItem $bundledLauncher -Recurse -File).Count
+Write-Host "[LAUNCHER] OK: $bundledLauncher ($fileCount files)"
 
-$exe = Get-Item $bundledExe
-Write-Host "[LAUNCHER] OK: $($exe.FullName)"
-Write-Host "[LAUNCHER] Size: $($exe.Length) bytes"
+$stub = Build-LauncherStub $python (Join-Path $build "stub")
+if (-not $stub) { [Environment]::Exit(1) }
+$bundledStub = Join-Path $bundledDir "$name.exe"
+Copy-Item $stub $bundledStub -Force
+$stubItem = Get-Item $bundledStub
+Write-Host "[LAUNCHER] OK: $($stubItem.FullName) (stub, $($stubItem.Length) bytes)"
 
 $installerName = "cerf_installer"
 Write-Host "[LAUNCHER] Building $installerName.exe ($Config)..."

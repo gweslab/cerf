@@ -6,7 +6,7 @@ import webbrowser
 from pathlib import Path
 from typing import Optional
 
-from app_paths import exe_dir, resolve_version_tuple
+from app_paths import install_root, resolve_version_tuple
 from app_settings import CHANNEL_DISABLED, read_update_channel
 from bundles import parse_version_tuple
 from available_update import AvailableUpdate
@@ -80,7 +80,7 @@ class UpdateCheck:
                                default="Cancel") == "Retry"
 
         try:
-            return wait_for_cerf_exit(ask_retry, exe_dir())
+            return wait_for_cerf_exit(ask_retry, install_root())
         except UpgradeError as exc:
             show_error(self.app, "Upgrade", str(exc))
             return False
@@ -88,7 +88,7 @@ class UpdateCheck:
     def _start_upgrade(self) -> None:
         if self.release is None or not self._cerf_is_clear():
             return
-        install_dir = exe_dir()
+        install_dir = install_root()
         window = UpgradeWindow(
             self.app,
             f"Upgrading CE Runtime Foundation to {self.release.tag}…",

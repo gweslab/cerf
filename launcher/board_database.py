@@ -4,13 +4,13 @@ import json
 from pathlib import Path
 from typing import Dict, List, Optional
 
-from app_paths import exe_dir
+from app_paths import install_root
 
 DB_FILENAME = "db.json"
 
 
 def _db_path() -> Optional[Path]:
-    candidates = [exe_dir() / DB_FILENAME,
+    candidates = [install_root() / DB_FILENAME,
                   Path(__file__).resolve().parent.parent / "bundled" / DB_FILENAME]
     for path in candidates:
         if path.is_file():

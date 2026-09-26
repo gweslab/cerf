@@ -12,6 +12,7 @@ from typing import Dict, Optional
 import sv_ttk
 
 import sv_elements
+from sv_sprite_stretch import source_sun_valley
 from device_state import (
     STATE_AVAILABLE,
     STATE_INSTALLED,
@@ -219,7 +220,7 @@ def apply_titlebar(window: tk.Misc) -> None:
 
 def _use_sun_valley(root: tk.Tk) -> None:
     if "sun-valley-dark" not in root.tk.call("ttk::style", "theme", "names"):
-        root.tk.call("source", str(Path(sv_ttk.__file__).parent / "sv.tcl"))
+        source_sun_valley(root, Path(sv_ttk.__file__).parent / "sv.tcl")
     root.tk.call("set_theme", "dark" if IS_DARK else "light")
 
 

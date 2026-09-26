@@ -7,7 +7,7 @@ import tkinter as tk
 from pathlib import Path
 from typing import List, Optional, Tuple
 
-from app_paths import exe_dir, resolve_icon
+from app_paths import install_root, resolve_icon
 from branding import PRODUCT_NAME
 from install_finalize import finalize
 from install_options import InstallOptions, parse_options
@@ -75,7 +75,7 @@ def _install(window: UpgradeWindow, wait_pid: Optional[int],
 
 def run_install_stage(wait_pid: Optional[int], argv: List[str]) -> int:
     root = _hidden_root()
-    upgrade_dir = exe_dir()
+    upgrade_dir = install_root()
     install_dir = upgrade_dir.parent
     options = parse_options(argv)
     status = {"code": 0}
@@ -110,7 +110,7 @@ def run_post_upgrade(wait_pid: Optional[int], argv: List[str]) -> bool:
         show_error(root, options.verb, str(exc))
         root.destroy()
         raise SystemExit(1)
-    staged = exe_dir() / UPGRADE_DIR_NAME
+    staged = install_root() / UPGRADE_DIR_NAME
     try:
         if staged.is_dir():
             shutil.rmtree(staged)

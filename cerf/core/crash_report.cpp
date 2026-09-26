@@ -42,7 +42,7 @@ bool Spawn() {
 
     wchar_t exe[MAX_PATH];
     lstrcpynW(exe, dir, MAX_PATH);
-    lstrcpynW(exe + cut, L"launcher.exe", MAX_PATH - cut);
+    lstrcpynW(exe + cut, L"launcher\\launcher.exe", MAX_PATH - cut);
     const DWORD attrs = GetFileAttributesW(exe);
     if (attrs == INVALID_FILE_ATTRIBUTES ||
         (attrs & FILE_ATTRIBUTE_DIRECTORY) != 0)

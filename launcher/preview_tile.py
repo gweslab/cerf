@@ -18,16 +18,43 @@ class PreviewTile:
     def __init__(self, parent: tk.Misc, devices_dir: Path, width: int,
                  height: int, glyph: int, bg: str, box_always: bool = False,
                  on_click: Optional[Callable[[], None]] = None):
+        self.canvas = tk.Canvas(parent, width=width, height=height, bg=bg,
+                                highlightthickness=0, bd=0, cursor="hand2")
+        self._init_drawing(self.canvas, "preview", devices_dir, width, height,
+                           glyph, box_always)
+        if on_click is not None:
+            self.canvas.bind("<Button-1>", lambda _e: on_click())
+
+    @classmethod
+    def on_canvas(cls, canvas: tk.Canvas, tag: str, devices_dir: Path,
+                  width: int, height: int, glyph: int) -> "PreviewTile":
+        tile = cls.__new__(cls)
+        tile.canvas = canvas
+        tile._init_drawing(canvas, tag, devices_dir, width, height, glyph,
+                           False)
+        return tile
+
+    def _init_drawing(self, canvas: tk.Canvas, tag: str, devices_dir: Path,
+                      width: int, height: int, glyph: int,
+                      box_always: bool) -> None:
+        self._tag = tag
+        self._x = 0
+        self._y = 0
         self._devices_dir = devices_dir
         self._w, self._h, self._glyph = width, height, glyph
         self._box_always = box_always
         self._device: Optional[DeviceBundle] = None
         self._sig = ""
         self._img: Optional[tk.PhotoImage] = None
-        self.canvas = tk.Canvas(parent, width=width, height=height, bg=bg,
-                                highlightthickness=0, bd=0, cursor="hand2")
-        if on_click is not None:
-            self.canvas.bind("<Button-1>", lambda _e: on_click())
+
+    def move_to(self, x: int, y: int) -> None:
+        if (x, y) != (self._x, self._y):
+            self.canvas.move(self._tag, x - self._x, y - self._y)
+            self._x, self._y = x, y
+
+    def delete(self) -> None:
+        self.canvas.delete(self._tag)
+        self._img = None
 
     def set_device(self, d: Optional[DeviceBundle]) -> None:
         self._device = d
@@ -51,18 +78,20 @@ class PreviewTile:
             return
         self._sig = sig
         cv = self.canvas
-        cv.delete("all")
+        cv.delete(self._tag)
         self._img = None
+        x0, y0 = self._x, self._y
         if state != "stopped" or self._box_always:
-            cv.create_rectangle(-1, -1, self._w + 1, self._h + 1,
-                                fill=BOX_BG, outline="")
+            cv.create_rectangle(x0 - 1, y0 - 1, x0 + self._w + 1,
+                                y0 + self._h + 1, fill=BOX_BG, outline="",
+                                tags=self._tag)
         if shot is not None:
             img = self._load(d, shot)
             if img is not None:
                 self._img = img
-                cv.create_image(self._w // 2, self._h // 2, image=img,
-                                anchor="center")
-        cx, cy, s = self._w / 2, self._h / 2, self._glyph
+                cv.create_image(x0 + self._w // 2, y0 + self._h // 2,
+                                image=img, anchor="center", tags=self._tag)
+        cx, cy, s = x0 + self._w / 2, y0 + self._h / 2, self._glyph
         if state == "running":
             self._play(cv, cx, cy, s, PLAY_RUNNING)
         elif state == "paused":
@@ -121,12 +150,13 @@ class PreviewTile:
     def _play(self, cv: tk.Canvas, cx: float, cy: float, s: float,
               fill: str, outline: str = "") -> None:
         cv.create_polygon(cx - s * 0.6, cy - s, cx - s * 0.6, cy + s,
-                          cx + s, cy, fill=fill, outline=outline, width=1)
+                          cx + s, cy, fill=fill, outline=outline, width=1,
+                          tags=self._tag)
 
     def _pause(self, cv: tk.Canvas, cx: float, cy: float, s: float,
                fill: str, outline: str = "") -> None:
         bw, gap, bh = s * 0.42, s * 0.32, s * 1.7
         cv.create_rectangle(cx - gap - bw, cy - bh / 2, cx - gap, cy + bh / 2,
-                            fill=fill, outline=outline)
+                            fill=fill, outline=outline, tags=self._tag)
         cv.create_rectangle(cx + gap, cy - bh / 2, cx + gap + bw, cy + bh / 2,
-                            fill=fill, outline=outline)
+                            fill=fill, outline=outline, tags=self._tag)

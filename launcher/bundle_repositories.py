@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import List, Optional
 
-from app_paths import exe_dir
+from app_paths import install_root
 
 MAIN_REPOSITORY_URL = "https://cerf-bundles.dz3n.net/cerf-bundles"
 CONFIG_KEY = "bundle_repositories"
@@ -20,7 +20,7 @@ class BundleRepository:
 
 
 def config_path() -> Path:
-    return exe_dir() / "cerf.json"
+    return install_root() / "cerf.json"
 
 
 def manifest_url_for(base_url: str) -> str:

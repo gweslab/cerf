@@ -8,7 +8,7 @@ import tkinter as tk
 from pathlib import Path
 from typing import List, Optional
 
-from app_paths import exe_dir, resolve_icon
+from app_paths import LAUNCHER_DIR_NAME, exe_dir, install_root, resolve_icon
 from ui_dialogs import show_dialog
 from uninstall import remove_installation, remove_shell_integration
 from uninstall_window import UninstallProgress, UninstallWindow
@@ -45,8 +45,9 @@ def _uninstall_dir_argument(argv: List[str]) -> Optional[Path]:
 
 def _relaunch_from_temp(install_dir: Path) -> None:
     copy_dir = Path(tempfile.mkdtemp(prefix="cerf-uninstall-"))
-    copy = copy_dir / Path(sys.executable).name
-    shutil.copy2(sys.executable, str(copy))
+    launcher_dir = copy_dir / LAUNCHER_DIR_NAME
+    shutil.copytree(str(exe_dir()), str(launcher_dir))
+    copy = launcher_dir / Path(sys.executable).name
     spawn_stage(copy, [UNINSTALL_FLAG,
                        UNINSTALL_DIR_PREFIX + str(install_dir),
                        WAIT_FOR_PID_PREFIX + str(os.getpid())], copy_dir)
@@ -56,7 +57,7 @@ def run_uninstall(argv: List[str]) -> int:
     target = _uninstall_dir_argument(argv)
     if target is None and getattr(sys, "frozen", False):
         try:
-            _relaunch_from_temp(exe_dir())
+            _relaunch_from_temp(install_root())
         except (OSError, UpgradeError) as exc:
             root = _root()
             show_dialog(root, "Uninstall",
@@ -66,7 +67,7 @@ def run_uninstall(argv: List[str]) -> int:
             return 1
         return 0
 
-    install_dir = target if target is not None else exe_dir()
+    install_dir = target if target is not None else install_root()
     wait_pid = find_pid_argument(argv, WAIT_FOR_PID_PREFIX)
     root = _root()
 

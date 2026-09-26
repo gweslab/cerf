@@ -8,7 +8,8 @@ from bundles import BundleError
 from device_state import format_size
 from available_update import AvailableUpdate
 from bundle_download import safe_extract, stream_download
-from upgrade_process import UPGRADE_DIR_NAME, UPGRADE_ZIP_NAME, UpgradeError
+from upgrade_process import (UPGRADE_DIR_NAME, UPGRADE_ZIP_NAME, UpgradeError,
+                             launcher_exe_in)
 
 LogFn = Callable[[str], None]
 ProgressFn = Callable[[str, int, Optional[int]], None]
@@ -52,10 +53,9 @@ def download_upgrade(release: AvailableUpdate, install_dir: Path,
 
     _wipe(zip_path)
 
-    staged_launcher = upgrade_dir / "launcher.exe"
-    if not staged_launcher.is_file():
+    if not launcher_exe_in(upgrade_dir).is_file():
         raise UpgradeError(
-            f"{release.asset_name} contains no launcher.exe at its root")
+            f"{release.asset_name} contains no launcher.exe")
 
     log(f"Staged the new build in {upgrade_dir}")
     return upgrade_dir

@@ -1,9 +1,29 @@
 # Launcher - the configuration and bundle front end
 
-`launcher/` is a standalone Python/tkinter program. PyInstaller packages it as
-`launcher.exe`. It is **not** a `CerfEmulator` service and it shares no code with
-`cerf.exe`. The two programs sit in the same directory and exchange data through
-files only.
+`launcher/` is a standalone Python/tkinter program. It is **not** a
+`CerfEmulator` service and it shares no code with `cerf.exe`. The two programs
+exchange data through files only.
+
+## Layout
+
+`cerf.exe` sits in the install root. The launcher sits in the `launcher\`
+directory below it. PyInstaller builds the launcher in one-directory mode, so
+`launcher\launcher.exe` sits next to the Python runtime DLLs.
+
+The root `launcher.exe` is a forwarder. It starts `launcher\launcher.exe` with the
+arguments that it received, and exits at once. These start the forwarder:
+
+- users who unzip a build
+- shortcuts from earlier installations
+- earlier launchers, when they stage an upgrade
+
+**No DLL goes next to `cerf.exe`.** Windows looks for a DLL in the directory of
+the exe before `System32`. This applies to every DLL that the process loads. A
+file dialog loads third-party shell extensions into the process. A runtime DLL in
+the install root replaces the system copy of that DLL in `cerf.exe`.
+
+**A caller that waits for the launcher starts `launcher\launcher.exe` directly.**
+The forwarder exits before the launcher does.
 
 The launcher owns three jobs:
 
@@ -27,7 +47,7 @@ The launcher owns three jobs:
 | `--upgrade`, `--install`, `--post-upgrade` | The stages that put a build in place. See § Installing and uninstalling. |
 | `--uninstall` | The uninstaller opens. See § Installing and uninstalling. |
 
-`devices_dir` is always `<exe dir>/devices`, the same tree `cerf.exe` reads.
+`devices_dir` is always `<install root>/devices`, the same tree `cerf.exe` reads.
 
 ## The three configuration files
 
@@ -35,7 +55,7 @@ The launcher owns three jobs:
 |---|---|---|
 | `devices/<name>/cerf.json` | The launcher, from the remote manifest | The truth about the device: `meta`, `board.id`, `rom.primary`. Never edited by hand. A bundle update replaces it. |
 | `devices/<name>/cerf-user.json` | The launcher (and the user) | Every user setting. It survives a bundle update. It wins over `cerf.json`. |
-| `<exe dir>/cerf.json` | Shipped, then the launcher | The keys that belong to the installation, not to one device. |
+| `<install root>/cerf.json` | Shipped, then the launcher | The keys that belong to the installation, not to one device. |
 
 `docs/website/content/articles/cerf-json.md` is the schema. It owns what each of
 these files can contain.
@@ -94,8 +114,8 @@ manual work to stay in step with the Properties sheet.
    `query` carries what the dialog cannot know by itself. It can be empty.
    More than one key runs more than one dialog, one after the other.
 
-2. `cerf.exe` starts `launcher.exe transactional <device> <file>` and waits for
-   it to exit. It pumps its own messages while it waits, so the window stays
+2. `cerf.exe` starts `launcher\launcher.exe transactional <device> <file>` and
+   waits for it to exit. It pumps its own messages while it waits, so the window stays
    alive.
 
 3. The launcher runs each dialog. The controls already show the saved values,
@@ -147,9 +167,9 @@ path has no dialog and no launcher. `cerf.exe` therefore writes
 (`UserConfigWriter`). This is the only write `cerf.exe` makes into that file. All
 three ways to set the resolution then agree.
 
-### When `launcher.exe` is missing
+### When the launcher is missing
 
-`launcher.exe` must be present and must work. If it is absent, or if it fails to
+`launcher\launcher.exe` must be present and must work. If it is absent, or if it fails to
 start, `cerf.exe` shows an error box that names the file. This is a damaged
 installation, not a supported state.
 
@@ -205,8 +225,8 @@ user made.
 
 `--uninstall` empties the installation directory. The user data in that
 directory stays, unless the user asked for it to go too. Windows locks a running
-image, so `launcher.exe` cannot delete itself. It copies itself to `%TEMP%` and
-runs the uninstaller from that copy. The copy stays in `%TEMP%`.
+image, so the launcher cannot delete its own directory. It copies that directory
+to `%TEMP%` and runs the uninstaller from the copy. The copy stays in `%TEMP%`.
 
 **The installer, and the copy of the uninstaller in `%TEMP%`, run outside an
 installation.** No installation data is beside them. The code that they reach
@@ -217,9 +237,10 @@ a module that loads such a file is enough to break them.
 
 `update_source.py` picks the channel from the global `cerf.json`: the latest
 GitHub release, the latest CI build, or nothing. The launcher downloads the
-update into `<exe dir>/upgrade/`. A staged `launcher.exe --upgrade` then copies
-it over the installation, after the old process exits. It never overwrites the
-global `cerf.json`. `cerf_json_merge.py` merges that file, so user keys survive.
+update into `<install root>/upgrade/`. The staged
+`upgrade\launcher\launcher.exe --upgrade` then copies the update over the
+installation, after the old process exits. It never overwrites the global
+`cerf.json`. `cerf_json_merge.py` merges that file, so user keys survive.
 The launcher refuses an update while any `cerf.exe` runs.
 
 ## CPython 3.7 - a hard limit
@@ -237,10 +258,12 @@ Run the cached interpreter on every launcher file:
 
     references/python/cpython-3.7.9-x86/python.exe -m py_compile launcher/*.py
 
-`launcher/build.ps1` runs PyInstaller 5.13.2 against that interpreter, embeds the
-UCRT redistributable, and copies the result to `bundled/launcher.exe`. The
-top-level `build.ps1` runs it when any launcher file changes, and
-`CopyBundledFiles` puts it next to `cerf.exe`.
+`launcher/build.ps1` runs PyInstaller 5.13.2 with that interpreter in
+one-directory mode. The launcher directory includes the UCRT redistributable. The
+script copies that directory to `bundled/launcher/`, and it compiles the
+forwarder with MSVC into `bundled/launcher.exe`. The top-level `build.ps1` runs
+the script when any launcher file changes. `CopyBundledFiles` puts both into the
+build output.
 
 ## Rules
 

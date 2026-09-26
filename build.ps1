@@ -177,11 +177,13 @@ Update-CerfLockStamp $buildLock
 $launcherBuild = Join-Path $PSScriptRoot "launcher\build.ps1"
 $launcherStamp = Join-Path $PSScriptRoot "launcher\.launcher_timestamps"
 $launcherExe   = Join-Path $PSScriptRoot "bundled\launcher.exe"
+$launcherReal  = Join-Path $PSScriptRoot "bundled\launcher\launcher.exe"
 $installerExe  = Join-Path $PSScriptRoot "launcher\dist\cerf_installer.exe"
 if (Test-Path $launcherBuild) {
     $launcherSig = Get-LauncherInputSignature
     $launcherStampOld = if (Test-Path $launcherStamp) { Get-Content $launcherStamp -Raw } else { "" }
     $launcherUpToDate = (-not $Rebuild) -and (Test-Path $launcherExe) -and
+                        (Test-Path $launcherReal) -and
                         (Test-Path $installerExe) -and
                         ($launcherStampOld -eq $launcherSig)
 

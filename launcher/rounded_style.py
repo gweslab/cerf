@@ -8,6 +8,7 @@ RADIUS = 5
 SUPERSAMPLE = 4
 CONTENT_PADDING = 3
 STRETCH_CENTER = 64
+CORNER = RADIUS + 1
 
 Rgb = Tuple[float, float, float]
 
@@ -104,3 +105,28 @@ def rounded_frame(parent: tk.Misc, fill: str, border: str, outer: str,
                   **options) -> ttk.Frame:
     return ttk.Frame(parent, style=rounded_style(parent, fill, border, outer),
                      padding=CONTENT_PADDING, **options)
+
+
+def _tile_piece(root: tk.Misc, tile: List[List[str]], top: int,
+                left: int) -> tk.PhotoImage:
+    rows = ["{" + " ".join(tile[top + y][left:left + CORNER]) + "}"
+            for y in range(CORNER)]
+    image = tk.PhotoImage(master=root, width=CORNER, height=CORNER)
+    image.put(" ".join(rows))
+    return image
+
+
+def rounded_corners(widget: tk.Misc, fill: str, border: str,
+                    outer: str) -> Tuple[tk.PhotoImage, ...]:
+    root = widget._root()
+    made: Dict[Tuple[str, str, str], Tuple[tk.PhotoImage, ...]] = (
+        root.__dict__.setdefault("_rounded_corner_images", {}))
+    key = (fill, border, outer)
+    if key not in made:
+        tile = _corner_tile(fill, border, outer)
+        far = len(tile) - CORNER
+        made[key] = (_tile_piece(root, tile, 0, 0),
+                     _tile_piece(root, tile, 0, far),
+                     _tile_piece(root, tile, far, 0),
+                     _tile_piece(root, tile, far, far))
+    return made[key]

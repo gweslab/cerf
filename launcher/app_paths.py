@@ -8,20 +8,27 @@ from pathlib import Path
 from typing import List, Optional, Tuple
 
 
+LAUNCHER_DIR_NAME = "launcher"
+
+
 def exe_dir() -> Path:
     if getattr(sys, "frozen", False):
         return Path(sys.executable).resolve().parent
     return Path(__file__).resolve().parent
 
 
+def install_root() -> Path:
+    if getattr(sys, "frozen", False):
+        return exe_dir().parent
+    return exe_dir()
+
+
 def resolve_devices_dir() -> Path:
-    # The launcher and cerf.exe are co-located; cerf.exe reads/writes its ROMs
-    # and state.img under "<exe dir>/devices", so the launcher uses the same tree.
-    return exe_dir() / "devices"
+    return install_root() / "devices"
 
 
 def resolve_cerf_exe() -> Optional[Path]:
-    candidate = exe_dir() / "cerf.exe"
+    candidate = install_root() / "cerf.exe"
     if candidate.is_file():
         return candidate
     return None

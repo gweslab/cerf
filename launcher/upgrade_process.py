@@ -3,12 +3,12 @@ from __future__ import annotations
 import ctypes
 import os
 import subprocess
-import sys
 import time
 from ctypes import wintypes
 from pathlib import Path
 from typing import Callable, List, Optional
 
+from app_paths import LAUNCHER_DIR_NAME
 
 CERF_EXE_NAME = "cerf.exe"
 DEFAULT_LAUNCHER_NAME = "launcher.exe"
@@ -135,10 +135,8 @@ def wait_for_pid_exit(pid: int, timeout: float = PID_WAIT_TIMEOUT) -> None:
 
 
 def launcher_exe_in(directory: Path) -> Path:
-    own = Path(sys.executable).name if getattr(sys, "frozen", False) \
-        else DEFAULT_LAUNCHER_NAME
-    candidate = directory / own
-    return candidate if candidate.exists() else directory / DEFAULT_LAUNCHER_NAME
+    candidate = directory / LAUNCHER_DIR_NAME / DEFAULT_LAUNCHER_NAME
+    return candidate if candidate.is_file() else directory / DEFAULT_LAUNCHER_NAME
 
 
 def spawn_stage(exe: Path, args: List[str], cwd: Path) -> None:

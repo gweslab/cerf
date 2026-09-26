@@ -14,7 +14,7 @@ REGISTER_SERVICE(LauncherTransaction);
 
 namespace {
 
-constexpr wchar_t kLauncherExe[] = L"launcher.exe";
+constexpr wchar_t kLauncherExe[] = L"launcher\\launcher.exe";
 constexpr wchar_t kTitle[]       = L"CERF configuration";
 
 }
@@ -30,8 +30,8 @@ bool LauncherTransaction::LocateLauncher(HWND owner, std::wstring& exe) {
     if (attrs != INVALID_FILE_ATTRIBUTES &&
         (attrs & FILE_ATTRIBUTE_DIRECTORY) == 0)
         return true;
-    Complain(owner, L"launcher.exe is missing next to cerf.exe, so the "
-                    L"configuration window cannot open.\n\n" + exe);
+    Complain(owner, L"The launcher is missing, so the configuration window "
+                    L"cannot open.\n\n" + exe);
     return false;
 }
 

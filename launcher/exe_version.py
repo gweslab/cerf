@@ -27,6 +27,43 @@ def version_string(header_path):
     return ".".join(str(n) for n in version_tuple(header_path))
 
 
+def rc_script(header_path, original_filename, internal_name, description,
+              icon_paths):
+    numbers = ",".join(str(n) for n in version_tuple(header_path))
+    text = version_string(header_path)
+    icons = "".join('{} ICON "{}"\n'.format(index + 1, path.replace("\\", "/"))
+                    for index, path in enumerate(icon_paths))
+    strings = "".join('            VALUE "{}", "{}"\n'.format(key, value)
+                      for key, value in (
+                          ("CompanyName", AUTHOR),
+                          ("FileDescription", description),
+                          ("FileVersion", text),
+                          ("InternalName", internal_name),
+                          ("LegalCopyright", copyright_line()),
+                          ("OriginalFilename", original_filename),
+                          ("ProductName", PRODUCT_NAME),
+                          ("ProductVersion", text)))
+    return ("#include <winver.h>\n" + icons +
+            "1 VERSIONINFO\n"
+            " FILEVERSION {0}\n"
+            " PRODUCTVERSION {0}\n"
+            " FILEOS VOS_NT_WINDOWS32\n"
+            " FILETYPE VFT_APP\n"
+            "BEGIN\n"
+            '    BLOCK "StringFileInfo"\n'
+            "    BEGIN\n"
+            '        BLOCK "040904E4"\n'
+            "        BEGIN\n"
+            "{1}"
+            "        END\n"
+            "    END\n"
+            '    BLOCK "VarFileInfo"\n'
+            "    BEGIN\n"
+            '        VALUE "Translation", 0x0409, 0x04E4\n'
+            "    END\n"
+            "END\n").format(numbers, strings)
+
+
 def build(header_path, original_filename, internal_name, description):
     from PyInstaller.utils.win32 import versioninfo as vi
 

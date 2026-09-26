@@ -8,7 +8,7 @@ from tkinter import font as tkfont
 from tkinter import ttk
 from typing import Optional
 
-from app_paths import exe_dir
+from app_paths import install_root
 from branded_dialog import load_dialog_icon
 from feedback_window import FeedbackWindow
 from rich_text import RichText, bold, link, plain
@@ -66,7 +66,7 @@ def _read_capped(path: Path, limit: int) -> str:
 class CrashWindow:
     def __init__(self, root: tk.Tk, log_path: Optional[Path]) -> None:
         self._root = root
-        here = exe_dir()
+        here = install_root()
         self._crash_log = here / CRASH_LOG_NAME
         self._log = log_path if log_path is not None else here / DEFAULT_LOG_NAME
 

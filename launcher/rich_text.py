@@ -65,8 +65,7 @@ class RichText(tk.Text):
     def fit(self) -> None:
         if not self.winfo_exists():
             return
-        self.update_idletasks()
-        crossed = self.count("1.0", "end-1c", "displaylines")
+        crossed = self.count("1.0", "end-1c", "update", "displaylines")
         if isinstance(crossed, (tuple, list)):
             crossed = crossed[0] if crossed else 0
         lines = int(crossed or 0) + 1

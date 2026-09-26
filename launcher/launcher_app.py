@@ -52,6 +52,7 @@ class LauncherApp(OperationsMixin, RefreshMixin, SpawnMixin, PropertiesMixin,
     def __init__(self, manager: BundleManager, cerf_exe: Optional[Path],
                  upgraded: bool = False):
         super().__init__()
+        self.withdraw()
         self.manager = manager
         self.cerf_exe = cerf_exe
         self.update_check = UpdateCheck(self)
@@ -85,12 +86,14 @@ class LauncherApp(OperationsMixin, RefreshMixin, SpawnMixin, PropertiesMixin,
         self._saved_state_warning = SavedStateEditWarning(self)
 
         self._build_ui()
-        theme.apply_titlebar(self)
         fit_geometry(self, int(1100 * scale), int(640 * scale))
-        self._install_theme_listener()
-        self._pump_progress()
         self.manager.load_local()
         self._reload_device_list()
+        self.update_idletasks()
+        self.deiconify()
+        theme.apply_titlebar(self)
+        self._install_theme_listener()
+        self._pump_progress()
         self.after(50, lambda: self._refresh_manifest())
         self.after(50, self.update_check.start)
         self.after(50, self._poll_runtime)

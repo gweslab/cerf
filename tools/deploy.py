@@ -23,6 +23,7 @@ from ci_release import (GITHUB_API, GITHUB_UPLOADS, REPO, Artifact, CiError,
 
 DISCORD_CHANNEL_ID = "1517249750796206191"
 RELEASE_WATCHERS_ROLE_ID = "1553511779789971606"
+DOWNLOAD_URL = "https://cerf.cx/download/"
 
 
 def confirm(question: str, assume_yes: bool) -> None:
@@ -78,6 +79,7 @@ def upload_asset(token: str, release_id: int, archive: Path) -> str:
 def release_message(artifact: Artifact) -> str:
     return (f"**v{artifact.series} build {artifact.run_number}** released "
             f"<@&{RELEASE_WATCHERS_ROLE_ID}>\n"
+            f"[Download]({DOWNLOAD_URL}) · "
             f"[Release](https://github.com/{REPO}/releases/tag/{artifact.tag}) · "
             f"[CI build]({artifact.run_url}) · "
             f"[`{artifact.sha[:7]}`]({artifact.commit_url})")

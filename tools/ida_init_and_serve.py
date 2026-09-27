@@ -47,4 +47,4 @@ ida_server.start_server()
 if not ida_kernwin.is_idaq():
     import ida_nalt
     import ida_taskbar_button
-    ida_taskbar_button.start("IDA - " + ida_nalt.get_root_filename(), ida_nalt.get_input_file_path())
+    ida_taskbar_button.start("IDA - " + ida_nalt.get_root_filename(), ida_server.get_instance_id())

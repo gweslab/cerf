@@ -43,6 +43,7 @@ if _HERE not in sys.path:
     sys.path.insert(0, _HERE)
 
 import idaapi
+import ida_loader
 
 import idasrv_config
 from idasrv_config import REGISTRY_DIR, log, set_readonly
@@ -59,9 +60,13 @@ def _sanitize_filename(name: str) -> str:
     return sanitized[:200] if sanitized else 'unknown'
 
 
-def _get_instance_id():
+def get_instance_id():
     """Derive instance ID from the loaded binary's full path."""
     try:
+        idb = ida_loader.get_path(ida_loader.PATH_TYPE_IDB)
+        base, ext = os.path.splitext(idb or "")
+        if ext.lower() in (".i64", ".idb"):
+            return base
         path = idaapi.get_input_file_path()
         if path:
             return path
@@ -75,7 +80,7 @@ def _register_instance(port):
     global _INSTANCE_FILE
     os.makedirs(REGISTRY_DIR, exist_ok=True)
 
-    instance_id = _get_instance_id()
+    instance_id = get_instance_id()
     pid = os.getpid()
     info = {
         "instance_id": instance_id,

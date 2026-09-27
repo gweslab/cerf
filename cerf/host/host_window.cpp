@@ -16,6 +16,7 @@
 #include "host_canvas.h"
 #include "host_dark_mode.h"
 #include "host_dpi.h"
+#include "host_focus_policy.h"
 #include "host_input_capture.h"
 #include "host_menu.h"
 #include "host_status_bar.h"
@@ -187,9 +188,13 @@ void HostWindow::FitWindowToSurface(uint32_t sw, uint32_t sh) {
         move = true;
     }
 
-    if (IsZoomed(hwnd_)) ShowWindow(hwnd_, SW_RESTORE);
+    if (IsZoomed(hwnd_)) ShowWindow(hwnd_, SW_SHOWNOACTIVATE);
     SetWindowPos(hwnd_, nullptr, x, y, outer_w, outer_h,
-                 SWP_NOZORDER | (move ? 0u : SWP_NOMOVE));
+                 SWP_NOZORDER | SWP_NOACTIVATE | (move ? 0u : SWP_NOMOVE));
+}
+
+void HostWindow::ToggleFullscreen() {
+    if (hwnd_) fullscreen_.Toggle(hwnd_, emu_.Get<HostFocusPolicy>().MayActivate());
 }
 
 void HostWindow::AutoResizeToGuest() {
@@ -282,7 +287,7 @@ void HostWindow::UiThreadMain() {
     emu_.Get<HostDarkMode>().ApplyToWindow(canvas.Hwnd());
     emu_.Get<HostInputCapture>().AttachUiThread(hwnd_);
 
-    ShowWindow(hwnd_, SW_SHOW);
+    emu_.Get<HostFocusPolicy>().Show(hwnd_);
     UpdateWindow(hwnd_);
 
     {

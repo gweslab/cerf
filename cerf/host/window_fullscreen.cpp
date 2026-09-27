@@ -2,7 +2,7 @@
 
 #include "window_fullscreen.h"
 
-void WindowFullscreen::Enter(HWND hwnd) {
+void WindowFullscreen::Enter(HWND hwnd, bool raise) {
     if (active_ || !hwnd) return;
 
     saved_place_.length = sizeof(saved_place_);
@@ -23,7 +23,8 @@ void WindowFullscreen::Enter(HWND hwnd) {
                      mi.rcMonitor.left, mi.rcMonitor.top,
                      mi.rcMonitor.right  - mi.rcMonitor.left,
                      mi.rcMonitor.bottom - mi.rcMonitor.top,
-                     SWP_NOOWNERZORDER | SWP_FRAMECHANGED);
+                     SWP_NOOWNERZORDER | SWP_FRAMECHANGED | SWP_NOACTIVATE |
+                     (raise ? 0u : SWP_NOZORDER));
 }
 
 void WindowFullscreen::Exit(HWND hwnd) {
@@ -36,5 +37,5 @@ void WindowFullscreen::Exit(HWND hwnd) {
     SetWindowPlacement(hwnd, &saved_place_);
     SetWindowPos(hwnd, nullptr, 0, 0, 0, 0,
                  SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER |
-                 SWP_NOOWNERZORDER | SWP_FRAMECHANGED);
+                 SWP_NOOWNERZORDER | SWP_FRAMECHANGED | SWP_NOACTIVATE);
 }

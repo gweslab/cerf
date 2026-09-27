@@ -5,6 +5,7 @@
 #include "../core/log.h"
 #include "host_dark_mode.h"
 #include "host_dpi.h"
+#include "host_focus_policy.h"
 #include "host_link_opener.h"
 
 #include <commctrl.h>
@@ -59,8 +60,9 @@ void ModalDialog::RunModal(HWND owner, const wchar_t* class_name,
     BuildControls(hwnd_);
     emu_.Get<HostDarkMode>().ApplyToDialog(hwnd_);
     ApplyDpiFont();
-    ShowWindow(hwnd_, SW_SHOW);
-    SetForegroundWindow(hwnd_);
+    auto& focus = emu_.Get<HostFocusPolicy>();
+    focus.Show(hwnd_);
+    focus.Raise(hwnd_);
     OnShown();
 
     MSG msg;
@@ -75,7 +77,7 @@ void ModalDialog::RunModal(HWND owner, const wchar_t* class_name,
     hwnd_ = nullptr;
     if (dpi_font_) { DeleteObject(dpi_font_); dpi_font_ = nullptr; }
     EnableWindow(owner, TRUE);
-    SetForegroundWindow(owner);
+    focus.Raise(owner);
 }
 
 BOOL CALLBACK ModalDialog::SetChildFontProc(HWND child, LPARAM font) {

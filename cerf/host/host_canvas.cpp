@@ -7,6 +7,7 @@
 #include "emulation_pause.h"
 #include "frame_renderer.h"
 #include "host_canvas_input.h"
+#include "host_focus_policy.h"
 #include "lcd_scan_tick.h"
 #include "boot_screen.h"
 #include "hw_screen.h"
@@ -21,6 +22,7 @@ void HostCanvas::CreateOn(HWND parent, const RECT& rect,
     const int rate = emu_.Get<RefreshRateService>().GetRefreshRate();
     const UINT interval = rate > 0 ? (UINT)(1000 / rate) : 16;
     canvas_.CreateOn(parent, rect, surf_w, surf_h, interval < 1 ? 1 : interval);
+    emu_.Get<HostFocusPolicy>().Focus(canvas_.Hwnd());
     canvas_.SetFramebufferActive(tab_ == Tab::Framebuffer);
 }
 

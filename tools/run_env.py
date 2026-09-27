@@ -9,7 +9,7 @@ import time
 from pathlib import Path
 
 SCRIPT_DIR = Path(__file__).resolve().parent
-PROJECT_DIR = SCRIPT_DIR.parent  # Z:\
+PROJECT_DIR = SCRIPT_DIR.parent
 
 IDA_EXE = Path(r"C:\Program Files\IDA Professional 9.0\ida.exe")
 IDA_SCRIPT = PROJECT_DIR / "tools" / "ida_server.py"
@@ -59,8 +59,9 @@ def main():
 
     launch_all_idas()
 
-    print("\n[cmd] Opening command prompt at Z:\\")
-    subprocess.Popen(["cmd", "/k", "cd /d Z:\\"], creationflags=subprocess.CREATE_NEW_CONSOLE)
+    print(f"\n[cmd] Opening command prompt at {PROJECT_DIR}")
+    subprocess.Popen(["cmd", "/k"], cwd=str(PROJECT_DIR),
+                     creationflags=subprocess.CREATE_NEW_CONSOLE)
 
     print("\n[done] Environment ready.")
 

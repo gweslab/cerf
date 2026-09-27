@@ -8,6 +8,7 @@
 #include "../host/dialog_band.h"
 #include "../host/host_dark_mode.h"
 #include "../host/host_dpi.h"
+#include "../host/host_focus_policy.h"
 #include "../host/host_window.h"
 #include "../version.h"
 
@@ -230,7 +231,7 @@ void ShutdownDialog::LayoutSaveRow() {
 
 void ShutdownDialog::OnShown() {
     LayoutSaveRow();
-    SetFocus(combo_);
+    emu_.Get<HostFocusPolicy>().Focus(combo_);
 }
 
 void ShutdownDialog::OnPaint(HDC dc) {

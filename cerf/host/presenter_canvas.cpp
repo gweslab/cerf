@@ -66,7 +66,6 @@ void PresenterCanvas::CreateOn(HWND parent, const RECT& rect,
     timer_mm_ = timeSetEvent(present_interval_ms_, 1, &PresenterCanvas::PresentTimerProc,
                              reinterpret_cast<DWORD_PTR>(this),
                              TIME_PERIODIC | TIME_CALLBACK_FUNCTION);
-    SetFocus(hwnd_);
 }
 
 void CALLBACK PresenterCanvas::PresentTimerProc(UINT, UINT, DWORD_PTR user,

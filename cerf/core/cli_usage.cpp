@@ -43,6 +43,8 @@ void CliUsage::Print(const char* prog) {
     printf("  --tab=boot|hw|fb         Startup tab: boot screen, hardware console, or framebuffer\n");
     printf("                           (default: hw in dev, boot in release)\n");
     printf("  --full-screen            Enter borderless fullscreen (host key + F) once the window is shown\n");
+    printf("  --no-focus               Never take the foreground from another application; windows\n");
+    printf("                           open at the bottom of the Z order until you switch to them\n");
     printf("  --help                   Show this help\n");
     printf("\n");
     printf("Board ids (cerf.json board.id / --board-id):\n  ");

@@ -446,6 +446,8 @@ void ConfigLoader::LoadInto(DeviceConfig& config) {
             config.share_folder = a + sizeof(kArgGaShareFolder) - 1;
         } else if (strcmp(a, kArgFullScreen) == 0) {
             config.start_fullscreen = true;
+        } else if (strcmp(a, kArgNoFocus) == 0) {
+            config.no_focus = true;
         } else if (strncmp(a, kArgBoot, sizeof(kArgBoot) - 1) == 0) {
             const char* v = a + sizeof(kArgBoot) - 1;
             if      (strcmp(v, "resume") == 0) config.boot_mode = StateBootMode::Resume;

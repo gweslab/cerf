@@ -62,7 +62,7 @@ public:
     void RefitIfFollowingGuest();
 
     bool IsFullscreen() const  { return fullscreen_.IsActive(); }
-    void ToggleFullscreen()    { if (hwnd_) fullscreen_.Toggle(hwnd_); }
+    void ToggleFullscreen();
 
     void BeginShutdownTeardown();
 

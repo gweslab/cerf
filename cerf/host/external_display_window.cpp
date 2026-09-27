@@ -9,6 +9,7 @@
 #include "frame_source.h"
 #include "host_dark_mode.h"
 #include "host_dpi.h"
+#include "host_focus_policy.h"
 #include "host_key_binding.h"
 #include "host_screenshot.h"
 #include "host_window.h"
@@ -141,9 +142,9 @@ void ExternalDisplayWindow::FitToSurface(uint32_t sw, uint32_t sh) {
         y = (int)wa.top  + (wa_h - outer_h) / 2;
         move = true;
     }
-    if (IsZoomed(hwnd_)) ShowWindow(hwnd_, SW_RESTORE);
+    if (IsZoomed(hwnd_)) ShowWindow(hwnd_, SW_SHOWNOACTIVATE);
     SetWindowPos(hwnd_, nullptr, x, y, outer_w, outer_h,
-                 SWP_NOZORDER | (move ? 0u : SWP_NOMOVE));
+                 SWP_NOZORDER | SWP_NOACTIVATE | (move ? 0u : SWP_NOMOVE));
 }
 
 void ExternalDisplayWindow::UiThreadMain(uint32_t surf_w, uint32_t surf_h) {
@@ -186,9 +187,11 @@ void ExternalDisplayWindow::UiThreadMain(uint32_t surf_w, uint32_t surf_h) {
     RECT rc;
     GetClientRect(hwnd_, &rc);
     canvas_.CreateOn(hwnd_, rc, surf_w, surf_h);
+    auto& focus = emu_.Get<HostFocusPolicy>();
+    focus.Focus(canvas_.Hwnd());
     emu_.Get<HostDarkMode>().ApplyToWindow(canvas_.Hwnd());
 
-    ShowWindow(hwnd_, SW_SHOW);
+    focus.Show(hwnd_);
     UpdateWindow(hwnd_);
 
     {
@@ -202,7 +205,7 @@ void ExternalDisplayWindow::UiThreadMain(uint32_t surf_w, uint32_t surf_h) {
         if ((msg.message == WM_KEYDOWN || msg.message == WM_SYSKEYDOWN) &&
             msg.wParam == 'F' &&
             emu_.Get<HostKeyBinding>().AllMembersDownNow()) {
-            fullscreen_.Toggle(hwnd_);
+            fullscreen_.Toggle(hwnd_, emu_.Get<HostFocusPolicy>().MayActivate());
             continue;
         }
         TranslateMessage(&msg);
@@ -288,7 +291,9 @@ LRESULT ExternalDisplayWindow::WndProc(HWND hwnd, UINT msg,
                         break;
                     case kIdAliasing:
                         canvas_.SetAntialias(!canvas_.Antialias()); break;
-                    case kIdFullscreen: fullscreen_.Toggle(hwnd); break;
+                    case kIdFullscreen:
+                        fullscreen_.Toggle(hwnd, emu_.Get<HostFocusPolicy>().MayActivate());
+                        break;
                     case kIdSaveShot: {
                         std::vector<uint32_t> px;
                         uint32_t w = 0, h = 0;

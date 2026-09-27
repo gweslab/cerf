@@ -11,8 +11,8 @@ public:
     bool IsActive() const { return active_; }
 
     /* The owning window's UI thread. */
-    void Toggle(HWND hwnd) { active_ ? Exit(hwnd) : Enter(hwnd); }
-    void Enter(HWND hwnd);
+    void Toggle(HWND hwnd, bool raise) { active_ ? Exit(hwnd) : Enter(hwnd, raise); }
+    void Enter(HWND hwnd, bool raise);
     void Exit(HWND hwnd);
 
 private:

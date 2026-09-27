@@ -1,22 +1,3 @@
-"""open_ida.py -- Open PE files in IDA with autonomous mode + ida_server.
-
-Opens new PE files (no existing .i64) in IDA with -A (autonomous mode) which
-auto-accepts all dialogs (PE format, PDB loading). After analysis completes,
-saves the DB and starts the ida_server.py HTTP API.
-
-Per CLAUDE.md, every PE opened in IDA must live under
-<project_dir>/references/extracted-roms/, produced by tools/extract_bundles.py
-from the corresponding bundle's .nb0 / .bin (matching PDBs are copied next
-to the modules automatically by that script). IDA is never run from build/
-or bundled/. This script enforces that gate.
-
-Usage:
-    python open_ida.py references/extracted-roms/<dev>/<rom>/fs/Windows/file.dll
-    python open_ida.py references/extracted-roms/<dev>/<rom>/fs/Windows/
-    python open_ida.py --all references/extracted-roms/<dev>/<rom>/fs/Windows/
-    python open_ida.py --wait references/extracted-roms/<dev>/<rom>/fs/Windows/file.dll
-"""
-
 import argparse
 import json
 import os
@@ -29,6 +10,7 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 PROJECT_DIR = SCRIPT_DIR.parent
 EXTRACTED_ROMS = (PROJECT_DIR / "references" / "extracted-roms").resolve()
 IDA_EXE = Path(r"C:\Program Files\IDA Professional 9.0\ida.exe")
+IDAT_EXE = Path(r"C:\Program Files\IDA Professional 9.0\idat.exe")
 IDA_INIT_SCRIPT = SCRIPT_DIR / "ida_init_and_serve.py"
 REGISTRY_DIR = Path.home() / ".ida-mcp" / "instances"
 
@@ -36,16 +18,6 @@ PE_EXTENSIONS = {".dll", ".exe"}
 
 
 def assert_in_extracted_roms(p):
-    """Refuse to touch any path outside <project_dir>/references/extracted-roms/.
-
-    Per CLAUDE.md: build/ is wiped every build (IDA holds locks → broken
-    rebuilds); bundled/ is CERF's runtime input (an .i64 sidecar there
-    would pollute the input tree). references/extracted-roms/ is the
-    gitignored, persistent debugging tree produced by
-    tools/extract_bundles.py from the same .nb0 / .bin CERF consumes
-    at runtime, with any matching PDBs already copied next to the
-    modules.
-    """
     resolved = Path(p).resolve()
     try:
         resolved.relative_to(EXTRACTED_ROMS)
@@ -96,20 +68,27 @@ def is_already_open(pe_path):
     return None
 
 
-def open_in_ida(pe_path):
-    """Launch IDA in autonomous mode with the init+serve script."""
+def open_in_ida(pe_path, gui):
     pe_path = Path(pe_path).resolve()
     port = is_already_open(pe_path)
     if port:
         print(f"  ERROR: {pe_path.name} is already open in IDA (port {port})")
         sys.exit(1)
     print(f"  Opening: {pe_path.name}")
-    subprocess.Popen([
-        str(IDA_EXE),
-        "-A",                           # autonomous mode — no dialogs
-        f"-S{IDA_INIT_SCRIPT}",         # wait for analysis, save, start server
+    args = [
+        str(IDA_EXE if gui else IDAT_EXE),
+        "-A",
+        f"-S{IDA_INIT_SCRIPT}",
         str(pe_path),
-    ])
+    ]
+    if gui:
+        subprocess.Popen(args)
+    else:
+        subprocess.Popen(args,
+                         creationflags=subprocess.CREATE_NO_WINDOW,
+                         stdin=subprocess.DEVNULL,
+                         stdout=subprocess.DEVNULL,
+                         stderr=subprocess.DEVNULL)
 
 
 def wait_for_registration(pe_path, timeout=120):
@@ -139,10 +118,13 @@ def main():
                         help="Wait for analysis completion and server registration")
     parser.add_argument("--stagger", type=float, default=3.0,
                         help="Seconds between launching IDA instances (default: 3)")
+    parser.add_argument("--gui", action="store_true",
+                        help="Open the IDA window (default: headless idat.exe, no window)")
     args = parser.parse_args()
 
-    if not IDA_EXE.exists():
-        print(f"ERROR: IDA not found at {IDA_EXE}")
+    exe = IDA_EXE if args.gui else IDAT_EXE
+    if not exe.exists():
+        print(f"ERROR: IDA not found at {exe}")
         sys.exit(1)
 
     target = Path(args.path)
@@ -161,7 +143,7 @@ def main():
 
     print(f"Opening {len(files)} file(s) in IDA (autonomous mode)...")
     for i, f in enumerate(files):
-        open_in_ida(f)
+        open_in_ida(f, args.gui)
         if i < len(files) - 1:
             time.sleep(args.stagger)
 
@@ -172,7 +154,7 @@ def main():
             if port:
                 print(f"  {f.name} -> port {port}")
             else:
-                print(f"  {f.name} — timed out waiting for registration")
+                print(f"  {f.name} - timed out waiting for registration")
 
     print("\nIDA IS READY!")
 

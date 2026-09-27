@@ -19,6 +19,9 @@ constexpr uint8_t kCfgMaskRe   = 1u << 2;
 constexpr uint8_t kCfgMaskFe   = 1u << 1;
 constexpr uint8_t kCfgLvlSel   = 1u << 0;
 constexpr uint8_t kCfgRetained = kCfgMaskRe | kCfgMaskFe | kCfgLvlSel;
+constexpr uint8_t kCfgMasked   = kCfgMaskRe | kCfgMaskFe;
+
+constexpr uint8_t kCfgRisingEdge = kCfgMaskFe;
 
 /* Linux drivers/mfd/pm8058-core.c _write_irq_blk_bit_cfg:
    cfg = (1 << 7) | (cfg & 0xf) | (bit << 4). */
@@ -101,6 +104,21 @@ uint8_t Pm8058Irq::ReadItStatus() const {
 
 uint8_t Pm8058Irq::ReadRtStatus() const {
     std::lock_guard<std::mutex> lk(mtx_);
+    if (unmodeled_[blk_sel_] != 0u) {
+        uint32_t bit = 0;
+        while ((unmodeled_[blk_sel_] & (1u << bit)) == 0u) ++bit;
+        emu_.Get<Fatal>().Die(
+            "pm8058 irq: RT status read of block %u, which holds unmodeled "
+            "source %u", blk_sel_, blk_sel_ * kIrqsPerBlock + bit);
+    }
+    const uint8_t hidden = rt_[blk_sel_] & shape_guard_[blk_sel_];
+    if (hidden != 0u) {
+        uint32_t bit = 0;
+        while ((hidden & (1u << bit)) == 0u) ++bit;
+        emu_.Get<Fatal>().Die(
+            "pm8058 irq: RT status read of block %u while guarded source %u is "
+            "asserted", blk_sel_, blk_sel_ * kIrqsPerBlock + bit);
+    }
     return rt_[blk_sel_];
 }
 
@@ -149,6 +167,28 @@ void Pm8058Irq::SetSourceLevel(uint32_t irq, bool high) {
     Republish();
 }
 
+void Pm8058Irq::GuardLineShape(uint32_t irq) { MarkGuarded(shape_guard_, irq); }
+
+void Pm8058Irq::GuardUnmodeledSource(uint32_t irq) { MarkGuarded(unmodeled_, irq); }
+
+void Pm8058Irq::MarkGuarded(uint8_t (&set)[kBlocks], uint32_t irq) {
+    std::lock_guard<std::mutex> lk(mtx_);
+    if (irq >= kIrqs) {
+        emu_.Get<Fatal>().Die(
+            "pm8058 irq: guarded source %u is outside the %u interrupts the "
+            "part has", irq, kIrqs);
+    }
+    set[irq / kIrqsPerBlock] |= (uint8_t)(1u << (irq % kIrqsPerBlock));
+}
+
+bool Pm8058Irq::GuardAdmits(uint32_t block, uint32_t bit, uint8_t cfg) const {
+    const uint8_t mask = (uint8_t)(1u << bit);
+    if ((cfg & kCfgMasked) == kCfgMasked) return true;
+    if ((unmodeled_[block] & mask) != 0u) return false;
+    if ((shape_guard_[block] & mask) == 0u) return true;
+    return (cfg & kCfgRetained) == kCfgRisingEdge;
+}
+
 void Pm8058Irq::RepublishOutput() {
     std::lock_guard<std::mutex> lk(mtx_);
     Republish();
@@ -182,6 +222,11 @@ void Pm8058Irq::WriteConfig(uint8_t value) {
 
     const uint32_t bit = (value >> kConfigBitShift) & kConfigBitMask;
     const uint8_t  cfg = (uint8_t)(value & kConfigCfgMask);
+    if (!GuardAdmits(blk_sel_, bit, cfg)) {
+        emu_.Get<Fatal>().Die(
+            "pm8058 irq: config write 0x%02X for guarded source %u", value,
+            blk_sel_ * kIrqsPerBlock + bit);
+    }
 
     config_shadow_      = value;
     cfg_[blk_sel_][bit] = (uint8_t)(cfg & kCfgRetained);
@@ -221,6 +266,19 @@ void Pm8058Irq::RestoreState(StateReader& r) {
         r.Reject(
             "pm8058 irq: restored block select %u is outside the %u blocks the "
             "part has", blk_sel_, kBlocks);
+    }
+    for (uint32_t b = 0; b < kBlocks; ++b) {
+        const uint8_t asserted = (uint8_t)((rt_[b] | latched_[b]) & unmodeled_[b]);
+        if (asserted != 0u) {
+            r.Reject("pm8058 irq: restored block %u asserts unmodeled sources "
+                     "0x%02X", b, (unsigned)asserted);
+        }
+        for (uint32_t i = 0; i < kIrqsPerBlock; ++i) {
+            if (!GuardAdmits(b, i, cfg_[b][i])) {
+                r.Reject("pm8058 irq: restored config 0x%02X for guarded source "
+                         "%u", cfg_[b][i], b * kIrqsPerBlock + i);
+            }
+        }
     }
 }
 

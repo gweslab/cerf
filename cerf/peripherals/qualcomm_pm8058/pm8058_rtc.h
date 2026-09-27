@@ -1,10 +1,13 @@
 #pragma once
 
 #include "../../core/service.h"
+#include "../../jit/guest_cycle_clock.h"
+#include "../../socs/cycle_anchored_counter.h"
 
 #include <cstdint>
 #include <mutex>
 
+class Pm8058Irq;
 class StateWriter;
 class StateReader;
 
@@ -13,6 +16,7 @@ public:
     using Service::Service;
 
     bool ShouldRegister() override;
+    void OnReady() override;
 
     /* Linux drivers/rtc/rtc-pm8xxx.c pm8058_regs: ctrl 0x1e8, write 0x1ea,
        read 0x1ee, alarm_ctrl 0x1e8, alarm_ctrl2 0x1e9, alarm_rw 0x1f2, with
@@ -35,16 +39,28 @@ public:
     void RestoreState(StateReader& r);
 
 private:
-    uint32_t CounterLocked() const;
-    void     LatchLocked();
+    bool     RunningLocked() const;
+    bool     AlarmArmedLocked() const;
+    uint32_t CountLocked(uint64_t now) const;
+    uint32_t AlarmLocked() const;
+    void     SetCountLocked(uint64_t now, uint32_t count);
+    void     SetAlarmStatusLocked(bool high);
+    void     ArmAlarmLocked(uint64_t now);
+    void     RequireComparatorUnequalLocked(uint64_t now, const char* write) const;
+    void     PowerOn();
+    void     OnAlarmMatch();
+    void     OnRateChange();
+    void     RedriveAlarmLine();
+    void     RequireRatio(bool ok) const;
 
-    mutable std::mutex mtx_;
+    std::mutex mtx_;
 
-    uint32_t base_      = 0;
-    uint64_t anchor_us_ = 0;
-    bool     running_   = false;
-    uint8_t  ctrl_       = 0;
-    uint8_t  alarm_ctl2_ = 0;
-    uint8_t  load_[kBytes]  = {};
-    uint8_t  alarm_[kBytes] = {};
+    GuestCycleClock*        clock_       = nullptr;
+    GuestCycleClock::Event* alarm_event_ = nullptr;
+    Pm8058Irq*              irq_         = nullptr;
+    CycleAnchoredCounter    counter_;
+    uint32_t                stopped_count_ = 0;
+    uint8_t                 ctrl_          = 0;
+    bool                    alarm_status_  = false;
+    uint8_t                 alarm_[kBytes] = {};
 };

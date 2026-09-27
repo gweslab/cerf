@@ -33,6 +33,8 @@ public:
     void WriteConfig(uint8_t value);
 
     void SetSourceLevel(uint32_t irq, bool high);
+    void GuardLineShape(uint32_t irq);
+    void GuardUnmodeledSource(uint32_t irq);
     void RepublishOutput();
 
     void SaveState(StateWriter& w);
@@ -42,6 +44,8 @@ private:
     uint8_t ReadRootLocked() const;
     uint8_t ReadMasterLocked(uint32_t master) const;
     bool    OutputAssertedLocked() const;
+    bool GuardAdmits(uint32_t block, uint32_t bit, uint8_t cfg) const;
+    void MarkGuarded(uint8_t (&set)[kBlocks], uint32_t irq);
     void Republish();
     void Reset();
 
@@ -52,4 +56,6 @@ private:
     uint8_t cfg_[kBlocks][kIrqsPerBlock] = {};
     uint8_t blk_sel_                     = 0;
     uint8_t config_shadow_               = 0;
+    uint8_t shape_guard_[kBlocks]        = {};
+    uint8_t unmodeled_[kBlocks]          = {};
 };

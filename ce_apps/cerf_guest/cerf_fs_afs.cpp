@@ -48,10 +48,12 @@ static BOOL CerfRegisterAFS(int iAFS, HANDLE hApi, DWORD ctx) {
     return FALSE;
 }
 
-#define CERF_AFS_METHODS   24
-#define CERF_FILE_METHODS  14
-#define CERF_FIND_METHODS  3
-
+#define CERF_AFS_METHODS       24
+#define CERF_AFS_BASE_METHODS  17
+#define CERF_AFS_FFCN_METHODS  22
+#define CERF_AFS_FFCN          17
+#define CERF_FILE_METHODS      14
+#define CERF_FIND_METHODS      3
 
 typedef struct {
     HANDLE           hAFSAPI;
@@ -63,6 +65,8 @@ typedef struct {
     SHELLFILECHANGEFUNC_t notify;
     HANDLE           hFileApi;
     HANDLE           hFindApi;
+    USHORT           afsCount;
+    BOOL             seekTakesOffset;
 } CerfAfsState;
 
 static CerfAfsState s_afs_state;
@@ -70,6 +74,7 @@ static CerfAfsState s_afs_state;
 static CerfAfsState* Afs(void) { return &s_afs_state; }
 
 HANDLE CerfFsFileApi(void) { return Afs()->hFileApi; }
+BOOL   CerfFsSeekTakesOffset(void) { return Afs()->seekTakesOffset; }
 HANDLE CerfFsFindApi(void) { return Afs()->hFindApi; }
 
 CerfFsServerPB* CerfFsPb(void)    { return Afs()->pb; }
@@ -233,7 +238,7 @@ static BOOL CerfCreateApiSets(void) {
     CerfAfsState* af = Afs();
     OSVERSIONINFO ovi;
     BOOL wide;
-    USHORT afsCount;
+    BOOL ffcn;
     HMODULE core = LoadLibraryW(L"coredll.dll");
     PFN_CreateAPISet pCreateAPISet =
         core ? (PFN_CreateAPISet)GetProcAddressW(core, L"CreateAPISet") : NULL;
@@ -246,14 +251,20 @@ static BOOL CerfCreateApiSets(void) {
     GetVersionEx(&ovi);
     wide = (ovi.dwMajorVersion >= 6);
 
-    afsCount = (ovi.dwMajorVersion == 5) ? 22 : 17;
+    /* smartbook_g138_ce4_2 coredll.dll 0x3F7C460 AFS_FindFirstChangeNotificationW:
+       traps AFS method 17 (0xF0010044), the highest AFS stub in that coredll. */
+    ffcn = !wide && GetProcAddressW(core, L"AFS_FindFirstChangeNotificationW") != NULL;
+    af->afsCount = ffcn ? CERF_AFS_FFCN_METHODS : CERF_AFS_BASE_METHODS;
+    CERF_LOG_X("cerf_guest: foldershare AFS method count", af->afsCount);
+    af->seekTakesOffset = GetProcAddressW(core, L"ReadFileWithSeek") != NULL;
+    CERF_LOG_X("cerf_guest: foldershare seek read takes offset", af->seekTakesOffset);
 
     if (wide) {
-        af->hAFSAPI  = pCreateAPISet("CFSV", afsCount,          g_afsMethods,  g_afsSig64);
+        af->hAFSAPI  = pCreateAPISet("CFSV", af->afsCount,      g_afsMethods,  g_afsSig64);
         af->hFileApi = pCreateAPISet("CFSF", CERF_FILE_METHODS, g_fileMethods, g_fileSig64);
         af->hFindApi = pCreateAPISet("CFSS", CERF_FIND_METHODS, g_findMethods, g_findSig64);
     } else {
-        af->hAFSAPI  = pCreateAPISet("CFSV", afsCount,          g_afsMethods,  (const ULONGLONG*)g_afsSig32);
+        af->hAFSAPI  = pCreateAPISet("CFSV", af->afsCount,      g_afsMethods,  (const ULONGLONG*)g_afsSig32);
         af->hFileApi = pCreateAPISet("CFSF", CERF_FILE_METHODS, g_fileMethods, (const ULONGLONG*)g_fileSig32);
         af->hFindApi = pCreateAPISet("CFSS", CERF_FIND_METHODS, g_findMethods, (const ULONGLONG*)g_findSig32);
     }
@@ -405,7 +416,7 @@ void CerfFsAfsInit(void) {
     af->pb->fStructureSize = sizeof(*af->pb);
 
     if (!CerfCreateApiSets()) return;
-    CerfFsNotifyInit();
+    if (af->afsCount > CERF_AFS_FFCN) CerfFsNotifyInit();
 
     t = CreateThread(NULL, 0, CerfFsMountThread, NULL, 0, NULL);
     if (t) CloseHandle(t);

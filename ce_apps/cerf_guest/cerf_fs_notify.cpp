@@ -56,21 +56,16 @@ static const DWORD g_notifySig32[3] = { 0x000, 0x000, 0x004 };
 
 void CerfFsNotifyInit(void) {
     CerfNotifyState* ns = Ntf();
-    OSVERSIONINFO ovi;
     HMODULE core;
     PFN_CreateAPISet pCreateAPISet;
     if (ns->ready) return;
     core = LoadLibraryW(L"coredll.dll");
     if (!core) return;
     ns->pSetEventData = (PFN_SetEventData)GetProcAddressW(core, L"SetEventData");
-    if (!ns->pSetEventData) { CERF_LOG("cerf_guest: notify SetEventData absent (pre-CE5)"); return; }
+    if (!ns->pSetEventData) { CERF_LOG("cerf_guest: notify SetEventData absent"); return; }
     pCreateAPISet = (PFN_CreateAPISet)GetProcAddressW(core, L"CreateAPISet");
     if (!pCreateAPISet) return;
 
-    ovi.dwOSVersionInfoSize = sizeof(ovi);
-    GetVersionEx(&ovi);
-
-    if (ovi.dwMajorVersion != 5) { CERF_LOG("cerf_guest: notify skipped (not CE5)"); return; }
     ns->hApi = pCreateAPISet("CFSN", 3, g_notifyMethods, (const ULONGLONG*)g_notifySig32);
     if (!ns->hApi) { CERF_LOG("cerf_guest: notify CreateAPISet FAILED"); return; }
 

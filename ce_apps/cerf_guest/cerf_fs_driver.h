@@ -32,6 +32,7 @@ HANDLE CerfFsFindFirstChangeNotificationW(CerfVol* vol, HANDLE hProc, PCWSTR pat
 
 HANDLE CerfFsFileApi(void);
 HANDLE CerfFsFindApi(void);
+BOOL   CerfFsSeekTakesOffset(void);
 
 HANDLE CerfFsMakeHandle(HANDLE apiSet, void* ctx, HANDLE hProc);
 

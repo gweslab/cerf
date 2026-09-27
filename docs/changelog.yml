@@ -55,6 +55,7 @@
       Mouse and keyboard no longer stop working for the whole session when input arrives early during boot
       Crash/artifacts when scrolling under complex rendering
       Apps run from a shared folder no longer crash
+      Shared folders no longer crash Explorer on Windows CE .NET
 
 - version: v6.7
   date: 23 Jul 2026

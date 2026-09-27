@@ -200,7 +200,10 @@ static BOOL RwAtSeek(CerfFile* fc, PVOID buf, DWORD count, PDWORD done,
 BOOL CerfFsReadFileWithSeek(CerfFile* f, PVOID buf, DWORD count, PDWORD done,
                             OVERLAPPED* ov, DWORD low, DWORD high) {
     BOOL ok;
-    (void)ov; (void)high;
+    (void)high;
+    /* sharp_mobilon_hc4100_hpc2 fatfs.dll 0x1FB57A4 -> 0x1FB564C: read at the handle
+       position and advance it; jornada820 fatfs.dll 0x1F83EB0 -> 0x1F83C40: read at *offset. */
+    if (!CerfFsSeekTakesOffset()) return CerfFsReadFile(f, buf, count, done, ov);
     CerfFsLock();
     ok = RwAtSeek(f, buf, count, done, CERF_FS_OP_READ, low);
     CerfFsUnlock();

@@ -210,10 +210,9 @@ freeze model.
   level from `PostRestore` - see
   [agent_docs/timers_clocks.md](timers_clocks.md) § Hibernation and deep sleep.
   A host-clock source re-anchors to `Clock::now()`.
-- **In-flight host coupling** resets on restore, because no host sink / pen /
-  socket exists after a restore. In RestoreState or PostRestore, clear audio-DMA
-  `in_flight`/`tx_running`, touch `pen_down`/`pen_timer_enabled`, and the
-  equivalent flags. See `sa11xx_dma`, `sa1111_sac`, `odo_arm720_touch_sound`.
+- **In-flight host coupling** resets on restore, because no host sink, pen, or
+  socket exists after a restore. Examples are an audio transfer in flight and a
+  held pen. Clear this state in RestoreState or PostRestore.
 
 ## What NOT to serialize (host-side members)
 

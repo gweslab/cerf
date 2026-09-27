@@ -23,6 +23,26 @@ rate of the SoC.
   A host-referenced observer sees the replay of at most one window when a
   busy guest becomes idle, and the guest cannot see it.
 
+## What runs on guest time
+
+- **Every state that the guest can see advance with time runs on guest
+  time.** A timer is one case. The same rule covers a frame or scan-line
+  status bit and a line counter. It also covers a transfer that completes
+  after a delay, a sample rate, a baud rate and a conversion time. The rule
+  holds for a part on every board and every CPU architecture. A shared part
+  never selects its time base by architecture.
+- **While guest time runs, a host clock, a host thread and a list of host
+  deadlines are never the time base of a guest-visible state.**
+- **When the guest reads a polled state, the part computes that state from
+  the cycle count.** A status bit, a line counter or a count register needs
+  no event and no thread.
+- **A part arms an event at a cycle count only where the silicon raises an
+  interrupt at that moment.** The interrupt line must rise at the cycle of the
+  edge, not at the next register read.
+- **Every period comes from the registers that the guest programs.** When the
+  guest changes the period or the CPU rate changes, a part recomputes the
+  period.
+
 ## Idle
 
 - **A wait-for-interrupt completes only on an interrupt.** ARM DDI 0406C
@@ -149,12 +169,14 @@ service. It also skips itself when any of these holds:
 
 - The write advances the compare by a whole number of tick periods. The kernel
   preserved its grid.
-- The kernel read the counter and then the compare register with the status bit
-  clear. It had the phase and banked it itself. A kernel that wakes on another
-  interrupt before its tick measures the phase with this pair, and its exit
-  re-base then discards nothing. Interrupts can be masked or unmasked at that
-  read.
-- The phase is zero, or the advance reaches the compare the kernel just armed.
+- The kernel read the counter and the compare register with the status bit
+  clear. It had the phase and banked it itself. The pair counts in either
+  order: the counter before the compare, or the compare with the counter as
+  the next timer read. A kernel that wakes on another interrupt before its tick
+  uses this pair to measure the phase. Its exit re-base then discards nothing.
+  Interrupts can be masked or unmasked at that read.
+- The phase is zero, or the advance reaches the compare that the kernel just
+  armed.
 
 The tick period comes from the handler stores of the kernel itself. Two consecutive
 equal steps confirm it, because a catch-up loop store is a multiple of the
@@ -228,7 +250,15 @@ timer change measured on it.
 
 ## Hibernation and deep sleep
 
-A timer on the clock saves its live count and re-anchors it at the restored
-guest time. The deep-sleep park stops guest time, so a timer stops as on
-silicon. The contracts are in [hibernation.md](hibernation.md) and
-[deep_sleep.md](deep_sleep.md).
+A timer on the clock saves its live count. The timer re-anchors this count at
+the restored guest time.
+
+The deep-sleep park stops guest time. A timer therefore stops for the length of
+the park. On silicon, the same timer also stops in sleep.
+
+A datasheet can state that the counter of a timer is unaffected by the
+transition into and out of sleep. That timer does not stop. That timer counts
+the full length of the park. That length comes from the wall clock.
+
+A chip in sleep can keep an oscillator in operation. The same chip can remove
+power from the counter that this oscillator feeds.

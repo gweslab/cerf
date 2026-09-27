@@ -88,7 +88,8 @@ def open_in_ida(pe_path, gui):
                          creationflags=subprocess.CREATE_NO_WINDOW,
                          stdin=subprocess.DEVNULL,
                          stdout=subprocess.DEVNULL,
-                         stderr=subprocess.DEVNULL)
+                         stderr=subprocess.DEVNULL,
+                         env={**os.environ, "TVHEADLESS": "1"})
 
 
 def wait_for_registration(pe_path, timeout=120):

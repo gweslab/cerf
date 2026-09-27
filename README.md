@@ -355,7 +355,7 @@ run_claude.cmd
           ✅ Device Emulator: sound no longer stutters<br/>
           ✅ Device Emulator: Windows Mobile 2003 SE no longer freezes<br/>
           ✅ Casio Toricomail: fixed rendering crashes<br/>
-          ✅ Ford Sync 2: Rendering massive improvements &amp; navigation maps (by @cavenderbi)</p>
+          ✅ Ford Sync 2: Massive rendering improvements, navigation maps and more (by @cavenderbi)</p>
         <p><b>💿 Emulator</b><br/>
           🆕 Configurable display colour depth for Guest Additions and Device Emulator<br/>
           🆕 Bundled CompactFlash cards can be auto-inserted at launch<br/>
@@ -379,7 +379,7 @@ run_claude.cmd
         <p><b>✨ Guest Additions</b><br/>
           🆕 Virtual Ethernet adapter<br/>
           🆕 Persistant customization/settings from CERF UI<br/>
-          🆕 Windows CE 2013 support<br/>
+          🆕 Windows Embedded Compact 2013 support<br/>
           🆕 Font size override support<br/>
           🆕 Stylus simulation mode for the mouse pointer<br/>
           🆕 Shared folders on Windows CE 2.0<br/>

@@ -12,7 +12,7 @@
       Device Emulator: sound no longer stutters
       Device Emulator: Windows Mobile 2003 SE no longer freezes
       Casio Toricomail: fixed rendering crashes
-      Ford Sync 2: Rendering massive improvements & navigation maps (by @cavenderbi)
+      Ford Sync 2: Massive rendering improvements, navigation maps and more (by @cavenderbi)
   emulator:
     new: |
       Configurable display colour depth for Guest Additions and Device Emulator
@@ -42,7 +42,7 @@
     new: |
       Virtual Ethernet adapter
       Persistant customization/settings from CERF UI
-      Windows CE 2013 support
+      Windows Embedded Compact 2013 support
       Font size override support
       Stylus simulation mode for the mouse pointer
       Shared folders on Windows CE 2.0

@@ -386,23 +386,6 @@ typedef struct _ENGCALLBACKS {
     PFN_EngReleasePooledPalette EngReleasePooledPalette;
 } ENGCALLBACKS, *PENGCALLBACKS;
 
-extern PFN_BRUSHOBJ_pvAllocRbrush  BRUSHOBJ_pvAllocRbrush;
-extern PFN_BRUSHOBJ_pvGetRbrush    BRUSHOBJ_pvGetRbrush;
-extern PFN_CLIPOBJ_cEnumStart      CLIPOBJ_cEnumStart;
-extern PFN_CLIPOBJ_bEnum           CLIPOBJ_bEnum;
-extern PFN_PALOBJ_cGetColors       PALOBJ_cGetColors;
-extern PFN_PATHOBJ_vEnumStart      PATHOBJ_vEnumStart;
-extern PFN_PATHOBJ_bEnum           PATHOBJ_bEnum;
-extern PFN_PATHOBJ_vGetBounds      PATHOBJ_vGetBounds;
-extern PFN_XLATEOBJ_cGetPalette    XLATEOBJ_cGetPalette;
-extern PFN_EngCreateDeviceSurface  EngCreateDeviceSurface;
-extern PFN_EngDeleteSurface        EngDeleteSurface;
-extern PFN_EngCreateDeviceBitmap   EngCreateDeviceBitmap;
-extern PFN_EngCreatePalette        EngCreatePalette;
-extern PFN_EngGetPaletteFromPool   EngGetPaletteFromPool;
-extern PFN_EngAddPaletteToPool     EngAddPaletteToPool;
-extern PFN_EngReleasePooledPalette EngReleasePooledPalette;
-
 #ifdef __cplusplus
 }
 #endif

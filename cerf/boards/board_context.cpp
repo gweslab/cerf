@@ -4,6 +4,7 @@
 #include "../core/device_config.h"
 #include "../core/fatal.h"
 #include "../core/log.h"
+#include "../peripherals/cerf_virt/cerf_virt_addr_map.h"
 
 namespace {
 
@@ -53,6 +54,10 @@ const char* BoardContext::ShortBoardName() const {
 
 const char* BoardContext::SocName() const {
     return soc_ ? soc_->name.c_str() : "";
+}
+
+uint32_t BoardContext::GuestAdditionsWindowSize() const {
+    return CerfVirt::kTotalSize;
 }
 
 uint32_t BoardContext::ResolveGuestAdditionsColorDepth() const {

@@ -4,6 +4,8 @@
 #include "include/cerf_gpe.h"
 #include "include/cerf_ddi.h"
 #include "include/cerf_surfobj.h"
+#include "cerf_ddgpe.h"
+#include "cerf_eng_callbacks.h"
 
 #define CERF_FILL_SWAP(type, a, b) { type tmp = (a); (a) = (b); (b) = tmp; }
 

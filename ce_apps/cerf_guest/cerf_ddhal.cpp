@@ -1,35 +1,16 @@
 #include <windows.h>
+#include "cerf_ddhal.h"
 #include "cerf_ddgpe.h"
+#include "cerf_ddgpe_ddhal.h"
+#include "cerf_ddhal_ce5.h"
+#include "main.h"
 #include "include/ddraw_ce6.h"
 #include "include/ddraw_wm.h"
-
-extern "C" void CerfGetVideoMem(unsigned long* base, unsigned long* size,
-                                unsigned long* freeBytes);
-
-extern "C" DWORD WINAPI DDGPECreateSurface(Ce6_DDHAL_CREATESURFACEDATA*);
-extern "C" DWORD WINAPI DDGPECanCreateSurface(Ce6_DDHAL_CANCREATESURFACEDATA*);
-extern "C" DWORD WINAPI DDGPEDestroySurface(Ce6_DDHAL_DESTROYSURFACEDATA*);
-extern "C" DWORD WINAPI DDGPEFlip(Ce6_DDHAL_FLIPDATA*);
-extern "C" DWORD WINAPI DDGPELock(Ce6_DDHAL_LOCKDATA*);
-extern "C" DWORD WINAPI DDGPEUnlock(Ce6_DDHAL_UNLOCKDATA*);
-extern "C" DWORD WINAPI DDGPESetColorKey(Ce6_DDHAL_SETCOLORKEYDATA*);
-extern "C" DWORD WINAPI DDGPEGetFlipStatus(Ce6_DDHAL_GETFLIPSTATUSDATA*);
-extern "C" DWORD WINAPI DDGPESetPalette(Ce6_DDHAL_SETPALETTEDATA*);
-extern "C" DWORD WINAPI DDGPEWaitForVerticalBlank(Ce6_DDHAL_WAITFORVERTICALBLANKDATA*);
-extern "C" DWORD WINAPI DDGPECreatePalette(Ce6_DDHAL_CREATEPALETTEDATA*);
 
 extern "C" DWORD WINAPI CerfGetBltStatus(Ce6_DDHAL_GETBLTSTATUSDATA* pd) {
     pd->ddRVal = CERF_DD_OK;
     return DDHAL_DRIVER_HANDLED;
 }
-
-extern "C" unsigned long CerfPrimaryShadowLockVa(unsigned long origin_pa);
-extern "C" void  CerfPrimaryShadowPresent(void);
-extern "C" ULONG CerfGpeFbMemBasePa(void);
-extern "C" void* CerfMapFbGlobal(void);
-extern "C" BOOL  CerfVidBackingIsGlobalFb(void);
-extern "C" BOOL  CerfDDSurfFbInfo(void* lcl, ULONG* pa, int* stride, int* bpp,
-                                  int* height);
 
 extern "C" DWORD WINAPI CerfDDGPELockWrap(Ce6_DDHAL_LOCKDATA* pd) {
     ULONG pa; int stride = 0, bpp = 0, height = 0;
@@ -38,15 +19,9 @@ extern "C" DWORD WINAPI CerfDDGPELockWrap(Ce6_DDHAL_LOCKDATA* pd) {
     int x = pd->bHasRect ? pd->rArea.left : 0;
     int y = pd->bHasRect ? pd->rArea.top  : 0;
     ULONG origin = pa + (ULONG)y * (ULONG)stride + (ULONG)x * ((ULONG)bpp / 8u);
-    unsigned long va;
-    if (CerfVidBackingIsGlobalFb()) {
-        void* g = CerfMapFbGlobal();
-        va = g ? (unsigned long)(ULONG_PTR)g + (origin - CerfGpeFbMemBasePa()) : 0;
-    } else {
-        va = CerfPrimaryShadowLockVa(origin);
-    }
-    if (!va) { pd->ddRVal = CERF_DDERR_OUTOFMEMORY; return DDHAL_DRIVER_HANDLED; }
-    pd->lpSurfData = (void*)(ULONG_PTR)va;
+    void* g = CerfMapFbGlobal();
+    if (!g) { pd->ddRVal = CERF_DDERR_OUTOFMEMORY; return DDHAL_DRIVER_HANDLED; }
+    pd->lpSurfData = (void*)((BYTE*)g + (origin - CerfGpeFbMemBasePa()));
     pd->ddRVal = CERF_DD_OK;
     return DDHAL_DRIVER_HANDLED;
 }
@@ -54,8 +29,6 @@ extern "C" DWORD WINAPI CerfDDGPELockWrap(Ce6_DDHAL_LOCKDATA* pd) {
 extern "C" DWORD WINAPI CerfDDGPEUnlockWrap(Ce6_DDHAL_UNLOCKDATA* pd) {
     ULONG pa; int stride = 0, bpp = 0, height = 0;
     if (CerfDDSurfFbInfo(pd->lpDDSurface, &pa, &stride, &bpp, &height)) {
-        if (!CerfVidBackingIsGlobalFb())
-            CerfPrimaryShadowPresent();
         pd->ddRVal = CERF_DD_OK;
         return DDHAL_DRIVER_HANDLED;
     }
@@ -118,11 +91,9 @@ static bool CerfGuidEq(const GUID& a, const GUID& b) {
     return true;
 }
 
-extern "C" DWORD WINAPI CerfHalGetDriverInfo(Ce6_DDHAL_GETDRIVERINFODATA* lpInput) {
+static DWORD CerfAnswerVidMemBase(Ce6_DDHAL_GETDRIVERINFODATA* lpInput, unsigned long base) {
     lpInput->ddRVal = CERF_DDERR_CURRENTLYNOTAVAIL;
     if (CerfGuidEq(lpInput->guidInfo, kCerfGuidVidMemBase)) {
-        unsigned long base = 0, size = 0, freeBytes = 0;
-        CerfGetVideoMem(&base, &size, &freeBytes);
         *(DWORD*)(lpInput->lpvData) = base;
         lpInput->dwActualSize = sizeof(DWORD);
         lpInput->ddRVal = CERF_DD_OK;
@@ -131,18 +102,31 @@ extern "C" DWORD WINAPI CerfHalGetDriverInfo(Ce6_DDHAL_GETDRIVERINFODATA* lpInpu
     return DDHAL_DRIVER_HANDLED;
 }
 
+extern "C" DWORD WINAPI CerfHalGetDriverInfo(Ce6_DDHAL_GETDRIVERINFODATA* lpInput) {
+    unsigned long base = 0;
+    CerfGetVideoMem(&base, NULL, NULL);
+    return CerfAnswerVidMemBase(lpInput, base);
+}
+
+static DWORD WINAPI CerfHalGetDriverInfoRegion(Ce6_DDHAL_GETDRIVERINFODATA* lpInput) {
+    unsigned long base = 0;
+    CerfGetVideoRegion(&base, NULL);
+    return CerfAnswerVidMemBase(lpInput, base);
+}
+
 EXTERN_C void buildDDHALInfo(Ce6_DDHALINFO* h, DWORD modeidx) {
-    unsigned long vidBase = 0, vidSize = 0, vidFree = 0;
-    CerfGetVideoMem(&vidBase, &vidSize, &vidFree);
+    unsigned long vidFree = 0, regionSize = 0;
+    CerfGetVideoMem(NULL, NULL, &vidFree);
+    CerfGetVideoRegion(NULL, &regionSize);
 
     memset(h, 0, sizeof(Ce6_DDHALINFO));
     h->dwSize               = sizeof(Ce6_DDHALINFO);
     h->lpDDCallbacks        = &g_cbDDCallbacks;
     h->lpDDSurfaceCallbacks = &g_cbDDSurfaceCallbacks;
-    h->GetDriverInfo        = (PVOID)CerfHalGetDriverInfo;
+    h->GetDriverInfo        = (PVOID)CerfHalGetDriverInfoRegion;
 
     h->ddCaps.dwSize        = sizeof(Ce6_DDCAPS);
-    h->ddCaps.dwVidMemTotal = vidSize;
+    h->ddCaps.dwVidMemTotal = regionSize;
     h->ddCaps.dwVidMemFree  = vidFree;
     h->ddCaps.dwVidMemStride = 0;
     h->ddCaps.ddsCaps.dwCaps =
@@ -175,8 +159,8 @@ static void CerfFillHelCaps(Ce6_DDCAPS* pDDCaps) {
 }
 
 extern "C" BOOL WmHALInit(void* lpddhi) {
-    unsigned long vidBase = 0, vidSize = 0, vidFree = 0;
-    CerfGetVideoMem(&vidBase, &vidSize, &vidFree);
+    unsigned long vidSize = 0, vidFree = 0;
+    CerfGetVideoMem(NULL, &vidSize, &vidFree);
 
     Wm_DDHALINFO* h = (Wm_DDHALINFO*)lpddhi;
     memset(h, 0, sizeof(Wm_DDHALINFO));
@@ -211,8 +195,6 @@ extern "C" BOOL WmHALInit(void* lpddhi) {
 
     return TRUE;
 }
-
-extern "C" BOOL Ce5HALInit(void* lpddhi);
 
 EXTERN_C BOOL WINAPI HALInit(void* lpddhi, BOOL unused1, DWORD modeidx) {
     OSVERSIONINFOW ovi;

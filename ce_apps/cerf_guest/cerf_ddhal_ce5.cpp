@@ -1,33 +1,12 @@
 #include <windows.h>
 
 #include "include/ddraw_ce6.h"
+#include "cerf_ddgpe.h"
+#include "cerf_ddgpe_ddhal.h"
+#include "cerf_ddhal.h"
 #include "cerf_ddhal_ce5.h"
 #include "cerf_debug_log.h"
-
-extern ULONG g_FbWidth;
-extern ULONG g_FbHeight;
-extern ULONG g_FbBpp;
-extern ULONG g_FbStride;
-extern ULONG g_FbRefreshRate;
-
-extern "C" void  CerfGetVideoMem(unsigned long* base, unsigned long* size,
-                                 unsigned long* freeBytes);
-extern "C" ULONG CerfGpeFbMemBasePa(void);
-
-extern "C" DWORD WINAPI DDGPECreateSurface(Ce6_DDHAL_CREATESURFACEDATA*);
-extern "C" DWORD WINAPI DDGPECanCreateSurface(Ce6_DDHAL_CANCREATESURFACEDATA*);
-extern "C" DWORD WINAPI DDGPEDestroySurface(Ce6_DDHAL_DESTROYSURFACEDATA*);
-extern "C" DWORD WINAPI DDGPEFlip(Ce6_DDHAL_FLIPDATA*);
-extern "C" DWORD WINAPI DDGPESetColorKey(Ce6_DDHAL_SETCOLORKEYDATA*);
-extern "C" DWORD WINAPI DDGPEGetFlipStatus(Ce6_DDHAL_GETFLIPSTATUSDATA*);
-extern "C" DWORD WINAPI DDGPESetPalette(Ce6_DDHAL_SETPALETTEDATA*);
-extern "C" DWORD WINAPI CerfDDGPELockWrap(Ce6_DDHAL_LOCKDATA*);
-extern "C" DWORD WINAPI CerfDDGPEUnlockWrap(Ce6_DDHAL_UNLOCKDATA*);
-extern "C" DWORD WINAPI CerfHalGetDriverInfo(Ce6_DDHAL_GETDRIVERINFODATA*);
-extern "C" DWORD WINAPI DDGPECreatePalette(Ce6_DDHAL_CREATEPALETTEDATA*);
-extern "C" DWORD WINAPI DDGPEWaitForVerticalBlank(Ce6_DDHAL_WAITFORVERTICALBLANKDATA*);
-extern "C" DWORD WINAPI CerfGetBltStatus(Ce6_DDHAL_GETBLTSTATUSDATA*);
-extern "C" unsigned long CerfDDGPESurfBufferVa(unsigned long surf);
+#include "main.h"
 
 #define CE5_LCL_DWRESERVED1_OFF 0x10u
 struct Ce5SurfBind { void* lcl; ULONG_PTR surf; };
@@ -231,11 +210,6 @@ static DWORD WINAPI Ce5LockWrap(Ce5_DDHAL_LOCKDATA* pd) {
     return r;
 }
 
-extern "C" int CerfDDrawBlt(void* dstLcl, void* srcLcl, const RECTL* rDest,
-                            const RECTL* rSrc, unsigned long ddFlags,
-                            unsigned long ropArg, unsigned long fillColor,
-                            unsigned long srcKeyOverride);
-
 typedef struct _Ce5_DDHAL_BLTDATA {
     PVOID       lpDD;
     PVOID       lpDDDestSurface;
@@ -358,8 +332,8 @@ extern "C" BOOL Ce5HALInit(void* lpddhi) {
                    (DWORD)sizeof(Ce5_DDHALINFO));
         return FALSE;
     }
-    unsigned long vidBase = 0, vidSize = 0, vidFree = 0;
-    CerfGetVideoMem(&vidBase, &vidSize, &vidFree);
+    unsigned long vidSize = 0, vidFree = 0;
+    CerfGetVideoMem(NULL, &vidSize, &vidFree);
 
     Ce5_DDHALINFO* h = (Ce5_DDHALINFO*)lpddhi;
     memset(h, 0, sizeof(Ce5_DDHALINFO));

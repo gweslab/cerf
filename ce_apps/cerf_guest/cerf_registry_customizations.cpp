@@ -1,14 +1,13 @@
 #include <windows.h>
 
 #include "cerf_debug_log.h"
+#include "cerf_registry_customizations.h"
 #include "cerf_regs_map.h"
+#include "main.h"
 
 #include "cerf/peripherals/cerf_virt/cerf_virt_addr_map.h"
 #include "cerf/peripherals/cerf_virt/cerf_virt_color_scheme_regs.h"
 #include "cerf/peripherals/cerf_virt/cerf_virt_fb_regs.h"
-
-extern LONG  g_FbSystemFontHeight;
-extern ULONG g_FbSystemFontPresent;
 
 typedef LONG (WINAPI *PFN_RegFlushKey)(HKEY);
 

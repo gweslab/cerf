@@ -1,4 +1,6 @@
 #include "cerf_ddgpe.h"
+#include "cerf_eng_callbacks.h"
+#include "main.h"
 
 #ifndef DMDO_0
 #define DMDO_0 0
@@ -34,26 +36,23 @@ bool CerfDDGPE::EnsureVideoHeap() {
         CERF_LOG_X("cerf_guest: EnsureVideoHeap no offscreen; memtotal", g_FbMemTotal);
         return false;
     }
-    m_vidSize = g_FbMemTotal - primary;
-    if (m_vidBacking == kCerfVidGlobalFb) {
-
-        void* base = CerfMapFbMemory();
-        if (!base) {
-            CERF_LOG("cerf_guest: EnsureVideoHeap FB map FAILED");
-            return false;
-        }
-        m_vidBaseVa = (BYTE*)base + primary;
-    } else {
-
-        m_vidBaseVa = (BYTE*)VirtualAlloc(NULL, m_vidSize, MEM_RESERVE | MEM_COMMIT,
-                                          PAGE_READWRITE);
-        if (!m_vidBaseVa) {
-            CERF_LOG_X("cerf_guest: EnsureVideoHeap VirtualAlloc FAILED gle", GetLastError());
-            return false;
-        }
+    BYTE* region = (BYTE*)((m_vidBacking == kCerfVidHeapMapped) ? CerfMapFbGlobal()
+                                                                : CerfMapFbMemory());
+    if (!region) {
+        CERF_LOG("cerf_guest: EnsureVideoHeap FB map FAILED");
+        return false;
     }
-    m_pVidHeap  = new SurfaceHeap(m_vidSize, 0);
+    m_fbRegionVa = region;
+    m_vidSize    = g_FbMemTotal - primary;
+    m_vidBaseVa  = region + primary;
+    m_pVidHeap   = new SurfaceHeap(m_vidSize, 0);
     return m_pVidHeap != NULL;
+}
+
+void CerfDDGPE::GetVideoRegion(unsigned long* base, unsigned long* size) {
+    EnsureVideoHeap();
+    if (base) *base = (unsigned long)(ULONG_PTR)m_fbRegionVa;
+    if (size) *size = g_FbMemTotal;
 }
 
 void CerfDDGPE::GetVirtualVideoMemory(unsigned long* base, unsigned long* size,
@@ -68,43 +67,14 @@ bool CerfDDGPE::SurfaceFbPa(GPESurf* s, ULONG* pa) {
     if (s == NULL) return false;
     if (s == m_pPrimarySurface) { *pa = CerfGpeFbMemBasePa(); return true; }
 
-    if (m_vidBacking == kCerfVidGlobalFb && s->InVideoMemory() && m_vidBaseVa) {
+    if (s->InVideoMemory() && m_vidBaseVa) {
         BYTE* buf = (BYTE*)s->Buffer();
         if (buf >= m_vidBaseVa && buf < m_vidBaseVa + m_vidSize) {
-            *pa = (ULONG)(ULONG_PTR)buf;
+            *pa = CerfGpeFbMemBasePa() + (ULONG)(buf - m_fbRegionVa);
             return true;
         }
     }
     return false;
-}
-
-DDGPESurf* CerfDDGPE::EnsurePrimaryShadow() {
-    if (m_pPrimaryShadow) return m_pPrimaryShadow;
-    if (!m_pPrimarySurface) return NULL;
-    GPESurf* s = NULL;
-    if (AllocSurface(&s, m_pPrimarySurface->Width(), m_pPrimarySurface->Height(),
-                     m_pPrimarySurface->Format(), GPE_REQUIRE_VIDEO_MEMORY) == S_OK)
-        m_pPrimaryShadow = (DDGPESurf*)s;
-    return m_pPrimaryShadow;
-}
-
-void CerfDDGPE::PrimaryShadowPresent() {
-    DDGPESurf* primary = DDGPEPrimarySurface();
-    if (!m_pPrimaryShadow || !primary) return;
-    RECT r;
-    r.left = 0; r.top = 0;
-    r.right  = primary->Width();
-    r.bottom = primary->Height();
-    BltExpanded(primary, m_pPrimaryShadow, NULL, &r, &r, 0u, 0u, 0xCCCCu);
-}
-
-extern "C" unsigned long CerfPrimaryShadowLockVa(unsigned long origin_pa) {
-    DDGPESurf* sh = ((CerfDDGPE*)GetGPE())->EnsurePrimaryShadow();
-    if (!sh || !sh->Buffer()) return 0;
-    return (unsigned long)(ULONG_PTR)sh->Buffer() + (origin_pa - CerfGpeFbMemBasePa());
-}
-extern "C" void CerfPrimaryShadowPresent(void) {
-    ((CerfDDGPE*)GetGPE())->PrimaryShadowPresent();
 }
 
 SCODE CerfDDGPE::AllocSurface(GPESurf** ppSurf, int width, int height,
@@ -250,13 +220,13 @@ extern "C" void CerfGetVideoMem(unsigned long* base, unsigned long* size,
     ((CerfDDGPE*)GetGPE())->GetVirtualVideoMemory(base, size, freeBytes);
 }
 
-extern "C" void CerfSetVidBackingByOsMajor(unsigned long os_major) {
-    ((CerfDDGPE*)GetGPE())->SetVidBacking(
-        (os_major >= 6u) ? kCerfVidGuestRamHeap : kCerfVidGlobalFb);
+extern "C" void CerfGetVideoRegion(unsigned long* base, unsigned long* size) {
+    ((CerfDDGPE*)GetGPE())->GetVideoRegion(base, size);
 }
 
-extern "C" BOOL CerfVidBackingIsGlobalFb(void) {
-    return ((CerfDDGPE*)GetGPE())->VidBacking() == kCerfVidGlobalFb;
+extern "C" void CerfSetVidBackingByOsMajor(unsigned long os_major) {
+    ((CerfDDGPE*)GetGPE())->SetVidBacking(
+        (os_major >= 6u) ? kCerfVidHeapMapped : kCerfVidHeapByPa);
 }
 
 extern "C" void CerfFillSurfaceFromSurfobj(CerfVirt::CerfBltSurface* s,

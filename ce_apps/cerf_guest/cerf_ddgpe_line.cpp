@@ -1,5 +1,6 @@
 #include "cerf_ddgpe.h"
 #include "cerf_dma_arena.h"
+#include "main.h"
 
 #include "cerf/peripherals/cerf_virt/cerf_virt_addr_map.h"
 

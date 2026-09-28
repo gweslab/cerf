@@ -1,8 +1,9 @@
 #include <windows.h>
 
+#include "cerf_driver_in_driver.h"
+#include "cerf_fs_driver.h"
 #include "cerf_ndis_miniport.h"
-
-extern "C" const wchar_t* CerfInjectedModuleName(void);
+#include "main.h"
 
 typedef HANDLE (WINAPI *PFN_ActivateDeviceEx)(LPCWSTR, LPCVOID, DWORD, LPVOID);
 typedef HANDLE (WINAPI *PFN_ActivateDevice)(LPCWSTR, DWORD);
@@ -89,8 +90,6 @@ extern "C" void CerfStartDriverInDriver(void) {
 }
 
 #define CDD_LIVE_CONTEXT 0x0CDD0001u
-
-extern "C" void CerfFsAfsInit(void);
 
 extern "C" DWORD CDD_Init(DWORD dwContext) {
     CERF_LOG_INIT(CERF_LOG_CH_SHARED_FOLDERS);

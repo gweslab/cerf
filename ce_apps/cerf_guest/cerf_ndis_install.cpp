@@ -1,8 +1,7 @@
 #include "cerf_ndis.h"
 #include "cerf_ndis_miniport.h"
 #include "cerf_debug_log.h"
-
-extern "C" const wchar_t* CerfInjectedModuleName(void);
+#include "main.h"
 
 static const wchar_t kDriverKey[]  = L"Comm\\CERFMP";
 static const wchar_t kLinkageKey[] = L"Comm\\CERFMP\\Linkage";

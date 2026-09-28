@@ -26,6 +26,7 @@ public:
     uint32_t ResolveGuestAdditionsColorDepth() const;
 
     virtual uint32_t GuestAdditionsWindowBase() const { return 0xF0000000u; }
+    virtual uint32_t GuestAdditionsWindowSize() const;
 
 private:
     const DbDevice*    device_ = nullptr;

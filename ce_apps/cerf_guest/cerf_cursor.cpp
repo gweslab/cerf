@@ -1,4 +1,5 @@
 #include <windows.h>
+#include "cerf_cursor.h"
 #include "cerf_regs_map.h"
 #include <string.h>
 

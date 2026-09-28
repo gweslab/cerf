@@ -5,6 +5,7 @@
 #include "include/cerf_ddi.h"
 #include "include/cerf_surfobj.h"
 #include "cerf_ddgpe.h"
+#include "cerf_eng_callbacks.h"
 
 const BYTE kCerfMixToRop3[17] = {
     0xFF, 0x00, 0x05, 0x0A, 0x0F, 0x50, 0x55, 0x5A,

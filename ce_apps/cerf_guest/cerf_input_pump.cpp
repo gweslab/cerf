@@ -3,6 +3,7 @@
 #include "cerf_regs_map.h"
 #include "cerf_debug_log.h"
 #include "cerf_gwes_ready.h"
+#include "cerf_input_pump.h"
 
 #include "cerf/peripherals/cerf_virt/cerf_virt_addr_map.h"
 

@@ -50,7 +50,10 @@ public:
     void RestoreState(StateReader& r);
 
 private:
-    uint32_t ComputeRegionBytes();
+    uint32_t MaxPrimaryBytes() const;
+    uint64_t PrimaryBytesAt(uint32_t bpp) const;
+    uint32_t ComputeRegionBytes() const;
+    void     ReservePrimary();
 
     std::vector<uint8_t> bytes_;
     uint32_t palette_[256] = { 0 };

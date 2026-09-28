@@ -12,7 +12,18 @@
 #include "cerf/peripherals/cerf_virt/cerf_virt_addr_map.h"
 #include "cerf/peripherals/cerf_virt/cerf_virt_color_scheme_regs.h"
 #include "cerf/peripherals/cerf_virt/cerf_virt_fb_regs.h"
+#include "cerf_autorun.h"
 #include "cerf_dma_arena.h"
+#include "cerf_ddgpe.h"
+#include "cerf_driver_in_driver.h"
+#include "cerf_eng_callbacks.h"
+#include "cerf_gradient.h"
+#include "cerf_input_pump.h"
+#include "cerf_power.h"
+#include "cerf_registry_customizations.h"
+#include "cerf_service_pump.h"
+#include "cerf_sync2_shell_replace.h"
+#include "main.h"
 
 #define CERF_GPE_DESC_VA          0x000u
 #define CERF_GPE_STATUS           0x004u
@@ -135,7 +146,7 @@ void* CerfMapFbMemory(void) {
     return g_FbMemVa;
 }
 
-extern "C" void* CerfMapFbWindow(ULONG fb_pa, ULONG bytes) {
+static void* CerfMapFbWindow(ULONG fb_pa, ULONG bytes) {
     const ULONG page_off  = fb_pa & 0xFFFu;
     const ULONG base_pa   = fb_pa & ~0xFFFu;
     const ULONG map_bytes = (page_off + bytes + 0xFFFu) & ~0xFFFu;
@@ -147,10 +158,6 @@ extern "C" void* CerfMapFbWindow(ULONG fb_pa, ULONG bytes) {
         return NULL;
     }
     return (void*)((BYTE*)va + page_off);
-}
-
-extern "C" void CerfUnmapFbWindow(void* exact_va) {
-    if (exact_va) VirtualFree((void*)((ULONG_PTR)exact_va & ~0xFFFu), 0, MEM_RELEASE);
 }
 
 extern "C" void* CerfMapFbGlobal(void) {
@@ -184,18 +191,6 @@ static ULONG WINAPI CerfXlateGetPaletteWrap(XLATEOBJ* pxlo, ULONG iPal,
     if (!mn->eng_xlate_get_palette) return 0;
     return mn->eng_xlate_get_palette(pxlo, iPal, cPal, pPal);
 }
-
-static BOOL CerfNoPoolGetPalette(ULONG, ULONG**, int*)             { return FALSE; }
-static VOID CerfNoPoolAddPalette(ULONG, ULONG*, int)              { }
-static VOID CerfNoPoolReleasePalette(ULONG, ULONG* pPalette, int) { delete[] pPalette; }
-
-extern "C" void CerfStartInputPump(void);
-extern "C" void CerfStartServicePump(void);
-extern "C" void CerfStartDriverInDriver(void);
-extern "C" void CerfAdvertiseDisplayPower(void);
-extern "C" void CerfStartSync2ShellReplace(void);
-extern "C" void CerfStartAutorun(void);
-extern "C" void CerfApplyRegistryCustomizations(void);
 
 static DHPDEV APIENTRY CerfEnablePDEVWrap(
     DEVMODEW* pdm, LPWSTR pwszLogAddress, ULONG cPat, HSURF* phsurfPatterns,
@@ -255,23 +250,12 @@ extern "C" BOOL APIENTRY DrvEnableDriver(ULONG iEngineVersion,
     PALOBJ_cGetColors       = pCallbacks->PALOBJ_cGetColors;
     PATHOBJ_vEnumStart      = pCallbacks->PATHOBJ_vEnumStart;
     PATHOBJ_bEnum           = pCallbacks->PATHOBJ_bEnum;
-    PATHOBJ_vGetBounds      = pCallbacks->PATHOBJ_vGetBounds;
     mn->eng_xlate_get_palette = pCallbacks->XLATEOBJ_cGetPalette;
     XLATEOBJ_cGetPalette    = CerfXlateGetPaletteWrap;
     EngCreateDeviceSurface  = pCallbacks->EngCreateDeviceSurface;
     EngDeleteSurface        = pCallbacks->EngDeleteSurface;
     EngCreateDeviceBitmap   = pCallbacks->EngCreateDeviceBitmap;
     EngCreatePalette        = pCallbacks->EngCreatePalette;
-
-    if (cj >= 31 * sizeof(void*)) {
-        EngGetPaletteFromPool   = pCallbacks->EngGetPaletteFromPool;
-        EngAddPaletteToPool     = pCallbacks->EngAddPaletteToPool;
-        EngReleasePooledPalette = pCallbacks->EngReleasePooledPalette;
-    } else {
-        EngGetPaletteFromPool   = CerfNoPoolGetPalette;
-        EngAddPaletteToPool     = CerfNoPoolAddPalette;
-        EngReleasePooledPalette = CerfNoPoolReleasePalette;
-    }
 
     memset(pded, 0, cj);
     pded->DrvEnablePDEV         = CerfEnablePDEVWrap;

@@ -1,4 +1,7 @@
 #include "cerf_ddgpe.h"
+#include "cerf_cursor.h"
+#include "cerf_power.h"
+#include "main.h"
 
 #ifndef QUERYESCSUPPORT
 #define QUERYESCSUPPORT 8
@@ -25,9 +28,6 @@
 #define DISP_CHANGE_SUCCESSFUL 0
 #endif
 
-extern "C" BOOL CerfPowerEscape(ULONG iEsc, ULONG cjOut, void* pvOut, ULONG* pRet);
-extern "C" BOOL CerfIsPowerIoctl(ULONG iEsc);
-
 extern "C" int APIENTRY MulDiv(int a, int b, int c) {
     if (c == 0) return -1;
     __int64 prod = (__int64)a * (__int64)b;
@@ -43,11 +43,11 @@ CerfDDGPE::CerfDDGPE() : DDGPE() {
     m_paletteEntries = 0;
     memset(m_palette, 0, sizeof(m_palette));
     memset(&m_gpeMode, 0, sizeof(m_gpeMode));
-    m_pVidHeap  = NULL;
-    m_vidBaseVa = NULL;
-    m_vidSize   = 0;
-    m_vidBacking = kCerfVidGuestRamHeap;
-    m_pPrimaryShadow = NULL;
+    m_pVidHeap   = NULL;
+    m_fbRegionVa = NULL;
+    m_vidBaseVa  = NULL;
+    m_vidSize    = 0;
+    m_vidBacking = kCerfVidHeapByPa;
     m_currentRotation = 0;
 }
 

@@ -28,31 +28,35 @@ void PeripheralDispatcher::Register(Peripheral* p) {
     }
     const uint32_t base = p->MmioBase();
     const uint32_t size = p->MmioSize();
-    const uint32_t end  = base + size;
     if (size == 0) {
         LOG(Caution, "PeripheralDispatcher::Register peripheral has "
                 "zero-size MMIO range (base 0x%08X)\n", base);
         CerfFatalExit(CERF_FATAL_RUNTIME_ERROR);
     }
+    if (size - 1u > 0xFFFFFFFFu - base) {
+        emu_.Get<Fatal>().Die("PeripheralDispatcher::Register %s at 0x%08X size 0x%08X runs "
+                              "past 0xFFFFFFFF", typeid(*p).name(), base, size);
+    }
+    const uint32_t last = base + (size - 1u);
 
     std::lock_guard<std::mutex> lock(table_mutex_);
     for (const auto& e : entries_) {
-        if (base < e.end && e.base < end) {
+        if (base <= e.last && e.base <= last) {
             LOG(Caution, "PeripheralDispatcher::Register overlap: "
-                    "new [0x%08X..0x%08X) vs existing [0x%08X..0x%08X)\n",
-                    base, end, e.base, e.end);
+                    "new [0x%08X..0x%08X] vs existing [0x%08X..0x%08X]\n",
+                    base, last, e.base, e.last);
             CerfFatalExit(CERF_FATAL_RUNTIME_ERROR);
         }
     }
 
-    const Entry entry{base, end, p->FastReader(), p->FastWriter(), p, p, nullptr};
+    const Entry entry{base, last, p->FastReader(), p->FastWriter(), p, p, nullptr};
     auto pos = std::lower_bound(entries_.begin(), entries_.end(), base,
         [](const Entry& e, uint32_t b) { return e.base < b; });
     entries_.insert(pos, entry);
     table_by_active_.clear();
     PublishLocked();
 
-    LOG(Periph, "Register 0x%08X..0x%08X\n", base, end);
+    LOG(Periph, "Register [0x%08X..0x%08X]\n", base, last);
 }
 
 PeripheralDispatcher::DataInversionId PeripheralDispatcher::InstallDataInversion(
@@ -115,11 +119,11 @@ bool PeripheralDispatcher::OverlapsDataInversionLocked(uint32_t base, uint64_t e
 const PeripheralDispatcher::InversionRange* PeripheralDispatcher::InversionRangeOf(
     const Entry& entry) const {
     for (const InversionRange& r : inversions_) {
-        if (entry.base < r.end && r.base < entry.end) {
-            if (entry.base < r.base || entry.end > r.end) {
-                emu_.Get<Fatal>().Die("PeripheralDispatcher: %s at [0x%08X..0x%08X) crosses the "
+        if (entry.base < r.end && r.base <= entry.last) {
+            if (entry.base < r.base || entry.last >= r.end) {
+                emu_.Get<Fatal>().Die("PeripheralDispatcher: %s at [0x%08X..0x%08X] crosses the "
                                       "edge of data inversion range [0x%08X..0x%08X)",
-                                      typeid(*entry.p).name(), entry.base, entry.end, r.base,
+                                      typeid(*entry.p).name(), entry.base, entry.last, r.base,
                                       r.end);
             }
             return &r;
@@ -176,12 +180,12 @@ void PeripheralDispatcher::ValidatePhysReachable(uint32_t phys_addr_mask) const 
     const EntryTable* t = live_.load(std::memory_order_acquire);
     if (!t) return;
     for (const auto& e : *t) {
-        if ((e.end - 1u) > phys_addr_mask) {
-            LOG(Caution, "PeripheralDispatcher: %s at [0x%08X..0x%08X) is above "
+        if (e.last > phys_addr_mask) {
+            LOG(Caution, "PeripheralDispatcher: %s at [0x%08X..0x%08X] is above "
                     "the SoC physical space (mask 0x%08X); it aliases to "
                     "0x%08X and is unreachable/shadowed - relocate it into the "
                     "addressable range\n",
-                    typeid(*e.p).name(), e.base, e.end, phys_addr_mask,
+                    typeid(*e.p).name(), e.base, e.last, phys_addr_mask,
                     e.base & phys_addr_mask);
             CerfFatalExit(CERF_FATAL_RUNTIME_ERROR);
         }
@@ -204,7 +208,7 @@ const PeripheralDispatcher::Entry* PeripheralDispatcher::LookupSlow(
         [](uint32_t a, const Entry& e) { return a < e.base; });
     if (it == t->begin()) return nullptr;
     --it;
-    if (addr >= it->base && addr < it->end) {
+    if (addr >= it->base && addr <= it->last) {
         last_hit_.store(static_cast<size_t>(it - t->begin()),
                         std::memory_order_relaxed);
         return &(*it);

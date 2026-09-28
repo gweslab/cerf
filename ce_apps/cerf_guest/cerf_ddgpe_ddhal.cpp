@@ -1,3 +1,4 @@
+#include "cerf_ddgpe_ddhal.h"
 #include "cerf_ddgpe.h"
 #include "include/ddraw_ce6.h"
 

@@ -3,6 +3,7 @@
 
 #include "cerf_debug_log.h"
 #include "cerf_shell_watch.h"
+#include "cerf_sync2_shell_replace.h"
 #include "cerf_toolhelp.h"
 #include "cerf_window_owner.h"
 

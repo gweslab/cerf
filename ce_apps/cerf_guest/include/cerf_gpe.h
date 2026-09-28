@@ -270,8 +270,6 @@ protected:
     ULONG    m_hSurf;
 };
 
-extern "C" GPE* GetGPE(void);
-
 typedef void* LPDDRAWI_DDRAWSURFACE_LCL;
 
 class DDGPESurf : public GPESurf {

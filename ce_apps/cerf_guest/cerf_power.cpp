@@ -3,8 +3,8 @@
 #include <pm.h>
 
 #include "cerf_debug_log.h"
-
-extern "C" const wchar_t* CerfInjectedModuleName(void);
+#include "cerf_power.h"
+#include "main.h"
 
 static const GUID kPmClassDisplay =
     { 0xEB91C7C9, 0x8BF6, 0x4a2d, { 0x9A, 0xB8, 0x69, 0x72, 0x4E, 0xED, 0x97, 0xD1 } };

@@ -4,6 +4,8 @@
 #include "include/cerf_gpe.h"
 #include "include/cerf_ddi.h"
 #include "include/cerf_surfobj.h"
+#include "cerf_ddgpe.h"
+#include "cerf_eng_callbacks.h"
 
 #define FL_H_ROUND_DOWN   0x00000080L
 #define FL_V_ROUND_DOWN   0x00008000L

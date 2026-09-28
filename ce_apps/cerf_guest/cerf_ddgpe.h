@@ -7,22 +7,21 @@
 #include "cerf/peripherals/cerf_virt/cerf_virt_blt_descriptor.h"
 #include "cerf/peripherals/cerf_virt/cerf_virt_line_descriptor.h"
 
-extern void* CerfMapFbMemory(void);
-extern "C" void* CerfMapFbGlobal(void);
-extern "C" ULONG CerfGpeFbMemBasePa(void);
-extern "C" ULONG CerfGpeBlt(ULONG desc_va);
-extern "C" ULONG CerfGpeLine(ULONG desc_va);
-extern "C" void* CerfMapFbWindow(ULONG fb_pa, ULONG bytes);
-extern "C" void  CerfUnmapFbWindow(void* va);
-extern "C" void  CerfPublishPalette(const ULONG* rgb, unsigned first, unsigned count);
-extern "C" void CerfPublishCursor(const void* mask_bits, int stride,
-                                  int cx, int cy, int xhot, int yhot, BOOL visible);
-extern ULONG g_FbWidth, g_FbHeight, g_FbBpp, g_FbStride, g_FbMemTotal, g_FbPrimaryReserve;
-extern ULONG g_FbRefreshRate;
-extern ULONG g_OsMajor;
-extern ULONG g_FbDpi;
-
 struct CerfStageWb { BOOL active; ULONG dst_va; void* arena_ptr; ULONG span; };
+
+extern "C" GPE*  GetGPE(void);
+extern "C" void  CerfSetVidBackingByOsMajor(unsigned long os_major);
+extern "C" void  CerfGetVideoMem(unsigned long* base, unsigned long* size,
+                                 unsigned long* freeBytes);
+extern "C" void  CerfGetVideoRegion(unsigned long* base, unsigned long* size);
+extern "C" BOOL  CerfDDSurfFbInfo(void* lcl, ULONG* pa, int* stride, int* bpp, int* height);
+extern "C" unsigned long CerfDDGPESurfBufferVa(unsigned long surf);
+extern "C" void  CerfFillSurfaceFromSurfobj(CerfVirt::CerfBltSurface* s, SURFOBJ* pso,
+                                            int y0, int y1, CerfStageWb* wb);
+extern "C" int   CerfDDrawBlt(void* dstLcl, void* srcLcl, const RECTL* rDest,
+                              const RECTL* rSrc, unsigned long ddFlags,
+                              unsigned long ropArg, unsigned long fillColor,
+                              unsigned long srcKeyOverride);
 
 struct CerfBltBand {
     int dl, dt, dr;
@@ -73,26 +72,23 @@ inline int CerfFormatBpp(EGPEFormat fmt) {
     }
 }
 
-enum CerfVidBacking { kCerfVidGuestRamHeap, kCerfVidGlobalFb };
+enum CerfVidBacking { kCerfVidHeapByPa, kCerfVidHeapMapped };
 
 class CerfDDGPE : public DDGPE {
 public:
     CerfDDGPE();
 
-    void          SetVidBacking(CerfVidBacking b) { m_vidBacking = b; }
-    CerfVidBacking VidBacking() const             { return m_vidBacking; }
+    void SetVidBacking(CerfVidBacking b) { m_vidBacking = b; }
 
     bool EnsureVideoHeap();
     void GetVirtualVideoMemory(unsigned long* base, unsigned long* size,
                                unsigned long* freeBytes);
+    void GetVideoRegion(unsigned long* base, unsigned long* size);
     bool SurfaceFbPa(GPESurf* s, ULONG* pa);
     CerfAliasKind BltAliasKind(GPEBltParms* p);
     BOOL  SnapshotSource(GPEBltParms* p, GPESurf** ppTemp);
     SCODE PlanAliasedBlt(GPEBltParms* p, CerfBandOrder* order, GPESurf** ppTemp);
     SCODE ApplyFbMode();
-
-    DDGPESurf* EnsurePrimaryShadow();
-    void       PrimaryShadowPresent();
 
     virtual SCODE BltPrepare(GPEBltParms* p);
     static void RectToDesc(CerfVirt::CerfBltRect* r, const RECTL* s);
@@ -131,10 +127,10 @@ private:
     unsigned short  m_paletteEntries;
     PALETTEENTRY    m_palette[256];
     SurfaceHeap*    m_pVidHeap;
+    BYTE*           m_fbRegionVa;
     BYTE*           m_vidBaseVa;
     ULONG           m_vidSize;
     CerfVidBacking  m_vidBacking;
-    DDGPESurf*      m_pPrimaryShadow;
     int             m_currentRotation;
     void EmitBltBand(const CerfBltBand& b, GPEBltParms* p, int r0, int r1);
     void EmitBltBands(const CerfBltBand& b, GPEBltParms* p, ULONG budget,

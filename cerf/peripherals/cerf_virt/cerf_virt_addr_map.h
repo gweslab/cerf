@@ -71,18 +71,15 @@ const uint32_t kNicRegsSize   = 0x1000u;
 const uint32_t kAutorunOffset = 0x11000u;
 const uint32_t kAutorunSize   = 0x4000u;
 
-const uint32_t kFramebufferMemOffset = 0x00100000u;
-const uint32_t kFramebufferMemSize   = 0x02000000u;
-
 const uint32_t kGuestBodyOffset  = kRegsSize;
 const uint32_t kGuestBodyHdrSize = 0x1000u;
 
+const uint32_t kDmaArenaOffset      = 0x00100000u;
 const uint32_t kInjectionBandSize   = 0x10000u;
-const uint32_t kInjectionBandOffset = kFramebufferMemOffset - kInjectionBandSize;
+const uint32_t kInjectionBandOffset = kDmaArenaOffset - kInjectionBandSize;
 
 const uint32_t kGuestBodyMaxSize = kInjectionBandOffset - kGuestBodyOffset;
 
-const uint32_t kDmaArenaOffset   = kFramebufferMemOffset + kFramebufferMemSize;
 const uint32_t kDmaArenaProcMax  = 8u;
 const uint32_t kDmaPartitionSize = 0x00080000u;
 const uint32_t kDmaArenaSize     = kDmaArenaProcMax * kDmaPartitionSize;
@@ -103,6 +100,9 @@ const uint32_t kNicRxSlots     = 32u;
 const uint32_t kNicTxBufOffset = 0u;
 const uint32_t kNicRxBufOffset = kNicTxBufOffset + kNicTxSlots * kNicSlotSize;
 const uint32_t kNicStageSize   = kNicRxBufOffset + kNicRxSlots * kNicSlotSize;
+
+const uint32_t kFramebufferMemOffset = kNicStageOffset + kNicStageSize;
+const uint32_t kFramebufferMemSize   = 0x02000000u;
 
 const uint32_t kDmaPartOwnerPid    = 0x0Cu;
 const uint32_t kDmaPartHdrSize     = 0x40u;

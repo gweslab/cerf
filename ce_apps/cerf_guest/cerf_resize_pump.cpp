@@ -2,6 +2,7 @@
 #include "cerf_regs_map.h"
 #include "cerf_gwes_ready.h"
 #include "cerf_resize_pump.h"
+#include "main.h"
 
 #include "cerf/peripherals/cerf_virt/cerf_virt_addr_map.h"
 
@@ -27,8 +28,6 @@
 #define CERF_DMDO_270     4u
 typedef LONG (WINAPI *PFN_ChangeDisplaySettingsExW)(
     LPCWSTR, DEVMODEW*, HWND, DWORD, LPVOID);
-
-extern ULONG g_FbWidth, g_FbHeight, g_FbBpp, g_FbStride;
 
 typedef struct {
     volatile ULONG*              regs;

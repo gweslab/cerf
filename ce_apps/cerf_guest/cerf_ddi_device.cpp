@@ -3,6 +3,8 @@
 
 #include "include/cerf_gpe.h"
 #include "include/cerf_ddi.h"
+#include "cerf_ddgpe.h"
+#include "cerf_eng_callbacks.h"
 
 ULONG CerfSwapRedBlue(ULONG value) {
     ULONG out = value;

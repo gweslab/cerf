@@ -1,6 +1,7 @@
 #include <windows.h>
 
 #include "cerf_gwes_ready.h"
+#include "main.h"
 
 /* Windows CE 2.0 Toolkit SDK kfuncs.h:22 - SH_WMGR 17 */
 #define CERF_SH_WMGR_CE5 17u
@@ -9,8 +10,6 @@
 #define CERF_GWES_READY_POLL_MS 10u
 
 typedef BOOL (WINAPI *PFN_IsAPIReady)(DWORD);
-
-extern ULONG g_OsMajor;
 
 static PFN_IsAPIReady s_pIsAPIReady = NULL;
 

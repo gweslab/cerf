@@ -55,7 +55,7 @@ private:
 
     struct Entry {
         uint32_t                base;
-        uint32_t                end;      /* exclusive */
+        uint32_t                last;
         Peripheral::FastReadFn  read;
         Peripheral::FastWriteFn write;
         void*                   ctx;
@@ -111,7 +111,7 @@ private:
         const size_t cached = last_hit_.load(std::memory_order_relaxed);
         if (cached >= t->size()) return nullptr;
         const Entry& hit = (*t)[cached];
-        if (addr < hit.base || addr >= hit.end) return nullptr;
+        if (addr < hit.base || addr > hit.last) return nullptr;
         return &hit;
     }
 

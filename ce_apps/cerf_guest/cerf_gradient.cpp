@@ -2,9 +2,13 @@
 #include <pkfuncs.h>
 #include <winddi.h>
 #include "include/cerf_gpe.h"
+#include "include/cerf_ddi.h"
 #include "cerf_ddgpe.h"
 #include "cerf_dma_arena.h"
 #include "cerf_debug_log.h"
+#include "cerf_eng_callbacks.h"
+#include "cerf_gradient.h"
+#include "main.h"
 #include "cerf/peripherals/cerf_virt/cerf_virt_addr_map.h"
 #include "cerf/peripherals/cerf_virt/cerf_virt_grad_descriptor.h"
 #include "cerf/peripherals/cerf_virt/cerf_virt_gpe_cmd.h"
@@ -12,17 +16,6 @@
 #ifndef BLACKONWHITE
 #define BLACKONWHITE 1
 #endif
-
-extern "C" ULONG CerfGpeGrad(ULONG desc_va);
-extern "C" void  CerfFillSurfaceFromSurfobj(CerfVirt::CerfBltSurface* s, SURFOBJ* pso,
-                                            int y0, int y1, CerfStageWb* wb);
-
-extern PFN_CLIPOBJ_cEnumStart CLIPOBJ_cEnumStart;
-extern PFN_CLIPOBJ_bEnum      CLIPOBJ_bEnum;
-
-extern BOOL APIENTRY AnyBlt(SURFOBJ*, SURFOBJ*, SURFOBJ*, CLIPOBJ*, XLATEOBJ*,
-                            RECTL*, RECTL*, POINTL*, BRUSHOBJ*, POINTL*,
-                            ROP4, unsigned long, int, BLENDFUNCTION);
 
 static void CerfRectIntersect(CerfVirt::CerfBltRect* out,
                               const RECTL& a, const RECTL& b) {

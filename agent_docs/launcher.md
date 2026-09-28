@@ -108,8 +108,9 @@ manual work to stay in step with the Properties sheet.
 1. `cerf.exe` writes `devices/<device>/transactional-XXXXXXXX-XXXX.json`. Each
    top-level key names one dialog to run:
 
-        { "live_customizations": { "query": { "force_reboot": true,
-                                              "default_reset": "soft" } } }
+        { "live_customizations": { "query": { "force_reboot": false,
+                                              "ce_version": { "major": 4,
+                                                              "minor": 20 } } } }
 
    `query` carries what the dialog cannot know by itself. It can be empty.
    More than one key runs more than one dialog, one after the other.
@@ -135,6 +136,15 @@ manual work to stay in step with the Properties sheet.
 with every control that needs a restart of `cerf.exe` disabled. Every `cerf.exe`
 entry point that edits a Guest Additions setting sends this one request.
 
+The request proves that Guest Additions run, so the sheet shows them enabled,
+and OK saves them enabled.
+
+Some fields take effect only after a guest reset. When the user changes one,
+the sheet marks it, and OK asks which reset to run. The resolution is such a
+field when the guest is older than CE 4. It is also such a field when
+`ce_version` is absent, because CERF cannot read the version from the ROM.
+`force_reboot` skips the question and answers `"soft"`.
+
 ### What the refresh does
 
 Each caller decides whether to run the refresh. `LauncherTransaction` never runs
@@ -150,8 +160,8 @@ value the launcher just wrote.
 Two services keep their own copy of a refreshed field, so each one registers a
 listener:
 
-- `FolderShareConfig` re-applies the path at once, because the shared folder is
-  live.
+- `FolderShareConfig` re-applies the path and the mount name at once, because
+  the shared folder is live.
 - `CerfVirtColorScheme` re-reads its table at the next CPU reset, because the
   guest reads that table only when its display driver starts.
 

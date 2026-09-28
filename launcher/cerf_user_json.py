@@ -199,6 +199,9 @@ def _extract_persist_fields(obj) -> dict:
         sf = ga.get("share_folder")
         if isinstance(sf, str) and sf:
             out["share_folder"] = sf
+        mp = ga.get("shared_folder_mount_point")
+        if isinstance(mp, str) and mp:
+            out["mount_point"] = mp
     if isinstance(obj.get("full_screen"), bool):
         out["full_screen"] = obj["full_screen"]
     board = obj.get("board")
@@ -251,7 +254,7 @@ def write_persist_overrides(device_dir: Path, fields: dict) -> None:
         ga_prev = obj.get("guest_additions")
         ga_obj: dict = dict(ga_prev) if isinstance(ga_prev, dict) else {}
         for key in ("enabled", "override_color_scheme", "override_font_size",
-                    "share_folder"):
+                    "share_folder", "shared_folder_mount_point"):
             ga_obj.pop(key, None)
         if "guest_additions" in fields:
             ga_obj["enabled"] = fields["guest_additions"]
@@ -261,6 +264,8 @@ def write_persist_overrides(device_dir: Path, fields: dict) -> None:
             ga_obj["override_font_size"] = fs
         if fields.get("share_folder"):
             ga_obj["share_folder"] = fields["share_folder"]
+        if fields.get("mount_point"):
+            ga_obj["shared_folder_mount_point"] = fields["mount_point"]
         if ga_obj:
             obj["guest_additions"] = ga_obj
         else:

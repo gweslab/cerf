@@ -12,6 +12,7 @@
 #include "../../core/device_config.h"
 #include "../../core/folder_share_config.h"
 #include "../../core/log.h"
+#include "../../core/share_folder_mount_name.h"
 #include "../../state/state_stream.h"
 
 #include <string>
@@ -21,6 +22,7 @@ using namespace CerfVirt;
 namespace {
 
 constexpr uint32_t kMountBytes = kFsMountPointMaxWchars * sizeof(uint16_t);
+static_assert(kShareFolderMountNameMaxWchars < kFsMountPointMaxWchars);
 
 class CerfVirtFolderShare : public Peripheral {
 public:

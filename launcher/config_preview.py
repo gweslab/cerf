@@ -103,14 +103,17 @@ class ConfigPreviewPanel:
                  auto_size: Tuple[int, int]) -> Rows:
         if not values.get("guest_additions", False):
             return [("Status", "Disabled")]
+        share = values.get("share_folder")
         rows: Rows = [("Status", "Enabled"),
-                      ("Shared folder", values.get("share_folder") or "None"),
-                      ("Resolution", _resolution_text(values, auto_size)),
-                      ("Color depth", _bpp_text(values)),
-                      ("DPI", str(values["dpi"]) if "dpi" in values
-                       else "Default"),
-                      ("Font size", str(values["font_size"])
-                       if "font_size" in values else "Default")]
+                      ("Shared folder", share or "None")]
+        if share:
+            rows.append(("Mount point", values.get("mount_point", "")))
+        rows += [("Resolution", _resolution_text(values, auto_size)),
+                 ("Color depth", _bpp_text(values)),
+                 ("DPI", str(values["dpi"]) if "dpi" in values
+                  else "Default"),
+                 ("Font size", str(values["font_size"])
+                  if "font_size" in values else "Default")]
         if color_scheme_supported_for_os(subject.os_name):
             key = values.get("color_scheme", "")
             rows.append(("Color scheme",

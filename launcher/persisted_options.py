@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Iterable, Optional, Tuple
 
+from board_database import ga_shared_folder_mount_point
 from board_info import board_panel_size
 from cerf_user_json import read_persist_fields, write_persist_overrides
 from launch_options_presets import (DEFAULT_SCREEN_WIDTH,
@@ -11,7 +12,7 @@ from launch_options_presets import (DEFAULT_SCREEN_WIDTH,
 
 PERSIST_KEYS = ("network_enabled", "guest_additions", "color_scheme",
                 "full_screen", "width", "height", "dpi", "font_size", "bpp",
-                "share_folder")
+                "share_folder", "mount_point")
 
 EXPLICIT_KEYS = ("width", "height", "bpp")
 
@@ -31,6 +32,7 @@ def resolve_baseline(base: dict) -> dict:
     b["guest_additions"] = base.get("guest_additions", False)
     b["color_scheme"] = base.get("color_scheme", "")
     b["full_screen"] = base.get("full_screen", False)
+    b["mount_point"] = base.get("mount_point", ga_shared_folder_mount_point())
     for key in ("share_folder", "dpi", "font_size"):
         if key in base:
             b[key] = base[key]

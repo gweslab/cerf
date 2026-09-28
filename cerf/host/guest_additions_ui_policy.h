@@ -9,8 +9,5 @@ public:
     using Service::Service;
 
     bool LiveResizeAvailable() const;
-    bool DefaultResetIsSoft() const;
-
-private:
     bool CeVersion(uint16_t& major, uint16_t& minor) const;
 };

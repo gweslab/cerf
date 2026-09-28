@@ -15,9 +15,3 @@ bool GuestAdditionsUiPolicy::LiveResizeAvailable() const {
     if (!CeVersion(maj, min)) return true;
     return maj > 3;
 }
-
-bool GuestAdditionsUiPolicy::DefaultResetIsSoft() const {
-    uint16_t maj = 0, min = 0;
-    if (!CeVersion(maj, min)) return false;
-    return maj <= 3;
-}

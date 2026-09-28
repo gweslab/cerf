@@ -28,14 +28,15 @@ void DeviceConfigRefresh::Refresh() {
     }
     emu_.Get<ConfigLoader>().ApplyBoardPanelDefault(config);
 
-    LOG(Cfg, "DeviceConfigRefresh: %ux%u dpi=%u bpp=%u font=%d(set=%d) scheme='%s' share='%s'\n",
+    LOG(Cfg, "DeviceConfigRefresh: %ux%u dpi=%u bpp=%u font=%d(set=%d) scheme='%s' share='%s' mount='%s'\n",
         config.board_configurable_screen_width,
         config.board_configurable_screen_height, config.screen_dpi,
         config.board_configurable_screen_bpp,
         config.guest_additions_font_size,
         config.guest_additions_font_size_set ? 1 : 0,
         config.guest_additions_color_scheme.c_str(),
-        config.share_folder.c_str());
+        config.share_folder.c_str(),
+        config.share_folder_mount_point.c_str());
 
     for (auto& fn : listeners_) fn();
 }

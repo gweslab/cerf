@@ -11,9 +11,17 @@ from device_state import DeviceBundle
 from persisted_options import (PERSIST_KEYS, auto_resolution,
                                effective_values, persist_subset)
 
-GA_KEYS = ("share_folder", "width", "height", "bpp", "dpi", "font_size",
-           "color_scheme")
-RESET_NEEDING_KEYS = ("bpp", "dpi", "font_size", "color_scheme")
+GA_KEYS = ("guest_additions", "share_folder", "mount_point", "width",
+           "height", "bpp", "dpi", "font_size", "color_scheme")
+REBOOT_KEYS = ("bpp", "dpi", "font_size", "color_scheme")
+LIVE_RESIZE_KEYS = ("width", "height")
+LIVE_RESIZE_MIN_CE_MAJOR = 4
+
+
+def reboot_keys(ce_major: Optional[int]) -> Tuple[str, ...]:
+    if ce_major is not None and ce_major >= LIVE_RESIZE_MIN_CE_MAJOR:
+        return REBOOT_KEYS
+    return REBOOT_KEYS + LIVE_RESIZE_KEYS
 
 
 @dataclass
@@ -78,9 +86,8 @@ class PropertiesModel:
         self.values["verbose_logs"] = verbose_logs
         self.initial = dict(self.values)
 
-    def reset_needing_changed(self) -> bool:
-        return any(self.values.get(k) != self.initial.get(k)
-                   for k in RESET_NEEDING_KEYS)
+    def changed(self, values: dict, keys: Iterable[str]) -> bool:
+        return any(values.get(k) != self.initial.get(k) for k in keys)
 
     def save(self, owned_keys: Iterable[str], board_rom: bool) -> None:
         values = dict(self.values)

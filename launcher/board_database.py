@@ -69,6 +69,11 @@ FEATURE_SPECS = [(f["id"], f.get("icon", f["id"]), f.get("name", f["id"]))
                  for f in DEVICE_FEATURES]
 
 
+def ga_shared_folder_mount_point() -> str:
+    value = _DB.get("ga_shared_folder_mount_point")
+    return value if isinstance(value, str) else ""
+
+
 def sort_text(value: object) -> str:
     if not isinstance(value, str):
         return ""

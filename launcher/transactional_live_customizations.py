@@ -6,15 +6,14 @@ from typing import Optional
 
 from dialog_buttons import pack_actions
 from properties_dialog import MODE_LIVE, PropertiesDialog
-from properties_model import PropertiesModel, PropertiesSubject
+from properties_model import PropertiesModel, PropertiesSubject, reboot_keys
 from properties_page_ga import PAGE_GUEST_ADDITIONS
 from screen_geometry import fit_geometry
 from ui_dialogs import show_error
 import ui_theme as theme
 
-RESET_NOTE = ("Windows CE 3 and older need at least a soft reset to use the "
-              "new resolution. A DPI, font-size or colour-depth change "
-              "requires a reset.")
+RESET_NOTE = ("Some properties you changed require a soft reset to take "
+              "effect. Would you like to perform it?")
 
 _RESET_CHOICES = (("none", "Do not reset"),
                   ("soft", "Soft reset"),
@@ -22,7 +21,7 @@ _RESET_CHOICES = (("none", "Do not reset"),
 
 
 class _ResetConfirmDialog:
-    def __init__(self, parent: tk.Misc, initial: str) -> None:
+    def __init__(self, parent: tk.Misc) -> None:
         self._parent = parent
         self.choice: Optional[str] = None
 
@@ -39,7 +38,7 @@ class _ResetConfirmDialog:
         ttk.Label(body, text=RESET_NOTE, wraplength=380,
                   justify="left").grid(row=0, column=0, sticky="w",
                                        pady=(0, 6))
-        self.var_reset = tk.StringVar(value=initial)
+        self.var_reset = tk.StringVar(value="soft")
         for i, (value, label) in enumerate(_RESET_CHOICES):
             ttk.Radiobutton(body, text=label, value=value,
                             variable=self.var_reset).grid(row=1 + i, column=0,
@@ -66,22 +65,36 @@ class _ResetConfirmDialog:
         self._dlg.destroy()
 
 
+def _ce_major(query: dict) -> Optional[int]:
+    version = query.get("ce_version")
+    if not isinstance(version, dict):
+        return None
+    major = version.get("major")
+    if isinstance(major, int) and not isinstance(major, bool):
+        return major
+    return None
+
+
 def run_live_customizations(ctx, query: dict) -> Optional[dict]:
     force = query.get("force_reboot") is True
-    default_soft = query.get("default_reset") == "soft"
+    keys = reboot_keys(_ce_major(query))
     model = PropertiesModel(PropertiesSubject.of_device_dir(ctx.device_dir),
                             verbose_logs=False)
+    model.values["guest_additions"] = True
     answer: dict = {}
+
+    def reboot_required(values: dict) -> bool:
+        return model.changed(values, keys)
 
     def accept(dlg: tk.Misc) -> bool:
         if force:
             choice = "soft"
-        else:
-            initial = ("soft" if default_soft or model.reset_needing_changed()
-                       else "none")
-            choice = _ResetConfirmDialog(dlg, initial).run()
+        elif reboot_required(model.values):
+            choice = _ResetConfirmDialog(dlg).run()
             if choice is None:
                 return False
+        else:
+            choice = "none"
         try:
             model.save_live()
         except OSError as exc:
@@ -92,7 +105,7 @@ def run_live_customizations(ctx, query: dict) -> Optional[dict]:
         return True
 
     dialog = PropertiesDialog(ctx.root, model, MODE_LIVE,
-                              PAGE_GUEST_ADDITIONS, accept)
+                              PAGE_GUEST_ADDITIONS, accept, reboot_required)
     if not dialog.run(ctx.owner_hwnd):
         return None
     return answer

@@ -30,12 +30,11 @@ public:
     std::wstring HostRoot()   const { std::lock_guard<std::mutex> lk(mtx_); return host_root_; }
     std::wstring MountPoint() const { std::lock_guard<std::mutex> lk(mtx_); return mount_point_; }
 
-    /* An empty host root forces disabled - sharing nothing is "off". */
     void Set(bool enabled, std::wstring host_root, std::wstring mount_point) {
         {
             std::lock_guard<std::mutex> lk(mtx_);
             host_root_ = std::move(host_root);
-            if (!mount_point.empty()) mount_point_ = std::move(mount_point);
+            mount_point_ = std::move(mount_point);
             enabled_.store(enabled && !host_root_.empty(), std::memory_order_relaxed);
         }
         generation_.fetch_add(1, std::memory_order_relaxed);
@@ -46,5 +45,5 @@ private:
     std::atomic<bool>     enabled_{false};
     std::atomic<uint32_t> generation_{0};
     std::wstring          host_root_;
-    std::wstring          mount_point_ = L"\\CERF Storage";
+    std::wstring          mount_point_;
 };

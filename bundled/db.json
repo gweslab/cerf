@@ -1,4 +1,5 @@
 {
+  "ga_shared_folder_mount_point": "CERF Storage",
   "operating_systems": [
     {
       "id": "windows_ce_1",

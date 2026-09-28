@@ -135,6 +135,7 @@ struct DeviceConfig : public Service {
 #endif
 
     std::string share_folder;
+    std::string share_folder_mount_point;
 
     bool start_fullscreen = false;
 

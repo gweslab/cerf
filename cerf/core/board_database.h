@@ -46,6 +46,10 @@ public:
 
     std::span<const DbDevice> Devices() const { return devices_; }
 
+    const std::string& GaSharedFolderMountPoint() const {
+        return ga_shared_folder_mount_point_;
+    }
+
     const DbDevice*    FindDevice(std::string_view id) const;
     const DbSoc&       Soc(std::string_view id) const;
     const DbSocFamily& Family(std::string_view id) const;
@@ -54,4 +58,5 @@ private:
     std::vector<DbSocFamily> families_;
     std::vector<DbSoc>       socs_;
     std::vector<DbDevice>    devices_;
+    std::string              ga_shared_folder_mount_point_;
 };

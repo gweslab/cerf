@@ -208,6 +208,20 @@ def show_color_scheme_help(parent: tk.Misc) -> None:
     )
 
 
+def show_mount_point_help(parent: tk.Misc) -> None:
+    show_info(
+        parent,
+        "Shared folder mount point",
+        "Some apps expect their files under \\Storage Card. You can use that "
+        "name, but some ROMs reserve it for their own volume, Windows CE 2.0 "
+        "among them. The shared folder then mounts under a numbered name, "
+        "such as \\Storage Card2.\n\n"
+        "A ROM can reserve other names too, so a custom name is at your own "
+        "risk. If the shared folder stops working, click Reset to restore the "
+        "default name."
+    )
+
+
 def show_guest_additions_help(parent: tk.Misc) -> None:
     """Open the Guest Additions article in the browser."""
     webbrowser.open(GUEST_ADDITIONS_URL)

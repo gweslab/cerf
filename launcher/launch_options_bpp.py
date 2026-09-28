@@ -28,6 +28,7 @@ class BppOptionBlock:
         self._window = window
         self._sync_guard = False
         self._value = 0
+        self.var_index = tk.DoubleVar(value=0)
 
         self.frame = ttk.Frame(parent)
         self.frame.columnconfigure(0, weight=1)
@@ -42,6 +43,7 @@ class BppOptionBlock:
         self.slider = ttk.Scale(self.frame, from_=0, to=len(BPP_STOPS) - 1,
                                 orient="horizontal",
                                 style="Res.Horizontal.TScale",
+                                variable=self.var_index,
                                 command=self._on_slider)
         self.slider.grid(row=1, column=0, sticky="ew", pady=(6, 0))
         self.label = ttk.Label(self.frame, text=bpp_label(0),
@@ -59,9 +61,6 @@ class BppOptionBlock:
             model["bpp"] = self._value
         else:
             model.pop("bpp", None)
-
-    def value(self) -> int:
-        return self._value
 
     def set_enabled(self, enabled: bool) -> None:
         state = "normal" if enabled else "disabled"

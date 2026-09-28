@@ -21,12 +21,11 @@ bool LiveCustomizationsTransaction::ShouldRegister() {
 }
 
 bool LiveCustomizationsTransaction::Open(HWND owner, bool force_reboot) {
-    const bool soft_default =
-        force_reboot || emu_.Get<GuestAdditionsUiPolicy>().DefaultResetIsSoft();
-
     nlohmann::json query;
-    query["force_reboot"]  = force_reboot;
-    query["default_reset"] = soft_default ? "soft" : "none";
+    query["force_reboot"] = force_reboot;
+    uint16_t major = 0, minor = 0;
+    if (emu_.Get<GuestAdditionsUiPolicy>().CeVersion(major, minor))
+        query["ce_version"] = { { "major", major }, { "minor", minor } };
 
     auto& cfg = emu_.Get<DeviceConfig>();
     const uint32_t prev_w = cfg.board_configurable_screen_width;

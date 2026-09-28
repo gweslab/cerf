@@ -168,8 +168,8 @@ class GuestAdditionsPage:
     def validate(self) -> bool:
         if not self.var_enabled.get():
             return True
-        return (self.resolution.validate() and self.dpi.validate()
-                and self.font_size.validate())
+        return (self.share.validate() and self.resolution.validate()
+                and self.dpi.validate() and self.font_size.validate())
 
     def set_enabled(self, enabled: bool) -> None:
         self._enabled = enabled

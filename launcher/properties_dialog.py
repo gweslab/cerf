@@ -20,15 +20,21 @@ MODE_EDIT = "edit"
 MODE_LOCKED = "locked"
 MODE_LIVE = "live"
 
+REBOOT_REQUIRED = "Reboot required"
+
+RebootCheck = Callable[[dict], bool]
+
 
 class PropertiesDialog:
     def __init__(self, parent: tk.Misc, model: PropertiesModel, mode: str,
                  initial_page: str,
-                 on_accept: Callable[[tk.Misc], bool]) -> None:
+                 on_accept: Callable[[tk.Misc], bool],
+                 reboot_required: Optional[RebootCheck] = None) -> None:
         self._parent = parent
         self._model = model
         self._subject = model.subject
         self._on_accept = on_accept
+        self._reboot_required = reboot_required
         self.accepted = False
 
         dlg = tk.Toplevel(parent)
@@ -47,6 +53,9 @@ class PropertiesDialog:
         actions.pack(side="right")
         self._ok = pack_actions(actions, [("OK", self._on_ok),
                                           ("Cancel", self._on_cancel)])[0]
+        self._reboot_label = ttk.Label(footer, text="",
+                                       foreground=theme.WARN_FG)
+        self._reboot_label.pack(side="right", padx=(0, 12))
         ttk.Button(footer, text="Open device directory",
                    command=lambda: open_device_directory(
                        dlg, self._subject.device_dir)).pack(side="left")
@@ -99,6 +108,9 @@ class PropertiesDialog:
         if initial_page not in self._keys:
             initial_page = PAGE_BOARD
         self._show(initial_page)
+        if reboot_required is not None:
+            self._watch_values(area)
+            self._refresh_reboot()
 
     def run(self, owner_hwnd: int = 0) -> bool:
         dlg = self._dlg
@@ -171,6 +183,31 @@ class PropertiesDialog:
             self._list.selection_set(self._keys.index(self._current))
             return
         self._show(key)
+
+    def _watch_values(self, root: tk.Misc) -> None:
+        names = set()
+        pending = [root]
+        while pending:
+            widget = pending.pop()
+            pending.extend(widget.winfo_children())
+            for option in ("variable", "textvariable"):
+                try:
+                    name = str(widget.cget(option))
+                except tk.TclError:
+                    continue
+                if name:
+                    names.add(name)
+        command = self._dlg.register(lambda *_args: self._refresh_reboot())
+        for name in names:
+            self._dlg.tk.call("trace", "add", "variable", name, "write",
+                              command)
+
+    def _refresh_reboot(self) -> None:
+        values = dict(self._model.values)
+        if self._current is not None:
+            self._pages[self._current].store(values)
+        required = self._reboot_required(values)
+        self._reboot_label.config(text=REBOOT_REQUIRED if required else "")
 
     def _refresh_auto_size(self) -> None:
         size = self._subject.auto_size(self._model.values.get("board_id", ""))

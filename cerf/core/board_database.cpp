@@ -3,6 +3,7 @@
 #include "cerf_emulator.h"
 #include "cerf_paths.h"
 #include "config_json.h"
+#include "share_folder_mount_name.h"
 #include "string_utils.h"
 
 #include <nlohmann/json.hpp>
@@ -62,6 +63,13 @@ void BoardDatabase::OnReady() {
     const std::string path = GetCerfDir() + "db.json";
     json root = CfgReadJsonFile(path);
     if (root.is_null()) CfgFatal(path, "is missing: the installation is damaged");
+
+    const char* kMountPointKey = "ga_shared_folder_mount_point";
+    if (!root.contains(kMountPointKey) || !root[kMountPointKey].is_string() ||
+        !IsValidShareFolderMountName(root[kMountPointKey].get<std::string>()))
+        CfgFatal(path, std::string("'") + kMountPointKey +
+                       "' must be a valid mount point name");
+    ga_shared_folder_mount_point_ = root[kMountPointKey].get<std::string>();
 
     for (const auto& f : RequireArray(root, "soc_families", path)) {
         if (!f.is_object()) CfgFatal(path, "soc_families[] entries must be objects");

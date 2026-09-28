@@ -4,7 +4,6 @@ import tkinter as tk
 from tkinter import ttk
 from typing import Callable, Dict, List, Optional
 
-from color_schemes import color_scheme_supported_for_os
 from dialog_buttons import pack_actions
 from properties_model import PropertiesModel
 from properties_page_board import BoardRomPage, PAGE_BOARD
@@ -84,9 +83,7 @@ class PropertiesDialog:
 
         self._board = BoardRomPage(area, dlg, self._subject.device_dir,
                                    self._on_board_changed)
-        self._ga = GuestAdditionsPage(
-            area, dlg, color_scheme_supported_for_os(self._subject.os_name),
-            self._on_ga_toggled)
+        self._ga = GuestAdditionsPage(area, dlg, self._on_ga_toggled)
         self._display = DisplayPage(area, dlg)
         self._emulator = EmulatorSettingsPage(area)
         self._pages: Dict[str, object] = {

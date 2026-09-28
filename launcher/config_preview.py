@@ -6,7 +6,7 @@ from tkinter import ttk
 from typing import Callable, List, Tuple
 
 from board_info import board_display_name
-from color_schemes import CS_KEY_TO_LABEL, color_scheme_supported_for_os
+from color_schemes import CS_KEY_TO_LABEL
 from device_file_types import device_file_types
 from properties_model import PropertiesModel
 from properties_page_board import PAGE_BOARD
@@ -80,7 +80,7 @@ class ConfigPreviewPanel:
         self._fill(self.board, board_rows)
 
         if subject.guest_additions_available(board_id):
-            self._fill(self.ga, self._ga_rows(subject, values, auto_size))
+            self._fill(self.ga, self._ga_rows(values, auto_size))
         else:
             self.ga.grid_remove()
 
@@ -99,8 +99,7 @@ class ConfigPreviewPanel:
              else "Detached"),
             ("Verbose logs", _on_off(values.get("verbose_logs", False)))])
 
-    def _ga_rows(self, subject, values: dict,
-                 auto_size: Tuple[int, int]) -> Rows:
+    def _ga_rows(self, values: dict, auto_size: Tuple[int, int]) -> Rows:
         if not values.get("guest_additions", False):
             return [("Status", "Disabled")]
         share = values.get("share_folder")
@@ -114,10 +113,9 @@ class ConfigPreviewPanel:
                   else "Default"),
                  ("Font size", str(values["font_size"])
                   if "font_size" in values else "Default")]
-        if color_scheme_supported_for_os(subject.os_name):
-            key = values.get("color_scheme", "")
-            rows.append(("Color scheme",
-                         CS_KEY_TO_LABEL.get(key, "None") if key else "None"))
+        key = values.get("color_scheme", "")
+        rows.append(("Color scheme",
+                     CS_KEY_TO_LABEL.get(key, "None") if key else "None"))
         return rows
 
     def _fill(self, block: SideBlock, rows: Rows) -> None:

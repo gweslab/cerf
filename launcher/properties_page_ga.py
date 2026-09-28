@@ -25,10 +25,8 @@ class GuestAdditionsPage:
     title = "Guest Additions"
 
     def __init__(self, parent: tk.Misc, window: tk.Misc,
-                 color_scheme_available: bool,
                  on_toggled: Callable[[], None]) -> None:
         self._on_toggled = on_toggled
-        self._color_scheme_available = color_scheme_available
         self._enabled = True
         self._toggle_locked = False
 
@@ -61,8 +59,27 @@ class GuestAdditionsPage:
         self.share.frame.grid(row=1, column=0, sticky="ew")
 
         self._rule(body, 2)
-        self.resolution = ResolutionBlock(body, window)
-        self.resolution.frame.grid(row=3, column=0, sticky="ew")
+        display = ttk.Frame(body)
+        display.grid(row=3, column=0, sticky="ew")
+        display.columnconfigure(0, weight=1, uniform="half")
+        display.columnconfigure(2, weight=1, uniform="half")
+        self.resolution = ResolutionBlock(display, window)
+        self.resolution.frame.grid(row=0, column=0, sticky="new", padx=(0, 8))
+        self._vrule(display, 1)
+        presets = ttk.Frame(display)
+        presets.grid(row=0, column=2, sticky="new", padx=(8, 0))
+        ttk.Label(presets, text="Set a preset").grid(row=0, column=0,
+                                                     columnspan=4, sticky="w")
+        ttk.Label(presets,
+                  text="Adopt settings below for a high DPI experience",
+                  style="Hint.TLabel").grid(row=1, column=0, columnspan=4,
+                                            sticky="w")
+        self.preset_buttons = []
+        for i, (label, dpi, font) in enumerate(SCALE_PRESETS):
+            b = ttk.Button(presets, text="Adapt for {}".format(label),
+                           command=lambda d=dpi, f=font: self._preset(d, f))
+            b.grid(row=2, column=i, sticky="w", padx=(0, 6), pady=(6, 0))
+            self.preset_buttons.append(b)
 
         self._rule(body, 4)
         depth = ttk.Frame(body)
@@ -82,8 +99,8 @@ class GuestAdditionsPage:
         look.columnconfigure(2, weight=1, uniform="half")
         self.font_size = FontSizeOptionBlock(look, window)
         self.font_size.frame.grid(row=0, column=0, sticky="new", padx=(0, 8))
-        self.cs_sep = self._vrule(look, 1)
-        cs = self.cs_frame = ttk.Frame(look)
+        self._vrule(look, 1)
+        cs = ttk.Frame(look)
         cs.grid(row=0, column=2, sticky="new", padx=(8, 0))
         cs.columnconfigure(0, weight=1)
         self.cs_check = ttk.Checkbutton(cs, text="Override color scheme",
@@ -100,38 +117,15 @@ class GuestAdditionsPage:
         self.cs_combo.grid(row=1, column=0, columnspan=2, sticky="ew",
                            pady=(6, 0))
 
-        self._rule(body, 8)
-        presets = ttk.Frame(body)
-        presets.grid(row=9, column=0, sticky="ew")
-        ttk.Label(presets, text="Set a preset",
-                  font=("Segoe UI", 9, "bold")).grid(row=0, column=0,
-                                                     columnspan=4, sticky="w")
-        ttk.Label(presets,
-                  text="Adopt settings above for a high DPI experience",
-                  style="Hint.TLabel").grid(row=1, column=0, columnspan=4,
-                                            sticky="w")
-        self.preset_buttons = []
-        for i, (label, dpi, font) in enumerate(SCALE_PRESETS):
-            b = ttk.Button(presets, text="Adapt for {}".format(label),
-                           command=lambda d=dpi, f=font: self._preset(d, f))
-            b.grid(row=2, column=i, sticky="w", padx=(0, 6), pady=(6, 0))
-            self.preset_buttons.append(b)
-
-        if not color_scheme_available:
-            self.cs_sep.grid_remove()
-            cs.grid_remove()
+    @staticmethod
+    def _rule(parent: tk.Misc, row: int) -> None:
+        ttk.Separator(parent, orient="horizontal").grid(
+            row=row, column=0, sticky="ew", pady=10)
 
     @staticmethod
-    def _rule(parent: tk.Misc, row: int) -> ttk.Separator:
-        sep = ttk.Separator(parent, orient="horizontal")
-        sep.grid(row=row, column=0, sticky="ew", pady=10)
-        return sep
-
-    @staticmethod
-    def _vrule(parent: tk.Misc, column: int) -> ttk.Separator:
-        sep = ttk.Separator(parent, orient="vertical")
-        sep.grid(row=0, column=column, sticky="ns")
-        return sep
+    def _vrule(parent: tk.Misc, column: int) -> None:
+        ttk.Separator(parent, orient="vertical").grid(
+            row=0, column=column, sticky="ns")
 
     def lock_toggle(self) -> None:
         self._toggle_locked = True
@@ -160,9 +154,9 @@ class GuestAdditionsPage:
         self.bpp.store(model)
         self.dpi.store(model)
         self.font_size.store(model)
-        if self._color_scheme_available and self.var_cs_override.get():
+        if self.var_cs_override.get():
             model["color_scheme"] = CS_LABEL_TO_KEY.get(self.var_cs.get(), "")
-        elif self._color_scheme_available:
+        else:
             model["color_scheme"] = ""
 
     def validate(self) -> bool:

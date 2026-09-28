@@ -8,6 +8,12 @@ from launch_options_presets import RES_PRESETS
 from ui_dialogs import show_error
 
 _AUTO = 0
+_AUTO_LABEL = "Auto"
+_CUSTOM_LABEL = "Custom"
+_SIZES = [(w, h) for w, h, _name in RES_PRESETS]
+_LABEL_CHARS = max(len(n) for n in
+                   [name for _w, _h, name in RES_PRESETS] +
+                   [_AUTO_LABEL, _CUSTOM_LABEL])
 
 
 class ResolutionBlock:
@@ -31,17 +37,17 @@ class ResolutionBlock:
                                 style="Res.Horizontal.TScale",
                                 command=self._on_slider)
         self.slider.grid(row=1, column=0, sticky="ew", pady=(6, 0))
-        self.preset_label = ttk.Label(self.frame, text="", style="Hint.TLabel")
-        self.preset_label.grid(row=2, column=0, sticky="w")
 
         fields = ttk.Frame(self.frame)
-        fields.grid(row=3, column=0, sticky="w", pady=(4, 0))
-        ttk.Label(fields, text="Width").grid(row=0, column=0, sticky="w")
+        fields.grid(row=2, column=0, sticky="w", pady=(4, 0))
+        self.preset_label = ttk.Label(fields, text="", style="Hint.TLabel",
+                                      width=-_LABEL_CHARS)
+        self.preset_label.grid(row=0, column=0, sticky="w", padx=(0, 6))
         self.width_entry = ttk.Entry(fields, textvariable=self.var_width,
                                      width=6, validate="key",
                                      validatecommand=numeric_vcmd)
-        self.width_entry.grid(row=0, column=1, padx=(4, 2))
-        ttk.Label(fields, text="px  ×  Height").grid(row=0, column=2)
+        self.width_entry.grid(row=0, column=1, padx=(0, 2))
+        ttk.Label(fields, text="px  ×").grid(row=0, column=2)
         self.height_entry = ttk.Entry(fields, textvariable=self.var_height,
                                       width=6, validate="key",
                                       validatecommand=numeric_vcmd)
@@ -124,7 +130,7 @@ class ResolutionBlock:
         w, h = self._auto_size
         self._set_text(w, h)
         self._set_slider(_AUTO)
-        self.preset_label.config(text="Auto")
+        self.preset_label.config(text=_AUTO_LABEL)
 
     def _on_slider(self, value: str) -> None:
         if self._sync_guard:
@@ -138,9 +144,9 @@ class ResolutionBlock:
             self._show_auto()
         else:
             self._auto = False
-            w, h = RES_PRESETS[index - 1]
+            w, h, name = RES_PRESETS[index - 1]
             self._set_text(w, h)
-            self.preset_label.config(text="{} × {}".format(w, h))
+            self.preset_label.config(text=name)
         self._refresh_state()
 
     def _on_text_changed(self, *_args: object) -> None:
@@ -150,15 +156,15 @@ class ResolutionBlock:
     def _sync_slider_to_text(self) -> None:
         size = self._size()
         if size is None:
-            self.preset_label.config(text="Custom")
+            self.preset_label.config(text=_CUSTOM_LABEL)
             return
-        if size in RES_PRESETS:
-            self._set_slider(RES_PRESETS.index(size) + 1)
-            self.preset_label.config(text="{} × {}".format(*size))
+        if size in _SIZES:
+            index = _SIZES.index(size)
+            self._set_slider(index + 1)
+            self.preset_label.config(text=RES_PRESETS[index][2])
             return
         area = size[0] * size[1]
-        nearest = min(range(len(RES_PRESETS)),
-                      key=lambda i: abs(RES_PRESETS[i][0] * RES_PRESETS[i][1]
-                                        - area))
+        nearest = min(range(len(_SIZES)),
+                      key=lambda i: abs(_SIZES[i][0] * _SIZES[i][1] - area))
         self._set_slider(nearest + 1)
-        self.preset_label.config(text="Custom - {} × {}".format(*size))
+        self.preset_label.config(text=_CUSTOM_LABEL)

@@ -29,7 +29,6 @@ class PropertiesSubject:
     device_dir: Path
     display_name: str
     os_ver_major: int
-    os_name: str
     forbid_guest_additions: bool
     default_width: Optional[int]
     default_height: Optional[int]
@@ -41,7 +40,6 @@ class PropertiesSubject:
             display_name=(device.meta.name or device.meta.device_name
                           or device.name),
             os_ver_major=device.meta.os_ver_major,
-            os_name=device.meta.os_name,
             forbid_guest_additions=device.meta.forbid_guest_additions,
             default_width=device.default_screen_width,
             default_height=device.default_screen_height)
@@ -53,7 +51,6 @@ class PropertiesSubject:
             device_dir=device_dir,
             display_name=meta.name or meta.device_name or device_dir.name,
             os_ver_major=meta.os_ver_major,
-            os_name=meta.os_name,
             forbid_guest_additions=meta.forbid_guest_additions,
             default_width=width,
             default_height=height)

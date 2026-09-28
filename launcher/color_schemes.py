@@ -27,15 +27,3 @@ COLOR_SCHEMES = [
 ]
 CS_KEY_TO_LABEL = {k: d for (k, d) in COLOR_SCHEMES}
 CS_LABEL_TO_KEY = {d: k for (k, d) in COLOR_SCHEMES}
-
-_COLOR_SCHEME_UNSUPPORTED_OS = {
-    _os_name("windows_mobile_2003se"), _os_name("windows_mobile_5"), _os_name("windows_mobile_6"),
-}
-
-
-def color_scheme_supported_for_os(os_name: str) -> bool:
-    n = (os_name or "").strip()
-    if n in _COLOR_SCHEME_UNSUPPORTED_OS:
-        return False
-    nl = n.casefold()
-    return not (nl.startswith("windows mobile") or nl.startswith("wm "))

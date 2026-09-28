@@ -447,10 +447,6 @@ constexpr void ArmCpu::VisitState(ArmCpuState& s, F& field) {
     field("acc0", s.acc0);
     field("ldrex_monitor_addr", s.ldrex_monitor_addr);
     field("ldrex_monitor_armed", s.ldrex_monitor_armed);
-#if CERF_DEV_MODE
-    field.Skip(s.retired_insns);
-    field.Skip(s.executed_insns);
-#endif
     field("guest_cycle_counter", s.guest_cycle_counter);
     field.Skip(s.guest_cycle_deadline);
     field("guest_cycle_hi", s.guest_cycle_hi);

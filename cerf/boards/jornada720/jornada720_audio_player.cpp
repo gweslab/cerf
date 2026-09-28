@@ -129,14 +129,7 @@ private:
             std::lock_guard<std::mutex> lk(slots_mtx_);
             slot.in_flight = true;
         }
-        if (!sink_.Play(&slot.hdr)) {
-            {
-                std::lock_guard<std::mutex> lk(slots_mtx_);
-                slot.in_flight = false;
-            }
-            auto frozen = emu_.Get<EmulationFreeze>().WorkerSection();
-            emu_.Get<Sa1111Sac>().CompleteTransmit(p.buffer_b);
-        }
+        sink_.Play(&slot.hdr);
     }
 
     void OnPageDone(LPWAVEHDR hdr) {

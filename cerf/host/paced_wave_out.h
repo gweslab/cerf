@@ -79,6 +79,7 @@ private:
     double                set_point_frames_ = 0.0;
     uint32_t              starved_        = 0;
     uint32_t              device_epoch_   = 0;
+    uint32_t              sink_generation_ = 0;
     uint32_t              unfed_total_    = 0;
     bool                  position_valid_ = false;
     uint32_t              position_       = 0;

@@ -92,10 +92,7 @@ void PacedWaveOut::PlayLocked(const uint8_t* bytes, uint32_t length) {
     headers_[slot].lpData         = reinterpret_cast<LPSTR>(buffers_[slot]);
     headers_[slot].dwBufferLength = length;
 
-    if (!sink_.Play(&headers_[slot])) {
-        LOG(Caution, "[%s] sink refused a %u-byte block\n", log_tag_, length);
-        CerfFatalExit(CERF_FATAL_RUNTIME_ERROR);
-    }
+    sink_.Play(&headers_[slot]);
     const auto now = std::chrono::steady_clock::now();
     slot_busy_[slot]    = true;
     ++outstanding_;
@@ -317,13 +314,15 @@ void PacedWaveOut::RefreshPositionLocked() {
     if (pending_count_ == 0) ++unfed_total_;
     position_unfed_ = unfed_total_;
     position_valid_ = false;
-    if (!sink_.IsOpen()) return;
-    MMTIME mmt{};
-    mmt.wType = TIME_SAMPLES;
-    if (waveOutGetPosition(sink_.Device(), &mmt, sizeof(mmt)) != MMSYSERR_NOERROR ||
-        mmt.wType != TIME_SAMPLES)
-        return;
-    position_        = mmt.u.sample;
+    uint32_t samples    = 0;
+    uint32_t generation = 0;
+    const bool sampled  = sink_.SamplePosition(samples, generation);
+    if (generation != sink_generation_) {
+        sink_generation_ = generation;
+        ++device_epoch_;
+    }
+    if (!sampled) return;
+    position_        = samples;
     position_wall_s_ = std::chrono::duration<double>(
                            std::chrono::steady_clock::now().time_since_epoch()).count();
     position_valid_  = true;

@@ -11,77 +11,85 @@
 #include <mutex>
 #include <thread>
 
-/* Host waveOut output sink shared by the sound paths. EnsureFormat (waveOutOpen)
-   MUST run on the audio thread - CALLBACK_THREAD delivers MM_WOM_DONE only there.
-   Play/Unprepare/Reset are winmm-serialized and may run on any thread. */
 class WaveOutSink {
 public:
     using ThreadCallback  = std::function<void()>;
     using MessageHandler  = std::function<void(const MSG&)>;
+    using Clock           = std::chrono::steady_clock;
 
     WaveOutSink() = default;
     ~WaveOutSink();
     WaveOutSink(const WaveOutSink&)            = delete;
     WaveOutSink& operator=(const WaveOutSink&) = delete;
 
-    /* Spawn the audio thread, block until its queue exists. on_start runs once on
-       the thread; on_message runs there per message except WM_QUIT. */
     void Start(ThreadCallback on_start, MessageHandler on_message,
                const char* log_tag);
-    /* Signal WM_QUIT and join. Idempotent; call from OnShutdown so the thread
-       stops before any peer it drives completion into is destroyed. */
     void Stop();
 
     DWORD ThreadId() const { return thread_id_; }
-    /* PostThreadMessage to the audio thread; no-op before Start / after Stop. */
     void Post(UINT message, WPARAM wparam = 0, LPARAM lparam = 0) const;
 
-    /* Open or re-open (on format change) the device; on the audio thread.
-       allow_resampler=false => WAVE_FORMAT_DIRECT, rejecting non-native rates;
-       busy=true holds a re-open until in-flight buffers drain. Returns IsOpen(). */
     bool EnsureFormat(uint32_t sample_rate_hz, uint16_t channels,
                       uint16_t bits, bool allow_resampler, bool busy);
-    bool     IsOpen() const { return out_device_ != nullptr; }
-    bool     FormatMatches(uint32_t sample_rate_hz, uint16_t channels, uint16_t bits) const {
-        return out_device_ != nullptr && open_rate_ == sample_rate_hz &&
-               open_channels_ == channels && open_bits_ == bits;
-    }
-    HWAVEOUT Device() const { return out_device_; }
+    bool IsOpen() const;
+    bool SamplePosition(uint32_t& samples, uint32_t& generation) const;
 
-    bool Play(WAVEHDR* hdr);
+    void Play(WAVEHDR* hdr);
     void Unprepare(WAVEHDR* hdr);
     void Reset();
 
     static constexpr UINT kMsgPaceDue = WM_USER + 909;
-    void ArmPaceDeadline(std::chrono::steady_clock::duration delay);
+    void ArmPaceDeadline(Clock::duration delay);
 
-    std::chrono::steady_clock::duration PeriodFor(uint32_t length) const;
+    Clock::duration PeriodFor(uint32_t length) const;
 
-private:
-    void ThreadMain(ThreadCallback on_start, MessageHandler on_message);
-    void CloseDevice();
-    void ArmSilentTimer(WAVEHDR* hdr);
-    void ArmSilentHead();
-    void CancelSilentTimers();
-    WAVEHDR* TakeSilentTimer(UINT_PTR id);
-
-    static constexpr UINT     kMsgArmSilent    = WM_USER + 907;
-    static constexpr UINT     kMsgCancelSilent = WM_USER + 908;
-
-public:
     static constexpr uint32_t kSilentQueue = 8;
     static constexpr WPARAM   kSilentDone  = 1;
 
 private:
+    struct SilentBlock {
+        WAVEHDR*          hdr;
+        Clock::time_point due;
+    };
 
-    std::mutex  silent_mtx_;
-    WAVEHDR*    silent_queue_[kSilentQueue] = {};
-    uint32_t    silent_count_ = 0;
-    UINT_PTR    silent_id_    = 0;
-    HANDLE      pace_timer_   = nullptr;
-    uint32_t    req_rate_     = 0;
-    uint16_t    req_channels_ = 0;
-    uint16_t    req_bits_     = 0;
+    struct OpenRequest {
+        WAVEFORMATEX fmt;
+        DWORD        flags;
+    };
+
+    void ThreadMain(ThreadCallback on_start, MessageHandler on_message);
+    HANDLE CreatePaceTimer() const;
+    void ArmTimer(HANDLE timer, Clock::duration delay) const;
+    bool FormatMatchesLocked() const;
+    OpenRequest BeginOpenLocked();
+    MMRESULT OpenDevice(const OpenRequest& req, HWAVEOUT& device) const;
+    bool FinishOpenLocked(const OpenRequest& req, MMRESULT r, HWAVEOUT device);
+    bool OpenLocked();
+    void CloseDeviceLocked();
+    void LoseDeviceLocked(const char* call, MMRESULT result);
+    void RetryOpen();
+    Clock::duration PeriodForLocked(uint32_t length) const;
+    void QueueSilentLocked(WAVEHDR* hdr);
+    void DeliverDueSilent(const MessageHandler& on_message);
+    void CancelSilentLocked();
+
+    static constexpr UINT kMsgRetryOpen = WM_USER + 907;
+    static constexpr Clock::duration kReopenInterval = std::chrono::seconds(1);
+
+    mutable std::mutex mtx_;
+    SilentBlock        silent_[kSilentQueue] = {};
+    uint32_t           silent_count_ = 0;
+    Clock::time_point  silent_tail_{};
+    HANDLE             silent_timer_ = nullptr;
+    HANDLE             pace_timer_   = nullptr;
+    uint32_t           req_rate_     = 0;
+    uint16_t           req_channels_ = 0;
+    uint16_t           req_bits_     = 0;
+    bool               req_allow_resampler_ = false;
+    Clock::time_point  last_attempt_{};
+    MMRESULT           last_fail_    = MMSYSERR_NOERROR;
+    bool               retry_posted_ = false;
+    uint32_t           generation_   = 0;
 
     DWORD             thread_id_   = 0;
     HANDLE            ready_event_ = nullptr;

@@ -185,10 +185,7 @@ bool Imx31AudioPlayer::QueuePage() {
     slot->hdr.dwUser         = reinterpret_cast<DWORD_PTR>(slot);
     slot->in_flight          = true;
 
-    if (!sink_.Play(&slot->hdr)) {
-        slot->in_flight = false;
-        return false;
-    }
+    sink_.Play(&slot->hdr);
     if (slot->retire) emu_.Get<AudioActivityWidget>().MarkTx();
     return true;
 }

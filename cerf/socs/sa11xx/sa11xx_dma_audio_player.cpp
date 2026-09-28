@@ -102,14 +102,7 @@ void Sa11xxDmaAudioPlayer::LoadIntoSlot(Slot& slot, const PendingPage& p) {
         std::lock_guard<std::mutex> lk(slots_mtx_);
         slot.in_flight = true;
     }
-    if (!sink_.Play(&slot.hdr)) {
-        {
-            std::lock_guard<std::mutex> lk(slots_mtx_);
-            slot.in_flight = false;
-        }
-        auto frozen = emu_.Get<EmulationFreeze>().WorkerSection();
-        emu_.Get<Sa11xxDma>().CompleteTransfer(p.dma_channel, p.buffer_b);
-    }
+    sink_.Play(&slot.hdr);
 }
 
 void Sa11xxDmaAudioPlayer::OnPageDone(LPWAVEHDR hdr) {

@@ -233,11 +233,7 @@ void OdoArm720AudioPlayer::SubmitNextPage() {
     slot->hdr.dwBufferLength = kPageSize;
     slot->hdr.dwUser         = page_index;
 
-    if (!sink_.Play(&slot->hdr)) {
-        std::lock_guard<std::mutex> lk(state_mutex_);
-        if (submitted_pages_ > 0) --submitted_pages_;
-        return;
-    }
+    sink_.Play(&slot->hdr);
     emu_.Get<AudioActivityWidget>().MarkTx();
 }
 

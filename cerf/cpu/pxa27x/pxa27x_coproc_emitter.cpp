@@ -17,6 +17,7 @@
 #include "../../jit/x86_emit_alu.h"
 #include "../../boards/board_context.h"
 #include "../../socs/pxa27x/pxa270_id.h"
+#include "../../socs/pxa27x/pxa27x_clock_manager.h"
 
 namespace {
 
@@ -57,8 +58,6 @@ protected:
         uint8_t* is_idle = EmitJzLabel32(cursor);
         EmitCmpRegImm32(cursor, m_field_reg, 3u);
         uint8_t* is_sleep = EmitJzLabel32(cursor);
-        EmitCmpRegImm32(cursor, m_field_reg, 7u);
-        uint8_t* is_deep_sleep = EmitJzLabel32(cursor);
         EmitCmpRegImm32(cursor, m_field_reg, 0u);
         uint8_t* is_active = EmitJzLabel32(cursor);
         cursor = EmitCoprocUnimplementedFatal(cursor, d, ctx);
@@ -72,7 +71,6 @@ protected:
         uint8_t* idle_done = EmitJmpLabel32(cursor);
 
         FixupLabel32(is_sleep, cursor);
-        FixupLabel32(is_deep_sleep, cursor);
         EmitMovRegImm32(cursor, kEcx,
             static_cast<uint32_t>(
                 reinterpret_cast<uintptr_t>(ctx->emit->Cpu())));
@@ -109,6 +107,30 @@ protected:
                                       BlockContext* ctx) override {
         cursor = EmitCparGate(cursor, d, ctx);
         return EmitCoprocUnimplementedFatal(cursor, d, ctx);
+    }
+
+    /* Intel PXA27x Developer's Manual 280000-001 Table 3-40 "Coprocessor 14
+       Clocks and Power Register Summary" (page 3-105): CP14 register 6 CLKCFG. */
+    uint8_t* EmitClkcfgTransfer(uint8_t*      cursor,
+                                DecodedInsn*  d,
+                                BlockContext* ctx) override {
+        using namespace x86;
+        if (d->rd == 15u) return EmitCoprocUnimplementedFatal(cursor, d, ctx);
+        const int32_t rd_disp = static_cast<int32_t>(
+            offsetof(ArmCpuState, gprs) + d->rd * 4u);
+        EmitMovRegImm32(cursor, kEcx,
+            static_cast<uint32_t>(reinterpret_cast<uintptr_t>(
+                &emu_.Get<Pxa27xClockManager>())));
+        if (d->l) {
+            EmitCall(cursor,
+                reinterpret_cast<void*>(&Pxa27xClockManager::ReadClkcfgHelper));
+            EmitMovBaseDisp32Reg(cursor, kStateReg, rd_disp, kEax);
+        } else {
+            EmitMovRegBaseDisp32(cursor, kEdx, kStateReg, rd_disp);
+            EmitCall(cursor,
+                reinterpret_cast<void*>(&Pxa27xClockManager::WriteClkcfgHelper));
+        }
+        return cursor;
     }
 };
 

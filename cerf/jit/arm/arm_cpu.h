@@ -27,9 +27,11 @@ public:
     ArmPsrFull* BankedSpsr(uint32_t mode);
 
     void SetInitialStackPointer(uint32_t sp);
+    void SetResetCoprocessorAccess(uint32_t value);
 
     void SetPendingResumeVector(uint32_t pc);
     void SetPendingResumeMmu(uint32_t control, uint32_t ttbr0, uint32_t dacr);
+    void SetPendingResumeAuxControl(uint32_t aux);
 
     void RaiseUndefinedException(uint32_t guest_pc);
     void RaiseAbortDataException(uint32_t guest_pc);
@@ -77,7 +79,10 @@ private:
     uint32_t pending_resume_ttbr0_   = 0;
     uint32_t pending_resume_dacr_    = 0;
     bool     pending_resume_mmu_set_ = false;
+    uint32_t pending_resume_aux_     = 0;
+    bool     pending_resume_aux_set_ = false;
     uint32_t initial_pc_             = 0;
     bool     initial_thumb_          = false;
     uint32_t initial_sp_             = 0;
+    uint32_t reset_coprocessor_access_ = 0;
 };

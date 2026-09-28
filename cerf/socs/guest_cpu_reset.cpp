@@ -34,7 +34,7 @@ void GuestCpuReset::ColdReset() {
 
 void GuestCpuReset::WatchdogReset() {
     if (latch_) latch_->LatchWatchdogReset();
-    pending_kind_.store(ResetLineKind::Other, std::memory_order_release);
+    pending_kind_.store(ResetLineKind::Watchdog, std::memory_order_release);
     emu_.Get<GuestEngine>().SetResetPending(false);
 }
 
@@ -59,7 +59,8 @@ void GuestCpuReset::RestoreState(StateReader& r) {
     uint32_t kind = 0;
     r.Read("pending_kind", kind);
     if (kind != static_cast<uint32_t>(ResetLineKind::Rtc) &&
-        kind != static_cast<uint32_t>(ResetLineKind::Other))
+        kind != static_cast<uint32_t>(ResetLineKind::Other) &&
+        kind != static_cast<uint32_t>(ResetLineKind::Watchdog))
         r.Reject("reset kind %u is not a ResetLineKind", kind);
     pending_kind_.store(static_cast<ResetLineKind>(kind), std::memory_order_release);
     uint8_t resume = 0;

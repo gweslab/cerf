@@ -55,7 +55,62 @@ void Pxa2xxGpio::ApplyEdgesLocked(const uint32_t* before) {
         const uint32_t fell = ~now & before[b] & gfer_[b];
         gedr_[b] |= (rose | fell);
     }
+    if (wake_sink_ != nullptr) {
+        const uint32_t now  = PinLevelLocked(0);
+        const uint32_t rose = now & ~before[0] & ~gpdr_[0];
+        const uint32_t fell = ~now & before[0] & ~gpdr_[0];
+        if ((rose | fell) != 0u) wake_sink_->OnInputEdges(rose, fell);
+    }
     UpdateIntcLocked();
+}
+
+void Pxa2xxGpio::CaptureLevels(uint32_t* levels) const {
+    for (uint32_t b = 0; b < BankCount(); ++b) levels[b] = PinLevelLocked(b);
+}
+
+/* PXA255 Dev Man §3.5.10: "When the processor re-enters the run mode, these
+   GPIO pins retain the programmed sleep state until software resets PSSR[PH]." */
+void Pxa2xxGpio::ResetRegisters(bool sleep_exit) {
+    std::lock_guard<std::mutex> g(mtx_);
+    for (uint32_t b = 0; b < kMaxBanks; ++b) {
+        if (sleep_exit) {
+            const uint32_t mask = gpdr_[b] | held_mask_[b];
+            held_level_[b] = PinLevelLocked(b) & mask;
+            held_mask_[b]  = mask;
+        } else {
+            held_mask_[b]  = 0u;
+            held_level_[b] = 0u;
+        }
+        out_[b]  = 0u;
+        gpdr_[b] = 0u;
+        grer_[b] = 0u;
+        gfer_[b] = 0u;
+        gedr_[b] = 0u;
+    }
+    for (uint32_t i = 0; i < kMaxGafr; ++i) gafr_[i] = 0u;
+    UpdateIntcLocked();
+}
+
+/* PXA255 Dev Man §3.5.10: "the contents of the PGSR registers are loaded into
+   the GPIO output data registers ... All bits in the output registers are
+   loaded." */
+void Pxa2xxGpio::LoadSleepOutputs(const uint32_t* pgsr, uint32_t banks) {
+    std::lock_guard<std::mutex> g(mtx_);
+    uint32_t before[kMaxBanks] = {};
+    CaptureLevels(before);
+    for (uint32_t b = 0; b < banks && b < BankCount(); ++b) out_[b] = pgsr[b];
+    ApplyEdgesLocked(before);
+}
+
+void Pxa2xxGpio::ReleaseSleepHold() {
+    std::lock_guard<std::mutex> g(mtx_);
+    uint32_t before[kMaxBanks] = {};
+    CaptureLevels(before);
+    for (uint32_t b = 0; b < kMaxBanks; ++b) {
+        held_mask_[b]  = 0u;
+        held_level_[b] = 0u;
+    }
+    ApplyEdgesLocked(before);
 }
 
 void Pxa2xxGpio::SetInputLevel(uint32_t gpio, bool high) {
@@ -149,6 +204,8 @@ void Pxa2xxGpio::SaveState(StateWriter& w) {
     w.WriteBytes("gfer", gfer_, nb);
     w.WriteBytes("gedr", gedr_, nb);
     w.WriteBytes("gafr", gafr_, GafrCount() * sizeof(uint32_t));
+    w.WriteBytes("held_mask", held_mask_, nb);
+    w.WriteBytes("held_level", held_level_, nb);
     if (serial_slave_) serial_slave_->SaveState(w);
 }
 
@@ -162,5 +219,7 @@ void Pxa2xxGpio::RestoreState(StateReader& r) {
     r.ReadBytes("gfer", gfer_, nb);
     r.ReadBytes("gedr", gedr_, nb);
     r.ReadBytes("gafr", gafr_, GafrCount() * sizeof(uint32_t));
+    r.ReadBytes("held_mask", held_mask_, nb);
+    r.ReadBytes("held_level", held_level_, nb);
     if (serial_slave_) serial_slave_->RestoreState(r);
 }

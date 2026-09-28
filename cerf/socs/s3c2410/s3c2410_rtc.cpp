@@ -2,18 +2,22 @@
 
 #include "../../core/cerf_emulator.h"
 #include "../../core/fatal.h"
+#include "../../core/log.h"
 #include "../../core/tick_scale.h"
 #include "../../jit/guest_cycle_clock.h"
 #include "../../peripherals/peripheral_dispatcher.h"
+#include "../../host/guest_deep_sleep.h"
+#include "../../jit/guest_engine.h"
 #include "../../boards/board_context.h"
 #include "s3c2410_id.h"
 #include "../../state/state_stream.h"
 #include "../guest_cpu_reset.h"
 #include "../irq_controller.h"
-#include "s3c2410_clocks.h"
+#include "../oscillator_ticks.h"
+#include "s3c2410_rtc_alarm.h"
+#include "s3c2410_rtc_calendar.h"
 
 #include <cstdint>
-#include <ctime>
 
 namespace {
 
@@ -42,17 +46,16 @@ constexpr uint32_t kRtcConClkRst  = 1u << 3;
 constexpr uint32_t kRtcRstSrstEn  = 1u << 3;
 constexpr uint32_t kTicntEnable   = 1u << 7;
 constexpr uint32_t kTicntCount    = 0x7Fu;
-constexpr uint32_t kRtcAlmEn      = 1u << 6;
-constexpr uint32_t kRtcAlmYear    = 1u << 5;
-constexpr uint32_t kRtcAlmMon     = 1u << 4;
-constexpr uint32_t kRtcAlmDate    = 1u << 3;
-constexpr uint32_t kRtcAlmHour    = 1u << 2;
-constexpr uint32_t kRtcAlmMin     = 1u << 1;
-constexpr uint32_t kRtcAlmSec     = 1u << 0;
 constexpr int      kIrqTick       = 8;
 constexpr int      kIrqRtc        = 30;
 constexpr uint64_t kTickHz        = 128ull;
-constexpr uint64_t kNsPerSec      = 1000000000ull;
+/* S3C2410A UM p.17-1: "The RTC unit works with an external 32.768 kHz crystal"; p.17-3:
+   tick "Period = ( n+1 ) / 128 second". */
+constexpr uint64_t kRtcxHz        = 32768ull;
+constexpr uint64_t kRtcxPerTick   = kRtcxHz / kTickHz;
+static_assert(kRtcxHz % kTickHz == 0u, "the 128 Hz tick divides the RTC crystal");
+
+using Cal = S3C2410RtcCalendar;
 
 class S3C2410Rtc : public Peripheral {
 public:
@@ -64,16 +67,35 @@ public:
     }
 
     void OnReady() override {
-        rate_hz_ = emu_.Get<S3C2410Clocks>().CoreClockHz();
-        if (rate_hz_ == 0u) {
-            emu_.Get<Fatal>().Die("S3C2410Rtc: the SoC reports a 0 Hz core clock");
-        }
-        origin_cycles_ = emu_.Get<GuestCycleClock>().Cycles();
-        SeedFromHost();
+        osc_.Attach(kRtcxHz, 1u);
+        const OscillatorTicks::Reading now = osc_.Sample();
+        total_seen_ = now.total;
+        park_seen_  = now.park;
+        cal_.SeedFromHost();
         GuestCycleClock& clk = emu_.Get<GuestCycleClock>();
         tick_ev_  = clk.Add([this] { OnTick(); });
         alarm_ev_ = clk.Add([this] { OnAlarmCompare(); });
-        emu_.Get<S3C2410Clocks>().RegisterRateListener([this] { OnRateChange(); });
+        clk.RegisterRateListener([this] { OnRateChange(); });
+        /* S3C2410A UM p.7-14: "The wakeup from Power_OFF mode can be issued by
+           the EINT[15:0] or by RTC alarm interrupt." */
+        emu_.Get<GuestDeepSleep>().RegisterParkClock([this] { Advance(); });
+        emu_.Get<GuestDeepSleep>().RegisterParkWakeSource([this] { return park_hit_; });
+        emu_.Get<GuestDeepSleep>().RegisterParkWakeDue([this] { return AlarmWakeDueNs(); });
+        /* S3C2410A UM p.17-3: "When the system is off ... the backup battery only drives the
+           oscillation circuit and the BCD counters". */
+        emu_.Get<GuestDeepSleep>().RegisterSleepEntryListener([this] {
+            Advance();
+            if (tick_armed_) {
+                emu_.Get<Fatal>().Die("S3C2410Rtc: Power_OFF entered with the tick enabled "
+                                      "(TICNT 0x%X); whether the tick counts in Power_OFF is "
+                                      "not modelled", ticnt_);
+            }
+            ReportPark();
+            tick_pending_  = false;
+            alarm_pending_ = false;
+            SyncTickEvent();
+            SyncAlarmEvent();
+        });
         emu_.Get<GuestCpuReset>().RegisterResetListener([this](ResetLineKind) {
             OnResetLine();
         });
@@ -88,204 +110,190 @@ public:
 
     void SaveState(StateWriter& w) override;
     void RestoreState(StateReader& r) override;
-    void PostRestore() override;
 
 private:
-    static uint32_t ToBcd(uint32_t v) { return ((v / 10u) << 4) | (v % 10u); }
-    static uint32_t FromBcd(uint32_t v) { return ((v >> 4) & 0xFu) * 10u + (v & 0xFu); }
-
-    /* S3C2410A UM p.17-1: "Leap year generator" and "Year 2000 problem is
-       removed"; p.17-8 gives the alarm date range "from 0 to 28, 29, 30, 31". */
-    static uint32_t DaysInMonth(uint32_t mon, uint32_t year) {
-        static const uint32_t kLen[12] = {31u, 28u, 31u, 30u, 31u, 30u,
-                                          31u, 31u, 30u, 31u, 30u, 31u};
-        if (mon == 2u && (year % 4u) == 0u) return 29u;
-        return kLen[mon - 1u];
+    uint64_t CreditTicks(uint64_t ticks) {
+        frac_ticks_ += ticks;
+        const uint64_t secs = frac_ticks_ / kRtcxHz;
+        frac_ticks_ %= kRtcxHz;
+        if (secs != 0u) cal_.AdvanceSeconds(secs);
+        return secs;
     }
 
-    void SeedFromHost() {
-        const std::time_t t = std::time(nullptr);
-        std::tm           lt{};
-        localtime_s(&lt, &t);
-        sec_  = static_cast<uint32_t>(lt.tm_sec % 60);
-        min_  = static_cast<uint32_t>(lt.tm_min);
-        hour_ = static_cast<uint32_t>(lt.tm_hour);
-        date_ = static_cast<uint32_t>(lt.tm_mday);
-        mon_  = static_cast<uint32_t>(lt.tm_mon + 1);
-        year_ = static_cast<uint32_t>((lt.tm_year + 1900) % 100);
-        day_  = static_cast<uint32_t>(lt.tm_wday + 1);
-    }
-
-    void AdvanceOneDay() {
-        day_ = day_ % 7u + 1u;
-        if (date_ < DaysInMonth(mon_, year_)) {
-            ++date_;
-            return;
-        }
-        date_ = 1u;
-        if (mon_ < 12u) {
-            ++mon_;
-            return;
-        }
-        mon_  = 1u;
-        year_ = (year_ + 1u) % 100u;
-    }
-
-    void AdvanceSeconds(uint64_t secs) {
-        uint64_t t = sec_ + secs;
-        sec_ = static_cast<uint32_t>(t % 60u);
-        t    = min_ + t / 60u;
-        min_ = static_cast<uint32_t>(t % 60u);
-        t    = hour_ + t / 60u;
-        hour_ = static_cast<uint32_t>(t % 24u);
-        for (uint64_t days = t / 24u; days > 0u; --days) AdvanceOneDay();
-    }
-
+    /* S3C2410A UM p.7-15: "For alarm wake-up, check the RTC time because the
+       RTC bit of SRCPND isn't set at the alarm wake-up." */
     void Advance() {
-        const uint64_t now   = emu_.Get<GuestCycleClock>().Cycles();
-        const uint64_t delta = now - origin_cycles_;
-        const uint64_t whole = (delta / rate_hz_) * kNsPerSec;
-        const uint64_t part  = (delta % rate_hz_) * kNsPerSec + ns_rem_;
-        ns_rem_ = part % rate_hz_;
-        const uint64_t d = whole + part / rate_hz_;
-        origin_cycles_ = now;
-        mono_ns_ += static_cast<int64_t>(d);
-        frac_ns_ += d;
-        const uint64_t secs = frac_ns_ / kNsPerSec;
-        frac_ns_ %= kNsPerSec;
-        if (secs != 0u) AdvanceSeconds(secs);
+        const OscillatorTicks::Reading now = osc_.Sample();
+        const uint64_t slept = now.park - park_seen_;
+        const uint64_t awake = now.total - total_seen_ - slept;
+        total_seen_ = now.total;
+        park_seen_  = now.park;
+        CreditTicks(awake);
+        if (slept != 0u) {
+            const Cal was = cal_;
+            if (park_ticks_ == 0u) park_from_ = was;
+            park_ticks_ += slept;
+            const uint64_t secs = CreditTicks(slept);
+            park_hit_ = park_hit_ || (alarm_armed_ && alarm_.Crossed(was, secs));
+        }
+        if (!emu_.Get<GuestEngine>().DeepSleep()) ReportPark();
+        if (slept == 0u) return;
+        if (alarm_armed_ && alarm_target_ <= total_seen_) ArmNextAlarm();
+        else                                              SyncAlarmEvent();
+        SyncTickEvent();
+    }
+
+    int64_t AlarmWakeDueNs() {
+        Advance();
+        if (!alarm_armed_ || !alarm_.Enabled()) return GuestDeepSleep::kNoParkWake;
+        const uint64_t secs = alarm_.SecondsTo(cal_);
+        if (secs == 0u) return GuestDeepSleep::kNoParkWake;
+        return osc_.SleptNsAtTick(total_seen_ + secs * kRtcxHz - frac_ticks_);
+    }
+
+    void ReportPark() {
+        if (park_ticks_ == 0u) return;
+        LOG(SocTimer, "[RTCSLEEP] s3c2410 park %llu ms: %02u:%02u:%02u -> %02u:%02u:%02u "
+                      "tick=%d alarm=%d hit=%d rtccon=0x%X ticnt=0x%X rtcalm=0x%X\n",
+            static_cast<unsigned long long>(ScaleU64(park_ticks_, 1000u, kRtcxHz)),
+            park_from_.hour, park_from_.min, park_from_.sec, cal_.hour, cal_.min, cal_.sec,
+            static_cast<int>(tick_armed_), static_cast<int>(alarm_armed_),
+            static_cast<int>(park_hit_), rtccon_, ticnt_, alarm_.rtcalm);
+        park_ticks_ = 0u;
+        park_hit_   = false;
     }
 
     void OnRateChange() {
         Advance();
-        const uint64_t hz = emu_.Get<S3C2410Clocks>().CoreClockHz();
-        if (hz == 0u) {
-            emu_.Get<Fatal>().Die("S3C2410Rtc: the SoC reports a 0 Hz core clock");
-        }
-        rate_hz_ = hz;
-        ns_rem_  = 0;
-        if (tick_armed_)  ArmAt(tick_ev_, tick_target_ns_);
-        if (alarm_armed_) ArmAt(alarm_ev_, alarm_target_ns_);
+        osc_.Rescale();
+        SyncTickEvent();
+        SyncAlarmEvent();
     }
 
     void OnResetLine() {
-        rtccon_  = 0;
-        ticnt_   = 0;
-        rtcalm_  = 0;
-        almsec_  = 0;
-        almmin_  = 0;
-        almhour_ = 0;
-        almdate_ = 0x01u;
-        almmon_  = 0x01u;
-        almyear_ = 0;
-        rtcrst_  = 0;
-        if (tick_armed_)  emu_.Get<GuestCycleClock>().Disarm(tick_ev_);
-        if (alarm_armed_) emu_.Get<GuestCycleClock>().Disarm(alarm_ev_);
-        tick_armed_  = false;
-        alarm_armed_ = false;
+        if (emu_.Get<GuestCpuReset>().DeliveredResetWasResume()) return;
+        rtccon_ = 0;
+        ticnt_  = 0;
+        rtcrst_ = 0;
+        alarm_.Reset();
+        tick_armed_    = false;
+        alarm_armed_   = false;
+        tick_pending_  = false;
+        alarm_pending_ = false;
+        SyncTickEvent();
+        SyncAlarmEvent();
     }
 
-    void ArmAt(GuestCycleClock::Event* ev, int64_t target_ns) {
-        Advance();
-        const int64_t  delta = target_ns > mono_ns_ ? target_ns - mono_ns_ : 0;
-        const uint64_t cyc   = ScaleU64(static_cast<uint64_t>(delta), rate_hz_, kNsPerSec);
-        emu_.Get<GuestCycleClock>().Arm(ev, origin_cycles_ + cyc);
+    void ArmAt(GuestCycleClock::Event* ev, uint64_t target) {
+        osc_.ArmAt(ev, target);
     }
 
-    int64_t TickPeriodNs() const {
-        const uint64_t n = (ticnt_ & kTicntCount) + 1u;
-        return static_cast<int64_t>(ScaleU64(n, kNsPerSec, kTickHz));
+    uint64_t TickPeriodTicks() const {
+        return ((ticnt_ & kTicntCount) + 1u) * kRtcxPerTick;
     }
 
     void RearmTick() {
-        if ((ticnt_ & kTicntEnable) == 0u) {
-            if (tick_armed_) emu_.Get<GuestCycleClock>().Disarm(tick_ev_);
-            tick_armed_ = false;
-            return;
-        }
-        if ((ticnt_ & kTicntCount) == 0u) {
-            emu_.Get<Fatal>().Die(
-                "S3C2410Rtc: TICNT enables the tick with count 0, outside the "
-                "documented 1..127 range, which CERF does not model");
-        }
         Advance();
-        tick_target_ns_ = mono_ns_ + TickPeriodNs();
-        tick_armed_     = true;
-        ArmAt(tick_ev_, tick_target_ns_);
+        tick_pending_ = tick_pending_ || (tick_armed_ && tick_target_ <= total_seen_);
+        tick_armed_   = (ticnt_ & kTicntEnable) != 0u;
+        if (tick_armed_) {
+            if ((ticnt_ & kTicntCount) == 0u) {
+                emu_.Get<Fatal>().Die(
+                    "S3C2410Rtc: TICNT enables the tick with count 0, outside the "
+                    "documented 1..127 range, which CERF does not model");
+            }
+            /* S3C2410A UM p.17-2 Figure 17-1: the Time Tick Generator counts the 128 Hz
+               output of the 2^15 divider whose 1 Hz output feeds SEC. */
+            tick_target_ = total_seen_ + TickPeriodTicks() - frac_ticks_ % kRtcxPerTick;
+        }
+        SyncTickEvent();
     }
 
-    void SyncEvent(GuestCycleClock::Event* ev, bool armed, int64_t target_ns) {
+    void SyncEvent(GuestCycleClock::Event* ev, bool armed, uint64_t target) {
         if (armed) {
-            ArmAt(ev, target_ns);
+            ArmAt(ev, target);
             return;
         }
         emu_.Get<GuestCycleClock>().Disarm(ev);
     }
 
+    void SyncTickEvent() {
+        if (tick_pending_) {
+            ArmAt(tick_ev_, total_seen_);
+            return;
+        }
+        SyncEvent(tick_ev_, tick_armed_, tick_target_);
+    }
+
+    void SyncAlarmEvent() {
+        if (alarm_pending_) {
+            ArmAt(alarm_ev_, total_seen_);
+            return;
+        }
+        SyncEvent(alarm_ev_, alarm_armed_, alarm_target_);
+    }
+
     void OnTick() {
+        if (tick_pending_) {
+            tick_pending_ = false;
+            emu_.Get<IrqController>().AssertIrq(kIrqTick);
+            SyncTickEvent();
+            return;
+        }
         if ((ticnt_ & kTicntEnable) == 0u) {
             tick_armed_ = false;
             return;
         }
         emu_.Get<IrqController>().AssertIrq(kIrqTick);
-        tick_target_ns_ += TickPeriodNs();
-        ArmAt(tick_ev_, tick_target_ns_);
+        tick_target_ += TickPeriodTicks();
+        ArmAt(tick_ev_, tick_target_);
     }
 
     void RearmAlarm() {
-        if ((rtcalm_ & kRtcAlmEn) == 0u) {
-            if (alarm_armed_) emu_.Get<GuestCycleClock>().Disarm(alarm_ev_);
-            alarm_armed_ = false;
-            return;
-        }
         Advance();
-        alarm_target_ns_ = mono_ns_ - (mono_ns_ % static_cast<int64_t>(kNsPerSec)) +
-                           static_cast<int64_t>(kNsPerSec);
-        alarm_armed_     = true;
-        ArmAt(alarm_ev_, alarm_target_ns_);
+        alarm_pending_ = alarm_pending_ || (alarm_armed_ && alarm_target_ <= total_seen_);
+        ArmNextAlarm();
+    }
+
+    void ArmNextAlarm() {
+        const uint64_t secs = alarm_.Enabled() ? alarm_.SecondsTo(cal_) : 0u;
+        alarm_armed_ = secs != 0u;
+        if (alarm_armed_) alarm_target_ = total_seen_ + secs * kRtcxHz - frac_ticks_;
+        SyncAlarmEvent();
     }
 
     void OnAlarmCompare() {
-        if ((rtcalm_ & kRtcAlmEn) == 0u) {
-            alarm_armed_ = false;
-            return;
-        }
         Advance();
-        bool match = true;
-        if ((rtcalm_ & kRtcAlmSec)  != 0u && ToBcd(sec_)  != (almsec_  & 0x7Fu)) match = false;
-        if ((rtcalm_ & kRtcAlmMin)  != 0u && ToBcd(min_)  != (almmin_  & 0x7Fu)) match = false;
-        if ((rtcalm_ & kRtcAlmHour) != 0u && ToBcd(hour_) != (almhour_ & 0x3Fu)) match = false;
-        if ((rtcalm_ & kRtcAlmDate) != 0u && ToBcd(date_) != (almdate_ & 0x3Fu)) match = false;
-        if ((rtcalm_ & kRtcAlmMon)  != 0u && ToBcd(mon_)  != (almmon_  & 0x1Fu)) match = false;
-        if ((rtcalm_ & kRtcAlmYear) != 0u && ToBcd(year_) != (almyear_ & 0xFFu)) match = false;
-        if (match) emu_.Get<IrqController>().AssertIrq(kIrqRtc);
-        alarm_target_ns_ += static_cast<int64_t>(kNsPerSec);
-        ArmAt(alarm_ev_, alarm_target_ns_);
+        if (alarm_pending_ || (alarm_.Enabled() && alarm_.Matches(cal_))) {
+            emu_.Get<IrqController>().AssertIrq(kIrqRtc);
+        }
+        alarm_pending_ = false;
+        ArmNextAlarm();
     }
 
     void SetField(uint32_t off, uint32_t value);
 
-    uint64_t origin_cycles_ = 0;
-    uint64_t rate_hz_       = 0;
-    uint64_t ns_rem_        = 0;
-    uint64_t frac_ns_       = 0;
-    int64_t  mono_ns_       = 0;
+    OscillatorTicks osc_{emu_, true};
+    uint64_t total_seen_   = 0;
+    uint64_t park_seen_    = 0;
+    uint64_t park_ticks_   = 0;
+    uint64_t frac_ticks_   = 0;
+    uint64_t tick_target_  = 0;
+    uint64_t alarm_target_ = 0;
+    bool     park_hit_     = false;
+    Cal      park_from_;
+    Cal      cal_;
 
-    uint32_t sec_ = 0, min_ = 0, hour_ = 0;
-    uint32_t date_ = 1, day_ = 1, mon_ = 1, year_ = 0;
-
-    uint32_t rtccon_ = 0, ticnt_ = 0;
-    uint32_t rtcalm_ = 0;
-    uint32_t almsec_ = 0, almmin_ = 0, almhour_ = 0;
-    uint32_t almdate_ = 0x01u, almmon_ = 0x01u, almyear_ = 0;
-    uint32_t rtcrst_ = 0;
+    uint32_t        rtccon_ = 0, ticnt_ = 0;
+    uint32_t        rtcrst_ = 0;
+    S3C2410RtcAlarm alarm_;
 
     GuestCycleClock::Event* tick_ev_  = nullptr;
     GuestCycleClock::Event* alarm_ev_ = nullptr;
-    int64_t  tick_target_ns_  = 0;
-    int64_t  alarm_target_ns_ = 0;
     bool     tick_armed_      = false;
     bool     alarm_armed_     = false;
+    bool     tick_pending_    = false;
+    bool     alarm_pending_   = false;
 };
 
 uint32_t S3C2410Rtc::ReadWord(uint32_t addr) {
@@ -293,26 +301,26 @@ uint32_t S3C2410Rtc::ReadWord(uint32_t addr) {
     switch (off) {
         case kOffRtcCon:  return rtccon_;
         case kOffTicnt:   return ticnt_;
-        case kOffRtcAlm:  return rtcalm_;
-        case kOffAlmSec:  return almsec_;
-        case kOffAlmMin:  return almmin_;
-        case kOffAlmHour: return almhour_;
-        case kOffAlmDate: return almdate_;
-        case kOffAlmMon:  return almmon_;
-        case kOffAlmYear: return almyear_;
+        case kOffRtcAlm:  return alarm_.rtcalm;
+        case kOffAlmSec:  return alarm_.sec;
+        case kOffAlmMin:  return alarm_.min;
+        case kOffAlmHour: return alarm_.hour;
+        case kOffAlmDate: return alarm_.date;
+        case kOffAlmMon:  return alarm_.mon;
+        case kOffAlmYear: return alarm_.year;
         case kOffRtcRst:  return rtcrst_;
         default: break;
     }
 
     Advance();
     switch (off) {
-        case kOffBcdSec:  return ToBcd(sec_);
-        case kOffBcdMin:  return ToBcd(min_);
-        case kOffBcdHour: return ToBcd(hour_);
-        case kOffBcdDate: return ToBcd(date_);
-        case kOffBcdDay:  return day_;
-        case kOffBcdMon:  return ToBcd(mon_);
-        case kOffBcdYear: return ToBcd(year_);
+        case kOffBcdSec:  return Cal::ToBcd(cal_.sec);
+        case kOffBcdMin:  return Cal::ToBcd(cal_.min);
+        case kOffBcdHour: return Cal::ToBcd(cal_.hour);
+        case kOffBcdDate: return Cal::ToBcd(cal_.date);
+        case kOffBcdDay:  return cal_.day;
+        case kOffBcdMon:  return Cal::ToBcd(cal_.mon);
+        case kOffBcdYear: return Cal::ToBcd(cal_.year);
         default:
             HaltUnsupportedAccess("ReadWord", addr, 0);
     }
@@ -320,24 +328,24 @@ uint32_t S3C2410Rtc::ReadWord(uint32_t addr) {
 
 void S3C2410Rtc::SetField(uint32_t off, uint32_t value) {
     Advance();
-    uint32_t  decoded = 0;
-    uint32_t  lo      = 0;
-    uint32_t  hi      = 0;
-    uint32_t* target  = nullptr;
+    const Cal::Field* field  = nullptr;
+    uint32_t*         target = nullptr;
     switch (off) {
-        case kOffBcdSec:  decoded = FromBcd(value & 0x7Fu); lo = 0;  hi = 59; target = &sec_;  break;
-        case kOffBcdMin:  decoded = FromBcd(value & 0x7Fu); lo = 0;  hi = 59; target = &min_;  break;
-        case kOffBcdHour: decoded = FromBcd(value & 0x3Fu); lo = 0;  hi = 23; target = &hour_; break;
-        case kOffBcdDate: decoded = FromBcd(value & 0x3Fu); lo = 1;  hi = 31; target = &date_; break;
-        case kOffBcdMon:  decoded = FromBcd(value & 0x1Fu); lo = 1;  hi = 12; target = &mon_;  break;
-        case kOffBcdYear: decoded = FromBcd(value & 0xFFu); lo = 0;  hi = 99; target = &year_; break;
-        case kOffBcdDay:  decoded = value & 0x7u;           lo = 1;  hi = 7;  target = &day_;  break;
+        case kOffBcdSec:  field = &Cal::kSec;  target = &cal_.sec;  break;
+        case kOffBcdMin:  field = &Cal::kMin;  target = &cal_.min;  break;
+        case kOffBcdHour: field = &Cal::kHour; target = &cal_.hour; break;
+        case kOffBcdDate: field = &Cal::kDate; target = &cal_.date; break;
+        case kOffBcdMon:  field = &Cal::kMon;  target = &cal_.mon;  break;
+        case kOffBcdYear: field = &Cal::kYear; target = &cal_.year; break;
+        case kOffBcdDay:  field = &Cal::kDay;  target = &cal_.day;  break;
         default:
             emu_.Get<Fatal>().Die(
                 "S3C2410Rtc: SetField reached offset +0x%02X, which is not a BCD "
                 "counter", off);
     }
-    if (decoded < lo || decoded > hi) {
+    const uint32_t decoded = off == kOffBcdDay ? (value & field->mask)
+                                               : Cal::FromBcd(value & field->mask);
+    if (!Cal::Holds(*field, decoded)) {
         emu_.Get<Fatal>().Die(
             "S3C2410Rtc: the guest wrote 0x%02X to the BCD register at +0x%02X, "
             "outside its documented range, which CERF does not model", value, off);
@@ -363,13 +371,13 @@ void S3C2410Rtc::WriteWord(uint32_t addr, uint32_t value) {
             return;
         }
         case kOffTicnt:   ticnt_  = value; RearmTick();  return;
-        case kOffRtcAlm:  rtcalm_ = value; RearmAlarm(); return;
-        case kOffAlmSec:  almsec_  = value; return;
-        case kOffAlmMin:  almmin_  = value; return;
-        case kOffAlmHour: almhour_ = value; return;
-        case kOffAlmDate: almdate_ = value; return;
-        case kOffAlmMon:  almmon_  = value; return;
-        case kOffAlmYear: almyear_ = value; return;
+        case kOffRtcAlm:  alarm_.rtcalm = value; RearmAlarm(); return;
+        case kOffAlmSec:  alarm_.sec    = value; RearmAlarm(); return;
+        case kOffAlmMin:  alarm_.min    = value; RearmAlarm(); return;
+        case kOffAlmHour: alarm_.hour   = value; RearmAlarm(); return;
+        case kOffAlmDate: alarm_.date   = value; RearmAlarm(); return;
+        case kOffAlmMon:  alarm_.mon    = value; RearmAlarm(); return;
+        case kOffAlmYear: alarm_.year   = value; RearmAlarm(); return;
         /* S3C2410A UM p.17-9: RTCRST SRSTEN [3] enables the round second reset
            at the SECCR [2:0] carry boundary. */
         case kOffRtcRst:
@@ -384,7 +392,10 @@ void S3C2410Rtc::WriteWord(uint32_t addr, uint32_t value) {
         case kOffBcdDay: case kOffBcdMon: case kOffBcdYear:
             /* S3C2410A UM p.17-3: bit 0 of RTCCON must be set high in order to
                write the BCD register in the RTC block. */
-            if ((rtccon_ & kRtcConRtcEn) != 0u) SetField(off, value);
+            if ((rtccon_ & kRtcConRtcEn) != 0u) {
+                SetField(off, value);
+                RearmAlarm();
+            }
             return;
         default:
             HaltUnsupportedAccess("WriteWord", addr, value);
@@ -393,41 +404,68 @@ void S3C2410Rtc::WriteWord(uint32_t addr, uint32_t value) {
 
 void S3C2410Rtc::SaveState(StateWriter& w) {
     Advance();
-    w.Write("mono_ns", mono_ns_);  w.Write("ns_rem", ns_rem_);  w.Write("frac_ns", frac_ns_);
-    w.Write("sec", sec_);   w.Write("min", min_);  w.Write("hour", hour_);
-    w.Write("date", date_);  w.Write("day", day_);  w.Write("mon", mon_);   w.Write("year", year_);
-    w.Write("rtccon", rtccon_);  w.Write("ticnt", ticnt_);   w.Write("rtcalm", rtcalm_);
-    w.Write("almsec", almsec_);  w.Write("almmin", almmin_);  w.Write("almhour", almhour_);
-    w.Write("almdate", almdate_); w.Write("almmon", almmon_);  w.Write("almyear", almyear_);
+    osc_.Save(w);
+    w.Write("frac_ticks", frac_ticks_);
+    w.Write("sec", cal_.sec);   w.Write("min", cal_.min);  w.Write("hour", cal_.hour);
+    w.Write("date", cal_.date);  w.Write("day", cal_.day);  w.Write("mon", cal_.mon);
+    w.Write("year", cal_.year);
+    w.Write("rtccon", rtccon_);  w.Write("ticnt", ticnt_);   w.Write("rtcalm", alarm_.rtcalm);
+    w.Write("almsec", alarm_.sec);  w.Write("almmin", alarm_.min);  w.Write("almhour", alarm_.hour);
+    w.Write("almdate", alarm_.date); w.Write("almmon", alarm_.mon);  w.Write("almyear", alarm_.year);
     w.Write("rtcrst", rtcrst_);
-    w.Write("tick_target_ns", tick_target_ns_);  w.Write("alarm_target_ns", alarm_target_ns_);
+    w.Write("tick_target", tick_target_);  w.Write("alarm_target", alarm_target_);
     w.Write<uint8_t>("tick_armed", tick_armed_ ? 1u : 0u);
     w.Write<uint8_t>("alarm_armed", alarm_armed_ ? 1u : 0u);
+    w.Write<uint8_t>("tick_pending", tick_pending_ ? 1u : 0u);
+    w.Write<uint8_t>("alarm_pending", alarm_pending_ ? 1u : 0u);
 }
 
 void S3C2410Rtc::RestoreState(StateReader& r) {
-    r.Read("mono_ns", mono_ns_);  r.Read("ns_rem", ns_rem_);  r.Read("frac_ns", frac_ns_);
-    r.Read("sec", sec_);   r.Read("min", min_);  r.Read("hour", hour_);
-    r.Read("date", date_);  r.Read("day", day_);  r.Read("mon", mon_);   r.Read("year", year_);
-    r.Read("rtccon", rtccon_);  r.Read("ticnt", ticnt_);   r.Read("rtcalm", rtcalm_);
-    r.Read("almsec", almsec_);  r.Read("almmin", almmin_);  r.Read("almhour", almhour_);
-    r.Read("almdate", almdate_); r.Read("almmon", almmon_);  r.Read("almyear", almyear_);
-    r.Read("rtcrst", rtcrst_);
-    r.Read("tick_target_ns", tick_target_ns_);  r.Read("alarm_target_ns", alarm_target_ns_);
-    uint8_t ta = 0, aa = 0;
-    r.Read("tick_armed", ta);  r.Read("alarm_armed", aa);
-    tick_armed_  = ta != 0u;
-    alarm_armed_ = aa != 0u;
-}
-
-void S3C2410Rtc::PostRestore() {
-    origin_cycles_ = emu_.Get<GuestCycleClock>().Cycles();
-    rate_hz_       = emu_.Get<S3C2410Clocks>().CoreClockHz();
-    if (rate_hz_ == 0u) {
-        emu_.Get<Fatal>().Die("S3C2410Rtc: the SoC reports a 0 Hz core clock");
+    osc_.Restore(r);
+    r.Read("frac_ticks", frac_ticks_);
+    if (frac_ticks_ >= kRtcxHz) {
+        r.Reject("S3C2410Rtc: restored sub-second tick %llu of a %llu Hz crystal",
+                 static_cast<unsigned long long>(frac_ticks_),
+                 static_cast<unsigned long long>(kRtcxHz));
     }
-    SyncEvent(tick_ev_, tick_armed_, tick_target_ns_);
-    SyncEvent(alarm_ev_, alarm_armed_, alarm_target_ns_);
+    r.Read("sec", cal_.sec);   r.Read("min", cal_.min);  r.Read("hour", cal_.hour);
+    r.Read("date", cal_.date);  r.Read("day", cal_.day);  r.Read("mon", cal_.mon);
+    r.Read("year", cal_.year);
+    if (!cal_.Valid()) {
+        r.Reject("S3C2410Rtc: restored calendar %u-%u-%u %u:%u:%u day %u is out of range",
+                 cal_.year, cal_.mon, cal_.date, cal_.hour, cal_.min, cal_.sec, cal_.day);
+    }
+    r.Read("rtccon", rtccon_);  r.Read("ticnt", ticnt_);   r.Read("rtcalm", alarm_.rtcalm);
+    r.Read("almsec", alarm_.sec);  r.Read("almmin", alarm_.min);  r.Read("almhour", alarm_.hour);
+    r.Read("almdate", alarm_.date); r.Read("almmon", alarm_.mon);  r.Read("almyear", alarm_.year);
+    r.Read("rtcrst", rtcrst_);
+    if ((rtccon_ & (kRtcConClkRst | kRtcConCntSel | kRtcConClkSel)) != 0u ||
+        (rtcrst_ & kRtcRstSrstEn) != 0u ||
+        ((ticnt_ & kTicntEnable) != 0u && (ticnt_ & kTicntCount) == 0u)) {
+        r.Reject("S3C2410Rtc: restored RTCCON 0x%X, RTCRST 0x%X or TICNT 0x%X sets a mode "
+                 "CERF does not model", rtccon_, rtcrst_, ticnt_);
+    }
+    r.Read("tick_target", tick_target_);  r.Read("alarm_target", alarm_target_);
+    uint8_t ta = 0, aa = 0, tp = 0, ap = 0;
+    r.Read("tick_armed", ta);  r.Read("alarm_armed", aa);
+    r.Read("tick_pending", tp);  r.Read("alarm_pending", ap);
+    if (ta > 1u || aa > 1u || tp > 1u || ap > 1u) {
+        r.Reject("S3C2410Rtc: an armed or pending flag above 1");
+    }
+    if ((ta != 0u) != ((ticnt_ & kTicntEnable) != 0u)) {
+        r.Reject("S3C2410Rtc: restored tick armed flag %u with TICNT 0x%X", ta, ticnt_);
+    }
+    tick_armed_    = ta != 0u;
+    alarm_armed_   = aa != 0u;
+    tick_pending_  = tp != 0u;
+    alarm_pending_ = ap != 0u;
+    const OscillatorTicks::Reading now = osc_.Sample();
+    total_seen_    = now.total;
+    park_seen_     = now.park;
+    park_ticks_    = 0u;
+    park_hit_      = false;
+    SyncTickEvent();
+    SyncAlarmEvent();
 }
 
 }

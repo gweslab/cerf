@@ -98,42 +98,70 @@ On wake the deep-sleep decider banners `GuestPowerNotifier::NotifyResume(ResumeS
 
 ## Per-SoC / per-board wiring contract
 
-To implement deep sleep on a new SoC or board. Step 1 is common. Steps 2-4 are the
-reset-on-wake shape, step 5 the clock-stop shape. A SoC takes one shape or the
-other, never both.
+Do these steps to implement deep sleep on a new SoC or board. A SoC takes one wake
+shape or the other, never both. A step that names a shape applies to that shape only.
+Every other step applies to every SoC.
 
-1. **Detect the power-down write** in the SoC peripheral that owns it (a
-   power-manager force-sleep bit, a CP power-mode write, a simultaneous
-   power-rail-enable clear, …) and call `emu_.Get<GuestDeepSleep>().Enter()`.
-2. **Latch the wake cause.** The peripheral that owns the reset-cause register
-   implements `DeepSleepWaker::LatchSleepWakeCause()` (set the sleep/SMR cause
-   bit) and registers via `GuestDeepSleep::RegisterWaker`.
-3. **Reset reset-line silicon on wake** with `GuestCpuReset::RegisterResetListener`
-   for each register/device the board's reset line clears.
-4. **If the guest resumes at a saved vector** rather than the cold entry,
-   implement `SleepResumeVectorProvider` (board-scoped) and register it with
+1. **Detect the power-down write** in the SoC peripheral that owns it (for example a
+   power-manager force-sleep bit, a CP power-mode write, or a simultaneous
+   power-rail-enable clear). Then call `emu_.Get<GuestDeepSleep>().Enter()`.
+2. **On a reset-on-wake SoC, latch the wake cause.** The peripheral that owns the
+   reset-cause register implements `DeepSleepWaker::LatchSleepWakeCause()` (set the
+   sleep/SMR cause bit) and registers via `GuestDeepSleep::RegisterWaker`.
+3. **On a reset-on-wake SoC, reset reset-line silicon on wake** with
+   `GuestCpuReset::RegisterResetListener` for each register or device that the
+   board's reset line clears.
+4. **On a reset-on-wake SoC whose guest resumes at a saved vector** rather than the
+   cold entry, implement `SleepResumeVectorProvider` (board-scoped) and register it with
    `GuestDeepSleep::RegisterResumeVectorProvider`. Its `ApplyPendingResume()`
    arms the next reset delivery through its own CPU service: an ARM board calls
    `ArmCpu::SetPendingResumeVector(pc)`. When the resume entry expects the MMU
-   still live, it also calls `ArmCpu::SetPendingResumeMmu(control, ttbr0, dacr)`
-   (which flushes the TLBs). If you arm nothing, the reset stays at the cold
-   entry. The `GuestEngine` seam is ISA-neutral
-   (`jit.md` § The `GuestEngine` seam), so no cp15 crosses it - the board owns
-   its own architecture's registers.
-5. **On a clock-stop SoC**, steps 2-4 do not apply - there is no reset, no cause to
-   latch and no resume vector. The peripheral that owns the power register implements
+   still live, the provider also calls `ArmCpu::SetPendingResumeMmu(control, ttbr0, dacr)`.
+   If you arm nothing, the reset stays at the cold entry.
+5. **On a clock-stop SoC**, there is no reset, no cause to latch and no resume
+   vector. The peripheral that owns the power register implements
    `DeepSleepClockStop::OnPowerUp()` and registers via
    `GuestDeepSleep::RegisterClockStopWaker`. `OnPowerUp()` applies exactly what the
    silicon asserts on the power-up edge (on the PR31x00, POWER_CTL PWRCS + VCCON,
    which §12.3.1 says hardware sets when ONBUTN is asserted while PWROK is high).
-   `DeliverWake()` then calls `GuestEngine::ExitDeepSleep()`, which clears the halt
-   so `JitRunner`'s park exits and `Run()` continues at the halted PC.
    **Silicon that loses power in the Suspend State still re-initializes.** No reset
-   line fires on this path, so a `GuestCpuReset` reset listener does NOT run: a
-   device on a power rail the suspend cuts (TMPR3911 §12.2.3: in the Suspend State
-   "VSTANDBY and VCCDRAM are powered but VCC3 is not powered") must be re-initialized
-   off the power-up edge instead. If you miss it, the resumed guest's driver
+   line fires on this path, so a `GuestCpuReset` reset listener does NOT run.
+   Re-initialize a device on a power rail that the suspend cuts from the power-up
+   edge instead (TMPR3911 §12.2.3: in the Suspend State "VSTANDBY and VCCDRAM are
+   powered but VCC3 is not powered"). If you miss it, the resumed guest's driver
    re-handshakes against a device that still holds its pre-sleep state.
+6. **Credit the park to a counter that the guest cycle clock drives and that the
+   datasheet exempts from sleep.** Read `GuestDeepSleep::SleptNs()`. It gives the
+   total time in the park since boot. This total includes the park in progress, and
+   it never decreases. Keep the previous total. Credit the difference, on the JIT thread.
+   Register the counter with `GuestDeepSleep::RegisterParkClock`, so that it also
+   advances during the park. Do not access `GuestCycleClock` from a host thread.
+7. **On a reset-on-wake SoC, guard the reset listener of a unit that the
+   datasheet exempts from sleep.** When
+   `GuestCpuReset::DeliveredResetWasResume()` is true, return early from that
+   listener. The wake arrives as a reset delivery, and every reset listener
+   runs before the resumed guest runs one instruction.
+8. **Register every wake source that the datasheet names for sleep.** Use
+   `GuestDeepSleep::RegisterParkWakeSource`. When its wake-up event occurs and
+   its enable is set, return true from the source. Assert only the status bits that
+   the datasheet sets at that wake-up event. If the datasheet clears a wake status
+   bit when sleep begins, clear it in a `GuestDeepSleep::RegisterSleepEntryListener`
+   callback. Otherwise a status bit from before the sleep ends the park at once.
+   If a counter drives the wake source, also register its due time with
+   `GuestDeepSleep::RegisterParkWakeDue`. The due time must be the exact
+   `SleptNs()` total at which the wake-up event occurs. The park credit stops at
+   the earliest due time. If the park reaches the due time and no wake source
+   returns true, CERF halts. A wake-up event can already be present when sleep
+   begins, for example a held level input. Latch that event in the
+   sleep-entry callback. Then register the current `SleptNs()` total as its
+   due time.
+9. **Make a user wake operate the input that a user operates.** A dialog Cancel
+   stands for a user who wakes the device. Some firmware reads the input that caused
+   a wake, and puts the device back to sleep when no user input caused it. For such
+   a board, register `GuestDeepSleep::RegisterUserWakeInput`. Its callback drives
+   that input, for example the power button pin. The callback runs only for a user
+   wake. It runs while the SoC is still asleep, so the SoC records the input as the
+   wake-up event.
 
 Suspend/resume serializes nothing - RAM stays live the whole time. The CPU is
 only parked.

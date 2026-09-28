@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../core/service.h"
+#include "guest_power_notifier.h"
 
 #include <atomic>
 #include <condition_variable>
@@ -72,9 +73,20 @@ public:
     /* OnReady-time, board-scoped: supplies the sleep-wake resume vector. */
     void RegisterResumeVectorProvider(SleepResumeVectorProvider* p);
 
-    void Enter();
+    static constexpr int64_t kNoParkWake = INT64_MAX;
 
-    void RequestHardwareWake();
+    void RegisterUserWakeInput(std::function<void()> fn);
+    void RegisterSleepEntryListener(std::function<void()> fn);
+    void RegisterParkClock(std::function<void()> fn);
+    void RegisterParkWakeSource(std::function<bool()> fn);
+    void RegisterParkWakeDue(std::function<int64_t()> fn);
+    void PollPark();
+    void FinishPark();
+
+    int64_t SleptNs() const;
+    int64_t ParkWaitNs() const;
+
+    void Enter();
 
     /* Hibernation worker, after a full restore: a machine saved mid-deep-sleep
        comes back with deep_sleep set, so auto-wake it (the dialog's Cancel
@@ -83,10 +95,21 @@ public:
 
 private:
     void Recover();      /* UI thread: run the prompt and act on the choice. */
-    void DeliverWake();
+    void ConsumeSleepSpan();
+    void DeliverWake(ResumeSource src);
     void TearDownPromptForHardwareWake();
 
     std::vector<std::function<void()>> power_up_listeners_;
+    std::vector<std::function<void()>> user_wake_inputs_;
+    std::vector<std::function<void()>> sleep_entry_listeners_;
+    std::vector<std::function<void()>> park_clocks_;
+    std::vector<std::function<bool()>> park_wake_sources_;
+    std::vector<std::function<int64_t()>> park_wake_dues_;
+    mutable std::mutex         span_mtx_;
+    int64_t                    slept_ns_       = 0;
+    int64_t                    sleep_entry_ns_ = 0;
+    int64_t                    park_due_ns_    = kNoParkWake;
+    std::atomic<bool>          wake_claimed_{false};
     DeepSleepClockStop*        clock_stop_             = nullptr;
     DeepSleepWaker*            waker_                  = nullptr;
     SleepResumeVectorProvider* resume_vector_provider_ = nullptr;

@@ -19,9 +19,7 @@ public:
     uint32_t MmioBase() const override { return 0x90040000u; }
     uint32_t MmioSize() const override { return 0x00010000u; }
 
-    uint8_t  ReadByte (uint32_t addr) override;
     uint32_t ReadWord (uint32_t addr) override;
-    void     WriteByte(uint32_t addr, uint8_t  value) override;
     void     WriteWord(uint32_t addr, uint32_t value) override;
 
     void SaveState(StateWriter& w) override;
@@ -32,6 +30,12 @@ public:
        Level changes on input-configured pins latch GEDR per GRER/GFER
        and update the INTC sources. */
     void DriveInputPin(uint32_t pin, bool level);
+
+    /* §9.5.7.4: "For a GPIO to serve as a wake-up source, it must be
+       programmed as an input in the GPDR." */
+    uint32_t InputEdges() const;
+
+    void LoadSleepOutputs(uint32_t pgsr);
 
 private:
     static constexpr uint32_t kPinMask = 0x0FFFFFFFu;  /* bits 27:0 */
@@ -45,8 +49,8 @@ private:
     uint32_t output_state_ = 0;
     uint32_t input_state_  = 0;
     uint32_t gpdr_         = 0;
-    uint32_t grer_         = 0;
-    uint32_t gfer_         = 0;
+    uint32_t grer_         = 0x3u;
+    uint32_t gfer_         = 0x3u;
     uint32_t gedr_         = 0;
     uint32_t gafr_         = 0;
 

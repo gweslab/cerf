@@ -42,6 +42,10 @@ public:
     /* GLOBALEN, Enable Interrupt 6 bit 18 (TMPR3911 §8.3.17). */
     void SetGlobalEnable();
 
+    bool EnabledInterruptPending() const;
+    bool SourceEnabledWithoutGlobalEnable() const;
+    bool WouldRaiseIrq(uint32_t set, uint32_t bits) const;
+
     /* Notify `cb` when the guest unmasks any of `bits` in Enable Interrupt
        `set+1` (and once at registration if already unmasked). Fired OUTSIDE the
        lock: the callback re-enters via SetPending, which would deadlock the
@@ -65,8 +69,8 @@ private:
 
     MipsJit* jit_ = nullptr;
 
-    bool IrqLowLocked() const;
-    bool IrqHighLocked() const;
-    uint32_t HighPriorityLevelLocked() const;
+    bool     IrqLowFor(const uint32_t* status) const;
+    bool     IrqHighFor(const uint32_t* status) const;
+    uint32_t HighPriorityLevelFor(const uint32_t* status) const;
     void RecomputeLocked();
 };

@@ -18,10 +18,6 @@ public:
     /* proc-sa1100.S:276  sa1100 = 0x4401a110 mask 0xfffffff0. */
     uint32_t Midr() const override { return 0x4401A110u; }
     uint32_t Ctr()  const override { return 0x4401A110u; }
-
-    /* SA-1100 Tech Ref §8.2 Table 8-1 (p. 8-2): CCF 01001 = 191.7 MHz =
-       52 x the 3.6864-MHz crystal. */
-    uint32_t CpuToOscrDivider() const override { return 52; }
 };
 
 }  /* namespace */

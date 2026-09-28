@@ -37,10 +37,20 @@ constexpr Vr41xxPmuModel kModel = {
     0x2C00u,
     0x0008u,   /* PMUINTREG D3 RSTSW  */
     0x0010u,   /* PMUINTREG D4 RTCRST */
+    /* Software shutdown's PMUINTREG column is "-" (UM Table 16-2), and D0 POWERSWINTR "is
+       not set to 1 when the POWER signal becomes high in the Hibernate mode (MPOWER = 0)"
+       (UM 16.2.1). */
+    0u,
+    /* UM 16.2.2 p412: D6:3 "Write 0 to these bits", D1 "Write 1 to this bit", D0
+       "Write 0 to this bit". */
+    0x0079u,
+    0x0002u,
+    /* UM 16.2.1 p409: PMUINTREG "After reset" row 0 in D15-D0. */
+    0x0000u,
+    /* UM 16.2.1 p410: "When a deadman's switch interrupt request has occurred, the DMSRST
+       bit and the RSTSW bit are both set." */
+    0x000Cu,
 };
-
-constexpr uint16_t kIntRstSw = 0x0008u;   /* PMUINTREG D3 RSTSW  */
-constexpr uint16_t kIntDmsRst = 0x0004u;  /* PMUINTREG D2 DMSRST */
 
 constexpr uint32_t kOffDivReg   = 0x0Cu;
 constexpr uint16_t kDivWritable = 0x000Fu;
@@ -62,18 +72,10 @@ public:
     void RestoreState(StateReader& r) override {
         Vr41xxPmuBase::RestoreState(r);
         r.Read("divreg", divreg_);
+        if ((divreg_ & ~kDivWritable) != 0u || !DivModeDefined(divreg_)) {
+            r.Reject("Vr4121Pmu: restored PMUDIVREG 0x%04X is no DIV mode a write stores", divreg_);
+        }
     }
-
-    /* A deadman's SW shutdown sets DMSRST and RSTSW (UM 16.2.1, 16.1.2(2)); the Casio
-       IOCTL_HAL_REBOOT (ASIC 0x1118/0x111A) routes here. nk.exe StartUp's reset gate
-       0x9F0B5EB4 reaches the shell only when both D2 DMSRST and D3 RSTSW are set. */
-    void LatchWatchdogReset() override { SetIntBits(kIntDmsRst | kIntRstSw); }
-
-    /* Software shutdown's PMUINTREG column is "-" (UM Table 16-2), and D0 POWERSWINTR "is
-       not set to 1 when the POWER signal becomes high in the Hibernate mode (MPOWER = 0)"
-       (UM 16.2.1). */
-    void LatchSleepWakeCause() override {}
-    void ClearSleepWakeCause() override {}
 
 protected:
     void ResetExt() override { divreg_ = 0; }
@@ -100,4 +102,4 @@ private:
 
 }  /* namespace */
 
-REGISTER_SERVICE(Vr4121Pmu);
+REGISTER_SERVICE_AS(Vr4121Pmu, Vr41xxPmu);

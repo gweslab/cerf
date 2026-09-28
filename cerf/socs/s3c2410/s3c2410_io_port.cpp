@@ -1,6 +1,7 @@
 #include "../../peripherals/peripheral_base.h"
 
 #include "../../core/cerf_emulator.h"
+#include "../../core/fatal.h"
 #include "../../core/log.h"
 #include "../../boards/board_context.h"
 #include "s3c2410_id.h"
@@ -116,6 +117,10 @@ constexpr int kSrcpndEint8_23 = 5;
 constexpr int kEintPendFirst = 4;
 constexpr int kEintLast      = 23;
 
+/* S3C2410A UM p. 7-14: "The wakeup from Power_OFF mode can be issued by the
+   EINT[15:0] or by RTC alarm interrupt." */
+constexpr uint32_t kWakeEints = 0x0000FFFFu;
+
 class S3C2410IoPort : public Peripheral,
                       public ResetCauseLatch,
                       public DeepSleepWaker,
@@ -132,7 +137,20 @@ public:
         auto& reset = emu_.Get<GuestCpuReset>();
         reset.SetCauseLatch(this);
         reset.RegisterResetListener([this](ResetLineKind) { OnResetLine(); });
-        emu_.Get<GuestDeepSleep>().RegisterWaker(this);
+        reset.RegisterResetReleaseListener([this] { OnResetRelease(); });
+        auto& sleep = emu_.Get<GuestDeepSleep>();
+        sleep.RegisterWaker(this);
+        sleep.RegisterSleepEntryListener([this] {
+            StoreWake(HeldLevelRequests(kWakeEints) & kWakeEints);
+            powered_off_.store(true, std::memory_order_release);
+        });
+        sleep.RegisterParkWakeSource([this] {
+            return ((LoadWake() | HeldLevelRequests(kWakeEints)) & kWakeEints) != 0u;
+        });
+        sleep.RegisterParkWakeDue([this, &sleep] {
+            return (LoadWake() & kWakeEints) != 0u ? sleep.SleptNs()
+                                                   : GuestDeepSleep::kNoParkWake;
+        });
         emu_.Get<S3C2410EintSource>().SetSink(this);
         emu_.Get<PeripheralDispatcher>().Register(this);
     }
@@ -162,6 +180,11 @@ public:
         if (was == level) { return; }
         if (!EintPinSelectsInterrupt(eint)) { return; }
         if (!EintRequests(EintMode(eint), level)) { return; }
+        OrWake(bit & kWakeEints);
+        if (powered_off_.load(std::memory_order_acquire)) {
+            LatchPoweredOffEint(eint);
+            return;
+        }
         LatchAndPropagateEint(eint);
     }
 
@@ -182,6 +205,8 @@ public:
         w.WriteBytes("storage", storage_, sizeof(storage_));
         w.Write<uint32_t>("levels", LoadLevels());
         w.Write<uint32_t>("driven", LoadDriven());
+        w.Write<uint32_t>("eint_wake", LoadWake());
+        w.Write<uint8_t>("powered_off", powered_off_.load(std::memory_order_acquire) ? 1u : 0u);
     }
     void RestoreState(StateReader& r) override {
         r.ReadBytes("storage", storage_, sizeof(storage_));
@@ -191,6 +216,16 @@ public:
         r.Read("driven", driven);
         StoreLevels(levels);
         StoreDriven(driven);
+        uint32_t wake        = 0;
+        uint8_t  powered_off = 0;
+        r.Read("eint_wake", wake);
+        r.Read("powered_off", powered_off);
+        if ((wake & ~kWakeEints) != 0u || powered_off > 1u) {
+            r.Reject("S3C2410IoPort: EINT wake latch 0x%08X or power-off flag %u out of range",
+                     wake, powered_off);
+        }
+        StoreWake(wake);
+        powered_off_.store(powered_off != 0u, std::memory_order_release);
     }
 
 private:
@@ -265,18 +300,43 @@ private:
 
     /* S3C2410A UM p. 9-26: EINTMASK 0 = Enable Interrupt, 1 = Masked.
        UM p. 14-7: SRCPND EINT4_7 [4], EINT8_23 [5]. */
+    bool EintMasked(int eint) {
+        return ((LoadSlot(kEintMaskSlot) >> eint) & 1u) != 0u;
+    }
+
     void PropagateEint(int eint) {
-        if (((LoadSlot(kEintMaskSlot) >> eint) & 1u) != 0u) { return; }
+        if (EintMasked(eint)) { return; }
         emu_.Get<IrqController>().AssertIrq(
             eint <= 7 ? kSrcpndEint4_7 : kSrcpndEint8_23);
+    }
+
+    /* S3C2410A UM p. 7-14 step 2 and p. 7-15 step 7. */
+    void LatchPoweredOffEint(int eint) {
+        if ((1u << eint) & ~kWakeEints) {
+            emu_.Get<Fatal>().Die("S3C2410IoPort: EINT%d requested in Power_OFF mode, "
+                                  "which is not a wake-up source", eint);
+        }
+        if (eint >= kEintPendFirst && !EintMasked(eint)) {
+            OrSlot(kEintPendSlot, 1u << eint);
+        }
+    }
+
+    /* S3C2410A UM p. 7-15 step 7: "For EINT[3:0], check the SRCPND register." */
+    void OnResetRelease() {
+        if (!emu_.Get<GuestCpuReset>().DeliveredResetWasResume()) { return; }
+        const uint32_t woke = LoadWake() & ((1u << kEintPendFirst) - 1u);
+        for (int e = kEintFirst; e < kEintPendFirst; ++e) {
+            if ((woke & (1u << e)) != 0u) { emu_.Get<IrqController>().AssertIrq(e); }
+        }
     }
 
     /* S3C2410A UM p. 9-22: 000 and 001 select a LEVEL signalling method, so
        the request stands while the pin holds that level. UM p. 9-7: while
        masked, "the EINT4_7 bit and EINT8_23 bit of the SRCPND" stay unset. */
-    void ReevaluateLevelEints(uint32_t candidates) {
+    uint32_t HeldLevelRequests(uint32_t candidates) {
         const uint32_t levels = LoadLevels();
         const uint32_t driven = LoadDriven();
+        uint32_t held = 0u;
         for (int e = kEintFirst; e <= kEintLast; ++e) {
             const uint32_t bit = 1u << e;
             if ((candidates & bit) == 0u) { continue; }
@@ -285,7 +345,15 @@ private:
             const uint32_t mode = EintMode(e);
             if (!EintIsLevelMode(mode)) { continue; }
             if (!EintRequests(mode, (levels & bit) != 0u)) { continue; }
-            LatchAndPropagateEint(e);
+            held |= bit;
+        }
+        return held;
+    }
+
+    void ReevaluateLevelEints(uint32_t candidates) {
+        const uint32_t held = HeldLevelRequests(candidates);
+        for (int e = kEintFirst; e <= kEintLast; ++e) {
+            if ((held & (1u << e)) != 0u) { LatchAndPropagateEint(e); }
         }
     }
 
@@ -302,6 +370,15 @@ private:
     uint32_t AndLevels(uint32_t bits) {
         return std::atomic_ref<uint32_t>(input_level_)
             .fetch_and(bits, std::memory_order_acq_rel);
+    }
+    uint32_t LoadWake() {
+        return std::atomic_ref<uint32_t>(eint_wake_).load(std::memory_order_acquire);
+    }
+    void StoreWake(uint32_t v) {
+        std::atomic_ref<uint32_t>(eint_wake_).store(v, std::memory_order_release);
+    }
+    void OrWake(uint32_t bits) {
+        std::atomic_ref<uint32_t>(eint_wake_).fetch_or(bits, std::memory_order_acq_rel);
     }
     uint32_t OrDriven(uint32_t bits) {
         return std::atomic_ref<uint32_t>(input_driven_)
@@ -331,6 +408,7 @@ private:
        mode." p. 7-15 wake steps 3/6/7 read back MISCCR[19:17], GSTATUS3,4 and
        EINTPEND written before entry. */
     void OnResetLine() {
+        powered_off_.store(false, std::memory_order_release);
         if (emu_.Get<GuestCpuReset>().DeliveredResetWasResume()) {
             return;
         }
@@ -348,6 +426,9 @@ private:
     uint32_t input_level_ = 0;
     alignas(std::atomic_ref<uint32_t>::required_alignment)
     uint32_t input_driven_ = 0;
+    alignas(std::atomic_ref<uint32_t>::required_alignment)
+    uint32_t eint_wake_ = 0;
+    std::atomic<bool> powered_off_{false};
 };
 
 uint32_t S3C2410IoPort::ReadWord(uint32_t addr) {

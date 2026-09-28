@@ -3,10 +3,21 @@
 #include "../../boards/board_context.h"
 #include "pxa270_id.h"
 #include "../../core/cerf_emulator.h"
+#include "../guest_cpu_reset.h"
 
 bool Pxa27xGpio::ShouldRegister() {
     auto* bd = emu_.TryGet<BoardContext>();
     return bd && bd->GetSocId() == SocId::Pxa270;
+}
+
+/* Intel PXA27x Developer's Manual 280000-001 Table 2-6 (page 2-9): GPIO
+   "All GPIO register states are reset" on sleep-exit, and reset on GPIO,
+   watchdog and hardware resets. */
+void Pxa27xGpio::OnReady() {
+    Pxa2xxGpio::OnReady();
+    emu_.Get<GuestCpuReset>().RegisterResetListener([this](ResetLineKind) {
+        ResetRegisters(emu_.Get<GuestCpuReset>().DeliveredResetWasResume());
+    });
 }
 
 Pxa2xxGpio::Reg Pxa27xGpio::Decode(uint32_t off, uint32_t* index) const {

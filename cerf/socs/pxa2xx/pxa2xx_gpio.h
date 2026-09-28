@@ -14,6 +14,14 @@ public:
     virtual void RestoreState(StateReader& r) = 0;
 };
 
+/* PXA255 Dev Man §3.5.3: "If a GPIO is to be used as a wake up source from
+   Sleep, it must be programmed as an input in the GPDR". */
+class Pxa2xxGpioWakeSink {
+public:
+    virtual ~Pxa2xxGpioWakeSink() = default;
+    virtual void OnInputEdges(uint32_t rose, uint32_t fell) = 0;
+};
+
 class Pxa2xxGpio : public Peripheral {
 public:
     using Peripheral::Peripheral;
@@ -26,6 +34,10 @@ public:
 
     void SetInputLevel(uint32_t gpio, bool high);
     void SetSerialSlave(Pxa2xxGpioSerialSlave* s) { serial_slave_ = s; }
+    void SetWakeSink(Pxa2xxGpioWakeSink* s) { wake_sink_ = s; }
+
+    void LoadSleepOutputs(const uint32_t* pgsr, uint32_t banks);
+    void ReleaseSleepHold();
 
     void SaveState(StateWriter& w) override;
     void RestoreState(StateReader& r) override;
@@ -46,10 +58,13 @@ protected:
        0x48/4C/50, GAFR0_L..GAFR3_U 0x54..0x70. */
     virtual Reg Decode(uint32_t off, uint32_t* index) const;
 
+    void ResetRegisters(bool sleep_exit);
+
 private:
     mutable std::mutex mtx_;
 
     Pxa2xxGpioSerialSlave* serial_slave_ = nullptr;
+    Pxa2xxGpioWakeSink*    wake_sink_    = nullptr;
 
     uint32_t in_[kMaxBanks]   = {};
     uint32_t out_[kMaxBanks]  = {};
@@ -58,10 +73,14 @@ private:
     uint32_t gfer_[kMaxBanks] = {};
     uint32_t gedr_[kMaxBanks] = {};
     uint32_t gafr_[kMaxGafr]  = {};
+    uint32_t held_mask_[kMaxBanks]  = {};
+    uint32_t held_level_[kMaxBanks] = {};
 
     uint32_t PinLevelLocked(uint32_t bank) const {
-        return (out_[bank] & gpdr_[bank]) | (in_[bank] & ~gpdr_[bank]);
+        const uint32_t live = (out_[bank] & gpdr_[bank]) | (in_[bank] & ~gpdr_[bank]);
+        return (live & ~held_mask_[bank]) | (held_level_[bank] & held_mask_[bank]);
     }
+    void CaptureLevels(uint32_t* levels) const;
     void ApplyEdgesLocked(const uint32_t* before);
     void UpdateIntcLocked();
 };

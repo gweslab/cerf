@@ -1,7 +1,10 @@
 #include "sa11xx_gpio.h"
 
 #include "../../core/cerf_emulator.h"
+#include "../../core/fatal.h"
 #include "../../boards/board_context.h"
+#include "../../host/guest_deep_sleep.h"
+#include "../guest_cpu_reset.h"
 #include "sa1110_id.h"
 #include "sa1100_id.h"
 #include "../../peripherals/peripheral_dispatcher.h"
@@ -15,6 +18,37 @@ bool Sa11xxGpio::ShouldRegister() {
 
 void Sa11xxGpio::OnReady() {
     emu_.Get<PeripheralDispatcher>().Register(this);
+    /* SA-1110 Dev Man §9.5.3, second step of sleep shutdown: "All potential
+       wake-up sources are cleared. This involves clearing all the GPIO edge
+       detect status bits". SA-1100 TRM §9.5.3 carries the same step. */
+    emu_.Get<GuestDeepSleep>().RegisterSleepEntryListener([this] {
+        std::unique_lock<std::mutex> lk(mtx_);
+        gedr_ = 0;
+        PublishEdgeSourcesLocked();
+    });
+    /* SA-1110 Dev Man §9.1.1.2 GPDR, §9.1.1.4 GRER / GFER reset rows, §9.1.1.6 GAFR "all
+       reset conditions"; §9.6: "Sleep reset does not affect the power manager, RTC, or GPIO
+       wake-up register". */
+    emu_.Get<GuestCpuReset>().RegisterResetListener([this](ResetLineKind kind) {
+        std::unique_lock<std::mutex> lk(mtx_);
+        gafr_ = 0;
+        if (emu_.Get<GuestCpuReset>().DeliveredResetWasResume()) return;
+        grer_ |= 0x3u;
+        gfer_ |= 0x3u;
+        if (kind == ResetLineKind::Rtc) gpdr_ = 0;
+    });
+}
+
+/* SA-1110 Dev Man §9.5.7.7 PGSR: "all 28 bits of the output register are
+   loaded". */
+void Sa11xxGpio::LoadSleepOutputs(uint32_t pgsr) {
+    std::unique_lock<std::mutex> lk(mtx_);
+    output_state_ = pgsr & kPinMask;
+}
+
+uint32_t Sa11xxGpio::InputEdges() const {
+    std::unique_lock<std::mutex> lk(mtx_);
+    return gedr_ & ~gpdr_ & kPinMask;
 }
 
 void Sa11xxGpio::DriveInputPin(uint32_t pin, bool level) {
@@ -57,7 +91,8 @@ uint32_t Sa11xxGpio::ReadReg(uint32_t off) {
         case 0x14: return gfer_ & kPinMask;                    /* GFER R/W */
         case 0x18: return gedr_ & kPinMask;                    /* GEDR R/W (W1C) */
         case 0x1C: return gafr_ & kPinMask;                    /* GAFR R/W */
-        default:   return 0;
+        default:
+            emu_.Get<Fatal>().Die("Sa11xxGpio: read of unmapped offset +0x%02X", off);
     }
 }
 
@@ -73,32 +108,15 @@ void Sa11xxGpio::WriteReg(uint32_t off, uint32_t value) {
         case 0x14: gfer_ = v; break;
         case 0x18: gedr_ &= ~v; PublishEdgeSourcesLocked(); break;  /* W1C */
         case 0x1C: gafr_ = v; break;
-        default:   break;
+        default:
+            emu_.Get<Fatal>().Die("Sa11xxGpio: write of unmapped offset +0x%02X", off);
     }
-}
-
-uint8_t Sa11xxGpio::ReadByte(uint32_t addr) {
-    const uint32_t off   = addr - MmioBase();
-    const uint32_t base  = off & ~0x3u;
-    const uint32_t shift = (off & 0x3u) * 8;
-    if (base > 0x1C) HaltUnsupportedAccess("ReadByte", addr, 0);
-    return static_cast<uint8_t>((ReadReg(base) >> shift) & 0xFFu);
 }
 
 uint32_t Sa11xxGpio::ReadWord(uint32_t addr) {
     const uint32_t off = addr - MmioBase();
     if (off > 0x1C || (off & 0x3u) != 0) HaltUnsupportedAccess("ReadWord", addr, 0);
     return ReadReg(off);
-}
-
-void Sa11xxGpio::WriteByte(uint32_t addr, uint8_t value) {
-    const uint32_t off   = addr - MmioBase();
-    const uint32_t base  = off & ~0x3u;
-    const uint32_t shift = (off & 0x3u) * 8;
-    if (base > 0x1C) HaltUnsupportedAccess("WriteByte", addr, value);
-    const uint32_t cur     = ReadReg(base);
-    const uint32_t cleared = cur & ~(0xFFu << shift);
-    WriteReg(base, cleared | (static_cast<uint32_t>(value) << shift));
 }
 
 void Sa11xxGpio::WriteWord(uint32_t addr, uint32_t value) {

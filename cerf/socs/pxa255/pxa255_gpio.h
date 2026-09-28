@@ -10,6 +10,7 @@ public:
     using Pxa2xxGpio::Pxa2xxGpio;
 
     bool ShouldRegister() override;
+    void OnReady() override;
 
 protected:
     uint32_t BankCount() const override { return 3u; }

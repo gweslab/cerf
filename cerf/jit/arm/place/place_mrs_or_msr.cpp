@@ -21,13 +21,23 @@ uint8_t* PlaceMRSorMSR(uint8_t*      cursor,
             return EmitRaiseUndAndReturn(cursor, d, ctx);
         }
         if (d->n != 0u) {
-            cursor = EmitSpsrModeGuard(cursor, d, ctx);
+            uint8_t* system_mode = nullptr;
+            cursor = EmitSpsrModeGuard(cursor, d, ctx,
+                config->AccessesSpsrInSystemMode() ? &system_mode : nullptr);
             EmitPush32(cursor,
                 static_cast<uint32_t>(
                     reinterpret_cast<uintptr_t>(ctx->emit->Cpu())));
             EmitCall(cursor,
                 reinterpret_cast<void*>(&ArmCpu::ReadSpsrHelper));
             EmitAddRegImm32(cursor, kEsp, 4);
+            if (system_mode != nullptr) {
+                uint8_t* done = EmitJmpLabel32(cursor);
+                FixupLabel32(system_mode, cursor);
+                /* ARM DDI 0100I A2.5 (p. A2-11): "User mode and System mode
+                   do not have an SPSR". */
+                EmitMovRegImm32(cursor, kEax, 0u);
+                FixupLabel32(done, cursor);
+            }
         } else {
             EmitMovRegBaseDisp32(cursor, kEcx, kStateReg, ArmNfDisp());
             EmitImulReg32Reg32Imm32(cursor, kEcx, kEcx,

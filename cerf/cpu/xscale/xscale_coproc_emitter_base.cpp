@@ -52,6 +52,19 @@ uint8_t* XscaleCoprocEmitterBase::EmitRegisterTransfer(uint8_t*      cursor,
             }
             return cursor;
         }
+        /* XScale Core Dev Manual Table 7-3 (page 80): register 1 is CRm=0 only;
+           Table 7-1 (page 78): CRm "should be programmed to zero ... unless a
+           value has been specified in the command". */
+        if (d->crn == 1 && d->cp_opc == 0 && d->crm != 0) {
+            if (d->crm != 1 || d->cp != 0) return EmitCoprocUnimplementedFatal(cursor, d, ctx);
+            if (d->l) {
+                using namespace x86;
+                const int32_t rd_disp = static_cast<int32_t>(
+                    offsetof(ArmCpuState, gprs) + d->rd * 4u);
+                EmitMovBaseDisp32Imm32(cursor, kStateReg, rd_disp, 0u);
+            }
+            return cursor;
+        }
         /* Allocate Data Cache Line (c7, c2, opc2=5) - XScale-specific
            (Core Dev Manual Table 7-12). No D-cache is modeled and the
            line's backing memory is real, so emit nothing. */
@@ -76,20 +89,12 @@ uint8_t* XscaleCoprocEmitterBase::EmitRegisterTransfer(uint8_t*      cursor,
                 return cursor;
             }
             EmitMovRegBaseDisp32(cursor, kEax, kStateReg, rd_disp);
-            EmitAndRegImm32(cursor, kEax, 0xFu);
             return EmitPwrmodeWrite(cursor, kEax, d, ctx);
         }
 
-        /* CCLKCFG (CRn=c6) - XScale Core Dev Manual Table 7-25. The
-           frequency change completes instantly under emulation (no PLL
-           relock), so a write has no retained state; reads return 0
-           (active, non-turbo). */
-        if (d->crn == 6) {
-            if (d->l) {
-                EmitMovBaseDisp32Imm32(cursor, kStateReg, rd_disp, 0u);
-            }
-            return cursor;
-        }
+        /* XScale Core Dev Manual Table 7-25: CCLKCFG "is defined by the
+           ASSP". */
+        if (d->crn == 6) return EmitClkcfgTransfer(cursor, d, ctx);
         /* CP14 c0-c5 perfmon + c8-c15 debug (XScale Core Dev Manual §8,
            §7.1): the perfmon counters and JTAG debug are not modeled, so
            these read 0 (inactive) and ignore writes. The OAL suspend
@@ -98,6 +103,12 @@ uint8_t* XscaleCoprocEmitterBase::EmitRegisterTransfer(uint8_t*      cursor,
         return cursor;
     }
     return EmitUnhandledCoprocessor(cursor, d, ctx);
+}
+
+uint8_t* XscaleCoprocEmitterBase::EmitClkcfgTransfer(uint8_t*      cursor,
+                                                     DecodedInsn*  d,
+                                                     BlockContext* ctx) {
+    return EmitCoprocUnimplementedFatal(cursor, d, ctx);
 }
 
 uint8_t* XscaleCoprocEmitterBase::EmitDataTransfer(uint8_t*      cursor,

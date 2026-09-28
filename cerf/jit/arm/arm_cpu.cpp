@@ -229,6 +229,7 @@ void ArmCpu::RaiseResetException(uint32_t initial_pc, bool initial_thumb) {
     state_.cpsr.bits.jazelle             = 0u;
 
     emu_.Get<ArmMmu>().ResetControlRegisters();
+    emu_.Get<ArmMmu>().State()->coprocessor_access = reset_coprocessor_access_;
 
     if (pending_resume_mmu_set_) {
         ArmMmuState* mmu_state = emu_.Get<ArmMmu>().State();
@@ -238,6 +239,11 @@ void ArmCpu::RaiseResetException(uint32_t initial_pc, bool initial_thumb) {
         mmu_state->domain_access_control           = pending_resume_dacr_;
         emu_.Get<ArmMmu>().RefreshFcseFold();
         pending_resume_mmu_set_ = false;
+    }
+
+    if (pending_resume_aux_set_) {
+        emu_.Get<ArmMmu>().State()->aux_control_register = pending_resume_aux_;
+        pending_resume_aux_set_ = false;
     }
 
     state_.deep_sleep    = 0u;
@@ -263,6 +269,11 @@ void ArmCpu::SetInitialStackPointer(uint32_t sp) {
     initial_sp_ = sp;
 }
 
+void ArmCpu::SetResetCoprocessorAccess(uint32_t value) {
+    reset_coprocessor_access_ = value;
+    emu_.Get<ArmMmu>().State()->coprocessor_access = value;
+}
+
 void ArmCpu::SetPendingResumeVector(uint32_t pc) {
     pending_resume_pc_     = pc;
     pending_resume_pc_set_ = true;
@@ -273,6 +284,11 @@ void ArmCpu::SetPendingResumeMmu(uint32_t control, uint32_t ttbr0, uint32_t dacr
     pending_resume_ttbr0_   = ttbr0;
     pending_resume_dacr_    = dacr;
     pending_resume_mmu_set_ = true;
+}
+
+void ArmCpu::SetPendingResumeAuxControl(uint32_t aux) {
+    pending_resume_aux_     = aux;
+    pending_resume_aux_set_ = true;
 }
 
 void __cdecl ArmCpu::RaiseUndefinedExceptionHelper(ArmCpu* cpu, uint32_t guest_pc) {

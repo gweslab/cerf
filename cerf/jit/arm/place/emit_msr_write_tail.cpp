@@ -12,7 +12,8 @@
 /* ARM DDI 0406C.c B9.3.8 (p. B9-1990), B9.3.11 (p. B9-1996), B9.3.12
    (p. B9-1998): SPSR access in User or System mode is UNPREDICTABLE;
    UNPREDICTABLE may be implemented as UNDEFINED (p. Glossary-2737). */
-uint8_t* EmitSpsrModeGuard(uint8_t* cursor, DecodedInsn* d, BlockContext* ctx) {
+uint8_t* EmitSpsrModeGuard(uint8_t* cursor, DecodedInsn* d, BlockContext* ctx,
+                           uint8_t** system_mode) {
     using namespace x86;
     EmitMovRegBaseDisp32(cursor, kEcx, kStateReg,
         static_cast<int32_t>(offsetof(ArmCpuState, cpsr)));
@@ -20,7 +21,13 @@ uint8_t* EmitSpsrModeGuard(uint8_t* cursor, DecodedInsn* d, BlockContext* ctx) {
     EmitCmpRegImm32(cursor, kEcx, ArmMode::kUser);
     uint8_t* und = EmitJzLabel32(cursor);
     EmitCmpRegImm32(cursor, kEcx, ArmMode::kSystem);
-    uint8_t* ok = EmitJnzLabel32(cursor);
+    uint8_t* ok = nullptr;
+    if (system_mode != nullptr) {
+        *system_mode = EmitJzLabel32(cursor);
+        ok = EmitJmpLabel32(cursor);
+    } else {
+        ok = EmitJnzLabel32(cursor);
+    }
     FixupLabel32(und, cursor);
     cursor = EmitRaiseUndTail(cursor, d, ctx);
     FixupLabel32(ok, cursor);
@@ -59,7 +66,9 @@ uint8_t* EmitMsrWriteTail(uint8_t* cursor, DecodedInsn* d, BlockContext* ctx) {
         } else {
             spsr_mask = byte_mask & 0xF00000DFu;
         }
-        cursor = EmitSpsrModeGuard(cursor, d, ctx);
+        uint8_t* system_mode = nullptr;
+        cursor = EmitSpsrModeGuard(cursor, d, ctx,
+            config->AccessesSpsrInSystemMode() ? &system_mode : nullptr);
         EmitPush32(cursor, spsr_mask);
         EmitPushReg(cursor, kEax);
         EmitPush32(cursor,
@@ -67,6 +76,7 @@ uint8_t* EmitMsrWriteTail(uint8_t* cursor, DecodedInsn* d, BlockContext* ctx) {
         EmitCall(cursor,
             reinterpret_cast<void*>(&ArmCpu::WriteSpsrByInstrHelper));
         EmitAddRegImm32(cursor, kEsp, 12);
+        if (system_mode != nullptr) FixupLabel32(system_mode, cursor);
         return cursor;
     }
 

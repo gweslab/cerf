@@ -24,12 +24,14 @@ public:
        for a [0x70][hi][lo] reply over RX; battery.dll maps the 16-bit value through
        a voltage table. The board battery service computes this from the widget %. */
     void SetMainBatteryRaw(uint16_t raw) { main_battery_raw_.store(raw, std::memory_order_release); }
+    uint16_t MainBatteryRaw() const { return main_battery_raw_.load(std::memory_order_acquire); }
 
     /* Cache the current key matrix so keybddr's on-demand 0x13 scan request
        (pco.dll sub_1BC2368(0x13)) can be answered from it. The PICO keyboard is
        request/reply (Linux pic-pxa2xx.c process_packets: the PIC replies to a 0x13
        request and NEVER streams the matrix), so the matrix is only cached here. */
     void SetKeyMatrix(const uint8_t matrix[13]);
+    uint8_t KeyMatrixByte(size_t i);
     /* PIC_KEY_DOWN (0x12): one async byte sent on a host key-down edge. pco's parser
        (sub_1BC28B4) signals the key-down event dword_1BC40D8 -> keybddr's sub_1BD3578
        wakes its idle scan thread into the 5 ms poll. Matches Linux notify_key_down. */

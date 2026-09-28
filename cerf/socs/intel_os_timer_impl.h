@@ -83,6 +83,7 @@ public:
         w.Write<uint8_t>("osmr0_written_since_ack", osmr0_written_since_ack_ ? 1u : 0u);
         w.Write<uint8_t>("last_write_rephased", last_write_rephased_ ? 1u : 0u);
         w.Write<uint8_t>("oscr_read_any", oscr_read_any_ ? 1u : 0u);
+        w.Write<uint8_t>("osmr0_read_last", osmr0_read_last_ ? 1u : 0u);
     }
 
     void RestoreState(StateReader& r) override {
@@ -131,6 +132,11 @@ public:
         last_write_rephased_ = flag != 0u;
         r.Read("oscr_read_any", flag);
         oscr_read_any_ = flag != 0u;
+        r.Read("osmr0_read_last", flag);
+        if (flag > 1u) {
+            r.Reject("IntelOsTimer: restored osmr0_read_last flag %u is not 0 or 1", flag);
+        }
+        osmr0_read_last_ = flag != 0u;
         const uint64_t now = clock_->Cycles();
         if (!counter_.AnchorAtPhase(now, oscr, phase, phase_den)) {
             r.Reject("IntelOsTimer: restored OSCR phase %llu/%llu is not a fraction of "
@@ -262,8 +268,9 @@ private:
     }
 
     void ClearPairLatches() {
-        pair_oscr_read_ = false;
-        oscr_read_any_  = false;
+        pair_oscr_read_  = false;
+        oscr_read_any_   = false;
+        osmr0_read_last_ = false;
     }
 
     void PushMatchLevel() { SetMatchLevel(ossr_ & 0xFu); }
@@ -369,11 +376,17 @@ private:
                 }
                 if (n != 0) census_.OnAuxOsmrRead(oscr_read_any_);
                 ClearPairLatches();
+                if (n == 0) osmr0_read_last_ = true;
                 return osmr_[n];
             }
             case 0x10: {
                 rate_probe_->Inc(RateProbe::Counter::OstReadOscr);
                 const uint32_t oscr = Oscr(clock_->Cycles());
+                if (osmr0_read_last_ && (ossr_ & 0x1u) == 0u) {
+                    bank_pair_since_match_ = true;
+                    ++census_.rev_pairs;
+                }
+                osmr0_read_last_ = false;
                 pair_oscr_read_ = GuestIrqMasked();
                 oscr_read_any_  = true;
                 pair_oscr_      = oscr;
@@ -464,6 +477,7 @@ private:
     bool     osmr0_written_since_ack_ = false;
     bool     last_write_rephased_     = false;
     bool     oscr_read_any_           = false;
+    bool     osmr0_read_last_         = false;
 
     IntelOsTimerCensus census_;
 

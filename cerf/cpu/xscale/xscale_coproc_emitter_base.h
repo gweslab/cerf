@@ -36,4 +36,8 @@ protected:
     virtual uint8_t* EmitUnhandledCoprocessor(uint8_t*      cursor,
                                               DecodedInsn*  d,
                                               BlockContext* ctx) = 0;
+
+    virtual uint8_t* EmitClkcfgTransfer(uint8_t*      cursor,
+                                        DecodedInsn*  d,
+                                        BlockContext* ctx);
 };

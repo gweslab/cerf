@@ -16,6 +16,11 @@ namespace {
 constexpr uint32_t kGpioAcLine     = 77u;  /* GPLR2 bit13 (sub_1C8229C): high = on AC. */
 constexpr uint32_t kGpioPresent    = 10u;  /* GPLR0 bit10 (sub_1C81F88): low forces NO_BATTERY. */
 constexpr uint32_t kGpioConvBranch = 27u;  /* GPLR0 bit27 (sub_1C81F88): low selects the C5/C6 branch. */
+/* nec_mobilepro_900_ce4_2 SABOOT.NB0 nk.exe sub_9006AF28: GPLR0 bit 6 high = "Battery Door closed". */
+constexpr uint32_t kGpioDoorClosed = 6u;
+/* nec_mobilepro_900_ce4_2 XIP.BIN pwr.dll sub_1BB19D0: GPLR0 bit 26 low at power-up
+   signals EmergencyShutdownEvent (SYSINTR 25, thread sub_1BB1D98). */
+constexpr uint32_t kGpioPowerGood  = 26u;
 
 /* battery.dll voltage poly (sub_1C81F88) + table (0x1C842AC). */
 constexpr double   kSlope       = 0.867924528;  /* C1*C2*1000 scaled-units per raw unit. */
@@ -71,6 +76,8 @@ void NecMobilePro900Battery::DriveState() {
     gpio.SetInputLevel(kGpioAcLine,     on_ac);
     gpio.SetInputLevel(kGpioPresent,    true);
     gpio.SetInputLevel(kGpioConvBranch, false);
+    gpio.SetInputLevel(kGpioDoorClosed, true);
+    gpio.SetInputLevel(kGpioPowerGood,  true);
 
     emu_.Get<NecMobilePro900PcoCompanion>().SetMainBatteryRaw(
         MainBatteryRaw(battery_.FillPercent(), on_ac));

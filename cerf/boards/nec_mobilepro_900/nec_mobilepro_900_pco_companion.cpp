@@ -74,6 +74,11 @@ void NecMobilePro900PcoCompanion::SetKeyMatrix(const uint8_t matrix[13]) {
     for (int i = 0; i < 13; ++i) cur_matrix_[i] = matrix[i];
 }
 
+uint8_t NecMobilePro900PcoCompanion::KeyMatrixByte(size_t i) {
+    std::lock_guard<std::mutex> lk(report_mtx_);
+    return cur_matrix_[i];
+}
+
 /* report_mtx_ keeps a report's bytes contiguous in the shared BTUART RX FIFO so
    pco's byte-stream parser (sub_1BC28B4) never sees a touch report spliced into a
    keyboard one. A lone 0x12 (PIC_KEY_DOWN) is the async key-down notify. */

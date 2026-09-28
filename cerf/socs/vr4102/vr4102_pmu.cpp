@@ -16,9 +16,7 @@ using cerf_vr41xx_pmu_detail::Vr41xxPmuModel;
 constexpr Vr41xxPmuModel kModel = {
     /*base=*/0x0B0000A0u,
     /*size=*/0x20u,
-    /* PMUINTREG bit classes (UM p328-329). Cause bits are write-1-to-clear; the two
-       lock bits are plain software R/W (never set by hardware); D10 DCDST is a
-       read-only pin state and D11 is reserved (both stay 0 - no source drives them). */
+    /* PMUINTREG bit classes (UM p328-329). */
     /*int_w1c=*/0xF33Fu,        /* D15-12 GPIOxINTR, D9 RTCINTR, D8 BATTINH, D5-0 *RST/*INTR */
     /*int_sw_rw=*/0x00C0u,      /* D7 BATTLOCK, D6 CARDLOCK */
     /* Cold power-on is the RTC-domain reset (UM Table 15-1 + p328 reset column), and
@@ -36,27 +34,24 @@ constexpr Vr41xxPmuModel kModel = {
     0u,
     0x0008u,   /* D3 RSTSW  (reset switch / soft reset) */
     0x0010u,   /* D4 RTCRST (RTC-domain / cold reset)   */
+    /* "Recovery from reset status occurs when the POWER pin is asserted" (UM 7.1.4), and
+       PMUINTREG D0 POWERSWINTR is "POWER switch interrupt detection. Cleared to 0 when 1 is
+       written" with no Hibernate exclusion (UM 15.2.1, p329). */
+    0x0001u,
+    /* UM 15.2.2 p331: D6..3 and D0 "Write 0 when writing", D1 "Write 1 when
+       writing". */
+    0x0079u,
+    0x0002u,
+    /* UM 15.2.1 p328: PMUINTREG "Other resets" row 0 in D15-D0. */
+    0x0000u,
+    0x0004u,   /* UM 15.2.1 p329: D2 DMSRST "Deadman's switch interrupt detection" */
 };
-
-constexpr uint16_t kIntDmSrst   = 0x0004u;  /* D2 DMSRST  (deadman's-switch reset)    */
-constexpr uint16_t kIntPowerSw  = 0x0001u;  /* D0 POWERSW (power-switch interrupt)    */
 
 class Vr4102Pmu : public Vr41xxPmuBase<SocId::Vr4102, kModel> {
 public:
     using Vr41xxPmuBase::Vr41xxPmuBase;
-
-    /* PMUINTREG latches the reset cause (UM 15.1.1): start() cold-JUMPOUTs to
-       0xBF0043C8 iff RTCRST(D4)/RSTSW(D3) set, else resumes a stale save block and
-       hangs. */
-    void LatchWatchdogReset() override { SetIntBits(kIntDmSrst); }
-
-    /* "Recovery from reset status occurs when the POWER pin is asserted" (UM 7.1.4), and
-       PMUINTREG D0 POWERSWINTR is "POWER switch interrupt detection. Cleared to 0 when 1 is
-       written" with no Hibernate exclusion (UM 15.2.1, p329). */
-    void LatchSleepWakeCause() override { SetIntBits(kIntPowerSw); }
-    void ClearSleepWakeCause() override { ClearIntBits(kIntPowerSw); }
 };
 
 }  /* namespace */
 
-REGISTER_SERVICE(Vr4102Pmu);
+REGISTER_SERVICE_AS(Vr4102Pmu, Vr41xxPmu);

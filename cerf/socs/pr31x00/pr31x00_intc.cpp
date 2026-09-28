@@ -4,6 +4,7 @@
 #include "pr31500_id.h"
 #include "pr31700_id.h"
 #include "../../core/cerf_emulator.h"
+#include "../../core/fatal.h"
 #include "../../jit/mips/mips_jit.h"
 #include "../../peripherals/peripheral_dispatcher.h"
 #include "../../state/state_stream.h"
@@ -97,16 +98,23 @@ void Pr31x00Intc::OnReady() {
         enable6_ &= ~kGlobalEn;
         RecomputeLocked();
     });
+    /* §8.2.2 (p.8-4): "all Clear Interrupts will be set for the duration of reset
+       (thus interrupts cleared)." */
+    emu_.Get<GuestCpuReset>().RegisterResetReleaseListener([this] {
+        std::lock_guard<std::mutex> lk(mtx_);
+        for (uint32_t i = 0; i < kSets; ++i) status_[i] = free_running_[i];
+        RecomputeLocked();
+    });
 }
 
 /* The priority encoder takes only the Priority Mask and the 15 high priority sources,
    so INTVECT is live while GLOBALEN is clear (Figure 8.2.1); level 0 means none is
    pending. */
-uint32_t Pr31x00Intc::HighPriorityLevelLocked() const {
+uint32_t Pr31x00Intc::HighPriorityLevelFor(const uint32_t* status) const {
     for (uint32_t level = 15; level >= 1; --level) {
         if ((enable6_ & (1u << level)) == 0u) continue;
         for (const HighPrioTerm& t : kHighPrio[level]) {
-            if (t.mask && (status_[t.set] & t.mask)) return level;
+            if (t.mask && (status[t.set] & t.mask)) return level;
         }
     }
     return 0;
@@ -116,22 +124,49 @@ uint32_t Pr31x00Intc::HighPriorityLevelLocked() const {
    IRQHIGH each name one signal that drives a CPU interrupt bit and is read back through
    Interrupt Status 6 (Figure 8.2.1). Computing either one twice lets the two copies
    disagree, and the guest reads a pending interrupt the CPU never took. */
-bool Pr31x00Intc::IrqLowLocked() const {
+bool Pr31x00Intc::IrqLowFor(const uint32_t* status) const {
     if ((enable6_ & kGlobalEn) == 0u) return false;
     for (uint32_t i = 0; i < kSets; ++i) {
-        if (status_[i] & enable_[i]) return true;
+        if (status[i] & enable_[i]) return true;
     }
     return false;
 }
 
-bool Pr31x00Intc::IrqHighLocked() const {
-    return (enable6_ & kGlobalEn) && HighPriorityLevelLocked() != 0u;
+bool Pr31x00Intc::IrqHighFor(const uint32_t* status) const {
+    return (enable6_ & kGlobalEn) && HighPriorityLevelFor(status) != 0u;
+}
+
+bool Pr31x00Intc::WouldRaiseIrq(uint32_t set, uint32_t bits) const {
+    if (set >= kSets) {
+        emu_.Get<Fatal>().Die("Pr31x00Intc: WouldRaiseIrq on status set %u", set);
+    }
+    std::lock_guard<std::mutex> lk(mtx_);
+    uint32_t status[kSets];
+    for (uint32_t i = 0; i < kSets; ++i) status[i] = status_[i];
+    status[set] |= bits;
+    return IrqLowFor(status) || IrqHighFor(status);
+}
+
+/* TMPR3911 Figure 8.2.1: the module's "irq" output is the OR of the IRQLOW and
+   IRQHIGH lines after their GLOBALEN gates. */
+bool Pr31x00Intc::EnabledInterruptPending() const {
+    std::lock_guard<std::mutex> lk(mtx_);
+    return IrqLowFor(status_) || IrqHighFor(status_);
+}
+
+bool Pr31x00Intc::SourceEnabledWithoutGlobalEnable() const {
+    std::lock_guard<std::mutex> lk(mtx_);
+    if ((enable6_ & kGlobalEn) != 0u) return false;
+    for (uint32_t i = 0; i < kSets; ++i) {
+        if (enable_[i] != 0u) return true;
+    }
+    return (enable6_ & kPriorityMask) != 0u;
 }
 
 void Pr31x00Intc::RecomputeLocked() {
     uint32_t ip = 0;
-    if (IrqLowLocked())  ip |= kIrqLowIp;
-    if (IrqHighLocked()) ip |= kIrqHighIp;
+    if (IrqLowFor(status_))  ip |= kIrqLowIp;
+    if (IrqHighFor(status_)) ip |= kIrqHighIp;
     jit_->SetExternalInterruptLevel(ip);
 }
 
@@ -197,9 +232,9 @@ uint32_t Pr31x00Intc::ReadWord(uint32_t addr) {
     }
 
     if (off == kOffStatus6) {
-        uint32_t v = (HighPriorityLevelLocked() & 0xFu) << kStatus6IntVectShift;
-        if (IrqHighLocked()) v |= kStatus6IrqHigh;
-        if (IrqLowLocked())  v |= kStatus6IrqLow;
+        uint32_t v = (HighPriorityLevelFor(status_) & 0xFu) << kStatus6IntVectShift;
+        if (IrqHighFor(status_)) v |= kStatus6IrqHigh;
+        if (IrqLowFor(status_))  v |= kStatus6IrqLow;
         return v;
     }
 

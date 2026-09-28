@@ -5,6 +5,7 @@
 #include "../core/log.h"
 #include "../core/rate_probe.h"
 #include "../core/virtual_clock.h"
+#include "../host/guest_deep_sleep.h"
 #include "../peripherals/peripheral_dispatcher.h"
 #include "guest_engine.h"
 #include "guest_cycle_clock.h"
@@ -100,7 +101,8 @@ void JitRunner::RunLoop() {
        before a single guest access silently aliases into it. */
     emu_.Get<PeripheralDispatcher>().ValidatePhysReachable(engine.PhysAddrMask());
 
-    auto& vclock = emu_.Get<VirtualClock>();
+    auto& vclock     = emu_.Get<VirtualClock>();
+    auto& deep_sleep = emu_.Get<GuestDeepSleep>();
 
 #if CERF_DEV_MODE
     auto& probe = emu_.Get<RateProbe>();
@@ -136,14 +138,20 @@ void JitRunner::RunLoop() {
                 static_cast<int>(engine.DeepSleep()), static_cast<int>(engine.ResetPending()),
                 static_cast<int>(pause_requested_.load(std::memory_order_acquire)),
                 engine.Pc());
-            /* Bounded wait: the wake (reset_pending) is signalled via idle_event_,
-               not pause_cv_, so an unbounded wait would never observe it and the
-               deep-sleep park would never wake. */
+            const bool sleep_park = engine.DeepSleep();
             while (!stop_requested_.load(std::memory_order_acquire) &&
                    !engine.ResetPending() &&
                    (pause_requested_.load(std::memory_order_acquire) || engine.DeepSleep())) {
-                pause_cv_.wait_for(lk, std::chrono::milliseconds(20));
+                int64_t wait_ns = 20000000;
+                if (!pause_requested_.load(std::memory_order_acquire) && engine.DeepSleep()) {
+                    deep_sleep.PollPark();
+                    if (engine.ResetPending() || !engine.DeepSleep()) break;
+                    wait_ns = deep_sleep.ParkWaitNs();
+                }
+                pause_cv_.wait_for(lk, std::chrono::nanoseconds(wait_ns));
             }
+            if (sleep_park && !stop_requested_.load(std::memory_order_acquire))
+                deep_sleep.FinishPark();
             vclock.Resume();
             paused_ = false;
             LOG(SocReset, "[DEEPSLEEP] RunLoop: park exit ds=%d reset_pending=%d pause=%d pc=0x%08X\n",

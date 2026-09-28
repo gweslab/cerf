@@ -9,6 +9,7 @@
 #include "../../state/state_stream.h"
 #include "../guest_cpu_reset.h"
 #include "vr41xx_icu.h"
+#include "vr41xx_pmu.h"
 
 #include <cstdint>
 #include <mutex>
@@ -64,6 +65,7 @@ public:
     }
 
     void OnReady() override {
+        pmu_ = &emu_.Get<Vr41xxPmu>();
         emu_.Get<PeripheralDispatcher>().Register(this);
         emu_.Get<GuestCpuReset>().RegisterResetListener([this](ResetLineKind kind) {
             std::lock_guard<std::mutex> lk(mtx_);
@@ -127,6 +129,7 @@ public:
         const bool     prev   = (level_ & pinbit) != 0;
         if (level) level_ |= pinbit;
         else       level_ &= ~pinbit;
+        pmu_->OnGpioLevel(pin, prev, level);
 
         /* GIUINTTYP "1: Edge" - "an interrupt is triggered when the signal state changes
            from low to high or from high to low"; "0: Level" - "the level set to the
@@ -339,6 +342,7 @@ private:
     }
 
     mutable std::mutex mtx_;
+    Vr41xxPmu*         pmu_ = nullptr;
 
     /* Every GIU register's RTCRST column is 0 except GIUPODATL's (VR4121 UM
        19.2.1-19.2.16, VR4102 UM 18.2.1-18.2.16). */

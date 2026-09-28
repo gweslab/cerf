@@ -79,6 +79,10 @@ public:
        ARMv4 and ARMv4T." */
     virtual bool     HasArmv5UnconditionalSpace() const { return false; }
 
+    /* ARM DDI 0100I p. A4-75: "Accessing the SPSR when in User mode or
+       System mode is UNPREDICTABLE." */
+    virtual bool     AccessesSpsrInSystemMode()   const { return false; }
+
     virtual bool     HasMls()                     const { return false; }
     virtual bool     HasMovwMovt()                const { return false; }
     virtual bool     HasBitField()                const { return false; }

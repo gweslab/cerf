@@ -11,9 +11,11 @@
 #include "../../boards/board_context.h"
 #include "s3c2410_id.h"
 #include "../../state/state_stream.h"
+#include "../guest_cpu_reset.h"
 #include "s3c2410_eint_source.h"
 #include "s3c2410_sub_source_levels.h"
 
+#include <array>
 #include <bit>
 #include <mutex>
 
@@ -27,6 +29,7 @@ public:
         auto* bd = emu_.TryGet<BoardContext>();
         return bd && bd->GetSocId() == SocId::S3c2410;
     }
+    void OnReady() override;
 
     /* IrqController API. */
     void AssertIrq   (int source_bit) override;
@@ -76,21 +79,28 @@ private:
        state_mutex_. */
     bool HasPendingUnmasked() const;
 
+    static constexpr std::array<uint32_t, kSlotCount> kResetValues = [] {
+        std::array<uint32_t, kSlotCount> v{};
+        v[kSlotINTMSK]    = 0xFFFFFFFFu;
+        v[kSlotPRIORITY]  = 0x0000007Fu;
+        v[kSlotINTSUBMSK] = 0x000007FFu;
+        return v;
+    }();
+
     std::mutex state_mutex_;
-    /* INTMSK powers up to 0xFFFFFFFF (everything masked) per the
-       chip; the kernel's OAL clears bits as it brings sources online.
-       Other slots reset to zero. */
     uint32_t storage_[kSlotCount] = {
-        /* SRCPND    */ 0,
-        /* INTMOD    */ 0,
-        /* INTMSK    */ 0xFFFFFFFFu,
-        /* PRIORITY  */ 0x0000007Fu,  /* reset value per S3C2410 UM */
-        /* INTPND    */ 0,
-        /* INTOFFSET */ 0,
-        /* SUBSRCPND */ 0,
-        /* INTSUBMSK */ 0x000007FFu,  /* reset value per S3C2410 UM */
+        kResetValues[0], kResetValues[1], kResetValues[2], kResetValues[3],
+        kResetValues[4], kResetValues[5], kResetValues[6], kResetValues[7],
     };
 };
+
+void S3C2410Intc::OnReady() {
+    emu_.Get<GuestCpuReset>().RegisterResetListener([this](ResetLineKind) {
+        std::lock_guard<std::mutex> lk(state_mutex_);
+        for (size_t i = 0; i < kSlotCount; ++i) storage_[i] = kResetValues[i];
+        emu_.Get<ArmJit>().ClearInterruptPending();
+    });
+}
 
 void S3C2410Intc::RecomputeIntpndIntoffset() {
     const uint32_t srcpnd  = storage_[kSlotSRCPND];
@@ -227,6 +237,7 @@ void S3C2410Intc::WriteReg(uint32_t offset, uint32_t value) {
 
     uint32_t cleared_sub  = 0;
     uint32_t cleared_main = 0;
+    uint32_t unmasked     = 0;
 
     {
         std::lock_guard<std::mutex> lk(state_mutex_);
@@ -257,6 +268,7 @@ void S3C2410Intc::WriteReg(uint32_t offset, uint32_t value) {
                 break;
 
             case kSlotINTMSK:
+                unmasked = storage_[slot] & ~value;
                 storage_[slot] = value;
                 RecomputeIntpndIntoffset();
                 break;
@@ -282,6 +294,9 @@ void S3C2410Intc::WriteReg(uint32_t offset, uint32_t value) {
     emu_.Get<S3C2410SubSourceLevels>().ReassertStillHeld(cleared_sub);
     if (cleared_main != 0u) {
         emu_.Get<S3C2410EintSource>().ReassertHeldLevelEints(cleared_main);
+    }
+    if (unmasked != 0u) {
+        emu_.Get<S3C2410EintSource>().NotifyUnmasked(unmasked);
     }
 }
 

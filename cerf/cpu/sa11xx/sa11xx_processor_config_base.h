@@ -29,7 +29,7 @@ public:
 
     uint16_t CycleCostFor(const DecodedInsn& d) const override;
 
-    /* 3686400 = OSCR base 3.6864 MHz (SA-1110 Dev Manual §9.4.1). Core clock
-       is runtime PLL/PPCR-set, so CpuClockHz tracks the OST divider. */
-    uint32_t CpuClockHz() const override { return CpuToOscrDivider() * 3686400u; }
+    /* SA-1110 Dev Manual §8.2: nRESET clears CCF, selecting the lowest core
+       clock, which Table 8-1 gives as 16 x the 3.6864-MHz crystal. */
+    uint32_t CpuClockHz() const override { return 16u * 3686400u; }
 };

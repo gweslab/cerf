@@ -37,18 +37,21 @@ public:
     }
 
 protected:
-    uint8_t* EmitPwrmodeWrite(uint8_t* cursor, uint8_t m_field_reg, DecodedInsn*, BlockContext* ctx) override {
+    /* Third Generation Intel XScale Microarchitecture Developer's Manual Table
+       66: M "0 = ACTIVE mode", "All other values are defined by the ASSP"; the
+       Linux XSC3 model cpu_xsc3_do_idle writes M = 1 to "go to idle". */
+    uint8_t* EmitPwrmodeWrite(uint8_t* cursor, uint8_t m_field_reg, DecodedInsn* d, BlockContext* ctx) override {
         using namespace x86;
-        EmitCmpRegImm32(cursor, m_field_reg, 3u);
-        uint8_t* not_sleep = EmitJnzLabel(cursor);
-        EmitMovRegImm32(cursor, kEcx, static_cast<uint32_t>(reinterpret_cast<uintptr_t>(ctx->emit->Cpu())));
-        EmitCall(cursor, reinterpret_cast<void*>(&ArmCpu::EnterDeepSleepHelper));
-        uint8_t* done = EmitJmpLabel(cursor);
-        FixupLabel(not_sleep, cursor);
+        EmitCmpRegImm32(cursor, m_field_reg, 1u);
+        uint8_t* is_idle = EmitJzLabel32(cursor);
+        EmitCmpRegImm32(cursor, m_field_reg, 0u);
+        uint8_t* is_active = EmitJzLabel32(cursor);
+        cursor = EmitCoprocUnimplementedFatal(cursor, d, ctx);
+        FixupLabel32(is_idle, cursor);
         EmitMovRegImm32(cursor, kEcx,
                        static_cast<uint32_t>(reinterpret_cast<uintptr_t>(ctx->emit->InterruptChannel())));
         EmitCall(cursor, reinterpret_cast<void*>(&ArmInterruptChannel::WfiHelper));
-        FixupLabel(done, cursor);
+        FixupLabel32(is_active, cursor);
         return cursor;
     }
 

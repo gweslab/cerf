@@ -52,7 +52,8 @@ uint8_t* EmitNeonVdup(uint8_t* cursor, DecodedInsn* d, BlockContext* ctx);
 uint8_t* EmitNeonVdupScalar(uint8_t* cursor, DecodedInsn* d, BlockContext* ctx);
 uint8_t* EmitRaiseUndAndReturn(uint8_t* cursor, DecodedInsn* d, BlockContext* ctx);
 uint8_t* EmitRaiseUndTail(uint8_t* cursor, DecodedInsn* d, BlockContext* ctx);
-uint8_t* EmitSpsrModeGuard(uint8_t* cursor, DecodedInsn* d, BlockContext* ctx);
+uint8_t* EmitSpsrModeGuard(uint8_t* cursor, DecodedInsn* d, BlockContext* ctx,
+                           uint8_t** system_mode = nullptr);
 uint8_t* EmitSwap(uint8_t* cursor, DecodedInsn* d, BlockContext* ctx);
 uint8_t* EmitTlbFastPath(uint8_t* cursor, BlockContext* ctx, TlbAccess access);
 uint8_t* EmitTranslateAccess(uint8_t* cursor, BlockContext* ctx,

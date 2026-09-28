@@ -40,13 +40,11 @@ public:
     bool     HasLoadToPcInterworking()    const override { return true; }
     bool     HasBlxReg()                  const override { return true; }
     bool     HasArmv5UnconditionalSpace() const override { return true; }
+    bool     AccessesSpsrInSystemMode()   const override { return true; }
 
-    uint32_t CpuClockHz()                 const override { return 416000000u; }
-
-    /* Section 22.4.5.1 (page 22-5): "The OSCR0 Counter register always
-       increments on the rising edge of the 3.25-MHz clock." 416 MHz / 3.25 MHz
-       = 128. */
-    uint32_t CpuToOscrDivider()           const override { return 128; }
+    /* Intel PXA27x Developer's Manual 280000-001 Table 3-7 (page 3-20): "L = 7
+       (Core = 91.0 MHz) is used for hardware boot-up frequency". */
+    uint32_t CpuClockHz()                 const override { return 91000000u; }
 };
 
 }  /* namespace */

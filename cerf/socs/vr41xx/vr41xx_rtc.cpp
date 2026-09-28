@@ -10,6 +10,7 @@
 #include "../../state/state_stream.h"
 #include "../guest_cpu_reset.h"
 #include "vr41xx_icu.h"
+#include "vr41xx_pmu.h"
 
 #include <algorithm>
 #include <chrono>
@@ -52,6 +53,19 @@ void Vr41xxRtc::OnReady() {
         else                            StopTclkLocked();
         EvaluateLocked();
         DriveIcuLocked();
+    });
+
+    /* Hibernate startup factor "an Elapsed Time timer interrupt" (VR4131 UM U15350EJ2V0UM
+       12.1.3 p216); PMUINTREG D9 RTCINTR "RTC alarm interrupt detection" (VR4102 UM 15.2.1). */
+    emu_.Get<GuestDeepSleep>().RegisterParkClock([this] {
+        std::lock_guard<std::mutex> lk(mtx_);
+        EvaluateLocked();
+        DriveIcuLocked();
+        if ((rtcintreg_ & kIntElapsed) != 0u) emu_.Get<Vr41xxPmu>().LatchRtcAlarmWake();
+    });
+    emu_.Get<GuestDeepSleep>().RegisterParkWakeSource([this] {
+        std::lock_guard<std::mutex> lk(mtx_);
+        return (rtcintreg_ & kIntElapsed) != 0u;
     });
 
     worker_ = std::thread([this] { WorkerLoop(); });
@@ -257,24 +271,14 @@ void Vr41xxRtc::StopWorker() {
 
 void Vr41xxRtc::WorkerLoop() {
     auto& freeze = emu_.Get<EmulationFreeze>();
-    auto& engine = emu_.Get<GuestEngine>();
     std::unique_lock<std::mutex> lk(cv_mtx_);
     while (!stop_.load(std::memory_order_acquire)) {
         lk.unlock();
         {
             auto frozen = freeze.WorkerSection();
-            bool elapsed_pending = false;
-            {
-                std::lock_guard<std::mutex> sl(mtx_);
-                EvaluateLocked();
-                DriveIcuLocked();
-                elapsed_pending = (rtcintreg_ & kIntElapsed) != 0;
-            }
-            /* Hibernate startup factor "an Elapsed Time timer interrupt" (VR4131 UM
-               U15350EJ2V0UM 12.1.3 p216); a match pending at HIBERNATE entry wakes
-               immediately - the guest arms ECMP = ETIME - 4 at 0x9F0359B0. */
-            if (elapsed_pending && engine.DeepSleep() && !engine.ResetPending())
-                emu_.Get<GuestDeepSleep>().RequestHardwareWake();
+            std::lock_guard<std::mutex> sl(mtx_);
+            EvaluateLocked();
+            DriveIcuLocked();
         }
         lk.lock();
         if (stop_.load(std::memory_order_acquire)) break;

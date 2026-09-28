@@ -97,7 +97,7 @@ function Build-LauncherStub([string]$python, [string]$outDir) {
            " && link /nologo /NODEFAULTLIB /ENTRY:StubEntry /SUBSYSTEM:WINDOWS,6.00" +
            " /MANIFEST:EMBED /MANIFESTUAC:`"level='asInvoker' uiAccess='false'`"" +
            " /OUT:`"$out`" `"$obj`" `"$res`" kernel32.lib user32.lib"
-    cmd /c $cmd
+    cmd /c $cmd | Write-Host
     if ($LASTEXITCODE -ne 0 -or -not (Test-Path $out)) {
         Write-Host "[LAUNCHER] FAILED! stub build returned $LASTEXITCODE"
         return $null

@@ -50,6 +50,7 @@ void CliUsage::Print(const char* prog) {
     printf("Board ids (cerf.json board.id / --board-id):\n  ");
     bool first = true;
     for (const auto& d : emu_.Get<BoardDatabase>().Devices()) {
+        if (!d.supported) continue;
         printf("%s%s", first ? "" : ", ", d.id.c_str());
         first = false;
     }

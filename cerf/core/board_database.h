@@ -31,6 +31,7 @@ struct DbDevice {
     std::string                   id;
     std::string                   name;
     std::string                   short_name;
+    bool                          supported;
     std::string                   soc_id;
     std::optional<DbLcdPanelSize> lcd_panel_size;
     uint32_t                      ga_color_depth;

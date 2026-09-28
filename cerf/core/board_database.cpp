@@ -28,6 +28,13 @@ std::string RequireString(const json& obj, const char* key, const std::string& p
     return obj[key].get<std::string>();
 }
 
+bool OptionalBool(const json& obj, const char* key, const std::string& path,
+                  const std::string& ctx) {
+    if (!obj.contains(key)) return false;
+    if (!obj[key].is_boolean()) CfgFatal(path, ctx + "." + key + " must be a boolean");
+    return obj[key].get<bool>();
+}
+
 uint32_t RequirePositiveInt(const json& obj, const char* key, const std::string& path,
                             const std::string& ctx) {
     if (!obj.contains(key) || !obj[key].is_number_integer() || obj[key].get<int>() < 1)
@@ -85,6 +92,7 @@ void BoardDatabase::OnReady() {
         row.short_name = d.contains("short_name")
                              ? RequireString(d, "short_name", path, ctx)
                              : row.name;
+        row.supported  = OptionalBool(d, "supported", path, ctx);
         row.soc_id     = RequireString(d, "soc_id", path, ctx);
         Soc(row.soc_id);
         if (d.contains("lcd_panel_size")) {

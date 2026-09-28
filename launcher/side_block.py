@@ -8,7 +8,7 @@ from typing import Callable, Optional, Tuple
 import ui_theme as theme
 
 HEADING_FONT = ("Segoe UI", 9, "bold")
-_GRADIENT_STRENGTH_DARK = 0.12
+_GRADIENT_STRENGTH_DARK = 0.075
 _GRADIENT_STRENGTH_LIGHT = 1.0
 _HEADING_PAD_X = 8
 _HEADING_PAD_Y = 4

@@ -92,13 +92,13 @@ private:
 
     bool Connect() {
         for (int i = 0; i < 10; i++) {
-            char name[64];
-            std::snprintf(name, sizeof name, "\\\\.\\pipe\\discord-ipc-%d", i);
-            HANDLE h = CreateFileA(name, GENERIC_READ | GENERIC_WRITE, 0, nullptr,
+            wchar_t name[64];
+            swprintf_s(name, L"\\\\.\\pipe\\discord-ipc-%d", i);
+            HANDLE h = CreateFileW(name, GENERIC_READ | GENERIC_WRITE, 0, nullptr,
                                    OPEN_EXISTING, FILE_FLAG_OVERLAPPED, nullptr);
             if (h != INVALID_HANDLE_VALUE) {
                 pipe_ = h;
-                LOG(Discord, "connected via %s\n", name);
+                LOG(Discord, "connected via %ls\n", name);
                 return true;
             }
         }

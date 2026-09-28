@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import List, Optional
 
 from app_paths import LAUNCHER_DIR_NAME, exe_dir, install_root, resolve_icon
+from text_context_menu import TextContextMenu
 from ui_dialogs import show_dialog
 from uninstall import remove_installation, remove_shell_integration
 from uninstall_window import UninstallProgress, UninstallWindow
@@ -27,6 +28,7 @@ def _root() -> tk.Tk:
     root = tk.Tk()
     root.withdraw()
     theme.apply_theme(root)
+    TextContextMenu(root)
     icon = resolve_icon()
     if icon is not None:
         try:

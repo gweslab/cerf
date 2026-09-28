@@ -15,6 +15,23 @@ This page is MANDATORY and complements `rules.md` (behavioral rules) and
 - **Includes** - project headers with relative paths (`"../core/log.h"`), system headers with angle brackets. When windowsx/GDI identifiers collide, put `#define NOMINMAX` before `<windows.h>`.
 - **Do not reach past CERF's abstractions to call host APIs that CERF owns the answer to at runtime.** When the running guest can observe CERF's internal answer to a question (emulated peripheral state, virtual-platform behavior the guest depends on), host-side code must consult CERF's surface and must not ask the host directly - a bypass produces values the guest was not supposed to see. (This rule is about runtime guest-observable answers. It does not block bootstrap-time host file reads against the bundled tree.)
 
+## Text encoding
+
+CERF runs on hosts in every locale. The ANSI code page is different on each of
+them, and it encodes only a part of Unicode. CERF therefore never uses the ANSI
+code page.
+
+- **Every `std::string` and `char*` in host code holds UTF-8.** This includes
+  paths, configuration values, command-line arguments and display text.
+- **Call the W form of each Win32 API.** Convert a UTF-8 argument with
+  `Utf8ToWide` at the call. Convert a wide result back with `WideToUtf8`. Do not
+  call an A form. Do not give `CP_ACP` to a conversion.
+- **Open a file through a wide path.** MSVC decodes a narrow path in
+  `std::fstream`, `std::filesystem::path` and `fopen` with the ANSI code page.
+  Give them `Utf8ToWide(path)`, or use `_wfopen_s`.
+- **Test each path or text change with characters that the ANSI code page
+  cannot encode.** A test with ASCII names proves nothing about encoding.
+
 ## Comments
 
 - **A comment is a CITATION, or it does not exist. There is no third kind.** A citation names the external source of truth for the code beneath it: a chip datasheet section, a CPU architecture manual section, a decompiled guest address with its ROM bundle name, a standard or RFC clause, or a permissively-licensed attributed source. That is the entire permitted set, and it is further bounded by `rules.md` § Reference Licence Hygiene - a source in that section's forbidden set is never cited here, whatever the citation would otherwise be worth. Everything else is forbidden - rationale, narration, restatement, design defense, alternatives history, background - as is any sentence that still reads fine with the code deleted. If you cannot name a source, write no comment. This applies in every file type, `.cpp` / `.h` / YAML / MSBuild / PowerShell / batch / CMake alike. Build infrastructure is not exempt.

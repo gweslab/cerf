@@ -20,6 +20,7 @@
 #include "../core/device_config.h"
 #include "../core/log.h"
 #include "../core/service.h"
+#include "../core/string_utils.h"
 #include "../cpu/emulated_memory.h"
 #include "../boards/page_table_builder.h"
 #include "../socs/guest_cpu_reset.h"
@@ -222,7 +223,7 @@ bool GuestAdditionsInjector::Replace(const char* victim_name,
         return false;
     }
 
-    std::ifstream f(source_path, std::ios::binary | std::ios::ate);
+    std::ifstream f(Utf8ToWide(source_path.c_str()), std::ios::binary | std::ios::ate);
     if (!f.is_open()) {
         LOG(Caution, "cannot open %s - cerf_guest_stub.dll must be built and "
                 "staged before injecting %s\n", source_path.c_str(), victim_name);

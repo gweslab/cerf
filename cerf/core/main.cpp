@@ -10,7 +10,21 @@
 #include <windows.h>
 #include <timeapi.h>
 
-int main(int argc, char* argv[]) {
+#include "string_utils.h"
+
+#include <string>
+#include <vector>
+
+int wmain(int argc, wchar_t* wargv[]) {
+    std::vector<std::string> utf8_args;
+    utf8_args.reserve(argc);
+    for (int i = 0; i < argc; ++i) utf8_args.push_back(WideToUtf8(wargv[i]));
+    std::vector<char*> argv_ptrs;
+    argv_ptrs.reserve(argc + 1);
+    for (std::string& a : utf8_args) argv_ptrs.push_back(a.data());
+    argv_ptrs.push_back(nullptr);
+    char** const argv = argv_ptrs.data();
+
     CerfConfig cfg;
     switch (ParseCerfArgs(argc, argv, cfg)) {
         case ArgParseResult::Run:         break;

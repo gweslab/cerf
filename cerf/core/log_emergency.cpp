@@ -114,16 +114,16 @@ void Log::EmergencyStart() {
     if (!g_emergency_started.compare_exchange_strong(expected, true))
         return;  /* already in emergency - concurrent handler on another thread */
     FreezeAllOtherThreads();
-    char crash_path[MAX_PATH];
-    const DWORD mod_len = GetModuleFileNameA(NULL, crash_path, MAX_PATH);
+    wchar_t crash_path[MAX_PATH];
+    const DWORD mod_len = GetModuleFileNameW(NULL, crash_path, MAX_PATH);
     int cut = 0;
     if (mod_len > 0 && mod_len < MAX_PATH) {
         for (int i = 0; i < (int)mod_len; ++i) {
-            if (crash_path[i] == '\\' || crash_path[i] == '/') cut = i + 1;
+            if (crash_path[i] == L'\\' || crash_path[i] == L'/') cut = i + 1;
         }
     }
-    lstrcpynA(crash_path + cut, "cerf.crash.log", MAX_PATH - cut);
-    g_emergency_file = CreateFileA(crash_path, GENERIC_WRITE,
+    lstrcpynW(crash_path + cut, L"cerf.crash.log", MAX_PATH - cut);
+    g_emergency_file = CreateFileW(crash_path, GENERIC_WRITE,
                                    FILE_SHARE_READ | FILE_SHARE_WRITE, NULL,
                                    CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
     SYSTEMTIME st;

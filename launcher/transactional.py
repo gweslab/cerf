@@ -11,6 +11,7 @@ from typing import List
 from app_paths import resolve_devices_dir, resolve_icon
 from device_state import write_cerf_json
 from screen_geometry import screen_work_area
+from text_context_menu import TextContextMenu
 from transactional_about import run_about
 from transactional_live_customizations import run_live_customizations
 from transactional_settings import run_settings
@@ -51,6 +52,7 @@ def _return_foreground(owner_hwnd: int) -> None:
 def _make_root() -> tk.Tk:
     root = tk.Tk()
     theme.apply_theme(root)
+    TextContextMenu(root)
     root.withdraw()
     icon = resolve_icon()
     if icon is not None:

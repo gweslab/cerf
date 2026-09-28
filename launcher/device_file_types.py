@@ -23,6 +23,7 @@ class DeviceFileType:
     formats: Tuple[str, ...]
     note: str
     picker_type: str
+    optional: bool
     optional_for_storage_ids: Tuple[str, ...]
 
     @property
@@ -79,6 +80,7 @@ def _file_type(section: str, row: dict) -> DeviceFileType:
         section=section, id=row["id"], name=_text(row, "name") or row["id"],
         formats=_strings(row, "formats"), note=_text(row, "note"),
         picker_type=picker,
+        optional=row.get("optional") is True,
         optional_for_storage_ids=_strings(row, "optional_for_storage_ids"))
 
 
@@ -114,7 +116,7 @@ def _file_non_empty(path: Path) -> bool:
 
 def is_required(ftype: DeviceFileType, values: Dict[FileKey, str],
                 base_dir: Optional[Path]) -> bool:
-    if ftype.is_storage:
+    if ftype.is_storage or ftype.optional:
         return False
     for storage_id in ftype.optional_for_storage_ids:
         value = (values.get((STORAGE_BLOCK, storage_id), "")

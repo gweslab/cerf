@@ -34,7 +34,7 @@ public:
         if (!cfg.rom_eeprom.empty()) {
             const std::string path = ResolveDeviceFile(cfg.device_name,
                                                        cfg.rom_eeprom);
-            std::ifstream f(path, std::ios::binary | std::ios::ate);
+            std::ifstream f(Utf8ToWide(path.c_str()), std::ios::binary | std::ios::ate);
             if (f) {
                 const std::streamsize n = f.tellg();
                 f.seekg(0);

@@ -25,7 +25,7 @@ void UserConfigWriter::WriteConfigurableScreenSize(uint32_t width,
     j["board"]["configurable_screen_width"]  = width;
     j["board"]["configurable_screen_height"] = height;
 
-    std::ofstream f(path, std::ios::trunc | std::ios::binary);
+    std::ofstream f(Utf8ToWide(path.c_str()), std::ios::trunc | std::ios::binary);
     if (!f.is_open()) {
         LOG(Cfg, "UserConfigWriter: cannot write '%s'\n", path.c_str());
         return;

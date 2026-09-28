@@ -483,7 +483,7 @@ void ConfigLoader::SaveLastSaveStateMode(bool save_state) {
 
     emu_.Get<DeviceConfig>().last_save_state_mode = save_state;
 
-    std::ofstream f(top_path, std::ios::trunc);
+    std::ofstream f(Utf8ToWide(top_path.c_str()), std::ios::trunc);
     if (!f.is_open()) {
         LOG(Cfg, "Could not write '%s' to persist last_save_state_mode\n",
             top_path.c_str());

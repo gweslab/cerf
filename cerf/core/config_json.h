@@ -1,6 +1,7 @@
 #pragma once
 
 #include "log.h"
+#include "string_utils.h"
 
 #include <nlohmann/json.hpp>
 
@@ -14,7 +15,7 @@
 }
 
 inline nlohmann::json CfgReadJsonFile(const std::string& path) {
-    std::ifstream f(path);
+    std::ifstream f(Utf8ToWide(path.c_str()));
     if (!f.is_open()) return nlohmann::json();
     nlohmann::json j;
     try {

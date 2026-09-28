@@ -1,4 +1,5 @@
 #include "log.h"
+#include "cerf_paths.h"
 #include <windows.h>
 #include <cstring>
 #include <mutex>
@@ -358,19 +359,8 @@ void Log::InitDefaultLogFile() {
     if (g_log_handle.load(std::memory_order_acquire) != INVALID_HANDLE_VALUE) {
         return;
     }
-    char path[MAX_PATH] = {};
-    DWORD len = GetModuleFileNameA(NULL, path, MAX_PATH);
-    if (len > 0) {
-        char* last_sep = strrchr(path, '\\');
-        if (!last_sep) last_sep = strrchr(path, '/');
-        if (last_sep) {
-            size_t prefix_len = (last_sep + 1) - path;
-            snprintf(path + prefix_len, MAX_PATH - prefix_len, "cerf.log");
-        } else {
-            snprintf(path, MAX_PATH, "cerf.log");
-        }
-        SetFile(path);
-    }
+    if (GetCerfExePath().empty()) return;
+    SetFile((GetCerfDir() + "cerf.log").c_str());
 }
 
 void Log::SetEnabled(uint64_t mask) {
@@ -381,7 +371,7 @@ void Log::SetAllowFlood(bool allow) { g_allow_flood = allow; }
 void Log::SetFile(const char* path) {
     EnsureRingWriter();
     EnterCriticalSection(&g_drain_cs);
-    HANDLE h = CreateFileA(path, GENERIC_WRITE,
+    HANDLE h = CreateFileW(Utf8ToWide(path).c_str(), GENERIC_WRITE,
                            FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr,
                            CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
     if (h != INVALID_HANDLE_VALUE) {

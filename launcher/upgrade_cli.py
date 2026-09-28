@@ -11,6 +11,7 @@ from app_paths import install_root, resolve_icon
 from branding import PRODUCT_NAME
 from install_finalize import finalize
 from install_options import InstallOptions, parse_options
+from text_context_menu import TextContextMenu
 from ui_dialogs import show_dialog, show_error
 from upgrade_install import install_upgrade
 from upgrade_process import (FRESH_INSTALL_FLAG, INSTALL_FLAG,
@@ -41,6 +42,7 @@ def _hidden_root() -> tk.Tk:
     root = tk.Tk()
     root.withdraw()
     theme.apply_theme(root)
+    TextContextMenu(root)
     icon = resolve_icon()
     if icon is not None:
         try:

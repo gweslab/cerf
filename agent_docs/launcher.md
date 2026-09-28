@@ -254,6 +254,10 @@ Use nothing newer: no walrus `:=`, no `Path.unlink(missing_ok=)`, no
 call runs on a modern interpreter and then fails inside the shipped exe, where
 nobody sees the traceback.
 
+Give every text-mode `open`, `read_text` and `write_text` an explicit `encoding`.
+Without it, Python 3.7 uses the ANSI code page of the host. Python then reads and
+writes non-ASCII text differently on each locale.
+
 Run the cached interpreter on every launcher file:
 
     references/python/cpython-3.7.9-x86/python.exe -m py_compile launcher/*.py

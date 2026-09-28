@@ -1,6 +1,7 @@
 #include "folder_share_config.h"
 #include "cerf_paths.h"
 #include "device_config_refresh.h"
+#include "log.h"
 
 #define NOMINMAX
 #include <windows.h>
@@ -15,21 +16,19 @@ void FolderShareConfig::OnReady() {
 
 void FolderShareConfig::ApplyFromConfig() {
     const std::string& p = emu_.Get<DeviceConfig>().share_folder;
-    if (p.empty()) {
+    std::wstring wp = Utf8ToWide(p.c_str());
+    if (wp.empty()) {
         Set(false, L"", L"");
         return;
     }
-
-    const int n = MultiByteToWideChar(CP_ACP, 0, p.c_str(), -1, nullptr, 0);
-    if (n <= 1) {
-        Set(false, L"", L"");
-        return;
-    }
-    std::wstring wp(n - 1, L'\0');
-    MultiByteToWideChar(CP_ACP, 0, p.c_str(), -1, &wp[0], n);
 
     if (!IsAbsoluteHostPath(p))
         wp = Utf8ToWide(GetCerfDir().c_str()) + wp;
+
+    const DWORD attrs = GetFileAttributesW(wp.c_str());
+    const DWORD gle   = attrs == INVALID_FILE_ATTRIBUTES ? GetLastError() : 0;
+    LOG(GuestAdditions, "[FolderShare] host root '%s' attrs=0x%lX gle=%lu\n",
+        WideToUtf8(wp).c_str(), attrs, gle);
 
     Set(true, std::move(wp), L"");
 }

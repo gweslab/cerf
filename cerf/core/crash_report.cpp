@@ -50,7 +50,7 @@ bool Spawn() {
 
     wchar_t log[MAX_PATH] = {};
     if (g_log_override) {
-        MultiByteToWideChar(CP_ACP, 0, g_log_override, -1, log, MAX_PATH);
+        MultiByteToWideChar(CP_UTF8, 0, g_log_override, -1, log, MAX_PATH);
     }
 
     wchar_t cmd[2 * MAX_PATH + 64];

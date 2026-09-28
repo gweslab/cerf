@@ -6,6 +6,7 @@ from typing import List, Optional
 
 from app_paths import resolve_icon
 from crash_window import CrashWindow
+from text_context_menu import TextContextMenu
 import ui_theme as theme
 
 
@@ -19,6 +20,7 @@ def run_transactional_crash(argv: List[str]) -> int:
 
     root = tk.Tk()
     theme.apply_theme(root)
+    TextContextMenu(root)
     root.withdraw()
     icon = resolve_icon()
     if icon is not None:

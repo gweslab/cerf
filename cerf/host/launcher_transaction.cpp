@@ -37,7 +37,7 @@ bool LauncherTransaction::LocateLauncher(HWND owner, std::wstring& exe) {
 
 bool LauncherTransaction::WriteRequest(HWND owner, const std::string& path,
                                        const nlohmann::json& request) {
-    std::ofstream f(path, std::ios::trunc | std::ios::binary);
+    std::ofstream f(Utf8ToWide(path.c_str()), std::ios::trunc | std::ios::binary);
     if (f.is_open()) {
         f << request.dump(2) << '\n';
         if (f.good()) return true;
@@ -110,7 +110,7 @@ bool LauncherTransaction::ReadResponse(HWND owner, const std::string& path,
                                        nlohmann::json& response) {
     nlohmann::json parsed;
     {
-        std::ifstream f(path);
+        std::ifstream f(Utf8ToWide(path.c_str()));
         if (!f.is_open()) {
             Complain(owner, L"The configuration window left no answer "
                             L"behind.\n\n" + Utf8ToWide(path.c_str()));

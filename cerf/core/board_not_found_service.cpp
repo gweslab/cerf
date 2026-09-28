@@ -6,6 +6,7 @@
 #include "cerf_emulator.h"
 #include "device_config.h"
 #include "log.h"
+#include "string_utils.h"
 
 #include <string>
 #include <windows.h>
@@ -34,8 +35,8 @@ void BoardNotFoundService::EnsureFound() {
             : ("Unrecognised board id '" + id +
                "'.\n\nRun cerf.exe --help for the supported id list. "
                "CERF will exit.");
-    MessageBoxA(nullptr, msg.c_str(),
-                "Unsupported board - CE Runtime Foundation",
+    MessageBoxW(nullptr, Utf8ToWide(msg.c_str()).c_str(),
+                L"Unsupported board - CE Runtime Foundation",
                 MB_OK | MB_ICONERROR);
 #endif
 

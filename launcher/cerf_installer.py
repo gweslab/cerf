@@ -13,6 +13,7 @@ if str(_THIS_DIR) not in sys.path:
 
 from app_paths import resolve_icon
 from installer_window import SETUP_ICO_NAME, InstallerWindow
+from text_context_menu import TextContextMenu
 from ui_theme import apply_theme, enable_dpi_awareness
 
 
@@ -23,6 +24,7 @@ def main(argv: List[str]) -> int:
     root = tk.Tk()
     root.withdraw()
     apply_theme(root)
+    TextContextMenu(root)
     icon = resolve_icon(SETUP_ICO_NAME)
     if icon is not None:
         try:

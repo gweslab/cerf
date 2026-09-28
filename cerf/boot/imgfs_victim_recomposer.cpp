@@ -11,6 +11,7 @@
 #include "../core/byte_order.h"
 #include "../core/cerf_emulator.h"
 #include "../core/log.h"
+#include "../core/string_utils.h"
 
 #include <fstream>
 
@@ -47,7 +48,7 @@ ImgfsVictimRecomposer::Recompose(std::span<const uint8_t> orig_hdr,
     const uint32_t orig_rva0      = U32(h, kE32RomCE5plusO32Base + kO32OffRva);
     const uint32_t slot_base = orig_realaddr0 - orig_rva0 - orig_vbase;
 
-    std::ifstream f(stub_path, std::ios::binary | std::ios::ate);
+    std::ifstream f(Utf8ToWide(stub_path.c_str()), std::ios::binary | std::ios::ate);
     if (!f.is_open()) {
         LOG(Caution, "[GA recompose] cannot open stub %s\n", stub_path.c_str());
         CerfFatalExit();

@@ -2,6 +2,7 @@
 #include "log.h"
 #include "main_config.h"
 #include "cerf_emulator.h"
+#include "host_diagnostics.h"
 #include "../version.h"
 
 #define WIN32_LEAN_AND_MEAN
@@ -42,7 +43,8 @@ int main(int argc, char* argv[]) {
     Log::InstallCrashHandler();
 
     LOG(Cerf, "== CE Runtime Foundation %s ==\n", CERF_VERSION_DISPLAY_STR);
-    LOG(Cerf, "main.cpp compiled at: %s %s\n\n", __DATE__, __TIME__);
+    LOG(Cerf, "main.cpp compiled at: %s %s\n", __DATE__, __TIME__);
+    HostDiagnostics::LogReport();
 
     CerfEmulator emu(cfg, argc, argv);
     emu.Boot();

@@ -3,6 +3,7 @@
 #include "host_screenshot.h"
 
 #include "../core/cerf_emulator.h"
+#include "../core/cerf_paths.h"
 #include "../core/device_config.h"
 #include "../core/log.h"
 #include "../core/string_utils.h"

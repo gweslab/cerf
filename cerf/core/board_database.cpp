@@ -1,6 +1,7 @@
 #include "board_database.h"
 
 #include "cerf_emulator.h"
+#include "cerf_paths.h"
 #include "config_json.h"
 #include "string_utils.h"
 

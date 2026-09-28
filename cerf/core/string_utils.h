@@ -12,15 +12,6 @@ inline std::string WideToUtf8(const std::wstring& w) {
     return s;
 }
 
-inline std::string GetCerfDir() {
-    wchar_t p[MAX_PATH];
-    ::GetModuleFileNameW(NULL, p, MAX_PATH);
-    std::wstring ws(p);
-    size_t sep = ws.find_last_of(L"\\/");
-    if (sep == std::wstring::npos) return "";
-    return WideToUtf8(ws.substr(0, sep + 1));
-}
-
 inline std::wstring Utf8ToWide(const char* u) {
     if (!u || !*u) return {};
     int n = MultiByteToWideChar(CP_UTF8, 0, u, -1, NULL, 0);

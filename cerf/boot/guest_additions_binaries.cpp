@@ -2,6 +2,7 @@
 
 #include "../core/byte_order.h"
 #include "../core/cerf_emulator.h"
+#include "../core/cerf_paths.h"
 #include "../core/log.h"
 #include "../core/string_utils.h"
 #include "../cpu/arm_processor_config.h"

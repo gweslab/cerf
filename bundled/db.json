@@ -1526,6 +1526,18 @@
       "formats": [
         "esco"
       ]
+    },
+    {
+      "id": "eeprom",
+      "name": "EEPROM",
+      "optional": true,
+      "board_ids": [
+        "jornada_720"
+      ],
+      "formats": [
+        "bin",
+        "img"
+      ]
     }
   ],
   "storage_types": [

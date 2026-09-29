@@ -5,6 +5,7 @@
 #include <windows.h>
 
 #include "../../core/cerf_emulator.h"
+#include "../../core/fatal.h"
 #include "../../core/log.h"
 #include "mips_cpu.h"
 #include "mips_cpu_state.h"
@@ -81,6 +82,11 @@ void MipsExceptionDelivery::RaiseAddressError(uint32_t va, MipsAccess acc) {
 void MipsExceptionDelivery::RaiseOverflowException() {
     EnterException(MipsExcCode::kOv, false);
     RaiseException(kGuestExceptionCode, 0, 0, nullptr);
+}
+
+void MipsExceptionDelivery::LeaveBlock() {
+    RaiseException(kGuestExceptionCode, 0, 0, nullptr);
+    emu_.Get<Fatal>().Die("MipsExceptionDelivery::LeaveBlock: the guest-exception unwind returned");
 }
 
 bool MipsExceptionDelivery::InterruptReady() const {

@@ -38,6 +38,10 @@ protected:
 
     virtual void* Mtc0Helper(uint32_t rd) const = 0;
 
+    virtual void* Mtc0HelperContext(uint32_t rd, MipsBlockContext* ctx) const;
+
+    virtual void* Mfc0Helper(uint32_t rd) const;
+
     /* gpr[rt] = sext32(cp0[rd]), sel 0 only; shared by MFC0 and DMFC0. */
     uint8_t* EmitFromCop0(uint8_t* cursor, MipsDecodedInsn* d,
                           MipsBlockContext* ctx);

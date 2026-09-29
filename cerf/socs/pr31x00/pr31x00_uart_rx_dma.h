@@ -1,12 +1,13 @@
 #pragma once
 
-#include <chrono>
-#include <condition_variable>
+#include "../../jit/guest_cycle_clock.h"
+#include "../../jit/host_request_channel.h"
+#include "../cycle_anchored_counter.h"
+
 #include <cstddef>
 #include <cstdint>
 #include <functional>
 #include <mutex>
-#include <thread>
 #include <vector>
 
 class CerfEmulator;
@@ -30,18 +31,21 @@ public:
     using RxIntFn    = std::function<void(const RxInts&)>;
     using LineIdleFn = std::function<void()>;
 
-    Pr31x00UartRxDma(CerfEmulator& emu, const char* source);
-    ~Pr31x00UartRxDma();
+    struct LineTiming {
+        GuestCycleClock::Rate uart_clock{0u, 1u};
+        uint64_t              uart_clocks_per_bit = 0;
+        uint32_t              frame_bits          = 0;
+        uint32_t              transfer_bits       = 0;
+    };
 
-    /* raise_ints fires for each batch landed in the buffer, on_line_idle once the last
-       received byte has been clocked out. Both run on the pacing thread. */
-    void Start(RxIntFn raise_ints, LineIdleFn on_line_idle);
-    void Stop();
+    Pr31x00UartRxDma(CerfEmulator& emu, const char* source);
+
+    void Attach(RxIntFn raise_ints, LineIdleFn on_line_idle);
 
     void SetBuffer(uint32_t pa);
     void SetLength(uint32_t bytes);
     void SetArmed(bool armed);
-    void SetLineRate(uint32_t baud, double bits_per_char);
+    void SetLine(const LineTiming& timing);
 
     uint32_t Count() const;
     uint32_t Length() const;
@@ -53,32 +57,40 @@ public:
     void RestoreState(StateReader& r);
 
 private:
-    using Clock = std::chrono::steady_clock;
-
-    void   PaceLoop();
-    RxInts MeterLocked();
+    void OnHostRequest();
+    void OnCharEvent();
+    void StartRunLocked(uint64_t now);
+    void StopRunLocked();
+    void ClockRunLocked(uint64_t now);
+    void SetBitRatioLocked();
+    bool ReachedLocked(uint64_t now) const;
+    void ArmLocked(uint64_t now);
 
     CerfEmulator& emu_;
     const char*   source_;
 
-    mutable std::mutex      mu_;
-    std::condition_variable cv_;
+    mutable std::mutex mu_;
 
     uint32_t buffer_pa_ = 0;
     uint32_t length_    = 0;
     uint32_t count_     = 0;
     bool     armed_     = false;
 
-    uint32_t baud_          = 115200;
-    double   bits_per_char_ = 10.0;
-
     std::vector<uint8_t> wire_;
     size_t               wire_pos_ = 0;
-    double               credit_   = 0.0;
-    Clock::time_point    last_;
 
-    bool        stop_ = true;
-    std::thread pacer_;
-    RxIntFn     raise_ints_;
-    LineIdleFn  on_line_idle_;
+    LineTiming              timing_;
+    CycleAnchoredCounter    bits_;
+    bool                    busy_       = false;
+    bool                    clocked_    = false;
+    uint32_t                next_bit_   = 0;
+    uint32_t                held_count_ = 0;
+    uint64_t                held_phase_ = 0;
+    uint64_t                held_den_   = 1;
+    GuestCycleClock*        clock_      = nullptr;
+    HostRequestChannel*     host_requests_ = nullptr;
+    GuestCycleClock::Event* event_      = nullptr;
+
+    RxIntFn    raise_ints_;
+    LineIdleFn on_line_idle_;
 };

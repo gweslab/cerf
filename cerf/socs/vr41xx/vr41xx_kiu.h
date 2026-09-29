@@ -1,13 +1,12 @@
 #pragma once
 
+#include "../../jit/guest_cycle_clock.h"
+#include "../../jit/host_request_channel.h"
 #include "../../peripherals/peripheral_base.h"
+#include "vr41xx_rtcx_ticks.h"
 
-#include <atomic>
-#include <chrono>
-#include <condition_variable>
 #include <cstdint>
 #include <mutex>
-#include <thread>
 
 /* KIUSCANREP STPREP[5:0] 000000 is "64 times" on the VR4102 (UM 21.2.2 p425) and RFU on the
    VR4111 (UM 22.2.2 p463) and VR4121 (UM 22.2.2 p514). VR4111 Figure 22-3 p473 and VR4121
@@ -27,9 +26,6 @@ struct Vr41xxKiuModel {
 class Vr41xxKiu : public Peripheral {
 public:
     using Peripheral::Peripheral;
-
-    ~Vr41xxKiu() override { StopWorker(); }
-    void OnShutdown() override { StopWorker(); }
 
     void OnReady() override;
 
@@ -66,6 +62,8 @@ private:
        "the key scan operation automatically starts after key contact is detected",
        VR4121 UM 22.2.2 p514). */
     uint16_t held_[6]   = {0, 0, 0, 0, 0, 0};
+    uint16_t host_held_[6] = {0, 0, 0, 0, 0, 0};
+    bool     host_dirty_   = false;
     /* KIUSCANREP reset row: D0 ATSCAN = 1, every other bit 0 (VR4111 UM 22.2.2 p463,
        VR4102 UM 21.2.2 p425, VR4121 UM 22.2.2 p514). */
     uint16_t scanrep_   = 0x0001;
@@ -108,7 +106,12 @@ private:
     /* End of the scan period or of the KIUWKI interval now in progress (VR4111 UM 22.2.4
        p466 / 22.2.5 p467, VR4102 UM 21.2.4 p429 / 21.2.5 p430, VR4121 UM 22.2.4 p518 /
        22.2.5 p519). */
-    std::chrono::steady_clock::time_point phase_end_{};
+    uint64_t phase_end_ = 0;
+
+    GuestCycleClock*        clock_ = nullptr;
+    GuestCycleClock::Event* event_ = nullptr;
+    HostRequestChannel*     host_requests_ = nullptr;
+    Vr41xxRtcxTicks         rtcx_{emu_, Vr41xxRtcxDomain::Peripheral};
 
     bool EnabledLocked() const;
     bool AnyKeyDownLocked();
@@ -120,21 +123,17 @@ private:
     void ClearScanStpLocked();
     void CompleteScanLocked();
     void ApplyScanRepLocked();
-    void ArmScanLocked(std::chrono::steady_clock::time_point now);
+    void ArmScanLocked(uint64_t start);
     void AdvancePhaseLocked();
+    void ArmEventLocked();
+    void UpdateLocked();
+    void ApplyHostKeysLocked();
+    uint32_t ScanLineCountLocked() const;
+    bool GpenOnScanLinesLocked(uint32_t lines) const;
     uint32_t ScanLinesLocked();
-    uint32_t ScanPeriodUsLocked();
+    uint32_t ScanPeriodTicksFor(uint32_t lines) const;
+    uint32_t ScanPeriodTicksLocked();
     uint32_t StpRepCountLocked() const;
     void PublishCausesLocked();
     void ApplyResetLocked();
-
-    std::mutex              cv_mtx_;
-    std::condition_variable cv_;
-    std::thread             worker_;
-    std::atomic<bool>       stop_{false};
-    std::atomic<uint64_t>   wake_seq_{0};
-
-    void NotifyWorker();
-    void StopWorker();
-    void WorkerLoop();
 };

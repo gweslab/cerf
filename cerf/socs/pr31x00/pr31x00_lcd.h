@@ -1,23 +1,19 @@
 #pragma once
 
-#include "../../peripherals/peripheral_base.h"
+#include "../raster_scan_peripheral.h"
 
-#include <atomic>
-#include <condition_variable>
 #include <cstdint>
-#include <mutex>
-#include <thread>
 
+class Pr31x00Clock;
 class Pr31x00Intc;
 
 /* Philips PR31x00 Video Module, TMPR3911/3912 ch.17. Registers $028-$05C. */
-class Pr31x00Lcd : public Peripheral {
+class Pr31x00Lcd : public RasterScanPeripheral {
 public:
-    using Peripheral::Peripheral;
+    using RasterScanPeripheral::RasterScanPeripheral;
 
     bool ShouldRegister() override;
     void OnReady() override;
-    void OnShutdown() override { StopWorker(); }
 
     uint32_t MmioBase() const override { return 0x10C00028u; }
     uint32_t MmioSize() const override { return 0x38u; }   /* $028-$05F */
@@ -44,32 +40,31 @@ public:
 
     void SaveState(StateWriter& w) override;
     void RestoreState(StateReader& r) override;
+    void PostRestore() override;
 
-    /* envid_ and frame_period_ns_ are derived from reg_, not serialized, and the
-       frame worker parks until they are re-published. */
-    void PostRestore() override { PublishFrameTiming(); }
+protected:
+    ScanShape              ScanShapeLocked() const override;
+    RasterScanClock::Frame ScanFrameLocked() const;
+    void                   FrameEdgeLocked(uint32_t edge_index) override;
+    void                   ScanEdgesRan() override;
 
 private:
     void StorePattern(uint32_t idx, uint32_t addr, uint32_t value,
                       uint32_t recommended, const char* op);
-
-    /* LCDINT fires at the end of each video frame (§8.3.1) and is this board's
-       only periodic interrupt, so the CE scheduler stops without it. */
-    void PublishFrameTiming();
-    void WorkerLoop();
-    void StopWorker();
+    void     WriteRegLocked(uint32_t addr, uint32_t value, uint64_t now);
+    bool     ScanWantedLocked() const;
+    void     SyncScanLocked(uint64_t now);
+    uint32_t LineCntLocked(uint64_t now) const;
 
     static constexpr uint32_t kRegs = 14;   /* VIDEO_CTL1..CTL14 */
 
     uint32_t reg_[kRegs] = {};
 
-    Pr31x00Intc* intc_ = nullptr;
+    Pr31x00Intc*  intc_  = nullptr;
+    Pr31x00Clock* clock_ = nullptr;
 
-    std::atomic<bool>     envid_{false};
-    std::atomic<uint64_t> frame_period_ns_{0};
-    std::atomic<bool>     stop_{false};
-
-    std::mutex              cv_mtx_;
-    std::condition_variable cv_;
-    std::thread             worker_;
+    uint32_t held_linecnt_       = 0;
+    bool     frame_edge_pending_ = false;
+    bool     enabled_edge_       = false;
+    bool     cp_rate_changed_    = false;
 };

@@ -9,12 +9,15 @@
 #include "../guest_engine.h"
 #include "mips_cpu_state.h"
 
+class GuestCycleClock;
+class HostRequestChannel;
 class MipsBlockCompiler;
 class MipsCp0Ops;
 class MipsCpu;
 class MipsExceptionDelivery;
 class MipsExceptionModel;
 class MipsInterruptChannel;
+class MipsMemoryAccess;
 class MipsMmu;
 class MipsTranslationCache;
 class EmulatedMemory;
@@ -36,7 +39,8 @@ public:
 
     void     Run() override;
     bool     DeepSleep()    const override { return cpu_state_->deep_sleep != 0; }
-    bool     ResetPending() const override { return cpu_state_->reset_pending != 0; }
+    bool     ResetPending() const override;
+    void     SetHostChainExit(bool requested) override;
 
     bool     GuestIrqMasked() const override;
     uint32_t Pc()           const override { return cpu_state_->pc; }
@@ -76,7 +80,10 @@ private:
     MipsTranslationCache*  cache_      = nullptr;
     MipsBlockCompiler*     compiler_   = nullptr;
     MipsInterruptChannel*  channel_    = nullptr;
+    MipsMemoryAccess*      mem_access_ = nullptr;
     MipsCp0Ops*            cp0_ops_    = nullptr;
     MipsExceptionDelivery* exceptions_ = nullptr;
     MipsExceptionModel*    exc_model_  = nullptr;
+    GuestCycleClock*       clock_      = nullptr;
+    HostRequestChannel*    host_requests_ = nullptr;
 };

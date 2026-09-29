@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../../core/service.h"
+#include "../../jit/guest_cycle_clock.h"
 
 #include <cstdint>
 
@@ -21,10 +22,22 @@ public:
     uint16_t Pending() const { return pending_; }
     uint16_t Active()  const { return active_; }
 
+    uint16_t ClkSp() const { return clksp_; }
+    uint16_t ClkSpeedReg() const;
+
+    GuestCycleClock::Rate ResetRate() const;
+    uint64_t              CyclesPerCountTick() const;
+    uint64_t              CyclesPerTclkCounterTick() const;
+
     void SaveState(StateWriter& w) const;
     void RestoreState(StateReader& r);
 
 private:
-    uint16_t pending_ = 0;
-    uint16_t active_  = 0;
+    uint16_t VtDivMode() const;
+    uint16_t TDivMode() const;
+
+    uint16_t pending_     = 0;
+    uint16_t active_      = 0;
+    uint16_t clksp_       = 0;
+    uint16_t strap_vtdiv_ = 0;
 };

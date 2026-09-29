@@ -1,14 +1,17 @@
 #pragma once
 
+#include "../../jit/guest_cycle_clock.h"
 #include "../../peripherals/peripheral_base.h"
+#include "../cycle_anchored_counter.h"
+#include "../oscillator_ticks.h"
 
-#include <atomic>
-#include <chrono>
-#include <condition_variable>
 #include <cstdint>
+#include <functional>
 #include <mutex>
-#include <thread>
+#include <optional>
+#include <vector>
 
+class Pr31x00Clock;
 class Pr31x00Intc;
 
 /* Philips PR31x00 Timer Module, TMPR3911/3912 ch.15. Registers $140-$157: the
@@ -16,9 +19,6 @@ class Pr31x00Intc;
 class Pr31x00Rtc : public Peripheral {
 public:
     using Peripheral::Peripheral;
-
-    ~Pr31x00Rtc() override { StopWorker(); }
-    void OnShutdown() override { StopWorker(); }
 
     bool ShouldRegister() override;
     void OnReady() override;
@@ -38,40 +38,58 @@ public:
     void RestoreState(StateReader& r) override;
     void PostRestore() override;
 
-private:
-    using Clock    = std::chrono::steady_clock;
-    using RtcTicks = std::chrono::duration<uint64_t, std::ratio<1, 32768>>;
+    uint64_t                Count();
+    uint64_t                Tc0Carries();
+    std::optional<uint64_t> CycleOfTc0Carry(uint64_t n);
+    void                    RegisterCountListener(std::function<void()> fn);
 
-    uint64_t          CountLocked() const;
-    Clock::time_point TimeAtCountLocked(uint64_t target) const;
-    Clock::duration   PeriodLocked() const;
-    uint32_t          PerCntLocked() const;
-    void              EvaluateLocked();
-    void     NotifyWorker();
-    void     StopWorker();
-    void     WorkerLoop();
+private:
+    uint64_t CountAtTickLocked(uint64_t tick) const;
+    uint64_t Tc0CarriesAtTickLocked(uint64_t tick) const;
+    uint64_t NextRiseTickLocked(uint64_t tick, uint64_t value) const;
+    uint32_t RtcRisesLocked(uint64_t from, uint64_t to) const;
+    void     RtcEvaluateLocked();
+    void     RtcArmLocked();
+    void     SetAlarmLocked(uint64_t alarm);
+    void     SetRtcClrLocked(bool clr);
+    int64_t  RtcWakeDueNs();
+    void     NotifyCountListeners();
+
+    void     ApplyTimerCtlLocked(uint32_t value);
+    uint64_t PerElapsedLocked();
+    uint32_t PerCntLocked();
+    void     PerEvaluateLocked();
+    void     PerArmLocked();
+    void     PerRetimeLocked();
+    void     SetPerRatio();
 
     mutable std::mutex mtx_;
 
-    uint64_t          base_ticks_ = 0;
-    Clock::time_point anchor_     = {};
     bool              rtc_clr_    = false;   /* RTCCLR holds the counter at zero */
 
     uint64_t alarm_          = 0;
     bool     alarm_armed_    = false;   /* ARARM resets to X; live once written */
-    bool     alarm_fired_    = false;
-    bool     rollover_fired_ = false;
     uint32_t timer_ctl_      = 0;
 
-    uint16_t          perval_           = 0;       /* $154 PERVAL[15:0] reload */
-    bool              periodic_enabled_ = false;   /* TimerCtl ENPERTIMER<4>   */
-    Clock::time_point periodic_next_    = {};      /* next PERINT deadline     */
+    uint16_t perval_           = 0;
+    bool     periodic_enabled_ = false;
+    bool     per_running_      = false;
+    uint64_t per_held_         = 0;
+    uint32_t per_loaded_       = 0;
+    bool     per_int_done_     = false;
 
-    Pr31x00Intc* intc_ = nullptr;
+    OscillatorTicks         osc_{emu_, true};
+    uint64_t                count_base_  = 0;
+    uint64_t                carries_base_ = 0;
+    uint64_t                anchor_tick_ = 0;
+    uint64_t                seen_tick_   = 0;
+    uint32_t                rises_pending_ = 0;
+    GuestCycleClock::Event* rtc_event_   = nullptr;
+    std::vector<std::function<void()>> count_listeners_;
 
-    std::mutex              cv_mtx_;
-    std::condition_variable cv_;
-    bool                    rearm_ = false;   /* guarded by cv_mtx_ */
-    std::thread             worker_;
-    std::atomic<bool>       stop_{false};
+    CycleAnchoredCounter    per_ctr_;
+    GuestCycleClock*        cycle_clock_  = nullptr;
+    GuestCycleClock::Event* per_event_    = nullptr;
+    Pr31x00Clock*           module_clock_ = nullptr;
+    Pr31x00Intc*            intc_         = nullptr;
 };

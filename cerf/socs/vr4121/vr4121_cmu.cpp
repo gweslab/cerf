@@ -1,3 +1,4 @@
+#include "../vr41xx/vr41xx_cmu.h"
 #include "../vr41xx/vr41xx_reg_window_impl.h"
 
 #include <cstdint>
@@ -24,11 +25,15 @@ constexpr Vr41xxRegWindowModel kModel = {
     },
 };
 
-class Vr4121Cmu : public Vr41xxRegWindowBase<SocId::Vr4121, kModel> {
+class Vr4121Cmu : public Vr41xxRegWindowBase<SocId::Vr4121, kModel, Vr41xxCmu> {
 public:
     using Vr41xxRegWindowBase::Vr41xxRegWindowBase;
+
+protected:
+    uint16_t ClockMask() const override { return StoredReg(0); }
+    void BeforeStore(uint32_t, uint16_t value) override { ClockMaskWriting(value); }
 };
 
 }
 
-REGISTER_SERVICE(Vr4121Cmu);
+REGISTER_SERVICE_AS(Vr4121Cmu, Vr41xxCmu);

@@ -1,5 +1,6 @@
 #include "pr31x00_uart.h"
 
+#include "pr31x00_clock.h"
 #include "pr31x00_intc.h"
 #include "pr31x00_io.h"
 
@@ -9,6 +10,7 @@
 #include "../../core/cerf_emulator.h"
 #include "../../core/log.h"
 #include "../../peripherals/peripheral_dispatcher.h"
+#include "../guest_cpu_reset.h"
 #include "../../host/host_widget_registry.h"
 #include "../../peripherals/serial/serial_cradle.h"
 #include "../../peripherals/serial/serial_endpoint.h"
@@ -31,10 +33,7 @@ constexpr uint32_t kOffData     = 0x14u;   /* write TXHOLD, read RXHOLD */
    The field is BAUDRATE[10:0] on the TMPR3912 parts and [9:0] on the TMPR3911, and the
    PR31700 carries the TMPR3912 internal function register map (R3912.H). */
 constexpr uint32_t kCtl2BaudMask = 0x000007FFu;
-
-/* f_UARTCLK / 16 = 230400: serial.dll sub_186311C writes BAUDRATE = 0x38400/baud - 1
-   (0x38400 = 230400), so baud = 230400 / (BAUDRATE + 1). */
-constexpr uint32_t kUartClkOver16 = 230400u;
+constexpr uint64_t kClocksPerBaud = 16u;
 
 /* UART DMA Control 1 (§16.5.3): DMASTARTVAL[31:2] is the DMA buffer's physical
    address; bits 1-0 reserved. DMA Control 2 (§16.5.4): DMALENGTH[15:0], which carries
@@ -87,11 +86,32 @@ bool Pr31x00Uart::ShouldRegister() {
 
 void Pr31x00Uart::OnReady() {
     ctl1_ = kCtl1Reset & kCtl1Writable;
-    emu_.Get<PeripheralDispatcher>().Register(this);
-
+    module_clock_ = &emu_.Get<Pr31x00Clock>();
     rx_dma_ = std::make_unique<Pr31x00UartRxDma>(emu_, TxSource());
-    rx_dma_->Start([this](const Pr31x00UartRxDma::RxInts& i) { RaiseRxInts(i); },
-                   [this] { OnRxLineIdle(); });
+    rx_dma_->Attach([this](const Pr31x00UartRxDma::RxInts& i) { RaiseRxInts(i); },
+                    [this] { OnRxLineIdle(); });
+    module_clock_->RegisterModuleClockListener([this] {
+        Pr31x00UartRxDma::LineTiming timing;
+        bool                         moved;
+        {
+            std::lock_guard<std::mutex> lk(mu_);
+            timing = LineTimingLocked();
+            moved  = ComputeLineConfigLocked().baud != fired_baud_;
+        }
+        if (moved) FireLineConfig();
+        else       rx_dma_->SetLine(timing);
+    });
+    line_cfg_   = ComputeLineConfigLocked();
+    fired_baud_ = line_cfg_.baud;
+    emu_.Get<PeripheralDispatcher>().Register(this);
+    /* Control 2, DMA Control 1 / 2 and DMA Count RESET X (TMPR3911 §16.5.2-16.5.5 p16-14,
+       p16-15). */
+    auto& reset = emu_.Get<GuestCpuReset>();
+    reset.RegisterResetListener([this](ResetLineKind) {
+        { std::lock_guard<std::mutex> lk(mu_); ctl1_ = kCtl1Reset & kCtl1Writable; }
+        rx_dma_->SetArmed(false);
+    });
+    reset.RegisterResetReleaseListener([this] { FireLineConfig(); });
 
     auto* wiring = emu_.TryGet<Pr31x00SerialWiring>();
     if (!wiring) return;
@@ -117,10 +137,7 @@ Pr31x00Uart::Pr31x00Uart(CerfEmulator& emu) : Peripheral(emu) {}
 
 Pr31x00Uart::~Pr31x00Uart() = default;
 
-/* The pacing thread reaches the endpoint through the drain callback, so it stops before
-   the cradle tears that endpoint down. */
 void Pr31x00Uart::OnShutdown() {
-    rx_dma_->Stop();
     if (cradle_) cradle_->OnShutdown();
 }
 
@@ -297,7 +314,9 @@ void Pr31x00Uart::DriveModemInput(const Pr31x00SerialPin& p, bool asserted) {
 
 SerialLine::LineConfig Pr31x00Uart::ComputeLineConfigLocked() const {
     LineConfig c;
-    c.baud      = kUartClkOver16 / (ctl2_baud_ + 1u);
+    const GuestCycleClock::Rate uartclk = module_clock_->UartClockRate(ClockEnableBit());
+    c.baud      = static_cast<uint32_t>(
+        uartclk.num / (uartclk.den * kClocksPerBaud * (static_cast<uint64_t>(ctl2_baud_) + 1u)));
     c.data_bits = (ctl1_ & kCtl1Bit7) ? 7u : 8u;
     if ((ctl1_ & kCtl1EnParity) == 0u) c.parity = LineConfig::Parity::None;
     else c.parity = (ctl1_ & kCtl1EvenParity) ? LineConfig::Parity::Even
@@ -306,9 +325,21 @@ SerialLine::LineConfig Pr31x00Uart::ComputeLineConfigLocked() const {
     return c;
 }
 
+/* §16.4 p16-9: start, 7 or 8 data bits, parity, then the transfer as the stop bit is clocked in;
+   TWOSTOP adds a stop bit on the transmitter only (p16-13). */
+Pr31x00UartRxDma::LineTiming Pr31x00Uart::LineTimingLocked() const {
+    const LineConfig c = ComputeLineConfigLocked();
+    Pr31x00UartRxDma::LineTiming t;
+    t.uart_clock          = module_clock_->UartClockRate(ClockEnableBit());
+    t.uart_clocks_per_bit = kClocksPerBaud * (static_cast<uint64_t>(ctl2_baud_) + 1u);
+    t.transfer_bits       = 1u + c.data_bits + (c.parity != LineConfig::Parity::None ? 1u : 0u) + 1u;
+    t.frame_bits          = t.transfer_bits + (c.stop == LineConfig::Stop::Two ? 1u : 0u);
+    return t;
+}
+
 SerialLine::LineConfig Pr31x00Uart::GetLineConfig() const {
     std::lock_guard<std::mutex> lk(mu_);
-    return ComputeLineConfigLocked();
+    return line_cfg_;
 }
 
 void Pr31x00Uart::SetLineConfigCallback(LineConfigFn cb) {
@@ -317,9 +348,16 @@ void Pr31x00Uart::SetLineConfigCallback(LineConfigFn cb) {
 }
 
 void Pr31x00Uart::FireLineConfig() {
-    LineConfig cfg;
-    { std::lock_guard<std::mutex> lk(mu_); cfg = ComputeLineConfigLocked(); }
-    rx_dma_->SetLineRate(cfg.baud, cfg.BitsPerChar());
+    LineConfig                   cfg;
+    Pr31x00UartRxDma::LineTiming timing;
+    {
+        std::lock_guard<std::mutex> lk(mu_);
+        cfg         = ComputeLineConfigLocked();
+        timing      = LineTimingLocked();
+        fired_baud_ = cfg.baud;
+        line_cfg_   = cfg;
+    }
+    rx_dma_->SetLine(timing);
     std::lock_guard<std::recursive_mutex> elk(endpoint_mu_);
     if (line_cfg_cb_) line_cfg_cb_(cfg);
 }
@@ -444,8 +482,13 @@ void Pr31x00Uart::RestoreState(StateReader& r) {
    once the cradle re-inserts the card it saved. The DMA engine's clock rate is derived
    from CTL1 and CTL2, so it is re-applied once both are back. */
 void Pr31x00Uart::PostRestore() {
-    LineConfig cfg;
-    { std::lock_guard<std::mutex> lk(mu_); cfg = ComputeLineConfigLocked(); }
-    rx_dma_->SetLineRate(cfg.baud, cfg.BitsPerChar());
+    Pr31x00UartRxDma::LineTiming timing;
+    {
+        std::lock_guard<std::mutex> lk(mu_);
+        timing      = LineTimingLocked();
+        line_cfg_   = ComputeLineConfigLocked();
+        fired_baud_ = line_cfg_.baud;
+    }
+    rx_dma_->SetLine(timing);
     if (cradle_) cradle_->PostRestore();
 }

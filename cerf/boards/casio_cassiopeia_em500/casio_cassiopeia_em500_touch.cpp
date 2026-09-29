@@ -1,13 +1,10 @@
 #include "casio_cassiopeia_em500_touch.h"
 
-#include "../../core/byte_order.h"
 #include "../../core/cerf_emulator.h"
-#include "../../cpu/emulated_memory.h"
-#include "../../state/emulation_freeze.h"
+#include "../../core/fatal.h"
 #include "../../state/state_stream.h"
 
 #include <algorithm>
-#include <chrono>
 
 namespace {
 
@@ -28,21 +25,16 @@ constexpr uint32_t kCtrlGoBits = 0x5u;
 constexpr uint32_t kPenStateMask   = 0x1C00u;
 constexpr uint32_t kPenStateActive = 0x1400u;
 
+constexpr uint32_t kOffIntCause0304 = 0x0304u;
+constexpr uint32_t kIntEnableMask   = 0xFF00u;
+/* casio_cassiopeia_em500_ppc2000 touch.dll @0xF91A40-@0xF91A44 (|= 1), @0xF91B48 (|= 0x18);
+   casio_cassiopeia_em500_ppc2000 nk_main_kernel.exe @0x9F036754-@0x9F036770 (stores 0). */
+constexpr uint32_t kIntStatusMask   = 0x00FFu;
+constexpr uint32_t kStatusPenEvent  = 0x01u;
+constexpr uint32_t kStatusSample    = 0x18u;
+
 /* touch.dll loc_F91D40 @0xF91D54 (& 0xFFF, 12-bit A/D). */
 constexpr uint16_t kAdcMax = 0x0FFFu;
-
-/* nk_main_kernel.exe resolver sub_9F0348xx @0x9F0348C4 returns SYSINTR 17 iff
-   MEM[0xA0002624] == 0x8001; touch.dll loc_F91958 reads the same word as
-   [dword_F94108(0xA0002000)+0x624]. PA 0x2624 runtime-confirmed by the
-   em500_wait_probe poke (TryTranslateWrite(0x2624)<-0x8001 delivered SYSINTR 17). */
-constexpr uint32_t kGatePa    = 0x00002624u;
-constexpr uint32_t kGateArmed = 0x00008001u;
-
-constexpr uint32_t kSampleIntervalMs = 10u;
-/* touch.dll loc_F91958: settle counter dword_F9411C init 5 (@0xF91A28), drained
-   one per lifting sample (@0xF919D0); the driver emits pen-up (status=1,
-   @0xF919E2) when it reaches 0. */
-constexpr int kReleaseDrainTicks = 8;
 
 uint16_t ToAdc(int surface_coord) {
     /* touch.dll TouchPanelCalibrateAPoint @0xF92344: uncalibrated (dword_F94144==0)
@@ -56,19 +48,14 @@ uint16_t ToAdc(int surface_coord) {
 
 }
 
-CasioCassiopeiaEm500Touch::~CasioCassiopeiaEm500Touch() { StopWorker(); }
-
-void CasioCassiopeiaEm500Touch::Init(CerfEmulator& emu) {
-    emu_ = &emu;
-    worker_ = std::thread([this] { WorkerLoop(); });
-}
-
-void CasioCassiopeiaEm500Touch::OnShutdown() { StopWorker(); }
-
-void CasioCassiopeiaEm500Touch::StopWorker() {
-    stop_.store(true, std::memory_order_release);
-    cv_.notify_all();
-    if (worker_.joinable()) worker_.join();
+void CasioCassiopeiaEm500Touch::Init(CerfEmulator& emu, std::function<void()> on_status_change) {
+    emu_              = &emu;
+    on_status_change_ = std::move(on_status_change);
+    clock_        = &emu.Get<GuestCycleClock>();
+    sample_event_ = clock_->Add([this] { OnSampleEvent(); });
+    clock_->RegisterRateListener([this] { OnRateChange(); });
+    host_requests_ = &emu.Get<HostRequestChannel>();
+    host_requests_->RegisterListener([this] { OnHostRequest(); });
 }
 
 bool CasioCassiopeiaEm500Touch::TryReadWord(uint32_t off, uint32_t& out) {
@@ -82,6 +69,7 @@ bool CasioCassiopeiaEm500Touch::TryReadWord(uint32_t off, uint32_t& out) {
     switch (off) {
         case kOffCtrl300: out = ctrl_300_ & ~kCtrlGoBits; return true;
         case kOffCfg3C8:  out = cfg_3C8_; return true;
+        case kOffIntCause0304: out = int_enable_.load(std::memory_order_acquire) | Status(); return true;
         default: return false;
     }
 }
@@ -96,13 +84,40 @@ bool CasioCassiopeiaEm500Touch::TryWriteWord(uint32_t off, uint32_t value) {
     }
     switch (off) {
         case kOffCtrl300:  ctrl_300_ = value; return true;
-        case kOffParam308: param_308_ = value; return true;
+        case kOffParam308:
+            param_308_ = value;
+            if (sampling_) RescaleSamplesLocked();
+            else if (param_308_ != 0u && SamplingLocked()) StartSamplingLocked();
+            return true;
         case kOffParam30C: param_30C_ = value; return true;
         case kOffParam310: param_310_ = value; return true;
         case kOffParam318: param_318_ = value; return true;
         case kOffCfg3C8:   cfg_3C8_ = value; return true;
+        case kOffIntCause0304:
+            int_enable_.store(value & kIntEnableMask, std::memory_order_release);
+            ClearStatus(value & kIntStatusMask);
+            NotifyStatus();
+            return true;
         default: return false;
     }
+}
+
+uint32_t CasioCassiopeiaEm500Touch::Status() const {
+    return (sample_pending_.load(std::memory_order_acquire) ? kStatusSample : 0u) |
+           (pen_event_.load(std::memory_order_acquire) ? kStatusPenEvent : 0u);
+}
+
+void CasioCassiopeiaEm500Touch::ClearStatus(uint32_t bits) {
+    if (bits & kStatusSample)   sample_pending_.store(false, std::memory_order_release);
+    if (bits & kStatusPenEvent) pen_event_.store(false, std::memory_order_release);
+}
+
+bool CasioCassiopeiaEm500Touch::IrqPending() const {
+    return (Status() & (int_enable_.load(std::memory_order_acquire) >> 8) & kIntStatusMask) != 0u;
+}
+
+void CasioCassiopeiaEm500Touch::NotifyStatus() {
+    on_status_change_();
 }
 
 bool CasioCassiopeiaEm500Touch::TryReadByte(uint32_t, uint8_t&)   { return false; }
@@ -112,33 +127,23 @@ bool CasioCassiopeiaEm500Touch::TryWriteHalf(uint32_t, uint16_t)  { return false
 
 void CasioCassiopeiaEm500Touch::SetPen(bool down, int surface_x, int surface_y) {
     {
-        auto frozen = emu_->Get<EmulationFreeze>().WorkerSection();
         std::lock_guard<std::mutex> lk(mtx_);
-        /* touch.dll loc_F91958: the release drain must reach the pen-up deliver
-           @0xF919E2 (settle drained to 0 @0xF919D0) before a new down. */
-        if (down && release_drain_ > 0) {
-            pending_down_ = true;
-            pending_x_ = ToAdc(surface_x);
-            pending_y_ = ToAdc(surface_y);
-            return;
-        }
-        raw_x_ = ToAdc(surface_x);
-        raw_y_ = ToAdc(surface_y);
-        pen_down_ = down;
-        if (down) {
-            PresentDownLocked();
-        } else {
-            release_drain_ = kReleaseDrainTicks;
-            pending_down_ = false;
-            PresentLiftLocked();
-        }
-        DepositGate();
+        host_pen_.push_back(HostPen{down, surface_x, surface_y});
+        host_x_ = surface_x;
+        host_y_ = surface_y;
     }
-    wake_.store(true, std::memory_order_release);
-    cv_.notify_all();
+    host_requests_->Request();
 }
 
-void CasioCassiopeiaEm500Touch::OnCaptureLost() { SetPen(false, raw_x_, raw_y_); }
+void CasioCassiopeiaEm500Touch::OnCaptureLost() {
+    int x, y;
+    {
+        std::lock_guard<std::mutex> lk(mtx_);
+        x = host_x_;
+        y = host_y_;
+    }
+    SetPen(false, x, y);
+}
 
 void CasioCassiopeiaEm500Touch::PresentDownLocked() {
     const uint16_t xp = raw_x_;
@@ -151,60 +156,94 @@ void CasioCassiopeiaEm500Touch::PresentDownLocked() {
     adc0_[3] = adc1_[3] = ym;
     ctrl_300_ = (ctrl_300_ & ~kPenStateMask) | kPenStateActive;
     sample_pending_.store(true, std::memory_order_release);
-    release_ack_.store(false, std::memory_order_release);
+    NotifyStatus();
 }
 
 void CasioCassiopeiaEm500Touch::PresentLiftLocked() {
     ctrl_300_ &= ~kPenStateMask;
     sample_pending_.store(false, std::memory_order_release);
-    release_ack_.store(true, std::memory_order_release);
+    NotifyStatus();
 }
 
-void CasioCassiopeiaEm500Touch::DepositGate() {
-    uint8_t* p = emu_->Get<EmulatedMemory>().TryTranslateWrite(kGatePa);
-    if (!p) return;
-    cerf::le::Put32(p, kGateArmed);
+void CasioCassiopeiaEm500Touch::OnHostRequest() {
+    std::lock_guard<std::mutex> lk(mtx_);
+    if (host_pen_.empty()) return;
+    std::vector<HostPen> pens;
+    pens.swap(host_pen_);
+    for (const HostPen& p : pens) ApplyPenLocked(p.down, p.x, p.y);
 }
 
-void CasioCassiopeiaEm500Touch::WorkerLoop() {
-    auto& freeze = emu_->Get<EmulationFreeze>();
-    std::unique_lock<std::mutex> lk(cv_mtx_);
-    while (!stop_.load(std::memory_order_acquire)) {
-        lk.unlock();
-        bool sampling;
-        {
-            auto frozen = freeze.WorkerSection();
-            std::lock_guard<std::mutex> sl(mtx_);
-            if (pen_down_) {
-                PresentDownLocked();
-                DepositGate();
-                sampling = true;
-            } else if (release_drain_ > 0) {
-                PresentLiftLocked();
-                DepositGate();
-                --release_drain_;
-                if (release_drain_ == 0 && pending_down_) {
-                    pending_down_ = false;
-                    pen_down_ = true;
-                    raw_x_ = pending_x_;
-                    raw_y_ = pending_y_;
-                }
-                sampling = true;
-            } else {
-                sampling = false;
-            }
-        }
-        lk.lock();
-        if (stop_.load(std::memory_order_acquire)) break;
-        if (sampling) {
-            cv_.wait_for(lk, std::chrono::milliseconds(kSampleIntervalMs));
-        } else {
-            cv_.wait(lk, [this] {
-                return stop_.load(std::memory_order_acquire) ||
-                       wake_.exchange(false, std::memory_order_acq_rel);
-            });
-        }
+void CasioCassiopeiaEm500Touch::ApplyPenLocked(bool down, int surface_x, int surface_y) {
+    raw_x_ = ToAdc(surface_x);
+    raw_y_ = ToAdc(surface_y);
+    /* casio_cassiopeia_em500_ppc2000 touch.dll loc_F91958 @0xF91A46-@0xF91A5E: 0x304 bit 0 with
+       the driver idle (dword_F94118 == 0) starts a stroke and arms its gate via sub_F916D4. */
+    if (down && !pen_down_) pen_event_.store(true, std::memory_order_release);
+    pen_down_ = down;
+    if (down) PresentDownLocked();
+    else      PresentLiftLocked();
+    if (!sampling_ && pen_down_ && param_308_ != 0u) StartSamplingLocked();
+}
+
+/* casio_cassiopeia_em500_ppc2000 touch.dll: sub_F917F0 (TouchPanelSetMode) and sub_F91DDC store
+   +0x308 = 1500; sub_F91C44 reports one point per 3 samples; sub_F91798 index 0 = {375, 500}. */
+uint64_t CasioCassiopeiaEm500Touch::SampleHzLocked() const {
+    if (param_308_ == 0u) {
+        emu_->Get<Fatal>().Die("Em500Touch: companion +0x308 set to 0 while the pen is sampled");
     }
+    return param_308_;
+}
+
+void CasioCassiopeiaEm500Touch::StartSamplingLocked() {
+    const GuestCycleClock::Rate rate = clock_->ClockRate();
+    const uint64_t hz = SampleHzLocked();
+    if (rate.den > UINT64_MAX / hz || !samples_.SetRatio(rate.num, rate.den * hz)) {
+        emu_->Get<Fatal>().Die("Em500Touch: %llu samples/s against the %llu/%llu Hz core does "
+                               "not fit", static_cast<unsigned long long>(hz),
+                               static_cast<unsigned long long>(rate.num),
+                               static_cast<unsigned long long>(rate.den));
+    }
+    samples_.Anchor(clock_->Cycles(), 0u);
+    next_sample_ = 1u;
+    sampling_    = true;
+    ArmSampleLocked();
+}
+
+void CasioCassiopeiaEm500Touch::ArmSampleLocked() {
+    clock_->Arm(sample_event_, samples_.NextMatchCycle(next_sample_, clock_->Cycles()));
+}
+
+void CasioCassiopeiaEm500Touch::OnSampleEvent() {
+    std::lock_guard<std::mutex> lk(mtx_);
+    if (!sampling_) return;
+    SampleLocked();
+    if (!SamplingLocked()) {
+        sampling_ = false;
+        return;
+    }
+    next_sample_ = samples_.CountAt(clock_->Cycles()) + 1u;
+    ArmSampleLocked();
+}
+
+void CasioCassiopeiaEm500Touch::SampleLocked() {
+    if (pen_down_) PresentDownLocked();
+}
+
+void CasioCassiopeiaEm500Touch::OnRateChange() {
+    std::lock_guard<std::mutex> lk(mtx_);
+    if (sampling_) RescaleSamplesLocked();
+}
+
+void CasioCassiopeiaEm500Touch::RescaleSamplesLocked() {
+    const GuestCycleClock::Rate rate = clock_->ClockRate();
+    const uint64_t hz = SampleHzLocked();
+    if (rate.den > UINT64_MAX / hz || !samples_.Rescale(clock_->Cycles(), rate.num, rate.den * hz)) {
+        emu_->Get<Fatal>().Die("Em500Touch: %llu samples/s against the %llu/%llu Hz core does "
+                               "not fit", static_cast<unsigned long long>(hz),
+                               static_cast<unsigned long long>(rate.num),
+                               static_cast<unsigned long long>(rate.den));
+    }
+    ArmSampleLocked();
 }
 
 void CasioCassiopeiaEm500Touch::SaveState(StateWriter& w) const {
@@ -214,6 +253,7 @@ void CasioCassiopeiaEm500Touch::SaveState(StateWriter& w) const {
     w.Write("cfg_3C8", cfg_3C8_);
     for (uint16_t v : adc0_) w.Write("adc0", v);
     for (uint16_t v : adc1_) w.Write("adc1", v);
+    w.Write("int_enable_0304", int_enable_.load(std::memory_order_acquire));
 }
 
 void CasioCassiopeiaEm500Touch::RestoreState(StateReader& r) {
@@ -223,11 +263,15 @@ void CasioCassiopeiaEm500Touch::RestoreState(StateReader& r) {
     r.Read("cfg_3C8", cfg_3C8_);
     for (uint16_t& v : adc0_) r.Read("adc0", v);
     for (uint16_t& v : adc1_) r.Read("adc1", v);
+    uint32_t int_enable = 0;
+    r.Read("int_enable_0304", int_enable);
+    int_enable_.store(int_enable, std::memory_order_release);
     pen_down_ = false;
-    release_drain_ = 0;
-    pending_down_ = false;
+    sampling_ = false;
+    host_pen_.clear();
+    clock_->Disarm(sample_event_);
     sample_pending_.store(false, std::memory_order_release);
-    release_ack_.store(false, std::memory_order_release);
+    pen_event_.store(false, std::memory_order_release);
 }
 
 void CasioCassiopeiaEm500Touch::PostRestore() {}

@@ -4,8 +4,11 @@
 #include "pr31500_id.h"
 #include "pr31700_id.h"
 #include "../../core/cerf_emulator.h"
+#include "../../core/fatal.h"
 #include "../../peripherals/peripheral_dispatcher.h"
 #include "../../state/state_stream.h"
+#include "../guest_cpu_reset.h"
+#include "pr31x00_clock.h"
 #include "pr31x00_intc.h"
 #include "pr31x00_sib_audio.h"
 #include "pr31x00_sib_codec.h"
@@ -47,8 +50,11 @@ constexpr uint32_t kSibSf1Int = 1u << 7;
 constexpr uint32_t kCtlSndFsShift = 8;
 constexpr uint32_t kCtlSndFsMask  = 0x7Fu;
 
-/* SIBSCLK is fixed at 9.216 MHz (§13.3.4, Tables 13.3.1/13.3.2). */
-constexpr uint32_t kSibSclkHz = 9216000u;
+/* SIBSCLKDIV[2:0]<26:24> divide-modulus 2, 3, 4, 5, 6, 8, 10, 12 (§13.6.6 p13-22); Fs =
+   (SIBSCLK x 2) / ((FSDIV + 1) x 64) (§13.3.4 p13-8). */
+constexpr uint32_t kCtlSibSclkDivShift = 24;
+constexpr uint32_t kCtlSibSclkDivMask  = 0x7u;
+constexpr uint64_t kSibSclkModulus[8]  = {2u, 3u, 4u, 5u, 6u, 8u, 10u, 12u};
 
 constexpr uint32_t kOffSize     = 0x00u;   /* $060 write-only */
 constexpr uint32_t kOffSndRxSt  = 0x04u;   /* $064 write-only */
@@ -73,6 +79,7 @@ constexpr uint32_t kSndTxStartMask = 0xFFFFFFFCu;
    ENTEL<5> and the two test bits all reset to 0, and the frame-rate fields reset
    undefined and feed no enabled subframe. */
 constexpr uint32_t kCtlReset = 0;
+constexpr uint32_t kCtlResetKept = 0x1FFFFFC0u;
 
 constexpr uint32_t kCtlWritable = 0x7FFFFFFFu;   /* SIBIRQ<31> is read-only */
 constexpr uint32_t kCtlSibIrq   = 1u << 31;      /* SIBIRQ input-pin level (§13.6.6) */
@@ -107,6 +114,21 @@ public:
 
     void OnReady() override {
         emu_.Get<PeripheralDispatcher>().Register(this);
+        /* TMPR3911 §13.6.6 p13-21 SIB Control RESET: ENCNTTEST, ENDMATEST and ENTEL..ENSIB 0,
+           SNDMONO..SELSNDSF1 X; §13.6.15 p13-27 SIB DMA Control: every R/W bit 0. */
+        emu_.Get<GuestCpuReset>().RegisterResetListener([this](ResetLineKind) {
+            ctl_    &= kCtlResetKept;
+            dma_ctl_ = 0;
+            UpdateSound();
+            UpdateSibFrameInts();
+        });
+        emu_.Get<Pr31x00Clock>().RegisterModuleClockListener([this] {
+            if (sound_active_ && SoundRateHz() != sound_rate_hz_) {
+                emu_.Get<Fatal>().Die("Pr31x00Sib: the SIB master clock moved the %u Hz sound rate "
+                                      "to %u Hz with sound TX running", sound_rate_hz_,
+                                      SoundRateHz());
+            }
+        });
     }
 
     uint32_t MmioBase() const override { return kBase; }
@@ -239,8 +261,11 @@ private:
         return (ctl_ & kCtlEnSib) && (ctl_ & kCtlEnSnd) && (dma_ctl_ & kDmaEnTxSnd);
     }
     uint32_t SoundRateHz() const {
-        const uint32_t fsdiv = (ctl_ >> kCtlSndFsShift) & kCtlSndFsMask;
-        return (kSibSclkHz * 2u) / ((fsdiv + 1u) * 64u);
+        const uint32_t fsdiv   = (ctl_ >> kCtlSndFsShift) & kCtlSndFsMask;
+        const uint64_t modulus = kSibSclkModulus[(ctl_ >> kCtlSibSclkDivShift) & kCtlSibSclkDivMask];
+        const GuestCycleClock::Rate mclk = emu_.Get<Pr31x00Clock>().SibMasterClockRate();
+        return static_cast<uint32_t>((mclk.num * 2u) /
+                                     (mclk.den * modulus * (fsdiv + 1u) * 64u));
     }
     uint32_t SoundBytes() const { return (snd_size_ + 1u) << 2; }
 
@@ -252,7 +277,12 @@ private:
                                       MmioBase(), ctl_);
             }
             if (!sound_active_) {
-                sink->StartSoundTx(snd_tx_start_, SoundBytes(), SoundRateHz());
+                sound_rate_hz_ = SoundRateHz();
+                if (sound_rate_hz_ == 0u) {
+                    emu_.Get<Fatal>().Die("Pr31x00Sib: sound TX DMA armed at a 0 Hz sound rate "
+                                          "(SIB Control 0x%08X)", ctl_);
+                }
+                sink->StartSoundTx(snd_tx_start_, SoundBytes(), sound_rate_hz_);
                 sound_active_ = true;
             }
         } else if (sound_active_) {
@@ -277,8 +307,9 @@ private:
     uint32_t tel_tx_hold_ = 0;
     uint32_t sf0_stat_    = 0;
     uint32_t snd_tx_start_ = 0;
-    uint32_t snd_size_     = 0;
-    bool     sound_active_ = false;
+    uint32_t snd_size_      = 0;
+    bool     sound_active_  = false;
+    uint32_t sound_rate_hz_ = 0;
 };
 
 }  /* namespace */

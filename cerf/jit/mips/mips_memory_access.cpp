@@ -6,6 +6,8 @@
 #include "../../core/log.h"
 #include "../../cpu/emulated_memory.h"
 #include "../../peripherals/peripheral_dispatcher.h"
+#include "../cycle_deadline.h"
+#include "../guest_cycle_clock.h"
 #include "mips_cpu.h"
 #include "mips_cpu_state.h"
 #include "mips_exception_delivery.h"
@@ -21,10 +23,19 @@ void MipsMemoryAccess::OnReady() {
     peripheral_ = &emu_.Get<PeripheralDispatcher>();
     exceptions_ = &emu_.Get<MipsExceptionDelivery>();
     cache_      = &emu_.Get<MipsTranslationCache>();
+    clock_      = &emu_.Get<GuestCycleClock>();
+}
+
+void MipsMemoryAccess::DeliverDueClockEvents() {
+    if (CycleDeadlineReached(cpu_state_->guest_cycle_counter,
+                             cpu_state_->guest_cycle_deadline)) {
+        clock_->OnDispatch();
+    }
 }
 
 uint32_t MipsMemoryAccess::MmioRead(uint32_t va, uint32_t pa, uint32_t width, const char* who) {
     if (peripheral_->IsPeripheralAddress(pa)) {
+        DeliverDueClockEvents();
         switch (width) {
             case 1:  return peripheral_->ReadByte(pa);
             case 2:  return peripheral_->ReadHalf(pa);
@@ -36,13 +47,20 @@ uint32_t MipsMemoryAccess::MmioRead(uint32_t va, uint32_t pa, uint32_t width, co
     CerfFatalExit(CERF_FATAL_RUNTIME_ERROR);
 }
 
+void MipsMemoryAccess::LeaveBlockIfCpuStopped() {
+    if (cpu_state_->idle_wait != MipsIdle::kNone) exceptions_->LeaveBlock();
+}
+
 void MipsMemoryAccess::MmioWrite(uint32_t va, uint32_t pa, uint32_t value, uint32_t width, const char* who) {
     if (peripheral_->IsPeripheralAddress(pa)) {
+        DeliverDueClockEvents();
         switch (width) {
-            case 1:  peripheral_->WriteByte(pa, static_cast<uint8_t>(value));  return;
-            case 2:  peripheral_->WriteHalf(pa, static_cast<uint16_t>(value)); return;
-            default: peripheral_->WriteWord(pa, value);                        return;
+            case 1:  peripheral_->WriteByte(pa, static_cast<uint8_t>(value));  break;
+            case 2:  peripheral_->WriteHalf(pa, static_cast<uint16_t>(value)); break;
+            default: peripheral_->WriteWord(pa, value);                        break;
         }
+        LeaveBlockIfCpuStopped();
+        return;
     }
     LOG(Caution, "%s: unmapped MMIO write va=0x%08X pa=0x%08X val=0x%08X pc=0x%08X (no peripheral "
         "registered)\n", who, va, pa, value, cpu_state_->pc);
@@ -155,6 +173,7 @@ uint64_t __fastcall MipsMemoryAccess::LoadDwordHelper(uint32_t va, MipsMemoryAcc
         return value;
     }
     if (mem->peripheral_->IsPeripheralAddress(pa)) {
+        mem->DeliverDueClockEvents();
         return mem->peripheral_->ReadDword(pa);
     }
     LOG(Caution, "MipsMemoryAccess::LoadDwordHelper: unmapped MMIO read va=0x%08X pa=0x%08X pc=0x%08X "
@@ -300,7 +319,9 @@ void __fastcall MipsMemoryAccess::StoreDwordHelper(uint32_t va, uint32_t rt, Mip
         return;
     }
     if (mem->peripheral_->IsPeripheralAddress(pa)) {
+        mem->DeliverDueClockEvents();
         mem->peripheral_->WriteDword(pa, mem->cpu_state_->gpr[rt]);
+        mem->LeaveBlockIfCpuStopped();
         return;
     }
     LOG(Caution, "MipsMemoryAccess::StoreDwordHelper: unmapped MMIO write va=0x%08X pa=0x%08X pc=0x%08X "

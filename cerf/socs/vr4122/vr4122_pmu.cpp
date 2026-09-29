@@ -2,6 +2,7 @@
 
 #include "../../core/cerf_emulator.h"
 #include "../../core/log.h"
+#include "../../jit/mips/mips_interrupt_channel.h"
 #include "vr4122_clock_state.h"
 
 #include <cstdint>
@@ -41,7 +42,13 @@ constexpr Vr41xxPmuModel kModel = {
     0x0008u,   /* PMUINTREG D3 RSTSW  */
     0x0010u,   /* PMUINTREG D4 RTCRST */
     0u,
+    /* PMUCNTREG D6:4 and D0 "Reserved. Write 0." (VR4131 UM 12.2.2 p228); D1 "Write 1" is stored
+       0 by casio_cassiopeia_em500_ppc2000 nk_main_kernel.exe sub_9F03BFAC @0x9F03BFBC. */
+    0x0071u,
+    0x0000u,
 };
+
+constexpr uint16_t kCntPllOffEn = 0x0008u;
 
 constexpr uint32_t kOffInt2Reg = 0x04u;
 constexpr uint32_t kOffCnt2Reg = 0x06u;
@@ -63,6 +70,19 @@ constexpr uint16_t kTclkDivWritable = 0x0107u;
 class Vr4122Pmu : public Vr41xxPmuBase<SocId::Vr4122, kModel> {
 public:
     using Vr41xxPmuBase::Vr41xxPmuBase;
+
+    /* PMUCNTREG D3 PLLOFFEN "1: PLL halt (Exsuspend mode)"; "The PLL operation also stops in
+       the Exsuspend mode" (VR4131 UM U15350EJ2V0UM 12.2.2 p228, 6.4.1(3) p130). */
+    void OnReady() override {
+        Vr41xxPmuBase::OnReady();
+        auto& channel = emu_.Get<MipsInterruptChannel>();
+        channel.RegisterSuspendListener([this, &channel] {
+            if (!channel.Suspended() || (cntreg_.load(std::memory_order_acquire) & kCntPllOffEn) == 0u)
+                return;
+            emu_.Get<Fatal>().Die("Vr4122Pmu: SUSPEND entered with PMUCNTREG PLLOFFEN set "
+                                  "(Exsuspend); the PLL stop is not modeled");
+        });
+    }
 
     /* Table 1-1 (VR4100 Series UM U15509EJ2V0UM): the VR4122's on-chip unit list
        carries no watchdog timer. */

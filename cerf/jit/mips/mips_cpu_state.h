@@ -56,6 +56,16 @@ namespace MipsCauseBit {
     constexpr uint32_t kExcCode = 2;  /* exception code = bits 2..6 */
 }
 
+constexpr uint32_t kMipsCauseTimerIp = 1u << (MipsCauseBit::kIP + 7);
+constexpr uint32_t kMipsCauseIpMask  = 0xFFu << MipsCauseBit::kIP;
+
+namespace MipsIdle {
+    constexpr uint32_t kNone    = 0;
+    constexpr uint32_t kStandby = 1;
+    constexpr uint32_t kSuspend = 2;
+    constexpr uint32_t kStopCpu = 3;
+}
+
 /* CP0 Cause.ExcCode values (MIPS Vol III Table; QEMU tlb_helper.c do_interrupt
    `cause` assignments). Only the ones CERF raises are listed. */
 namespace MipsExcCode {
@@ -137,7 +147,7 @@ struct MipsCpuState {
     uint32_t cp0_pagemask;
     uint32_t cp0_wired;
     uint32_t cp0_badvaddr;
-    uint32_t cp0_count;
+    uint32_t count_save;
     uint32_t cp0_entryhi;
     uint32_t cp0_compare;
     uint32_t cp0_status;
@@ -168,13 +178,11 @@ struct MipsCpuState {
     uint32_t reset_pending;
     uint32_t deep_sleep;
     uint32_t guest_cycle_counter;
-
-    /* In-core R4000 Count/Compare timer (the CE scheduler tick = IP7 on this
-       pre-R2 core). Count is driven off guest_cycle_counter on the JIT thread;
-       count_anchor is the cycle value at the last advance, timer_armed gates a
-       single IP7 raise per Compare write (QEMU cp0_timer.c). */
-    uint32_t count_anchor;
-    uint32_t timer_armed;
+    uint32_t guest_cycle_deadline;
+    uint64_t count_save_phase;
+    uint32_t guest_cycle_hi;
+    uint32_t guest_cycle_folded;
+    uint32_t count_save_phase_den;
 
     /* log2(min TLB page size) from MipsProcessorConfig::MinPageShift(), seeded
        at reset like nb_tlb. MipsMmu derives the PFN shift / PageMask alignment /
@@ -199,11 +207,14 @@ struct MipsCpuState {
     /* Pending branch/jump byte length; delay-slot EPC = slot PC - branch_len
        (QEMU exception.c exception_resume_pc:41, MIPS_HFLAG_B16 ? 2 : 4). */
     uint32_t branch_len;
+
+    uint32_t idle_wait;
+    uint32_t idle_pad;
 };
 
 static_assert(offsetof(MipsTlbEntry, pfn) == 24, "MipsTlbEntry layout");
 static_assert(sizeof(MipsTlbEntry) == 40, "MipsTlbEntry layout");
-static_assert(sizeof(MipsCpuState) == 5560, "MipsCpuState layout");
+static_assert(sizeof(MipsCpuState) == 5584, "MipsCpuState layout");
 
 /* CP0 register number -> byte offset of its field in MipsCpuState, or -1 for a
    register CERF does not model. Shared by the MFC0 (read) and MTC0 (write) place
@@ -218,7 +229,7 @@ inline int32_t Cp0RegOffset(uint32_t rd) {
         case MipsCp0::kPageMask: return static_cast<int32_t>(offsetof(MipsCpuState, cp0_pagemask));
         case MipsCp0::kWired:    return static_cast<int32_t>(offsetof(MipsCpuState, cp0_wired));
         case MipsCp0::kBadVAddr: return static_cast<int32_t>(offsetof(MipsCpuState, cp0_badvaddr));
-        case MipsCp0::kCount:    return static_cast<int32_t>(offsetof(MipsCpuState, cp0_count));
+        case MipsCp0::kCount:    return static_cast<int32_t>(offsetof(MipsCpuState, count_save));
         case MipsCp0::kEntryHi:  return static_cast<int32_t>(offsetof(MipsCpuState, cp0_entryhi));
         case MipsCp0::kCompare:  return static_cast<int32_t>(offsetof(MipsCpuState, cp0_compare));
         case MipsCp0::kStatus:   return static_cast<int32_t>(offsetof(MipsCpuState, cp0_status));

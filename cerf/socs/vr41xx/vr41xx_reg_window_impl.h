@@ -52,20 +52,20 @@ struct Vr41xxRegWindowModel {
     Vr41xxRegSpec reg[kMaxRegs];
 };
 
-template <const std::string_view& Soc, Vr41xxRegWindowModel M>
-class Vr41xxRegWindowBase : public Peripheral {
+template <const std::string_view& Soc, Vr41xxRegWindowModel M, class Base = Peripheral>
+class Vr41xxRegWindowBase : public Base {
 public:
-    using Peripheral::Peripheral;
+    using Base::Base;
 
     bool ShouldRegister() override {
-        auto* bd = emu_.TryGet<BoardContext>();
+        auto* bd = this->emu_.template TryGet<BoardContext>();
         return bd && bd->GetSocId() == Soc;
     }
 
     void OnReady() override {
         for (uint32_t i = 0; i < M.num_regs; ++i) reg_[i] = ResetValue(i, true);
-        emu_.Get<PeripheralDispatcher>().Register(this);
-        emu_.Get<GuestCpuReset>().RegisterResetListener([this](ResetLineKind kind) {
+        this->emu_.template Get<PeripheralDispatcher>().Register(this);
+        this->emu_.template Get<GuestCpuReset>().RegisterResetListener([this](ResetLineKind kind) {
             const bool rtc = kind == ResetLineKind::Rtc;
             for (uint32_t i = 0; i < M.num_regs; ++i) {
                 if (rtc || M.reg[i].other_reset == OtherReset::kReset) reg_[i] = ResetValue(i, rtc);
@@ -81,26 +81,27 @@ public:
     uint16_t ReadHalf(uint32_t addr) override {
         const uint32_t i = RegIndex(addr, "ReadHalf", 0);
         if (undefined_[i]) {
-            HaltUnsupportedAccess("ReadHalf of bits the Other-resets row leaves Undefined",
-                                  addr, undefined_[i]);
+            this->HaltUnsupportedAccess("ReadHalf of bits the Other-resets row leaves Undefined",
+                                        addr, undefined_[i]);
         }
         switch (M.reg[i].read) {
             case ReadKind::kStored: return reg_[i];
             case ReadKind::kZero:   return 0u;
-            default: HaltUnsupportedAccess("ReadHalf", addr, 0);
+            default: this->HaltUnsupportedAccess("ReadHalf", addr, 0);
         }
     }
 
     void WriteHalf(uint32_t addr, uint16_t value) override {
         const uint32_t i = RegIndex(addr, "WriteHalf", value);
         if (value & M.reg[i].fatal_on_set) {
-            HaltUnsupportedAccess((value & M.reg[i].fatal_on_set & M.reg[i].wmask) != 0u
-                                      ? "WriteHalf sets an unmodeled trigger bit"
-                                      : "WriteHalf sets a write-0 RFU bit",
-                                  addr, value);
+            this->HaltUnsupportedAccess((value & M.reg[i].fatal_on_set & M.reg[i].wmask) != 0u
+                                            ? "WriteHalf sets an unmodeled trigger bit"
+                                            : "WriteHalf sets a write-0 RFU bit",
+                                        addr, value);
         }
         switch (M.reg[i].write) {
             case WriteKind::kStored:
+                BeforeStore(i, static_cast<uint16_t>(value & M.reg[i].wmask));
                 StoreMasked(i, value);
                 return;
             case WriteKind::kClear:
@@ -108,26 +109,28 @@ public:
                 return;
             case WriteKind::kDrop:
                 return;
-            default: HaltUnsupportedAccess("WriteHalf", addr, value);
+            default: this->HaltUnsupportedAccess("WriteHalf", addr, value);
         }
     }
 
     uint32_t ReadWord(uint32_t addr) override {
-        if (!M.word_pairs) HaltUnsupportedAccess("ReadWord", addr, 0);
+        if (!M.word_pairs) this->HaltUnsupportedAccess("ReadWord", addr, 0);
         const uint32_t lo = PairLow(addr, "ReadWord");
         return ReadHalf(M.base + lo * 2u) |
                (static_cast<uint32_t>(ReadHalf(M.base + (lo + 1u) * 2u)) << 16);
     }
 
     void WriteWord(uint32_t addr, uint32_t value) override {
-        if (!M.word_pairs) HaltUnsupportedAccess("WriteWord", addr, value);
+        if (!M.word_pairs) this->HaltUnsupportedAccess("WriteWord", addr, value);
         PairLow(addr, "WriteWord");
         WriteHalf(addr,     static_cast<uint16_t>(value));
         WriteHalf(addr + 2, static_cast<uint16_t>(value >> 16));
     }
 
-    uint8_t ReadByte(uint32_t addr) override { HaltUnsupportedAccess("ReadByte", addr, 0); }
-    void WriteByte(uint32_t addr, uint8_t v) override { HaltUnsupportedAccess("WriteByte", addr, v); }
+    uint8_t ReadByte(uint32_t addr) override { this->HaltUnsupportedAccess("ReadByte", addr, 0); }
+    void WriteByte(uint32_t addr, uint8_t v) override {
+        this->HaltUnsupportedAccess("WriteByte", addr, v);
+    }
 
     void SaveState(StateWriter& w) override {
         for (uint32_t i = 0; i < M.num_regs; ++i) w.Write(RegStateName(), reg_[i]);
@@ -146,6 +149,10 @@ protected:
         return M.reg[i].reset;
     }
     virtual void AfterReset() {}
+    virtual void BeforeStore(uint32_t i, uint16_t value) {
+        (void)i;
+        (void)value;
+    }
 
     uint16_t StoredReg(uint32_t i) const { return reg_[i]; }
 
@@ -153,7 +160,7 @@ protected:
         const uint32_t i = offset / 2u;
         if ((offset & 1u) || i >= M.num_regs || M.reg[i].write != WriteKind::kStored ||
             (value & ~M.reg[i].wmask) != 0u || (value & M.reg[i].fatal_on_set) != 0u) {
-            emu_.Get<Fatal>().Die("%s: stored write 0x%04X at offset 0x%02X is not a "
+            this->emu_.template Get<Fatal>().Die("%s: stored write 0x%04X at offset 0x%02X is not a "
                                   "stored-register write", typeid(*this).name(), value,
                                   offset);
         }
@@ -168,12 +175,12 @@ private:
 
     uint32_t RegIndex(uint32_t addr, const char* what, uint32_t value) {
         const uint32_t off = addr - M.base;
-        if (off >= M.num_regs * 2u || (off & 1u)) HaltUnsupportedAccess(what, addr, value);
+        if (off >= M.num_regs * 2u || (off & 1u)) this->HaltUnsupportedAccess(what, addr, value);
         return off / 2u;
     }
     uint32_t PairLow(uint32_t addr, const char* what) {
         const uint32_t lo = RegIndex(addr, what, 0);
-        if (lo + 1u >= M.num_regs) HaltUnsupportedAccess(what, addr, 0);
+        if (lo + 1u >= M.num_regs) this->HaltUnsupportedAccess(what, addr, 0);
         return lo;
     }
 

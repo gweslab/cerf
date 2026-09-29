@@ -8,9 +8,6 @@
 
 namespace {
 
-/* TClock = (18.432 MHz / CLKSP) * 16 (UM p245 CLKSPEEDREG); MobilePro 700
-   straps CLKSP=9 (66-MHz VR4102 -> PClock 65.536 MHz), so TClock = 32.768 MHz
-   (25-bit TCLK period 1.024 s, matching UM p335 "1 to 2 seconds"). */
 class Vr4102Rtc : public Vr41xxRtc {
 public:
     using Vr41xxRtc::Vr41xxRtc;
@@ -19,7 +16,6 @@ public:
         auto* bd = emu_.TryGet<BoardContext>();
         return bd && bd->GetSocId() == SocId::Vr4102;
     }
-    uint32_t TClockHz() const override { return 32768000u; }
 };
 
 }  /* namespace */

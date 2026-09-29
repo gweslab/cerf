@@ -29,6 +29,11 @@ public:
         bool                  armed_ = false;
     };
 
+    struct Rate {
+        uint64_t num = 0;
+        uint64_t den = 1;
+    };
+
     void OnReady() override;
 
     Event* Add(std::function<void()> fn);
@@ -37,10 +42,12 @@ public:
     bool   IsDue(const Event* e, uint64_t now) const;
 
     uint64_t Cycles() { return CyclesNow(); }
-    uint64_t CpuHz() const { return cpu_hz_; }
-    void     SetClockHz(uint64_t hz);
+    uint64_t CpuHz() const;
+    Rate     ClockRate() const { return rate_; }
+    void     SetClockHz(uint64_t hz) { SetClockRate(Rate{hz, 1u}); }
+    void     SetClockRate(Rate rate);
     void     RegisterRateListener(std::function<void()> fn);
-    int64_t  NowNs() { return CyclesToNs(CyclesNow()); }
+    int64_t  NowNs() { return guest_ns_ + CyclesToNs(CyclesNow() - guest_ns_cycle_); }
     uint64_t NsToCycles(int64_t ns) const;
     int64_t  CyclesToNs(uint64_t cycles) const;
 
@@ -55,13 +62,14 @@ public:
 #endif
 
 protected:
-    virtual uint32_t ClockHz()                          = 0;
+    virtual Rate     InitialRate()                      = 0;
     virtual uint64_t CyclesNow()                        = 0;
     virtual void     SetCycles(uint64_t cycles)         = 0;
     virtual void     PublishDeadline(uint64_t cycles_ahead) = 0;
 
 private:
-    void     SetUnits(uint64_t hz);
+    Rate     Normalized(Rate rate) const;
+    void     SetUnits(Rate rate);
     void     RunDue(uint64_t now);
     uint64_t NextArmed() const;
     void     Publish(uint64_t now);
@@ -75,11 +83,13 @@ private:
     Event*        throttle_    = nullptr;
     VirtualClock* wall_        = nullptr;
     void*         timer_       = nullptr;
-    uint64_t      cpu_hz_      = 1;
+    Rate          rate_        = Rate{1u, 1u};
     uint64_t      ns_unit_     = 1;
     uint64_t      cyc_unit_    = 1;
     uint64_t      ref_cycle_   = 0;
     int64_t       ref_wall_ns_ = 0;
+    uint64_t      guest_ns_cycle_ = 0;
+    int64_t       guest_ns_       = 0;
 
 #if CERF_DEV_MODE
     void LogSecond();
@@ -94,7 +104,7 @@ private:
     uint32_t stat_idle_early_   = 0;
     int64_t  stat_idle_wait_ns_ = 0;
     int64_t  stat_wall_mark_ns_ = 0;
-    uint64_t stat_cycle_mark_   = 0;
+    int64_t  stat_guest_mark_ns_ = 0;
     std::atomic<int64_t> stat_lag_published_ns_{0};
 #endif
 };

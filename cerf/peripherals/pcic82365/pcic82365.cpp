@@ -29,6 +29,12 @@ constexpr uint8_t kIfsCd1       = 0x04u;
 constexpr uint8_t kIfsCd2       = 0x08u;
 constexpr uint8_t kIfsCardReady = 0x20u;
 
+/* Interface Status bit 6 Card Power On per Power Control bit 4 VCC Power and bit 5 Auto-Power
+   (CL-PD6710/'22 data sheet 6.2 p38, Table 6-1 p40; i82365reg.h PCIC_IF_STATUS_POWERACTIVE). */
+constexpr uint8_t kIfsCardPowerOn = 0x40u;
+constexpr uint8_t kPwrVccPower    = 0x10u;
+constexpr uint8_t kPwrAutoPower   = 0x20u;
+
 /* REG_INTERRUPT_AND_GENERAL_CONTROL CARDTYPE (i82365reg.h PCIC_INTR_CARDTYPE_IO). */
 constexpr uint8_t kIntrCardTypeIo = 0x20u;
 
@@ -93,6 +99,10 @@ uint8_t Pcic82365::ReadReg(uint8_t index) {
                 v |= kIfsCd1 | kIfsCd2;
                 const bool io_card = (reg_interrupt_and_gen_ctrl_ & kIntrCardTypeIo) != 0u;
                 if (CardPoweredByReg() && !(io_card && card_irq_)) v |= kIfsCardReady;
+            }
+            if ((reg_power_control_ & kPwrVccPower) &&
+                (!(reg_power_control_ & kPwrAutoPower) || card_present_)) {
+                v |= kIfsCardPowerOn;
             }
             return v;
         }

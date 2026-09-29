@@ -1,5 +1,8 @@
 #pragma once
 
+#include <functional>
+#include <vector>
+
 #include "../../boards/board_context.h"
 #include "../../core/cerf_emulator.h"
 #include "../../core/service.h"
@@ -28,9 +31,15 @@ public:
     void SaveState(StateWriter& w);
     void RestoreState(StateReader& r);
 
+    void RegisterRestoreListener(std::function<void()> fn);
+    void NotifyRestored();
+    void RegisterResetListener(std::function<void()> fn);
+
 private:
     template <typename F>
     static constexpr void VisitState(MipsCpuState& s, F& field);
 
     MipsCpuState state_{};
+    std::vector<std::function<void()>> restore_listeners_;
+    std::vector<std::function<void()>> reset_listeners_;
 };

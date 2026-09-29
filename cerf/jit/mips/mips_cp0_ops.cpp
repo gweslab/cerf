@@ -1,7 +1,9 @@
 #include "mips_cp0_ops.h"
 
 #include "../../core/cerf_emulator.h"
+#include "../../core/fatal.h"
 #include "../../cpu/mips_processor_config.h"
+#include "mips_core_clock.h"
 #include "mips_cpu.h"
 #include "mips_cpu_state.h"
 #include "mips_mmu.h"
@@ -9,37 +11,80 @@
 
 REGISTER_SERVICE(MipsCp0Ops);
 
-namespace {
-/* IP7 = Cause bit 15. The R4000/VR5500 timer interrupt is hardwired to the
-   highest hardware interrupt line, IP7 (pre-Release-2: no IntCtl.IPTI). */
-constexpr uint32_t kCauseIp7 = 1u << (MipsCauseBit::kIP + 7);
-}
-
 void MipsCp0Ops::OnReady() {
     cpu_state_ = emu_.Get<MipsCpu>().State();
     mmu_       = &emu_.Get<MipsMmu>();
     cache_     = &emu_.Get<MipsTranslationCache>();
     config_    = &emu_.Get<MipsProcessorConfig>();
+    if (!config_->HasCounter()) return;
+    clock_         = &emu_.Get<GuestCycleClock>();
+    core_clock_    = &emu_.Get<MipsCoreClock>();
+    compare_event_ = clock_->Add([this] { OnCompareMatch(); });
+    core_clock_->RegisterCountRateListener([this] { AnchorSavedCount(); });
+    OnCpuReset();
 }
 
-void MipsCp0Ops::TimerPoll() {
-    MipsCpuState& s = *cpu_state_;
-    /* Count is free-running: advance it by the guest cycles elapsed since the
-       last poll (uint32 wrap is the architectural Count wrap). cpu_mips_get_count
-       / store_count keep Count = base + elapsed; here the field IS the live Count,
-       refreshed each block. */
-    const uint32_t now = s.guest_cycle_counter;
-    s.cp0_count += now - s.count_anchor;
-    s.count_anchor = now;
-
-    /* Count == Compare fires once per Compare write (cpu_mips_timer_expire); IP7
-       then stays asserted until software writes Compare again. The signed delta
-       detects the crossing across the poll interval. */
-    if (s.timer_armed &&
-        static_cast<int32_t>(s.cp0_count - s.cp0_compare) >= 0) {
-        s.cp0_cause |= kCauseIp7;
-        s.timer_armed = 0;
+void MipsCp0Ops::SetCountRatio() {
+    const uint64_t cycles = core_clock_->CyclesPerCountTick();
+    if (!count_.SetRatio(cycles, 1u)) {
+        emu_.Get<Fatal>().Die("MipsCp0Ops: %llu cycles per Count tick overflows the counter",
+                              static_cast<unsigned long long>(cycles));
     }
+}
+
+void MipsCp0Ops::ArmCompare(uint64_t now) {
+    clock_->Arm(compare_event_, count_.NextMatchCycle(cpu_state_->cp0_compare, now));
+}
+
+/* IP7 "is set automatically whenever the value of the Count register equals the value of the
+   Compare register" (VR4121 UM §10.4); QEMU cp0_timer cpu_mips_timer_expire. */
+void MipsCp0Ops::OnCompareMatch() {
+    cpu_state_->cp0_cause |= kMipsCauseTimerIp;
+    ArmCompare(clock_->Cycles());
+}
+
+void MipsCp0Ops::OnCpuReset() {
+    if (!config_->HasCounter()) return;
+    const uint64_t now = clock_->Cycles();
+    SetCountRatio();
+    count_.Anchor(now, 0u);
+    ArmCompare(now);
+}
+
+void MipsCp0Ops::SaveCount() {
+    MipsCpuState& s = *cpu_state_;
+    if (!config_->HasCounter()) {
+        s.count_save           = 0u;
+        s.count_save_phase     = 0u;
+        s.count_save_phase_den = 0u;
+        return;
+    }
+    const uint64_t now = clock_->Cycles();
+    const uint64_t den = count_.PhaseDenominator();
+    if (den > UINT32_MAX) {
+        emu_.Get<Fatal>().Die("MipsCp0Ops: Count phase denominator %llu does not fit the save",
+                              static_cast<unsigned long long>(den));
+    }
+    s.count_save           = count_.CountAt(now);
+    s.count_save_phase     = count_.PhaseAt(now);
+    s.count_save_phase_den = static_cast<uint32_t>(den);
+}
+
+void MipsCp0Ops::OnCpuStateRestored() {
+    if (!config_->HasCounter()) return;
+    AnchorSavedCount();
+}
+
+void MipsCp0Ops::AnchorSavedCount() {
+    const MipsCpuState& s = *cpu_state_;
+    const uint64_t now = clock_->Cycles();
+    SetCountRatio();
+    count_.AnchorAtPhase(now, s.count_save, s.count_save_phase, s.count_save_phase_den);
+    ArmCompare(now);
+}
+
+uint32_t __fastcall MipsCp0Ops::Mfc0CountHelper(MipsCp0Ops* ops) {
+    return ops->count_.CountAt(ops->clock_->Cycles());
 }
 
 void __fastcall MipsCp0Ops::TlbwiHelper(MipsCp0Ops* ops) {
@@ -63,20 +108,16 @@ uint32_t __fastcall MipsCp0Ops::Mfc0RandomHelper(MipsCp0Ops* ops) {
 }
 
 void __fastcall MipsCp0Ops::Mtc0CountHelper(uint32_t value, MipsCp0Ops* ops) {
-    /* store_count: set Count and re-anchor so the next poll's elapsed is measured
-       from here. */
-    MipsCpuState& s = *ops->cpu_state_;
-    s.cp0_count    = value;
-    s.count_anchor = s.guest_cycle_counter;
+    const uint64_t now = ops->clock_->Cycles();
+    ops->count_.SetCountAt(now, value);
+    ops->ArmCompare(now);
 }
 
 void __fastcall MipsCp0Ops::Mtc0CompareHelper(uint32_t value, MipsCp0Ops* ops) {
-    /* store_compare: set Compare, lower the pending timer IRQ (IP7), and re-arm
-       for the next crossing. */
     MipsCpuState& s = *ops->cpu_state_;
     s.cp0_compare = value;
-    s.cp0_cause  &= ~kCauseIp7;
-    s.timer_armed = 1;
+    s.cp0_cause  &= ~kMipsCauseTimerIp;
+    ops->ArmCompare(ops->clock_->Cycles());
 }
 
 void __fastcall MipsCp0Ops::Mtc0EntryHiHelper(uint32_t value, MipsCp0Ops* ops) {

@@ -23,6 +23,9 @@ constexpr Vr41xxPiuModel kModel = {
     /* "PENSTC does not change while PENCHGINTR is set to 1, even if the touch panel contact
        state changes between release and touch" (UM 20.3.1 p426). */
     /*penstc_latched_by_penchg=*/true,
+    /* "During the WaitPenTouch state, it is possible to change to Suspend mode because the panel
+       state can be detected even when TClock has been stopped" (UM p423). */
+    true,
 };
 
 class Vr4111Piu : public Vr41xxPiuBase<SocId::Vr4111, kModel> {

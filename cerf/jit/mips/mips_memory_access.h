@@ -9,6 +9,7 @@
 struct MipsCpuState;
 
 class EmulatedMemory;
+class GuestCycleClock;
 class MipsExceptionDelivery;
 class MipsMmu;
 class MipsTranslationCache;
@@ -47,10 +48,13 @@ public:
     static void __fastcall SdlHelper(uint32_t va, uint32_t rt, MipsMemoryAccess* mem);
     static void __fastcall SdrHelper(uint32_t va, uint32_t rt, MipsMemoryAccess* mem);
 
+    void DeliverDueClockEvents();
+
 private:
     static void StoreByteXlate(MipsMemoryAccess* mem, uint32_t va, uint8_t value,
                                const char* who);
 
+    void     LeaveBlockIfCpuStopped();
     uint32_t MmioRead (uint32_t va, uint32_t pa, uint32_t width, const char* who);
     void     MmioWrite(uint32_t va, uint32_t pa, uint32_t value, uint32_t width,
                        const char* who);
@@ -61,4 +65,5 @@ private:
     PeripheralDispatcher*  peripheral_ = nullptr;
     MipsExceptionDelivery* exceptions_ = nullptr;
     MipsTranslationCache*  cache_      = nullptr;
+    GuestCycleClock*       clock_      = nullptr;
 };

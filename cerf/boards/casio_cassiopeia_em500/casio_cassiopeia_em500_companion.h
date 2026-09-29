@@ -10,6 +10,7 @@
 
 #include <atomic>
 #include <cstdint>
+#include <mutex>
 
 /* Casio companion ASIC in External I/O area 2 (IOCS0#), PA 0x0A000000 (kseg1
    0xAA000000; VR4131 UM U15350EJ2V0UM Fig 3-1 p75); registers from
@@ -53,7 +54,7 @@ private:
     void WriteReg(uint32_t off, uint32_t value);
     void WriteCodecCommand(uint32_t value);
     void WriteSysCtrl(uint32_t off, uint32_t value, uint32_t keep_mask);
-    void UpdateAudioIrqLine();
+    void UpdateIrqLine();
 
     CasioCassiopeiaEm500Audio audio_;
     CasioCassiopeiaEm500Display display_;
@@ -99,10 +100,7 @@ private:
        (&~0x38); IST @0xED15D6-0xED15E4 (&~0x30|8), @0xED1682-0xED168C (&~0x38);
        gate sub_ED19A0 (&0x40). */
     uint32_t adc_ctrl_89C_ = 0;
-    /* nk_main_kernel.exe sub_9F08F334 case17 @0x9F08F388 / case24 @0x9F08F3A4
-       (RMW enable config), @0x9F033A84 (sw 0); consumed @0x9F036608 (lw 0x304;
-       raw & (raw>>8) = pending[7:0] & enable[15:8] cascade demux). */
-    uint32_t reg_0304_ = 0;
+    std::mutex irq_mtx_;
     /* nk_main_kernel.exe @0x9F033118/@0x9F033130 (0x0910), @0x9F0331D8-0x9F0331F0
        (0x0900/0x0908/0x090C). */
     uint32_t sib_regs_[5] = {};

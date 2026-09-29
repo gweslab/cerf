@@ -57,7 +57,6 @@ constexpr uint16_t kCntBits     = 0x001Fu;
 constexpr uint32_t kT2CntShift  = 5u;
 constexpr uint32_t kT3CntShift  = 10u;
 constexpr uint16_t kWintvlBits  = 0x03FFu;
-constexpr uint32_t kTimeUnitUs  = 30u;
 
 /* SCANLINE LINE[1:0]: 00 twelve pins, 01 ten, 10 eight, 11 SCAN pins are output ports
    (VR4111 UM 22.2.9 p472, VR4102 UM 21.2.9 p434, VR4121 UM 22.2.9 p524). KSCAN[2n] and

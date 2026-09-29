@@ -1,13 +1,16 @@
 #pragma once
 
+#include "../../jit/guest_cycle_clock.h"
 #include "../../peripherals/peripheral_base.h"
+#include "vr41xx_rtc_latch.h"
+#include "vr41xx_rtcl_rephase.h"
+#include "vr41xx_rtcx_ticks.h"
 
-#include <atomic>
-#include <chrono>
-#include <condition_variable>
 #include <cstdint>
 #include <mutex>
-#include <thread>
+
+class MipsCoreClock;
+class MipsInterruptChannel;
 
 /* NEC VR41xx RTC, VR4102 UM ch.16 == VR4111 UM ch.17 == VR4121 UM ch.17 (VR4102 Table 16-1,
    VR4111 Table 17-1 p372, VR4121 Table 17-1); RTC1 block 0x0B0000C0, RTC2 block 0x0B0001C0. */
@@ -15,13 +18,7 @@ class Vr41xxRtc : public Peripheral {
 public:
     using Peripheral::Peripheral;
 
-    ~Vr41xxRtc() override { StopWorker(); }
-    void OnShutdown() override { StopWorker(); }
-
     void OnReady() override;
-
-    /* CLKSPEEDREG: VR4102 UM 10.2.8 p245, VR4111 UM 11.2.8 p273, VR4121 UM 11.2.10 p291. */
-    virtual uint32_t TClockHz() const = 0;
 
     uint32_t MmioBase() const override { return 0x0B0000C0u; }   /* RTC1 block */
     uint32_t MmioSize() const override { return 0x20u; }         /* 0xC0-0xDF   */
@@ -44,12 +41,9 @@ public:
     void PostRestore() override;
 
 private:
-    using Clock = std::chrono::steady_clock;
-
     static constexpr uint64_t kMask48    = 0xFFFFFFFFFFFFull;
     static constexpr uint32_t kMask24    = 0x00FFFFFFu;
     static constexpr uint32_t kMask25    = 0x01FFFFFFu;
-    static constexpr uint32_t kRtcHz     = 32768u;      /* elapsed + long timers */
 
     /* RTCINTREG D0-D3 latch bits (VR4102 UM 16.2.9 p353 == VR4111 UM 17.2.9 p389 ==
        VR4121 UM 17.2.9 p437); each comment names the ICU direct source it routes to
@@ -59,43 +53,63 @@ private:
     static constexpr uint16_t kIntLong2   = 1u << 2;    /* RTCINTR2 -> SYSINT2 D0 (RTCL2INTR)  */
     static constexpr uint16_t kIntTclk    = 1u << 3;    /* RTCINTR3 -> SYSINT2 D3 (TCLKINTR)   */
 
-    uint64_t ElapsedTicksLocked(Clock::time_point anchor, uint32_t hz) const;
-    uint64_t ReadEtimeLocked() const;
-    uint32_t ReadDownCountLocked(uint32_t reload, Clock::time_point anchor,
-                                 uint32_t hz, uint32_t mask) const;
+    uint64_t RtcTicksLocked();
+    uint64_t TclkCyclesLocked() const;
+    uint64_t TclkTicksLocked() const;
+    uint64_t ReadEtimeLocked();
+    static uint32_t DownCount(uint32_t reload, uint64_t elapsed, uint32_t mask);
+    static uint64_t PeriodsReached(uint32_t reload, uint64_t elapsed);
 
-    void     ApplyRtcResetLocked();     /* RTCRST: every register takes its reset column */
-    void     StopTclkLocked();          /* non-RTCRST reset: TCLK period/count/latch = 0 */
-    void     AckIntBitsLocked(uint16_t clr);   /* W1C a cause + ack its period counter */
-    void     EvaluateLocked();          /* update the four RTCINTR latches */
-    void     DriveIcuLocked();          /* push RTCINTREG bits to the ICU  */
-    void     NotifyWorker();
-    void     StopWorker();
-    void     WorkerLoop();
+    void     ApplyRtcResetLocked();
+    void     StopTclkLocked();
+    void     StartTclkLocked();
+    void     AckIntBitsLocked(uint16_t clr);
+    void     ArmEcmpLocked();
+    void     EvaluateLocked();
+    void     DriveIcuLocked();
+    void     ArmNextLocked();
+    void     UpdateLocked();
+    void     OnRateChange();
+    Vr41xxRtclView RtclViewLocked(int ch, uint64_t now);
+    uint16_t RtclCntHalfLocked(int ch, bool high);
+    void     WriteEtimeHalfLocked(uint32_t half, uint16_t value);
+    void     WriteEcmpHalfLocked(uint32_t half, uint16_t value);
+    void     WriteRtclHalfLocked(int ch, bool high, uint16_t value);
+    void     WriteTclkHalfLocked(bool high, uint16_t value);
+    void     RtclPairWrittenLocked(int ch);
 
     mutable std::mutex mtx_;
 
-    /* Elapsed-time up counter + one-shot compare alarm. */
-    uint64_t          etime_base_   = 0;                /* value at etime_anchor_ */
-    Clock::time_point etime_anchor_ = {};
-    uint64_t          ecmp_         = 0;
-    bool              ecmp_armed_   = false;            /* fires once per ECMP write */
+    GuestCycleClock*        clock_      = nullptr;
+    GuestCycleClock::Event* event_      = nullptr;
+    MipsCoreClock*          core_clock_ = nullptr;
+    MipsInterruptChannel*   channel_    = nullptr;
+    Vr41xxRtcxTicks         rtcx_{emu_, Vr41xxRtcxDomain::RtcIcuPmu};
 
-    /* Two RTCLong down counters + one TClock down counter (reload=0 stops). */
-    uint32_t          rtcl1_reload_ = 0;
-    uint32_t          rtcl2_reload_ = 0;
-    uint32_t          tclk_reload_  = 0;
-    Clock::time_point rtcl1_anchor_ = {};
-    Clock::time_point rtcl2_anchor_ = {};
-    Clock::time_point tclk_anchor_  = {};
-    uint64_t          rtcl1_periods_ack_ = 0;          /* period count acknowledged (W1C) */
-    uint64_t          rtcl2_periods_ack_ = 0;
-    uint64_t          tclk_periods_ack_  = 0;
+    uint64_t etime_base_   = 0;
+    uint64_t etime_anchor_ = 0;
+    uint64_t ecmp_         = 0;
+    bool     ecmp_armed_   = false;
+    uint64_t ecmp_match_   = 0;
 
-    uint16_t          rtcintreg_ = 0;                  /* RTCINTREG latches (W1C) */
+    uint32_t rtcl1_reload_      = 0;
+    uint32_t rtcl2_reload_      = 0;
+    uint32_t tclk_reload_       = 0;
+    uint64_t rtcl1_anchor_      = 0;
+    uint64_t rtcl2_anchor_      = 0;
+    uint64_t tclk_anchor_cycle_ = 0;
+    uint64_t tclk_cycles_       = 1;
+    uint64_t tclk_restore_pos_  = 0;
+    uint64_t rtcl1_periods_ack_ = 0;
+    uint64_t rtcl2_periods_ack_ = 0;
+    uint64_t tclk_periods_ack_  = 0;
 
-    std::mutex              cv_mtx_;
-    std::condition_variable cv_;
-    std::thread             worker_;
-    std::atomic<bool>       stop_{false};
+    uint16_t rtcintreg_ = 0;
+
+    Vr41xxRtcLatch etime_latch_{3u, kMask48};
+    Vr41xxRtcLatch ecmp_latch_{3u, kMask48};
+    Vr41xxRtcLatch rtcl_latch_[2] = {{2u, kMask24}, {2u, kMask24}};
+    Vr41xxRtcLatch tclk_latch_{2u, kMask25};
+
+    Vr41xxRtclRephase rephase_;
 };

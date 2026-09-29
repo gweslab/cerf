@@ -8,8 +8,6 @@
 
 namespace {
 
-/* VR4121 UM 11.2.10 p291: TClock = PClock / DIVT[3:0], PClock = (18.432 MHz /
-   CLKSP[4:0]) * 64; CERF models no CLKSPEEDREG, so the strap is ungrounded. */
 class Vr4121Rtc : public Vr41xxRtc {
 public:
     using Vr41xxRtc::Vr41xxRtc;
@@ -18,7 +16,6 @@ public:
         auto* bd = emu_.TryGet<BoardContext>();
         return bd && bd->GetSocId() == SocId::Vr4121;
     }
-    uint32_t TClockHz() const override { return 0u; }
 };
 
 }  /* namespace */

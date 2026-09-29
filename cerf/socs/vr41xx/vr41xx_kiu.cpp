@@ -2,25 +2,48 @@
 
 #include "../../core/cerf_emulator.h"
 #include "../../peripherals/peripheral_dispatcher.h"
-#include "../../state/emulation_freeze.h"
 #include "../../state/state_stream.h"
 #include "../guest_cpu_reset.h"
+#include "vr41xx_cmu.h"
 #include "vr41xx_icu.h"
 #include "vr41xx_kiu_regs.h"
 
-#include <chrono>
 #include <cstdint>
 
 using namespace cerf_vr41xx_kiu_regs;
 
 void Vr41xxKiu::OnReady() {
+    clock_ = &emu_.Get<GuestCycleClock>();
+    event_ = clock_->Add([this] {
+        std::lock_guard<std::mutex> lk(mtx_);
+        UpdateLocked();
+    });
+    rtcx_.Attach([this] {
+        std::lock_guard<std::mutex> lk(mtx_);
+        UpdateLocked();
+    });
+    clock_->RegisterRateListener([this] {
+        std::lock_guard<std::mutex> lk(mtx_);
+        rtcx_.Rescale();
+        ArmEventLocked();
+    });
+    host_requests_ = &emu_.Get<HostRequestChannel>();
+    host_requests_->RegisterListener([this] {
+        std::lock_guard<std::mutex> lk(mtx_);
+        ApplyHostKeysLocked();
+    });
+    emu_.Get<Vr41xxCmu>().RegisterClockUser(kCmuMskKiu, "KIU", [this] {
+        std::lock_guard<std::mutex> lk(mtx_);
+        UpdateLocked();
+        return sstat_ == kSStatScanning;
+    });
     emu_.Get<PeripheralDispatcher>().Register(this);
     emu_.Get<GuestCpuReset>().RegisterResetListener([this](ResetLineKind kind) {
         std::lock_guard<std::mutex> lk(mtx_);
         if (kind == ResetLineKind::Rtc || !Model().gpen_retained_on_other_reset) gpen_ = 0;
         ApplyResetLocked();
+        UpdateLocked();
     });
-    worker_ = std::thread([this] { WorkerLoop(); });
 }
 
 /* KIURST "forcibly reset the KIU registers" (VR4111 UM 22.2.7 p469, VR4121 UM 22.2.7 p521;
@@ -46,16 +69,24 @@ bool Vr41xxKiu::EnabledLocked() const { return (scanrep_ & kKeyen) != 0; }
 
 /* SCANLINE selects the scan-line count (VR4111 UM 22.2.9 p472, VR4102 UM 21.2.9 p434,
    VR4121 UM 22.2.9 p524). */
-uint32_t Vr41xxKiu::ScanLinesLocked() {
-    uint32_t lines = 0;
+uint32_t Vr41xxKiu::ScanLineCountLocked() const {
     switch (scanline_ & kScanLineMask) {
-        case 0x0000u: lines = 12u; break;
-        case 0x0001u: lines = 10u; break;
-        case 0x0002u: lines = 8u;  break;
-        default:      HaltUnsupportedAccess("KIU scan with SCANLINE = 11", kBase + kOffScanLine,
-                                            scanline_);
+        case 0x0000u: return 12u;
+        case 0x0001u: return 10u;
+        case 0x0002u: return 8u;
+        default:      return 0u;
     }
-    if (gpen_ & ((1u << lines) - 1u))
+}
+
+bool Vr41xxKiu::GpenOnScanLinesLocked(uint32_t lines) const {
+    return (gpen_ & ((1u << lines) - 1u)) != 0u;
+}
+
+uint32_t Vr41xxKiu::ScanLinesLocked() {
+    const uint32_t lines = ScanLineCountLocked();
+    if (lines == 0u)
+        HaltUnsupportedAccess("KIU scan with SCANLINE = 11", kBase + kOffScanLine, scanline_);
+    if (GpenOnScanLinesLocked(lines))
         HaltUnsupportedAccess("KIU scan over KSCAN lines KIUGPEN selects as output ports",
                               kBase + kOffGpen, gpen_);
     return lines;
@@ -86,12 +117,14 @@ void Vr41xxKiu::LatchScanLocked() {
 /* One set of key scan data walks every KSCAN pin, each costing T1CNT + T2CNT + T3CNT, and the
    sets are separated by the KIUWKI interval (VR4111 UM 22.2.4 p466 / 22.2.5 p467 figures,
    VR4102 UM p429 / p430, VR4121 UM Figure 22-2 p519 and Figure 22-3 p520). */
-uint32_t Vr41xxKiu::ScanPeriodUsLocked() {
+uint32_t Vr41xxKiu::ScanPeriodTicksFor(uint32_t lines) const {
     const uint32_t t1 = wks_ & kCntBits;
     const uint32_t t2 = (wks_ >> kT2CntShift) & kCntBits;
     const uint32_t t3 = (wks_ >> kT3CntShift) & kCntBits;
-    return ScanLinesLocked() * (t1 + t2 + t3 + 3u) * kTimeUnitUs;
+    return lines * (t1 + t2 + t3 + 3u);
 }
+
+uint32_t Vr41xxKiu::ScanPeriodTicksLocked() { return ScanPeriodTicksFor(ScanLinesLocked()); }
 
 /* STPREP[5:0] "key scan sequencer stop count setting", 000001 one time .. 111111 63 times
    (VR4111 UM 22.2.2 p463, VR4102 UM 21.2.2 p425, VR4121 UM 22.2.2 p514); the 000000 row is
@@ -137,6 +170,7 @@ void Vr41xxKiu::ClearScanStpLocked() {
    p520). Scan end reaches interval, "waiting for the start of the next key scan" (VR4102 UM
    21.2.3 p428; VR4111 UM Fig 22-3 p473, VR4121 UM Fig 22-5 p525). */
 void Vr41xxKiu::CompleteScanLocked() {
+    emu_.Get<Vr41xxCmu>().RequireTclock(kCmuMskKiu, "KIU key scan completion");
     LatchScanLocked();
     data_unread_ = true;
     causes_ |= kKDatRdy;
@@ -236,8 +270,10 @@ void Vr41xxKiu::PublishCausesLocked() { emu_.Get<Vr41xxIcu>().SetKiuSource(cause
 uint16_t Vr41xxKiu::ReadHalf(uint32_t addr) {
     const uint32_t off = addr - kBase;
     std::lock_guard<std::mutex> lk(mtx_);
+    UpdateLocked();
     if (off <= kOffDat5 && (off & 1u) == 0u) {
         data_unread_ = false;
+        ArmEventLocked();
         return matrix_[off >> 1];
     }
     switch (off) {
@@ -255,12 +291,13 @@ uint16_t Vr41xxKiu::ReadHalf(uint32_t addr) {
 void Vr41xxKiu::WriteHalf(uint32_t addr, uint16_t value) {
     const uint32_t off = addr - kBase;
     std::lock_guard<std::mutex> lk(mtx_);
+    AdvancePhaseLocked();
     switch (off) {
         case kOffScanRep:
             scanrep_ = value & kScanRepMask;
             ApplyScanRepLocked();
             PublishCausesLocked();
-            NotifyWorker();
+            UpdateLocked();
             return;
         /* KIUINT D2:0 are each "Cleared to 0 when 1 is written" (VR4111 UM 22.2.6 p468,
            VR4102 UM 21.2.6 p431, VR4121 UM 22.2.6 p520). */
@@ -276,11 +313,11 @@ void Vr41xxKiu::WriteHalf(uint32_t addr, uint16_t value) {
                 if (!Model().gpen_survives_kiurst) gpen_ = 0;
                 ApplyResetLocked();
             }
-            NotifyWorker();
+            UpdateLocked();
             return;
         case kOffWki:
             wintvl_ = value & kWintvlBits;
-            NotifyWorker();
+            UpdateLocked();
             return;
         /* KIUWKS T3CNT D14:10, T2CNT D9:5, T1CNT D4:0, each "((field) + 1) x 30 us" with
            "00000 : RFU" (VR4111 UM 22.2.4 p466, VR4102 UM 21.2.4 p429, VR4121 UM 22.2.4
@@ -291,6 +328,7 @@ void Vr41xxKiu::WriteHalf(uint32_t addr, uint16_t value) {
                 ((w >> kT3CntShift) & kCntBits) == 0)
                 HaltUnsupportedAccess("KIU KIUWKS with an RFU 00000 count", addr, value);
             wks_ = w;
+            ArmEventLocked();
             return;
         }
         /* VR4111 UM Figure 22-3 p473 Note 2 with 22.2.2 p463 and VR4121 UM Figure 22-5 p525
@@ -304,13 +342,14 @@ void Vr41xxKiu::WriteHalf(uint32_t addr, uint16_t value) {
             scanline_ = value & kScanLineMask;
             ReevaluateWaitKeyInLocked();
             PublishCausesLocked();
-            NotifyWorker();
+            UpdateLocked();
             return;
         /* KIUGPEN routes KSCAN[n] to GPIO[32+n], output value from the GIU's GIUPODATL
            (VR4111 UM 22.2.8 p470, VR4102 UM 21.2.8 p433; VR4121 UM 22.2.8 p523 names that
            register GIUPIODL). */
         case kOffGpen:
             gpen_ = value & kGpenMask;
+            ArmEventLocked();
             return;
         default:           HaltUnsupportedAccess("KIU WriteHalf", addr, value);
     }
@@ -320,20 +359,27 @@ void Vr41xxKiu::SetKeyState(uint8_t matrix_index, bool pressed) {
     if (matrix_index >= 96u)
         HaltUnsupportedAccess("KIU SetKeyState index", matrix_index, pressed);
 
-    auto frozen = emu_.Get<EmulationFreeze>().WorkerSection();
-    std::lock_guard<std::mutex> lk(mtx_);
+    {
+        std::lock_guard<std::mutex> lk(mtx_);
+        const uint32_t reg  = matrix_index >> 4;
+        const uint16_t mask = static_cast<uint16_t>(1u << (matrix_index & 15u));
+        if (((host_held_[reg] & mask) != 0) == pressed)
+            return;
+        if (pressed) host_held_[reg] |= mask;
+        else         host_held_[reg] &= static_cast<uint16_t>(~mask);
+        host_dirty_ = true;
+    }
+    host_requests_->Request();
+}
 
-    const uint32_t reg  = matrix_index >> 4;
-    const uint16_t mask = static_cast<uint16_t>(1u << (matrix_index & 15u));
-    if (((held_[reg] & mask) != 0) == pressed)
-        return;
-
-    if (pressed) held_[reg] |= mask;
-    else         held_[reg] &= static_cast<uint16_t>(~mask);
-
+void Vr41xxKiu::ApplyHostKeysLocked() {
+    if (!host_dirty_) return;
+    host_dirty_ = false;
+    AdvancePhaseLocked();
+    for (uint32_t i = 0; i < 6u; ++i) held_[i] = host_held_[i];
     ReevaluateWaitKeyInLocked();
     PublishCausesLocked();
-    NotifyWorker();
+    UpdateLocked();
 }
 
 void Vr41xxKiu::SaveState(StateWriter& w) {
@@ -351,6 +397,10 @@ void Vr41xxKiu::SaveState(StateWriter& w) {
     w.Write<uint8_t>("stop_after_scan", stop_after_scan_ ? 1u : 0u);
     w.Write<uint8_t>("scanstart_set_while_running", scanstart_set_while_running_ ? 1u : 0u);
     w.Write<uint8_t>("scanstp_set_in_waitkeyin", scanstp_set_in_waitkeyin_ ? 1u : 0u);
+    const uint64_t now   = rtcx_.Now();
+    const bool     timed = sstat_ == kSStatScanning || sstat_ == kSStatInterval;
+    w.Write<uint8_t>("scan_in_flight", scan_in_flight_ ? 1u : 0u);
+    w.Write<int64_t>("phase_rel", timed ? static_cast<int64_t>(phase_end_ - now) : 0);
 }
 
 void Vr41xxKiu::RestoreState(StateReader& r) {
@@ -369,41 +419,38 @@ void Vr41xxKiu::RestoreState(StateReader& r) {
     r.Read("stop_after_scan", stopping);
     r.Read("scanstart_set_while_running", scanstart_held);
     r.Read("scanstp_set_in_waitkeyin", scanstp_held);
+    uint8_t in_flight = 0;
+    int64_t phase_rel = 0;
+    r.Read("scan_in_flight", in_flight);
+    r.Read("phase_rel", phase_rel);
     data_unread_     = unread != 0;
     stop_after_scan_ = stopping != 0;
     scanstart_set_while_running_ = scanstart_held != 0;
     scanstp_set_in_waitkeyin_ = scanstp_held != 0;
-    scan_in_flight_  = false;
+    scan_in_flight_  = in_flight != 0u;
+    rtcx_.Rebase();
+    phase_end_ = rtcx_.Now() + static_cast<uint64_t>(phase_rel);
     for (uint16_t& w : held_) w = 0;
+    for (uint16_t& w : host_held_) w = 0;
+    host_dirty_ = false;
 }
 
 void Vr41xxKiu::PostRestore() {
     std::lock_guard<std::mutex> lk(mtx_);
     PublishCausesLocked();
-    NotifyWorker();
-}
-
-void Vr41xxKiu::NotifyWorker() {
-    std::lock_guard<std::mutex> g(cv_mtx_);
-    wake_seq_.fetch_add(1, std::memory_order_release);
-    cv_.notify_all();
-}
-
-void Vr41xxKiu::StopWorker() {
-    stop_.store(true, std::memory_order_release);
-    NotifyWorker();
-    if (worker_.joinable()) worker_.join();
+    UpdateLocked();
 }
 
 /* KDATLOST when the data was not read "between when data is input to the data register after a
    key scan and when the next scan operation starts" (VR4111 UM 22.2.6 p468 D[2] cell, VR4121 UM
    22.2.6 p520 prose; VR4102 UM 21.2.6 p431 carries the bit with no such prose). */
-void Vr41xxKiu::ArmScanLocked(std::chrono::steady_clock::time_point now) {
+void Vr41xxKiu::ArmScanLocked(uint64_t start) {
+    emu_.Get<Vr41xxCmu>().RequireTclock(kCmuMskKiu, "KIU key scan");
     if (data_unread_) causes_ |= kKDatLost;
     PublishCausesLocked();
     scan_in_flight_ = true;
     sstat_ = kSStatScanning;
-    phase_end_ = now + std::chrono::microseconds(ScanPeriodUsLocked());
+    phase_end_ = start + ScanPeriodTicksLocked();
 }
 
 /* A scan set occupies one scan period, and "the interval after the completion of the scan of a
@@ -411,45 +458,39 @@ void Vr41xxKiu::ArmScanLocked(std::chrono::steady_clock::time_point now) {
    p428; VR4111 UM 22.2.4 p466 / 22.2.5 p467, VR4121 UM 22.2.4 p518 / 22.2.5 p519; the two arcs
    are VR4111 UM Fig 22-3 p473 and VR4121 UM Fig 22-5 p525). */
 void Vr41xxKiu::AdvancePhaseLocked() {
-    const auto now = std::chrono::steady_clock::now();
-    if (sstat_ == kSStatScanning && !scan_in_flight_) {
-        ArmScanLocked(now);
-        return;
+    const uint64_t now = rtcx_.Now();
+    uint64_t at = now;
+    for (;;) {
+        if (sstat_ == kSStatScanning && !scan_in_flight_) ArmScanLocked(at);
+        if (sstat_ != kSStatScanning && sstat_ != kSStatInterval) return;
+        if (now < phase_end_) return;
+        at = phase_end_;
+        if (sstat_ == kSStatScanning) {
+            scan_in_flight_ = false;
+            CompleteScanLocked();
+            PublishCausesLocked();
+            if (sstat_ == kSStatInterval) phase_end_ = at + wintvl_;
+        } else {
+            ArmScanLocked(at);
+        }
     }
-    if (now < phase_end_) return;
-    if (sstat_ == kSStatScanning) {
-        scan_in_flight_ = false;
-        CompleteScanLocked();
-        PublishCausesLocked();
-        if (sstat_ == kSStatInterval)
-            phase_end_ = now + std::chrono::microseconds(
-                                   static_cast<uint32_t>(wintvl_) * kTimeUnitUs);
-        return;
-    }
-    if (sstat_ == kSStatInterval) ArmScanLocked(now);
 }
 
-void Vr41xxKiu::WorkerLoop() {
-    auto& freeze = emu_.Get<EmulationFreeze>();
-    std::unique_lock<std::mutex> lk(cv_mtx_);
-    while (!stop_.load(std::memory_order_acquire)) {
-        const uint64_t seq = wake_seq_.load(std::memory_order_acquire);
-        lk.unlock();
-        bool timed = false;
-        std::chrono::steady_clock::time_point until;
-        {
-            auto frozen = freeze.WorkerSection();
-            std::lock_guard<std::mutex> sl(mtx_);
-            AdvancePhaseLocked();
-            timed = sstat_ == kSStatScanning || sstat_ == kSStatInterval;
-            until = phase_end_;
-        }
-        lk.lock();
-        const auto woken = [this, seq] {
-            return stop_.load(std::memory_order_acquire) ||
-                   wake_seq_.load(std::memory_order_acquire) != seq;
-        };
-        if (timed) cv_.wait_until(lk, until, woken);
-        else       cv_.wait(lk, woken);
+void Vr41xxKiu::ArmEventLocked() {
+    if (sstat_ == kSStatScanning || (sstat_ == kSStatInterval && data_unread_)) {
+        rtcx_.ArmAt(event_, phase_end_);
+        return;
     }
+    if (sstat_ != kSStatInterval) {
+        clock_->Disarm(event_);
+        return;
+    }
+    const uint32_t lines = ScanLineCountLocked();
+    const bool start_halts = lines == 0u || GpenOnScanLinesLocked(lines);
+    rtcx_.ArmAt(event_, start_halts ? phase_end_ : phase_end_ + ScanPeriodTicksFor(lines));
+}
+
+void Vr41xxKiu::UpdateLocked() {
+    AdvancePhaseLocked();
+    ArmEventLocked();
 }

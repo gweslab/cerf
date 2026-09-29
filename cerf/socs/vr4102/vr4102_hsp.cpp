@@ -68,7 +68,12 @@ public:
         if (addr - kBase == kOffPctel) return;
         HaltUnsupportedAccess("HSP WriteByte", addr, value);
     }
-    uint8_t  ReadByte (uint32_t addr) override { HaltUnsupportedAccess("HSP ReadByte", addr, 0); }
+    /* HSPINIT D7:0 (UM 25.2.1 p484); nec_mobilepro_700_ce2 battdrv.dll BatteryDriverGetStatus
+       0x1560644 reads the low byte for D4 OPD. */
+    uint8_t ReadByte(uint32_t addr) override {
+        if (addr - kBase == kOffInit) return static_cast<uint8_t>(init_ & kInitMask);
+        HaltUnsupportedAccess("HSP ReadByte", addr, 0);
+    }
     uint32_t ReadWord (uint32_t addr) override { HaltUnsupportedAccess("HSP ReadWord", addr, 0); }
     void WriteWord(uint32_t addr, uint32_t v) override { HaltUnsupportedAccess("HSP WriteWord", addr, v); }
 

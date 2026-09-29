@@ -9,19 +9,16 @@
 #include "../../host/host_gdiplus.h"
 #include "../../host/host_widget.h"
 #include "../../host/host_widget_registry.h"
+#include "../../jit/guest_cycle_clock.h"
 #include "../../peripherals/peripheral_dispatcher.h"
-#include "../../state/emulation_freeze.h"
 #include "../../state/state_stream.h"
 #include "../guest_cpu_reset.h"
 #include "vr41xx_icu.h"
+#include "vr41xx_rtcx_ticks.h"
 
-#include <atomic>
-#include <chrono>
-#include <condition_variable>
 #include <cstdint>
 #include <mutex>
 #include <string>
-#include <thread>
 
 namespace cerf_vr41xx_led_detail {
 
@@ -46,6 +43,8 @@ constexpr uint16_t kHltcPowerOn = 0x0000u;
    0.0625 seconds. */
 constexpr uint32_t kHltcHz        = 32768u;
 constexpr uint32_t kHltcUnitShift = 11u;
+static_assert(kHltcHz == Vr41xxRtcxTicks::kHz);
+constexpr uint64_t kUnitsPerHostSecond = kHltcHz >> kHltcUnitShift;
 
 /* LEDCNTREG D1 LEDSTOP enables blink auto-stop and D0 LEDENABLE starts blinking; at auto-stop
    counter zero the unit clears both and sets LEDINT (VR4111 UM 24.3 p499). */
@@ -89,15 +88,26 @@ class Vr41xxLedBase : public Peripheral, public HostWidget {
 public:
     using Peripheral::Peripheral;
 
-    ~Vr41xxLedBase() override { StopWorker(); }
-    void OnShutdown() override { StopWorker(); }
-
     bool ShouldRegister() override {
         auto* bd = emu_.TryGet<BoardContext>();
         return bd && bd->GetSocId() == Soc;
     }
     void OnReady() override {
-        hltc_anchor_ = Clock::now();
+        clock_ = &emu_.Get<GuestCycleClock>();
+        event_ = clock_->Add([this] {
+            std::lock_guard<std::mutex> lk(state_mutex_);
+            UpdateLocked();
+        });
+        rtcx_.Attach([this] {
+            std::lock_guard<std::mutex> lk(state_mutex_);
+            UpdateLocked();
+        });
+        clock_->RegisterRateListener([this] {
+            std::lock_guard<std::mutex> lk(state_mutex_);
+            rtcx_.Rescale();
+            ArmAutoStopLocked();
+        });
+        hltc_anchor_tick_ = rtcx_.Now();
         emu_.Get<PeripheralDispatcher>().Register(this);
         emu_.Get<HostWidgetRegistry>().Register(this);
         /* LEDASTCREG and LEDINTREG carry identical RTCRST and Other-resets rows, while
@@ -116,9 +126,8 @@ public:
             }
             if (cnt_ & kCntEnable) ArmBlinkLocked();
             else                   astc_remaining_ = 0;
-            DriveIcuLocked();
+            UpdateLocked();
         });
-        worker_ = std::thread([this] { WorkerLoop(); });
     }
 
     uint32_t MmioBase() const override { return Base; }
@@ -143,36 +152,34 @@ public:
         }
     }
     void WriteHalf(uint32_t addr, uint16_t value) override {
-        {
-            std::lock_guard<std::mutex> lk(state_mutex_);
-            switch (addr - Base) {
-                case kOffHts:
-                    hts_ = static_cast<uint16_t>(value & kHtsWritable);
-                    NoteTimeChangeLocked("LEDHTSREG", value);
-                    return;
-                case kOffLts:
-                    lts_ = static_cast<uint16_t>(value & kLtsWritable);
-                    NoteTimeChangeLocked("LEDLTSREG", value);
-                    return;
-                case kOffHltcl:
-                    ReanchorHltcLocked((HltcNowLocked() & 0xFFFF0000u) | value);
-                    return;
-                case kOffHltch:
-                    ReanchorHltcLocked((HltcNowLocked() & 0x0000FFFFu) |
-                                       (static_cast<uint32_t>(value) << 16));
-                    return;
-                case kOffCnt:
-                    WriteCntLocked(static_cast<uint16_t>(value & kCntMask));
-                    break;
-                case kOffAstc: WriteAstcLocked(value); return;
-                case kOffInt:
-                    int_ = static_cast<uint16_t>(int_ & ~(value & kIntLedint));
-                    DriveIcuLocked();
-                    return;
-                default: HaltUnsupportedAccess("LED WriteHalf", addr, value);
-            }
+        std::lock_guard<std::mutex> lk(state_mutex_);
+        EvaluateLocked();
+        switch (addr - Base) {
+            case kOffHts:
+                hts_ = static_cast<uint16_t>(value & kHtsWritable);
+                NoteTimeChangeLocked("LEDHTSREG", value);
+                break;
+            case kOffLts:
+                lts_ = static_cast<uint16_t>(value & kLtsWritable);
+                NoteTimeChangeLocked("LEDLTSREG", value);
+                break;
+            case kOffHltcl:
+                ReanchorHltcLocked((HltcNowLocked() & 0xFFFF0000u) | value);
+                break;
+            case kOffHltch:
+                ReanchorHltcLocked((HltcNowLocked() & 0x0000FFFFu) |
+                                   (static_cast<uint32_t>(value) << 16));
+                break;
+            case kOffCnt:
+                WriteCntLocked(static_cast<uint16_t>(value & kCntMask));
+                break;
+            case kOffAstc: WriteAstcLocked(value); break;
+            case kOffInt:
+                int_ = static_cast<uint16_t>(int_ & ~(value & kIntLedint));
+                break;
+            default: HaltUnsupportedAccess("LED WriteHalf", addr, value);
         }
-        NotifyWorker();
+        UpdateLocked();
     }
     void WriteByte(uint32_t addr, uint8_t value) override {
         HaltUnsupportedAccess("LED WriteByte", addr, value);
@@ -195,22 +202,21 @@ public:
         std::lock_guard<std::mutex> lk(state_mutex_);
         w.Write("cnt", cnt_); w.Write("hts", hts_); w.Write("lts", lts_); w.Write("astc", astc_); w.Write("int", int_);
         w.Write("hltc", HltcNowLocked());
-        w.Write("astc_remaining", astc_remaining_);
+        w.Write("astc_remaining",
+                (cnt_ & kCntEnable) ? RemainingAtLocked(PairIndexLocked()) : astc_remaining_);
     }
     void RestoreState(StateReader& r) override {
         std::lock_guard<std::mutex> lk(state_mutex_);
         r.Read("cnt", cnt_); r.Read("hts", hts_); r.Read("lts", lts_); r.Read("astc", astc_); r.Read("int", int_);
         uint32_t hltc = 0;
         r.Read("hltc", hltc); r.Read("astc_remaining", astc_remaining_);
+        rtcx_.Rebase();
         ReanchorHltcLocked(hltc);
         last_pair_index_ = (cnt_ & kCntEnable) ? PairIndexLocked() : 0;
     }
     void PostRestore() override {
-        {
-            std::lock_guard<std::mutex> lk(state_mutex_);
-            DriveIcuLocked();
-        }
-        NotifyWorker();
+        std::lock_guard<std::mutex> lk(state_mutex_);
+        UpdateLocked();
     }
 
     std::wstring WidgetName() const override { return L"Notification LED"; }
@@ -236,12 +242,11 @@ public:
             draw_blink_ ? kClrRimBlink : kClrRim);
     }
     bool PollDirty() override {
-        bool blink = false, lit = false;
-        {
-            std::lock_guard<std::mutex> lk(state_mutex_);
-            blink = (cnt_ & kCntEnable) != 0u;
-            if (blink) lit = (HltcUnitsLocked() % (hts_ + lts_)) < hts_;
-        }
+        uint16_t cnt, hts, lts;
+        { std::lock_guard<std::mutex> lk(state_mutex_); cnt = cnt_; hts = hts_; lts = lts_; }
+        const bool blink = (cnt & kCntEnable) != 0u;
+        const bool lit   = blink && (GetTickCount64() * kUnitsPerHostSecond / 1000u) %
+                                        (static_cast<uint64_t>(hts) + lts) < hts;
         if (lit == draw_lit_ && blink == draw_blink_) return false;
         draw_lit_   = lit;
         draw_blink_ = blink;
@@ -249,27 +254,39 @@ public:
     }
 
 private:
-    using Clock = std::chrono::steady_clock;
-
-    uint64_t ElapsedHltcTicksLocked() const {
-        const auto d = Clock::now() - hltc_anchor_;
-        return static_cast<uint64_t>(std::chrono::duration_cast<
-            std::chrono::duration<int64_t, std::ratio<1, kHltcHz>>>(d).count());
+    uint64_t HltcTicksLocked() {
+        return hltc_base_ + (rtcx_.Now() - hltc_anchor_tick_);
     }
-    uint32_t HltcNowLocked() const {
-        return static_cast<uint32_t>(hltc_base_ + ElapsedHltcTicksLocked());
+    uint32_t HltcNowLocked() {
+        return static_cast<uint32_t>(HltcTicksLocked());
     }
-    uint64_t HltcUnitsLocked() const {
-        return (hltc_base_ + ElapsedHltcTicksLocked()) >> kHltcUnitShift;
+    uint64_t HltcUnitsLocked() {
+        return HltcTicksLocked() >> kHltcUnitShift;
     }
     void ReanchorHltcLocked(uint32_t value) {
-        hltc_base_   = value;
-        hltc_anchor_ = Clock::now();
+        hltc_base_        = value;
+        hltc_anchor_tick_ = rtcx_.Now();
         if (cnt_ & kCntEnable) last_pair_index_ = PairIndexLocked();
     }
 
-    uint64_t PairIndexLocked() const {
+    uint64_t PairIndexLocked() {
         return HltcUnitsLocked() / (hts_ + lts_);
+    }
+
+    void ArmAutoStopLocked() {
+        if (!(cnt_ & kCntEnable) || !(cnt_ & kCntStop)) {
+            clock_->Disarm(event_);
+            return;
+        }
+        const uint64_t period = static_cast<uint64_t>(hts_) + lts_;
+        const uint64_t stop   = (last_pair_index_ + astc_remaining_) * period;
+        rtcx_.ArmAt(event_, hltc_anchor_tick_ + ((stop << kHltcUnitShift) - hltc_base_));
+    }
+
+    void UpdateLocked() {
+        EvaluateLocked();
+        DriveIcuLocked();
+        ArmAutoStopLocked();
     }
     void ArmBlinkLocked() {
         last_pair_index_ = PairIndexLocked();
@@ -323,46 +340,23 @@ private:
        '1' by this counter. The counter counts down from the set value and an LEDINT interrupt
        occurs when it reaches zero" (VR4111 UM 24.2.4 p497); at zero the flow clears LEDENABLE
        and LEDSTOP and sets LEDINT (24.3 p499 / VR4131 UM 19.3 p364). */
+    uint16_t RemainingAtLocked(uint64_t idx) const {
+        if (!(cnt_ & kCntEnable) || !(cnt_ & kCntStop) || idx <= last_pair_index_)
+            return astc_remaining_;
+        const uint64_t advance = idx - last_pair_index_;
+        return advance >= astc_remaining_ ? 0 : static_cast<uint16_t>(astc_remaining_ - advance);
+    }
     void EvaluateLocked() {
         if (!(cnt_ & kCntEnable)) return;
         const uint64_t idx = PairIndexLocked();
-        if (idx != last_pair_index_) {
-            const uint64_t advance = idx > last_pair_index_ ? idx - last_pair_index_ : 0;
-            last_pair_index_ = idx;
-            if ((cnt_ & kCntStop) && advance)
-                astc_remaining_ = advance >= astc_remaining_
-                                      ? 0
-                                      : static_cast<uint16_t>(astc_remaining_ - advance);
-        }
+        astc_remaining_  = RemainingAtLocked(idx);
+        last_pair_index_ = idx;
         if (!(cnt_ & kCntStop) || astc_remaining_) return;
         cnt_ = static_cast<uint16_t>(cnt_ & ~(kCntStop | kCntEnable));
         int_ = static_cast<uint16_t>(int_ | kIntLedint);
     }
     void DriveIcuLocked() {
         emu_.Get<Vr41xxIcu>().SetSysint2Source(kIcuLedintBit, (int_ & kIntLedint) != 0);
-    }
-
-    void NotifyWorker() { std::lock_guard<std::mutex> g(cv_mtx_); cv_.notify_all(); }
-    void StopWorker() {
-        stop_.store(true, std::memory_order_release);
-        NotifyWorker();
-        if (worker_.joinable()) worker_.join();
-    }
-    void WorkerLoop() {
-        auto& freeze = emu_.Get<EmulationFreeze>();
-        std::unique_lock<std::mutex> lk(cv_mtx_);
-        while (!stop_.load(std::memory_order_acquire)) {
-            lk.unlock();
-            {
-                auto frozen = freeze.WorkerSection();
-                std::lock_guard<std::mutex> sl(state_mutex_);
-                EvaluateLocked();
-                DriveIcuLocked();
-            }
-            lk.lock();
-            if (stop_.load(std::memory_order_acquire)) break;
-            cv_.wait_for(lk, std::chrono::milliseconds(10));
-        }
     }
 
     mutable std::mutex state_mutex_;
@@ -373,16 +367,15 @@ private:
     uint16_t astc_  = kAstcPowerOn;
     uint16_t int_   = 0;
 
-    uint32_t          hltc_base_   = 0;
-    Clock::time_point hltc_anchor_ = {};
+    uint32_t hltc_base_ = 0;
 
     uint64_t last_pair_index_ = 0;
     uint16_t astc_remaining_  = 0;
 
-    std::mutex              cv_mtx_;
-    std::condition_variable cv_;
-    std::thread             worker_;
-    std::atomic<bool>       stop_{false};
+    GuestCycleClock*        clock_            = nullptr;
+    GuestCycleClock::Event* event_            = nullptr;
+    Vr41xxRtcxTicks         rtcx_{emu_, Vr41xxRtcxDomain::Peripheral};
+    uint64_t                hltc_anchor_tick_ = 0;
 
     bool draw_lit_   = false;
     bool draw_blink_ = false;

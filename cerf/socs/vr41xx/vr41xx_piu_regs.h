@@ -77,5 +77,7 @@ struct Vr41xxPiuModel {
     uint16_t sivl_power_on;             /* PIUSIVLREG reset row                        */
     bool     has_penstp;                /* PIUCNTREG D14 PENSTP exists                 */
     bool     penstc_latched_by_penchg;  /* PIUCNTREG D13 PENSTC holds while PENCHGINTR */
+    bool     pen_detect_in_suspend;
 };
+
 }  /* namespace cerf_vr41xx_piu_detail */

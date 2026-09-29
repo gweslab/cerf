@@ -19,6 +19,7 @@ protected:
     uint32_t TxAvailIntBit() const override { return 1u << 26; }
     uint32_t DmaFullIntBit() const override { return 1u << 23; }
     uint32_t DmaHalfIntBit() const override { return 1u << 22; }
+    uint32_t ClockEnableBit() const override { return 1u << 1; }
 };
 
 }  /* namespace */

@@ -11,12 +11,15 @@
 #include "../../host/guest_deep_sleep.h"
 #include "../../host/guest_power_notifier.h"
 #include "../../socs/guest_cpu_reset.h"
+#include "../guest_cycle_clock.h"
+#include "../host_request_channel.h"
 #include "mips_block_compiler.h"
 #include "mips_cp0_ops.h"
 #include "mips_cpu.h"
 #include "mips_exception_delivery.h"
 #include "mips_exception_model.h"
 #include "mips_interrupt_channel.h"
+#include "mips_memory_access.h"
 #include "mips_mmu.h"
 #include "mips_translation_cache.h"
 
@@ -48,9 +51,12 @@ void MipsJit::OnReady() {
     cache_      = &emu_.Get<MipsTranslationCache>();
     compiler_   = &emu_.Get<MipsBlockCompiler>();
     channel_    = &emu_.Get<MipsInterruptChannel>();
+    mem_access_ = &emu_.Get<MipsMemoryAccess>();
     cp0_ops_    = &emu_.Get<MipsCp0Ops>();
     exceptions_ = &emu_.Get<MipsExceptionDelivery>();
     exc_model_  = &emu_.Get<MipsExceptionModel>();
+    clock_      = &emu_.Get<GuestCycleClock>();
+    host_requests_ = &emu_.Get<HostRequestChannel>();
 
     LOG(Jit, "MipsJit::OnReady: entry VA=0x%08X\n", cpu_state_->pc);
 }
@@ -92,13 +98,23 @@ void MipsJit::PrintFatalDump() {
             i + 3, static_cast<unsigned long long>(g[i + 3]));
 }
 
+bool MipsJit::ResetPending() const { return channel_->ResetRequested(); }
+
+void MipsJit::SetHostChainExit(bool requested) { channel_->SetHostExit(requested); }
+
 void MipsJit::Run() {
-    if (cpu_state_->reset_pending) {
-        DeliverReset();
-        return;
+    if (cpu_state_->idle_wait != MipsIdle::kNone && !channel_->ResumeIdle()) return;
+
+    if (channel_->DispatchRequests() != 0u) {
+        const uint32_t req = channel_->TakeDispatchRequests();
+        if (req & MipsInterruptChannel::kDispatchHostClock) host_requests_->ServiceRequests();
+        if (req & MipsInterruptChannel::kDispatchReset) {
+            DeliverReset();
+            return;
+        }
     }
 
-    cp0_ops_->TimerPoll();
+    mem_access_->DeliverDueClockEvents();
 
     const uint32_t device_mask = channel_->DeviceIpMask();
     cpu_state_->cp0_cause = (cpu_state_->cp0_cause & ~device_mask) |
@@ -129,6 +145,7 @@ void MipsJit::Run() {
 void MipsJit::DeliverReset() {
     emu_.Get<GuestCpuReset>().OnResetDelivered();
     cpu_->ResetState();
+    cp0_ops_->OnCpuReset();
     cache_->ContextSwitchFlush();
 }
 
@@ -138,8 +155,7 @@ void MipsJit::SetExternalInterruptLevel(uint32_t ip_mask) {
 
 void MipsJit::SetResetPending(bool is_resume) {
     emu_.Get<GuestCpuReset>().SetPendingResume(is_resume);
-    cpu_state_->reset_pending = 1;
-    channel_->SignalIdleWake();
+    channel_->RequestDispatch(MipsInterruptChannel::kDispatchReset);
     if (is_resume) return;
     emu_.Get<GuestDeepSleep>().ClearWakeCause();
     emu_.Get<GuestPowerNotifier>().NotifyReboot();
@@ -152,13 +168,21 @@ void MipsJit::ExitDeepSleep() {
     channel_->SignalIdleWake();
 }
 
-void MipsJit::EnterIdleWait() {
-    emu_.Get<Fatal>().Die("MipsJit: a peripheral entered the idle wait, which "
-                          "CERF does not model on this engine");
-}
+void MipsJit::EnterIdleWait() { channel_->StopCpuAfterAccess(); }
 
-void MipsJit::SaveCpuState(StateWriter& w)    { cpu_->SaveState(w); }
-void MipsJit::RestoreCpuState(StateReader& r) { cpu_->RestoreState(r); }
+void MipsJit::SaveCpuState(StateWriter& w) {
+    cpu_state_->reset_pending = channel_->ResetRequested() ? 1u : 0u;
+    cp0_ops_->SaveCount();
+    cpu_->SaveState(w);
+}
+void MipsJit::RestoreCpuState(StateReader& r) {
+    cpu_->RestoreState(r);
+    channel_->SetResetRequest(cpu_state_->reset_pending != 0u);
+    clock_->OnCyclesRestored();
+    channel_->OnCpuStateRestored();
+    cp0_ops_->OnCpuStateRestored();
+    cpu_->NotifyRestored();
+}
 void MipsJit::SaveMmuState(StateWriter& w)    { mmu_->SaveState(w); }
 void MipsJit::RestoreMmuState(StateReader& r) { mmu_->RestoreState(r); }
 

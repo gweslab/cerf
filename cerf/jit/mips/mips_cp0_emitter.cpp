@@ -29,6 +29,12 @@ void __fastcall Dmtc0Width64Fatal(uint32_t rd) {
 
 bool MipsCp0Emitter::RegWritable(uint32_t rd) const { return Cp0RegWritable(rd); }
 
+void* MipsCp0Emitter::Mfc0Helper(uint32_t) const { return nullptr; }
+
+void* MipsCp0Emitter::Mtc0HelperContext(uint32_t, MipsBlockContext* ctx) const {
+    return ctx->emit->Cp0Ops();
+}
+
 uint8_t* MipsCp0Emitter::EmitMfc0(uint8_t* cursor, MipsDecodedInsn* d,
                                   MipsBlockContext* ctx) {
     return EmitFromCop0(cursor, d, ctx);
@@ -65,11 +71,14 @@ uint8_t* MipsCp0Emitter::EmitFromCop0(uint8_t* cursor, MipsDecodedInsn* d,
         return cursor;
     }
     /* Random has no stored value; compute it on read (QEMU helper_mfc0_random). */
-    if (d->rd == MipsCp0::kRandom) {
+    void* helper = d->rd == MipsCp0::kRandom
+                       ? reinterpret_cast<void*>(&MipsCp0Ops::Mfc0RandomHelper)
+                       : Mfc0Helper(d->rd);
+    if (helper != nullptr) {
         EmitMovRegImm32(cursor, kEcx,
                         static_cast<uint32_t>(
                             reinterpret_cast<uintptr_t>(ctx->emit->Cp0Ops())));
-        EmitCall(cursor, reinterpret_cast<void*>(&MipsCp0Ops::Mfc0RandomHelper));
+        EmitCall(cursor, helper);
         mips_emit::EmitStoreGprSextEax(cursor, d->rt);
         return cursor;
     }
@@ -110,7 +119,7 @@ uint8_t* MipsCp0Emitter::EmitToCop0(uint8_t* cursor, MipsDecodedInsn* d,
         EmitMovRegBaseDisp32(cursor, kEcx, kStateReg, mips_emit::GprLoOff(d->rt));
         EmitMovRegImm32(cursor, kEdx,
                         static_cast<uint32_t>(
-                            reinterpret_cast<uintptr_t>(ctx->emit->Cp0Ops())));
+                            reinterpret_cast<uintptr_t>(Mtc0HelperContext(d->rd, ctx))));
         EmitCall(cursor, helper);
         return cursor;
     }

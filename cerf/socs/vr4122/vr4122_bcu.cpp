@@ -32,14 +32,6 @@ constexpr uint32_t kOffClkSpeed = 0x14u;   /* CLKSPEEDREG (R), VR4131 UM Table 7
 constexpr uint32_t kOffRevId = 0x10u;
 constexpr uint16_t kRevId    = 0x4000u;
 
-/* CLKSPEEDREG read-only CLKSEL strap; EM-500 straps CLKSEL=100 (150 MHz part). VR4122
-   datasheet U15585EJ1V0DS Table 1-1 CLKSEL=100 -> PClock 150.5/VTClock 30.1/TClock 15.1;
-   VR4131 UM 7.2.7 encoding -> VTDIVMODE(10:8)=101, TDIVMODE(12)=0, CLKSP(4:0)=12
-   (CLKX/12*98=150.5, NetBSD bcu_vrip.c:454 RID_4122). */
-constexpr uint16_t kStrapVtDivMode = 0x5u;
-constexpr uint16_t kStrapTDivMode  = 0x0u;
-constexpr uint16_t kStrapClkSp     = 0x0Cu;
-
 class Vr4122Bcu : public Peripheral {
 public:
     using Peripheral::Peripheral;
@@ -61,7 +53,7 @@ public:
         switch (addr - kBase) {
             case kOffCntReg1:  return cntreg1_;
             case kOffRevId:    return kRevId;
-            case kOffClkSpeed: return ClkSpeed();
+            case kOffClkSpeed: return emu_.Get<Vr4122ClockState>().ClkSpeedReg();
             default: HaltUnsupportedAccess("VR4122 BCU ReadHalf", addr, 0);
         }
     }
@@ -77,17 +69,6 @@ public:
     void RestoreState(StateReader& r) override { r.Read("cntreg1", cntreg1_); }
 
 private:
-    /* VR4131 UM 7.2.7 p142: CLKSPEEDREG VTDIVMODE(10:8)/TDIVMODE(12) take PMUTCLKDIVREG's
-       VTDIV/TDIV (12.2.6; VTDIV=000 keeps the CLKSEL strap); CLKSP(4:0) is always the strap. */
-    uint16_t ClkSpeed() {
-        const uint16_t div    = emu_.Get<Vr4122ClockState>().Active();
-        const uint16_t vtdiv  = static_cast<uint16_t>(div & 0x7u);
-        const bool     ovr    = vtdiv != 0;
-        const uint16_t vtmode = ovr ? vtdiv : kStrapVtDivMode;
-        const uint16_t tdmode = ovr ? static_cast<uint16_t>((div >> 8) & 1u) : kStrapTDivMode;
-        return static_cast<uint16_t>((tdmode << 12) | (vtmode << 8) | kStrapClkSp);
-    }
-
     uint16_t cntreg1_ = 0;
 };
 

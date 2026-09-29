@@ -11,6 +11,7 @@
 #include "../../peripherals/peripheral_dispatcher.h"
 #include "../../state/state_stream.h"
 #include "../guest_cpu_reset.h"
+#include "pr31x00_clock.h"
 #include "pr31x00_intc.h"
 #include "pr31x00_power_inputs.h"
 #include "pr31x00_rtc.h"
@@ -136,6 +137,7 @@ public:
         const uint32_t prev = Ctl();
         const uint32_t next = value & kWritable;
         ctl_.store(next & ~kStopCpu, std::memory_order_release);
+        emu_.Get<Pr31x00Clock>().SetPowerClockBits(next);
 
         /* TMPR3911 §12.2.8 p.12-10: "When the ENSTPTIMER control bit is not set the counter
            will be reset to zero. Once the ENSTPTIMER bit is set the counter will count up

@@ -13,7 +13,12 @@ void MipsCpu::OnReady() { ResetState(); }
 void MipsCpu::ResetState() {
     auto& cfg = emu_.Get<MipsProcessorConfig>();
 
+    const MipsCpuState prior = state_;
     state_ = MipsCpuState{};
+    state_.guest_cycle_counter  = prior.guest_cycle_counter;
+    state_.guest_cycle_deadline = prior.guest_cycle_deadline;
+    state_.guest_cycle_hi       = prior.guest_cycle_hi;
+    state_.guest_cycle_folded   = prior.guest_cycle_folded;
     state_.cp0_prid       = cfg.Prid();
     state_.nb_tlb         = cfg.TlbSize();
     state_.tlb_in_use     = state_.nb_tlb;
@@ -21,6 +26,7 @@ void MipsCpu::ResetState() {
     state_.phys_addr_mask = cfg.PhysAddrMask();
 
     state_.pc = emu_.Get<RomParserService>().EntryVa();
+    for (auto& fn : reset_listeners_) fn();
 }
 
 void __fastcall MipsCpu::HibernateHelper(uint32_t next_pc, MipsCpu* cpu) {
@@ -45,7 +51,7 @@ constexpr void MipsCpu::VisitState(MipsCpuState& s, F& field) {
     field("cp0_pagemask", s.cp0_pagemask);
     field("cp0_wired", s.cp0_wired);
     field("cp0_badvaddr", s.cp0_badvaddr);
-    field("cp0_count", s.cp0_count);
+    field("count", s.count_save);
     field("cp0_entryhi", s.cp0_entryhi);
     field("cp0_compare", s.cp0_compare);
     field("cp0_status", s.cp0_status);
@@ -82,13 +88,18 @@ constexpr void MipsCpu::VisitState(MipsCpuState& s, F& field) {
     field("reset_pending", s.reset_pending);
     field("deep_sleep", s.deep_sleep);
     field("guest_cycle_counter", s.guest_cycle_counter);
-    field("count_anchor", s.count_anchor);
-    field("timer_armed", s.timer_armed);
+    field.Skip(s.guest_cycle_deadline);
+    field("count_phase", s.count_save_phase);
+    field("guest_cycle_hi", s.guest_cycle_hi);
+    field("guest_cycle_folded", s.guest_cycle_folded);
+    field("count_phase_den", s.count_save_phase_den);
     field("min_page_shift", s.min_page_shift);
     field("phys_addr_mask", s.phys_addr_mask);
     field("isa_mode", s.isa_mode);
     field("btarget_isa", s.btarget_isa);
     field("branch_len", s.branch_len);
+    field("idle_wait", s.idle_wait);
+    field.Skip(s.idle_pad);
 }
 
 void MipsCpu::SaveState(StateWriter& w) {
@@ -102,4 +113,16 @@ void MipsCpu::SaveState(StateWriter& w) {
 void MipsCpu::RestoreState(StateReader& r) {
     StateReadField field(r);
     VisitState(state_, field);
+}
+
+void MipsCpu::RegisterRestoreListener(std::function<void()> fn) {
+    restore_listeners_.push_back(std::move(fn));
+}
+
+void MipsCpu::RegisterResetListener(std::function<void()> fn) {
+    reset_listeners_.push_back(std::move(fn));
+}
+
+void MipsCpu::NotifyRestored() {
+    for (auto& fn : restore_listeners_) fn();
 }

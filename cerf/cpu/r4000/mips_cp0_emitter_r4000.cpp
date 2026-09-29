@@ -42,6 +42,13 @@ protected:
         }
         return nullptr;
     }
+
+    void* Mfc0Helper(uint32_t rd) const override {
+        if (rd == MipsCp0::kCount) {
+            return reinterpret_cast<void*>(&MipsCp0Ops::Mfc0CountHelper);
+        }
+        return nullptr;
+    }
 };
 
 }  /* namespace */

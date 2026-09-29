@@ -29,24 +29,46 @@ GuestCycleClock::~GuestCycleClock() {
     if (timer_ != nullptr) CloseHandle(timer_);
 }
 
-void GuestCycleClock::SetUnits(uint64_t hz) {
-    if (hz == 0u) {
-        emu_.Get<Fatal>().Die("GuestCycleClock: a 0 Hz clock rate");
+GuestCycleClock::Rate GuestCycleClock::Normalized(Rate rate) const {
+    if (rate.num == 0u || rate.den == 0u || rate.den > UINT64_MAX / kNsPerSec) {
+        emu_.Get<Fatal>().Die("GuestCycleClock: the clock rate %llu/%llu Hz",
+                              static_cast<unsigned long long>(rate.num),
+                              static_cast<unsigned long long>(rate.den));
     }
-    cpu_hz_ = hz;
-    const uint64_t g = std::gcd(kNsPerSec, cpu_hz_);
-    ns_unit_  = kNsPerSec / g;
-    cyc_unit_ = cpu_hz_ / g;
+    const uint64_t g = std::gcd(rate.num, rate.den);
+    return Rate{rate.num / g, rate.den / g};
 }
 
-void GuestCycleClock::SetClockHz(uint64_t hz) {
-    if (hz == cpu_hz_) return;
+uint64_t GuestCycleClock::CpuHz() const {
+    if (rate_.den != 1u) {
+        emu_.Get<Fatal>().Die("GuestCycleClock: an integral Hz read of the rate %llu/%llu Hz",
+                              static_cast<unsigned long long>(rate_.num),
+                              static_cast<unsigned long long>(rate_.den));
+    }
+    return rate_.num;
+}
+
+void GuestCycleClock::SetUnits(Rate rate) {
+    rate_ = rate;
+    const uint64_t ns = kNsPerSec * rate_.den;
+    const uint64_t g  = std::gcd(ns, rate_.num);
+    ns_unit_  = ns / g;
+    cyc_unit_ = rate_.num / g;
+}
+
+void GuestCycleClock::SetClockRate(Rate rate) {
+    const Rate r = Normalized(rate);
+    if (r.num == rate_.num && r.den == rate_.den) return;
     const uint64_t now = CyclesNow();
     RunDue(now);
+    const int64_t slice_left_ns =
+        throttle_->armed_ ? CyclesToNs(throttle_->at_ - now) : kThrottleSliceNs;
     ref_wall_ns_ = TargetWallNs(now);
     ref_cycle_   = now;
-    SetUnits(hz);
-    Arm(throttle_, now + NsToCycles(kThrottleSliceNs));
+    guest_ns_      += CyclesToNs(now - guest_ns_cycle_);
+    guest_ns_cycle_ = now;
+    SetUnits(r);
+    Arm(throttle_, now + NsToCycles(slice_left_ns));
     for (auto& fn : rate_listeners_) fn();
 }
 
@@ -55,7 +77,7 @@ void GuestCycleClock::RegisterRateListener(std::function<void()> fn) {
 }
 
 void GuestCycleClock::OnReady() {
-    SetUnits(ClockHz());
+    SetUnits(Normalized(InitialRate()));
     wall_ = &emu_.Get<VirtualClock>();
     timer_ = CreateWaitableTimerExW(nullptr, nullptr,
                                     CREATE_WAITABLE_TIMER_HIGH_RESOLUTION,
@@ -223,13 +245,14 @@ void GuestCycleClock::IdleStep(void* wake_event) {
 
 #if CERF_DEV_MODE
 void GuestCycleClock::LogSecond() {
-    const uint64_t now  = CyclesNow();
-    const int64_t  wall = wall_->NowNs();
+    const uint64_t now      = CyclesNow();
+    const int64_t  wall     = wall_->NowNs();
+    const int64_t  guest_ns = NowNs();
     LOG(Jit, "[CYCLECLK] guest_s=%llu guest_ms=%lld wall_ms=%lld lag_ms=%lld | "
              "sleeps=%u sleep_ms=%lld wake_over_us=%lld stall_us=%lld "
              "forgiven_ms=%lld | idle_steps=%u early=%u idle_wait_ms=%lld\n",
         static_cast<unsigned long long>(stat_throttles_ / 1000u),
-        static_cast<long long>(CyclesToNs(now - stat_cycle_mark_) / 1000000),
+        static_cast<long long>((guest_ns - stat_guest_mark_ns_) / 1000000),
         static_cast<long long>((wall - stat_wall_mark_ns_) / 1000000),
         static_cast<long long>((wall - TargetWallNs(now)) / 1000000),
         stat_sleeps_, static_cast<long long>(stat_sleep_ns_ / 1000000),
@@ -241,18 +264,20 @@ void GuestCycleClock::LogSecond() {
     stat_sleeps_ = 0;  stat_sleep_ns_ = 0;  stat_forgiven_ns_ = 0;
     stat_wake_over_ns_ = 0;  stat_stall_ns_ = 0;
     stat_idle_steps_ = 0;  stat_idle_early_ = 0;  stat_idle_wait_ns_ = 0;
-    stat_wall_mark_ns_ = wall;
-    stat_cycle_mark_   = now;
+    stat_guest_mark_ns_ = guest_ns;
+    stat_wall_mark_ns_  = wall;
     stat_lag_published_ns_.store(wall - TargetWallNs(now), std::memory_order_relaxed);
 }
 #endif
 
 void GuestCycleClock::OnCyclesRestored() {
-    ref_cycle_   = CyclesNow();
-    ref_wall_ns_ = wall_->NowNs();
+    ref_cycle_      = CyclesNow();
+    ref_wall_ns_    = wall_->NowNs();
+    guest_ns_cycle_ = ref_cycle_;
+    guest_ns_       = CyclesToNs(ref_cycle_);
 #if CERF_DEV_MODE
-    stat_cycle_mark_   = ref_cycle_;
-    stat_wall_mark_ns_ = ref_wall_ns_;
+    stat_guest_mark_ns_ = guest_ns_;
+    stat_wall_mark_ns_  = ref_wall_ns_;
 #endif
     Arm(throttle_, ref_cycle_ + NsToCycles(kThrottleSliceNs));
 }

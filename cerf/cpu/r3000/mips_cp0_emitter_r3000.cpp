@@ -10,6 +10,7 @@
 #include "../../jit/mips/mips_cp0_ops.h"
 #include "../../jit/mips/mips_cpu_state.h"
 #include "../../jit/mips/mips_translation_cache.h"
+#include "tx39_config_register.h"
 
 namespace {
 
@@ -77,7 +78,15 @@ protected:
         if (rd == Tx39Cp0::kEntryHi) {
             return reinterpret_cast<void*>(&Mtc0EntryHiR3000);
         }
+        if (rd == Tx39Cp0::kConfig) {
+            return reinterpret_cast<void*>(&Tx39ConfigRegister::Mtc0Helper);
+        }
         return nullptr;
+    }
+
+    void* Mtc0HelperContext(uint32_t rd, MipsBlockContext* ctx) const override {
+        if (rd == Tx39Cp0::kConfig) return &emu_.Get<Tx39ConfigRegister>();
+        return MipsCp0Emitter::Mtc0HelperContext(rd, ctx);
     }
 };
 

@@ -12,6 +12,7 @@
 #include <optional>
 #include <string>
 
+class Pr31x00Clock;
 class SerialCradle;
 
 class Pr31x00Uart : public Peripheral, public SerialLine {
@@ -65,10 +66,14 @@ protected:
     virtual uint32_t DmaFullIntBit() const = 0;
     virtual uint32_t DmaHalfIntBit() const = 0;
 
+    /* ENUARTACLK<1> / ENUARTBCLK<0> in Clock Control (TMPR3911 §6.3.1 p6-6). */
+    virtual uint32_t ClockEnableBit() const = 0;
+
 private:
     void       WriteCtl1(uint32_t addr, uint32_t value);
     void       WriteTxHold(uint32_t addr, uint32_t value);
     LineConfig ComputeLineConfigLocked() const;
+    Pr31x00UartRxDma::LineTiming LineTimingLocked() const;
     void       OnRxLineIdle();
     void       RaiseRxInts(const Pr31x00UartRxDma::RxInts& ints);
     void       OnMfioOut(uint32_t mfio_dout, uint32_t out_mask);
@@ -92,6 +97,10 @@ private:
     std::unique_ptr<Pr31x00UartRxDma> rx_dma_;
 
     uint32_t ctl2_baud_ = 0;
+    uint32_t   fired_baud_ = 0;
+    LineConfig line_cfg_;
+
+    Pr31x00Clock* module_clock_ = nullptr;
 
     RxDrainFn    rx_drain_cb_;
     LineConfigFn line_cfg_cb_;

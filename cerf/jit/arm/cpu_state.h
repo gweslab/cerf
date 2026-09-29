@@ -3,6 +3,8 @@
 #include <cstddef>
 #include <cstdint>
 
+#include "../cycle_deadline.h"
+
 /* ARM ARM DDI 0406C.c Table B1-1, p. B1-1139: CPSR.M[4:0] mode encodings. */
 namespace ArmMode {
 constexpr uint32_t kUser       = 0x10;
@@ -162,8 +164,7 @@ inline void ArmItStoreToCpsr(ArmCpuState& state, uint32_t it) {
 }
 
 inline bool ArmCycleDeadlineReached(const ArmCpuState& state) {
-    return static_cast<int32_t>(state.guest_cycle_counter -
-                                state.guest_cycle_deadline) >= 0;
+    return CycleDeadlineReached(state.guest_cycle_counter, state.guest_cycle_deadline);
 }
 
 constexpr int32_t ArmNfDisp() {

@@ -9,3 +9,7 @@ $ce2def = "$PSScriptRoot/../cerf_guest/coredll_ce2.def"
 & $build -Type exe -Target cerfstress.exe -Arch arm_thumb -ObjDir obj_thumb `
     -Sources main.cpp -Entry WinMain -Libs coredll `
     -CoreDllDef $ce2def -WceVersion "211" -SubsystemVersion "2.11"
+
+& $build -Type exe -Target cerfstress.exe -Arch mips -MipsIsa mips1 -ObjDir obj_mips1 `
+    -Sources main.cpp -Entry WinMain -Libs coredll `
+    -CoreDllDef $ce2def -WceVersion "100" -SubsystemVersion "2.00"

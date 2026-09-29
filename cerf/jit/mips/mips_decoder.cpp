@@ -119,8 +119,9 @@ bool MipsDecoder::Decode(uint32_t word, uint32_t pc, MipsDecodedInsn* d) {
         case MipsOp::kCOP0:
             if (d->rs >= MipsCop0Rs::kCO &&
                 ((d->funct == MipsCop0Funct::kERET && has_eret_) ||
-                 (d->funct == MipsCop0Funct::kHIBERNATE && has_vr41xx_power_modes_))) {
-                d->ends_block = 1;   /* neither has a delay slot */
+                 ((d->funct == MipsCop0Funct::kHIBERNATE || d->funct == MipsCop0Funct::kSTANDBY ||
+                   d->funct == MipsCop0Funct::kSUSPEND) && has_vr41xx_power_modes_))) {
+                d->ends_block = 1;
             }
             return RecognizedCop0(d, has_vr41xx_power_modes_, has_64bit_, has_eret_, has_rfe_);
 

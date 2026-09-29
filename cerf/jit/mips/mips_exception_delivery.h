@@ -32,6 +32,7 @@ public:
     void DeliverFetchAddressError(uint32_t va);
     void RaiseAddressError(uint32_t va, MipsAccess acc);
     void RaiseOverflowException();
+    [[noreturn]] void LeaveBlock();
 
     /* QEMU target/mips internal.h enabled/pending gates. */
     bool InterruptReady() const;

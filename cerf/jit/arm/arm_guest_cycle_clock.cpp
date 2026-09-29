@@ -56,7 +56,7 @@ public:
     }
 
 protected:
-    uint32_t ClockHz() override { return hz_; }
+    Rate InitialRate() override { return Rate{hz_, 1u}; }
 
     uint64_t CyclesNow() override {
         const uint32_t c = state_->guest_cycle_counter;

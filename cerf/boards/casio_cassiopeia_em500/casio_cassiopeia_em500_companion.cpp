@@ -27,6 +27,9 @@ constexpr uint32_t kOffSysCtrlHi = 0x004Cu;
    0x089C bit7 and returns SYSINTR 0x14 @0x9F037248. */
 constexpr uint32_t kOffIntStatus0004 = 0x0004u;
 constexpr uint16_t kIntStatusAudio   = 0x100u;
+/* casio_cassiopeia_em500_ppc2000 nk_main_kernel.exe @0x9F036180 andi 0x200 -> loc_9F03623C
+   -> loc_9F036554, the 0x0304 cause demux @0x9F036608. */
+constexpr uint16_t kIntStatusTouch   = 0x200u;
 
 /* nk_main_kernel.exe sub_9F08EE0C case 20 writes 12 to 0xAA000030; loc_9F03703C
    @0x9F0370B8 lw 0xAA000030 / and 0xFFFFFFF7 / @0x9F0370C4 sw clears bit3 while
@@ -147,11 +150,6 @@ constexpr uint32_t kOffIntCfg8404 = 0x8404u;
    0xA0002520). */
 constexpr uint32_t kOffCause8800 = 0x8800u;
 
-/* nk_main_kernel.exe sub_9F08F334 case17 @0x9F08F388 / case24 @0x9F08F3A4
-   (RMW enable config: (x & mask) | enable), @0x9F033A84 (sw 0); consumed
-   @0x9F036608 (lw 0x304; raw & (raw>>8) = pending[7:0] & enable[15:8]). */
-constexpr uint32_t kOffIntCause0304 = 0x0304u;
-
 constexpr uint32_t kOffSibRegsLo = 0x0900u;
 constexpr uint32_t kOffSibRegsHi = 0x0910u;
 
@@ -170,16 +168,15 @@ bool CasioCassiopeiaEm500Companion::ShouldRegister() {
 }
 
 void CasioCassiopeiaEm500Companion::OnReady() {
-    audio_.Init(emu_, [this] { UpdateAudioIrqLine(); });
+    audio_.Init(emu_, [this] { UpdateIrqLine(); });
     display_.Init(emu_);
     modem_.Init();
-    touch_.Init(emu_);
+    touch_.Init(emu_, [this] { UpdateIrqLine(); });
     emu_.Get<PeripheralDispatcher>().Register(this);
 }
 
 void CasioCassiopeiaEm500Companion::OnShutdown() {
     audio_.OnShutdown();
-    touch_.OnShutdown();
 }
 
 uint8_t CasioCassiopeiaEm500Companion::ReadByte(uint32_t addr) {
@@ -193,7 +190,8 @@ uint16_t CasioCassiopeiaEm500Companion::ReadHalf(uint32_t addr) {
     const uint32_t off = addr - kBase;
     if (uint16_t v; display_.TryReadHalf(off, v)) return v;
     if (off == kOffIntStatus0004)
-        return audio_.IrqPending() ? kIntStatusAudio : 0u;
+        return static_cast<uint16_t>((audio_.IrqPending() ? kIntStatusAudio : 0u) |
+                                     (touch_.IrqPending() ? kIntStatusTouch : 0u));
     if (off == kOffWakeStatus1 || off == kOffWakeStatus2) return 0u;
     /* mailbox cmd 0x8900 bit9 (0x200) = busy; cdm.dll sub_EE15EC @0xEE1624
        busy-waits `while (*0x8900 & 0x200)`. Not-busy: command completes instantly
@@ -257,9 +255,6 @@ uint32_t CasioCassiopeiaEm500Companion::ReadWord(uint32_t addr) {
     if (off == kOffCause8800) return 0u;
     /* touch.dll loc_F91958 @0xF91A82 (0x304 & 0x18 acquire cause), @0xF91A38
        (0x304 & 1 pen-event cause -> ACK path @0xF91A3C resets median index). */
-    if (off == kOffIntCause0304)
-        return reg_0304_ | (touch_.SamplePending() ? 0x18u : 0u)
-                         | (touch_.ReleaseAckPending() ? 0x1u : 0u);
     if (off == kOffPanelState904) return sib_regs_[1];
     /* ddi.dll sub_FC838C @0xFC8394 RMW read-back (companion 0x0900). */
     if (off == kOffSibRegsLo) return sib_regs_[0];
@@ -341,10 +336,6 @@ void CasioCassiopeiaEm500Companion::WriteReg(uint32_t off, uint32_t value) {
         case kOffCtrlA0D4: ctrl_a0d4_ = value; return;
         case kOffCause8800: return;
         /* touch.dll loc_F91958 @0xF91B48/@0xF91BFE (0x304 |= 0x18 ack). */
-        case kOffIntCause0304:
-            reg_0304_ = value & ~0x19u;
-            if (value & 0x18u) touch_.AckSample();
-            return;
         case 0x0900u: case 0x0904u: case 0x0908u: case 0x090Cu: case 0x0910u:
             sib_regs_[(off - kOffSibRegsLo) / 4u] = value;
             return;
@@ -371,14 +362,15 @@ void CasioCassiopeiaEm500Companion::WriteSysCtrl(uint32_t off, uint32_t value,
     std::atomic<uint32_t>& w = sys_ctrl_[(off - kOffSysCtrlLo) / 4u];
     const uint32_t prev = w.load(std::memory_order_acquire);
     w.store((prev & keep_mask) | (value & ~keep_mask), std::memory_order_release);
-    if (off == kOffIntMask0030) UpdateAudioIrqLine();
+    if (off == kOffIntMask0030) UpdateIrqLine();
 }
 
-void CasioCassiopeiaEm500Companion::UpdateAudioIrqLine() {
+void CasioCassiopeiaEm500Companion::UpdateIrqLine() {
+    std::lock_guard<std::mutex> lk(irq_mtx_);
     const uint32_t mask =
         sys_ctrl_[(kOffIntMask0030 - kOffSysCtrlLo) / 4u].load(std::memory_order_acquire);
-    emu_.Get<Vr41xxGiu>().SetPinLevel(
-        kCompanionGiuPin, audio_.IrqPending() && (mask & kIntMaskAudio) != 0u);
+    const bool audio = audio_.IrqPending() && (mask & kIntMaskAudio) != 0u;
+    emu_.Get<Vr41xxGiu>().SetPinLevel(kCompanionGiuPin, audio || touch_.IrqPending());
 }
 
 void CasioCassiopeiaEm500Companion::WriteCodecCommand(uint32_t value) {
@@ -428,7 +420,6 @@ void CasioCassiopeiaEm500Companion::SaveState(StateWriter& w) {
     w.Write("latch130C", latch130C_);
     w.Write("strap8000", strap8000_);
     w.Write("adc_ctrl_89C", adc_ctrl_89C_);
-    w.Write("reg_0304", reg_0304_);
     eeprom_.SaveState(w);
     audio_.SaveState(w);
     display_.SaveState(w);
@@ -464,7 +455,6 @@ void CasioCassiopeiaEm500Companion::RestoreState(StateReader& r) {
     r.Read("latch130C", latch130C_);
     r.Read("strap8000", strap8000_);
     r.Read("adc_ctrl_89C", adc_ctrl_89C_);
-    r.Read("reg_0304", reg_0304_);
     eeprom_.RestoreState(r);
     audio_.RestoreState(r);
     display_.RestoreState(r);
@@ -474,7 +464,7 @@ void CasioCassiopeiaEm500Companion::RestoreState(StateReader& r) {
 
 void CasioCassiopeiaEm500Companion::PostRestore() {
     audio_.PostRestore();
-    UpdateAudioIrqLine();
     modem_.PostRestore();
     touch_.PostRestore();
+    UpdateIrqLine();
 }

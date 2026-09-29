@@ -21,6 +21,9 @@ constexpr Vr41xxPiuModel kModel = {
     /*has_penstp=*/true,
     /* PIUCNTREG D13 PENSTC, R: "Current touch panel contact state" (UM 19.3.1). */
     /*penstc_latched_by_penchg=*/false,
+    /* "During the WaitPenTouch state, it is possible to change to Suspend mode because the panel
+       state can be detected even when TClock has been stopped" (UM p385). */
+    true,
 };
 
 class Vr4102Piu : public Vr41xxPiuBase<SocId::Vr4102, kModel> {

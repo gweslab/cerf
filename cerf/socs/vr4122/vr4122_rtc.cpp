@@ -35,9 +35,6 @@ public:
         if (off >= 0x20u) { WriteHalf2(off - 0x20u, value); return; }
         Vr41xxRtc::WriteHalf(addr, value);
     }
-
-    /* VR4131 UM 13.1: TClock counter counts on VTClock cycles. */
-    uint32_t TClockHz() const override { return 0u; }
 };
 
 }  /* namespace */

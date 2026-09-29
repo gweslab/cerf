@@ -3,6 +3,7 @@
 #include "../../core/service.h"
 
 #include <cstdint>
+#include <functional>
 
 class Sed1356Config : public Service {
 public:
@@ -27,4 +28,7 @@ public:
        software clears it. The S1D13806 has no such gate - its driver reads
        REG[004h] before clearing REG[001h]. */
     virtual bool RegMemSelectLockedAtReset() const = 0;
+
+    virtual uint64_t BusClockHz() const = 0;
+    virtual void     RegisterBusClockListener(std::function<void()> fn) = 0;
 };

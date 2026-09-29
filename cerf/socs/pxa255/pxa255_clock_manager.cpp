@@ -81,6 +81,10 @@ void Pxa255ClockManager::RegisterOscillatorListener(std::function<void()> fn) {
     osc_listeners_.push_back(std::move(fn));
 }
 
+void Pxa255ClockManager::RegisterMemoryClockListener(std::function<void()> fn) {
+    memory_clock_listeners_.push_back(std::move(fn));
+}
+
 void Pxa255ClockManager::SetOscillatorStable() {
     const bool was_ok = ook_;
     oon_ = true;
@@ -100,10 +104,14 @@ bool Pxa255ClockManager::Supported(uint32_t cccr, bool turbo) const {
     return false;
 }
 
+uint64_t Pxa255ClockManager::MemoryHz(uint32_t cccr) const {
+    return kCrystalHz * LMultiplier(LCode(cccr));
+}
+
 /* §3.6.1: "Run mode frequency = Memory frequency * ... (M)", "Turbo mode
    frequency = run mode frequency * ... (N)"; the N code counts halves. */
 uint64_t Pxa255ClockManager::CoreHz(uint32_t cccr, bool turbo) const {
-    const uint64_t run = kCrystalHz * LMultiplier(LCode(cccr)) * MMultiplier(MCode(cccr));
+    const uint64_t run = MemoryHz(cccr) * MMultiplier(MCode(cccr));
     return turbo ? run * NCode(cccr) / 2u : run;
 }
 
@@ -137,6 +145,9 @@ void Pxa255ClockManager::WriteClkcfg(uint32_t value) {
 void Pxa255ClockManager::ApplyRate() {
     emu_.Get<GuestCycleClock>().SetClockHz(
         CoreHz(loaded_cccr_, (cclkcfg_ & kClkcfgTurbo) != 0u));
+    if (MemoryClockHz() == published_memory_hz_) return;
+    published_memory_hz_ = MemoryClockHz();
+    for (auto& fn : memory_clock_listeners_) fn();
 }
 
 uint32_t __fastcall Pxa255ClockManager::ReadClkcfgHelper(Pxa255ClockManager* self) {

@@ -1,20 +1,22 @@
 #pragma once
 
-#include "../peripheral_base.h"
 #include "../../lcd/display_mode_latch.h"
+#include "../../socs/raster_scan_peripheral.h"
 #include "sed1356_bitblt.h"
 
-#include <chrono>
 #include <cstdint>
 #include <unordered_set>
 #include <vector>
 
+class Sed1356PanelPower;
+class Sed1356PowerSequence;
+
 /* EPSON SED1356 / S1D13506 / S1D13806 Color LCD/CRT/TV Controller (Technical
    Manual X25B-A-001-12). Per-board base / buffer size / product code via
    Sed1356Config (Jornada 720 SED1356; NEC MobilePro 900 S1D13806). */
-class Sed1356 : public Peripheral {
+class Sed1356 : public RasterScanPeripheral {
 public:
-    using Peripheral::Peripheral;
+    using RasterScanPeripheral::RasterScanPeripheral;
 
     bool ShouldRegister() override;
     void OnReady() override;
@@ -62,6 +64,7 @@ public:
 
     void SaveState(StateWriter& w) override;
     void RestoreState(StateReader& r) override;
+    void PostRestore() override;
 
     /* --- BitBLT engine surface (regs §8.3.12, latched by Sed1356BitBlt). --- */
     uint8_t  BltReg(uint32_t off) const { return Reg(off); }
@@ -90,8 +93,29 @@ private:
     uint8_t  ReadLutData();
     void     WriteLutData(uint8_t value);
     void     StepLutPointer();
-    uint8_t  VndStatusBit() const;
     void     PublishOnLcdEnableEdge();
+
+    ScanShape ScanShapeLocked() const override;
+    bool      EdgeRaisesInterruptLocked(uint32_t, bool) const override { return false; }
+    bool      FrameEdgesInertLocked() const override { return true; }
+    void      FrameEdgeLocked(uint32_t) override {}
+    void      ScanEdgesRan() override {}
+
+    bool     LcdPipelineRunning() const;
+    bool     CrtTvPipelineRunning() const;
+    uint32_t LcdPanelDivisor() const;
+    uint64_t LcdLineTicks() const;
+    uint64_t LcdFrameTicks() const;
+    uint8_t  LcdFieldMask(uint32_t off) const;
+    GuestCycleClock::Rate LcdPixelRate() const;
+    uint8_t  LcdVndStatusBit();
+    void     TrackLcdScanLocked(uint32_t off, uint8_t old);
+    void     OnBusClockChange();
+
+    uint64_t                    bus_clock_hz_ = 0;
+    const Sed1356PowerSequence* power_seq_    = nullptr;
+    Sed1356PanelPower*          panel_        = nullptr;
+    uint64_t                    lcd_on_tick_  = 0;
 
     uint8_t reg_[kRegWindow] = {};
     std::vector<uint8_t> vram_;
@@ -114,8 +138,6 @@ private:
     /* Offsets whose dropped-write was already logged: log each undocumented
        register once (--log=Periph-recoverable in the field), never per-write. */
     std::unordered_set<uint32_t> dropped_logged_;
-
-    std::chrono::steady_clock::time_point boot_time_{};
 
     Sed1356BitBlt blt_{*this};
 

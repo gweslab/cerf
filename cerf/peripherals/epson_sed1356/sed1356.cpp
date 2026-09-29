@@ -1,11 +1,14 @@
 #include "sed1356.h"
 
 #include "sed1356_config.h"
+#include "sed1356_panel_power.h"
+#include "sed1356_power_sequence.h"
 #include "../../core/byte_order.h"
 #include "../../core/cerf_emulator.h"
 #include "../../core/log.h"
 #include "../peripheral_dispatcher.h"
 #include "../../state/state_stream.h"
+#include "../../core/fatal.h"
 
 bool Sed1356::ShouldRegister() {
     return emu_.TryGet<Sed1356Config>() != nullptr;
@@ -20,7 +23,11 @@ void Sed1356::OnReady() {
     vram_.assign(vram_size_, 0u);
     /* §8.1 reset-lock, board-dependent (see Sed1356Config). */
     reg_[0x01] = cfg.RegMemSelectLockedAtReset() ? 0x80u : 0x00u;
-    boot_time_ = std::chrono::steady_clock::now();
+    bus_clock_hz_ = cfg.BusClockHz();
+    power_seq_    = &emu_.Get<Sed1356PowerSequence>();
+    panel_        = &emu_.Get<Sed1356PanelPower>();
+    AttachScanClock();
+    cfg.RegisterBusClockListener([this] { OnBusClockChange(); });
     emu_.Get<PeripheralDispatcher>().Register(this);
 }
 
@@ -59,20 +66,131 @@ void Sed1356::LcdInkColor(uint32_t which, uint8_t& r5, uint8_t& g6,
     r5 = Reg(base + 2) & 0x1Fu;
 }
 
-/* REG[03Ah] bit 7 (§8.3.6): 1 while the vertical non-display period is
-   occurring. CERF has no pixel clock, so the bit is phased off a synthetic
-   60 Hz host-clock frame; both states occur every frame, which is what
-   guest VND poll loops require to terminate. */
-uint8_t Sed1356::VndStatusBit() const {
-    const uint32_t vdh = LcdGuestH();
-    const uint32_t vnd = (Reg(0x3A) & 0x3Fu) + 1u;
-    const auto since = std::chrono::steady_clock::now() - boot_time_;
-    const uint64_t us = (uint64_t)std::chrono::duration_cast<
-        std::chrono::microseconds>(since).count();
-    const uint64_t frame_us = 16667u;          /* synthetic 60 Hz. */
-    const uint64_t in_frame = us % frame_us;
-    const uint64_t vnd_us   = frame_us * vnd / (vdh + vnd);
-    return in_frame < vnd_us ? 0x80u : 0x00u;
+/* S1D13806 X28B-A-001-13 Table 8-35 p.147, SED1356 X25B-A-001-12 Table 8-36 p.172:
+   REG[1FCh] bit 0 enables the LCD; Table 19-1 (p.200 / p.222): power save disables it. */
+bool Sed1356::LcdPipelineRunning() const {
+    return (Reg(0x1FC) & 0x1u) != 0u && (Reg(0x1F0) & 0x1u) == 0u;
+}
+
+/* SED1356 Table 8-36 p.172 (S1D13806 Table 8-35 p.147): modes 010-111 drive the CRT or TV;
+   Table 19-1 (p.222 / p.200): power save disables them. */
+bool Sed1356::CrtTvPipelineRunning() const {
+    return (Reg(0x1FC) & 0x6u) != 0u && (Reg(0x1F0) & 0x1u) == 0u;
+}
+
+/* REG[030h] bit 1 = dual panel (S1D13806 p.108, SED1356 p.135); §18.1.1 n. */
+uint32_t Sed1356::LcdPanelDivisor() const {
+    return (Reg(0x30) & 0x2u) ? 2u : 1u;
+}
+
+/* §18.1.1 (S1D13806 p.186, SED1356 p.212): LHDP + LHNDP in Ts, LHNDP =
+   (REG[034h] bits 4-0 + 1) x 8. */
+uint64_t Sed1356::LcdLineTicks() const {
+    return LcdGuestW() + ((Reg(0x34) & 0x1Fu) + 1u) * 8u;
+}
+
+/* REG[014h] (S1D13806 p.102 and X28B-R-001-03 p.3, SED1356 p.129): bits 1-0 source,
+   01 = BUSCLK; bits 5-4 divide = value + 1. */
+GuestCycleClock::Rate Sed1356::LcdPixelRate() const {
+    const uint32_t pclk = Reg(0x14);
+    if ((pclk & 0x3u) != 0x1u) {
+        emu_.Get<Fatal>().Die("Sed1356: LCD PCLK source %u (REG[014h]=0x%02X) is not modelled",
+                              pclk & 0x3u, pclk);
+    }
+    if (bus_clock_hz_ == 0u) {
+        emu_.Get<Fatal>().Die("Sed1356: LCD pixel clock taken from a stopped BUSCLK is not "
+                              "modelled");
+    }
+    return {bus_clock_hz_, ((pclk >> 4) & 0x3u) + 1u};
+}
+
+/* §18.1.1: line x (LVDP / n + LVNDP). */
+RasterScanPeripheral::ScanShape Sed1356::ScanShapeLocked() const {
+    const uint32_t n = LcdPanelDivisor();
+    if (LcdGuestH() % n != 0u) {
+        emu_.Get<Fatal>().Die("Sed1356: dual-panel LCD with an odd display height %u",
+                              LcdGuestH());
+    }
+    ScanShape s;
+    s.tick          = LcdPixelRate();
+    s.frame.ticks   = LcdFrameTicks();
+    s.frame.edges   = 1u;
+    s.frame.edge[0] = s.frame.ticks;
+    return s;
+}
+
+uint64_t Sed1356::LcdFrameTicks() const {
+    return LcdLineTicks() * (LcdGuestH() / LcdPanelDivisor() + (Reg(0x3A) & 0x3Fu) + 1u);
+}
+
+/* REG[03Ah] bit 7 (S1D13806 p.112, SED1356 p.139): 1 while the vertical non-display
+   period occurs; S1D13806 Figure 6-22 p.72: VDP lines, then VNDP lines. */
+uint8_t Sed1356::LcdVndStatusBit() {
+    std::lock_guard<std::mutex> lk(state_mtx_);
+    if (!ScanLiveLocked()) return panel_->VndWhileScanStopped();
+    const uint64_t tick = ScanTicksLocked(ScanNow());
+    if (tick < lcd_on_tick_) return 0x00u;
+    const uint64_t display = LcdLineTicks() * (LcdGuestH() / LcdPanelDivisor());
+    return (tick - lcd_on_tick_) % LcdFrameTicks() >= display ? 0x80u : 0x00u;
+}
+
+uint8_t Sed1356::LcdFieldMask(uint32_t off) const {
+    switch (off) {
+        case 0x014: return 0x33u;
+        case 0x030: return 0x02u;
+        case 0x032: return 0x7Fu;
+        case 0x034: return 0x1Fu;
+        case 0x038: return 0xFFu;
+        case 0x039: return 0x03u;
+        case 0x03A: return 0x3Fu;
+        case 0x1F0: return 0x01u;
+        case 0x1FC: return 0x01u;
+    }
+    emu_.Get<Fatal>().Die("Sed1356: REG[%03Xh] is not an LCD timing or power field", off);
+}
+
+/* SED1356 REG[1FCh] p.172: 0 to 1 starts the power-on sequence, 1 to 0 the power-off
+   sequence; Table 7-21 p.80 t2/t4 give maxima only. */
+void Sed1356::TrackLcdScanLocked(uint32_t off, uint8_t old) {
+    const uint64_t now     = ScanNow();
+    const bool     running = LcdPipelineRunning();
+    const bool     changed = ((old ^ reg_[off]) & LcdFieldMask(off)) != 0u;
+    if (!ScanLiveLocked()) {
+        if (!running) {
+            if (changed) panel_->Disturb();
+            return;
+        }
+        StartScanLocked(now);
+        lcd_on_tick_ =
+            off == 0x1FCu ? LcdLineTicks() * power_seq_->LcdPowerOnLines(Reg(0x1F0)) : 0u;
+        panel_->PowerUp();
+        return;
+    }
+    if (!running) {
+        StopScanLocked();
+        panel_->PowerDown(off == 0x1FCu, {LcdPixelRate(), LcdFrameTicks(), LcdLineTicks(),
+                                          LcdPanelDivisor(), Reg(0x1F0)});
+        return;
+    }
+    if (changed) {
+        emu_.Get<Fatal>().Die("Sed1356: LCD timing REG[%03Xh] 0x%02X -> 0x%02X while the LCD "
+                              "pipeline runs", off, old, reg_[off]);
+    }
+}
+
+void Sed1356::OnBusClockChange() {
+    const uint64_t hz = emu_.Get<Sed1356Config>().BusClockHz();
+    {
+        std::lock_guard<std::mutex> lk(state_mtx_);
+        if (hz == bus_clock_hz_) return;
+        if (hz == 0u && (ScanLiveLocked() || panel_->PowerDownInProgress())) {
+            emu_.Get<Fatal>().Die("Sed1356: BUSCLK stopped while the LCD scan or the panel "
+                                  "power-down sequence runs is not modelled");
+        }
+        bus_clock_hz_ = hz;
+        if (panel_->Pending()) panel_->SetPixelRate(LcdPixelRate());
+    }
+    OnScanSourceClockChange();
 }
 
 void Sed1356::PublishOnLcdEnableEdge() {
@@ -132,10 +250,17 @@ uint8_t Sed1356::RegRead(uint32_t off) {
         case 0x00C:                 /* MD[15:0] readback = board strap pins; */
         case 0x00D:                 /* Jornada strap values not grounded yet. */
             HaltUnsupportedAccess("RegRead(MD readback)", MmioBase() + off, 0);
-        case 0x03A: return (uint8_t)((reg_[off] & 0x3Fu) | VndStatusBit());
+        case 0x03A: return (uint8_t)((reg_[off] & 0x3Fu) | LcdVndStatusBit());
+        case 0x058:
+            if (CrtTvPipelineRunning()) {
+                emu_.Get<Fatal>().Die("Sed1356: REG[058h] CRT/TV VND status read with the CRT/TV "
+                                      "pipeline running (REG[1FCh]=0x%02X) is not modelled",
+                                      Reg(0x1FC));
+            }
+            return static_cast<uint8_t>(reg_[off] & 0x7Fu);
         case 0x100: return blt_.Status();
         case 0x1E4: return ReadLutData();
-        case 0x1F1: return (reg_[0x1F0] & 0x1u) ? 0x03u : 0x00u;  /* §8.3.14. */
+        case 0x1F1: return panel_->StatusBits(Reg(0x1FC), Reg(0x1F0), Reg(0x21));
         default:
             /* §8.2 / Table 8-1: the full 0x000..0x1FF window is decoded
                register space; reserved registers (REG[033h] etc.) read back
@@ -173,7 +298,19 @@ void Sed1356::RegWrite(uint32_t off, uint8_t value) {
                         "0x%03X = 0x%02X\n", off, value);
                 return;
             }
-            reg_[off] = value;
+            switch (off) {
+                case 0x014: case 0x030: case 0x032: case 0x034: case 0x038:
+                case 0x039: case 0x03A: case 0x1F0: case 0x1FC: {
+                    std::lock_guard<std::mutex> lk(state_mtx_);
+                    const uint8_t old = reg_[off];
+                    reg_[off] = value;
+                    TrackLcdScanLocked(off, old);
+                    break;
+                }
+                default:
+                    reg_[off] = value;
+                    break;
+            }
             PublishOnLcdEnableEdge();
             return;
     }
@@ -321,6 +458,7 @@ void Sed1356::WriteWord(uint32_t addr, uint32_t value) {
 }
 
 void Sed1356::SaveState(StateWriter& w) {
+    std::lock_guard<std::mutex> lk(state_mtx_);
     w.WriteBytes("reg", reg_, sizeof(reg_));
     w.WriteBytes("vram", vram_.data(), vram_.size());
     w.WriteBytes("lcd_lut", lcd_lut_, sizeof(lcd_lut_));
@@ -330,9 +468,13 @@ void Sed1356::SaveState(StateWriter& w) {
     w.WriteBytes("lut_rgb_latch", lut_rgb_latch_, sizeof(lut_rgb_latch_));
     mode_latch_.SaveState(w);
     blt_.SaveState(w);
+    SaveScanLocked(w);
+    w.Write<uint64_t>("lcd_on_tick", lcd_on_tick_);
+    panel_->SaveState(w);
 }
 
 void Sed1356::RestoreState(StateReader& r) {
+    std::lock_guard<std::mutex> lk(state_mtx_);
     r.ReadBytes("reg", reg_, sizeof(reg_));
     r.ReadBytes("vram", vram_.data(), vram_.size());
     r.ReadBytes("lcd_lut", lcd_lut_, sizeof(lcd_lut_));
@@ -342,6 +484,16 @@ void Sed1356::RestoreState(StateReader& r) {
     r.ReadBytes("lut_rgb_latch", lut_rgb_latch_, sizeof(lut_rgb_latch_));
     mode_latch_.RestoreState(r);
     blt_.RestoreState(r);
+    RestoreScanLocked(r);
+    r.Read("lcd_on_tick", lcd_on_tick_);
+    panel_->RestoreState(r);
+}
+
+void Sed1356::PostRestore() {
+    std::lock_guard<std::mutex> lk(state_mtx_);
+    bus_clock_hz_ = emu_.Get<Sed1356Config>().BusClockHz();
+    ResumeScanLocked(ScanNow());
+    panel_->ResumeAfterRestore();
 }
 
 REGISTER_SERVICE(Sed1356);

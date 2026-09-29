@@ -4,6 +4,8 @@
 #include "../core/fatal.h"
 #include "../state/state_stream.h"
 
+#include <algorithm>
+
 void RasterScanPeripheral::AttachScanClock() {
     clock_ = &emu_.Get<GuestCycleClock>();
     event_ = clock_->Add([this] { OnScanEvent(); });
@@ -103,6 +105,10 @@ void RasterScanPeripheral::RearmScanLocked() {
 }
 
 bool RasterScanPeripheral::CatchUpLocked(uint64_t now) {
+    if (state_ == State::Live && FrameEdgesInertLocked()) {
+        edges_done_ = std::max(edges_done_, scan_.EdgesThrough(now));
+        return false;
+    }
     bool ran = false;
     while (state_ == State::Live) {
         uint64_t cycle;

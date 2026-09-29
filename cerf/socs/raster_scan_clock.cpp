@@ -44,3 +44,13 @@ bool RasterScanClock::EdgeCycle(uint64_t edge, uint64_t& cycle) const {
     cycle = ticks_.CycleOfTick(frame * frame_.ticks + frame_.edge[edge % frame_.edges]);
     return true;
 }
+
+uint64_t RasterScanClock::EdgesThrough(uint64_t cycle) const {
+    const uint64_t ticks    = ticks_.TicksAt(cycle);
+    const uint64_t in_frame = ticks % frame_.ticks;
+    uint64_t       edges    = ticks / frame_.ticks * frame_.edges;
+    for (uint32_t i = 0; i < frame_.edges; ++i) {
+        if (frame_.edge[i] <= in_frame) ++edges;
+    }
+    return edges;
+}

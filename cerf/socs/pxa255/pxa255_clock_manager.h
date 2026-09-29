@@ -28,6 +28,9 @@ public:
     void SetOscillatorStable();
     void WriteClkcfg(uint32_t value);
 
+    uint64_t MemoryClockHz() const { return MemoryHz(loaded_cccr_); }
+    void     RegisterMemoryClockListener(std::function<void()> fn);
+
     static uint32_t __fastcall ReadClkcfgHelper(Pxa255ClockManager* self);
     static void __fastcall WriteClkcfgHelper(Pxa255ClockManager* self, uint32_t value);
 
@@ -44,6 +47,7 @@ private:
 
     void     LoadPll(const char* when);
     bool     Supported(uint32_t cccr, bool turbo) const;
+    uint64_t MemoryHz(uint32_t cccr) const;
     uint64_t CoreHz(uint32_t cccr, bool turbo) const;
     void     ApplyRate();
 
@@ -53,6 +57,8 @@ private:
     uint32_t cken_        = kCkenReset;
     bool     oon_         = false;
     bool     ook_         = false;
+    uint64_t published_memory_hz_ = 0;
 
     std::vector<std::function<void()>> osc_listeners_;
+    std::vector<std::function<void()>> memory_clock_listeners_;
 };

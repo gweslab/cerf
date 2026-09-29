@@ -26,6 +26,7 @@ public:
     Position PositionAt(uint64_t cycle) const { return ticks_.PositionAt(cycle); }
     uint64_t TickInFrame(uint64_t cycle) const;
     bool     EdgeCycle(uint64_t edge, uint64_t& cycle) const;
+    uint64_t EdgesThrough(uint64_t cycle) const;
     uint32_t EdgesPerFrame() const { return frame_.edges; }
 
 private:

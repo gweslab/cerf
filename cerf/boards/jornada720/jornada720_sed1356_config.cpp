@@ -22,6 +22,11 @@ public:
     uint32_t DisplayBufferBytes()    const override { return 0x80000u; }
     uint8_t  ProductRevCode()        const override { return 0x11u; }
     bool     RegMemSelectLockedAtReset() const override { return true; }
+
+    /* jornada720 ddi.dll mode tables from 0x00FFF0B0: the 90 Hz set (0x0100001C),
+       672 x 243 Ts, LCD PCLK = BUSCLK / 2. */
+    uint64_t BusClockHz() const override { return 29393280u; }
+    void     RegisterBusClockListener(std::function<void()>) override {}
 };
 
 }  /* namespace */

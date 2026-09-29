@@ -42,6 +42,12 @@ constexpr uint32_t kCtlEnSib = 1u << 0;
 constexpr uint32_t kCtlEnSf0 = 1u << 1;
 constexpr uint32_t kCtlEnSnd = 1u << 4;
 
+/* SND16<15>, SELSNDSF1<6> (§13.6.6 p13-21); 16-bit sound on subframe 0 takes
+   SNDTXHOLD[31:16], then [15:0] in the next frame (Table 13.3.4 p13-13). */
+constexpr uint32_t kCtlSnd16     = 1u << 15;
+constexpr uint32_t kCtlSelSndSf1 = 1u << 6;
+constexpr uint32_t kCtlSoundFormat = 0x0700FF40u;
+
 /* Interrupt Status 1 bit 8 SIBSF0INT and bit 7 SIBSF1INT (§8.3.1). */
 constexpr uint32_t kSibSf0Int = 1u << 8;
 constexpr uint32_t kSibSf1Int = 1u << 7;
@@ -123,10 +129,15 @@ public:
             UpdateSibFrameInts();
         });
         emu_.Get<Pr31x00Clock>().RegisterModuleClockListener([this] {
-            if (sound_active_ && SoundRateHz() != sound_rate_hz_) {
-                emu_.Get<Fatal>().Die("Pr31x00Sib: the SIB master clock moved the %u Hz sound rate "
-                                      "to %u Hz with sound TX running", sound_rate_hz_,
-                                      SoundRateHz());
+            if (!sound_active_) return;
+            const GuestCycleClock::Rate rate = SoundRate();
+            if (rate.num * sound_rate_.den != sound_rate_.num * rate.den) {
+                emu_.Get<Fatal>().Die("Pr31x00Sib: the SIB master clock moved the %llu/%llu Hz "
+                                      "sound rate to %llu/%llu Hz with sound TX running",
+                                      static_cast<unsigned long long>(sound_rate_.num),
+                                      static_cast<unsigned long long>(sound_rate_.den),
+                                      static_cast<unsigned long long>(rate.num),
+                                      static_cast<unsigned long long>(rate.den));
             }
         });
     }
@@ -168,12 +179,22 @@ public:
             if (value & kSizeReserved) {
                 HaltUnsupportedAccess("PR31x00 SIB SIZE reserved", addr, value);
             }
-            snd_size_ = (value >> kSizeSndShift) & kSizeSndMask;
+            const uint32_t size = (value >> kSizeSndShift) & kSizeSndMask;
+            if (sound_active_ && size != snd_size_) {
+                emu_.Get<Fatal>().Die("Pr31x00Sib: SNDSIZE 0x%03X -> 0x%03X with sound TX running; "
+                                      "not modeled", snd_size_, size);
+            }
+            snd_size_ = size;
             return;
         }
         if (addr - kBase == kOffSndTxSt) {
             if (value & kStartReserved) {
                 HaltUnsupportedAccess("PR31x00 SIB DMA start reserved", addr, value);
+            }
+            if (sound_active_ && (value & kSndTxStartMask) != snd_tx_start_) {
+                emu_.Get<Fatal>().Die("Pr31x00Sib: SNDTXSTART 0x%08X -> 0x%08X with sound TX "
+                                      "running; not modeled", snd_tx_start_,
+                                      value & kSndTxStartMask);
             }
             snd_tx_start_ = value & kSndTxStartMask;
             return;
@@ -199,7 +220,14 @@ public:
             HaltUnsupportedAccess("PR31x00 SIB CTL starts a telecom or loopback frame "
                                   "with no codec modelled", addr, value);
         }
-        ctl_ = value & kCtlWritable;
+        const uint32_t next = value & kCtlWritable;
+        if (sound_active_ && (next & kCtlEnSib) && (next & kCtlEnSnd) &&
+            ((next ^ ctl_) & (kCtlSoundFormat | kCtlEnSf0)) != 0u) {
+            emu_.Get<Fatal>().Die("Pr31x00Sib: SIB Control 0x%08X -> 0x%08X changes the sound "
+                                  "rate, format or subframe-0 enable with sound TX running; not "
+                                  "modeled", ctl_, value);
+        }
+        ctl_ = next;
         UpdateSound();
         UpdateSibFrameInts();
     }
@@ -243,16 +271,18 @@ public:
         w.Write("snd_tx_hold", snd_tx_hold_); w.Write("tel_tx_hold", tel_tx_hold_); w.Write("sf0_stat", sf0_stat_);
         w.Write("snd_tx_start", snd_tx_start_); w.Write("snd_size", snd_size_);
         if (auto* codec = emu_.TryGet<Pr31x00SibCodec>()) codec->SaveState(w);
+        emu_.Get<Pr31x00SibAudioSink>().SaveState(w);
     }
     void RestoreState(StateReader& r) override {
         r.Read("ctl", ctl_); r.Read("dma_ctl", dma_ctl_); r.Read("sf0_aux", sf0_aux_); r.Read("sf1_aux", sf1_aux_);
         r.Read("snd_tx_hold", snd_tx_hold_); r.Read("tel_tx_hold", tel_tx_hold_); r.Read("sf0_stat", sf0_stat_);
         r.Read("snd_tx_start", snd_tx_start_); r.Read("snd_size", snd_size_);
         if (auto* codec = emu_.TryGet<Pr31x00SibCodec>()) codec->RestoreState(r);
+        emu_.Get<Pr31x00SibAudioSink>().RestoreState(r);
     }
     void PostRestore() override {
-        sound_active_ = false;
-        UpdateSound();
+        sound_active_ = SoundArmed();
+        sound_rate_   = sound_active_ ? SoundRate() : GuestCycleClock::Rate{};
         if (auto* codec = emu_.TryGet<Pr31x00SibCodec>()) codec->PostRestore();
     }
 
@@ -260,12 +290,11 @@ private:
     bool SoundArmed() const {
         return (ctl_ & kCtlEnSib) && (ctl_ & kCtlEnSnd) && (dma_ctl_ & kDmaEnTxSnd);
     }
-    uint32_t SoundRateHz() const {
+    GuestCycleClock::Rate SoundRate() const {
         const uint32_t fsdiv   = (ctl_ >> kCtlSndFsShift) & kCtlSndFsMask;
         const uint64_t modulus = kSibSclkModulus[(ctl_ >> kCtlSibSclkDivShift) & kCtlSibSclkDivMask];
         const GuestCycleClock::Rate mclk = emu_.Get<Pr31x00Clock>().SibMasterClockRate();
-        return static_cast<uint32_t>((mclk.num * 2u) /
-                                     (mclk.den * modulus * (fsdiv + 1u) * 64u));
+        return GuestCycleClock::Rate{mclk.num * 2u, mclk.den * modulus * (fsdiv + 1u) * 64u};
     }
     uint32_t SoundBytes() const { return (snd_size_ + 1u) << 2; }
 
@@ -277,12 +306,18 @@ private:
                                       MmioBase(), ctl_);
             }
             if (!sound_active_) {
-                sound_rate_hz_ = SoundRateHz();
-                if (sound_rate_hz_ == 0u) {
+                sound_rate_ = SoundRate();
+                if (sound_rate_.num == 0u) {
                     emu_.Get<Fatal>().Die("Pr31x00Sib: sound TX DMA armed at a 0 Hz sound rate "
                                           "(SIB Control 0x%08X)", ctl_);
                 }
-                sink->StartSoundTx(snd_tx_start_, SoundBytes(), sound_rate_hz_);
+                if ((ctl_ & kCtlSnd16) == 0u || (ctl_ & kCtlSelSndSf1) != 0u ||
+                    (ctl_ & kCtlEnSf0) == 0u) {
+                    emu_.Get<Fatal>().Die("Pr31x00Sib: sound TX DMA armed for 8-bit or subframe-1 "
+                                          "sound, or with subframe 0 disabled (SIB Control "
+                                          "0x%08X); only 16-bit subframe-0 sound is modeled", ctl_);
+                }
+                sink->StartSoundTx(snd_tx_start_, SoundBytes(), sound_rate_);
                 sound_active_ = true;
             }
         } else if (sound_active_) {
@@ -309,7 +344,7 @@ private:
     uint32_t snd_tx_start_ = 0;
     uint32_t snd_size_      = 0;
     bool     sound_active_  = false;
-    uint32_t sound_rate_hz_ = 0;
+    GuestCycleClock::Rate sound_rate_;
 };
 
 }  /* namespace */

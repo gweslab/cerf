@@ -8,7 +8,6 @@
 #include "frame_renderer.h"
 #include "host_canvas_input.h"
 #include "host_focus_policy.h"
-#include "lcd_scan_tick.h"
 #include "boot_screen.h"
 #include "hw_screen.h"
 #include "refresh_rate_service.h"
@@ -48,8 +47,6 @@ void HostCanvas::RearmFramebufferAutoSwitch() {
 }
 
 void HostCanvas::OnPresentTick() {
-    if (auto* tick = emu_.TryGet<LcdScanTick>()) tick->OnHostTick();
-
     const bool has_frame = canvas_.SourceHasFrame();
     if (has_frame && !latched_once_) {
         latched_once_ = true;

@@ -143,8 +143,31 @@ void Pxa27xClockManager::WriteClkcfg(uint32_t value) {
     ApplyRate();
 }
 
+/* Section 3.8.2.1 (page 3-94): "LCD frequency = 13-MHz processor-oscillator
+   frequency * L / K, where K = 1 (L = 2-7), K = 2 (L = 8-16), or K = 4
+   (L = 17-31)"; "a frequency change is required to enact any changes". */
+uint64_t Pxa27xClockManager::LcdClockHz() const {
+    const uint32_t l = LField(loaded_cccr_);
+    const uint32_t k = l <= 7u ? 1u : (l <= 16u ? 2u : 4u);
+    return kOscHz * l / k;
+}
+
+void Pxa27xClockManager::RegisterLcdClockListener(std::function<void()> fn) {
+    lcd_clock_listeners_.push_back(std::move(fn));
+}
+
 void Pxa27xClockManager::ApplyRate() {
     emu_.Get<GuestCycleClock>().SetClockHz(CoreHz(loaded_cccr_, clkcfg_));
+    PublishLcdClock();
+}
+
+void Pxa27xClockManager::PublishLcdClock() {
+    const uint64_t lcd_hz = LcdClockHz();
+    const bool     lcd_on = LcdClockEnabled();
+    if (lcd_hz == published_lcd_hz_ && lcd_on == published_lcd_on_) return;
+    published_lcd_hz_ = lcd_hz;
+    published_lcd_on_ = lcd_on;
+    for (auto& fn : lcd_clock_listeners_) fn();
 }
 
 uint32_t __fastcall Pxa27xClockManager::ReadClkcfgHelper(Pxa27xClockManager* self) {
@@ -184,6 +207,7 @@ void Pxa27xClockManager::WriteWord(uint32_t addr, uint32_t value) {
             return;
         case 0x04:
             cken_ = value & kCkenMask;
+            PublishLcdClock();
             return;
         /* Section 3.8.2.3 (page 3-99): "OON can be set only by software and
            cleared only by power-on or hardware reset", and "OOK sets 2-3

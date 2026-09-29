@@ -118,6 +118,7 @@ The file [`licenses/OFL-1.1.txt`](licenses/OFL-1.1.txt) contains the full licens
 - **[qemu-neo1973](https://github.com/jvesely/qemu-neo1973)** - Openmoko
 - **[libqmi](https://gitlab.freedesktop.org/mobile-broadband/libqmi)**
 - **[Rockbox](https://www.rockbox.org/)**
+- **[Das U-Boot](https://github.com/u-boot/u-boot)**
 
 ## Trademarks
 

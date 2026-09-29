@@ -1,15 +1,22 @@
 #pragma once
 
-#include "../../peripherals/peripheral_base.h"
+#include "../raster_scan_peripheral.h"
 
 #include <cstdint>
-#include <mutex>
+
+class Pxa27xLcdDma;
 
 /* Intel PXA27x Developer's Manual 280000-001 Section 7.6 Table 7-64: LCD
    controller registers, 0x4400_0000..0x4400_026C. */
-class Pxa27xLcd : public Peripheral {
+class Pxa27xLcd : public RasterScanPeripheral {
 public:
-    using Peripheral::Peripheral;
+    using RasterScanPeripheral::RasterScanPeripheral;
+
+    /* Intel PXA27x Developer's Manual 280000-001 Table 7-43: BPP3:BPP = 0b0100
+       selects 16 bpp with no palette. Section 7.4.1.3: the palette RAM is bypassed
+       for pixel depth greater than 8 bpp. */
+    static constexpr uint32_t kBppCode16Bpp       = 0x4u;
+    static constexpr uint32_t kBytesPerPixel16Bpp = 2u;
 
     bool ShouldRegister() override;
     void OnReady() override;
@@ -46,11 +53,12 @@ public:
     uint32_t GetChannelLength(uint32_t channel) const;
     bool     ChannelIsPalette(uint32_t channel) const;
 
-    /* Intel PXA27x Developer's Manual 280000-001 Section 7.5.1.2.1: the next
-       frame Descriptor pointed to by FDADRx is loaded into the registers of the
-       associated DMA channel after all of the data for the current Descriptor
-       has been transferred. */
-    void AdvanceFrame();
+protected:
+    ScanShape              ScanShapeLocked() const override;
+    RasterScanClock::Frame ScanFrameLocked() const;
+    bool      EdgeRaisesInterruptLocked(uint32_t edge_index, bool) const override;
+    void      FrameEdgeLocked(uint32_t edge_index) override;
+    void      ScanEdgesRan() override;
 
 private:
     /* Intel PXA27x Developer's Manual 280000-001 Table 7-64. */
@@ -60,8 +68,6 @@ private:
     static constexpr uint32_t kLccr3 = 0x00Cu;
     static constexpr uint32_t kLccr4 = 0x010u;
     static constexpr uint32_t kLccr5 = 0x014u;
-    static constexpr uint32_t kFbr0  = 0x020u;
-    static constexpr uint32_t kFbr4  = 0x030u;
     static constexpr uint32_t kLcsr1 = 0x034u;
     static constexpr uint32_t kLcsr0 = 0x038u;
     static constexpr uint32_t kLiidr = 0x03Cu;
@@ -74,22 +80,24 @@ private:
     static constexpr uint32_t kCcr    = 0x090u;
     static constexpr uint32_t kCmdcr  = 0x100u;
     static constexpr uint32_t kPrsr   = 0x104u;
-    static constexpr uint32_t kFbr5   = 0x110u;
-    static constexpr uint32_t kFbr6   = 0x114u;
-    static constexpr uint32_t kDmaBase = 0x200u;
-    static constexpr uint32_t kDmaEnd  = 0x270u;
 
-    static constexpr uint32_t kChannels = 7u;
+    template <typename F> void VisitRegs(F& f);
 
-    uint32_t ReadRegLocked (uint32_t off);
-    void     WriteRegLocked(uint32_t off, uint32_t value);
-    void     WriteLccr0Locked(uint32_t value);
+    uint32_t* RegSlotLocked(uint32_t off);
+    void      WriteRegLocked(uint32_t off, uint32_t value, uint64_t now);
+    void      WriteLccr0Locked(uint32_t value, uint64_t now);
+    void      RequireStableTimingLocked(uint32_t off, uint32_t value) const;
+    void      RequirePlaneDisabled(const char* reg, uint32_t value, uint32_t enable) const;
+    void      ResetRegistersLocked();
 
-    void LoadChannelDescriptorLocked(uint32_t channel);
+    bool LoadChannel0DescriptorLocked();
+    void LoadFrameDescriptorLocked();
+    void RequireWholeFrameDescriptorLocked() const;
 
-    /* Intel PXA27x Developer's Manual 280000-001 Section 7.5.22: LIIDR is only
-       written when an unmasked interrupt is signaled and there are no other
-       unmasked interrupts pending. */
+    uint32_t BppCodeLocked() const;
+
+    const char* UnmodelledScanLocked() const;
+
     void LatchInterruptIdLocked(uint32_t unmasked_before, uint32_t frame_id);
 
     uint32_t UnmaskedStatusLocked() const;
@@ -98,14 +106,10 @@ private:
 
     static bool IsKnown(uint32_t off);
 
-    mutable std::mutex state_mtx_;
+    Pxa27xLcdDma* dma_ = nullptr;
 
-    /* Intel PXA27x Developer's Manual 280000-001 Tables 7-40..7-45 reset
-       column. */
     uint32_t lccr_[6] = {};
-    /* Intel PXA27x Developer's Manual 280000-001 Table 7-58 reset column. */
     uint32_t lcsr0_ = 0;
-    /* Intel PXA27x Developer's Manual 280000-001 Table 7-59 reset column. */
     uint32_t lcsr1_ = 0;
     /* Intel PXA27x Developer's Manual 280000-001 Table 7-60 IFRAMEID. */
     uint32_t liidr_ = 0;
@@ -118,12 +122,4 @@ private:
     uint32_t ovl2c1_ = 0;
     uint32_t ovl2c2_ = 0;
     uint32_t ccr_    = 0;
-
-    /* Intel PXA27x Developer's Manual 280000-001 Table 7-54 FDADR0/1/2/3/4/5/6,
-       Table 7-61 FSADR, Table 7-62 FIDR, Table 7-63 LDCMD, Table 7-55 FBR. */
-    uint32_t fdadr_[kChannels] = {};
-    uint32_t fsadr_[kChannels] = {};
-    uint32_t fidr_ [kChannels] = {};
-    uint32_t ldcmd_[kChannels] = {};
-    uint32_t fbr_  [kChannels] = {};
 };

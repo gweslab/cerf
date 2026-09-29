@@ -4,6 +4,7 @@
 #include "../../jit/guest_cycle_clock.h"
 #include "../guest_cpu_reset.h"
 #include "omap3530_board_clock_setup.h"
+#include "omap3530_dpll.h"
 
 namespace {
 
@@ -29,21 +30,6 @@ constexpr uint32_t kClksel1MultDiv  = 0x0007FF7Fu;
 /* Table 4-122 (printed p. 441): MPU_DPLL_CLKOUT_DIV [4:0]. */
 constexpr uint32_t kClksel2Mask  = 0x0000001Fu;
 
-struct FreqSelBand {
-    uint32_t sel;
-    uint64_t lo_hz;
-    uint64_t hi_hz;
-};
-
-/* Table 4-112 (printed p. 437): MPU_DPLL_FREQSEL internal frequency ranges. */
-constexpr FreqSelBand kFreqSelBands[] = {
-    { 0x3u,   750000u,  1000000u }, { 0x4u,  1000000u,  1250000u },
-    { 0x5u,  1250000u,  1500000u }, { 0x6u,  1500000u,  1750000u },
-    { 0x7u,  1750000u,  2100000u }, { 0xBu,  7500000u, 10000000u },
-    { 0xCu, 10000000u, 12500000u }, { 0xDu, 12500000u, 15000000u },
-    { 0xEu, 15000000u, 17500000u }, { 0xFu, 17500000u, 21000000u },
-};
-
 bool DpllOffset(uint32_t off) {
     return off == kOffClkenPll || off == kOffClksel1Pll || off == kOffClksel2Pll;
 }
@@ -52,9 +38,6 @@ bool DpllOffset(uint32_t off) {
 
 void Omap3530CmMpu::OnReady() {
     osc_hz_ = emu_.Get<Omap3530BoardClockSetup>().OscSysClkHz();
-    if (osc_hz_ == 0u) {
-        emu_.Get<Fatal>().Die("omap3530 CM_MPU: the board reports a 0 Hz OSC_SYS_CLK");
-    }
     Omap3530PrcmStubBlock::OnReady();
     {
         std::lock_guard<std::mutex> lk(mu_);
@@ -102,20 +85,8 @@ bool Omap3530CmMpu::DeriveArmFclkLocked(uint64_t& hz, const char*& why) const {
     const uint32_t clken   = regs_[kOffClkenPll / 4u];
     const uint32_t clksel1 = regs_[kOffClksel1Pll / 4u];
     const uint32_t clksel2 = regs_[kOffClksel2Pll / 4u];
-    if ((clken & kEnMask) != kEnLock) {
-        why = "EN_MPU_DPLL does not select lock mode";
-        return false;
-    }
-    const uint64_t m   = (clksel1 >> 8) & 0x7FFu;
-    const uint64_t n   = clksel1 & 0x7Fu;
     const uint64_t m2  = clksel2 & 0x1Fu;
     const uint32_t src = (clksel1 >> 19) & 0x7u;
-    /* §4.7.3.3 NOTE (printed p. 307): "When M is set to 0 or 1, the DPLL is
-       forced to bypass mode." */
-    if (m <= 1u) {
-        why = "MPU_DPLL_MULT 0 or 1 forces bypass";
-        return false;
-    }
     if (m2 == 0u || m2 > 16u) {
         why = "MPU_DPLL_CLKOUT_DIV is reserved";
         return false;
@@ -124,20 +95,12 @@ bool Omap3530CmMpu::DeriveArmFclkLocked(uint64_t& hz, const char*& why) const {
         why = "MPU_CLK_SRC is reserved";
         return false;
     }
-    const uint32_t freqsel = (clken & kFreqSelMask) >> kFreqSelShift;
-    bool band_ok = false;
-    for (const auto& b : kFreqSelBands) {
-        if (b.sel == freqsel && b.lo_hz * (n + 1u) <= osc_hz_ &&
-            osc_hz_ <= b.hi_hz * (n + 1u)) {
-            band_ok = true;
-        }
-    }
-    if (!band_ok) {
-        why = "MPU_DPLL_FREQSEL does not cover the DPLL1 reference frequency";
-        return false;
-    }
-    const uint64_t num = osc_hz_ * m * 2u;
-    const uint64_t den = (n + 1u) * m2;
+    uint64_t num = 0;
+    uint64_t den = 0;
+    why = Omap3530DpllClkoutX2(osc_hz_, clken & kEnMask, (clken & kFreqSelMask) >> kFreqSelShift,
+                               clksel1, num, den);
+    if (why) return false;
+    den *= m2;
     if (num % den != 0u || (num / den) % 2u != 0u) {
         why = "ARM_FCLK is not a whole number of Hz";
         return false;

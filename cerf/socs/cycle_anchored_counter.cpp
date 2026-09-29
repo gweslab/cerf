@@ -24,7 +24,6 @@ bool CycleAnchoredCounter::Rescale(uint64_t cycle, uint64_t cycles, uint64_t tic
     const uint64_t part  = PhaseAt(cycle);
     const uint64_t den   = cyc_unit_;
     const uint32_t count = CountAt(cycle);
-    if (part != 0u && part > UINT64_MAX / cyc) return false;
     cyc_unit_ = cyc;
     tk_unit_  = tk;
     PlaceAnchor(cycle, count, part, den);
@@ -34,7 +33,6 @@ bool CycleAnchoredCounter::Rescale(uint64_t cycle, uint64_t cycles, uint64_t tic
 bool CycleAnchoredCounter::AnchorAtPhase(uint64_t cycle, uint32_t count, uint64_t phase,
                                          uint64_t denominator) {
     if (denominator == 0u || phase >= denominator) return false;
-    if (phase != 0u && phase > UINT64_MAX / cyc_unit_) return false;
     PlaceAnchor(cycle, count, phase, denominator);
     return true;
 }
@@ -42,5 +40,5 @@ bool CycleAnchoredCounter::AnchorAtPhase(uint64_t cycle, uint32_t count, uint64_
 void CycleAnchoredCounter::PlaceAnchor(uint64_t cycle, uint32_t count, uint64_t phase,
                                        uint64_t denominator) {
     anchor_count_ = count;
-    anchor_cycle_ = cycle - phase * cyc_unit_ / denominator / tk_unit_;
+    anchor_cycle_ = cycle - MulDivU64(phase, cyc_unit_, denominator) / tk_unit_;
 }

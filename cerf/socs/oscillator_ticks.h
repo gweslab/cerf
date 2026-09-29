@@ -1,7 +1,7 @@
 #pragma once
 
 #include "../jit/guest_cycle_clock.h"
-#include "cycle_anchored_counter.h"
+#include "rated_tick_count.h"
 
 #include <cstdint>
 
@@ -47,16 +47,15 @@ protected:
 private:
     uint64_t Scale() const;
     bool     SetRatio();
-    void     RequireRatio();
+    void     RatioOverflow();
     void     RescaleAt(uint64_t now);
     void     DrainPark();
     uint64_t CreditNs(uint64_t ns);
 
     const bool           credits_park_;
-    CycleAnchoredCounter ctr_;
+    RatedTickCount       ticks_;
     uint64_t             osc_num_    = 1;
     uint64_t             osc_den_    = 1;
-    uint64_t             base_       = 0;
     uint64_t             park_ticks_ = 0;
     uint64_t             credit_rem_ = 0;
     int64_t              slept_seen_ = 0;

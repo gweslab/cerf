@@ -5,8 +5,11 @@
 #include "../../boards/board_context.h"
 #include "../../core/cerf_emulator.h"
 #include "../../state/state_stream.h"
+#include "../freescale_timer_clocks.h"
 
 #include <cstdint>
+#include <functional>
+#include <vector>
 
 /* MCIMX31RM Table 3-1: AP Clock Controller at 0x53F8_0000. Named (not anonymous)
    so Imx31AudioPlayer can resolve the SSI serial clock its sample rate derives
@@ -38,9 +41,17 @@ public:
        through the SSIx pre and post dividers. Returns 0 for an unselectable source. */
     uint32_t SsiClockHz(uint32_t ssi) const;
 
+    uint64_t HspClkHz() const;
+    uint32_t ClockGate1(uint32_t index) const;
+
+    static bool ClockGateRunsIn(uint32_t cg, FreescaleLowPowerMode mode);
+
+    void RegisterGate1Listener(std::function<void()> fn);
+
 private:
     uint32_t PllHz(uint32_t pll_ctl_reg) const;
 
+    std::vector<std::function<void()>> gate1_listeners_;
     uint32_t regs_[kSlotCount] = {};
 
     static bool OffsetToSlot(uint32_t off, uint32_t* slot_out) {

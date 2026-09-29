@@ -34,21 +34,17 @@ uint64_t OscillatorTicks::ClockCycles() { return clock_->Cycles(); }
 uint64_t OscillatorTicks::Scale() const { return kNsPerSec * osc_den_; }
 
 bool OscillatorTicks::SetRatio() {
-    const GuestCycleClock::Rate rate = clock_->ClockRate();
-    if (rate.num > UINT64_MAX / osc_den_ || rate.den > UINT64_MAX / osc_num_) return false;
-    return ctr_.SetRatio(rate.num * osc_den_, rate.den * osc_num_);
+    return ticks_.SetRate(clock_->ClockRate(), OscRate());
 }
 
-void OscillatorTicks::RequireRatio() {
-    if (!SetRatio()) {
-        const GuestCycleClock::Rate rate = clock_->ClockRate();
-        emu_.Get<Fatal>().Die("OscillatorTicks: the %llu/%llu Hz core against the %llu/%llu Hz "
-                              "oscillator overflows the 64-bit scale",
-                              static_cast<unsigned long long>(rate.num),
-                              static_cast<unsigned long long>(rate.den),
-                              static_cast<unsigned long long>(osc_num_),
-                              static_cast<unsigned long long>(osc_den_));
-    }
+void OscillatorTicks::RatioOverflow() {
+    const GuestCycleClock::Rate rate = clock_->ClockRate();
+    emu_.Get<Fatal>().Die("OscillatorTicks: the %llu/%llu Hz core against the %llu/%llu Hz "
+                          "oscillator overflows the 64-bit scale",
+                          static_cast<unsigned long long>(rate.num),
+                          static_cast<unsigned long long>(rate.den),
+                          static_cast<unsigned long long>(osc_num_),
+                          static_cast<unsigned long long>(osc_den_));
 }
 
 uint64_t OscillatorTicks::CreditNs(uint64_t ns) {
@@ -56,14 +52,12 @@ uint64_t OscillatorTicks::CreditNs(uint64_t ns) {
     const uint64_t part  = (ns % scale) * osc_num_ + credit_rem_;
     const uint64_t whole = ns / scale;
     const uint64_t carry = part / scale;
-    if (whole > (UINT64_MAX - carry) / osc_num_ || whole * osc_num_ + carry > UINT64_MAX - base_) {
+    if (whole > (UINT64_MAX - carry) / osc_num_ || !ticks_.AddTicks(whole * osc_num_ + carry)) {
         emu_.Get<Fatal>().Die("OscillatorTicks: a %llu ns credit overflows the tick count",
                               static_cast<unsigned long long>(ns));
     }
-    credit_rem_          = part % scale;
-    const uint64_t ticks = whole * osc_num_ + carry;
-    base_ += ticks;
-    return ticks;
+    credit_rem_ = part % scale;
+    return whole * osc_num_ + carry;
 }
 
 void OscillatorTicks::DrainPark() {
@@ -82,12 +76,12 @@ void OscillatorTicks::CreditAwakeNs(uint64_t ns) {
 
 uint64_t OscillatorTicks::Now() {
     DrainPark();
-    return base_ + ctr_.TicksSince(ClockCycles());
+    return ticks_.TicksAt(ClockCycles());
 }
 
 OscillatorTicks::Reading OscillatorTicks::Sample() {
     DrainPark();
-    return Reading{base_ + ctr_.TicksSince(ClockCycles()), park_ticks_};
+    return Reading{ticks_.TicksAt(ClockCycles()), park_ticks_};
 }
 
 uint64_t OscillatorTicks::CycleOf(uint64_t tick) {
@@ -97,7 +91,7 @@ uint64_t OscillatorTicks::CycleOf(uint64_t tick) {
     }
     const uint64_t cycle = clock_->Cycles();
     if (tick <= Now()) return cycle;
-    return ctr_.CycleOfTick(tick - base_) + (cycle - ClockCycles());
+    return ticks_.CycleOfTick(tick) + (cycle - ClockCycles());
 }
 
 void OscillatorTicks::ArmAt(GuestCycleClock::Event* event, uint64_t tick) {
@@ -131,15 +125,7 @@ int64_t OscillatorTicks::SleptNsAtTick(uint64_t tick) {
 }
 
 void OscillatorTicks::RescaleAt(uint64_t now) {
-    const uint64_t phase     = ctr_.PhaseAt(now);
-    const uint64_t phase_den = ctr_.PhaseDenominator();
-    base_ += ctr_.TicksSince(now);
-    RequireRatio();
-    if (!ctr_.AnchorAtPhase(now, 0u, phase, phase_den)) {
-        emu_.Get<Fatal>().Die("OscillatorTicks: the tick phase %llu/%llu does not fit the new "
-                              "ratio", static_cast<unsigned long long>(phase),
-                              static_cast<unsigned long long>(phase_den));
-    }
+    if (!ticks_.Rescale(now, clock_->ClockRate(), OscRate())) RatioOverflow();
 }
 
 void OscillatorTicks::Rescale() { RescaleAt(ClockCycles()); }
@@ -154,37 +140,28 @@ void OscillatorTicks::SetOscRate(uint64_t osc_num, uint64_t osc_den) {
     DrainPark();
     const uint64_t now     = ClockCycles();
     const uint64_t old_den = osc_den_;
-    const uint64_t phase     = ctr_.PhaseAt(now);
-    const uint64_t phase_den = ctr_.PhaseDenominator();
-    base_   += ctr_.TicksSince(now);
-    osc_num_  = osc_num;
-    osc_den_  = osc_den;
+    osc_num_    = osc_num;
+    osc_den_    = osc_den;
     credit_rem_ = credit_rem_ * osc_den / old_den;
-    RequireRatio();
-    if (!ctr_.AnchorAtPhase(now, 0u, phase, phase_den)) {
-        emu_.Get<Fatal>().Die("OscillatorTicks: the tick phase %llu/%llu does not fit the new "
-                              "oscillator rate", static_cast<unsigned long long>(phase),
-                              static_cast<unsigned long long>(phase_den));
-    }
+    if (!ticks_.Rescale(now, clock_->ClockRate(), OscRate())) RatioOverflow();
 }
 
 void OscillatorTicks::Rebase() {
-    RequireRatio();
-    ctr_.Anchor(ClockCycles(), 0u);
-    base_       = 0;
+    if (!SetRatio()) RatioOverflow();
+    ticks_.Start(ClockCycles());
     park_ticks_ = 0;
     credit_rem_   = 0;
     slept_seen_ = sleep_->SleptNs();
 }
 
 void OscillatorTicks::Save(StateWriter& w) {
-    const uint64_t ticks = Now();
-    const uint64_t now   = ClockCycles();
+    DrainPark();
+    const RatedTickCount::Position at = ticks_.PositionAt(ClockCycles());
     w.Write<uint64_t>("osc_num", osc_num_);
     w.Write<uint64_t>("osc_den", osc_den_);
-    w.Write<uint64_t>("osc_ticks", ticks);
-    w.Write<uint64_t>("osc_phase", ctr_.PhaseAt(now));
-    w.Write<uint64_t>("osc_phase_den", ctr_.PhaseDenominator());
+    w.Write<uint64_t>("osc_ticks", at.ticks);
+    w.Write<uint64_t>("osc_phase", at.phase);
+    w.Write<uint64_t>("osc_phase_den", at.phase_den);
     w.Write<uint64_t>("osc_credit_rem", credit_rem_);
 }
 
@@ -209,12 +186,12 @@ void OscillatorTicks::Restore(StateReader& r) {
                  static_cast<unsigned long long>(phase_den),
                  static_cast<unsigned long long>(rem));
     }
-    if (!SetRatio() || !ctr_.AnchorAtPhase(ClockCycles(), 0u, phase, phase_den)) {
+    if (!SetRatio() ||
+        !ticks_.PlaceAt(ClockCycles(), RatedTickCount::Position{ticks, phase, phase_den})) {
         r.Reject("OscillatorTicks: restored phase %llu/%llu does not fit the current core ratio",
                  static_cast<unsigned long long>(phase),
                  static_cast<unsigned long long>(phase_den));
     }
-    base_       = ticks;
     park_ticks_ = 0;
     credit_rem_   = rem;
     slept_seen_ = sleep_->SleptNs();

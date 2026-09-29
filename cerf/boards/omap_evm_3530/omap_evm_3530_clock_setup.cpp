@@ -17,6 +17,11 @@ constexpr uint32_t kMpuDpllMult    = 300u;
 constexpr uint32_t kMpuDpllDiv     = 12u;
 constexpr uint32_t kMpuDpllM2      = 1u;
 
+constexpr uint32_t kPeriphDpllFreqSel = 7u;
+constexpr uint32_t kPeriphDpllLock    = 7u;
+constexpr uint32_t kPeriphDpllMult    = 216u;
+constexpr uint32_t kPeriphDpllDiv     = 12u;
+
 class OmapEvm3530ClockSetup : public Omap3530BoardClockSetup {
 public:
     using Omap3530BoardClockSetup::Omap3530BoardClockSetup;
@@ -36,6 +41,11 @@ public:
         return { (kMpuDpllFreqSel << 4) | kMpuDpllLock,
                  (kMpuClkSrc << 19) | (kMpuDpllMult << 8) | kMpuDpllDiv,
                  kMpuDpllM2 };
+    }
+
+    Omap3530PeriphDpllSetting BootPeriphDpll() const override {
+        return { (kPeriphDpllFreqSel << 20) | (kPeriphDpllLock << 16),
+                 (kPeriphDpllMult << 8) | kPeriphDpllDiv };
     }
 
     bool BootEnablesGpt1Clocks() const override { return true; }

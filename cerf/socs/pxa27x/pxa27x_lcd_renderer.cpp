@@ -15,11 +15,8 @@
 
 namespace {
 
-/* Intel PXA27x Developer's Manual 280000-001 Table 7-43: BPP3:BPP = 0b0100
-   selects 16 bpp with no palette. Section 7.4.1.3: the palette RAM is bypassed
-   for pixel depth greater than 8 bpp. */
-constexpr uint32_t kBppCode16Bpp = 0x4u;
-constexpr uint32_t kBytesPerPixel16Bpp = 2u;
+constexpr uint32_t kBppCode16Bpp       = Pxa27xLcd::kBppCode16Bpp;
+constexpr uint32_t kBytesPerPixel16Bpp = Pxa27xLcd::kBytesPerPixel16Bpp;
 
 class Pxa27xLcdRenderer : public PanelFrameRenderer {
 public:

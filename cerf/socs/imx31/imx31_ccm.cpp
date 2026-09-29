@@ -53,6 +53,7 @@ constexpr uint32_t kCcmrSlot  = 0u;
 constexpr uint32_t kPdr1Slot  = 2u;
 constexpr uint32_t kUpctlSlot = 5u;
 constexpr uint32_t kSpctlSlot = 6u;
+constexpr uint32_t kCgr1Slot  = 9u;
 
 /* The board crystal feeding pll_ref_clk (MCIMX31RM Figure 3-24). The manual states
    no frequency; 27 MHz is derived from the OAL's own PLL constants (nk.exe start():
@@ -128,6 +129,31 @@ uint32_t Imx31Ccm::SsiClockHz(uint32_t ssi) const {
     return src / (pre * post);
 }
 
+void Imx31Ccm::RegisterGate1Listener(std::function<void()> fn) {
+    gate1_listeners_.push_back(std::move(fn));
+}
+
+/* Figure 3-24: the hsp divider is fed from mcu_main_clk; Table 3-5 HSP_PODF
+   [13:11], value + 1. */
+uint64_t Imx31Ccm::HspClkHz() const {
+    return McuMainClkHz() / (((regs_[kPdr0Slot] >> 11) & 0x7u) + 1u);
+}
+
+uint32_t Imx31Ccm::ClockGate1(uint32_t index) const {
+    return (regs_[kCgr1Slot] >> (2u * index)) & 0x3u;
+}
+
+/* MCIMX31RM Table 3-12: 01 on in run mode only, 10 on in run and wait modes,
+   11 on in all modes except when the PLL clock is off. */
+bool Imx31Ccm::ClockGateRunsIn(uint32_t cg, FreescaleLowPowerMode mode) {
+    switch (mode) {
+        case FreescaleLowPowerMode::kRun:  return cg != 0u;
+        case FreescaleLowPowerMode::kWait: return cg == 2u || cg == 3u;
+        case FreescaleLowPowerMode::kDoze: return cg == 3u;
+        default:                           return false;
+    }
+}
+
 uint32_t Imx31Ccm::ReadWord(uint32_t addr) {
     const uint32_t off = addr - MmioBase();
     uint32_t slot;
@@ -159,6 +185,9 @@ void Imx31Ccm::WriteWord(uint32_t addr, uint32_t value) {
         return;
     }
     regs_[slot] = value;
+    if (slot == kCgr1Slot && old != value) {
+        for (auto& fn : gate1_listeners_) fn();
+    }
 }
 
 uint8_t Imx31Ccm::ReadByte(uint32_t addr) {

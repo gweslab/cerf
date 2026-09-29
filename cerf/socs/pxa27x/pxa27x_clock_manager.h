@@ -28,6 +28,10 @@ public:
     void SetOscillatorStable();
     void WriteClkcfg(uint32_t value);
 
+    uint64_t LcdClockHz() const;
+    bool     LcdClockEnabled() const { return (cken_ & kCkenLcd) != 0u; }
+    void     RegisterLcdClockListener(std::function<void()> fn);
+
     static uint32_t __fastcall ReadClkcfgHelper(Pxa27xClockManager* self);
     static void __fastcall WriteClkcfgHelper(Pxa27xClockManager* self, uint32_t value);
 
@@ -39,6 +43,9 @@ private:
     static constexpr uint32_t kOsccOok    = 0x00000001u;
     static constexpr uint32_t kCccrReset  = 0x00000107u;
     static constexpr uint32_t kCkenReset  = 0x81FFFFFFu;
+    /* Intel PXA27x Developer's Manual 280000-001 Table 3-33 (page 3-98): CKEN[16]
+       "LCD Controller Clock Enable". */
+    static constexpr uint32_t kCkenLcd    = 1u << 16;
     static constexpr uint32_t kCccrPllOff = 0xC0000000u;
     static constexpr uint32_t kClkcfgT    = 0x1u;
     static constexpr uint32_t kClkcfgF    = 0x2u;
@@ -50,6 +57,7 @@ private:
     bool     Supported(uint32_t cccr, uint32_t clkcfg) const;
     uint64_t CoreHz(uint32_t cccr, uint32_t clkcfg) const;
     void     ApplyRate();
+    void     PublishLcdClock();
 
     uint32_t cccr_        = kCccrReset;
     uint32_t loaded_cccr_ = kCccrReset;
@@ -58,4 +66,7 @@ private:
     uint32_t oscc_        = 0u;
 
     std::vector<std::function<void()>> osc_listeners_;
+    std::vector<std::function<void()>> lcd_clock_listeners_;
+    uint64_t                           published_lcd_hz_ = 0u;
+    bool                               published_lcd_on_ = false;
 };

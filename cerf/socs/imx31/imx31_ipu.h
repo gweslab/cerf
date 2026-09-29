@@ -1,15 +1,18 @@
 #pragma once
 
-#include "../../peripherals/peripheral_base.h"
-
-#include "../../state/state_stream.h"
+#include "../freescale_timer_clocks.h"
+#include "../raster_scan_peripheral.h"
+#include "imx31_ipu_cpm.h"
+#include "imx31_ipu_sdc_timing.h"
 
 #include <cstdint>
-#include <mutex>
 
-class Imx31Ipu : public Peripheral {
+class Imx31Ipu : public RasterScanPeripheral {
 public:
-    using Peripheral::Peripheral;
+    using RasterScanPeripheral::RasterScanPeripheral;
+
+    using PfsKind       = Imx31IpuCpm::PfsKind;
+    using ChannelFormat = Imx31IpuCpm::ChannelFormat;
 
     bool ShouldRegister() override;
     void OnReady() override;
@@ -20,45 +23,9 @@ public:
     uint32_t ReadWord (uint32_t addr) override;
     void     WriteWord(uint32_t addr, uint32_t value) override;
 
-    void SaveState(StateWriter& w) override {
-        std::lock_guard<std::mutex> lk(state_mtx_);
-        w.WriteBytes("regs", regs_, sizeof(regs_));
-        w.WriteBytes("cpm", cpm_,  sizeof(cpm_));
-        w.Write("ima_mem_nu", ima_mem_nu_);
-        w.Write("ima_row_nu", ima_row_nu_);
-        w.Write("ima_word_nu", ima_word_nu_);
-        w.Write("last_pub_w", last_pub_w_);
-        w.Write("last_pub_h", last_pub_h_);
-    }
-    void RestoreState(StateReader& r) override {
-        std::lock_guard<std::mutex> lk(state_mtx_);
-        r.ReadBytes("regs", regs_, sizeof(regs_));
-        r.ReadBytes("cpm", cpm_,  sizeof(cpm_));
-        r.Read("ima_mem_nu", ima_mem_nu_);
-        r.Read("ima_row_nu", ima_row_nu_);
-        r.Read("ima_word_nu", ima_word_nu_);
-        r.Read("last_pub_w", last_pub_w_);
-        r.Read("last_pub_h", last_pub_h_);
-    }
-
-    /* Re-assert the AVIC line from the restored SDC3 vsync ctrl/stat - the IPU
-       vsync interrupt is a level the source re-drives after restore. */
-    void PostRestore() override {
-        std::lock_guard<std::mutex> lk(state_mtx_);
-        RouteSdc3VsyncToAvicLocked();
-    }
-
-    enum class PfsKind { Unknown = 0, RgbPack = 4, Yuv422 = 6, Generic = 7 };
-
-    struct ChannelFormat {
-        PfsKind  pfs       = PfsKind::Unknown;
-        uint8_t  bpp_bits  = 0;
-        uint16_t stride    = 0;
-        uint8_t  wid[4]    = {};
-        uint8_t  ofs[4]    = {};
-        uint16_t fw        = 0;
-        uint16_t fh        = 0;
-    };
+    void SaveState(StateWriter& w) override;
+    void RestoreState(StateReader& r) override;
+    void PostRestore() override;
 
     bool          IsEnabled()        const;
     uint32_t      GetGuestW()        const;
@@ -66,48 +33,45 @@ public:
     uint32_t      GetSdcBgFbPa()     const;
     ChannelFormat GetSdcBgFormat()   const;
 
-    /* Bootloader-style one-shot bring-up: point the SDC bg channel at fb_pa as
-       w x h RGB565 and enable SDC scan-out. The OS display driver later
-       reprograms the same registers over MMIO. */
     void SetupSdcScanout(uint32_t fb_pa, uint32_t w, uint32_t h);
 
-    void OnHostTick();
+protected:
+    ScanShape              ScanShapeLocked() const override;
+    RasterScanClock::Frame ScanFrameLocked() const;
+    bool                   EdgeRaisesInterruptLocked(uint32_t edge_index,
+                                                     bool this_frame) const override;
+    void                   FrameEdgeLocked(uint32_t edge_index) override;
+    void                   ScanEdgesRan() override;
 
 private:
-    static constexpr uint32_t kRegCount       = 112u;
-    static constexpr uint32_t kLastOff        = 0x1BCu;
-    static constexpr uint32_t kCpmRows        = 128u;
-    static constexpr uint32_t kCpmDwordsPerRow= 5u;
-    static constexpr uint32_t kCpmDwordCount  = kCpmRows * kCpmDwordsPerRow;
+    static constexpr uint32_t kRegCount = 112u;
+    static constexpr uint32_t kLastOff  = 0x1BCu;
 
-    mutable std::mutex state_mtx_;
+    struct Lines {
+        bool functional = false;
+        bool error      = false;
+    };
+
+    void        ApplyResetsLocked();
+    void        WriteRegLocked(uint32_t off, uint32_t value);
+    void        OnIpuConfWriteLocked(uint32_t old_conf, uint32_t new_conf, uint64_t now);
+    void        PublishSdcDimsLocked();
+    void        EffectiveDimsLocked(uint32_t* w, uint32_t* h) const;
+    Imx31SdcTimingRegs SdcRegsLocked() const;
+    void        LatchScanTimingLocked();
+    void        RequireStableScanLocked(uint32_t off) const;
+    void        FrameStartLocked();
+    uint32_t    IdmacBusyLocked(uint64_t now) const;
+    Lines       LinesLocked() const;
+    void        PublishLines(const Lines& lines);
+    void        OnIdle();
+    void        RequireIpuClockLocked(FreescaleLowPowerMode mode, const char* when) const;
+
+    Imx31IpuCpm* cpm_ = nullptr;
+
     uint32_t regs_[kRegCount] = {};
-
-    uint32_t cpm_[kCpmDwordCount] = {};
-    uint8_t  ima_mem_nu_   = 0;
-    uint16_t ima_row_nu_   = 0;
-    uint8_t  ima_word_nu_  = 0;
-    uint32_t last_pub_w_   = 0;
-    uint32_t last_pub_h_   = 0;
-
-    void     ApplyResetsLocked();
-    uint32_t ReadRegLocked (uint32_t off) const;
-    void     WriteRegLocked(uint32_t off, uint32_t value);
-    void     OnIpuConfWriteLocked(uint32_t old_conf, uint32_t new_conf);
-    void     OnImaAddrWriteLocked(uint32_t value);
-    void     OnImaDataWriteLocked(uint32_t value);
-    void     PublishSdcDimsLocked();
-    void     EffectiveDimsLocked(uint32_t* w, uint32_t* h) const;
-    void     RouteSdc3VsyncToAvicLocked();
-
-    static bool OffsetToSlot(uint32_t off, uint32_t* slot_out) {
-        if (off > kLastOff || (off & 0x3u) != 0u) return false;
-        *slot_out = off / 4u;
-        return true;
-    }
-
-    static uint32_t ExtractBitsFromWord1(const uint32_t* w1_dwords,
-                                         uint32_t lsb,
-                                         uint32_t width);
-    ChannelFormat   DecodeChannelFormatLocked(uint32_t channel) const;
+    uint32_t last_pub_w_      = 0;
+    uint32_t last_pub_h_      = 0;
+    bool     bg_in_frame_     = false;
+    Imx31SdcTimingRegs latched_sdc_;
 };

@@ -77,8 +77,14 @@ machine. A rollback that fails is a CERF bug, and CERF halts.
 
 The magic moves only when the frame or tag encoding in `state_stream` changes.
 
-A `RestoreState` never calls `CerfFatalExit` or `Fatal::Die` on a value it read
-from the image. It calls `r.Reject`, which refuses the image.
+**A `RestoreState` does not compare a value against a state that CERF never produces.**
+Such a state reaches an image in two ways only. In the first, CERF corrupted the
+state, and the defect to fix is the corruptor. In the second, a user edited the
+file. A check against such a state is dead code.
+
+An image can carry a value that CERF produced under another configuration, for
+example a display depth that the user changed after the save. The reader refuses
+it with `r.Reject`, never with `CerfFatalExit` or `Fatal::Die`.
 
 A buffer whose size this build fixes is read at that size, with no saved count.
 The byte-block tag then refuses an image that saved another size.

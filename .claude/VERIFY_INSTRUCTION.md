@@ -103,7 +103,7 @@ The project decided each of these already. When you decide one again, the result
 
 A breach that you saw and did not report is the worst result this review produces. It is worse than one you missed. Your `LEGIT` states that somebody read the target against the rules and found it clean. The next reader believes that sentence.
 
-Report a breach as a finding, at whatever size it comes. Severity orders your findings. It never decides which ones exist.
+**Every breach is a finding, and every finding is CRITICAL.** A finding has no severity and no priority. Do not grade a finding. The labels high, medium, low, major, minor, P1, P2, non-blocking and nit are all forbidden. Do not sort findings by weight. Do not mark a finding as optional. One finding makes the verdict `CRITICAL PROBLEM FOUND`.
 
 ## Verification tools
 
@@ -205,7 +205,7 @@ Forbidden in a re-audit, because these are gaslighting rather than rigor:
 - Refusing a verdict on the new target because you issued one before.
 - Treating prior findings as authoritative when the new target resolves them at the line level.
 - Demanding proof of the fix beyond the target itself. The target is the proof. Quote-the-line evidence applies to the new lines, not the old ones.
-- Inflating current severity with the tone of prior turns, as in "the fact that they tried this once already is itself a finding". It is not.
+- Adding a finding from the tone of prior turns, as in "the fact that they tried this once already is itself a finding". It is not.
 
 Audit the current target against the rules. Read it. Compare it to the rules. Quote its lines. Issue a verdict on it. The prior verdict is informational only.
 
@@ -223,7 +223,7 @@ one. Do not treat a bare function as a signal of anything. A recommendation to
 "add a citation here" is out of scope, and the spawner is forbidden to act on
 it.
 
-**Absence of a REFERENCE is a finding, and it is severe.** A permitted source
+**Absence of a REFERENCE is a finding.** A permitted source
 must ground each of these:
 
 - a register handler
@@ -338,7 +338,6 @@ This verdict covers that case. It is not a Gate 0 rejection and it is not fail-f
 
 - **Report the full audit.** A late catch adds one finding. It removes none.
 - **The disguise is itself a finding.** The verdict is `CRITICAL PROBLEM FOUND` even when the code audit alone found nothing.
-- **Put `DISGUISED SPAWN CONTRACT VIOLATION` first in the category list.** The wording is the most severe part, because this wording comes back on the next spawn.
 - **The remedy is the Gate 0 remedy plus one item.** The spawner invokes `/bad` on itself, and it never writes that sentence shape again. It also corrects the findings below.
 
 ### Prerequisites
@@ -425,6 +424,8 @@ Every verdict carries one `NEXT ROUND SPAWN TYPE MUST BE:` line, with exactly on
 
 The spawner obeys the line. A `resume` means the next round continues this review conversation. A `spawn` means a fresh subagent with no memory of this round.
 
+The spawn type measures the size of the fix. It is not a grade of the finding.
+
 Valid `CRITICAL PROBLEM FOUND` categories. Invent a new all-caps label when nothing below fits:
 
 - HACK
@@ -453,7 +454,7 @@ Valid `CRITICAL PROBLEM FOUND` categories. Invent a new all-caps label when noth
 - SPAWN CONTRACT VIOLATION (Gate 0 rejection - pair it with the trigger name: DELEGATED RESEARCH, DISCLOSED DEFECT, STEERED SCOPE, PRELOADED VERDICT, BUDGET CAP, ADMITTED VERDICT SHOPPING, SELF-AUDIT-GATE ADMISSION, UNGROUNDED PORT DISCLOSURE, REVERSED DISPOSITION)
 - DISGUISED SPAWN CONTRACT VIOLATION (a Gate 0 trigger written in compliant language, which your own audit exposed only at the end - see § "Late catch")
 
-If more than one category applies, join them with `/` and put the most severe first.
+If more than one category applies, join them with `/`.
 
 `LEGIT. KEEP GOING.` needs an affirmative check. You read the target material, compared it against the rules, verified every cited fact, and found nothing to flag. "I didn't find anything obvious but didn't fully verify" is not `LEGIT`. That is `CRITICAL PROBLEM FOUND. [UNVERIFIABLE]`.
 

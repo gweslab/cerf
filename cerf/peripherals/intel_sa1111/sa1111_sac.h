@@ -1,75 +1,68 @@
 #pragma once
 
-#include "../peripheral_base.h"
+#include "sa1111_unit.h"
+#include "../../jit/guest_cycle_clock.h"
 
 #include <cstdint>
-#include <functional>
-#include <mutex>
 
-/* SA-1111 Serial Audio Controller (Developer's Manual ch.7, Table 7-31,
-   base 0x40000600). SASR0/1 idle 0x9 = TNF|TFS - 0 wedges guest FIFO polls.
-   TX DMA self-re-arms A/B: wavedev kicks SADTCS=0x53 ONCE (sub_FD17EC) and
-   never rewrites it while playing; waiting for a re-kick stalls playback. */
-class Sa1111Sac : public Peripheral {
+class Sa1111SacDma;
+class Sa1111SacHostOutput;
+class Sa1111SacL3;
+class Sa1111SacRequestLines;
+class Sa1111SacRxFifo;
+class Sa1111SacTxStream;
+
+class Sa1111Sac : public Sa1111Unit {
 public:
-    using Peripheral::Peripheral;
+    using Sa1111Unit::Sa1111Unit;
 
     bool ShouldRegister() override;
-    void OnReady() override;
 
     uint32_t MmioBase() const override { return 0x40000600u; }
     uint32_t MmioSize() const override { return 0x00000200u; }
 
-    uint32_t ReadWord (uint32_t addr) override;
-    void     WriteWord(uint32_t addr, uint32_t value) override;
-
-    /* One transmit buffer handed to the board audio player. src_pa points
-       at guest DRAM (SADTSA/B), byte_count from SADTCA/B (4-byte units,
-       Tables 7-20/7-21). Sink returns false to decline; the SAC then
-       completes the page itself, unpaced. */
-    struct TransmitPage {
-        bool     buffer_b;
-        uint32_t src_pa;
-        uint32_t byte_count;
-        uint32_t sample_rate_hz;
-    };
-    using TransmitSink = std::function<bool(const TransmitPage&)>;
-    void RegisterTransmitSink(TransmitSink sink) { tx_sink_ = std::move(sink); }
-
-    /* Called by the player when the page finished playing: sets TDBDA/B,
-       raises INTC source 32/33 (Table 11-1) when TDIE, submits the other
-       buffer while TDEN holds. */
-    void CompleteTransmit(bool buffer_b);
-
     void SaveState(StateWriter& w) override;
     void RestoreState(StateReader& r) override;
+    void PostRestore() override;
+
+protected:
+    void     OnUnitReady() override;
+    void     OnChipReset(bool held) override;
+    uint32_t UnitReadWord (uint32_t addr) override;
+    void     UnitWriteWord(uint32_t addr, uint32_t value) override;
 
 private:
-    enum : uint32_t {                  /* SADTCS bits, Table 7-19. */
-        kTden  = 1u << 0,
-        kTdie  = 1u << 1,
-        kTdbda = 1u << 3,
-        kTdsta = 1u << 4,
-        kTdbdb = 1u << 5,
-        kTdstb = 1u << 6,
-        kTbiu  = 1u << 7,
-    };
+    void     OnSystemClockWrite();
+    void     WriteRegister(uint32_t addr, uint32_t value);
+    void     ResetRegisters(uint64_t now, bool chip);
+    bool     RstActive() const;
+    void     WriteSacr0(uint32_t value);
+    void     WriteSacr1(uint32_t value);
+    void     UpdateSerializer(uint64_t now);
+    bool     SerializerWanted() const;
+    bool     RecordingWanted() const;
+    void     RequireFrameClock() const;
+    void     RequireI2sMode() const;
+    uint32_t ThresholdLevel() const;
+    uint32_t RxThresholdLevel() const;
+    bool     Enabled() const;
+    uint32_t FifoStatus(uint64_t now);
+    void     PublishRequestLines(uint64_t now);
+    void     SyncRequestLines();
+    void     RescaleFrames(uint64_t now);
+    void     ApplyFrameRate(uint64_t now);
 
-    void    WriteSadtcs(uint32_t value);
-    void    TryStartNextLocked(std::unique_lock<std::mutex>& lk);
+    GuestCycleClock*        clock_   = nullptr;
+    Sa1111SacDma*           dma_     = nullptr;
+    Sa1111SacTxStream*      stream_  = nullptr;
+    Sa1111SacRxFifo*        rx_      = nullptr;
+    Sa1111SacRequestLines*  lines_   = nullptr;
+    Sa1111SacHostOutput*    host_    = nullptr;
+    Sa1111SacL3*            l3_      = nullptr;
 
-    std::mutex dma_mtx_;               /* JIT-thread writes vs player-thread
-                                          completions. */
-    TransmitSink tx_sink_;
-    bool tx_running_  = false;
-    bool tx_buffer_b_ = false;
+    /* SA-1111 Developer's Manual Table 7-7 note: "The power-up/reset default value of this
+       register is 7700h." */
+    static constexpr uint32_t kSacr0Reset = 0x7700u;
 
-    uint32_t sacr0_ = 0, sacr1_ = 0, sacr2_ = 0;
-    uint32_t accar_ = 0, accdr_ = 0, acsar_ = 0;
-    uint32_t sadtcs_ = 0, sadtsa_ = 0, sadtca_ = 0, sadtsb_ = 0, sadtcb_ = 0;
-    uint32_t sadrcs_ = 0, sadrsa_ = 0, sadrca_ = 0, sadrsb_ = 0, sadrcb_ = 0;
-    uint32_t saitr_ = 0;
-    uint32_t l3car_ = 0;
-    uint8_t  l3_regs_[256] = {};       /* UDA1344 codec settings via L3. */
-    bool     l3wd_ = false, l3rd_ = false;
+    uint32_t sacr0_ = kSacr0Reset, sacr1_ = 0;
 };

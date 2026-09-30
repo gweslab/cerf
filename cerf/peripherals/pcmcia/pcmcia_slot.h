@@ -17,6 +17,7 @@ public:
     virtual void OnCardDetectChanged(PcmciaSlot& slot) = 0;
     virtual void OnCardIrqAsserted  (PcmciaSlot& slot) = 0;
     virtual void OnCardIrqDeasserted(PcmciaSlot& slot) = 0;
+    virtual void OnCardAccess(PcmciaSlot&) {}
 };
 
 /* One physical PCMCIA socket. Lock hierarchy: bus_mutex_ > backend rx-callback
@@ -37,6 +38,7 @@ public:
     }
     void SetPowered(bool on);
     void ResetCard();          /* socket RESET pin pulse */
+    void GateCardAccess() { access_gate_ = true; }
 
     uint8_t  ReadAttribute8 (uint32_t offset);
     void     WriteAttribute8(uint32_t offset, uint8_t value);
@@ -84,6 +86,7 @@ private:
     static constexpr uint8_t kPinPresent = 0x01u;
     static constexpr uint8_t kPinPowered = 0x02u;
     void PublishPinsLocked();
+    bool CardSelectedLocked();
 
     void InsertLocked(std::unique_ptr<PcmciaCard> card);
     void EjectLocked();
@@ -106,6 +109,7 @@ private:
     mutable std::mutex          bus_mutex_;
     std::unique_ptr<PcmciaCard> card_;
     bool                        powered_ = false;
+    bool                        access_gate_ = false;
     uint64_t                    generation_ = 0;
     std::atomic<uint8_t>        pins_{0};
 

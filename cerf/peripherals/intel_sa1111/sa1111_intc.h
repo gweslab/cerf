@@ -1,25 +1,24 @@
 #pragma once
 
-#include "../peripheral_base.h"
+#include "sa1111_unit.h"
 
 #include <cstdint>
+#include <functional>
+#include <mutex>
+#include <vector>
 
 /* SA-1111 Interrupt Controller (Developer's Manual Table 11-2, base
    0x40001600). Sub-blocks call RaiseInterrupt/LowerInterrupt with their
    Table 11-1 source number (0..63); the chip IRQ output cascades through
    an SA-1110 GPIO. */
-class Sa1111Intc : public Peripheral {
+class Sa1111Intc : public Sa1111Unit {
 public:
-    using Peripheral::Peripheral;
+    using Sa1111Unit::Sa1111Unit;
 
     bool ShouldRegister() override;
-    void OnReady() override;
 
     uint32_t MmioBase() const override { return 0x40001600u; }
     uint32_t MmioSize() const override { return 0x00000200u; }
-
-    uint32_t ReadWord (uint32_t addr) override;
-    void     WriteWord(uint32_t addr, uint32_t value) override;
 
     void SaveState(StateWriter& w) override;
     void RestoreState(StateReader& r) override;
@@ -32,13 +31,28 @@ public:
     void RaiseInterrupt(uint8_t source);
     void LowerInterrupt(uint8_t source);
 
-    /* True while any enabled source is pending - the level the chip's
-       cascade output drives onto its SA-1110 GPIO. */
-    bool OutputAsserted() const { return (status0_ & enable0_) ||
-                                         (status1_ & enable1_); }
+    void RegisterSampler(uint64_t sources, std::function<void()> sample);
+    void SetSourceLevel(uint8_t source, bool level);
+
+protected:
+    void     OnUnitReady() override;
+    void     OnChipReset(bool held) override;
+    uint32_t UnitReadWord (uint32_t addr) override;
+    void     UnitWriteWord(uint32_t addr, uint32_t value) override;
 
 private:
+    bool OutputAsserted() const { return (status0_ & enable0_) ||
+                                         (status1_ & enable1_); }
     void DriveCascadeOutput(bool pulse_low_first);
+    void SampleSources();
+    void RequireUnsampled(uint32_t bank, uint32_t enable) const;
+    void SetAsleep(bool asleep);
+    void RequireAwake(uint8_t source) const;
+
+    std::mutex mtx_;
+    std::vector<std::function<void()>> samplers_;
+    uint32_t sampled0_ = 0, sampled1_ = 0;
+    bool     asleep_   = false;
 
     /* Latch sources whose (raw ^ pol) rose 0->1 into status; run on raw AND
        INTPOL writes - the INTPOL case is the kernel's retrigger (Fig 11-1). */

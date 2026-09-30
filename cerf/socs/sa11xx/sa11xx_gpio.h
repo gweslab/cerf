@@ -3,7 +3,9 @@
 #include "../../peripherals/peripheral_base.h"
 
 #include <cstdint>
+#include <functional>
 #include <mutex>
+#include <vector>
 
 /* SA-1110 Dev Man §9.1.1: GPSR (+0x8) and GPCR (+0xC) are W-O set/clear
    commands updating the output shadow read via GPLR (+0x0); GEDR (+0x18)
@@ -37,6 +39,17 @@ public:
 
     void LoadSleepOutputs(uint32_t pgsr);
 
+    using OutputObserver = std::function<void(uint32_t levels, uint32_t out_mask, bool resync)>;
+    void RegisterOutputObserver(OutputObserver fn);
+
+    struct PinConfig {
+        bool output;
+        bool alternate;
+        bool latch;
+    };
+    PinConfig Pin(uint32_t pin) const;
+    void RegisterPinConfigListener(std::function<void()> fn);
+
 private:
     static constexpr uint32_t kPinMask = 0x0FFFFFFFu;  /* bits 27:0 */
 
@@ -57,8 +70,13 @@ private:
     uint32_t ReadGplrLocked() const {
         return ((output_state_ & gpdr_) | (input_state_ & ~gpdr_)) & kPinMask;
     }
+    uint32_t OutputMaskLocked() const { return gpdr_ & ~gafr_ & kPinMask; }
 
     uint32_t ReadReg(uint32_t off);
     void     WriteReg(uint32_t off, uint32_t value);
     void     PublishEdgeSourcesLocked();
+    void     NotifyOutputs(uint32_t levels, uint32_t out_mask, bool resync);
+
+    std::vector<OutputObserver> output_observers_;
+    std::vector<std::function<void()>> pin_config_listeners_;
 };

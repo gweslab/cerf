@@ -31,11 +31,18 @@ void Sa11xxGpio::OnReady() {
        wake-up register". */
     emu_.Get<GuestCpuReset>().RegisterResetListener([this](ResetLineKind kind) {
         std::unique_lock<std::mutex> lk(mtx_);
+        const uint32_t mask_before = OutputMaskLocked();
         gafr_ = 0;
-        if (emu_.Get<GuestCpuReset>().DeliveredResetWasResume()) return;
-        grer_ |= 0x3u;
-        gfer_ |= 0x3u;
-        if (kind == ResetLineKind::Rtc) gpdr_ = 0;
+        if (!emu_.Get<GuestCpuReset>().DeliveredResetWasResume()) {
+            grer_ |= 0x3u;
+            gfer_ |= 0x3u;
+            if (kind == ResetLineKind::Rtc) gpdr_ = 0;
+        }
+        const uint32_t mask = OutputMaskLocked();
+        if (mask == mask_before) return;
+        const uint32_t levels = output_state_ & mask;
+        lk.unlock();
+        NotifyOutputs(levels, mask, false);
     });
 }
 
@@ -43,7 +50,38 @@ void Sa11xxGpio::OnReady() {
    loaded". */
 void Sa11xxGpio::LoadSleepOutputs(uint32_t pgsr) {
     std::unique_lock<std::mutex> lk(mtx_);
+    const uint32_t mask   = OutputMaskLocked();
+    const uint32_t before = output_state_ & mask;
     output_state_ = pgsr & kPinMask;
+    const uint32_t levels = output_state_ & mask;
+    if (levels == before) return;
+    lk.unlock();
+    NotifyOutputs(levels, mask, false);
+}
+
+void Sa11xxGpio::RegisterOutputObserver(OutputObserver fn) {
+    uint32_t levels = 0, mask = 0;
+    {
+        std::unique_lock<std::mutex> lk(mtx_);
+        mask   = OutputMaskLocked();
+        levels = output_state_ & mask;
+    }
+    fn(levels, mask, true);
+    output_observers_.push_back(std::move(fn));
+}
+
+void Sa11xxGpio::NotifyOutputs(uint32_t levels, uint32_t out_mask, bool resync) {
+    for (auto& fn : output_observers_) fn(levels, out_mask, resync);
+}
+
+Sa11xxGpio::PinConfig Sa11xxGpio::Pin(uint32_t pin) const {
+    const uint32_t bit = 1u << pin;
+    std::unique_lock<std::mutex> lk(mtx_);
+    return {(gpdr_ & bit) != 0u, (gafr_ & bit) != 0u, (output_state_ & bit) != 0u};
+}
+
+void Sa11xxGpio::RegisterPinConfigListener(std::function<void()> fn) {
+    pin_config_listeners_.push_back(std::move(fn));
 }
 
 uint32_t Sa11xxGpio::InputEdges() const {
@@ -99,6 +137,11 @@ uint32_t Sa11xxGpio::ReadReg(uint32_t off) {
 void Sa11xxGpio::WriteReg(uint32_t off, uint32_t value) {
     const uint32_t v = value & kPinMask;
     std::unique_lock<std::mutex> lk(mtx_);
+    const uint32_t mask_before   = OutputMaskLocked();
+    const uint32_t levels_before = output_state_ & mask_before;
+    const uint32_t gpdr_before   = gpdr_;
+    const uint32_t gafr_before   = gafr_;
+    const uint32_t latch_before  = output_state_;
     switch (off) {
         case 0x00: break;                                      /* GPLR R-O, writes ignored */
         case 0x04: gpdr_ = v; break;
@@ -111,6 +154,14 @@ void Sa11xxGpio::WriteReg(uint32_t off, uint32_t value) {
         default:
             emu_.Get<Fatal>().Die("Sa11xxGpio: write of unmapped offset +0x%02X", off);
     }
+    const uint32_t mask   = OutputMaskLocked();
+    const uint32_t levels = output_state_ & mask;
+    const bool pins_changed = gpdr_ != gpdr_before || gafr_ != gafr_before ||
+                              output_state_ != latch_before;
+    lk.unlock();
+    if (mask != mask_before || levels != levels_before) NotifyOutputs(levels, mask, false);
+    if (!pins_changed) return;
+    for (auto& fn : pin_config_listeners_) fn();
 }
 
 uint32_t Sa11xxGpio::ReadWord(uint32_t addr) {
@@ -152,6 +203,10 @@ void Sa11xxGpio::PostRestore() {
        INTC's own RestoreState can't know about. */
     std::unique_lock<std::mutex> lk(mtx_);
     PublishEdgeSourcesLocked();
+    const uint32_t mask   = OutputMaskLocked();
+    const uint32_t levels = output_state_ & mask;
+    lk.unlock();
+    NotifyOutputs(levels, mask, true);
 }
 
 REGISTER_SERVICE(Sa11xxGpio);

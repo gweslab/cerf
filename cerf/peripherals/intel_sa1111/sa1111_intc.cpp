@@ -1,26 +1,120 @@
 #include "sa1111_intc.h"
 
 #include "../../core/cerf_emulator.h"
+#include "../../core/fatal.h"
 #include "../../boards/board_context.h"
 #include "../../boards/jornada720/jornada_720_id.h"
 #include "../../socs/sa11xx/sa11xx_gpio.h"
-#include "../peripheral_dispatcher.h"
 #include "../../state/state_stream.h"
+#include "sa1111_sbi.h"
+#include "sa1111_system_controller.h"
+
+namespace {
+
+/* SA-1111 Developer's Manual Table 3-3 note 1: "All reserved bits are read back as zero."
+   Table 11-1: sources 27:31 and 55:63 reserved; §11.5.5 INTTSTSEL bits 1:0. */
+constexpr uint32_t kSources0   = 0x07FFFFFFu;
+constexpr uint32_t kSources1   = 0x007FFFFFu;
+constexpr uint32_t kTstselBits = 0x3u;
+
+}
 
 bool Sa1111Intc::ShouldRegister() {
     auto* bd = emu_.TryGet<BoardContext>();
     return bd && bd->GetBoardId() == BoardId::Jornada720;
 }
 
-void Sa1111Intc::OnReady() {
-    emu_.Get<PeripheralDispatcher>().Register(this);
+/* SA-1111 Developer's Manual §2.3: "Unless indicated otherwise, all register bits are set to
+   zero during reset." */
+void Sa1111Intc::OnChipReset(bool held) {
+    if (!held) return;
+    std::lock_guard<std::mutex> lk(mtx_);
+    asleep_    = false;
+    inttest0_  = inttest1_  = 0u;
+    enable0_   = enable1_   = 0u;
+    polarity0_ = polarity1_ = 0u;
+    tstsel_    = 0u;
+    status0_   = status1_   = 0u;
+    wake_en0_  = wake_en1_  = 0u;
+    wake_pol0_ = wake_pol1_ = 0u;
+    detect0_   = raw0_;
+    detect1_   = raw1_;
+    DriveCascadeOutput(false);
+}
+
+void Sa1111Intc::OnUnitReady() {
+    const auto& sbi = emu_.Get<Sa1111Sbi>();
+    emu_.Get<Sa1111SystemController>().RegisterClockListener([this, &sbi] {
+        std::lock_guard<std::mutex> lk(mtx_);
+        SetAsleep(sbi.SleepRequested());
+    });
+}
+
+/* SA-1111 Developer's Manual §11.3.2 (printed 11-4): "Wake-up interrupts are only active when
+   the Sleep state has been initiated by software"; "When an enabled wake-up signal is detected,
+   the logical OR of all potential sources is output on the INT pin." */
+void Sa1111Intc::SetAsleep(bool asleep) {
+    if (asleep && !asleep_ && OutputAsserted()) {
+        emu_.Get<Fatal>().Die("Sa1111Intc: SKCR Sleep set with INT asserted (status0 0x%08X, "
+                              "status1 0x%08X) is not modelled", status0_, status1_);
+    }
+    asleep_ = asleep;
+}
+
+void Sa1111Intc::RequireAwake(uint8_t source) const {
+    if (!asleep_) return;
+    emu_.Get<Fatal>().Die("Sa1111Intc: source %u changed with SKCR Sleep set (the wake-up path) "
+                          "is not modelled", source);
+}
+
+void Sa1111Intc::RegisterSampler(uint64_t sources, std::function<void()> sample) {
+    std::lock_guard<std::mutex> lk(mtx_);
+    sampled0_ |= static_cast<uint32_t>(sources);
+    sampled1_ |= static_cast<uint32_t>(sources >> 32);
+    samplers_.push_back(std::move(sample));
+}
+
+void Sa1111Intc::SampleSources() {
+    for (auto& fn : samplers_) fn();
+}
+
+/* SA-1111 Developer's Manual §11.5.3 INTEN: "Writing a zero disables that status bit from
+   generating an interrupt and writing a one enables its effect." */
+void Sa1111Intc::RequireUnsampled(uint32_t bank, uint32_t enable) const {
+    const uint32_t sampled = (bank != 0u ? sampled1_ : sampled0_) & enable;
+    if (sampled == 0u) return;
+    emu_.Get<Fatal>().Die("Sa1111Intc: INTEN%u 0x%08X enables source bits 0x%08X, whose "
+                          "interrupt timing is not modelled", bank, enable, sampled);
+}
+
+/* §2.3: "When nRESET is asserted, all on-chip activity halts". */
+void Sa1111Intc::SetSourceLevel(uint8_t source, bool level) {
+    std::lock_guard<std::mutex> lk(mtx_);
+    const bool     bank1 = source >= 32u;
+    const uint32_t bit   = 1u << (source & 31u);
+    uint32_t& raw = bank1 ? raw1_ : raw0_;
+    raw = level ? (raw | bit) : (raw & ~bit);
+    if (ChipHeld()) {
+        (bank1 ? detect1_ : detect0_) = raw ^ (bank1 ? polarity1_ : polarity0_);
+        return;
+    }
+    RequireAwake(source);
+    LatchEdges(bank1);
+    DriveCascadeOutput(false);
 }
 
 /* Offsets within the 0x40001600 block, Developer's Manual Table 11-2. */
-uint32_t Sa1111Intc::ReadWord(uint32_t addr) {
-    switch (addr - MmioBase()) {
-        case 0x00: return inttest0_;
-        case 0x04: return inttest1_;
+uint32_t Sa1111Intc::UnitReadWord(uint32_t addr) {
+    SampleSources();
+    std::lock_guard<std::mutex> lk(mtx_);
+    const uint32_t off = addr - MmioBase();
+    switch (off) {
+        /* §11.5.2 INTTEST: "On read, only bit 0 is significant indicating the logical OR of
+           all the interrupt bits"; §11.5.7 INTSET: "When read, this register returns the value
+           of the interrupt before it has been synchronized". */
+        case 0x00: case 0x04: case 0x24: case 0x28:
+            emu_.Get<Fatal>().Die("Sa1111Intc: %s read at +0x%02X is not modelled",
+                                  off <= 0x04u ? "INTTEST" : "INTSET", off);
         case 0x08: return enable0_;
         case 0x0C: return enable1_;
         case 0x10: return polarity0_;
@@ -28,8 +122,6 @@ uint32_t Sa1111Intc::ReadWord(uint32_t addr) {
         case 0x18: return tstsel_;
         case 0x1C: return status0_;     /* INTSTATCLR0 read = pending. */
         case 0x20: return status1_;
-        case 0x24: return 0;            /* INTSET0 write-1-to-set; read unspecified. */
-        case 0x28: return 0;            /* INTSET1. */
         case 0x2C: return wake_en0_;
         case 0x30: return wake_en1_;
         case 0x34: return wake_pol0_;
@@ -38,29 +130,46 @@ uint32_t Sa1111Intc::ReadWord(uint32_t addr) {
     HaltUnsupportedAccess("ReadWord", addr, 0);
 }
 
-void Sa1111Intc::WriteWord(uint32_t addr, uint32_t value) {
-    switch (addr - MmioBase()) {
-        case 0x00: inttest0_  = value; return;
-        case 0x04: inttest1_  = value; return;
-        case 0x08: enable0_   = value; DriveCascadeOutput(false); return;
-        case 0x0C: enable1_   = value; DriveCascadeOutput(false); return;
-        case 0x10: polarity0_ = value; LatchEdges(false);
+void Sa1111Intc::UnitWriteWord(uint32_t addr, uint32_t value) {
+    SampleSources();
+    std::lock_guard<std::mutex> lk(mtx_);
+    const uint32_t off = addr - MmioBase();
+    switch (off) {
+        case 0x00: inttest0_  = value & kSources0; return;
+        case 0x04: inttest1_  = value & kSources1; return;
+        case 0x08: RequireUnsampled(0u, value & kSources0);
+                   enable0_   = value & kSources0; DriveCascadeOutput(false); return;
+        case 0x0C: RequireUnsampled(1u, value & kSources1);
+                   enable1_   = value & kSources1; DriveCascadeOutput(false); return;
+        case 0x10: polarity0_ = value & kSources0; LatchEdges(false);
                    DriveCascadeOutput(false); return;
-        case 0x14: polarity1_ = value; LatchEdges(true);
+        case 0x14: polarity1_ = value & kSources1; LatchEdges(true);
                    DriveCascadeOutput(false); return;
-        case 0x18: tstsel_    = value; return;
+        /* §11.5.5 INTTSTSEL: bit 0 selects "the interrupt test register (Inttest) as the raw
+           input", bit 1 "sets the mode as wake-up". */
+        case 0x18:
+            if ((value & kTstselBits) != 0u) {
+                emu_.Get<Fatal>().Die("Sa1111Intc: INTTSTSEL 0x%08X (test source or wake-up "
+                                      "mode) is not modelled", value);
+            }
+            tstsel_ = 0u;
+            return;
         case 0x1C: status0_  &= ~value;           /* INTSTATCLR0 W1C. */
                    DriveCascadeOutput(true); return;
         case 0x20: status1_  &= ~value;
                    DriveCascadeOutput(true); return;
-        case 0x24: status0_  |= value;            /* INTSET0 software-set. */
-                   DriveCascadeOutput(false); return;
-        case 0x28: status1_  |= value;
-                   DriveCascadeOutput(false); return;
-        case 0x2C: wake_en0_  = value; return;
-        case 0x30: wake_en1_  = value; return;
-        case 0x34: wake_pol0_ = value; return;
-        case 0x38: wake_pol1_ = value; return;
+        /* §11.5.7 INTSET: "These registers allow the interrupt sources to be set. Writing a one
+           will set the interrupt value, writing a zero will do nothing." */
+        case 0x24: case 0x28:
+            if ((value & (off == 0x24u ? kSources0 : kSources1)) != 0u) {
+                emu_.Get<Fatal>().Die("Sa1111Intc: INTSET write 0x%08X at +0x%02X is not "
+                                      "modelled", value, off);
+            }
+            return;
+        case 0x2C: wake_en0_  = value & kSources0; return;
+        case 0x30: wake_en1_  = value & kSources1; return;
+        case 0x34: wake_pol0_ = value & kSources0; return;
+        case 0x38: wake_pol1_ = value & kSources1; return;
     }
     HaltUnsupportedAccess("WriteWord", addr, value);
 }
@@ -92,23 +201,37 @@ void Sa1111Intc::LatchEdges(bool bank1) {
 }
 
 void Sa1111Intc::RaiseInterrupt(uint8_t source) {
-    if (source < 32) { raw0_ |= 1u << source;        LatchEdges(false);
-                       status0_ |= 1u << source; }
-    else             { raw1_ |= 1u << (source - 32); LatchEdges(true);
-                       status1_ |= 1u << (source - 32); }
+    std::lock_guard<std::mutex> lk(mtx_);
+    if (source < 32) raw0_ |= 1u << source;
+    else             raw1_ |= 1u << (source - 32);
+    if (ChipHeld()) {
+        detect0_ = raw0_ ^ polarity0_;
+        detect1_ = raw1_ ^ polarity1_;
+        return;
+    }
+    RequireAwake(source);
+    if (source < 32) { LatchEdges(false); status0_ |= 1u << source; }
+    else             { LatchEdges(true);  status1_ |= 1u << (source - 32); }
     DriveCascadeOutput(false);
 }
 
 void Sa1111Intc::LowerInterrupt(uint8_t source) {
-    if (source < 32) { raw0_ &= ~(1u << source);        LatchEdges(false); }
-    else             { raw1_ &= ~(1u << (source - 32)); LatchEdges(true);  }
+    std::lock_guard<std::mutex> lk(mtx_);
+    if (source < 32) raw0_ &= ~(1u << source);
+    else             raw1_ &= ~(1u << (source - 32));
+    if (ChipHeld()) {
+        detect0_ = raw0_ ^ polarity0_;
+        detect1_ = raw1_ ^ polarity1_;
+        return;
+    }
+    RequireAwake(source);
+    LatchEdges(source >= 32);
     DriveCascadeOutput(false);
 }
 
-/* Whole register/latch image - every member is a guest-observable
-   integer (raw lines, edge-detect latches, enable/polarity/test/status/
-   wake registers). Order mirrors the field declaration order in the .h. */
 void Sa1111Intc::SaveState(StateWriter& w) {
+    SampleSources();
+    std::lock_guard<std::mutex> lk(mtx_);
     w.Write("raw0", raw0_);      w.Write("raw1", raw1_);
     w.Write("detect0", detect0_);   w.Write("detect1", detect1_);
     w.Write("inttest0", inttest0_);  w.Write("inttest1", inttest1_);
@@ -121,6 +244,7 @@ void Sa1111Intc::SaveState(StateWriter& w) {
 }
 
 void Sa1111Intc::RestoreState(StateReader& r) {
+    std::lock_guard<std::mutex> lk(mtx_);
     r.Read("raw0", raw0_);      r.Read("raw1", raw1_);
     r.Read("detect0", detect0_);   r.Read("detect1", detect1_);
     r.Read("inttest0", inttest0_);  r.Read("inttest1", inttest1_);
@@ -133,8 +257,9 @@ void Sa1111Intc::RestoreState(StateReader& r) {
 }
 
 void Sa1111Intc::PostRestore() {
-    /* Re-drive the cascade line to the SA-1110 GPIO from the restored status,
-       which RestoreState alone leaves stale. */
+    const bool asleep = emu_.Get<Sa1111Sbi>().SleepRequested();
+    std::lock_guard<std::mutex> lk(mtx_);
+    asleep_ = asleep;
     DriveCascadeOutput(false);
 }
 

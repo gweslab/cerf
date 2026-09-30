@@ -11,6 +11,7 @@
 #include "../../jit/guest_engine.h"
 #include "../../peripherals/peripheral_dispatcher.h"
 #include "../../state/state_stream.h"
+#include "sa11xx_test_unit.h"
 
 #include <atomic>
 
@@ -31,6 +32,7 @@ public:
         return bd && (bd->GetSocId() == SocId::Sa1110 || bd->GetSocId() == SocId::Sa1100);
     }
     void OnReady() override {
+        test_unit_ = &emu_.Get<Sa11xxTestUnit>();
         emu_.Get<PeripheralDispatcher>().Register(this);
         emu_.Get<GuestCpuReset>().SetCauseLatch(this);
         emu_.Get<GuestDeepSleep>().RegisterWaker(this);
@@ -74,11 +76,7 @@ private:
        reads/W1C-clears it. */
     std::atomic<uint32_t> rcsr_{0x1u};  /* HWR cold-reset state per §9.6.1.2. */
 
-    /* SA-1110 Dev Man App. D.1: TUCR (+0x08, reset 0) is a R/W control
-       register - TSEL2:0 clock-out select, MIR, PMD; no hardware-set
-       bits - so plain storage is faithful. The clock-out routing
-       (TSEL=0b101 drives RCLK to the SA-1111) has no CERF side effect. */
-    uint32_t tucr_ = 0;
+    Sa11xxTestUnit* test_unit_ = nullptr;
 
     void ApplyRcsrW1c(uint32_t v) {
         rcsr_.fetch_and(~(v & 0xFu), std::memory_order_acq_rel);
@@ -104,7 +102,7 @@ uint8_t Sa11xxResetController::ReadByte(uint32_t addr) {
         return static_cast<uint8_t>((rcsr_ >> (8 * (off - 0x4))) & 0xFFu);
     }
     if (off >= 0x8 && off <= 0xB) {
-        return static_cast<uint8_t>((tucr_ >> (8 * (off - 0x8))) & 0xFFu);
+        return static_cast<uint8_t>((test_unit_->Read() >> (8 * (off - 0x8))) & 0xFFu);
     }
     HaltUnsupportedAccess("ReadByte", addr, 0);
 }
@@ -113,7 +111,7 @@ uint32_t Sa11xxResetController::ReadWord(uint32_t addr) {
     const uint32_t off = addr - MmioBase();
     if (off == 0x0) return 0;
     if (off == 0x4) return rcsr_;
-    if (off == 0x8) return tucr_;
+    if (off == 0x8) return test_unit_->Read();
     HaltUnsupportedAccess("ReadWord", addr, 0);
 }
 
@@ -124,7 +122,8 @@ void Sa11xxResetController::WriteByte(uint32_t addr, uint8_t value) {
     if (off >= 0x5 && off <= 0x7) return;    /* RCSR bytes 1..3 reserved. */
     if (off >= 0x8 && off <= 0xB) {
         const uint32_t shift = 8 * (off - 0x8);
-        tucr_ = (tucr_ & ~(0xFFu << shift)) | (static_cast<uint32_t>(value) << shift);
+        const uint32_t tucr  = test_unit_->Read();
+        test_unit_->Write((tucr & ~(0xFFu << shift)) | (static_cast<uint32_t>(value) << shift));
         return;
     }
     HaltUnsupportedAccess("WriteByte", addr, value);
@@ -134,20 +133,20 @@ void Sa11xxResetController::WriteWord(uint32_t addr, uint32_t value) {
     const uint32_t off = addr - MmioBase();
     if (off == 0x0) { HandleRsrrWrite(value); return; }
     if (off == 0x4) { ApplyRcsrW1c(value); return; }
-    if (off == 0x8) { tucr_ = value; return; }
+    if (off == 0x8) { test_unit_->Write(value); return; }
     HaltUnsupportedAccess("WriteWord", addr, value);
 }
 
 void Sa11xxResetController::SaveState(StateWriter& w) {
     w.Write("rcsr", rcsr_.load(std::memory_order_acquire));
-    w.Write("tucr", tucr_);
+    test_unit_->Save(w);
 }
 
 void Sa11xxResetController::RestoreState(StateReader& r) {
     uint32_t rcsr = 0;
     r.Read("rcsr", rcsr);
     rcsr_.store(rcsr, std::memory_order_release);
-    r.Read("tucr", tucr_);
+    test_unit_->Restore(r);
 }
 
 }  /* namespace */

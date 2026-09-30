@@ -1,218 +1,322 @@
 #include "sa1111_sac.h"
 
 #include "../../core/cerf_emulator.h"
-#include "../../core/log.h"
+#include "../../core/fatal.h"
 #include "../../boards/board_context.h"
 #include "../../boards/jornada720/jornada_720_id.h"
-#include "../peripheral_dispatcher.h"
 #include "sa1111_intc.h"
+#include "sa1111_sac_dma.h"
+#include "sa1111_sac_host_output.h"
+#include "sa1111_sac_l3.h"
+#include "sa1111_sac_request_lines.h"
+#include "sa1111_sac_rx_fifo.h"
+#include "sa1111_sac_tx_stream.h"
+#include "sa1111_sbi.h"
 #include "sa1111_system_controller.h"
 #include "../../host/audio_activity_widget.h"
 #include "../../state/state_stream.h"
+
+namespace {
+
+constexpr uint32_t kSacr0Enb = 1u << 0;
+constexpr uint32_t kSacr0Rst = 1u << 3;
+constexpr uint32_t kSacr1Drec  = 1u << 3;
+constexpr uint32_t kSacr1Drpl  = 1u << 4;
+constexpr uint32_t kSacr1Enlbf = 1u << 5;
+constexpr uint32_t kSacr0TfthShift = 8u;
+constexpr uint32_t kSacr0TfthMask  = 0xFu << kSacr0TfthShift;
+constexpr uint32_t kSacr0RfthShift = 12u;
+constexpr uint32_t kSacr0RfthMask  = 0xFu << kSacr0RfthShift;
+
+/* SA-1111 Developer's Manual Table 3-3 note 1: "All reserved bits are read back as zero."
+   Table 7-7 SACR0 bits 0, 2, 3, 11:8, 15:12; Table 7-8 SACR1 bits 5:0. */
+constexpr uint32_t kSacr0Defined = 0xFF0Du;
+constexpr uint32_t kSacr1Defined = 0x3Fu;
+
+}
 
 bool Sa1111Sac::ShouldRegister() {
     auto* bd = emu_.TryGet<BoardContext>();
     return bd && bd->GetBoardId() == BoardId::Jornada720;
 }
 
-void Sa1111Sac::OnReady() {
-    emu_.Get<PeripheralDispatcher>().Register(this);
+void Sa1111Sac::OnUnitReady() {
     emu_.Get<AudioActivityWidget>().NotePresent();
+    stream_ = &emu_.Get<Sa1111SacTxStream>();
+    rx_     = &emu_.Get<Sa1111SacRxFifo>();
+    lines_  = &emu_.Get<Sa1111SacRequestLines>();
+    host_   = &emu_.Get<Sa1111SacHostOutput>();
+    l3_     = &emu_.Get<Sa1111SacL3>();
+    dma_    = &emu_.Get<Sa1111SacDma>();
+    dma_->SetFifoControlReader([this] {
+        return Sa1111SacDma::FifoControl{Enabled(), ThresholdLevel()};
+    });
+    emu_.Get<Sa1111Intc>().RegisterSampler(Sa1111SacRequestLines::kSourceMask,
+                                           [this] { SyncRequestLines(); });
+    emu_.Get<Sa1111SystemController>().RegisterClockListener([this] { OnSystemClockWrite(); });
+    clock_ = &emu_.Get<GuestCycleClock>();
+    clock_->RegisterRateListener([this] { ApplyFrameRate(clock_->Cycles()); });
+    uint64_t num = 0, den = 1;
+    emu_.Get<Sa1111SystemController>().AudioFrameRate(num, den);
+    if (!stream_->SetRatio(clock_->CpuHz(), emu_.Get<Sa1111Sbi>().CasLatency(), num, den)) {
+        emu_.Get<Fatal>().Die("Sa1111Sac: frame clock %llu/%llu Hz against the %llu Hz core "
+                              "overflows the 64-bit scale", static_cast<unsigned long long>(num),
+                              static_cast<unsigned long long>(den),
+                              static_cast<unsigned long long>(clock_->CpuHz()));
+    }
 }
 
-uint32_t Sa1111Sac::ReadWord(uint32_t addr) {
+uint32_t Sa1111Sac::UnitReadWord(uint32_t addr) {
     const uint32_t off = addr - MmioBase();
-    if (off >= 0x60u && off <= 0x9Cu) return 0;   /* SADR FIFO drained. */
     switch (off) {
         case 0x00: return sacr0_;
         case 0x04: return sacr1_;
-        case 0x08: return sacr2_;
-        case 0x0C: return 0x9u | (l3wd_ ? 1u << 16 : 0u)
-                               | (l3rd_ ? 1u << 17 : 0u);  /* SASR0. */
-        case 0x10: return 0x9u;                            /* SASR1. */
-        case 0x1C: return l3car_;
-        case 0x20: return l3_regs_[l3car_];
-        case 0x24: return accar_;
-        case 0x28: return accdr_;
-        case 0x2C: return acsar_;
-        case 0x30: return 0;          /* ACSDR - no AC-link codec. */
-        case 0x34: {
-            std::unique_lock<std::mutex> lk(dma_mtx_);
-            return sadtcs_;
+        case 0x0C: {
+            const uint64_t now = clock_->Cycles();
+            return FifoStatus(now) | l3_->StatusBits(now);
         }
-        case 0x38: return sadtsa_;
-        case 0x3C: return sadtca_;
-        case 0x40: return sadtsb_;
-        case 0x44: return sadtcb_;
-        case 0x48: return sadrcs_;
-        case 0x4C: return sadrsa_;
-        case 0x50: return sadrca_;
-        case 0x54: return sadrsb_;
-        case 0x58: return sadrcb_;
-        case 0x5C: return saitr_;
+        case 0x10: return FifoStatus(clock_->Cycles());
+        case 0x1C: return l3_->Address();
+        case 0x20:
+            emu_.Get<Fatal>().Die("Sa1111Sac: L3CDR read (an L3 read transfer) is not "
+                                  "modelled");
+        /* Table 7-9 note: SACR2 "power-up/reset default value of this register is 0000h";
+           §2.3 zero for ACCAR, ACCDR and the read-only ACSAR (Tables 7-15 to 7-17). */
+        case 0x08: case 0x24: case 0x28: case 0x2C: return 0u;
+        case 0x34: case 0x38: case 0x3C: case 0x40: case 0x44:
+        case 0x48: case 0x4C: case 0x50: case 0x54: case 0x58:
+            return dma_->ReadRegister(off);
     }
     HaltUnsupportedAccess("ReadWord", addr, 0);
 }
 
-void Sa1111Sac::WriteWord(uint32_t addr, uint32_t value) {
+void Sa1111Sac::UnitWriteWord(uint32_t addr, uint32_t value) {
+    WriteRegister(addr, value);
+    PublishRequestLines(clock_->Cycles());
+}
+
+void Sa1111Sac::WriteRegister(uint32_t addr, uint32_t value) {
     const uint32_t off = addr - MmioBase();
-    if (off >= 0x60u && off <= 0x9Cu) return;     /* SADR FIFO: discard. */
+    if (off != 0x00u && RstActive()) {
+        emu_.Get<Fatal>().Die("Sa1111Sac: write 0x%08X to +0x%02X with SACR0 RST active is not "
+                              "modelled", value, off);
+    }
     switch (off) {
-        case 0x00: sacr0_ = value; return;
-        case 0x04: sacr1_ = value; return;
-        case 0x08: sacr2_ = value; return;
+        case 0x00: WriteSacr0(value); return;
+        case 0x04: WriteSacr1(value); return;
         case 0x18:                                /* SASCR, Table 7-12. */
-            if (value & (1u << 16)) l3wd_ = false;     /* DTS. */
-            if (value & (1u << 17)) l3rd_ = false;     /* RDD. */
-            return;
-        case 0x1C: l3car_ = value & 0xFFu; return;
-        case 0x20:
-            l3_regs_[l3car_] = value & 0xFFu;
-            l3wd_ = true;
-            LOG(Periph, "[Sa1111Sac] L3 codec write addr=0x%02X "
-                "val=0x%02X\n", l3car_, value & 0xFFu);
-            emu_.Get<Sa1111Intc>().RaiseInterrupt(40);  /* AudDTS. */
-            return;
-        case 0x24: accar_ = value; return;
-        case 0x28: accdr_ = value; return;
-        case 0x2C: acsar_ = value; return;
-        case 0x34: WriteSadtcs(value); return;
-        case 0x38: sadtsa_ = value; return;
-        case 0x3C: sadtca_ = value; return;
-        case 0x40: sadtsb_ = value; return;
-        case 0x44: sadtcb_ = value; return;
-        case 0x48:
-            /* Receive DMA (recording): paced sample-source not built. */
-            if (value & (kTden | kTdsta | kTdstb)) {
-                LOG(Caution, "Sa1111Sac: audio DMA receive start "
-                    "(SADRCS=0x%08X) is not implemented\n", value);
-                CerfFatalExit(CERF_FATAL_RUNTIME_ERROR);
+            if (value & (1u << 5)) {
+                const uint64_t now = clock_->Cycles();
+                dma_->CatchUp(now);
+                stream_->ClearUnderrun(now);
             }
-            sadrcs_ = value;
+            if (value & (1u << 6))  rx_->ClearOverrun(stream_->Position(clock_->Cycles()));
+            l3_->ClearStatus(clock_->Cycles(), value);
             return;
-        case 0x4C: sadrsa_ = value; return;
-        case 0x50: sadrca_ = value; return;
-        case 0x54: sadrsb_ = value; return;
-        case 0x58: sadrcb_ = value; return;
-        case 0x5C: saitr_ = value; return;
+        case 0x1C: l3_->WriteAddress(clock_->Cycles(), value, sacr1_); return;
+        case 0x20: l3_->WriteData(clock_->Cycles(), value, sacr1_); return;
+        case 0x34: case 0x38: case 0x3C: case 0x40: case 0x44:
+        case 0x48: case 0x4C: case 0x50: case 0x54: case 0x58:
+            dma_->WriteRegister(off, value);
+            return;
+        case 0x5C:                                /* SAITR, Table 7-29: write-only. */
+            if (value != 0u) HaltUnsupportedAccess("WriteWord", addr, value);
+            return;
     }
     HaltUnsupportedAccess("WriteWord", addr, value);
 }
 
-/* TDSTA/TDSTB are start strobes the engine consumes on pickup; the guest
-   re-sets the strobe each time it refills a buffer (wavedev sub_FD5094
-   callback) and stops re-setting when out of data, so SADTCS&0xD0 reaches 0
-   (sub_FD17C4) and the IST takes its drained path (sub_FD1C74 cause 16). */
-void Sa1111Sac::WriteSadtcs(uint32_t value) {
-    std::unique_lock<std::mutex> lk(dma_mtx_);
-    sadtcs_ &= ~(value & (kTdbda | kTdbdb));      /* done bits W1C. */
-    sadtcs_  = (sadtcs_ & ~(kTden | kTdie)) | (value & (kTden | kTdie));
-    sadtcs_ |= value & (kTdsta | kTdstb);         /* arm strobes. */
-#if CERF_DEV_MODE
-    LOG(Periph, "[Sa1111Sac] SADTCS W 0x%08X -> 0x%08X (running=%d buf=%c)\n",
-        value, sadtcs_, tx_running_ ? 1 : 0, tx_buffer_b_ ? 'B' : 'A');
-#endif
-    if (!(sadtcs_ & kTden)) {                     /* wavedev stop. */
-        tx_running_ = false;
-        sadtcs_ &= ~(kTdsta | kTdstb | kTbiu);
-        return;
-    }
-    if (!tx_running_) TryStartNextLocked(lk);
+/* SA-1111 Developer's Manual Table 7-7 RST: "Reset the SAC Control and FIFOs except this
+   register"; §7.4.1.1 Note: "The following bits are effective when the ENB bit is "1"". */
+bool Sa1111Sac::RstActive() const {
+    return (sacr0_ & (kSacr0Enb | kSacr0Rst)) == (kSacr0Enb | kSacr0Rst);
 }
 
-/* Picks an armed buffer, consumes its strobe, hands the page to the player.
-   Drops the lock around the sink call (the sink posts to its own thread).
-   A declined page completes inline WITHOUT continuing - continuing unpaced
-   would recurse submit->complete->submit without bound. */
-void Sa1111Sac::TryStartNextLocked(std::unique_lock<std::mutex>& lk) {
-    bool b;
-    if (sadtcs_ & kTdsta)      b = false;
-    else if (sadtcs_ & kTdstb) b = true;
-    else { tx_running_ = false; sadtcs_ &= ~kTbiu; return; }
-
-    tx_running_  = true;
-    tx_buffer_b_ = b;
-    sadtcs_ &= ~(b ? kTdstb : kTdsta);            /* strobe consumed. */
-    sadtcs_  = (sadtcs_ & ~kTbiu) | (b ? kTbiu : 0u);   /* Table 7-19 TBIU. */
-    TransmitPage page{
-        b,
-        (b ? sadtsb_ : sadtsa_) & ~0x3u,          /* LSB2 = 00, Table 7-20. */
-        (b ? sadtcb_ : sadtca_) & ~0x3u,
-        emu_.Get<Sa1111SystemController>().AudioSampleRateHz(),
-    };
-#if CERF_DEV_MODE
-    LOG(Periph, "[Sa1111Sac] TX pickup buf=%c pa=0x%08X bytes=%u rate=%u "
-        "SADTCS=0x%08X\n", b ? 'B' : 'A', page.src_pa, page.byte_count,
-        page.sample_rate_hz, sadtcs_);
-#endif
-    lk.unlock();
-    if (tx_sink_ && tx_sink_(page)) return;
-
-    LOG(Caution, "Sa1111Sac: transmit page declined by the audio sink - "
-        "completing it inline\n");
-    CompleteTransmit(b);
+/* Table 7-8 note: SACR1 "The power-up/reset default value of this register is 0000h";
+   §2.3: "Unless indicated otherwise, all register bits are set to zero during reset." */
+void Sa1111Sac::ResetRegisters(uint64_t now, bool chip) {
+    dma_->Reset();
+    stream_->Clear(now);
+    rx_->Clear(stream_->Position(now));
+    l3_->Reset(now, chip);
+    sacr1_ = 0u;
 }
 
-/* Transmit Done A = source 32, Done B = source 34 (Table 11-1; 33/35 are
-   the receive channel). */
-void Sa1111Sac::CompleteTransmit(bool buffer_b) {
-    bool raise = false, start_next = false;
-    {
-        std::unique_lock<std::mutex> lk(dma_mtx_);
-        if (!tx_running_ || tx_buffer_b_ != buffer_b) return;
-        /* Cleared BEFORE the continuation - TryStartNext is gated on
-           !tx_running_ in BOTH this thread and a racing WriteSadtcs; clearing
-           it only on !start_next wedges the ping-pong after one page. */
-        tx_running_ = false;
-        sadtcs_ |= buffer_b ? kTdbdb : kTdbda;
-        raise = (sadtcs_ & kTdie) != 0;
-        start_next = (sadtcs_ & kTden) &&
-                     (sadtcs_ & (kTdsta | kTdstb));
-        if (!start_next) sadtcs_ &= ~kTbiu;
-#if CERF_DEV_MODE
-        LOG(Periph, "[Sa1111Sac] TX done buf=%c SADTCS=0x%08X raise=%d "
-            "next=%d\n", buffer_b ? 'B' : 'A', sadtcs_, raise ? 1 : 0,
-            start_next ? 1 : 0);
-#endif
+void Sa1111Sac::OnChipReset(bool held) {
+    const uint64_t now = clock_->Cycles();
+    if (held) {
+        ResetRegisters(now, true);
+        sacr0_ = kSacr0Reset;
+        UpdateSerializer(now);
+    } else {
+        RescaleFrames(now);
     }
-    emu_.Get<AudioActivityWidget>().MarkTx();
-    if (raise)
-        emu_.Get<Sa1111Intc>().RaiseInterrupt(buffer_b ? 34u : 32u);
-    if (start_next) {
-        std::unique_lock<std::mutex> lk(dma_mtx_);
-        if (!tx_running_ && (sadtcs_ & kTden))
-            TryStartNextLocked(lk);
+    PublishRequestLines(now);
+}
+
+void Sa1111Sac::WriteSacr0(uint32_t value) {
+    const uint64_t now = clock_->Cycles();
+    value &= kSacr0Defined;
+    dma_->Evaluate(now);
+    if (!RstActive() && (value & (kSacr0Enb | kSacr0Rst)) == (kSacr0Enb | kSacr0Rst)) {
+        ResetRegisters(now, false);
     }
+    if (dma_->TransmitRunning() && (((value ^ sacr0_) & kSacr0TfthMask) != 0u ||
+                                    (value & (kSacr0Enb | kSacr0Rst)) != kSacr0Enb)) {
+        emu_.Get<Fatal>().Die("Sa1111Sac: SACR0 write 0x%08X -> 0x%08X (a TFTH change, or the "
+                              "SAC disabled) with the transmit DMA running is not modelled",
+                              sacr0_, value);
+    }
+    sacr0_ = value;
+    RequireI2sMode();
+    UpdateSerializer(now);
+    dma_->Evaluate(now);
+}
+
+void Sa1111Sac::WriteSacr1(uint32_t value) {
+    if ((value & kSacr1Enlbf) != 0u) {
+        emu_.Get<Fatal>().Die("Sa1111Sac: SACR1 ENLBF loop back (0x%08X) is not modelled",
+                              value);
+    }
+    sacr1_ = value & kSacr1Defined;
+    l3_->OnSacr1Write(clock_->Cycles(), sacr1_);
+    UpdateSerializer(clock_->Cycles());
+}
+
+/* Table 7-10 TFS: "0 - Transmit FIFO level exceeds TFL threshold, or SAC disabled". */
+bool Sa1111Sac::Enabled() const {
+    return (sacr0_ & kSacr0Enb) != 0u && (sacr0_ & kSacr0Rst) == 0u;
+}
+
+/* Table 7-8 DRPL: "1 = Replaying Function is Disabled"; Table 7-7 ENB: "1 = Pins
+   function as Serial Audio Controller". */
+bool Sa1111Sac::SerializerWanted() const {
+    return Enabled() && (sacr1_ & kSacr1Drpl) == 0u;
+}
+
+/* Table 7-8 DREC: "0 = Recording Function is Enabled". */
+bool Sa1111Sac::RecordingWanted() const {
+    return Enabled() && (sacr1_ & kSacr1Drec) == 0u;
+}
+
+/* Table 3-4 PLL_Bypass: "Bypass PLL, send input CLK direct to dividers; from SKCR". */
+void Sa1111Sac::RequireFrameClock() const {
+    if (!emu_.Get<Sa1111SystemController>().I2sClockEnabled()) {
+        emu_.Get<Fatal>().Die("Sa1111Sac: serializer running with SKPCR I2SCLKEn clear is not "
+                              "modelled");
+    }
+    const auto& sbi = emu_.Get<Sa1111Sbi>();
+    if (sbi.PllClockRunning()) return;
+    emu_.Get<Fatal>().Die("Sa1111Sac: serializer running with SKCR 0x%08X (PLL bypassed, VCO "
+                          "off, Sleep or Doze) is not modelled", sbi.Skcr());
+}
+
+/* Table 3-9 SeLAC: "1 = AC Link"; §7.4.1.3: SACR2 controls the AC-link functions "when
+   SACMDSL bit of SKCR selects AC-link mode". */
+void Sa1111Sac::RequireI2sMode() const {
+    if ((sacr0_ & kSacr0Enb) == 0u || emu_.Get<Sa1111Sbi>().I2sSelected()) return;
+    emu_.Get<Fatal>().Die("Sa1111Sac: SACR0 ENB set (0x%08X) with SKCR SeLAC selecting the AC "
+                          "link is not modelled", sacr0_);
+}
+
+void Sa1111Sac::UpdateSerializer(uint64_t now) {
+    const bool play   = SerializerWanted();
+    const bool record = RecordingWanted();
+    if (play == stream_->Running() && record == rx_->Running()) return;
+    dma_->Evaluate(now);
+    if ((play && !stream_->Running()) || (record && !rx_->Running())) RequireFrameClock();
+    const uint64_t pos = stream_->Position(now);
+    if (record != rx_->Running()) {
+        if (record) rx_->Start(pos);
+        else        rx_->Stop(pos);
+    }
+    if (play != stream_->Running()) {
+        if (play) stream_->Run(now);
+        else      stream_->Hold(now);
+    }
+    dma_->Evaluate(now);
+}
+
+/* Table 7-7 TFTH: "This value should be set to the desired threshold value minus one." */
+uint32_t Sa1111Sac::ThresholdLevel() const {
+    return ((sacr0_ & kSacr0TfthMask) >> kSacr0TfthShift) + 1u;
+}
+
+/* Table 7-7 RFTH: "This value should be set to the desired threshold value minus one." */
+uint32_t Sa1111Sac::RxThresholdLevel() const {
+    return ((sacr0_ & kSacr0RfthMask) >> kSacr0RfthShift) + 1u;
+}
+
+/* Table 7-10 BSY: "1 - SAC currently transmitting or receiving a frame". */
+uint32_t Sa1111Sac::FifoStatus(uint64_t now) {
+    dma_->Evaluate(now);
+    const uint64_t pos = stream_->Position(now);
+    uint32_t status = stream_->StatusBits(now, Enabled(), ThresholdLevel()) |
+                      rx_->StatusBits(pos, Enabled(), RxThresholdLevel());
+    if (stream_->Running() || rx_->Running()) status |= 1u << 2;
+    return status;
+}
+
+void Sa1111Sac::PublishRequestLines(uint64_t now) {
+    dma_->CatchUp(now);
+    lines_->Publish(now, Enabled(), ThresholdLevel(), RxThresholdLevel());
+}
+
+void Sa1111Sac::SyncRequestLines() { PublishRequestLines(clock_->Cycles()); }
+
+void Sa1111Sac::RescaleFrames(uint64_t now) {
+    uint64_t num = 0, den = 1;
+    emu_.Get<Sa1111SystemController>().AudioFrameRate(num, den);
+    if (!stream_->Rescale(now, clock_->CpuHz(), emu_.Get<Sa1111Sbi>().CasLatency(), num, den)) {
+        emu_.Get<Fatal>().Die("Sa1111Sac: the transmit frame phase does not fit the %llu/%llu "
+                              "Hz frame clock", static_cast<unsigned long long>(num),
+                              static_cast<unsigned long long>(den));
+    }
+    host_->SetRate(num, den);
+}
+
+/* SA-1111 Developer's Manual §2.3 (printed 2-4): "When nRESET is asserted, all on-chip
+   activity halts". */
+void Sa1111Sac::ApplyFrameRate(uint64_t now) {
+    dma_->Evaluate(now);
+    if (!ChipHoldPending()) stream_->RequireInFlightTiming(now, clock_->CpuHz());
+    RescaleFrames(now);
+    dma_->Evaluate(now);
+}
+
+void Sa1111Sac::OnSystemClockWrite() {
+    const uint64_t now = clock_->Cycles();
+    RequireI2sMode();
+    dma_->OnClockChange();
+    if (stream_->Running() || rx_->Running()) RequireFrameClock();
+    l3_->OnClockChange(now);
+    ApplyFrameRate(now);
+    PublishRequestLines(now);
 }
 
 void Sa1111Sac::SaveState(StateWriter& w) {
-    std::lock_guard<std::mutex> lk(dma_mtx_);
-    w.Write("accar", accar_);  w.Write("accdr", accdr_);  w.Write("acsar", acsar_);
-    w.Write("sadtcs", sadtcs_); w.Write("sadtsa", sadtsa_); w.Write("sadtca", sadtca_); w.Write("sadtsb", sadtsb_); w.Write("sadtcb", sadtcb_);
-    w.Write("sadrcs", sadrcs_); w.Write("sadrsa", sadrsa_); w.Write("sadrca", sadrca_); w.Write("sadrsb", sadrsb_); w.Write("sadrcb", sadrcb_);
-    w.Write("saitr", saitr_);
-    w.Write("sacr0", sacr0_); w.Write("sacr1", sacr1_); w.Write("sacr2", sacr2_);
-    w.Write("l3car", l3car_);
-    w.WriteBytes("l3_regs", l3_regs_, sizeof(l3_regs_));
-    w.Write<uint8_t>("l3wd", l3wd_ ? 1u : 0u);
-    w.Write<uint8_t>("l3rd", l3rd_ ? 1u : 0u);
+    const uint64_t now = clock_->Cycles();
+    w.Write("sacr0", sacr0_); w.Write("sacr1", sacr1_);
+    l3_->Save(w, now);
+    dma_->Save(w, now);
+    stream_->Save(w, now);
+    rx_->Save(w, stream_->Position(now));
 }
 
 void Sa1111Sac::RestoreState(StateReader& r) {
-    std::lock_guard<std::mutex> lk(dma_mtx_);
-    r.Read("accar", accar_);  r.Read("accdr", accdr_);  r.Read("acsar", acsar_);
-    r.Read("sadtcs", sadtcs_); r.Read("sadtsa", sadtsa_); r.Read("sadtca", sadtca_); r.Read("sadtsb", sadtsb_); r.Read("sadtcb", sadtcb_);
-    r.Read("sadrcs", sadrcs_); r.Read("sadrsa", sadrsa_); r.Read("sadrca", sadrca_); r.Read("sadrsb", sadrsb_); r.Read("sadrcb", sadrcb_);
-    r.Read("saitr", saitr_);
-    r.Read("sacr0", sacr0_); r.Read("sacr1", sacr1_); r.Read("sacr2", sacr2_);
-    r.Read("l3car", l3car_);
-    r.ReadBytes("l3_regs", l3_regs_, sizeof(l3_regs_));
-    uint8_t l3wd = 0, l3rd = 0; r.Read("l3wd", l3wd); r.Read("l3rd", l3rd);
-    l3wd_ = (l3wd != 0); l3rd_ = (l3rd != 0);
-    /* No host audio sink owns a buffer after a restore; clear the in-flight TX
-       so the guest re-arms on the next DMA program (mirrors Sa11xxDma). */
-    tx_running_  = false;
-    tx_buffer_b_ = false;
+    const uint64_t now = clock_->Cycles();
+    r.Read("sacr0", sacr0_); r.Read("sacr1", sacr1_);
+    l3_->Restore(r, now);
+    dma_->Restore(r);
+    stream_->Restore(r, now);
+    rx_->Restore(r, stream_->Position(now));
+}
+
+void Sa1111Sac::PostRestore() {
+    const uint64_t now = clock_->Cycles();
+    RescaleFrames(now);
+    lines_->Baseline(now, Enabled(), ThresholdLevel(), RxThresholdLevel());
+    dma_->PostRestore();
 }
 
 REGISTER_SERVICE(Sa1111Sac);

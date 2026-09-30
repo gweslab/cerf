@@ -43,63 +43,69 @@ void PcmciaSlot::ResetCard() {
     card_->SocketReset();
 }
 
+bool PcmciaSlot::CardSelectedLocked() {
+    if (!card_ || !powered_) return false;
+    if (access_gate_) host_.OnCardAccess(*this);
+    return true;
+}
+
 uint8_t PcmciaSlot::ReadAttribute8(uint32_t offset) {
     std::lock_guard<std::mutex> lk(bus_mutex_);
-    if (!card_ || !powered_) return kFloat8;
+    if (!CardSelectedLocked()) return kFloat8;
     return card_->ReadAttribute8(offset);
 }
 
 void PcmciaSlot::WriteAttribute8(uint32_t offset, uint8_t value) {
     std::lock_guard<std::mutex> lk(bus_mutex_);
-    if (!card_ || !powered_) return;
+    if (!CardSelectedLocked()) return;
     card_->WriteAttribute8(offset, value);
 }
 
 uint8_t PcmciaSlot::ReadCommon8(uint32_t offset) {
     std::lock_guard<std::mutex> lk(bus_mutex_);
-    if (!card_ || !powered_) return kFloat8;
+    if (!CardSelectedLocked()) return kFloat8;
     return card_->ReadCommon8(offset);
 }
 
 uint16_t PcmciaSlot::ReadCommon16(uint32_t offset) {
     std::lock_guard<std::mutex> lk(bus_mutex_);
-    if (!card_ || !powered_) return kFloat16;
+    if (!CardSelectedLocked()) return kFloat16;
     return card_->ReadCommon16(offset);
 }
 
 void PcmciaSlot::WriteCommon8(uint32_t offset, uint8_t value) {
     std::lock_guard<std::mutex> lk(bus_mutex_);
-    if (!card_ || !powered_) return;
+    if (!CardSelectedLocked()) return;
     card_->WriteCommon8(offset, value);
 }
 
 void PcmciaSlot::WriteCommon16(uint32_t offset, uint16_t value) {
     std::lock_guard<std::mutex> lk(bus_mutex_);
-    if (!card_ || !powered_) return;
+    if (!CardSelectedLocked()) return;
     card_->WriteCommon16(offset, value);
 }
 
 uint8_t PcmciaSlot::ReadIo8(uint32_t offset) {
     std::lock_guard<std::mutex> lk(bus_mutex_);
-    if (!card_ || !powered_) return kFloat8;
+    if (!CardSelectedLocked()) return kFloat8;
     return card_->ReadIo8(offset);
 }
 
 uint16_t PcmciaSlot::ReadIo16(uint32_t offset) {
     std::lock_guard<std::mutex> lk(bus_mutex_);
-    if (!card_ || !powered_) return kFloat16;
+    if (!CardSelectedLocked()) return kFloat16;
     return card_->ReadIo16(offset);
 }
 
 void PcmciaSlot::WriteIo8(uint32_t offset, uint8_t value) {
     std::lock_guard<std::mutex> lk(bus_mutex_);
-    if (!card_ || !powered_) return;
+    if (!CardSelectedLocked()) return;
     card_->WriteIo8(offset, value);
 }
 
 void PcmciaSlot::WriteIo16(uint32_t offset, uint16_t value) {
     std::lock_guard<std::mutex> lk(bus_mutex_);
-    if (!card_ || !powered_) return;
+    if (!CardSelectedLocked()) return;
     card_->WriteIo16(offset, value);
 }
 
@@ -249,17 +255,15 @@ void PcmciaSlot::CombinedSwap(uint64_t gen, std::unique_ptr<PcmciaCard> card) {
         }
     }
     if (ejected) {
-        host_.OnCardDetectChanged(*this);   /* removal edge */
-        /* Hold the socket empty until the guest's detect handler runs and reads
-           it absent */
+        host_.OnCardDetectChanged(*this);
         std::this_thread::sleep_for(std::chrono::milliseconds(1500));
     }
     {
         std::lock_guard<std::mutex> lk(bus_mutex_);
-        if (card_) return;   /* raced with another inserter; keep theirs */
+        if (card_) return;
         InsertLocked(std::move(card));
     }
-    host_.OnCardDetectChanged(*this);       /* insert edge */
+    host_.OnCardDetectChanged(*this);
 }
 
 void PcmciaSlot::MenuInsert(uint64_t gen, const std::string& card_id) {

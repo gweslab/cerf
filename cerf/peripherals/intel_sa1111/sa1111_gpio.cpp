@@ -1,11 +1,15 @@
-#include "../peripheral_base.h"
+#include "sa1111_unit.h"
 
 #include "../../core/cerf_emulator.h"
 #include "../../boards/board_context.h"
 #include "../../boards/jornada720/jornada_720_id.h"
-#include "../peripheral_dispatcher.h"
 #include "../../state/state_stream.h"
 #include "sa1111_gpio_port_a_sink.h"
+#include "sa1111_sbi.h"
+#include "sa1111_system_controller.h"
+
+#include <algorithm>
+#include <iterator>
 
 namespace {
 
@@ -13,16 +17,13 @@ namespace {
    ports DDR/DWR·DRR/SDR/SSR at stride 0x10. Px_DDR (§10.3.3): 1=input,
    0=output, reset 0xFF - flipping the polarity inverts every port.
    Input pins read 0 (nothing drives them). */
-class Sa1111Gpio : public Peripheral {
+class Sa1111Gpio : public Sa1111Unit {
 public:
-    using Peripheral::Peripheral;
+    using Sa1111Unit::Sa1111Unit;
 
     bool ShouldRegister() override {
         auto* bd = emu_.TryGet<BoardContext>();
         return bd && bd->GetBoardId() == BoardId::Jornada720;
-    }
-    void OnReady() override {
-        emu_.Get<PeripheralDispatcher>().Register(this);
     }
 
     uint32_t MmioBase() const override { return 0x40001000u; }
@@ -40,8 +41,22 @@ public:
         r.ReadBytes("sdr", sdr_, sizeof(sdr_));
         r.ReadBytes("ssr", ssr_, sizeof(ssr_));
     }
+    void PostRestore() override { asleep_ = sbi_->SleepRequested(); }
 
-    uint32_t ReadWord(uint32_t addr) override {
+protected:
+    void OnUnitReady() override {
+        sbi_ = &emu_.Get<Sa1111Sbi>();
+        emu_.Get<Sa1111SystemController>().RegisterClockListener([this] { OnClockChange(); });
+    }
+
+    void OnChipReset(bool held) override {
+        if (!held) return;
+        asleep_ = false;
+        LoadResetValues();
+        NotifyPortA();
+    }
+
+    uint32_t UnitReadWord(uint32_t addr) override {
         const uint32_t off = addr - MmioBase();
         if (off >= 0x30u || (off & 3u)) HaltUnsupportedAccess("ReadWord", addr, 0);
         const uint32_t port = off >> 4, reg = (off >> 2) & 3u;
@@ -54,7 +69,7 @@ public:
         HaltUnsupportedAccess("ReadWord", addr, 0);
     }
 
-    void WriteWord(uint32_t addr, uint32_t value) override {
+    void UnitWriteWord(uint32_t addr, uint32_t value) override {
         const uint32_t off = addr - MmioBase();
         if (off >= 0x30u || (off & 3u)) HaltUnsupportedAccess("WriteWord", addr, value);
         const uint32_t port = off >> 4, reg = (off >> 2) & 3u, v = value & 0xFFu;
@@ -65,18 +80,43 @@ public:
             case 3: ssr_[port] = v; return;
             default: HaltUnsupportedAccess("WriteWord", addr, value);
         }
-        if (port == 0) {
-            if (auto* sink = emu_.TryGet<Sa1111GpioPortASink>()) {
-                sink->OnPortAOutputs(
-                    static_cast<uint8_t>(dwr_[0] & ~ddr_[0] & 0xFFu));
-            }
-        }
+        if (port == 0) NotifyPortA();
     }
 
 private:
-    uint32_t ddr_[3] = { 0xFFu, 0xFFu, 0xFFu };  /* reset: all input (§10.3.3). */
+    /* SA-1111 Developer's Manual §10.3.1 Px_DWR "All bits are cleared (set to zero) by a
+       system reset"; §10.3.3 Px_DDR and §10.3.5 Px_SDR "All bits are set by system reset". */
+    static constexpr uint32_t kDdrReset = 0xFFu;
+    static constexpr uint32_t kSdrReset = 0xFFu;
+
+    void LoadResetValues() {
+        std::fill(std::begin(ddr_), std::end(ddr_), kDdrReset);
+        std::fill(std::begin(dwr_), std::end(dwr_), 0u);
+        std::fill(std::begin(sdr_), std::end(sdr_), kSdrReset);
+        std::fill(std::begin(ssr_), std::end(ssr_), 0u);
+    }
+
+    /* §10.3.4 Px_SSR: "These bits take effect on the state of the relevant pins when the
+       system goes into sleep mode"; §10.3.5 Px_SDR: "clearing a bit makes the pin an output". */
+    void NotifyPortA() {
+        const uint32_t levels = asleep_ ? ssr_[0] & ~sdr_[0] : dwr_[0] & ~ddr_[0];
+        if (auto* sink = emu_.TryGet<Sa1111GpioPortASink>()) {
+            sink->OnPortAOutputs(static_cast<uint8_t>(levels & 0xFFu));
+        }
+    }
+
+    void OnClockChange() {
+        const bool asleep = sbi_->SleepRequested();
+        if (asleep == asleep_) return;
+        asleep_ = asleep;
+        NotifyPortA();
+    }
+
+    const Sa1111Sbi* sbi_ = nullptr;
+    bool     asleep_ = false;
+    uint32_t ddr_[3] = { kDdrReset, kDdrReset, kDdrReset };
     uint32_t dwr_[3] = {};
-    uint32_t sdr_[3] = {};
+    uint32_t sdr_[3] = { kSdrReset, kSdrReset, kSdrReset };
     uint32_t ssr_[3] = {};
 };
 

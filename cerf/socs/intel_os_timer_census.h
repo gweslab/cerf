@@ -31,6 +31,11 @@ struct IntelOsTimerCensus {
         absorb_skipped_tk += phase_tk;
     }
 
+    void OnWalkAway(uint32_t ahead_tk) {
+        ++walkaways;
+        walkaway_tk += ahead_tk;
+    }
+
     void OnMatch0(bool bank_pending) {
         if (bank_pending) ++standing;
     }
@@ -43,14 +48,19 @@ struct IntelOsTimerCensus {
                       "standing_at_match=%u acked=%u mixed_masked=%u unmasked=%u "
                       "post_grid_write=%u | absorbs=%u absorb_tk=%llu "
                       "absorb_skipped=%u absorb_skipped_tk=%llu absorb_step=%u "
-                      "aux_reads=%u aux_reads_after_oscr=%u rev_pairs=%u\n",
+                      "aux_reads=%u aux_reads_after_oscr=%u rev_pairs=%u "
+                      "walkaways=%u walkaway_tk=%llu osmr0_writes=%u tick_acks=%u\n",
             banks, resolved_write, rearm, rearm_match, period,
             pairs, standing, pairs_acked, pairs_mixed, pairs_unmasked,
             pairs_post_grid_write,
             absorbs, static_cast<unsigned long long>(absorb_tk), absorb_skipped,
             static_cast<unsigned long long>(absorb_skipped_tk), absorb_step,
-            aux_reads, aux_reads_after_oscr, rev_pairs);
+            aux_reads, aux_reads_after_oscr, rev_pairs,
+            walkaways, static_cast<unsigned long long>(walkaway_tk), osmr0_writes, tick_acks);
+        osmr0_writes = tick_acks = 0u;
         rev_pairs = 0u;
+        walkaways = 0u;
+        walkaway_tk = 0u;
         banks = resolved_write = rearm = rearm_match = pairs_post_grid_write = 0u;
         pairs = standing = pairs_acked = pairs_mixed = pairs_unmasked = 0u;
         absorbs = absorb_skipped = absorb_step = 0u;
@@ -78,4 +88,8 @@ struct IntelOsTimerCensus {
     uint32_t aux_reads             = 0;
     uint32_t aux_reads_after_oscr  = 0;
     uint32_t rev_pairs             = 0;
+    uint32_t walkaways             = 0;
+    uint64_t walkaway_tk           = 0;
+    uint32_t osmr0_writes          = 0;
+    uint32_t tick_acks             = 0;
 };

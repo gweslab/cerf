@@ -4,6 +4,8 @@
 
 #include "cycle_anchored_counter.h"
 #include "guest_cpu_reset.h"
+#include "intel_os_timer_census.h"
+#include "intel_os_timer_kernel_invariants.h"
 
 #include "../core/cerf_emulator.h"
 #include "../core/fatal.h"
@@ -13,8 +15,6 @@
 #include "../state/state_stream.h"
 
 #include <cstdint>
-
-#include "intel_os_timer_census.h"
 
 #include "../core/rate_probe.h"
 
@@ -26,6 +26,7 @@ public:
     void OnReady() override {
         clock_      = &emu_.Get<GuestCycleClock>();
         engine_     = &emu_.Get<GuestEngine>();
+        invariants_ = &emu_.Get<IntelOsTimerKernelInvariants>();
         rate_probe_ = &emu_.Get<RateProbe>();
         SetUnits();
         for (int n = 0; n < 4; ++n) {
@@ -66,24 +67,12 @@ public:
         w.Write<uint32_t>("oscr", Oscr(now));
         w.Write<uint64_t>("oscr_phase", counter_.PhaseAt(now));
         w.Write<uint64_t>("oscr_phase_den", counter_.PhaseDenominator());
-        for (int n = 0; n < 4; ++n) {
-            w.Write<uint8_t>("match_due", clock_->IsDue(event_[n], now) ? 1u : 0u);
-        }
-        for (int n = 0; n < 4; ++n) w.Write<uint32_t>("last_match_oscr", last_match_oscr_[n]);
-        for (int n = 0; n < 4; ++n) w.Write<uint8_t>("have_match", have_match_[n] ? 1u : 0u);
         w.Write<uint8_t>("pair_oscr_read", pair_oscr_read_ ? 1u : 0u);
         w.Write<uint32_t>("pair_oscr", pair_oscr_);
-        w.Write<uint32_t>("period_cand", period_cand_);
-        w.Write<uint8_t>("bank_pending", bank_pending_ ? 1u : 0u);
-        w.Write<uint32_t>("bank_oscr", bank_oscr_);
-        w.Write<uint8_t>("have_period", have_period_ ? 1u : 0u);
-        w.Write<uint32_t>("period", period_);
-        w.Write<uint8_t>("isr_write_pending", isr_write_pending_ ? 1u : 0u);
-        w.Write<uint8_t>("bank_pair_since_match", bank_pair_since_match_ ? 1u : 0u);
-        w.Write<uint8_t>("osmr0_written_since_ack", osmr0_written_since_ack_ ? 1u : 0u);
-        w.Write<uint8_t>("last_write_rephased", last_write_rephased_ ? 1u : 0u);
         w.Write<uint8_t>("oscr_read_any", oscr_read_any_ ? 1u : 0u);
         w.Write<uint8_t>("osmr0_read_last", osmr0_read_last_ ? 1u : 0u);
+        w.Write<uint8_t>("bank_pair_since_match", bank_pair_since_match_ ? 1u : 0u);
+        invariants_->Save(w);
     }
 
     void RestoreState(StateReader& r) override {
@@ -96,47 +85,17 @@ public:
         uint64_t phase = 0, phase_den = 0;
         r.Read("oscr_phase", phase);
         r.Read("oscr_phase_den", phase_den);
-        bool due[4] = {};
-        for (int n = 0; n < 4; ++n) {
-            uint8_t v = 0;
-            r.Read("match_due", v);
-            if (v > 1u) {
-                r.Reject("IntelOsTimer: restored match_due flag %u is not 0 or 1", v);
-            }
-            due[n] = v != 0u;
-        }
-        for (int n = 0; n < 4; ++n) r.Read("last_match_oscr", last_match_oscr_[n]);
-        for (int n = 0; n < 4; ++n) {
-            uint8_t v = 0;
-            r.Read("have_match", v);
-            have_match_[n] = v != 0u;
-        }
         uint8_t flag = 0;
         r.Read("pair_oscr_read", flag);
         pair_oscr_read_ = flag != 0u;
         r.Read("pair_oscr", pair_oscr_);
-        r.Read("period_cand", period_cand_);
-        r.Read("bank_pending", flag);
-        bank_pending_ = flag != 0u;
-        r.Read("bank_oscr", bank_oscr_);
-        r.Read("have_period", flag);
-        have_period_ = flag != 0u;
-        r.Read("period", period_);
-        r.Read("isr_write_pending", flag);
-        isr_write_pending_ = flag != 0u;
-        r.Read("bank_pair_since_match", flag);
-        bank_pair_since_match_ = flag != 0u;
-        r.Read("osmr0_written_since_ack", flag);
-        osmr0_written_since_ack_ = flag != 0u;
-        r.Read("last_write_rephased", flag);
-        last_write_rephased_ = flag != 0u;
         r.Read("oscr_read_any", flag);
         oscr_read_any_ = flag != 0u;
         r.Read("osmr0_read_last", flag);
-        if (flag > 1u) {
-            r.Reject("IntelOsTimer: restored osmr0_read_last flag %u is not 0 or 1", flag);
-        }
         osmr0_read_last_ = flag != 0u;
+        r.Read("bank_pair_since_match", flag);
+        bank_pair_since_match_ = flag != 0u;
+        invariants_->Restore(r);
         const uint64_t now = clock_->Cycles();
         if (!counter_.AnchorAtPhase(now, oscr, phase, phase_den)) {
             r.Reject("IntelOsTimer: restored OSCR phase %llu/%llu is not a fraction of "
@@ -144,10 +103,7 @@ public:
                      static_cast<unsigned long long>(phase),
                      static_cast<unsigned long long>(phase_den));
         }
-        for (int n = 0; n < 4; ++n) {
-            if (due[n]) clock_->Arm(event_[n], now);
-            else        ArmChannel(n);
-        }
+        ArmAll();
     }
 
     void PostRestore() override { PushMatchLevel(); }
@@ -161,11 +117,13 @@ protected:
     virtual void OnResetLine() {
         ower_ = 0;
         oier_ = 0;
-        ForgetGuestSequence();
+        ForgetGuestReads();
+        invariants_->ForgetGuestSequence();
     }
 
     void ResetRegistersToZero() {
-        ForgetCounterDomain();
+        ForgetGuestReads();
+        invariants_->ForgetCounterDomain();
         for (int n = 0; n < 4; ++n) osmr_[n] = 0u;
         ossr_ = 0u;
         oier_ = 0u;
@@ -228,44 +186,36 @@ private:
         for (int n = 0; n < 4; ++n) ArmChannel(n);
     }
 
-    /* SA-1110 §9.4.4: the OSSR bit is set at the match and stays set until the
-       guest writes a one, so a write with the bit clear is not the service of
-       that match. §9.4.2: every OSMR is compared on each rising edge. */
-    void AbsorbRephase(int n, uint32_t value) {
-        if (n != 0 || !have_period_ || !have_match_[n] ||
-            (ossr_ & (1u << n)) != 0u) {
-            return;
-        }
-        if (!last_write_rephased_) {
-            ++census_.absorb_step;
-            return;
-        }
-        const uint32_t oscr  = Oscr(clock_->Cycles());
-        const uint32_t phase = oscr - last_match_oscr_[n];
-        const uint32_t ahead = value - oscr;
-        if (bank_pair_since_match_) {
-            bank_pair_since_match_ = false;
-            last_match_oscr_[n]    = oscr;
-            census_.OnAbsorbSkipped(phase);
-            return;
-        }
-        if (phase == 0u || phase >= ahead) {
-            last_match_oscr_[n] = oscr;
-            return;
-        }
+    void AdvanceCounter(int n, uint32_t oscr, uint32_t by) {
         uint32_t crossed = 0u;
         for (int c = 0; c < 4; ++c) {
             const uint32_t d = osmr_[c] - oscr;
-            if (c != n && d != 0u && d <= phase) crossed |= 1u << c;
+            if (c != n && d != 0u && d <= by) crossed |= 1u << c;
         }
-        census_.OnAbsorb(phase);
-        counter_.Anchor(counter_.AnchorCycle(), counter_.AnchorCount() + phase);
-        last_match_oscr_[n] = oscr + phase;
+        counter_.Anchor(counter_.AnchorCycle(), counter_.AnchorCount() + by);
         for (int c = 0; c < 4; ++c) {
             if ((crossed & (1u << c)) != 0u) OnMatch(c);
         }
         ArmAll();
     }
+
+    void ApplyRearm(const IntelOsTimerRearm& rearm) {
+        const uint32_t oscr = Oscr(clock_->Cycles());
+        if (static_cast<int32_t>(rearm.target - oscr) <= 0) {
+            emu_.Get<Fatal>().Die(
+                "IntelOsTimer: omitted-exit re-arm target 0x%08X at or behind OSCR 0x%08X "
+                "(bank 0x%08X period %u)",
+                rearm.target, oscr, rearm.bank, rearm.period);
+        }
+        osmr_[0] = rearm.target;
+        ArmChannel(0);
+    }
+
+    void PushMatchLevel() { SetMatchLevel(ossr_ & 0xFu); }
+
+    bool Status(int n) const { return (ossr_ & (1u << n)) != 0u; }
+
+    bool GuestIrqMasked() const { return engine_->GuestIrqMasked(); }
 
     void ClearPairLatches() {
         pair_oscr_read_  = false;
@@ -273,67 +223,31 @@ private:
         osmr0_read_last_ = false;
     }
 
-    void PushMatchLevel() { SetMatchLevel(ossr_ & 0xFu); }
-
-    bool GuestIrqMasked() { return engine_->GuestIrqMasked(); }
-
-    void ForgetCounterDomain() {
-        for (int n = 0; n < 4; ++n) have_match_[n] = false;
-        ForgetGuestSequence();
-    }
-
-    void ForgetGuestSequence() {
+    void ForgetGuestReads() {
         ClearPairLatches();
-        bank_pending_      = false;
-        have_period_       = false;
-        period_cand_       = 0u;
-        isr_write_pending_ = false;
         bank_pair_since_match_ = false;
-        osmr0_written_since_ack_ = false;
-        last_write_rephased_ = false;
     }
 
-    /* falcon_4220__4_10 nk.exe sub_800F5550 / symbol_mk500 nk.exe sub_801BD03C: OEMIdle
-       banks (phase + accum) / P read through sub_800F5DE8 / sub_801BD5DC and returns
-       without re-arming OSMR0 when the bank consumes the deadline. */
-    void RearmOmittedExit() {
-        const uint32_t target = bank_oscr_ + period_;
-        const uint32_t oscr   = Oscr(clock_->Cycles());
-        if (static_cast<int32_t>(target - oscr) <= 0) {
-            emu_.Get<Fatal>().Die(
-                "IntelOsTimer: omitted-exit re-arm target 0x%08X at or behind OSCR 0x%08X "
-                "(bank 0x%08X period %u)",
-                target, oscr, bank_oscr_, period_);
+    void ReadOsmr0AfterOscr() {
+        const bool status0 = Status(0);
+        const bool masked  = GuestIrqMasked();
+        const bool pair    = pair_oscr_read_ && !status0 && masked;
+        if (!status0) bank_pair_since_match_ = true;
+        census_.OnOsmr0Read(pair, true, status0, masked);
+        if (!pair) return;
+        IntelOsTimerRearm rearm;
+        if (invariants_->OnMaskedPair((oier_ & 0x1u) != 0u, pair_oscr_, census_, rearm)) {
+            ApplyRearm(rearm);
         }
-        osmr_[0]      = target;
-        bank_pending_ = false;
-        ArmChannel(0);
-        ++census_.rearm;
-    }
-
-    void LearnPeriod(uint32_t value) {
-        if (have_period_) return;
-        const uint32_t step = value - osmr_[0];
-        if (step != 0u && step == period_cand_) {
-            period_      = step;
-            have_period_ = true;
-        }
-        period_cand_ = step;
     }
 
     void OnMatch(int n) {
-        if (n == 0) census_.OnMatch0(bank_pending_);
-        if (n == 0) census_.Report(clock_->NowNs(), period_);
-        if (n == 0 && bank_pending_ && have_period_ && (oier_ & 0x1u) != 0u) {
-            RearmOmittedExit();
-            ++census_.rearm_match;
+        IntelOsTimerRearm rearm;
+        if (invariants_->OnMatch(n, osmr_[n], (oier_ & 0x1u) != 0u, census_, rearm)) {
+            ApplyRearm(rearm);
             return;
         }
-        if (n == 0) bank_pending_ = false;
-        if (n == 0) isr_write_pending_ = true;
         if (n == 0) bank_pair_since_match_ = false;
-        last_match_oscr_[n] = osmr_[n];
-        have_match_[n]      = true;
         const uint32_t bit = 1u << n;
         /* SA-1110 §9.4.5: the OIER enables decide whether a match will set a
            status bit in the OSSR - for every match register, with no WME term. */
@@ -355,26 +269,11 @@ private:
         switch (off) {
             case 0x00: case 0x04: case 0x08: case 0x0C: {
                 const int n = static_cast<int>(off >> 2);
-                if (n == 0) {
-                    const bool masked = GuestIrqMasked();
-                    const bool pair   = pair_oscr_read_ && (ossr_ & 0x1u) == 0u && masked;
-                    if (oscr_read_any_ && (ossr_ & 0x1u) == 0u) {
-                        bank_pair_since_match_ = true;
-                    }
-                    census_.OnOsmr0Read(pair, oscr_read_any_, (ossr_ & 0x1u) != 0u,
-                                        masked);
-                    if (pair && osmr0_written_since_ack_ && !last_write_rephased_) {
-                        ++census_.pairs_post_grid_write;
-                    } else if (pair) {
-                        if (bank_pending_ && have_period_ && (oier_ & 0x1u) != 0u) {
-                            RearmOmittedExit();
-                        }
-                        bank_pending_ = true;
-                        bank_oscr_    = pair_oscr_;
-                        ++census_.banks;
-                    }
+                if (n != 0) {
+                    census_.OnAuxOsmrRead(oscr_read_any_);
+                } else if (oscr_read_any_) {
+                    ReadOsmr0AfterOscr();
                 }
-                if (n != 0) census_.OnAuxOsmrRead(oscr_read_any_);
                 ClearPairLatches();
                 if (n == 0) osmr0_read_last_ = true;
                 return osmr_[n];
@@ -382,14 +281,14 @@ private:
             case 0x10: {
                 rate_probe_->Inc(RateProbe::Counter::OstReadOscr);
                 const uint32_t oscr = Oscr(clock_->Cycles());
-                if (osmr0_read_last_ && (ossr_ & 0x1u) == 0u) {
+                if (osmr0_read_last_ && !Status(0)) {
                     bank_pair_since_match_ = true;
                     ++census_.rev_pairs;
                 }
                 osmr0_read_last_ = false;
-                pair_oscr_read_ = GuestIrqMasked();
-                oscr_read_any_  = true;
-                pair_oscr_      = oscr;
+                pair_oscr_read_  = GuestIrqMasked();
+                oscr_read_any_   = true;
+                pair_oscr_       = oscr;
                 return oscr;
             }
             case 0x14: ClearPairLatches(); return ossr_ & 0xFu;
@@ -399,30 +298,44 @@ private:
         HaltUnsupportedAccess("ReadReg", MmioBase() + off, 0);
     }
 
+    void WriteOsmr(int n, uint32_t value) {
+        ClearPairLatches();
+        if (n == 0) {
+            WriteOsmr0(value);
+        } else {
+            osmr_[n] = value;
+        }
+        ArmChannel(n);
+    }
+
+    void WriteOsmr0(uint32_t value) {
+        ++census_.osmr0_writes;
+        const uint32_t old = osmr_[0];
+        const IntelOsTimerOsmrWrite plan =
+            invariants_->OnChannel0Write(value - old, Status(0), census_);
+        osmr_[0] = value;
+        if (plan.walk_away) {
+            const uint32_t oscr  = Oscr(clock_->Cycles());
+            const uint32_t ahead = old - oscr;
+            if (invariants_->WalkAway(ahead, census_)) AdvanceCounter(0, oscr, ahead);
+        }
+        if (plan.absorb) {
+            const uint32_t oscr = Oscr(clock_->Cycles());
+            const uint32_t by =
+                invariants_->Absorb(value, oscr, bank_pair_since_match_, census_);
+            bank_pair_since_match_ = false;
+            if (by != 0u) AdvanceCounter(0, oscr, by);
+        }
+    }
+
     void WriteReg(uint32_t off, uint32_t value) {
         switch (off) {
-            case 0x00: case 0x04: case 0x08: case 0x0C: {
-                const int n = static_cast<int>(off >> 2);
-                ClearPairLatches();
-                const uint32_t step = value - osmr_[n];
-                if (n == 0) {
-                    if (isr_write_pending_) {
-                        LearnPeriod(value);
-                        isr_write_pending_ = false;
-                    }
-                    if (bank_pending_) ++census_.resolved_write;
-                    bank_pending_            = false;
-                    osmr0_written_since_ack_ = true;
-                    last_write_rephased_ =
-                        !(have_period_ && step != 0u && step % period_ == 0u);
-                }
-                osmr_[n] = value;
-                AbsorbRephase(n, value);
-                ArmChannel(n);
+            case 0x00: case 0x04: case 0x08: case 0x0C:
+                WriteOsmr(static_cast<int>(off >> 2), value);
                 return;
-            }
             case 0x10:
-                ForgetCounterDomain();
+                ForgetGuestReads();
+                invariants_->ForgetCounterDomain();
                 counter_.SetCountAt(clock_->Cycles(), value);
                 ArmAll();
                 return;
@@ -430,8 +343,11 @@ private:
                writing zeros has no effect. */
             case 0x14:
                 ClearPairLatches();
+                if ((value & 0x1u) != 0u) {
+                    ++census_.tick_acks;
+                    invariants_->OnTickAck();
+                }
                 ossr_ &= ~(value & 0xFu);
-                if ((value & 0x1u) != 0u) osmr0_written_since_ack_ = false;
                 PushMatchLevel();
                 return;
             /* SA-1110 §9.4.3: WME is a write-once bit that can only be changed
@@ -455,34 +371,24 @@ private:
         WriteReg(off, value);
     }
 
-    GuestCycleClock*        clock_      = nullptr;
-    GuestEngine*            engine_     = nullptr;
-    RateProbe*              rate_probe_ = nullptr;
-    GuestCycleClock::Event* event_[4]   = {};
+    GuestCycleClock*              clock_      = nullptr;
+    GuestEngine*                  engine_     = nullptr;
+    IntelOsTimerKernelInvariants* invariants_ = nullptr;
+    RateProbe*                    rate_probe_ = nullptr;
+    GuestCycleClock::Event*       event_[4]   = {};
 
     CycleAnchoredCounter counter_;
-
-    uint32_t last_match_oscr_[4] = {};
-    bool     have_match_[4]      = {};
-
-    bool     pair_oscr_read_      = false;
-    uint32_t pair_oscr_           = 0;
-    uint32_t period_cand_         = 0;
-    bool     bank_pending_        = false;
-    uint32_t bank_oscr_           = 0;
-    bool     have_period_         = false;
-    uint32_t period_              = 0;
-    bool     isr_write_pending_   = false;
-    bool     bank_pair_since_match_   = false;
-    bool     osmr0_written_since_ack_ = false;
-    bool     last_write_rephased_     = false;
-    bool     oscr_read_any_           = false;
-    bool     osmr0_read_last_         = false;
-
-    IntelOsTimerCensus census_;
 
     uint32_t osmr_[4] = {};
     uint32_t ossr_    = 0;
     uint32_t ower_    = 0;
     uint32_t oier_    = 0;
+
+    bool     pair_oscr_read_        = false;
+    bool     oscr_read_any_         = false;
+    uint32_t pair_oscr_             = 0;
+    bool     osmr0_read_last_       = false;
+    bool     bank_pair_since_match_ = false;
+
+    IntelOsTimerCensus census_;
 };

@@ -87,20 +87,29 @@ that timer is what makes it dangerous.
 
 - **The catch-up loop.** Many SA-11xx and PXA kernels re-arm with
   `OSMR0 += period`. The kernel repeats that add while `OSMR0 - OSCR` is
-  under a small margin. The loop therefore walks one period per pass until
-  the match is ahead of the counter again. **Whether the millisecond counter
+  under a small margin, and some kernels also while that distance is more
+  than one period. The loop therefore walks one period per pass until the
+  match is ahead of the counter again. **Whether the millisecond counter
   is credited inside that loop or once after it is a per-kernel choice, and
   it decides what lateness costs.**
   A kernel that credits inside the loop credits every period the loop walks.
   A kernel that credits once after it credits one period however many the
-  loop walked. The subtraction is unsigned. An entry that is late by about
-  one period lands in a narrow residue band whose values are less than the
-  exit margin. In that band the loop walks 2^32 / period passes. At
-  3.6864 MHz that is 1,165,211 passes, or 19.4 minutes of guest time inside
-  one interrupt. That is the tick death. A store that lands at or behind the
-  counter laps 2^32 ticks (1165 s at 3.6864 MHz). The channel is then dead
-  until the guest rewrites it. On the cycle clock an entry is never late, so
-  the loop runs one pass.
+  loop walked.
+- **The tick death.** The subtraction is unsigned. An entry that is late by
+  nearly one period or more can land in a narrow residue band. In that band
+  the distance is less than the exit margin. In a kernel with both tests, the
+  next pass leaves the match more than one period ahead. The loop then walks
+  until the distance wraps through 2^32. Each pass also moves the counter by
+  the time of that pass. The lap therefore takes a little more than
+  2^32 / period passes, roughly 1.165 million at a 3686-tick period.
+
+  A kernel that credits inside the loop moves its clock by that many periods,
+  about 19.4 minutes at 1 ms each. A store that lands at or behind the counter
+  laps 2^32 ticks (1165 s at 3.6864 MHz). The channel is then dead until the
+  guest rewrites it.
+- **Late entries.** On the cycle clock CERF never makes an entry late. A guest
+  that masks the tick while it waits on the counter makes the entry late
+  itself, by the whole wait.
 - **Per-pass and per-entry credit.** A kernel credits either once per loop
   pass or once per entry, in units of its own tick period, and some re-check
   the distance after the re-arm and credit again.
@@ -221,6 +230,27 @@ The two cases answer different kernels. A kernel that services the match before
 it advances the compare always writes between the match and the read. The kind
 of that write then decides. A kernel that advances the compare before it
 services the match writes nothing there. The absence then decides.
+
+**The walk-away step.** It serves a kernel whose catch-up loop also repeats
+while the match is more than one period ahead. A late entry can end a pass with
+the match ahead of the counter by less than the exit margin. The loop then adds
+one more period, and the match is more than a period ahead. Each later pass
+moves it further, so the loop runs until the 32-bit wrap.
+
+The step acts on a tick-channel compare write that is not the first since the
+kernel cleared the status bit. The write advances the compare by one tick period,
+and the compare that it replaces is more than one period ahead of the counter.
+The timer then advances the counter to the replaced compare, and the next check of
+the kernel finds the match one period ahead. The loop ends there.
+
+No tick-channel match fires, because the compare already moved past the point
+that the counter reaches. The timer delivers the match of every other channel whose
+compare lies inside the advance. A kernel that credits one period for each pass
+then credits exactly the grid points that the counter passed. A kernel that
+credits once per entry credits one period, as for any late entry. Before two
+equal steps confirm the tick period, the step takes it from the first store of
+the handler.
+The late entry after a wake comes before that confirmation.
 
 **A measurement over every kernel settles a correction.** Before a correction
 lands, that measurement covers every kernel on the shared model. It records the

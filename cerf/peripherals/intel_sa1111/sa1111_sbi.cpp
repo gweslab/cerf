@@ -33,7 +33,7 @@ void Sa1111Sbi::SetHostPins(std::function<Mbgnt()> mbgnt, std::function<bool()> 
 }
 
 bool Sa1111Sbi::LiveClockInput() const {
-    return clk_3686400_ && clk_3686400_();
+    return clk_3686400_();
 }
 
 bool Sa1111Sbi::ClockInputModelled() const {
@@ -79,7 +79,7 @@ void Sa1111Sbi::NotifyGrant() {
    3-13): MBGNT high for the whole bus tenure. */
 Sa1111Sbi::BusGrant Sa1111Sbi::Grant() const {
     if ((smcr_ & kSmcrMbge) == 0u) return BusGrant::Stalled;
-    switch (mbgnt_ ? mbgnt_() : Mbgnt::Undetermined) {
+    switch (mbgnt_()) {
         case Mbgnt::Arbiter: return BusGrant::Granted;
         case Mbgnt::Low:     return BusGrant::Stalled;
         case Mbgnt::High:

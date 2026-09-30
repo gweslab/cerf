@@ -49,6 +49,7 @@ protected:
     void     UnitWriteWord(uint32_t addr, uint32_t value) override;
 
 private:
+    bool LiveClockInput() const;
     void RequireAwake(uint32_t addr) const;
     void RequireRclk(uint32_t addr) const;
     void NotifyGrant();

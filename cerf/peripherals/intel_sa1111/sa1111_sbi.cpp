@@ -29,11 +29,15 @@ void Sa1111Sbi::OnChipReset(bool held) {
 void Sa1111Sbi::SetHostPins(std::function<Mbgnt()> mbgnt, std::function<bool()> clk_3686400) {
     mbgnt_       = std::move(mbgnt);
     clk_3686400_ = std::move(clk_3686400);
-    clk_seen_    = ClockInputModelled();
+    clk_seen_    = LiveClockInput();
+}
+
+bool Sa1111Sbi::LiveClockInput() const {
+    return clk_3686400_ && clk_3686400_();
 }
 
 bool Sa1111Sbi::ClockInputModelled() const {
-    return clk_3686400_ && clk_3686400_();
+    return clk_seen_;
 }
 
 /* §2.2 (printed 2-3): "A phase-locked loop (PLL) in the SA-1111 generates the clocks required for
@@ -43,11 +47,14 @@ bool Sa1111Sbi::PllClockSelected() const {
 }
 
 void Sa1111Sbi::OnHostPinsChange() {
-    const bool clk = ClockInputModelled();
+    const bool clk = LiveClockInput();
     if (clk != clk_seen_) {
-        clk_seen_ = clk;
-        if (!ChipHeld() && !clock_disturbed_) {
+        const bool disturb = !ChipHeld() && !clock_disturbed_;
+        if (disturb) {
             for (auto& fn : clk_input_listeners_) fn();
+        }
+        clk_seen_ = clk;
+        if (disturb) {
             clock_disturbed_ = true;
             LOG(Periph, "[Sa1111Sbi] CLK input %s outside reset (SKCR 0x%08X)\n",
                 clk ? "restored" : "lost", skcr_);
@@ -167,7 +174,7 @@ void Sa1111Sbi::RestoreState(StateReader& r) {
 }
 
 void Sa1111Sbi::PostRestore() {
-    clk_seen_ = ClockInputModelled();
+    clk_seen_ = LiveClockInput();
 }
 
 REGISTER_SERVICE(Sa1111Sbi);

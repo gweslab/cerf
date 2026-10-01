@@ -2,14 +2,18 @@
 
 #include "../../peripherals/peripheral_base.h"
 #include "../../peripherals/usb/usb_host_port.h"
-#include "../../core/virtual_timer_list.h"
+#include "../../jit/guest_cycle_clock.h"
+#include "../freescale_usb_frame_index.h"
 
 #include <array>
 #include <cstdint>
 #include <mutex>
 #include <vector>
 
+class Imx51UsbDeviceTransfers;
+class Imx51UsbTransceiverClocks;
 class UsbDeviceHost;
+enum class FreescaleLowPowerMode : uint8_t;
 
 /* i.MX51 USBOH3 (MCIMX51RM Ch 60, base 0x73F80000): OAL PHY config block plus
    the four ChipIdea/EHCI cores. Core 0 (OTG) runs in device mode for the SBOOT
@@ -21,8 +25,6 @@ public:
 
     bool ShouldRegister() override;
     void OnReady() override;
-    void OnShutdown() override;
-    ~Imx51Usboh3() override;
 
     uint32_t MmioBase() const override;
     uint32_t MmioSize() const override;
@@ -36,7 +38,7 @@ public:
     void RestoreState(StateReader& r) override;
     void PostRestore() override;
 
-    void RegisterDeviceHost(UsbDeviceHost* host) { host_ = host; }
+    void RegisterDeviceHost(UsbDeviceHost* host);
 
     /* Host->device EP0 control SETUP: write the 8-byte packet into the EP0-OUT
        dQH set-up buffer and raise the setup interrupt. */
@@ -54,17 +56,19 @@ private:
     static constexpr uint32_t kCores       = kNonCore / kCoreSpan;
     static constexpr uint8_t  kPhyRegCount = 0x40u;
 
+    void     ResetController();
+    void     RefreshTransceiverClocks(FreescaleLowPowerMode mode);
     bool     Core0IsDevice() const;
+    uint32_t ReadLocked(uint32_t off);
+    void     WriteCoreFrameReg(uint32_t off, uint32_t value);
     void     RefreshDeviceIrq();
+    void     ArmFrameIrq();
+    void     OnFrameIrqEvent();
     void     ReflectScheduleStatus(uint32_t usbcmd_off, uint32_t usbcmd);
     uint32_t UlpiTransfer(uint32_t core, uint32_t value);
 
-    /* dQH/dTD device-controller engine (core 0). */
     uint32_t DqhBase() const;
     void     ExecutePrime(uint32_t prime_bits);
-    void     ExecuteEndpoint(uint32_t ep, bool dir_in);
-    void     TransferDtdBuffers(const uint32_t pages[5], uint8_t* host,
-                                uint32_t n, bool to_host);
 
     void WriteOtgHostPortsc(uint32_t value);
     void ExecuteAsyncSchedule();
@@ -73,15 +77,22 @@ private:
     bool ExecuteQtd(uint32_t qtd_addr, UsbDevice* dev, uint32_t endpt);
     void UpdateScheduleTimer();
     void OnScheduleTimer();
+    void OnCpuRateChanged();
+    void ArmNextFrame();
 
-    UsbDeviceHost* host_ = nullptr;
-    bool           reset_seen_ = false;   /* URI cleared; await the reset flush */
+    Imx51UsbDeviceTransfers*   transfers_ = nullptr;
+    Imx51UsbTransceiverClocks* transceiver_clocks_ = nullptr;
+    bool                       reset_seen_ = false;
 
     UsbHostPort otg_host_root_port_{*this, 0};
 
     std::array<uint32_t, kSize / 4> regs_{};
     std::array<std::array<uint8_t, kPhyRegCount>, kCores> phy_{};
 
-    std::mutex               async_schedule_mtx_;
-    VirtualTimerList::Entry* schedule_timer_ = nullptr;
+    std::mutex              async_schedule_mtx_;
+    GuestCycleClock*        clock_ = nullptr;
+    GuestCycleClock::Event* frame_event_ = nullptr;
+    GuestCycleClock::Event* irq_event_   = nullptr;
+    FreescaleUsbFrameIndex  frame_index_{emu_};
+    bool                    frames_running_ = false;
 };

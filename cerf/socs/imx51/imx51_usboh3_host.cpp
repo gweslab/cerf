@@ -2,6 +2,7 @@
 
 #include "../../core/byte_order.h"
 #include "../../core/cerf_emulator.h"
+#include "../../core/fatal.h"
 #include "../../cpu/emulated_memory.h"
 #include "../../peripherals/usb/usb_device.h"
 #include "../irq_controller.h"
@@ -10,15 +11,9 @@ namespace {
 
 constexpr uint32_t kOffUsbcmdRel  = 0x00000140u;
 constexpr uint32_t kOffUsbstsRel  = 0x00000144u;
-constexpr uint32_t kOffFrindexRel = 0x0000014Cu;
 constexpr uint32_t kOffPeriodicListBaseRel = 0x00000154u;
 constexpr uint32_t kOffAsyncListRel = 0x00000158u;
 constexpr uint32_t kOffPortscRel  = 0x00000184u;
-/* EHCI 1.0 Spec Table 2-12 (p23): FRINDEX is a 14-bit field, bits[13:0]. */
-constexpr uint32_t kFrindexMask = 0x00003FFFu;
-/* EHCI 1.0 Spec 2.3.4 (p23): with the default (non-programmable-length)
-   1024-element frame list, N=12, so the current entry is FRINDEX[12:3]. */
-constexpr uint32_t kFrameListIndexMask = 0x000003FFu;
 constexpr uint32_t kCmdPseLocal = 1u << 4;
 constexpr uint32_t kStsUiLocal  = 1u << 0;
 constexpr uint32_t kStsUeiLocal = 1u << 1;
@@ -151,9 +146,9 @@ void Imx51Usboh3::ExecutePeriodicSchedule() {
     const uint32_t base = regs_[kOffPeriodicListBaseRel >> 2] & ~0xFFFu;
     if (base == 0u) return;
 
-    const uint32_t frindex = (regs_[kOffFrindexRel >> 2] + 8u) & kFrindexMask;
-    regs_[kOffFrindexRel >> 2] = frindex;
-    const uint32_t index = (frindex >> 3) & kFrameListIndexMask;
+    const uint32_t elements = FreescaleUsbFrameIndex::FrameListElements(
+        FreescaleUsbFrameIndex::FrameListSizeCode(cmd));
+    const uint32_t index = (frame_index_.Frindex(0u) >> 3) & (elements - 1u);
 
     auto& mem = emu_.Get<EmulatedMemory>();
     uint32_t link = mem.ReadWord(base + index * 4u);

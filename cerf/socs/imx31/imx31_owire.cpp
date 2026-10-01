@@ -5,6 +5,7 @@
 #include "imx31_id.h"
 #include "../../peripherals/peripheral_dispatcher.h"
 #include "../../state/state_stream.h"
+#include "../freescale_module_clocks.h"
 
 #include <cstdint>
 
@@ -34,7 +35,10 @@ public:
         auto* bd = emu_.TryGet<BoardContext>();
         return bd && bd->GetSocId() == SocId::Imx31;
     }
-    void OnReady() override { emu_.Get<PeripheralDispatcher>().Register(this); }
+    void OnReady() override {
+        module_clocks_ = &emu_.Get<FreescaleModuleClocks>();
+        emu_.Get<PeripheralDispatcher>().Register(this);
+    }
 
     uint32_t MmioBase() const override { return kBase; }
     uint32_t MmioSize() const override { return kSize; }
@@ -79,6 +83,8 @@ private:
                the idle-high bus -> RDST=1. The strobe bits self-clear, so none
                persist into control_. */
             case kControl:
+                if (value & (kCtrlRpp | kCtrlWr0 | kCtrlWr1))
+                    module_clocks_->RequireRunning(FreescaleModule::kOwire, "runs a bus slot");
                 if (value & kCtrlWr1) control_ |= kCtrlRdst;
                 return;
             case kTimeDivider: time_divider_ = value; return;
@@ -95,6 +101,7 @@ private:
     uint16_t control_      = 0;  /* PST(6)=0 no device; only RDST(3) ever set */
     uint16_t time_divider_ = 0;
     uint16_t reset_        = 0;
+    FreescaleModuleClocks* module_clocks_ = nullptr;
 };
 
 }  /* namespace */

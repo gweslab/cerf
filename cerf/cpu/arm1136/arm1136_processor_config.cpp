@@ -74,17 +74,6 @@ public:
        "the r1p0 to r1p4 releases of the ARM1136JF-S processor". */
     uint32_t Fpsid()                      const override { return 0x410120B3u; }
 
-    /* MCIMX31RM Figure 3-24 (PDF p235) clock tree + Table 3-5 PDR0
-       field decode: Pyxis OAL writes PDR0=0xFF841E5B (MCU_PDF=3,
-       MAX_PODF=3, IPG_PODF=1) so arm_clk/ipg_clk = 4*2/4 = 2. */
-    uint32_t CpuToOscrDivider()           const override { return 2; }
-
-    /* Divider = CpuClockHz / source_clock (icount ratio). highfreq =
-       ipg_clk_highfreq = 66 MHz (kernel reads it from BSP_ARGS+0xE8;
-       532M/66M≈8); lowfreq = CKIL 32.768 kHz (532M/32768≈16235). */
-    uint32_t CpuToHighfreqClockDivider()  const override { return 8; }
-    uint32_t CpuToLowfreqClockDivider()   const override { return 16235; }
-
     /* MCIMX31RM §3.5.3 arm_clk max = 532 MHz. */
     uint32_t CpuClockHz()                 const override { return 532000000u; }
 };

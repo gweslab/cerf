@@ -6,6 +6,7 @@
 #include "../../peripherals/peripheral_dispatcher.h"
 #include "../../state/state_stream.h"
 #include "imx31_avic.h"
+#include "../freescale_module_clocks.h"
 
 #include <cstdint>
 
@@ -50,7 +51,10 @@ public:
         auto* bd = emu_.TryGet<BoardContext>();
         return bd && bd->GetSocId() == SocId::Imx31;
     }
-    void OnReady() override { emu_.Get<PeripheralDispatcher>().Register(this); }
+    void OnReady() override {
+        module_clocks_ = &emu_.Get<FreescaleModuleClocks>();
+        emu_.Get<PeripheralDispatcher>().Register(this);
+    }
 
     uint32_t MmioBase() const override { return kBase; }
     uint32_t MmioSize() const override { return kSize; }
@@ -78,6 +82,8 @@ public:
     void WriteWord(uint32_t addr, uint32_t value) override {
         switch (addr - kBase) {
             case kStrStpClk:
+                if (value & kClkStartClk)
+                    module_clocks_->RequireRunning(FreescaleModule::kSdhc1, "starts its card clock");
                 str_stp_clk_ = value;
                 if (value & kClkStartClk) status_ |= kStsCardClkRun;
                 if (value & kClkStopClk)  status_ &= ~kStsCardClkRun;
@@ -88,6 +94,7 @@ public:
             /* Command submit (§29.5.1 step 5). No card -> the command times out:
                END_CMD_RESP (transfer done) + TIME_OUT_RESP (no response). */
             case kCmdDatCont:
+                module_clocks_->RequireRunning(FreescaleModule::kSdhc1, "issues a command");
                 cmd_dat_cont_ = value;
                 status_ |= kStsEndCmdResp | kStsTimeOutResp;
                 UpdateIrq();
@@ -142,6 +149,7 @@ private:
     uint32_t int_cntr_     = 0;
     uint32_t cmd_          = 0;
     uint32_t arg_          = 0;
+    FreescaleModuleClocks* module_clocks_ = nullptr;
 };
 
 }  /* namespace */

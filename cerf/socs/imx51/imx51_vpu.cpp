@@ -3,8 +3,10 @@
 #include "../../core/cerf_emulator.h"
 #include "../../boards/board_context.h"
 #include "imx51_id.h"
+#include "imx51_power_gate_line.h"
 #include "../../peripherals/peripheral_dispatcher.h"
 #include "../../state/state_stream.h"
+#include "../freescale_module_clocks.h"
 
 #include <array>
 #include <cstdint>
@@ -29,7 +31,12 @@ public:
         auto* bd = emu_.TryGet<BoardContext>();
         return bd && bd->GetSocId() == SocId::Imx51;
     }
-    void OnReady() override { emu_.Get<PeripheralDispatcher>().Register(this); }
+    void OnReady() override {
+        module_clocks_ = &emu_.Get<FreescaleModuleClocks>();
+        emu_.Get<PeripheralDispatcher>().Register(this);
+        emu_.Get<Imx51PowerGateLine>().RegisterBlock(Imx51PowerGatedBlock::kVpu,
+                                                     [this] { PowerDown(); });
+    }
 
     uint32_t MmioBase() const override { return kBase; }
     uint32_t MmioSize() const override { return kSize; }
@@ -49,26 +56,42 @@ public:
 
     void WriteWord(uint32_t a, uint32_t v) override {
         const uint32_t o = a - kBase;
+        written_ = true;
         regs_[o >> 2] = v;
         /* vpu.dll VPU_Init sets BIT_BUSY=1, writes BIT_CODE_RUN=1, then spins
            `while(*(base+0x160))` until the BIT core clears BUSY. No real CODA
            core exists, so the run-kick clears BUSY here - without it VPU_Init
            never returns and gwes never launches. */
-        if (o == kRegCodeRun && v != 0u)
+        if (o == kRegCodeRun && v != 0u) {
+            module_clocks_->RequireRunning(FreescaleModule::kVpu, "starts its BIT processor");
             regs_[kRegBusy >> 2] = 0u;
+        }
     }
 
     void SaveState(StateWriter& w) override    { w.WriteBytes("regs", regs_.data(), sizeof(regs_)); }
-    void RestoreState(StateReader& r) override { r.ReadBytes("regs", regs_.data(), sizeof(regs_)); }
+    void RestoreState(StateReader& r) override {
+        r.ReadBytes("regs", regs_.data(), sizeof(regs_));
+        written_ = true;
+    }
 
 private:
     void Merge(uint32_t off, uint32_t v, uint32_t shift, uint32_t vmask) {
         const uint32_t m = vmask << shift;
         uint32_t& r = regs_[off >> 2];
+        written_ = true;
         r = (r & ~m) | ((v << shift) & m);
     }
 
+    /* MCIMX51RM §11.1.2: PG loses all data in the VPU. */
+    void PowerDown() {
+        if (!written_) return;
+        regs_.fill(0u);
+        written_ = false;
+    }
+
     std::array<uint32_t, kSize / 4> regs_{};
+    bool                            written_       = false;
+    FreescaleModuleClocks*          module_clocks_ = nullptr;
 };
 
 }  /* namespace */

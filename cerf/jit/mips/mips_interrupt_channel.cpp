@@ -94,13 +94,19 @@ bool MipsInterruptChannel::InterruptPending(uint32_t idle) const {
 
 bool MipsInterruptChannel::WaitForInterrupt(uint32_t idle) {
     const MipsCpuState& s = *cpu_state_;
+    bool woke = true;
     for (;;) {
-        if (ResetRequested() || s.deep_sleep) return true;
-        if (host_exit_.load(std::memory_order_acquire)) return false;
+        if (ResetRequested() || s.deep_sleep) break;
+        if (host_exit_.load(std::memory_order_acquire)) {
+            woke = false;
+            break;
+        }
         if (TakeHostRequest()) host_requests_->ServiceRequests();
-        if (InterruptPending(idle)) return true;
+        if (InterruptPending(idle)) break;
         clock_->IdleStep(idle_event_);
     }
+    clock_->ExitIdle();
+    return woke;
 }
 
 void MipsInterruptChannel::EnterIdle(const char* insn, uint32_t next_pc) {

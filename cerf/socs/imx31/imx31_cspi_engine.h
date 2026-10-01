@@ -7,6 +7,7 @@
 #include "imx31_id.h"
 #include "../../peripherals/peripheral_dispatcher.h"
 #include "../../state/state_stream.h"
+#include "../freescale_module_clocks.h"
 
 #include <cstdint>
 
@@ -21,7 +22,10 @@ public:
         auto* bd = emu_.TryGet<BoardContext>();
         return bd && bd->GetSocId() == SocId::Imx31;
     }
-    void OnReady() override { emu_.Get<PeripheralDispatcher>().Register(this); }
+    void OnReady() override {
+        module_clocks_ = &emu_.Get<FreescaleModuleClocks>();
+        emu_.Get<PeripheralDispatcher>().Register(this);
+    }
 
     uint32_t MmioSize() const override { return 0x00004000u; }  /* SPBA 16 KB slot */
 
@@ -44,7 +48,10 @@ protected:
        Called only on a CONREG XCH with EN set. */
     virtual uint32_t SpiExchange(uint32_t cs, uint32_t tx) = 0;
 
+    virtual FreescaleModule ClockModule() const = 0;
+
 private:
+    FreescaleModuleClocks* module_clocks_ = nullptr;
     uint32_t conreg_      = 0;
     uint32_t intreg_      = 0;
     uint32_t dmareg_      = 0;

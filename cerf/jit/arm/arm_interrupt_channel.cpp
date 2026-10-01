@@ -10,6 +10,7 @@
 #include "../../core/fatal.h"
 #include "../../core/log.h"
 #include "../guest_cycle_clock.h"
+#include "../host_request_channel.h"
 #include "arm_cpu.h"
 #include "cpu_state.h"
 
@@ -23,8 +24,9 @@ ArmInterruptChannel::~ArmInterruptChannel() {
 }
 
 void ArmInterruptChannel::OnReady() {
-    cpu_state_ = emu_.Get<ArmCpu>().State();
-    clock_     = &emu_.Get<GuestCycleClock>();
+    cpu_state_     = emu_.Get<ArmCpu>().State();
+    clock_         = &emu_.Get<GuestCycleClock>();
+    host_requests_ = &emu_.Get<HostRequestChannel>();
 
     idle_event_ = CreateEventW(nullptr, FALSE, FALSE, nullptr);
     if (!idle_event_) {
@@ -62,6 +64,15 @@ void ArmInterruptChannel::Wake() {
     SetEvent(idle_event_);
 }
 
+void ArmInterruptChannel::RequestHostService() {
+    if (host_request_.exchange(1u, std::memory_order_acq_rel) == 0u) SetEvent(idle_event_);
+}
+
+bool ArmInterruptChannel::TakeHostRequest() {
+    return host_request_.load(std::memory_order_acquire) != 0u &&
+           host_request_.exchange(0u, std::memory_order_acq_rel) != 0u;
+}
+
 ArmInterruptChannel::IrqGate ArmInterruptChannel::EvaluateGate() const {
     IrqGate gate;
     gate.level = Level();
@@ -86,16 +97,18 @@ uint32_t __cdecl ArmInterruptChannel::BackOutForIrqHelper(
 void ArmInterruptChannel::WaitForInterrupt() {
     ArmCpuState* state = cpu_state_;
     for (;;) {
-        if (state->reset_pending || state->deep_sleep) return;
+        if (state->reset_pending || state->deep_sleep) break;
         const uint32_t exits = std::atomic_ref<uint32_t>(state->chain_exit_request)
                                    .load(std::memory_order_acquire);
-        if ((exits & ~(kChainExitIrq | kChainExitFlush)) != 0u) return;
-        if (irq_line_.load(std::memory_order_acquire) != 0u) return;
+        if ((exits & ~(kChainExitIrq | kChainExitFlush)) != 0u) break;
+        if (TakeHostRequest()) host_requests_->ServiceRequests();
+        if (irq_line_.load(std::memory_order_acquire) != 0u) break;
         /* SA-1110 Dev Man §9.5.2.2: with ICCR.DIM = 0 any enabled interrupt, masked
            or unmasked, ends idle mode; the WFI completes and execution resumes. */
-        if (idle_wake_line_.load(std::memory_order_acquire) != 0u) return;
+        if (idle_wake_line_.load(std::memory_order_acquire) != 0u) break;
         clock_->IdleStep(idle_event_);
     }
+    clock_->ExitIdle();
 }
 
 void __fastcall ArmInterruptChannel::WfiHelper(ArmInterruptChannel* channel) {

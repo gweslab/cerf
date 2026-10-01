@@ -52,6 +52,7 @@ constexpr uint32_t kResetBitReset = 1u << 0;
    fsl,imx51-sdma); kBdExtd per cspddk DDKSdmaSetBufDesc OR-mask 0x810000. */
 constexpr uint32_t kBdDone       = 1u << 16;   /* D */
 constexpr uint32_t kBdWrap       = 1u << 17;   /* W */
+constexpr uint32_t kBdCont       = 1u << 18;
 constexpr uint32_t kBdIntr       = 1u << 19;   /* I */
 constexpr uint32_t kBdError      = 1u << 20;   /* R */
 constexpr uint32_t kBdExtd       = 1u << 23;

@@ -6,15 +6,18 @@
 #include "../../core/cerf_emulator.h"
 #include "../../state/state_stream.h"
 #include "../freescale_timer_clocks.h"
+#include "../guest_cpu_reset.h"
+#include "imx31_plls.h"
 
+#include <atomic>
 #include <cstdint>
 #include <functional>
 #include <vector>
 
-/* MCIMX31RM Table 3-1: AP Clock Controller at 0x53F8_0000. Named (not anonymous)
-   so Imx31AudioPlayer can resolve the SSI serial clock its sample rate derives
-   from (MCIMX31RM Figure 3-24, Table 3-4 SSIxS, Table 3-6 SSIx_PODF). */
-class Imx31Ccm : public Peripheral {
+class Imx31ClockInput;
+
+/* MCIMX31RM Table 3-1: AP Clock Controller at 0x53F8_0000. */
+class Imx31Ccm : public Peripheral, public ResetCauseLatch {
 public:
     using Peripheral::Peripheral;
 
@@ -33,25 +36,54 @@ public:
     void     WriteHalf(uint32_t addr, uint16_t value) override;
     void     WriteWord(uint32_t addr, uint32_t value) override;
 
-    /* JIT-thread-only register file (no worker thread). */
-    void SaveState(StateWriter& w) override    { w.WriteBytes("regs", regs_, sizeof(regs_)); }
-    void RestoreState(StateReader& r) override { r.ReadBytes("regs", regs_, sizeof(regs_)); }
+    void SaveState(StateWriter& w) override;
+    void RestoreState(StateReader& r) override;
+    void PostRestore() override;
 
     /* ccm_ssi_clk for SSI1 / SSI2 (MCIMX31RM Figure 3-24): the CCMR-selected PLL
        through the SSIx pre and post dividers. Returns 0 for an unselectable source. */
     uint32_t SsiClockHz(uint32_t ssi) const;
 
+    uint64_t McuMainClkHz() const;
+    uint64_t IpgClkHz() const;
+    uint64_t PerClkHz() const;
     uint64_t HspClkHz() const;
+    uint64_t CkilHz() const;
+    uint32_t ClockGate0(uint32_t index) const;
     uint32_t ClockGate1(uint32_t index) const;
+    uint32_t ClockGate(uint32_t cgr, uint32_t index) const;
+    FreescaleLowPowerMode WfiMode() const;
 
     static bool ClockGateRunsIn(uint32_t cg, FreescaleLowPowerMode mode);
 
+    void RegisterRateListener(std::function<void()> fn);
     void RegisterGate1Listener(std::function<void()> fn);
+    void RegisterGateListener(std::function<void()> fn);
+
+    void LatchWarmReset() override;
+    void LatchColdReset() override;
+    void LatchWatchdogReset() override;
 
 private:
-    uint32_t PllHz(uint32_t pll_ctl_reg) const;
+    uint64_t            McuClkHz() const;
+    uint64_t            DividedHz(uint64_t hz, uint64_t divider, const char* clock) const;
+    uint32_t            LowPowerModeField() const;
+    void                OnIdle() const;
+    void                OnIdleExit();
+    [[noreturn]] void   DieDeepSleep() const;
+    void                ApplyRates();
+    void                NotifyGates();
+    void                ResetRegisters(ResetLineKind kind);
+    void                LoadResetValues();
+    Imx31Plls::Controls PllControls() const;
 
+    const Imx31ClockInput*             input_ = nullptr;
+    Imx31Plls*                         plls_  = nullptr;
+    std::vector<std::function<void()>> listeners_;
     std::vector<std::function<void()>> gate1_listeners_;
+    std::vector<std::function<void()>> gate_listeners_;
+    std::atomic<uint32_t>              latched_rest_{0u};
+    uint64_t                           applied_hz_ = 0u;
     uint32_t regs_[kSlotCount] = {};
 
     static bool OffsetToSlot(uint32_t off, uint32_t* slot_out) {

@@ -3,8 +3,10 @@
 #include "../peripherals/peripheral_base.h"
 
 #include "../core/cerf_emulator.h"
+#include "../core/fatal.h"
 #include "../boards/board_context.h"
 #include "imx51/imx51_id.h"
+#include "imx51/imx51_iomuxc.h"
 #include "../peripherals/peripheral_dispatcher.h"
 #include "../state/state_stream.h"
 #include "irq_controller.h"
@@ -30,9 +32,13 @@ constexpr uint32_t kOffEdgeSel = 0x1Cu;
 /* Freescale i.MX GPIO (i.MX31 MCIMX31RM Ch 5 / i.MX51 MCIMX51RM Ch 35); i.MX51 adds
    EDGE_SEL (0x1C); gated per concrete by kSoc; 32-bit access only. kIrqLow16/kIrqHigh16
    = the TZIC sources (MCIMX51RM Table 3-2) for a concrete's OR'd pin 0-15 / 16-31
-   lines; -1 (default) = passive register file, interrupt path compiled out. */
-template <uint32_t kBase, const std::string_view& kSoc, int kIrqLow16 = -1, int kIrqHigh16 = -1>
+   lines; -1 (default) = passive register file, interrupt path compiled out.
+   kOrLine32: MCIMX31RM §5.1 ipi_gpio_int, the 1-bit OR of all 32 lines. */
+template <uint32_t kBase, const std::string_view& kSoc, int kIrqLow16 = -1, int kIrqHigh16 = -1,
+          bool kOrLine32 = false>
 class FreescaleGpioBase : public Peripheral {
+    static constexpr bool kHasIrq = kIrqLow16 >= 0 || kOrLine32;
+
 public:
     using Peripheral::Peripheral;
 
@@ -40,7 +46,14 @@ public:
         auto* bd = emu_.TryGet<BoardContext>();
         return bd && bd->GetSocId() == kSoc;
     }
-    void OnReady() override { emu_.Get<PeripheralDispatcher>().Register(this); }
+    void OnReady() override {
+        if constexpr (kSoc == SocId::Imx51) {
+            iomuxc_ = &emu_.Get<Imx51Iomuxc>();
+            RefreshPadMasks();
+            iomuxc_->RegisterPadListener([this] { OnPadChange(); });
+        }
+        emu_.Get<PeripheralDispatcher>().Register(this);
+    }
 
     uint32_t MmioBase() const override { return kBase; }
     uint32_t MmioSize() const override { return kGpioSize; }
@@ -50,12 +63,18 @@ public:
        Undriven pins stay 0. On an interrupt-enabled concrete a matching ICR
        edge/level (+IMR) raises the OR'd TZIC line. */
     void SetInputPin(uint32_t pin, bool level) {
-        if constexpr (kIrqLow16 >= 0) {
+        if constexpr (kSoc == SocId::Imx51) {
+            if (!Imx51Iomuxc::MapsGpioPin(kBase, pin)) {
+                emu_.Get<Fatal>().Die("FreescaleGpio 0x%08X: a board device drives pin %u, which "
+                                      "has no IOMUXC pad mapping", kBase, pin);
+            }
+        }
+        if constexpr (kHasIrq) {
             std::lock_guard<std::mutex> lk(irq_mu_);
-            const bool prev = (input_level_ >> pin) & 1u;
+            const bool prev = ((input_level_ & input_mask_) >> pin) & 1u;
             driven_mask_ |= (1u << pin);
             SetLevelBit(pin, level);
-            DetectEdgeLocked(pin, prev, level);
+            DetectEdgeLocked(pin, prev, ((input_level_ & input_mask_) >> pin) & 1u);
             RecomputeIrqLocked();
         } else {
             SetLevelBit(pin, level);
@@ -67,7 +86,7 @@ public:
        guest's SCL/SDA edges through a write callback and reads the master-driven
        level via these getters; it drives the line back through SetInputPin. */
     void SetWriteObserver(std::function<void()> cb) { write_obs_ = std::move(cb); }
-    bool PinIsOutput(uint32_t pin) const { return (gdir_ >> pin) & 1u; }
+    bool PinIsOutput(uint32_t pin) const { return ((gdir_ & output_mask_) >> pin) & 1u; }
     bool PinOutLevel(uint32_t pin) const { return (dr_ >> pin) & 1u; }
     bool PinInputLevel(uint32_t pin) const { return (input_level_ >> pin) & 1u; }
 
@@ -82,18 +101,18 @@ public:
                ("while GDIR=0, a read access to DR does not return DR data"). A
                board device drives a pin's pad level via SetInputPin. */
             case kOffDr: {
-                const uint32_t dr_val = (dr_ & gdir_) | (input_level_ & ~gdir_);
+                const uint32_t dr_val = (dr_ & gdir_) | (input_level_ & input_mask_ & ~gdir_);
                 return dr_val;
             }
             case kOffGdir: return gdir_;
             /* PSR always returns the pad input value (MCIMX31RM §5.3.3.3). */
             case kOffPsr:
-                return input_level_;
+                return input_level_ & input_mask_;
             case kOffIcr1: return icr1_;
             case kOffIcr2: return icr2_;
             case kOffImr:  return imr_;
             case kOffIsr:
-                if constexpr (kIrqLow16 >= 0) {
+                if constexpr (kHasIrq) {
                     std::lock_guard<std::mutex> lk(irq_mu_);
                     return isr_ | LiveLevelIsrLocked();
                 }
@@ -124,7 +143,12 @@ public:
     /* Re-drive the OR'd TZIC line from the restored ICR/IMR/ISR + pad levels: a
        level-driving source must re-assert its INTC line after a restore. */
     void PostRestore() override {
-        if constexpr (kIrqLow16 >= 0) {
+        if constexpr (kSoc == SocId::Imx51) RefreshPadMasks();
+        if constexpr (kOrLine32) {
+            std::lock_guard<std::mutex> lk(irq_mu_);
+            irq_low_asserted_ = ((isr_ | LiveLevelIsrLocked()) & imr_) != 0u;
+            DrivePortIrqLine(irq_low_asserted_);
+        } else if constexpr (kIrqLow16 >= 0) {
             std::lock_guard<std::mutex> lk(irq_mu_);
             irq_low_asserted_  = false;
             irq_high_asserted_ = false;
@@ -145,7 +169,39 @@ public:
         if constexpr (kSoc == SocId::Imx51) r.Read("edge_sel", edge_sel_);
     }
 
+protected:
+    virtual void DrivePortIrqLine(bool asserted) {
+        emu_.Get<Fatal>().Die("FreescaleGpio 0x%08X: the port interrupt line (level %d) has no "
+                              "interrupt controller source", kBase, asserted ? 1 : 0);
+    }
+
 private:
+    void RefreshPadMasks() {
+        input_mask_  = iomuxc_->InputPathMask(kBase);
+        output_mask_ = iomuxc_->GpioPadMask(kBase);
+    }
+
+    void OnPadChange() {
+        if constexpr (kHasIrq) {
+            std::lock_guard<std::mutex> lk(irq_mu_);
+            const uint32_t before = input_level_ & input_mask_;
+            RefreshPadMasks();
+            const uint32_t moved = (before ^ (input_level_ & input_mask_)) & driven_mask_;
+            for (uint32_t pin = 0u; pin < 32u; ++pin) {
+                if (((moved >> pin) & 1u) == 0u) continue;
+                const uint32_t cfg = IcrCfg(pin);
+                if (((edge_sel_ >> pin) & 1u) != 0u || cfg == 0b10u || cfg == 0b11u) {
+                    emu_.Get<Fatal>().Die("FreescaleGpio 0x%08X: an IOMUXC mux change moves pin "
+                                          "%u with edge detection on; that edge is not modeled",
+                                          kBase, pin);
+                }
+            }
+            RecomputeIrqLocked();
+        } else {
+            RefreshPadMasks();
+        }
+    }
+
     void SetLevelBit(uint32_t pin, bool level) {
         if (level) input_level_ |=  (1u << pin);
         else       input_level_ &= ~(1u << pin);
@@ -184,7 +240,7 @@ private:
                (00) IMR on it would assert forever. */
             if (((driven_mask_ >> pin) & 1u) == 0u) continue;
             if (((edge_sel_ >> pin) & 1u) != 0u) continue;
-            const bool level = ((input_level_ >> pin) & 1u) != 0u;
+            const bool level = (((input_level_ & input_mask_) >> pin) & 1u) != 0u;
             switch (IcrCfg(pin)) {
                 case 0b00u: if (!level) live |= (1u << pin); break;
                 case 0b01u: if (level)  live |= (1u << pin); break;
@@ -195,7 +251,7 @@ private:
     }
 
     void RecomputeIrq() {
-        if constexpr (kIrqLow16 >= 0) {
+        if constexpr (kHasIrq) {
             std::lock_guard<std::mutex> lk(irq_mu_);
             RecomputeIrqLocked();
         }
@@ -203,20 +259,28 @@ private:
 
     void RecomputeIrqLocked() {
         const uint32_t eff = (isr_ | LiveLevelIsrLocked()) & imr_;
-        const bool low = (eff & 0x0000FFFFu) != 0u;
-        if (low != irq_low_asserted_) {
-            irq_low_asserted_ = low;
-            auto& intc = emu_.Get<IrqController>();
-            if (low) intc.AssertIrq(kIrqLow16);
-            else     intc.DeAssertIrq(kIrqLow16);
-        }
-        if constexpr (kIrqHigh16 >= 0) {
-            const bool high = (eff & 0xFFFF0000u) != 0u;
-            if (high != irq_high_asserted_) {
-                irq_high_asserted_ = high;
+        if constexpr (kOrLine32) {
+            const bool any = eff != 0u;
+            if (any != irq_low_asserted_) {
+                irq_low_asserted_ = any;
+                DrivePortIrqLine(any);
+            }
+        } else {
+            const bool low = (eff & 0x0000FFFFu) != 0u;
+            if (low != irq_low_asserted_) {
+                irq_low_asserted_ = low;
                 auto& intc = emu_.Get<IrqController>();
-                if (high) intc.AssertIrq(kIrqHigh16);
-                else      intc.DeAssertIrq(kIrqHigh16);
+                if (low) intc.AssertIrq(kIrqLow16);
+                else     intc.DeAssertIrq(kIrqLow16);
+            }
+            if constexpr (kIrqHigh16 >= 0) {
+                const bool high = (eff & 0xFFFF0000u) != 0u;
+                if (high != irq_high_asserted_) {
+                    irq_high_asserted_ = high;
+                    auto& intc = emu_.Get<IrqController>();
+                    if (high) intc.AssertIrq(kIrqHigh16);
+                    else      intc.DeAssertIrq(kIrqHigh16);
+                }
             }
         }
     }
@@ -230,6 +294,9 @@ private:
     uint32_t edge_sel_ = 0;   /* i.MX51 only */
     uint32_t input_level_ = 0;  /* board-driven input pin levels read back via PSR */
     uint32_t driven_mask_ = 0;  /* pins a board device has driven (level-IRQ scope) */
+    uint32_t input_mask_  = 0xFFFFFFFFu;
+    uint32_t output_mask_ = 0xFFFFFFFFu;
+    Imx51Iomuxc* iomuxc_  = nullptr;
     std::function<void()> write_obs_;  /* fired on DR/GDIR write (bit-bang observers) */
     std::mutex irq_mu_;
     bool irq_low_asserted_  = false;

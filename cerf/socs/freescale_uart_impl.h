@@ -10,6 +10,7 @@
 #include "../peripherals/peripheral_dispatcher.h"
 #include "../state/state_stream.h"
 #include "uart_endpoint.h"
+#include "freescale_module_clocks.h"
 #include "freescale_sdma_bus.h"
 
 #include <cstddef>
@@ -17,6 +18,7 @@
 #include <cstdio>
 #include <deque>
 #include <string>
+#include <vector>
 
 namespace cerf_freescale_uart_detail {
 
@@ -33,7 +35,10 @@ public:
         auto* bd = emu_.TryGet<BoardContext>();
         return bd && bd->GetSocId() == kSoc;
     }
-    void OnReady() override { emu_.Get<PeripheralDispatcher>().Register(this); }
+    void OnReady() override {
+        module_clocks_ = &emu_.Get<FreescaleModuleClocks>();
+        emu_.Get<PeripheralDispatcher>().Register(this);
+    }
 
     uint32_t MmioBase() const override { return kBase; }
     uint32_t MmioSize() const override { return 0x4000u; }
@@ -52,18 +57,24 @@ public:
     void WriteHalf(uint32_t a, uint16_t v) override { Wr(a - kBase, v, (a & 2u) * 8u, 0xFFFFu); }
     void WriteWord(uint32_t a, uint32_t v) override { Wr(a - kBase, v, 0u, 0xFFFFFFFFu); }
 
-    /* Only the control/baud register file is machine state. tx_line_ is a
-       host-side console line accumulator (rebuilt as the guest writes UTXD),
-       so it is skipped. An attached endpoint (e.g. the VMCU peer) serializes
-       its own guest-coupled state via the forward below. */
     void SaveState(StateWriter& w) override {
         w.WriteBytes("ctrl", ctrl_, sizeof(ctrl_));
+        const std::vector<uint8_t> rx(rx_fifo_.begin(), rx_fifo_.end());
+        LOG(SocUart, "UART%d: saving %zu pending RX FIFO bytes\n", kUartNum, rx.size());
+        w.Write<uint32_t>("rx_fifo_count", static_cast<uint32_t>(rx.size()));
+        w.WriteBytes("rx_fifo", rx.data(), rx.size());
         if (endpoint_) endpoint_->SaveState(w);
     }
     void RestoreState(StateReader& r) override {
         r.ReadBytes("ctrl", ctrl_, sizeof(ctrl_));
+        uint32_t count = 0u;
+        r.Read("rx_fifo_count", count);
+        std::vector<uint8_t> rx(count);
+        r.ReadBytes("rx_fifo", rx.data(), rx.size());
+        rx_fifo_.assign(rx.begin(), rx.end());
         if (endpoint_) endpoint_->RestoreState(r);
     }
+    void PostRestore() override { UpdateRxIrq(); }
 
     /* A board wires an off-chip device (e.g. the SYNC2 VMCU) to this UART. */
     void AttachEndpoint(UartEndpoint* ep) { endpoint_ = ep; }
@@ -87,6 +98,7 @@ public:
        driver the bytes are delivered into the armed RX DMA channel; otherwise into
        the RxFIFO, raising the RX interrupt if the guest enabled it. */
     void InjectRx(const uint8_t* data, size_t n) {
+        module_clocks_->RequireRunning(kModule, "receives characters");
         if (sdma_bus_ && rx_dma_event_ != 0
             && sdma_bus_->SdmaRxDeliver(rx_dma_event_, data, n))
             return;
@@ -101,6 +113,18 @@ protected:
     virtual void DeassertRxIrq() {}
 
 private:
+    static_assert(kUartNum == 1 || kUartNum == 2 || kUartNum == 3 || kUartNum == 5);
+
+    /* MCIMX51RM §59.4.2.1: peripheral_clock is the TxFIFO write / RxFIFO read clock, module_clock
+       runs the sending and receiving state machines; Linux i.MX5 clock driver uart1_ipg_gate
+       ("ipg") and uart1_per_gate ("uart_root"). */
+    static constexpr FreescaleModule kModule =
+        kUartNum == 1 ? FreescaleModule::kUart1 : kUartNum == 2 ? FreescaleModule::kUart2
+        : kUartNum == 3 ? FreescaleModule::kUart3 : FreescaleModule::kUart5;
+    static constexpr FreescaleModule kIpgModule =
+        kUartNum == 1 ? FreescaleModule::kUart1Ipg : kUartNum == 2 ? FreescaleModule::kUart2Ipg
+        : kUartNum == 3 ? FreescaleModule::kUart3Ipg : FreescaleModule::kUart5Ipg;
+
     static constexpr uint32_t kURXD = 0x00u, kUTXD = 0x40u;
     static constexpr uint32_t kUCR1 = 0x80u, kUCR2 = 0x84u;
     static constexpr uint32_t kUCR4 = 0x8Cu, kUFCR = 0x90u;
@@ -163,6 +187,7 @@ private:
 
     uint32_t Reg(uint32_t off) {
         if (off == kURXD) {
+            module_clocks_->RequireRunning(kIpgModule, "reads its receive FIFO");
             if (rx_fifo_.empty()) return 0u;   /* CHARRDY=0 */
             const uint8_t b = rx_fifo_.front();
             rx_fifo_.pop_front();
@@ -208,14 +233,16 @@ private:
     }
 
     void EmitTx(uint8_t ch) {
+        module_clocks_->RequireRunning(kModule, "transmits a character");
         if (endpoint_) { endpoint_->OnGuestTx(ch); return; }
         char tag[8];
         std::snprintf(tag, sizeof(tag), "UART%d", kUartNum);
         emu_.Get<KernelDebugSink>().EmitChar(static_cast<char>(ch), tx_line_, tag);
     }
 
-    UartEndpoint*        endpoint_ = nullptr;
-    std::deque<uint8_t>  rx_fifo_;
+    UartEndpoint*          endpoint_      = nullptr;
+    FreescaleModuleClocks* module_clocks_ = nullptr;
+    std::deque<uint8_t>    rx_fifo_;
     FreescaleSdmaBus*    sdma_bus_      = nullptr;
     uint32_t             rx_dma_event_  = 0;
 };

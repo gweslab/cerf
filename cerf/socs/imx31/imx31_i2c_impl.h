@@ -7,6 +7,7 @@
 #include "imx31_id.h"
 #include "../../peripherals/peripheral_dispatcher.h"
 #include "../../state/state_stream.h"
+#include "../freescale_module_clocks.h"
 
 #include <cstdint>
 
@@ -29,7 +30,7 @@ constexpr uint16_t kI2srIal  = 0x10u;  /* arbitration lost */
 constexpr uint16_t kI2srIif  = 0x02u;  /* interrupt flag (w0c) */
 constexpr uint16_t kI2srRxak = 0x01u;  /* 0 = ACK received */
 
-template <uint32_t kBase>
+template <uint32_t kBase, FreescaleModule kModule>
 class Imx31I2cImpl : public Peripheral {
 public:
     using Peripheral::Peripheral;
@@ -38,7 +39,10 @@ public:
         auto* bd = emu_.TryGet<BoardContext>();
         return bd && bd->GetSocId() == SocId::Imx31;
     }
-    void OnReady() override { emu_.Get<PeripheralDispatcher>().Register(this); }
+    void OnReady() override {
+        module_clocks_ = &emu_.Get<FreescaleModuleClocks>();
+        emu_.Get<PeripheralDispatcher>().Register(this);
+    }
 
     uint32_t MmioBase() const override { return kBase; }
     uint32_t MmioSize() const override { return kSize; }
@@ -49,7 +53,10 @@ public:
             case kOffIfdr: return ifdr_;
             case kOffI2cr: return i2cr_;
             case kOffI2sr: return i2sr_;
-            case kOffI2dr: i2sr_ |= kI2srIcf; return i2dr_;
+            case kOffI2dr:
+                module_clocks_->RequireRunning(kModule, "receives a byte");
+                i2sr_ |= kI2srIcf;
+                return i2dr_;
         }
         HaltUnsupportedAccess("ReadHalf", addr, 0);
     }
@@ -61,6 +68,8 @@ public:
             case kOffI2cr: {
                 const bool was_master = (i2cr_ & kI2crMsta) != 0;
                 const bool is_master  = (value & kI2crMsta) != 0;
+                if (was_master != is_master)
+                    module_clocks_->RequireRunning(kModule, "drives a START or STOP");
                 i2cr_ = value;
                 if (!was_master && is_master)      i2sr_ |= kI2srIbb;
                 else if (was_master && !is_master) i2sr_ &= ~(kI2srIbb | kI2srIcf);
@@ -71,6 +80,7 @@ public:
             /* Audio careful stub (§0.3): accept the codec byte, complete the
                transfer instantly with ACK so the polling driver proceeds. */
             case kOffI2dr:
+                module_clocks_->RequireRunning(kModule, "transmits a byte");
                 i2dr_ = value;
                 i2sr_ |= (kI2srIcf | kI2srIif);
                 i2sr_ &= ~kI2srRxak;
@@ -90,6 +100,7 @@ public:
 
 private:
     uint16_t iadr_ = 0, ifdr_ = 0, i2cr_ = 0, i2sr_ = 0, i2dr_ = 0;
+    FreescaleModuleClocks* module_clocks_ = nullptr;
 };
 
 }  /* namespace cerf_imx31_i2c_detail */

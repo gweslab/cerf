@@ -8,6 +8,8 @@
 #include "../irq_controller.h"
 #include "imx51_gpu2d_command_engine.h"
 #include "imx51_gpu2d_rasterizer.h"
+#include "imx51_power_gate_line.h"
+#include "../freescale_module_clocks.h"
 
 #include <cstdint>
 
@@ -60,6 +62,8 @@ public:
     }
     void OnReady() override {
         emu_.Get<PeripheralDispatcher>().Register(this);
+        emu_.Get<Imx51PowerGateLine>().RegisterBlock(Imx51PowerGatedBlock::kGpu2d,
+                                                     [this] { PowerDown(); });
     }
 
     uint32_t MmioBase() const override { return kBase; }
@@ -82,6 +86,7 @@ public:
         HaltUnsupportedAccess("ReadWord", a, 0);
     }
     void WriteWord(uint32_t a, uint32_t v) override {
+        written_ = true;
         switch (a - kBase) {
             case kOffCommandStream:    Funnel(cmd_, v, /*is_mmu=*/false); return;
             case kOffMmuCommandStream: Funnel(mmu_cmd_, v, /*is_mmu=*/true); return;
@@ -125,6 +130,7 @@ public:
         r.Read("irq_active_g2d", irq_active_g2d_);
         emu_.Get<Imx51Gpu2dCommandEngine>().RestoreState(r);
         emu_.Get<Imx51Gpu2dRasterizer>().RestoreState(r);
+        written_ = true;
     }
     void PostRestore() override {  /* re-drive the restored G2D IRQ line (hibernation.md peripheral contract) */
         if ((irqstatus_ & kVgcIrqG2d) && (irq_enable_ & kVgcIrqG2d))
@@ -164,6 +170,20 @@ private:
             CompleteSubmit();
     }
 
+    /* MCIMX51RM §11.1.2: PG loses all data in the GPU2D. */
+    void PowerDown() {
+        if (!written_) return;
+        mh_arbiter_config_ = mh_mmu_config_ = mh_interrupt_mask_ = 0;
+        mh_mpu_base_ = mh_mpu_end_ = mh_read_addr_ = 0;
+        irq_enable_ = irqstatus_ = irq_active_g2d_ = 0;
+        cmd_     = Latch{};
+        mmu_cmd_ = Latch{};
+        emu_.Get<IrqController>().DeAssertIrq(kTzicG2d);
+        emu_.Get<Imx51Gpu2dCommandEngine>().PowerOnReset();
+        emu_.Get<Imx51Gpu2dRasterizer>().ClearPath();
+        written_ = false;
+    }
+
     void WriteMhReg(uint32_t addr, uint32_t data) {
         switch (addr) {
             case kAddrMhArbiterConfig: mh_arbiter_config_ = data; return;
@@ -189,6 +209,8 @@ private:
        (issueibcmds sub_C1016F3C) and waittimestamp adds the G2D IRQ_ACTIVE_CNT byte to its
        timestamp (sub_C1016E10), so the completion count is 1 per submit, not the mark count. */
     void CompleteSubmit() {
+        emu_.Get<FreescaleModuleClocks>().RequireRunning(FreescaleModule::kGpu2d,
+                                                         "retires a command submit");
         if (irq_active_g2d_ < 0xFFu) ++irq_active_g2d_;
         irqstatus_ |= kVgcIrqG2d;
         if (irq_enable_ & kVgcIrqG2d) emu_.Get<IrqController>().AssertIrq(kTzicG2d);
@@ -217,6 +239,7 @@ private:
     uint32_t irq_active_g2d_    = 0;
     Latch    cmd_;
     Latch    mmu_cmd_;
+    bool     written_ = false;
 };
 
 }  /* namespace */

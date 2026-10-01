@@ -7,6 +7,7 @@ public:
     bool ShouldRegister() override;
     void SaveState(class StateWriter& writer);
     void RestoreState(class StateReader& reader);
+    void PowerOnReset();
     void Triangle(const std::array<Imx51Gpu3dShaderState,3>& vertices,
         const std::unordered_map<uint32_t,uint32_t>& registers,
         std::span<const uint32_t> pixel_program, uint32_t mmu_config);

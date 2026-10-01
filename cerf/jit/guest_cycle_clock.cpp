@@ -57,10 +57,12 @@ void GuestCycleClock::SetUnits(Rate rate) {
 }
 
 void GuestCycleClock::SetClockRate(Rate rate) {
-    const Rate r = Normalized(rate);
+    const Rate     r       = Normalized(rate);
+    const uint64_t request = ++rate_requests_;
     if (r.num == rate_.num && r.den == rate_.den) return;
     const uint64_t now = CyclesNow();
     RunDue(now);
+    if (rate_requests_ != request) return;
     const int64_t slice_left_ns =
         throttle_->armed_ ? CyclesToNs(throttle_->at_ - now) : kThrottleSliceNs;
     ref_wall_ns_ = TargetWallNs(now);
@@ -74,6 +76,20 @@ void GuestCycleClock::SetClockRate(Rate rate) {
 
 void GuestCycleClock::RegisterRateListener(std::function<void()> fn) {
     rate_listeners_.push_back(std::move(fn));
+}
+
+void GuestCycleClock::RegisterIdleListener(std::function<void()> fn) {
+    idle_listeners_.push_back(std::move(fn));
+}
+
+void GuestCycleClock::RegisterIdleExitListener(std::function<void()> fn) {
+    idle_exit_listeners_.push_back(std::move(fn));
+}
+
+void GuestCycleClock::ExitIdle() {
+    if (!in_idle_) return;
+    in_idle_ = false;
+    for (auto& fn : idle_exit_listeners_) fn();
 }
 
 void GuestCycleClock::OnReady() {
@@ -205,6 +221,8 @@ void GuestCycleClock::OnThrottle() {
 }
 
 void GuestCycleClock::IdleStep(void* wake_event) {
+    in_idle_ = true;
+    for (auto& fn : idle_listeners_) fn();
     const uint64_t now  = CyclesNow();
     const uint64_t next = NextArmed();
     if (next == kNever) {

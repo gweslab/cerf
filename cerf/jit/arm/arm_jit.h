@@ -19,6 +19,7 @@ class ArmMmuProbe;
 class ArmPageWalker;
 class ArmTranslationCache;
 class GuestCycleClock;
+class HostRequestChannel;
 
 class ArmJit : public GuestEngine {
 public:
@@ -85,4 +86,5 @@ private:
     ArmBlockCompiler*    compiler_ = nullptr;
     ArmInterruptChannel* channel_  = nullptr;
     GuestCycleClock*     clock_    = nullptr;
+    HostRequestChannel*  host_requests_ = nullptr;
 };

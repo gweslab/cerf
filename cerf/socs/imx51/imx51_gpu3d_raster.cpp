@@ -6,6 +6,7 @@
 #include "../../core/fatal.h"
 #include "../../state/state_stream.h"
 #include "../../boards/board_context.h"
+#include "../freescale_module_clocks.h"
 #include "imx51_id.h"
 #include <algorithm>
 #include <bit>
@@ -30,6 +31,11 @@ bool Imx51Gpu3dRaster::ShouldRegister() {
 void Imx51Gpu3dRaster::SaveState(StateWriter& writer) {
     writer.Write("gmem_binding", gmem_binding_); writer.Write("gmem_pitch", gmem_pitch_);
     writer.WriteBytes("gmem", gmem_.data(),gmem_.size());
+}
+void Imx51Gpu3dRaster::PowerOnReset() {
+    gmem_.fill(0u);
+    gmem_binding_ = 0xFFFFFFFFu;
+    gmem_pitch_   = 0;
 }
 void Imx51Gpu3dRaster::RestoreState(StateReader& reader) {
     reader.Read("gmem_binding", gmem_binding_); reader.Read("gmem_pitch", gmem_pitch_);
@@ -169,6 +175,8 @@ void Imx51Gpu3dRaster::RasterizeTriangle(const std::array<Imx51Gpu3dShaderState,
     if (tiled && (surface & 31u)) fail("tiled target pitch",surface);
     const uint32_t binding = info & 0xFFFFF00Fu;
     if (gmem) {
+        emu_.Get<FreescaleModuleClocks>().RequireRunning(FreescaleModule::kGpu3dMemory,
+                                                         "accesses its graphics memory");
         if (swap == 3u) fail("GMEM swap",info);
         if ((mmu_config & 1u) && mmu_config != 1u) fail("GMEM MMU mode",mmu_config);
         if (gmem_binding_ != 0xFFFFFFFFu && (gmem_binding_ != binding || gmem_pitch_ != (surface & 0x3FFFu)))

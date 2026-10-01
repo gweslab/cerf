@@ -5,6 +5,7 @@
 #include <cstdint>
 #include <deque>
 
+class FreescaleModuleClocks;
 class SpiSlave;
 class StateWriter;
 class StateReader;
@@ -47,5 +48,6 @@ private:
     std::deque<uint32_t> tx_fifo_;
     std::deque<uint32_t> rx_fifo_;
 
-    SpiSlave* slave_ = nullptr;
+    SpiSlave*              slave_         = nullptr;
+    FreescaleModuleClocks* module_clocks_ = nullptr;
 };

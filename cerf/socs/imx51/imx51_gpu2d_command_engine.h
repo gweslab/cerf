@@ -24,6 +24,7 @@ public:
 
     void SaveState(StateWriter& w) const;
     void RestoreState(StateReader& r);
+    void PowerOnReset();
 
 private:
     [[noreturn]] void Halt(const char* why, uint32_t addr, uint32_t data) const;

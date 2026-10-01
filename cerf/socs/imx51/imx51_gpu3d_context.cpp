@@ -75,3 +75,4 @@ void Imx51Gpu3dContext::RestoreState(StateReader& reader) {
     StateReadField field(reader);
     for (Bank& bank : banks_) Bank::Visit(bank, field);
 }
+void Imx51Gpu3dContext::PowerOnReset() { banks_ = {}; }

@@ -1,55 +1,89 @@
 #include "../freescale_wdog_impl.h"
 
-#include "../../state/state_stream.h"
+#include "imx31_ccm.h"
 #include "imx31_id.h"
 
 namespace {
 
 using cerf_freescale_wdog_detail::FreescaleWdogBase;
-using cerf_freescale_wdog_detail::kWcr;
-using cerf_freescale_wdog_detail::kWsr;
-using cerf_freescale_wdog_detail::kWrsr;
 using cerf_freescale_wdog_detail::kWcrReset;
+using cerf_freescale_wdog_detail::kWcrWdbg;
+using cerf_freescale_wdog_detail::kWcrWde;
+using cerf_freescale_wdog_detail::kWcrWdzst;
+using cerf_freescale_wdog_detail::WdogResetSource;
 
-/* i.MX31 Watchdog (MCIMX31RM Ch 37) at PA 0x53FD_C000 - three 16-bit registers.
-   The kernel loads WCR.WT, sets WDE, then services the dog (WSR 0x5555/0xAAAA)
-   every cycle and reads WRSR for the boot reason. */
+/* MCIMX31RM Table 37-6: bit 7 reserved; WRE, WDBG and WDZST write once-only; WDE can
+   only be written to 1. */
+constexpr uint16_t kWcrWoe       = 1u << 6;
+constexpr uint16_t kWcrWre       = 1u << 3;
+constexpr uint16_t kWcrWritable  = 0xFF7Fu;
+constexpr uint16_t kWcrWriteOnce = kWcrWre | kWcrWdbg | kWcrWdzst;
+
+/* MCIMX31RM Table 37-8. */
+constexpr uint16_t kWrsrSftw = 1u << 0;
+constexpr uint16_t kWrsrTout = 1u << 1;
+constexpr uint16_t kWrsrExt  = 1u << 3;
+constexpr uint16_t kWrsrPwr  = 1u << 4;
+
 class Imx31Wdog : public FreescaleWdogBase<0x53FDC000u, SocId::Imx31> {
 public:
     using FreescaleWdogBase::FreescaleWdogBase;
 
-    /* WRSR is read-only (cold power-on signature) and recomputed, not stored;
-       WCR and WSR are the whole writable state. */
-    void SaveState(StateWriter& w) override    { w.Write("wcr", wcr_); w.Write("wsr", wsr_); }
-    void RestoreState(StateReader& r) override { r.Read("wcr", wcr_); r.Read("wsr", wsr_); }
-
 protected:
-    uint16_t ReadReg16(uint32_t off) override {
-        switch (off) {
-            case kWcr:  return wcr_;
-            case kWsr:  return wsr_;
-            case kWrsr: return 0x0010u;  /* PWR: reset was power-on (Table 37-8) */
-        }
-        HaltUnsupportedAccess("ReadReg16", MmioBase() + off, 0);
-    }
-    void WriteReg16(uint32_t off, uint16_t value) override {
-        switch (off) {
-            case kWcr:  wcr_ = value; return;
-            /* No time-out->reset timer: the kernel services the dog (WSR
-               0x5555/0xAAAA) every cycle so a real watchdog never bites, and a
-               reset timer would only fire a spurious mid-boot reset on
-               host/guest timing skew. */
-            case kWsr:  wsr_ = value; return;
-            case kWrsr: return;  /* read-only (§37.5.4: write raises bus error) */
-        }
-        HaltUnsupportedAccess("WriteReg16", MmioBase() + off, value);
+    uint64_t CkilHz() const override { return emu_.Get<Imx31Ccm>().CkilHz(); }
+    uint16_t WcrWritable() const override { return kWcrWritable; }
+    uint16_t WcrWriteOnce() const override { return kWcrWriteOnce; }
+    uint16_t WcrWriteOneOnce() const override { return kWcrWde; }
+
+    void OnWriteOnceChange(uint16_t value) override {
+        emu_.Get<Fatal>().Die("Imx31Wdog: WCR write 0x%04X changes a write-once bit of 0x%04X",
+                              value, wcr_);
     }
 
-private:
-    uint16_t wcr_ = kWcrReset;
-    uint16_t wsr_ = 0;
+    bool SuspendedIn(FreescaleLowPowerMode mode) const override {
+        return (wcr_ & kWcrWdzst) != 0u && mode != FreescaleLowPowerMode::kRun;
+    }
+
+    /* MCIMX31RM Figure 37-1. */
+    bool SuspendStopsPrescaler() const override { return false; }
+
+    void OnWdaChange() override {
+        if ((wcr_ & cerf_freescale_wdog_detail::kWcrWda) == 0u) {
+            emu_.Get<Fatal>().Die("Imx31Wdog: WCR 0x%04X asserts the WDOG signal; the pin is "
+                                  "not modeled", wcr_);
+        }
+    }
+
+    void OnCounterTimeout() override {
+        if ((wcr_ & kWcrWre) != 0u) {
+            emu_.Get<Fatal>().Die("Imx31Wdog: time-out with WCR 0x%04X asserts the WDOG "
+                                  "signal; the pin is not modeled", wcr_);
+        }
+        RaiseReset(WdogResetSource::kTimeout);
+    }
+
+    void OnPowerOn(uint64_t) override {
+        wcr_  = kWcrReset;
+        wsr_  = 0u;
+        wrsr_ = kWrsrPwr;
+    }
+
+    /* MCIMX31RM 37.5.2: a system reset restores every register but WRSR; Table 37-6 WOE
+       survives a software reset only. Table 37-8: WRSR names the last reset source. */
+    void ResetRegisters(ResetLineKind kind, WdogResetSource source, uint64_t) override {
+        const uint16_t woe = source == WdogResetSource::kSoftware ? (wcr_ & kWcrWoe) : 0u;
+        wcr_ = static_cast<uint16_t>(kWcrReset | woe);
+        wsr_ = 0u;
+        switch (kind) {
+            case ResetLineKind::Rtc:   wrsr_ = kWrsrPwr; break;
+            case ResetLineKind::Other: wrsr_ = kWrsrExt; break;
+            case ResetLineKind::Watchdog:
+                wrsr_ = source == WdogResetSource::kTimeout ? kWrsrTout : kWrsrSftw;
+                break;
+        }
+    }
 };
 
-}  /* namespace */
+}
 
 REGISTER_SERVICE(Imx31Wdog);

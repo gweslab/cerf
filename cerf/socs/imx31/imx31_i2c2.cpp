@@ -3,7 +3,8 @@
 namespace {
 
 /* MCIMX31RM Table 26-3: I2C2 at 0x43F98000. */
-class Imx31I2c2 : public cerf_imx31_i2c_detail::Imx31I2cImpl<0x43F98000u> {
+class Imx31I2c2
+    : public cerf_imx31_i2c_detail::Imx31I2cImpl<0x43F98000u, FreescaleModule::kI2c2> {
     using Imx31I2cImpl::Imx31I2cImpl;
 };
 

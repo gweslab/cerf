@@ -478,3 +478,10 @@ void Imx51Gpu2dCommandEngine::RestoreState(StateReader& r) {
     r.Read("bbox_live", bbox_live_);
     r.ReadBytes("vg_regs", vg_regs_, sizeof(vg_regs_));
 }
+
+void Imx51Gpu2dCommandEngine::PowerOnReset() {
+    vgv3_nextaddr_ = vgv3_nextcmd_ = vgv3_cursor_ = 0;
+    cur_x_ = cur_y_ = 0.0f;
+    bbox_live_ = false;
+    std::fill(std::begin(vg_regs_), std::end(vg_regs_), 0u);
+}

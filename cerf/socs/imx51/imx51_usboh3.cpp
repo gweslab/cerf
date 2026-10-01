@@ -1,20 +1,21 @@
 #include "../../peripherals/usb/usb_state.h"
 #include "imx51_usboh3.h"
+#include "imx51_usb_device_transfers.h"
 #include "usb_device_host.h"
 
 #include "../../core/cerf_emulator.h"
+#include "../../core/fatal.h"
 #include "../../core/log.h"
 #include "../../boards/board_context.h"
 #include "imx51_id.h"
-#include "../../cpu/emulated_memory.h"
 #include "../../peripherals/peripheral_dispatcher.h"
-#include "../../core/virtual_clock.h"
 #include "../../state/state_stream.h"
+#include "imx51_usb_transceiver_clocks.h"
+#include "../guest_cpu_reset.h"
 #include "../irq_controller.h"
 
 #include <array>
 #include <cstdint>
-#include <vector>
 
 namespace {
 
@@ -28,6 +29,11 @@ constexpr uint32_t kCapReset = 0x01000040u;
 /* EHCI 1.0 Spec Table 2-5 (p13) + Table 2-6 (p14, N_PORTS bits 3:0). */
 constexpr uint32_t kOffHcsparams = kOffCaplen + 0x04u;
 constexpr uint32_t kHcsparamsOnePort = 1u;
+/* MCIMX51RM §60.4.2.4.4 HCCPARAMS "Default Value: 0006h"; Table 60-87 USBCMD "00080B00h if
+   Asynchronous Schedule Park Capability is a one". */
+constexpr uint32_t kOffHccparams = kOffCaplen + 0x08u;
+constexpr uint32_t kHccparamsBorn = 0x00000006u;
+constexpr uint32_t kUsbcmdBorn    = 0x00080B00u;
 
 constexpr uint32_t kOffUsbsts = 0x00000144u;  /* USBSTS (=USBCMD+4) */
 constexpr uint32_t kCmdRs  = 1u << 0;   /* USBCMD.RS  Run/Stop */
@@ -62,7 +68,13 @@ constexpr uint32_t kPortscDevAttached =
    every read, or guest port-reset gating that requires PP=1 never opens. */
 constexpr uint32_t kPortscPp = 1u << 12;
 
+constexpr uint32_t kOffPhyCtrl0  = 0x00000808u;
+constexpr uint32_t kOffUsbCtrl1  = 0x00000810u;
+/* MCIMX51RM Figure 60-4 (PHY_CTRL_0 reset row). */
+constexpr uint32_t kPhyCtrl0Born = 0x80001400u;
+
 constexpr uint32_t kOffUsbintr       = 0x00000148u;
+constexpr uint32_t kOffFrindex       = 0x0000014Cu;
 constexpr uint32_t kOffEndptlistaddr = 0x00000158u;  /* dQH array base (2 KB aligned) */
 constexpr uint32_t kOffEndptsetupstat= 0x000001ACu;  /* per-EP setup-received (w1c) */
 constexpr uint32_t kOffEndptprime    = 0x000001B0u;  /* per-ep-dir prime (self-clear) */
@@ -74,21 +86,9 @@ constexpr uint32_t kStsUei = 1u << 1;   /* error */
 constexpr uint32_t kStsPci = 1u << 2;   /* port change detect */
 constexpr uint32_t kStsUri = 1u << 6;   /* USB reset received */
 constexpr uint32_t kDevIntBits = kStsUi | kStsUei | kStsPci | kStsUri;
+constexpr uint32_t kFrameStatusBits =
+    FreescaleUsbFrameIndex::kStsSri | FreescaleUsbFrameIndex::kStsFri;
 constexpr uint32_t kUsbOtgIrq = 18u;    /* TZIC source 18 (SBOOT sub_8005DC4C) */
-
-/* ChipIdea device dQH/dTD layout, MCIMX51RM Fig 60-88/89/90: dQH array indexed
-   (2*ep + dir_in) on a 64-byte stride; the constants below name the field offsets. */
-constexpr uint32_t kDqhStride   = 0x40u;
-constexpr uint32_t kDqhOvNext   = 0x08u;
-constexpr uint32_t kDqhOvCur    = 0x04u;
-constexpr uint32_t kDqhOvToken  = 0x0Cu;
-constexpr uint32_t kSetupBufOff = 0x28u;
-constexpr uint32_t kDtdNext     = 0x00u;
-constexpr uint32_t kDtdToken    = 0x04u;
-constexpr uint32_t kDtdBuf0     = 0x08u;
-constexpr uint32_t kDtdTerminate = 1u;
-constexpr uint32_t kTokenActive  = 0x80u;
-constexpr uint32_t kPageSize     = 0x1000u;
 
 constexpr uint8_t kUsb3317Id[4] = {0x24u, 0x04u, 0x06u, 0x00u};
 
@@ -102,48 +102,98 @@ bool Imx51Usboh3::ShouldRegister() {
 }
 
 void Imx51Usboh3::OnReady() {
+    for (auto& phy : phy_)
+        for (uint8_t i = 0; i < 4; ++i) phy[i] = kUsb3317Id[i];
+    emu_.Get<PeripheralDispatcher>().Register(this);
+    transfers_   = &emu_.Get<Imx51UsbDeviceTransfers>();
+    clock_       = &emu_.Get<GuestCycleClock>();
+    frame_event_ = clock_->Add([this] { OnScheduleTimer(); });
+    irq_event_   = clock_->Add([this] { OnFrameIrqEvent(); });
+    frame_index_.Attach();
+    transceiver_clocks_ = &emu_.Get<Imx51UsbTransceiverClocks>();
+    transceiver_clocks_->RegisterChangeListener([this](FreescaleLowPowerMode mode) {
+        std::lock_guard<std::mutex> lk(async_schedule_mtx_);
+        RefreshTransceiverClocks(mode);
+    });
+    clock_->RegisterRateListener([this] { OnCpuRateChanged(); });
+    /* MCIMX51RM Table 54-10: system_rst_b "Resets functional modules" in every reset row. */
+    emu_.Get<GuestCpuReset>().RegisterResetListener([this](ResetLineKind) {
+        std::lock_guard<std::mutex> lk(async_schedule_mtx_);
+        ResetController();
+        RefreshDeviceIrq();
+    });
+    ResetController();
+}
+
+void Imx51Usboh3::ResetController() {
+    regs_.fill(0u);
     for (uint32_t core = 0; core < kNonCore; core += kCoreSpan) {
-        regs_[(core + kOffCaplen) >> 2] = kCapReset;
+        regs_[(core + kOffCaplen) >> 2]    = kCapReset;
+        regs_[(core + kOffHccparams) >> 2] = kHccparamsBorn;
+        regs_[(core + kOffUsbcmd) >> 2]    = kUsbcmdBorn;
         /* Out of reset the host controller is halted (Table 60-40/41). */
         regs_[(core + kOffUsbsts) >> 2] = kStsHch;
     }
     regs_[kOffHcsparams >> 2] = kHcsparamsOnePort;
-    for (auto& phy : phy_)
-        for (uint8_t i = 0; i < 4; ++i) phy[i] = kUsb3317Id[i];
-    emu_.Get<PeripheralDispatcher>().Register(this);
-    schedule_timer_ = emu_.Get<VirtualTimerList>().Add([this] { OnScheduleTimer(); });
+    regs_[kOffPhyCtrl0 >> 2]  = kPhyCtrl0Born;
+    reset_seen_ = false;
+    frame_index_.ResetAll();
+    clock_->Disarm(irq_event_);
+    frames_running_ = false;
     UpdateScheduleTimer();
+    /* MCIMX51RM Table 60-52 CCS: "This value reflects the current state of the port". */
+    if (otg_host_root_port_.IsConnected()) OnPortConnectChanged(0);
 }
 
-void Imx51Usboh3::OnShutdown() {
-    std::lock_guard<std::mutex> lk(async_schedule_mtx_);
-    if (schedule_timer_) schedule_timer_->Arm(VirtualTimerList::kNoDeadline);
-    schedule_timer_ = nullptr;
+/* MCIMX51RM §60.4.5.4.1: micro-frame starts are "timed precisely to 125 us using the
+   transceiver clock as a reference clock". */
+void Imx51Usboh3::RefreshTransceiverClocks(FreescaleLowPowerMode mode) {
+    bool changed = false;
+    for (uint32_t core = 0; core < kCores; ++core) {
+        if (!frame_index_.Running(core)) continue;
+        const bool on = transceiver_clocks_->CoreClockRuns(
+            core, regs_[(core * kCoreSpan + kOffPortsc) >> 2], regs_[kOffPhyCtrl0 >> 2],
+            regs_[kOffUsbCtrl1 >> 2], mode);
+        if (on == frame_index_.Clocked(core)) continue;
+        frame_index_.SetClocked(core, on);
+        changed = true;
+    }
+    if (!changed) return;
+    UpdateScheduleTimer();
+    ArmFrameIrq();
 }
-
-Imx51Usboh3::~Imx51Usboh3() { OnShutdown(); }
 
 void Imx51Usboh3::UpdateScheduleTimer() {
-    if (!schedule_timer_) return;
     const auto cmd = regs_[kOffUsbcmd >> 2];
-    if (Core0IsDevice() || !otg_host_root_port_.IsConnected() ||
+    if (Core0IsDevice() || !otg_host_root_port_.IsConnected() || !frame_index_.Clocked(0u) ||
         !(cmd & kCmdRs) || !(cmd & (kCmdAse | kCmdPse))) {
-        schedule_timer_->Arm(VirtualTimerList::kNoDeadline);
-    } else if (schedule_timer_->DeadlineNs() == VirtualTimerList::kNoDeadline) {
-        /* USB 2.0 5.10: one full-speed frame is 1 ms. */
-        constexpr int64_t kFrameNs = 1000000;
-        schedule_timer_->Arm(emu_.Get<VirtualClock>().NowNs() + kFrameNs);
+        frames_running_ = false;
+        clock_->Disarm(frame_event_);
+        return;
     }
+    if (frames_running_) return;
+    frames_running_ = true;
+    ArmNextFrame();
+}
+
+void Imx51Usboh3::ArmNextFrame() {
+    clock_->Arm(frame_event_, frame_index_.NextFrameCycle(0u));
 }
 
 void Imx51Usboh3::OnScheduleTimer() {
     std::lock_guard<std::mutex> lk(async_schedule_mtx_);
-    if (!schedule_timer_) return;
-    if (!Core0IsDevice() && otg_host_root_port_.IsConnected()) {
-        ExecuteAsyncSchedule();
-        ExecutePeriodicSchedule();
-    }
-    UpdateScheduleTimer();
+    ExecuteAsyncSchedule();
+    ExecutePeriodicSchedule();
+    ArmNextFrame();
+}
+
+void Imx51Usboh3::OnCpuRateChanged() {
+    std::lock_guard<std::mutex> lk(async_schedule_mtx_);
+    frame_index_.Rescale();
+    ArmFrameIrq();
+    if (!frames_running_) return;
+    const uint64_t now = clock_->Cycles();
+    if (!clock_->IsDue(frame_event_, now)) ArmNextFrame();
 }
 
 uint32_t Imx51Usboh3::MmioBase() const { return kBase; }
@@ -152,24 +202,43 @@ uint32_t Imx51Usboh3::MmioSize() const { return kSize; }
 uint8_t Imx51Usboh3::ReadByte(uint32_t addr) {
     std::lock_guard<std::mutex> lk(async_schedule_mtx_);
     const uint32_t off = addr - kBase;
-    return static_cast<uint8_t>(regs_[off >> 2] >> ((off & 3u) * 8u));
+    return static_cast<uint8_t>(ReadLocked(off & ~3u) >> ((off & 3u) * 8u));
 }
 uint16_t Imx51Usboh3::ReadHalf(uint32_t addr) {
     std::lock_guard<std::mutex> lk(async_schedule_mtx_);
     const uint32_t off = addr - kBase;
-    return static_cast<uint16_t>(regs_[off >> 2] >> ((off & 2u) * 8u));
+    return static_cast<uint16_t>(ReadLocked(off & ~3u) >> ((off & 2u) * 8u));
 }
 uint32_t Imx51Usboh3::ReadWord(uint32_t addr) {
     std::lock_guard<std::mutex> lk(async_schedule_mtx_);
-    const uint32_t off = addr - kBase;
+    return ReadLocked(addr - kBase);
+}
+
+uint32_t Imx51Usboh3::ReadLocked(uint32_t off) {
     /* Device mode (core0): CERF is the always-present host, so PORTSC1 reflects a
        connected, enabled, high-speed device port (sub_8005D97C polls it). */
     if (off == kOffPortsc && Core0IsDevice())
         return regs_[off >> 2] | kPortscDevAttached;
+    if (off >= kNonCore) return regs_[off >> 2];
     const uint32_t coff = off % kCoreSpan;
+    const uint32_t core = off / kCoreSpan;
     if (coff == kOffPortsc && !Core0IsDevice())
         return regs_[off >> 2] | kPortscPp;
+    if (coff == kOffUsbsts) return regs_[off >> 2] | frame_index_.Status(core);
+    if (coff == kOffFrindex) return frame_index_.Frindex(core);
     return regs_[off >> 2];
+}
+
+void Imx51Usboh3::WriteCoreFrameReg(uint32_t off, uint32_t value) {
+    if ((off % kCoreSpan) != kOffFrindex) return;
+    const uint32_t core = off / kCoreSpan;
+    if (core == 0u && Core0IsDevice()) return;
+    if (frame_index_.Running(core)) {
+        emu_.Get<Fatal>().Die("Imx51Usboh3: FRINDEX write 0x%08X on core %u with Run/Stop set",
+                              value, core);
+    }
+    frame_index_.WriteFrindex(core, value);
+    ArmFrameIrq();
 }
 
 void Imx51Usboh3::WriteWord(uint32_t addr, uint32_t value) {
@@ -178,10 +247,23 @@ void Imx51Usboh3::WriteWord(uint32_t addr, uint32_t value) {
     if (off < kNonCore) {
         const uint32_t coff = off % kCoreSpan;
         const bool core0_dev = off < kCoreSpan && Core0IsDevice();
+        WriteCoreFrameReg(off, value);
+        if (coff == kOffFrindex) return;
         if (coff == kOffUsbcmd) {
+            if ((value & kUsbcmdReset) != 0u) {
+                if (frame_index_.Running(off / kCoreSpan)) {
+                    emu_.Get<Fatal>().Die("Imx51Usboh3: USBCMD 0x%08X sets RST on core %u "
+                                          "with Run/Stop set", value, off / kCoreSpan);
+                }
+                frame_index_.Reset(off / kCoreSpan);
+            }
             value &= ~kUsbcmdReset;   /* RST self-clears at reset completion */
             const uint32_t old = regs_[off >> 2];
             regs_[off >> 2] = value;
+            frame_index_.SetFrameListSize(off / kCoreSpan,
+                                          FreescaleUsbFrameIndex::FrameListSizeCode(value));
+            frame_index_.SetRunning(off / kCoreSpan, (value & kCmdRs) != 0u, !core0_dev);
+            RefreshTransceiverClocks(FreescaleLowPowerMode::kRun);
             if (core0_dev) {
                 /* RS 0->1: CERF (host) attaches and drives a bus reset ->
                    USBSTS.URI|PCI, raising the OTG interrupt. */
@@ -192,11 +274,15 @@ void Imx51Usboh3::WriteWord(uint32_t addr, uint32_t value) {
                 ReflectScheduleStatus(off, value);
             }
             if (off < kCoreSpan) UpdateScheduleTimer();
+            if (off < kCoreSpan && !core0_dev) RefreshDeviceIrq();
+            ArmFrameIrq();
             return;
         }
         if (coff == kOffUsbsts) {
             const uint32_t old = regs_[off >> 2];
             regs_[off >> 2] = (old & kUsbstsRoMask) | (old & ~kUsbstsRoMask & ~value);
+            frame_index_.ClearStatus(off / kCoreSpan,
+                                     value & kFrameStatusBits);
             if (core0_dev) {
                 RefreshDeviceIrq();
                 /* URI cleared marks the start of SBOOT's reset handler
@@ -208,11 +294,13 @@ void Imx51Usboh3::WriteWord(uint32_t addr, uint32_t value) {
             } else if (off < kCoreSpan) {
                 RefreshDeviceIrq();
             }
+            ArmFrameIrq();
             return;
         }
-        if (off < kCoreSpan && coff == kOffUsbintr) {
+        if (coff == kOffUsbintr) {
             regs_[off >> 2] = value;
-            RefreshDeviceIrq();
+            if (off < kCoreSpan) RefreshDeviceIrq();
+            ArmFrameIrq();
             return;
         }
         if (core0_dev && (coff == kOffEndptsetupstat || coff == kOffEndptcomplete)) {
@@ -231,7 +319,7 @@ void Imx51Usboh3::WriteWord(uint32_t addr, uint32_t value) {
                first SETUP and it will survive to the next ISR. */
             if (reset_seen_) {
                 reset_seen_ = false;
-                if (host_) host_->OnDeviceReset();
+                if (UsbDeviceHost* host = transfers_->Host()) host->OnDeviceReset();
             }
             return;
         }
@@ -241,11 +329,16 @@ void Imx51Usboh3::WriteWord(uint32_t addr, uint32_t value) {
         }
         if (off < kCoreSpan && !core0_dev && coff == kOffPortsc) {
             WriteOtgHostPortsc(value);
+            RefreshTransceiverClocks(FreescaleLowPowerMode::kRun);
             return;
         }
     }
     regs_[off >> 2] = value;
     if (off == kOffUsbmode) UpdateScheduleTimer();
+    if (off == kOffPhyCtrl0 || off == kOffUsbCtrl1 ||
+        (off < kNonCore && off % kCoreSpan == kOffPortsc)) {
+        RefreshTransceiverClocks(FreescaleLowPowerMode::kRun);
+    }
 }
 
 void Imx51Usboh3::SaveState(StateWriter& w) {
@@ -253,7 +346,8 @@ void Imx51Usboh3::SaveState(StateWriter& w) {
     w.WriteBytes("regs", regs_.data(), sizeof(regs_));
     w.WriteBytes("phy", phy_.data(), sizeof(phy_));
     w.Write<uint8_t>("reset_seen", reset_seen_ ? 1 : 0);
-    if (host_) host_->SaveState(w);   /* forward to the registered USB host driver */
+    frame_index_.Save(w);
+    if (UsbDeviceHost* host = transfers_->Host()) host->SaveState(w);
     otg_host_root_port_.SaveState(w);
 }
 void Imx51Usboh3::RestoreState(StateReader& r) {
@@ -261,28 +355,64 @@ void Imx51Usboh3::RestoreState(StateReader& r) {
     r.ReadBytes("regs", regs_.data(), sizeof(regs_));
     r.ReadBytes("phy", phy_.data(), sizeof(phy_));
     uint8_t b = 0; r.Read("reset_seen", b); reset_seen_ = b != 0;
-    if (host_) host_->RestoreState(r);
+    frame_index_.Restore(r);
+    if (UsbDeviceHost* host = transfers_->Host()) host->RestoreState(r);
     otg_host_root_port_.RestoreState(r);
+    clock_->Disarm(frame_event_);
+    clock_->Disarm(irq_event_);
 }
 
 void Imx51Usboh3::PostRestore() {
     std::lock_guard<std::mutex> lk(async_schedule_mtx_);
     otg_host_root_port_.PostRestore();
+    RefreshTransceiverClocks(FreescaleLowPowerMode::kRun);
     RefreshDeviceIrq();
-    if (schedule_timer_) schedule_timer_->Arm(VirtualTimerList::kNoDeadline);
+    frames_running_ = false;
+    clock_->Disarm(frame_event_);
     UpdateScheduleTimer();
+    ArmFrameIrq();
 }
 
 bool Imx51Usboh3::Core0IsDevice() const {
     return (regs_[kOffUsbmode >> 2] & kUsbmodeCmMask) == kUsbmodeDevice;
 }
 
+/* MCIMX51RM Table 60-42: SRE and FRE raise the interrupt while SRI or FRI is set. */
 void Imx51Usboh3::RefreshDeviceIrq() {
-    const bool pending = (regs_[kOffUsbsts >> 2] & regs_[kOffUsbintr >> 2] &
-                          kDevIntBits) != 0;
+    const uint32_t sts = regs_[kOffUsbsts >> 2] | frame_index_.Status(0u);
+    const bool pending = (sts & regs_[kOffUsbintr >> 2] &
+                          (kDevIntBits | kFrameStatusBits)) != 0;
     auto& intc = emu_.Get<IrqController>();
     if (pending) intc.AssertIrq(static_cast<int>(kUsbOtgIrq));
     else         intc.DeAssertIrq(static_cast<int>(kUsbOtgIrq));
+}
+
+void Imx51Usboh3::ArmFrameIrq() {
+    uint64_t due = FreescaleUsbFrameIndex::kNever;
+    for (uint32_t core = 0; core < kCores; ++core) {
+        const uint32_t enabled =
+            regs_[(core * kCoreSpan + kOffUsbintr) >> 2] & kFrameStatusBits;
+        if (enabled == 0u) continue;
+        const uint64_t at = frame_index_.NextStatusCycle(core, enabled);
+        if (at < due) due = at;
+    }
+    if (due == FreescaleUsbFrameIndex::kNever) clock_->Disarm(irq_event_);
+    else                                   clock_->Arm(irq_event_, due);
+}
+
+void Imx51Usboh3::OnFrameIrqEvent() {
+    std::lock_guard<std::mutex> lk(async_schedule_mtx_);
+    for (uint32_t core = 1; core < kCores; ++core) {
+        const uint32_t live = frame_index_.Status(core) &
+                              regs_[(core * kCoreSpan + kOffUsbintr) >> 2] & kFrameStatusBits;
+        if (live != 0u) {
+            emu_.Get<Fatal>().Die("Imx51Usboh3: core %u USBSTS 0x%X meets USBINTR 0x%08X; "
+                                  "that core's interrupt line is not modeled", core, live,
+                                  regs_[(core * kCoreSpan + kOffUsbintr) >> 2]);
+        }
+    }
+    RefreshDeviceIrq();
+    ArmFrameIrq();
 }
 
 void Imx51Usboh3::ReflectScheduleStatus(uint32_t usbcmd_off, uint32_t usbcmd) {
@@ -310,100 +440,21 @@ uint32_t Imx51Usboh3::DqhBase() const {
     return regs_[kOffEndptlistaddr >> 2] & ~0x7FFu;
 }
 
+void Imx51Usboh3::RegisterDeviceHost(UsbDeviceHost* host) {
+    transfers_->SetHost(host);
+}
+
 void Imx51Usboh3::DeliverSetup(const uint8_t setup[8]) {
-    auto& mem = emu_.Get<EmulatedMemory>();
-    const uint32_t base = DqhBase();
-    if (!base || !mem.TryTranslate(base)) {
-        LOG(Caution, "Imx51Usboh3: DeliverSetup with invalid ENDPTLISTADDR=0x%08X\n", base);
-        return;
-    }
-    /* EP0-OUT dQH = index 0; the SETUP buffer is at dQH+0x28. */
-    mem.CopyIn(base + kSetupBufOff, setup, 8);
-    regs_[kOffEndptsetupstat >> 2] |= 1u;   /* EP0 setup received */
+    if (!transfers_->WriteSetup(DqhBase(), setup)) return;
+    regs_[kOffEndptsetupstat >> 2] |= 1u;
     regs_[kOffUsbsts >> 2] |= kStsUi;
     RefreshDeviceIrq();
 }
 
 void Imx51Usboh3::ExecutePrime(uint32_t prime_bits) {
-    for (uint32_t ep = 0; ep < 16; ++ep) {
-        if (prime_bits & (1u << ep))          ExecuteEndpoint(ep, false);  /* OUT */
-        if (prime_bits & (1u << (16u + ep)))  ExecuteEndpoint(ep, true);   /* IN  */
-    }
-}
-
-void Imx51Usboh3::ExecuteEndpoint(uint32_t ep, bool dir_in) {
-    auto& mem = emu_.Get<EmulatedMemory>();
-    const uint32_t base = DqhBase();
-    if (!base || !mem.TryTranslate(base)) {
-        LOG(Caution, "Imx51Usboh3: ENDPTPRIME ep%u %s but ENDPTLISTADDR=0x%08X invalid\n",
-            ep, dir_in ? "IN" : "OUT", base);
-        return;
-    }
-    const uint32_t dqh  = base + (ep * 2u + (dir_in ? 1u : 0u)) * kDqhStride;
-    const uint32_t next = mem.ReadWord(dqh + kDqhOvNext);
-    if (next & kDtdTerminate) return;            /* nothing primed */
-
-    uint32_t dtd = next & ~0x1Fu;
-    bool any = false;
-    for (int guard = 0; guard < 64 && dtd; ++guard) {
-        if (!mem.TryTranslate(dtd)) break;
-        const uint32_t token = mem.ReadWord(dtd + kDtdToken);
-        const uint32_t total = (token >> 16) & 0x7FFFu;
-
-        uint32_t pages[5];
-        for (int p = 0; p < 5; ++p) pages[p] = mem.ReadWord(dtd + kDtdBuf0 + p * 4u);
-
-        uint32_t residual = total;
-        if (dir_in) {
-            /* device->host: gather the dTD's buffers, hand them to the host. */
-            std::vector<uint8_t> data(total);
-            TransferDtdBuffers(pages, data.data(), total, /*to_host=*/true);
-            if (host_) host_->OnDeviceIn(ep, data.data(), static_cast<uint32_t>(data.size()));
-            residual = 0;
-        } else {
-            /* host->device: ask the host for up to `total` bytes, scatter them. */
-            std::vector<uint8_t> data(total);
-            const uint32_t got = host_ ? host_->OnDeviceOut(ep, data.data(), total) : 0u;
-            TransferDtdBuffers(pages, data.data(), got, /*to_host=*/false);
-            residual = total - got;
-        }
-
-        /* Retire: clear Active + error/status, set the residual byte count. The
-           dTD token (which SBOOT's dTD wrapper aliases) is what its sub_8005E540
-           reads to detect completion (token & 0x80 == 0). */
-        const uint32_t new_token = residual << 16;
-        mem.WriteWord(dtd + kDtdToken, new_token);
-        const uint32_t dtd_next = mem.ReadWord(dtd + kDtdNext);
-        mem.WriteWord(dqh + kDqhOvCur, dtd);
-        mem.WriteWord(dqh + kDqhOvNext, dtd_next);
-        mem.WriteWord(dqh + kDqhOvToken, new_token);
-        any = true;
-        if (dtd_next & kDtdTerminate) break;
-        dtd = dtd_next & ~0x1Fu;
-    }
-
-    if (any) {
-        regs_[kOffEndptcomplete >> 2] |= dir_in ? (1u << (16u + ep)) : (1u << ep);
-        regs_[kOffUsbsts >> 2] |= kStsUi;
-        RefreshDeviceIrq();
-    }
-}
-
-void Imx51Usboh3::TransferDtdBuffers(const uint32_t pages[5], uint8_t* host,
-                                     uint32_t n, bool to_host) {
-    /* EHCI/ChipIdea dTD buffer pages (RM Fig 60-90): page 0 carries the Current
-       Offset in bits[11:0]; pages 1-4 reserve bits[11:0], so the byte stream
-       continues at each page frame's boundary - mask the offset bits off pages
-       1-4 (a non-zero low value there is reserved, not a data offset). */
-    auto& mem = emu_.Get<EmulatedMemory>();
-    uint32_t left = n, cursor = 0;
-    for (int p = 0; p < 5 && left; ++p) {
-        const uint32_t pa    = (p == 0) ? pages[0] : (pages[p] & ~0xFFFu);
-        const uint32_t inpg  = (p == 0) ? (kPageSize - (pages[0] & 0xFFFu)) : kPageSize;
-        const uint32_t chunk = inpg < left ? inpg : left;
-        if (to_host) mem.CopyOut(pa, host + cursor, chunk);
-        else         mem.CopyIn(pa, host + cursor, chunk);
-        cursor += chunk;
-        left   -= chunk;
-    }
+    const uint32_t done = transfers_->ExecutePrime(DqhBase(), prime_bits);
+    if (done == 0u) return;
+    regs_[kOffEndptcomplete >> 2] |= done;
+    regs_[kOffUsbsts >> 2] |= kStsUi;
+    RefreshDeviceIrq();
 }

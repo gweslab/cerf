@@ -28,6 +28,10 @@ public:
         Imx31CspiEngine::RestoreState(r);
         if (auto* pmic = emu_.TryGet<Mc13783>()) pmic->RestoreState(r);
     }
+    void PostRestore() override {
+        Imx31CspiEngine::PostRestore();
+        if (auto* pmic = emu_.TryGet<Mc13783>()) pmic->PostRestore();
+    }
 
 protected:
     uint32_t SpiExchange(uint32_t cs, uint32_t tx) override {
@@ -37,6 +41,8 @@ protected:
         }
         return emu_.Get<Mc13783>().SpiExchange(tx);
     }
+
+    FreescaleModule ClockModule() const override { return FreescaleModule::kCspi2; }
 };
 
 }  /* namespace */

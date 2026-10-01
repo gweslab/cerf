@@ -47,12 +47,16 @@ public:
     void     SetClockHz(uint64_t hz) { SetClockRate(Rate{hz, 1u}); }
     void     SetClockRate(Rate rate);
     void     RegisterRateListener(std::function<void()> fn);
+    void     RegisterIdleListener(std::function<void()> fn);
+    void     RegisterIdleExitListener(std::function<void()> fn);
     int64_t  NowNs() { return guest_ns_ + CyclesToNs(CyclesNow() - guest_ns_cycle_); }
     uint64_t NsToCycles(int64_t ns) const;
     int64_t  CyclesToNs(uint64_t cycles) const;
 
     void OnDispatch();
     void IdleStep(void* wake_event);
+    void ExitIdle();
+    bool InIdle() const { return in_idle_; }
     void OnCyclesRestored();
 
 #if CERF_DEV_MODE
@@ -80,10 +84,14 @@ private:
 
     std::vector<std::unique_ptr<Event>> events_;
     std::vector<std::function<void()>>  rate_listeners_;
+    std::vector<std::function<void()>>  idle_listeners_;
+    std::vector<std::function<void()>>  idle_exit_listeners_;
+    bool          in_idle_     = false;
     Event*        throttle_    = nullptr;
     VirtualClock* wall_        = nullptr;
     void*         timer_       = nullptr;
     Rate          rate_        = Rate{1u, 1u};
+    uint64_t      rate_requests_ = 0;
     uint64_t      ns_unit_     = 1;
     uint64_t      cyc_unit_    = 1;
     uint64_t      ref_cycle_   = 0;

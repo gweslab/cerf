@@ -10,6 +10,7 @@
 struct ArmCpuState;
 
 class GuestCycleClock;
+class HostRequestChannel;
 
 class ArmInterruptChannel : public Service {
 public:
@@ -43,6 +44,9 @@ public:
 
     void Wake();
 
+    void RequestHostService();
+    bool TakeHostRequest();
+
     void WaitForInterrupt();
 
     static void __fastcall WfiHelper(ArmInterruptChannel* channel);
@@ -50,8 +54,10 @@ public:
 private:
     std::atomic<uint32_t> irq_line_{0};
     std::atomic<uint32_t> idle_wake_line_{0};
+    std::atomic<uint32_t> host_request_{0};
     void*                 idle_event_ = nullptr;
 
-    ArmCpuState*     cpu_state_ = nullptr;
-    GuestCycleClock* clock_     = nullptr;
+    ArmCpuState*        cpu_state_     = nullptr;
+    GuestCycleClock*    clock_         = nullptr;
+    HostRequestChannel* host_requests_ = nullptr;
 };

@@ -25,13 +25,6 @@ public:
        24 MHz reference (MCIMX51RM Eqn 22-1). */
     uint32_t CpuClockHz() const override { return 600000000u; }
 
-    /* EPIT/GPT icount ratio = arm_clk / source_clock. ipg_clk = PLL2(665)/AHB(/5)/
-       IPG(/2) = 66.5 MHz (CBCDR 0x24239180): 600/66.5 = 9. ipg_clk_highfreq = osc
-       ckih 24 MHz: 600/24 = 25. ipg_clk_32k = CKIL 32.768 kHz: 600M/32768 = 18310. */
-    uint32_t CpuToOscrDivider()          const override { return 9u; }
-    uint32_t CpuToHighfreqClockDivider() const override { return 25u; }
-    uint32_t CpuToLowfreqClockDivider()  const override { return 18310u; }
-
     /* Cortex-A8 with unified L2 present (ARM DDI0344K TRM, c0 Cache Level ID
        Register, page 3-39: 0x0A000023). */
     uint32_t Clidr() const override { return 0x0A000023u; }

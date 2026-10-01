@@ -14,6 +14,7 @@
 #include "../../state/state_stream.h"
 #include "../../storage/ata_drive.h"
 #include "../../storage/disk_image.h"
+#include "../freescale_module_clocks.h"
 #include "../guest_cpu_reset.h"
 #include "imx31_avic.h"
 
@@ -78,6 +79,9 @@ public:
                          "another cerf instance, or no write access.\n", path.c_str());
             CerfFatalExit(CERF_FATAL_RUNTIME_ERROR);
         }
+        module_clocks_ = &emu_.Get<FreescaleModuleClocks>();
+        module_clocks_->RegisterGateListener([this] { RefreshClock(); });
+        RefreshClock();
         emu_.Get<PeripheralDispatcher>().Register(this);
         emu_.Get<HostWidgetRegistry>().Register(this);
         /* Drive RESET- rides the system reset line. The Zune pmc_atapi
@@ -136,6 +140,7 @@ public:
             case kFifoAlarm:  return fifo_alarm_;
         }
         if (auto idx = TaskFileIndex(off)) {
+            RequireClock("reads the drive task file");
             const uint8_t v = drive_.ReadTaskFile(*idx);
             LogTaskFileAccess("R", off, v);
             UpdateAvic();
@@ -154,6 +159,7 @@ public:
             case kFifoAlarm:  fifo_alarm_  = value; return;
         }
         if (auto idx = TaskFileIndex(off)) {
+            RequireClock("writes the drive task file");
             LogTaskFileAccess("W", off, value);
             drive_.WriteTaskFile(*idx, value);
             UpdateAvic();
@@ -165,6 +171,7 @@ public:
     uint16_t ReadHalf(uint32_t addr) override {
         const uint32_t off = addr - kBase;
         if (off == kDriveData) {
+            RequireClock("reads drive data");
             const uint16_t v = drive_.ReadData();
             MarkRx();
             UpdateAvic();
@@ -176,6 +183,7 @@ public:
     void WriteHalf(uint32_t addr, uint16_t value) override {
         const uint32_t off = addr - kBase;
         if (off == kDriveData) {
+            RequireClock("writes drive data");
             drive_.WriteData(value);
             MarkTx();
             UpdateAvic();
@@ -212,6 +220,17 @@ public:
     }
 
 private:
+    void RefreshClock() {
+        clock_on_ = module_clocks_->ModuleRunsIn(FreescaleModule::kAta, FreescaleLowPowerMode::kRun);
+    }
+
+    void RequireClock(const char* operation) {
+        if (!clock_on_) module_clocks_->RequireRunning(FreescaleModule::kAta, operation);
+    }
+
+    FreescaleModuleClocks* module_clocks_ = nullptr;
+    bool                   clock_on_      = false;
+
 #if CERF_DEV_MODE
     /* Task-file/control accesses only (data FIFO excluded); a status-poll
        spin would otherwise bury the log - cap at 64 lines per second. */

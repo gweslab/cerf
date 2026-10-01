@@ -15,6 +15,7 @@ public:
     void ShadowWrite(uint32_t index, uint32_t value, uint32_t mmu_config);
     void SaveState(StateWriter& writer);
     void RestoreState(StateReader& reader);
+    void PowerOnReset();
 private:
     struct Bank {
         uint32_t address = 0;

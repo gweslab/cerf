@@ -5,6 +5,7 @@
 #include "../boards/board_context.h"
 #include "../core/cerf_emulator.h"
 #include "../peripherals/peripheral_dispatcher.h"
+#include "freescale_module_clocks.h"
 
 #include <cstdint>
 #include <optional>
@@ -26,7 +27,10 @@ public:
         auto* bd = emu_.TryGet<BoardContext>();
         return bd && bd->GetSocId() == Soc;
     }
-    void OnReady() override { emu_.Get<PeripheralDispatcher>().Register(this); }
+    void OnReady() override {
+        module_clocks_ = &emu_.Get<FreescaleModuleClocks>();
+        emu_.Get<PeripheralDispatcher>().Register(this);
+    }
 
     uint32_t MmioBase() const override { return Base; }
     uint32_t MmioSize() const override { return kSize; }
@@ -48,9 +52,14 @@ protected:
 private:
     uint32_t Read(uint32_t off) {
         if (auto v = ReadRegister(off)) return *v;
-        if (IsFuseShadow(off)) return 0;   /* unblown e-fuse reads 0 */
+        if (IsFuseShadow(off)) {
+            module_clocks_->RequireRunning(FreescaleModule::kIim, "reads its fuse shadow");
+            return 0;
+        }
         HaltUnsupportedAccess("Read", Base + off, 0);
     }
+
+    FreescaleModuleClocks* module_clocks_ = nullptr;
 };
 
 }  /* namespace cerf_freescale_iim_detail */

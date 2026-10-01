@@ -14,6 +14,7 @@
 #include "../../host/guest_deep_sleep.h"
 #include "../../host/guest_power_notifier.h"
 #include "../guest_cycle_clock.h"
+#include "../host_request_channel.h"
 #include "../jit_code_arena.h"
 #include "arm_block_compiler.h"
 #include "arm_cpu.h"
@@ -104,6 +105,7 @@ void ArmJit::OnReady() {
     compiler_  = &emu_.Get<ArmBlockCompiler>();
     channel_   = &emu_.Get<ArmInterruptChannel>();
     clock_     = &emu_.Get<GuestCycleClock>();
+    host_requests_ = &emu_.Get<HostRequestChannel>();
 
     BootMode&      boot       = emu_.Get<BootMode>();
     const uint32_t cold_entry = boot.ColdEntryPa();
@@ -145,6 +147,7 @@ void ArmJit::Run() {
         return;
     }
 
+    if (channel_->TakeHostRequest()) host_requests_->ServiceRequests();
     clock_->OnDispatch();
 
     /* QEMU accel/tcg/cpu-exec.c cpu_handle_interrupt: "Clear the interrupt

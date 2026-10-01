@@ -6,7 +6,9 @@
 #include "imx51_id.h"
 #include "../../core/cerf_emulator.h"
 #include "../../peripherals/peripheral_dispatcher.h"
+#include "../../core/fatal.h"
 #include "../../state/state_stream.h"
+#include "../freescale_module_clocks.h"
 #include "../i2c_slave.h"
 #include "../irq_controller.h"
 
@@ -38,7 +40,7 @@ constexpr uint16_t kI2srIal  = 0x10u;       /* arbitration lost (w0c) */
 constexpr uint16_t kI2srIif  = 0x02u;       /* interrupt flag (w0c) */
 constexpr uint16_t kI2srRxak = 0x01u;       /* 0 = ACK received */
 
-template <uint32_t kBase, int kIrq>
+template <uint32_t kBase, int kIrq, FreescaleModule kModule>
 class Imx51I2cImpl : public Peripheral {
 public:
     using Peripheral::Peripheral;
@@ -47,7 +49,10 @@ public:
         auto* bd = emu_.TryGet<BoardContext>();
         return bd && bd->GetSocId() == SocId::Imx51;
     }
-    void OnReady() override { emu_.Get<PeripheralDispatcher>().Register(this); }
+    void OnReady() override {
+        modules_ = &emu_.Get<FreescaleModuleClocks>();
+        emu_.Get<PeripheralDispatcher>().Register(this);
+    }
 
     uint32_t MmioBase() const override { return kBase; }
     uint32_t MmioSize() const override { return kSize; }
@@ -155,8 +160,12 @@ private:
         return out;
     }
 
-    /* A byte transfer finished: set ICF + IIF, raise the interrupt if enabled. */
+    /* MCIMX51RM Table 7-34: CG9 / CG10 drive i2c1_serial_clk_enable / i2c2_serial_clk_enable. */
     void CompleteByte() {
+        if (!modules_->ModuleRunsIn(kModule, FreescaleLowPowerMode::kRun)) {
+            emu_.Get<Fatal>().Die("Imx51I2c 0x%08X: a byte transfer runs while the I2C serial "
+                                  "clock gate is off; the stalled transfer is not modeled", kBase);
+        }
         i2sr_ |= (kI2srIcf | kI2srIif);
         UpdateIrq();
     }
@@ -175,6 +184,7 @@ private:
     uint8_t  cur_addr_   = 0;
     uint8_t  rx_shift_   = 0;
     bool     irq_asserted_ = false;
+    const FreescaleModuleClocks* modules_ = nullptr;
 };
 
 }  /* namespace cerf_imx51_i2c_detail */

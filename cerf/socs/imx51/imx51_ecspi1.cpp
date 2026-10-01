@@ -5,6 +5,7 @@
 #include "imx51_id.h"
 #include "../../peripherals/peripheral_dispatcher.h"
 #include "../../state/state_stream.h"
+#include "../freescale_module_clocks.h"
 #include "../irq_controller.h"
 #include "../spi_slave.h"
 
@@ -50,7 +51,10 @@ bool Imx51Ecspi1::ShouldRegister() {
     return bd && bd->GetSocId() == SocId::Imx51;
 }
 
-void Imx51Ecspi1::OnReady() { emu_.Get<PeripheralDispatcher>().Register(this); }
+void Imx51Ecspi1::OnReady() {
+    module_clocks_ = &emu_.Get<FreescaleModuleClocks>();
+    emu_.Get<PeripheralDispatcher>().Register(this);
+}
 
 uint32_t Imx51Ecspi1::MmioBase() const { return kBase; }
 uint32_t Imx51Ecspi1::MmioSize() const { return kSize; }
@@ -75,6 +79,7 @@ void Imx51Ecspi1::RaiseIrqIfPending() {
 }
 
 void Imx51Ecspi1::DoExchange() {
+    module_clocks_->RequireRunning(FreescaleModule::kEcspi1, "runs an SPI burst");
     /* BURST_LENGTH is bits-1; the driver packs each FIFO word little-endian
        (ipdacp.dll sub_C0D83334), so extract bytes LSB-first to hand the slave the
        driver's logical byte order ([reg][len][data]); reassemble RX the same way. */

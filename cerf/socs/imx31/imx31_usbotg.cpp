@@ -2,9 +2,15 @@
 
 #include "../../core/cerf_emulator.h"
 #include "../../boards/board_context.h"
+#include "../../core/fatal.h"
+#include "../../jit/guest_cycle_clock.h"
 #include "imx31_id.h"
 #include "../../peripherals/peripheral_dispatcher.h"
 #include "../../state/state_stream.h"
+#include "../freescale_module_clocks.h"
+#include "../freescale_timer_clocks.h"
+#include "../freescale_usb_frame_index.h"
+#include "../guest_cpu_reset.h"
 
 #include <cstdint>
 
@@ -32,6 +38,11 @@ constexpr uint32_t kUsbcmdReset = 0x00080000u; /* ITC=0x08 (Table 32-23) */
 constexpr uint32_t kUsbCtrl     = 0x600u;      /* USB_CTRL (Table 32-3) */
 constexpr uint32_t kOtgMirror   = 0x604u;      /* OTG_MIRROR */
 constexpr uint32_t kUsbmode     = 0x1A8u;      /* USBMODE CM/ES (Table 32-34) */
+constexpr uint32_t kUsbmodeCm   = 0x3u;
+constexpr uint32_t kUsbmodeHost = 0x3u;
+constexpr uint32_t kUsbmodeDevice = 0x2u;
+constexpr uint32_t kFrameStatusBits =
+    FreescaleUsbFrameIndex::kStsSri | FreescaleUsbFrameIndex::kStsFri;
 constexpr uint32_t kConfigFlag  = 0x180u;      /* CONFIGFLAG CF bit0, reset 1 (Table 32-13) */
 constexpr uint32_t kOtgsc       = 0x1A4u;      /* OTGSC On-The-Go status/ctrl (Table 32-33) */
 /* OTGSC: bits30:24 interrupt-enable + bits5:0 control are R/W; bits19:16 are
@@ -49,8 +60,7 @@ constexpr uint32_t kEndptStat      = 0x1B8u;   /* ENDPTSTAT R/O ready bitmap (Fi
 constexpr uint32_t kEndptComplete  = 0x1BCu;   /* ENDPTCOMPLETE W1C */
 constexpr uint32_t kEndptCtrl0     = 0x1C0u;   /* ENDPTCTRL0..15 (§32.9.5.18) */
 constexpr uint32_t kEndptCtrl15    = 0x1FCu;
-/* EHCI operational list/index regs (§32.9.5, Figs 32-27/28/30) - R/W,
-   reset 0; no schedule runs with no device, so plain storage. */
+/* EHCI operational list/index regs (§32.9.5, Figs 32-27/28/30). */
 constexpr uint32_t kFrIndex     = 0x14Cu;      /* FRINDEX */
 constexpr uint32_t kCtrlDsSeg   = 0x150u;      /* CTRLDSSEGMENT 4G segment, unused (ADC=0) */
 constexpr uint32_t kPeriodicBase = 0x154u;     /* PERIODICLISTBASE / DEVICEADDR */
@@ -79,7 +89,28 @@ public:
         auto* bd = emu_.TryGet<BoardContext>();
         return bd && bd->GetSocId() == SocId::Imx31;
     }
-    void OnReady() override { emu_.Get<PeripheralDispatcher>().Register(this); }
+    void OnReady() override {
+        module_clocks_ = &emu_.Get<FreescaleModuleClocks>();
+        timer_clocks_  = &emu_.Get<FreescaleTimerClocks>();
+        clock_         = &emu_.Get<GuestCycleClock>();
+        irq_event_     = clock_->Add([this] { ArmFrameIrq(); });
+        frame_index_.Attach();
+        frame_index_.SetClocked(0u, true);
+        clock_->RegisterRateListener([this] {
+            frame_index_.Rescale();
+            ArmFrameIrq();
+        });
+        module_clocks_->RegisterGateListener([this] {
+            RequireFrameClock(FreescaleLowPowerMode::kRun);
+        });
+        clock_->RegisterIdleListener([this] { RequireFrameClock(timer_clocks_->WfiMode()); });
+        /* MCIMX31RM §3.6.1: "periph_reset_out signal is connected to all peripherals except
+           EMI". */
+        emu_.Get<GuestCpuReset>().RegisterResetListener([this](ResetLineKind) {
+            ResetController();
+        });
+        emu_.Get<PeripheralDispatcher>().Register(this);
+    }
 
     uint32_t MmioBase() const override { return kBase; }
     uint32_t MmioSize() const override { return kSize; }
@@ -109,10 +140,12 @@ public:
                spins until AS==ASE / PS==PSE (hcd_hsotg sub_306B560); returning
                only HCHalted wedges USB bring-up. Tables 32-23/32-24. */
             case kUsbsts: {
+                RequireDefinedReset("USBSTS read");
+                RequireNoDeviceSof("USBSTS read");
                 uint32_t sts = (usbcmd_ & kCmdRs) ? 0u : kStsHcHalted;
                 if (usbcmd_ & kCmdAse) sts |= kStsAs;
                 if (usbcmd_ & kCmdPse) sts |= kStsPs;
-                return sts;
+                return sts | frame_index_.Status(0u);
             }
             case kUsbintr: return usbintr_;
             /* USB_CTRL/OTG_MIRROR: PHY/control RMW config; no device/no wake so
@@ -123,7 +156,9 @@ public:
             case kConfigFlag: return configflag_;  /* CF: ports routed to this HC */
             case kOtgsc:     return (otgsc_ & kOtgscRwMask) | kOtgscNoCable;
             case kUlpiView:  return ulpiview_; /* ULPIRUN already cleared */
-            case kFrIndex:      return frindex_;
+            case kFrIndex:
+                RequireDefinedReset("FRINDEX read");
+                return frame_index_.Frindex(0u);
             case kCtrlDsSeg:    return ctrl_ds_seg_;
             case kPeriodicBase: return periodic_base_;
             case kAsyncAddr:    return async_addr_;
@@ -149,18 +184,55 @@ public:
         switch (off) {
             /* RST self-clears on reset-complete (Table 32-23); reset is instant
                here, so store with RST already cleared. */
-            case kUsbcmd:  usbcmd_  = value & ~kCmdRst; return;
-            case kUsbsts:  return;  /* W1C status bits; none set (no events) */
-            case kUsbintr: usbintr_   = value; return;
+            case kUsbcmd:
+                if (value & kCmdRst) RequireCoreClock("resets the controller");
+                if (value & (kCmdRs | kCmdAse | kCmdPse)) RequireCoreClock("runs the controller or a schedule");
+                /* MCIMX31RM Table 32-23 RST: the controller "resets its internal pipelines,
+                   timers, counters, state machines, and so on. to their initial value". zune_keel
+                   usbfn.dll sub_30916AC 0x3091750 sets RST with the host controller running. */
+                if (value & kCmdRst) {
+                    frame_index_.Reset(0u);
+                    rst_undefined_ = (usbmode_ & kUsbmodeCm) == kUsbmodeHost &&
+                                     (usbcmd_ & kCmdRs) != 0u;
+                }
+                usbcmd_  = value & ~kCmdRst;
+                frame_index_.SetFrameListSize(0u, FreescaleUsbFrameIndex::FrameListSizeCode(usbcmd_));
+                SetFrameRunning();
+                return;
+            case kUsbsts:
+                frame_index_.ClearStatus(0u, value & kFrameStatusBits);
+                ArmFrameIrq();
+                return;
+            case kUsbintr:
+                usbintr_ = value;
+                ArmFrameIrq();
+                return;
             case kUsbCtrl:   usb_ctrl_   = value; return;
             case kOtgMirror: otg_mirror_ = value; return;
-            case kUsbmode:   usbmode_    = value; return;
+            case kUsbmode:
+                usbmode_ = value;
+                SetFrameRunning();
+                return;
             case kConfigFlag: configflag_ = value & 1u; return;  /* CF bit0; [31:1] SBZ (Table 32-13) */
             case kOtgsc:     otgsc_ = value & kOtgscRwMask; return;  /* R/O status, W1C ints unset */
             /* No emulated ULPI PHY: complete instantly by clearing WU/RUN
                so the driver's "poll until ULPIRUN==0" sees completion. */
-            case kUlpiView:  ulpiview_   = value & ~(kUlpiWu | kUlpiRun); return;
-            case kFrIndex:      frindex_       = value; return;
+            case kUlpiView:
+                if (value & (kUlpiWu | kUlpiRun)) RequireCoreClock("runs a ULPI viewport operation");
+                ulpiview_   = value & ~(kUlpiWu | kUlpiRun);
+                return;
+            /* MCIMX31RM §32.9.5.4: "In device mode this register is read only"; "A write to
+               this register while the Run/Stop hit is set to a one produces undefined
+               results." */
+            case kFrIndex:
+                if ((usbmode_ & kUsbmodeCm) == kUsbmodeDevice) return;
+                if (frame_index_.Running(0u)) {
+                    emu_.Get<Fatal>().Die("Imx31Usbotg: FRINDEX write 0x%08X with Run/Stop set",
+                                          value);
+                }
+                frame_index_.WriteFrindex(0u, value);
+                ArmFrameIrq();
+                return;
             case kCtrlDsSeg:    ctrl_ds_seg_   = value; return;
             case kPeriodicBase: periodic_base_ = value; return;
             case kAsyncAddr:    async_addr_    = value; return;
@@ -168,8 +240,14 @@ public:
             /* PRIME makes the named endpoints ready (HW would clear PRIME after
                priming, Table 32-36); FLUSH clears them (Table 32-37). SETUPSTAT/
                COMPLETE are W1C - nothing is set with no host. STAT is read-only. */
-            case kEndptPrime:     endpt_stat_ |=  value; return;
-            case kEndptFlush:     endpt_stat_ &= ~value; return;
+            case kEndptPrime:
+                if (value) RequireCoreClock("primes an endpoint");
+                endpt_stat_ |=  value;
+                return;
+            case kEndptFlush:
+                if (value) RequireCoreClock("flushes an endpoint");
+                endpt_stat_ &= ~value;
+                return;
             case kEndptSetupStat: return;
             case kEndptComplete:  return;
             case kEndptStat:      return;
@@ -177,8 +255,6 @@ public:
         HaltUnsupportedAccess("WriteWord", addr, value);
     }
 
-    /* Every member is a plain register (scalar or fixed register-file array);
-       all are guest-observable. No host pointers, FIFOs, or rebase-time state. */
     void SaveState(StateWriter& w) override {
         w.WriteBytes("portsc", portsc_, sizeof(portsc_));
         w.Write("usbcmd", usbcmd_);
@@ -189,13 +265,14 @@ public:
         w.Write("configflag", configflag_);
         w.Write("otgsc", otgsc_);
         w.Write("ulpiview", ulpiview_);
-        w.Write("frindex", frindex_);
+        frame_index_.Save(w);
         w.Write("ctrl_ds_seg", ctrl_ds_seg_);
         w.Write("periodic_base", periodic_base_);
         w.Write("async_addr", async_addr_);
         w.Write("tx_fill_tune", tx_fill_tune_);
         w.Write("endpt_stat", endpt_stat_);
         w.WriteBytes("endptctrl", endptctrl_, sizeof(endptctrl_));
+        w.Write<uint8_t>("rst_undefined", rst_undefined_ ? 1u : 0u);
     }
     void RestoreState(StateReader& r) override {
         r.ReadBytes("portsc", portsc_, sizeof(portsc_));
@@ -207,21 +284,109 @@ public:
         r.Read("configflag", configflag_);
         r.Read("otgsc", otgsc_);
         r.Read("ulpiview", ulpiview_);
-        r.Read("frindex", frindex_);
+        frame_index_.Restore(r);
         r.Read("ctrl_ds_seg", ctrl_ds_seg_);
         r.Read("periodic_base", periodic_base_);
         r.Read("async_addr", async_addr_);
         r.Read("tx_fill_tune", tx_fill_tune_);
         r.Read("endpt_stat", endpt_stat_);
         r.ReadBytes("endptctrl", endptctrl_, sizeof(endptctrl_));
+        uint8_t rst_undefined = 0;
+        r.Read("rst_undefined", rst_undefined);
+        rst_undefined_ = rst_undefined != 0u;
+        clock_->Disarm(irq_event_);
     }
+    void PostRestore() override { ArmFrameIrq(); }
 
 private:
     static bool IsPortsc(uint32_t off) {
         return off >= kPortscFirst && off <= kPortscLast && (off & 3u) == 0u;
     }
+    void RequireCoreClock(const char* operation) {
+        module_clocks_->RequireRunning(FreescaleModule::kUsbotg, operation);
+    }
+
+    void ResetController() {
+        for (auto& p : portsc_) p = 0u;
+        for (auto& e : endptctrl_) e = 0u;
+        usbcmd_        = kUsbcmdReset;
+        usbintr_       = 0u;
+        usb_ctrl_      = 0u;
+        otg_mirror_    = 0u;
+        usbmode_       = 0u;
+        configflag_    = 1u;
+        otgsc_         = 0u;
+        ulpiview_      = 0u;
+        ctrl_ds_seg_   = 0u;
+        periodic_base_ = 0u;
+        async_addr_    = 0u;
+        tx_fill_tune_  = 0u;
+        endpt_stat_    = 0u;
+        rst_undefined_ = false;
+        frame_index_.ResetAll();
+        clock_->Disarm(irq_event_);
+    }
+
+    /* MCIMX31RM §32.9.5.4: the host controller's FRINDEX "updates every 125 microseconds";
+       in device mode it follows the SOF marker. */
+    void SetFrameRunning() {
+        const bool host = (usbmode_ & kUsbmodeCm) == kUsbmodeHost;
+        frame_index_.SetRunning(0u, host && (usbcmd_ & kCmdRs) != 0u, host);
+        RequireFrameClock(FreescaleLowPowerMode::kRun);
+        ArmFrameIrq();
+    }
+
+    /* MCIMX31RM Table 32-24 SRI: in device mode it follows the received SOF and "will be set
+       at an interval of 1ms during the prelude to connect and chirp"; Table 32-23 RS: a device
+       Run/Stop "initiate[s] an attach event". */
+    void RequireNoDeviceSof(const char* what) {
+        if ((usbmode_ & kUsbmodeCm) != kUsbmodeDevice || (usbcmd_ & kCmdRs) == 0u) return;
+        emu_.Get<Fatal>().Die("Imx31Usbotg: %s in device mode with Run/Stop set; the SOF "
+                              "status with no host on the bus is not modeled", what);
+    }
+
+    /* MCIMX31RM Table 32-23 RST: "Attempting to reset an actively running host controller will
+       result in undefined behavior." */
+    void RequireDefinedReset(const char* what) {
+        if (!rst_undefined_) return;
+        emu_.Get<Fatal>().Die("Imx31Usbotg: %s after a reset of a running host controller",
+                              what);
+    }
+
+    void RequireFrameClock(FreescaleLowPowerMode mode) {
+        if (!frame_index_.Running(0u) ||
+            module_clocks_->ModuleRunsIn(FreescaleModule::kUsbotg, mode)) {
+            return;
+        }
+        emu_.Get<Fatal>().Die("Imx31Usbotg: the host frame counter runs while the USBOTG clock "
+                              "stops in low-power mode %u; the counter's behavior is not modeled",
+                              static_cast<unsigned>(mode));
+    }
+
+    /* MCIMX31RM Table 32-25: SRE / FRE make the controller "issue an interrupt" while SRI /
+       FRI are set. */
+    void ArmFrameIrq() {
+        const uint32_t enabled = usbintr_ & kFrameStatusBits;
+        if ((enabled & FreescaleUsbFrameIndex::kStsSri) != 0u) RequireNoDeviceSof("USBINTR SRE");
+        if ((frame_index_.Status(0u) & enabled) != 0u) {
+            emu_.Get<Fatal>().Die("Imx31Usbotg: USBSTS 0x%X meets USBINTR 0x%08X; the USBOTG "
+                                  "interrupt line is not modeled",
+                                  frame_index_.Status(0u), usbintr_);
+        }
+        const uint64_t at = enabled != 0u ? frame_index_.NextStatusCycle(0u, enabled)
+                                          : FreescaleUsbFrameIndex::kNever;
+        if (at == FreescaleUsbFrameIndex::kNever) clock_->Disarm(irq_event_);
+        else                                      clock_->Arm(irq_event_, at);
+    }
+
+    FreescaleModuleClocks* module_clocks_ = nullptr;
+    FreescaleTimerClocks*  timer_clocks_  = nullptr;
+    GuestCycleClock*       clock_         = nullptr;
+    GuestCycleClock::Event* irq_event_    = nullptr;
+    FreescaleUsbFrameIndex frame_index_{emu_};
     uint32_t portsc_[8] = {};
     uint32_t usbcmd_     = kUsbcmdReset;
+    bool     rst_undefined_ = false;
     uint32_t usbintr_    = 0;
     uint32_t usb_ctrl_   = 0;
     uint32_t otg_mirror_ = 0;
@@ -229,7 +394,6 @@ private:
     uint32_t configflag_ = 1;  /* reset value 1 (Table 32-13) */
     uint32_t otgsc_      = 0;  /* R/W interrupt-enable + control bits */
     uint32_t ulpiview_   = 0;
-    uint32_t frindex_       = 0;
     uint32_t ctrl_ds_seg_   = 0;
     uint32_t periodic_base_ = 0;
     uint32_t async_addr_    = 0;

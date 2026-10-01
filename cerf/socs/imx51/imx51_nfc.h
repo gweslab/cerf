@@ -5,6 +5,8 @@
 #include <array>
 #include <cstdint>
 
+class FreescaleModuleClocks;
+
 /* i.MX51 NAND Flash Controller (NFC v3), MCIMX51RM Ch 45. State owner for both
    non-contiguous register windows: registered for the IP window (0x83FDB000);
    the AXI window (0xCFFF1000) forwards here via Imx51NfcAxiWindow. */
@@ -67,4 +69,6 @@ private:
 
     uint64_t seq_data_off_  = 0;   /* NAND Read-Cache: page being loaded */
     uint64_t seq_cache_off_ = 0;   /* NAND Read-Cache: page served by the next data-output */
+
+    FreescaleModuleClocks* module_clocks_ = nullptr;
 };

@@ -4,6 +4,7 @@
 #include "../../boards/board_context.h"
 #include "imx51_id.h"
 #include "../../peripherals/peripheral_dispatcher.h"
+#include "../freescale_module_clocks.h"
 
 #include <cstdint>
 
@@ -26,19 +27,28 @@ public:
         auto* bd = emu_.TryGet<BoardContext>();
         return bd && bd->GetSocId() == SocId::Imx51;
     }
-    void OnReady() override { emu_.Get<PeripheralDispatcher>().Register(this); }
+    void OnReady() override {
+        module_clocks_ = &emu_.Get<FreescaleModuleClocks>();
+        emu_.Get<PeripheralDispatcher>().Register(this);
+    }
 
     uint32_t MmioBase() const override { return kBase; }
     uint32_t MmioSize() const override { return kSize; }
 
     uint32_t ReadWord(uint32_t addr) override {
-        if (addr - kBase == kSiRevOff) return kSiRevTo3;
+        if (addr - kBase == kSiRevOff) {
+            module_clocks_->RequireRunning(FreescaleModule::kRom, "is read");
+            return kSiRevTo3;
+        }
         HaltUnsupportedAccess("ReadWord", addr, 0);
     }
 
     void WriteWord(uint32_t addr, uint32_t value) override {
         HaltUnsupportedAccess("WriteWord", addr, value);  /* mask ROM: read-only */
     }
+
+private:
+    FreescaleModuleClocks* module_clocks_ = nullptr;
 };
 
 }  /* namespace */

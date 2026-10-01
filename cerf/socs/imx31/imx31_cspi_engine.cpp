@@ -64,6 +64,7 @@ void Imx31CspiEngine::WriteWord(uint32_t addr, uint32_t value) {
         case kOffConreg: {
             conreg_ = value;
             if ((value & kConregXch) && (value & kConregEn)) {
+                module_clocks_->RequireRunning(ClockModule(), "runs an SPI exchange");
                 const uint32_t cs = (value & kConregCsMask) >> kConregCsShift;
                 last_rxdata_ = SpiExchange(cs, last_txdata_);
                 /* Table 24-10: TC fires on shift-in of last bit; RR fires

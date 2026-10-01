@@ -17,6 +17,7 @@ public:
                 std::unordered_map<uint32_t, uint32_t>& registers, uint32_t mmu_config);
     void SaveState(StateWriter& writer);
     void RestoreState(StateReader& reader);
+    void PowerOnReset();
 
 private:
     uint32_t Operand(const Imx51Gpu3dPacket& packet, uint32_t index, uint32_t mmu);

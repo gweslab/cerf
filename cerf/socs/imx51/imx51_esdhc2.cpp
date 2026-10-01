@@ -5,6 +5,7 @@
 #include "imx51_id.h"
 #include "../../peripherals/peripheral_dispatcher.h"
 #include "../../state/state_stream.h"
+#include "../freescale_module_clocks.h"
 
 #include <array>
 #include <cstdint>
@@ -58,6 +59,7 @@ public:
         return bd && bd->GetSocId() == SocId::Imx51;
     }
     void OnReady() override {
+        module_clocks_ = &emu_.Get<FreescaleModuleClocks>();
         regs_[kOffSysctl >> 2] = kSysctlReset;
         emu_.Get<PeripheralDispatcher>().Register(this);
     }
@@ -79,6 +81,7 @@ public:
         const uint32_t off = addr - kBase;
         switch (off) {
             case kOffXfertyp:
+                module_clocks_->RequireRunning(FreescaleModule::kEsdhc2, "issues a command");
                 /* esdhc.dll's polled completion handler (sub_C0AF2E88) advances
                    ONLY when IRQSTAT.CC is set, so omitting CC spins its busy-poll
                    forever and the boot hangs; CTOE is the no-card response timeout
@@ -117,6 +120,7 @@ private:
     }
 
     std::array<uint32_t, kSize / 4> regs_{};
+    FreescaleModuleClocks*          module_clocks_ = nullptr;
 };
 
 }  /* namespace */

@@ -12,6 +12,8 @@
 #include "imx51_gpu3d_regs.h"
 #include "imx51_gpu3d_packet.h"
 #include "imx51_gpu3d_context.h"
+#include "imx51_power_gate_line.h"
+#include "../freescale_module_clocks.h"
 
 #include <cstdint>
 #include <cstring>
@@ -32,6 +34,8 @@ public:
     void OnReady() override {
         emu_.Get<Imx51Gpu3dRaster>();
         emu_.Get<PeripheralDispatcher>().Register(this);
+        emu_.Get<Imx51PowerGateLine>().RegisterBlock(Imx51PowerGatedBlock::kGpu3d,
+                                                     [this] { PowerDown(); });
     }
 
     uint32_t MmioBase() const override { return kBase; }
@@ -57,6 +61,7 @@ public:
     }
     void WriteWord(uint32_t a, uint32_t v) override {
         const uint32_t idx = (a - kBase) >> 2;
+        written_ = true;
         if ((idx >= kIdxScratchReg0 && idx <= kIdxScratchReg7) || idx == kIdxScratchAddr || idx == kIdxScratchUmsk) {
             WriteRegister(idx, v); return;
         }
@@ -134,9 +139,22 @@ public:
         emu_.Get<Imx51Gpu3dContext>().RestoreState(r);
         emu_.Get<Imx51Gpu3dDraw>().RestoreState(r);
         emu_.Get<Imx51Gpu3dRaster>().RestoreState(r);
+        written_ = true;
     }
 
 private:
+    /* MCIMX51RM §11.1.2: PG loses all data in the GPU3D. */
+    void PowerDown() {
+        if (!written_) return;
+        pm_override1_ = pm_override2_ = 0;
+        rb_cntl_ = rb_base_ = rb_rptr_addr_ = rptr_ = wptr_ = 0;
+        reg_file_.clear();
+        emu_.Get<Imx51Gpu3dContext>().PowerOnReset();
+        emu_.Get<Imx51Gpu3dDraw>().PowerOnReset();
+        emu_.Get<Imx51Gpu3dRaster>().PowerOnReset();
+        written_ = false;
+    }
+
     uint32_t MmuConfig() const {
         const auto config = reg_file_.find(kIdxMhMmuConfig);
         return config == reg_file_.end() ? 0u : config->second;
@@ -354,6 +372,8 @@ private:
     /* NXP linux-imx gsl_ringbuffer.c: gsl_ringbuffer_sizelog2quadwords;
        yamato/22/yamato_registers.h: CP_RB_BASE, CP_RB_CNTL and CP_RB_WPTR. */
     void HandleRbWptr(uint32_t wptr) {
+        emu_.Get<FreescaleModuleClocks>().RequireRunning(FreescaleModule::kGpu3dCore,
+                                                         "runs its command ring");
         const uint32_t shift = rb_cntl_ & 0x3Fu;
         if (shift >= 20u || (rb_base_ & 31u) != 0 || (rb_cntl_ & 0x30000u) != 0)
             HaltUnsupportedAccess("CP ring geometry/swap", rb_base_, rb_cntl_);
@@ -424,6 +444,7 @@ private:
     uint32_t rptr_         = 0;
     uint32_t wptr_         = 0;
     std::unordered_map<uint32_t, uint32_t> reg_file_;  /* GPU3D registers/constants the guest programs (TYPE0 / SET_CONSTANT), served on a REG_TO_MEM save */
+    bool written_ = false;
 };
 
 }  /* namespace */

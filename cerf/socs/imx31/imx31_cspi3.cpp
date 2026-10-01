@@ -21,6 +21,8 @@ protected:
            completes (engine sets TC), and the unread RXDATA is immaterial. */
         return 0;
     }
+
+    FreescaleModule ClockModule() const override { return FreescaleModule::kCspi3; }
 };
 
 }  /* namespace */

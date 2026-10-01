@@ -123,6 +123,10 @@ void Imx51Gpu3dDraw::RestoreState(StateReader& reader) {
     reader.Read("instructions", instructions_); reader.Read("valid", valid_); reader.Read("start_size", start_size_);
     reader.Read("bases", bases_); reader.Read("bin_base", bin_base_);
 }
+void Imx51Gpu3dDraw::PowerOnReset() {
+    instructions_ = {}; valid_ = {}; start_size_ = {};
+    bases_ = 0; bin_base_ = 0;
+}
 
 /* Mesa e97ad748, fd2_gmem.c:591-600,609-635; fd2_util.c: fd2_pipe2color;
    NXP linux-imx a1638da9, yamato_registers.h: VGT_CURRENT_BIN_ID_MIN/MAX. */

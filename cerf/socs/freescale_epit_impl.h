@@ -2,108 +2,84 @@
 
 #include "../peripherals/peripheral_base.h"
 
-#include "../core/cerf_emulator.h"
-#include "../core/log.h"
 #include "../boards/board_context.h"
-#include "../cpu/arm_processor_config.h"
-#include "../jit/arm/arm_jit.h"
-#include "../jit/arm/cpu_state.h"
+#include "../core/cerf_emulator.h"
+#include "../core/fatal.h"
+#include "../core/log.h"
+#include "../jit/guest_cycle_clock.h"
 #include "../peripherals/peripheral_dispatcher.h"
-#include "../state/emulation_freeze.h"
 #include "../state/state_stream.h"
+#include "cycle_anchored_counter.h"
+#include "freescale_timer_clocks.h"
+#include "guest_cpu_reset.h"
 
-#include <atomic>
-#include <chrono>
-#include <condition_variable>
 #include <cstdint>
-#include <mutex>
-#include <thread>
+#include <string_view>
 
-/* Shared EPIT core. The EPIT IP is register-identical on i.MX31 (MCIMX31RM Ch 33)
-   and i.MX51 (MCIMX51RM Ch 29) - registers/offsets/reset-values/EPITCR-SWR-mode all
-   match (verified MCIMX51RM Table 29-2 + Figure 29-3) - so the model is shared; only
-   the IRQ line differs (AVIC vs TZIC source), per-concrete via Assert/DeassertIrqLine. */
 namespace cerf_freescale_epit_detail {
 
 constexpr uint32_t kEpitSize = 0x00004000u;
-constexpr uint32_t kRegEnd   = 0x14u;
 
 /* MCIMX31RM Table 33-5 / MCIMX51RM Table 29-2. */
-constexpr uint32_t kOffCr    = 0x00u;
-constexpr uint32_t kOffSr    = 0x04u;
-constexpr uint32_t kOffLr    = 0x08u;
-constexpr uint32_t kOffCmpr  = 0x0Cu;
-constexpr uint32_t kOffCnt   = 0x10u;
+constexpr uint32_t kOffCr   = 0x00u;
+constexpr uint32_t kOffSr   = 0x04u;
+constexpr uint32_t kOffLr   = 0x08u;
+constexpr uint32_t kOffCmpr = 0x0Cu;
+constexpr uint32_t kOffCnt  = 0x10u;
 
 /* MCIMX31RM Table 33-6 / MCIMX51RM Table 29-5 EPITCR. */
-constexpr uint32_t kCrEnMask         = 1u << 0;
-constexpr uint32_t kCrEnmodMask      = 1u << 1;
-constexpr uint32_t kCrOcienMask      = 1u << 2;
-constexpr uint32_t kCrRldMask        = 1u << 3;
-constexpr uint32_t kCrPrescalerShift = 4;
-constexpr uint32_t kCrPrescalerMask  = 0xFFFu << kCrPrescalerShift;
-constexpr uint32_t kCrSwrMask        = 1u << 16;
-constexpr uint32_t kCrIovwMask       = 1u << 17;
-constexpr uint32_t kCrClksrcShift    = 24;
-constexpr uint32_t kCrClksrcMask     = 0x3u << kCrClksrcShift;
-/* SWR description: preserves EN/ENMOD/STOPEN/DOZEN/WAITEN/DBGEN. DOZEN(20) is
-   reserved-0 on i.MX51, so preserving it there is a no-op. */
-constexpr uint32_t kCrSwrPreserveMask =
-    (1u <<  0) |  /* EN     */
-    (1u <<  1) |  /* ENMOD  */
-    (1u << 18) |  /* DBGEN  */
-    (1u << 19) |  /* WAITEN */
-    (1u << 20) |  /* DOZEN  (i.MX31 only; reserved on i.MX51) */
-    (1u << 21);   /* STOPEN */
+constexpr uint32_t kCrEn             = 1u << 0;
+constexpr uint32_t kCrEnmod          = 1u << 1;
+constexpr uint32_t kCrOcien          = 1u << 2;
+constexpr uint32_t kCrRld            = 1u << 3;
+constexpr uint32_t kCrPrescalerShift = 4u;
+constexpr uint32_t kCrPrescalerMask  = 0xFFFu;
+constexpr uint32_t kCrSwr            = 1u << 16;
+constexpr uint32_t kCrIovw           = 1u << 17;
+constexpr uint32_t kCrWaiten         = 1u << 19;
+constexpr uint32_t kCrDozen          = 1u << 20;
+constexpr uint32_t kCrStopen         = 1u << 21;
+constexpr uint32_t kCrOmShift        = 22u;
+constexpr uint32_t kCrClksrcShift    = 24u;
 
-/* CLKSRC values (MCIMX31RM §33.6.1.1 / MCIMX51RM Table 29-5). */
-constexpr uint32_t kClksrcOff            = 0u;
-constexpr uint32_t kClksrcIpgClk         = 1u;
-constexpr uint32_t kClksrcIpgClkHighfreq = 2u;
-constexpr uint32_t kClksrcIpgClk32k      = 3u;
+/* MCIMX31RM Table 33-6: bits 31-26 reserved; SWR keeps EN, ENMOD, STOPEN, DOZEN,
+   WAITEN and DBGEN. */
+constexpr uint32_t kCrWritableMx31 = 0x03FFFFFFu;
+constexpr uint32_t kCrSwrKeepMx31  = 0x003C0003u;
+/* MCIMX51RM Table 29-5: bits 31-26 and 20 reserved; SWR keeps EN, ENMOD, STOPEN,
+   WAITEN and DBGEN. */
+constexpr uint32_t kCrWritableMx51 = 0x03EFFFFFu;
+constexpr uint32_t kCrSwrKeepMx51  = 0x002C0003u;
 
-/* OCIF (bit 0) is w1c (MCIMX31RM Table 33-7 / MCIMX51RM Table 29-6). */
-constexpr uint32_t kSrOcifMask = 1u << 0;
+/* MCIMX31RM Table 33-7 / MCIMX51RM Table 29-6: OCIF is w1c. */
+constexpr uint32_t kSrOcif = 1u << 0;
 
-/* Reset rows (MCIMX31RM Figure 33-6/33-8 / MCIMX51RM Table 29-2). */
-constexpr uint32_t kLrResetValue  = 0xFFFFFFFFu;
-constexpr uint32_t kCntResetValue = 0xFFFFFFFFu;
+/* MCIMX31RM Figures 33-6 and 33-8 / MCIMX51RM Table 29-2. */
+constexpr uint32_t kLrReset  = 0xFFFFFFFFu;
+constexpr uint32_t kCntReset = 0xFFFFFFFFu;
 
-constexpr auto kPollInterval = std::chrono::microseconds(100);
-
-template <uint32_t kBase, const std::string_view& kSoc>
+template <uint32_t kBase, const std::string_view& kSoc, FreescaleTimerUnit kUnit,
+          uint32_t kCrWritable, uint32_t kCrSwrKeep>
 class FreescaleEpitBase : public Peripheral {
 public:
     using Peripheral::Peripheral;
 
     bool ShouldRegister() override {
-        auto* bd = emu_.TryGet<BoardContext>();
-        return bd && bd->GetSocId() == kSoc;
+        return emu_.Get<BoardContext>().GetSocId() == kSoc;
     }
+
     void OnReady() override {
-        auto& cfg = emu_.Get<ArmProcessorConfig>();
-        cpu_to_ipg_      = cfg.CpuToOscrDivider();
-        cpu_to_highfreq_ = cfg.CpuToHighfreqClockDivider();
-        cpu_to_lowfreq_  = cfg.CpuToLowfreqClockDivider();
-        if (cpu_to_ipg_      == 0) cpu_to_ipg_      = 1;
-        if (cpu_to_highfreq_ == 0) cpu_to_highfreq_ = 1;
-        if (cpu_to_lowfreq_  == 0) cpu_to_lowfreq_  = 1;
-        baseline_packed_.store(PackPair(kCntResetValue, GuestCycles()),
-                               std::memory_order_release);
-        anchor_cnt_.store(kCntResetValue, std::memory_order_release);
+        clock_  = &emu_.Get<GuestCycleClock>();
+        clocks_ = &emu_.Get<FreescaleTimerClocks>();
+        event_  = clock_->Add([this] { OnCompare(); });
+        clock_->RegisterRateListener([this] { Retime(); });
+        clock_->RegisterIdleListener([this] { OnIdle(); });
+        clock_->RegisterIdleExitListener([this] { OnIdleExit(); });
+        clocks_->RegisterRateListener([this] { Retime(); });
+        emu_.Get<GuestCpuReset>().RegisterResetListener([this](ResetLineKind) {
+            HardwareReset();
+        });
         emu_.Get<PeripheralDispatcher>().Register(this);
-        match_thread_ = std::thread([this] { MatchLoop(); });
-    }
-
-    ~FreescaleEpitBase() override { StopMatchThread(); }
-
-    /* Match thread raises INTC IRQs; stop it before any peer is destroyed. */
-    void OnShutdown() override { StopMatchThread(); }
-
-    void StopMatchThread() {
-        stop_.store(true, std::memory_order_release);
-        cv_.notify_all();
-        if (match_thread_.joinable()) match_thread_.join();
     }
 
     uint32_t MmioBase() const override { return kBase; }
@@ -112,301 +88,372 @@ public:
     FastReadFn  FastReader() override { return &FreescaleEpitBase::FastReadThunk; }
     FastWriteFn FastWriter() override { return &FreescaleEpitBase::FastWriteThunk; }
 
-    uint32_t ReadWord(uint32_t addr) override {
-        const uint32_t off = addr - kBase;
-        if (off < kRegEnd && (off & 0x3u) == 0) return ReadReg(off);
-        HaltUnsupportedAccess("ReadWord", addr, 0);
-    }
-
+    uint32_t ReadWord(uint32_t addr) override { return FastRead(addr - kBase, 4u); }
     void WriteWord(uint32_t addr, uint32_t value) override {
-        const uint32_t off = addr - kBase;
-        if (off < kRegEnd && (off & 0x3u) == 0) { WriteReg(off, value); return; }
-        HaltUnsupportedAccess("WriteWord", addr, value);
+        FastWrite(addr - kBase, value, 4u);
     }
 
+    void SaveState(StateWriter& w) override {
+        const uint64_t now = clock_->Cycles();
+        w.Write<uint32_t>("cr", cr_);
+        w.Write<uint32_t>("sr", sr_);
+        w.Write<uint32_t>("lr", lr_);
+        w.Write<uint32_t>("cmpr", cmpr_);
+        w.Write<uint32_t>("count", Count(now));
+        w.Write<uint64_t>("prescale_phase", counting_ ? counter_.PhaseAt(now) : phase_);
+        w.Write<uint64_t>("prescale_phase_den",
+                          counting_ ? counter_.PhaseDenominator() : phase_den_);
+    }
+
+    void RestoreState(StateReader& r) override {
+        uint32_t cr = 0, sr = 0, lr = 0, cmpr = 0, count = 0;
+        uint64_t phase = 0, den = 0;
+        r.Read("cr", cr);
+        r.Read("sr", sr);
+        r.Read("lr", lr);
+        r.Read("cmpr", cmpr);
+        r.Read("count", count);
+        r.Read("prescale_phase", phase);
+        r.Read("prescale_phase_den", den);
+        clock_->Disarm(event_);
+        ocif_pending_    = false;
+        counting_        = false;
+        suspended_       = false;
+        cr_              = cr;
+        sr_              = sr;
+        lr_              = lr;
+        cmpr_            = cmpr;
+        base_value_      = count;
+        phase_           = phase;
+        phase_den_       = den;
+    }
+
+    void PostRestore() override {
+        Retime();
+        RefreshIrq();
+    }
+
+protected:
+    virtual void AssertIrqLine()   = 0;
+    virtual void DeassertIrqLine() = 0;
+
+private:
     static uint32_t FastReadThunk(void* ctx, uint32_t off, uint32_t width) {
         return static_cast<FreescaleEpitBase*>(ctx)->FastRead(off, width);
     }
     static void FastWriteThunk(void* ctx, uint32_t off, uint32_t value, uint32_t width) {
         static_cast<FreescaleEpitBase*>(ctx)->FastWrite(off, value, width);
     }
+
+    static uint32_t Prescaler(uint32_t cr) {
+        return (cr >> kCrPrescalerShift) & kCrPrescalerMask;
+    }
+    static uint32_t Clksrc(uint32_t cr) { return (cr >> kCrClksrcShift) & 0x3u; }
+    static uint32_t Om(uint32_t cr) { return (cr >> kCrOmShift) & 0x3u; }
+
     uint32_t FastRead(uint32_t off, uint32_t width) {
-        if (width != 4 || (off & 0x3u) != 0u || off >= kRegEnd) {
-            HaltUnsupportedAccess("FastRead", kBase + off, 0);
-        }
-        return ReadReg(off);
-    }
-    void FastWrite(uint32_t off, uint32_t value, uint32_t width) {
-        if (width != 4 || (off & 0x3u) != 0u || off >= kRegEnd) {
-            HaltUnsupportedAccess("FastWrite", kBase + off, value);
-        }
-        WriteReg(off, value);
-    }
-
-    void SaveState(StateWriter& w) override {
-        w.Write("cr", cr_.load(std::memory_order_acquire));
-        w.Write("sr", sr_.load(std::memory_order_acquire));
-        w.Write("lr", lr_.load(std::memory_order_acquire));
-        w.Write("cmpr", cmpr_.load(std::memory_order_acquire));
-        w.Write("anchor_cnt", anchor_cnt_.load(std::memory_order_acquire));
-        w.Write("frozen_cnt", frozen_cnt_.load(std::memory_order_acquire));
-        w.Write<uint32_t>("counter", ReadCounter());
-    }
-    void RestoreState(StateReader& r) override {
-        uint32_t cr = 0, sr = 0, lr = 0, cmpr = 0, anchor = 0, frozen = 0, cnt = 0;
-        r.Read("cr", cr); r.Read("sr", sr); r.Read("lr", lr); r.Read("cmpr", cmpr);
-        r.Read("anchor_cnt", anchor); r.Read("frozen_cnt", frozen); r.Read("counter", cnt);
-        cr_.store(cr,        std::memory_order_release);
-        sr_.store(sr,        std::memory_order_release);
-        lr_.store(lr,        std::memory_order_release);
-        cmpr_.store(cmpr,    std::memory_order_release);
-        anchor_cnt_.store(anchor, std::memory_order_release);
-        frozen_cnt_.store(frozen, std::memory_order_release);
-        /* Re-anchor so ReadCounter() yields the saved CNT against the
-           restored guest_cycle_counter. */
-        baseline_packed_.store(PackPair(cnt, GuestCycles()), std::memory_order_release);
-        cv_.notify_all();
-    }
-
-    /* Re-assert the INTC line from the restored OCIF/OCIEN - the EPIT compare
-       output is a level the source re-drives after restore. */
-    void PostRestore() override { RefreshIrq(); }
-
-protected:
-    /* Per-SoC interrupt line. i.MX31 -> Imx31Avic::Assert/DeassertSource(src);
-       i.MX51 -> Imx51Tzic::AssertIrq/DeAssertIrq(src). */
-    virtual void AssertIrqLine()    = 0;
-    virtual void DeassertIrqLine()  = 0;
-
-private:
-    std::mutex              cv_mtx_;
-    std::condition_variable cv_;
-    std::thread             match_thread_;
-    std::atomic<bool>       stop_{false};
-
-    std::atomic<uint32_t> cr_{0};
-    std::atomic<uint32_t> sr_{0};
-    std::atomic<uint32_t> lr_{kLrResetValue};
-    std::atomic<uint32_t> cmpr_{0};
-    /* hi = baseline CNT, lo = guest_cycle_counter snapshot. */
-    std::atomic<uint64_t> baseline_packed_{0};
-    std::atomic<uint32_t> frozen_cnt_{kCntResetValue};
-    /* CNT value at the moment the compare channel was last (re)armed
-       (EN edge, CMPR write, or OCIF clear). The down-crossing of CMPR
-       is measured relative to this so a far-behind CMPR doesn't fire
-       every poll. */
-    std::atomic<uint32_t> anchor_cnt_{kCntResetValue};
-
-    uint32_t cpu_to_ipg_      = 1;
-    uint32_t cpu_to_highfreq_ = 1;
-    uint32_t cpu_to_lowfreq_  = 1;
-
-    static uint64_t PackPair(uint32_t hi, uint32_t lo) {
-        return (static_cast<uint64_t>(hi) << 32) | lo;
-    }
-    static uint32_t HiOf(uint64_t p) { return static_cast<uint32_t>(p >> 32); }
-    static uint32_t LoOf(uint64_t p) { return static_cast<uint32_t>(p); }
-
-    uint32_t GuestCycles() const {
-        return emu_.Get<ArmJit>().CpuState()->guest_cycle_counter;
-    }
-
-    uint32_t EffectiveDivider() const {
-        const uint32_t cr = cr_.load(std::memory_order_acquire);
-        if ((cr & kCrEnMask) == 0) return 0;
-        const uint32_t clksrc    = (cr & kCrClksrcMask)    >> kCrClksrcShift;
-        const uint32_t prescaler = (cr & kCrPrescalerMask) >> kCrPrescalerShift;
-        switch (clksrc) {
-            case kClksrcOff:             return 0;
-            case kClksrcIpgClk:          return cpu_to_ipg_      * (prescaler + 1);
-            case kClksrcIpgClkHighfreq:  return cpu_to_highfreq_ * (prescaler + 1);
-            case kClksrcIpgClk32k:       return cpu_to_lowfreq_  * (prescaler + 1);
-        }
-        return 0;
-    }
-
-    uint32_t ReadCounter() const {
-        const uint32_t div = EffectiveDivider();
-        if (div == 0) return frozen_cnt_.load(std::memory_order_acquire);
-        const uint64_t packed = baseline_packed_.load(std::memory_order_acquire);
-        const uint32_t delta_cyc     = GuestCycles() - LoOf(packed);
-        const uint32_t elapsed_ticks = delta_cyc / div;
-        const uint32_t base_cnt      = HiOf(packed);
-
-        if ((cr_.load(std::memory_order_acquire) & kCrRldMask) == 0) {
-            /* Free-Running mode: rolls 0 -> 0xFFFFFFFF. */
-            return base_cnt - elapsed_ticks;
-        }
-        /* Set-and-Forget mode: when CNT reaches 0, reload from LR;
-           period = LR + 1 ticks. */
-        const uint32_t period = lr_.load(std::memory_order_acquire) + 1u;
-        if (period == 0) {
-            return base_cnt - elapsed_ticks;
-        }
-        const uint32_t ticks_in_period = elapsed_ticks % period;
-        if (ticks_in_period <= base_cnt) {
-            return base_cnt - ticks_in_period;
-        }
-        const uint32_t overshoot = ticks_in_period - base_cnt;
-        return lr_.load(std::memory_order_acquire) - (overshoot - 1u);
-    }
-
-    /* Anchored down-crossing: the compare has fired once the counter has
-       descended from anchor_cnt past cmpr. */
-    static bool CompareHasFired(uint32_t anchor_cnt, uint32_t cmpr,
-                                uint32_t count_now) {
-        const uint32_t descent_target = anchor_cnt - cmpr;
-        const uint32_t descent_now    = anchor_cnt - count_now;
-        return descent_now >= descent_target;
-    }
-
-    void Rearm(uint32_t count_now) {
-        anchor_cnt_.store(count_now, std::memory_order_release);
-    }
-
-    void RefreshIrq() {
-        const bool pending = (sr_.load(std::memory_order_acquire) & kSrOcifMask) != 0 &&
-                             (cr_.load(std::memory_order_acquire) & kCrOcienMask) != 0;
-        if (pending) AssertIrqLine();
-        else         DeassertIrqLine();
-    }
-
-    uint32_t ReadReg(uint32_t off) const {
+        if (width != 4u) HaltUnsupportedAccess("FastRead", kBase + off, 0);
         switch (off) {
-            case kOffCr:   return cr_.load(std::memory_order_acquire);
-            case kOffSr:   return sr_.load(std::memory_order_acquire);
-            case kOffLr:   return lr_.load(std::memory_order_acquire);
-            case kOffCmpr: return cmpr_.load(std::memory_order_acquire);
-            case kOffCnt:  return ReadCounter();
+            case kOffCr:   return cr_;
+            case kOffSr:   return sr_;
+            case kOffLr:   return lr_;
+            case kOffCmpr: return cmpr_;
+            case kOffCnt:  return Count(clock_->Cycles());
+            default: break;
         }
-        const_cast<FreescaleEpitBase*>(this)->HaltUnsupportedAccess(
-            "ReadReg", kBase + off, 0);
+        HaltUnsupportedAccess("FastRead", kBase + off, 0);
     }
 
-    void WriteReg(uint32_t off, uint32_t value) {
+    void FastWrite(uint32_t off, uint32_t value, uint32_t width) {
+        if (width != 4u) HaltUnsupportedAccess("FastWrite", kBase + off, value);
         switch (off) {
             case kOffCr:   WriteCr(value); return;
             case kOffSr:   WriteSr(value); return;
             case kOffLr:   WriteLr(value); return;
             case kOffCmpr: WriteCmpr(value); return;
+            default: break;
         }
-        HaltUnsupportedAccess("WriteReg", kBase + off, value);
+        HaltUnsupportedAccess("FastWrite", kBase + off, value);
     }
 
-    void WriteSr(uint32_t value) {
-        /* OCIF is write-one-to-clear; re-anchor so the next descent past CMPR
-           is detected fresh (the ISR re-arms CMPR for the following tick). */
-        if ((value & kSrOcifMask) == 0) return;
-        sr_.fetch_and(~kSrOcifMask, std::memory_order_acq_rel);
-        Rearm(ReadCounter());
+    /* MCIMX31RM Figure 33-10 / MCIMX51RM Figure 29-9: in set-and-forget mode the
+       counter holds 0 for one tick, then loads EPITLR. */
+    uint32_t ValueAfter(uint64_t ticks) const {
+        if ((cr_ & kCrRld) == 0u || ticks <= base_value_) {
+            return base_value_ - static_cast<uint32_t>(ticks);
+        }
+        const uint64_t period = uint64_t{lr_} + 1u;
+        return lr_ - static_cast<uint32_t>((ticks - base_value_ - 1u) % period);
+    }
+
+    uint64_t TicksAt(uint64_t now) const { return counter_.TicksSince(now) - base_tick_; }
+
+    uint32_t Count(uint64_t now) const {
+        return counting_ ? ValueAfter(TicksAt(now)) : base_value_;
+    }
+
+    bool NextCompareIndex(uint64_t ticks, uint64_t& e) const {
+        if ((cr_ & kCrRld) == 0u) {
+            const uint64_t d = static_cast<uint32_t>(base_value_ - cmpr_);
+            e = ticks <= d ? d : d + (((ticks - d) + 0xFFFFFFFFull) >> 32 << 32);
+            return true;
+        }
+        if (cmpr_ <= base_value_ && ticks <= uint64_t{base_value_ - cmpr_}) {
+            e = base_value_ - cmpr_;
+            return true;
+        }
+        if (cmpr_ > lr_) return false;
+        const uint64_t period = uint64_t{lr_} + 1u;
+        const uint64_t first  = uint64_t{base_value_} + 1u + (lr_ - cmpr_);
+        e = ticks <= first ? first : first + (ticks - first + period - 1u) / period * period;
+        return true;
+    }
+
+    /* MCIMX31RM Figure 33-10 / MCIMX51RM Figure 29-9: OCIF sets on the counter
+       clock edge that moves the counter off the compare value. */
+    void CaptureDue(uint64_t now) {
+        if (clock_->IsDue(event_, now)) ocif_pending_ = true;
+    }
+
+    void Arm(uint64_t now) {
+        uint64_t e = 0;
+        if (ocif_pending_) {
+            clock_->Arm(event_, now);
+            return;
+        }
+        if (!counting_ || (sr_ & kSrOcif) != 0u || !NextCompareIndex(TicksAt(now), e)) {
+            clock_->Disarm(event_);
+            return;
+        }
+        clock_->Arm(event_, counter_.CycleOfTick(base_tick_ + e + 1u));
+    }
+
+    void OnCompare() {
+        if (!counting_ && !ocif_pending_) {
+            emu_.Get<Fatal>().Die("EPIT %08X: compare event fired while the counter is "
+                                  "stopped", kBase);
+        }
+        ocif_pending_ = false;
+        sr_ |= kSrOcif;
         RefreshIrq();
-        cv_.notify_all();
+        Arm(clock_->Cycles());
     }
 
-    void WriteCmpr(uint32_t value) {
-        cmpr_.store(value, std::memory_order_release);
-        Rearm(ReadCounter());
-        cv_.notify_all();
+    void RefreshIrq() {
+        if ((sr_ & kSrOcif) != 0u && (cr_ & kCrOcien) != 0u) AssertIrqLine();
+        else                                                  DeassertIrqLine();
+    }
+
+    FreescaleTimerInput Input() const {
+        switch (Clksrc(cr_)) {
+            case 1u:  return FreescaleTimerInput::kIpg;
+            case 2u:  return FreescaleTimerInput::kHighfreq;
+            default:  return FreescaleTimerInput::kLowfreq;
+        }
+    }
+
+    /* MCIMX31RM Table 33-6 / MCIMX51RM Table 29-5 CLKSRC 00: clock is off. */
+    uint64_t EnabledInputHz() const {
+        if (suspended_ || (cr_ & kCrEn) == 0u || Clksrc(cr_) == 0u) return 0u;
+        return clocks_->InputHz(kUnit, Input());
+    }
+
+    void RequireScale(bool ok, uint64_t input_hz) const {
+        if (!ok) {
+            emu_.Get<Fatal>().Die("EPIT %08X: %llu Hz input / %u against the %llu Hz core "
+                                  "overflows the 64-bit scale", kBase,
+                                  static_cast<unsigned long long>(input_hz),
+                                  Prescaler(cr_) + 1u,
+                                  static_cast<unsigned long long>(clock_->CpuHz()));
+        }
+    }
+
+    uint64_t RatioCycles() const {
+        return clock_->CpuHz() * (uint64_t{Prescaler(cr_)} + 1u);
+    }
+
+    void Rebase(uint64_t now) {
+        base_value_ = Count(now);
+        base_tick_  = counter_.TicksSince(now);
+    }
+
+    /* MCIMX31RM Table 33-6 / MCIMX51RM Table 29-5 ENMOD: with EN=0 the main
+       counter and the prescaler counter freeze at their current values. */
+    void Freeze(uint64_t now) {
+        base_value_      = Count(now);
+        phase_           = counter_.PhaseAt(now);
+        phase_den_       = counter_.PhaseDenominator();
+        counting_        = false;
+    }
+
+    /* MCIMX31RM Table 33-6 ENMOD and Figure 33-9, MCIMX51RM Table 29-5 ENMOD: after a
+       prescaler counter reset the next prescaled pulse comes one input clock later. */
+    void ResetPrescaler() {
+        phase_     = Prescaler(cr_);
+        phase_den_ = uint64_t{Prescaler(cr_)} + 1u;
+    }
+
+    void Resume(uint64_t now, uint64_t input_hz) {
+        RequireScale(counter_.SetRatio(RatioCycles(), input_hz), input_hz);
+        RequireScale(counter_.AnchorAtPhase(now, 0u, phase_, phase_den_), input_hz);
+        base_tick_     = 0u;
+        ratio_cycles_  = RatioCycles();
+        ratio_ticks_   = input_hz;
+        counting_      = true;
+    }
+
+    void Retime() {
+        const uint64_t now      = clock_->Cycles();
+        const uint64_t input_hz = EnabledInputHz();
+        CaptureDue(now);
+        if (!counting_) {
+            if (input_hz != 0u) Resume(now, input_hz);
+        } else if (input_hz == 0u) {
+            Freeze(now);
+        } else if (input_hz != ratio_ticks_ || RatioCycles() != ratio_cycles_) {
+            base_value_ = Count(now);
+            RequireScale(counter_.Rescale(now, RatioCycles(), input_hz), input_hz);
+            base_tick_    = counter_.TicksSince(now);
+            ratio_cycles_ = RatioCycles();
+            ratio_ticks_  = input_hz;
+        }
+        Arm(now);
+    }
+
+    void OnIdle() {
+        if (!counting_) return;
+        const FreescaleLowPowerMode mode = clocks_->WfiMode();
+        uint32_t enable = 0u;
+        switch (mode) {
+            case FreescaleLowPowerMode::kRun:  return;
+            case FreescaleLowPowerMode::kWait: enable = kCrWaiten; break;
+            case FreescaleLowPowerMode::kDoze: enable = kCrDozen;  break;
+            case FreescaleLowPowerMode::kStop:
+            case FreescaleLowPowerMode::kStateRetention: enable = kCrStopen; break;
+        }
+        if ((cr_ & enable) != 0u && clocks_->InputRunsIn(kUnit, Input(), mode)) return;
+        suspended_ = true;
+        Retime();
+    }
+
+    void OnIdleExit() {
+        if (!suspended_) return;
+        suspended_ = false;
+        Retime();
     }
 
     void WriteCr(uint32_t value) {
-        if (value & kCrSwrMask) {
-            cr_.store(value & kCrSwrPreserveMask, std::memory_order_release);
-            sr_.store(0, std::memory_order_release);
-            lr_.store(kLrResetValue, std::memory_order_release);
-            cmpr_.store(0, std::memory_order_release);
-            baseline_packed_.store(PackPair(kCntResetValue, GuestCycles()),
-                                   std::memory_order_release);
-            frozen_cnt_.store(kCntResetValue, std::memory_order_release);
-            anchor_cnt_.store(kCntResetValue, std::memory_order_release);
-            RefreshIrq();
-            cv_.notify_all();
+        LOG(SocTimer, "EPIT %08X: CR <- %08X (was %08X)\n", kBase, value, cr_);
+        if ((value & kCrSwr) != 0u) {
+            if (value != kCrSwr) {
+                emu_.Get<Fatal>().Die("EPIT %08X: SWR write 0x%08X carries other bits; "
+                                      "the value those bits take is not modeled", kBase,
+                                      value);
+            }
+            ResetRegisters(cr_ & kCrSwrKeep);
             return;
         }
-
-        const uint32_t old_cr = cr_.load(std::memory_order_acquire);
-        const bool was_en = (old_cr & kCrEnMask) != 0;
-        const bool now_en = (value  & kCrEnMask) != 0;
-        const uint32_t sampled_cnt =
-            was_en ? ReadCounter() : frozen_cnt_.load(std::memory_order_acquire);
-
-        cr_.store(value, std::memory_order_release);
-
-        if (!was_en && now_en) {
-            /* ENMOD: when set, EN edge loads CNT from LR (RLD=1) or
-               0xFFFFFFFF (RLD=0); when cleared, CNT resumes from frozen. */
-            const uint32_t start = (value & kCrEnmodMask)
-                                       ? ((value & kCrRldMask)
-                                              ? lr_.load(std::memory_order_acquire)
-                                              : kCntResetValue)
-                                       : sampled_cnt;
-            baseline_packed_.store(PackPair(start, GuestCycles()),
-                                   std::memory_order_release);
-            Rearm(start);
-        } else if (was_en && !now_en) {
-            frozen_cnt_.store(sampled_cnt, std::memory_order_release);
-        } else if (was_en && now_en) {
-            baseline_packed_.store(PackPair(sampled_cnt, GuestCycles()),
-                                   std::memory_order_release);
-            Rearm(sampled_cnt);
+        value &= kCrWritable;
+        if (Om(value) != 0u) {
+            emu_.Get<Fatal>().Die("EPIT %08X: EPITCR 0x%08X drives the ipp_do_epito "
+                                  "output pin, which is not modeled", kBase, value);
         }
+        const uint32_t old    = cr_;
+        const bool     was_en = (old & kCrEn) != 0u;
+        const bool     now_en = (value & kCrEn) != 0u;
+        if (was_en && now_en &&
+            (Clksrc(old) != Clksrc(value) || Prescaler(old) != Prescaler(value))) {
+            emu_.Get<Fatal>().Die("EPIT %08X: EPITCR 0x%08X changes CLKSRC or PRESCALER of "
+                                  "the enabled timer (was 0x%08X); not modeled", kBase,
+                                  value, old);
+        }
+        const uint64_t now = clock_->Cycles();
+        CaptureDue(now);
+        if (counting_) {
+            if (now_en) Rebase(now);
+            else        Freeze(now);
+        }
+        cr_ = value;
+        /* MCIMX31RM §33.6.1.1 with Figure 33-9: "A change in the value of the PRESCALER
+           field is immediately reflected on its output clock frequency." */
+        if (Prescaler(old) != Prescaler(value)) ResetPrescaler();
+        if (!was_en && now_en && (value & kCrEnmod) != 0u) {
+            base_value_ = (value & kCrRld) != 0u ? lr_ : kCntReset;
+            ResetPrescaler();
+        }
+        Retime();
         RefreshIrq();
-        cv_.notify_all();
+    }
+
+    void WriteSr(uint32_t value) {
+        if ((value & kSrOcif) == 0u) return;
+        ocif_pending_ = false;
+        sr_ &= ~kSrOcif;
+        clock_->Disarm(event_);
+        RefreshIrq();
+        Arm(clock_->Cycles());
     }
 
     void WriteLr(uint32_t value) {
-        lr_.store(value, std::memory_order_release);
-        /* IOVW (bit 17) gates LR->CNT propagation. */
-        if (cr_.load(std::memory_order_acquire) & kCrIovwMask) {
-            baseline_packed_.store(PackPair(value, GuestCycles()),
-                                   std::memory_order_release);
-            Rearm(value);
+        const uint64_t now = clock_->Cycles();
+        CaptureDue(now);
+        if (counting_) Rebase(now);
+        lr_ = value;
+        if ((cr_ & kCrIovw) != 0u) base_value_ = value;
+        Arm(now);
+    }
+
+    void WriteCmpr(uint32_t value) {
+        const uint64_t now = clock_->Cycles();
+        CaptureDue(now);
+        if (counting_) {
+            const uint32_t cnt = Count(now);
+            const int32_t  gap = static_cast<int32_t>(cnt - value);
+            if (gap <= 0) {
+                LOG(Caution, "[EPITPAST] EPIT %08X cmpr<-%08X cnt=%08X behind=%d ticks\n",
+                    kBase, value, cnt, -gap);
+            }
         }
-        cv_.notify_all();
+        cmpr_ = value;
+        Arm(now);
     }
 
-    /* MUST run every poll: guest_cycle_counter is 32-bit, so the
-       GuestCycles()-baseline_cyc delta wraps every ~2^32 cycles and
-       ReadCounter jumps backward unless the baseline is slid forward. */
-    void RebaseToCurrent() {
-        if (EffectiveDivider() == 0) return;
-        const uint32_t cnt_now = ReadCounter();
-        baseline_packed_.store(PackPair(cnt_now, GuestCycles()),
-                               std::memory_order_release);
-    }
-
-    void CheckAndFire() {
-        if (EffectiveDivider() == 0) return;
-        if ((sr_.load(std::memory_order_acquire) & kSrOcifMask) != 0) return;
-        const uint32_t anchor    = anchor_cnt_.load(std::memory_order_acquire);
-        const uint32_t cmpr      = cmpr_.load(std::memory_order_acquire);
-        const uint32_t count_now = ReadCounter();
-        if (!CompareHasFired(anchor, cmpr, count_now)) return;
-        sr_.fetch_or(kSrOcifMask, std::memory_order_acq_rel);
+    void ResetRegisters(uint32_t cr) {
+        clock_->Disarm(event_);
+        ocif_pending_    = false;
+        counting_        = false;
+        suspended_       = false;
+        cr_              = cr;
+        sr_              = 0u;
+        lr_              = kLrReset;
+        cmpr_            = 0u;
+        base_value_      = kCntReset;
+        ResetPrescaler();
+        Retime();
         RefreshIrq();
     }
 
-    bool Armed() const {
-        if (EffectiveDivider() == 0) return false;
-        return (sr_.load(std::memory_order_acquire) & kSrOcifMask) == 0;
-    }
+    void HardwareReset() { ResetRegisters(0u); }
 
-    void MatchLoop() {
-        auto& freeze = emu_.Get<EmulationFreeze>();
-        std::unique_lock<std::mutex> lk(cv_mtx_);
-        while (!stop_.load(std::memory_order_acquire)) {
-            lk.unlock();
-            {
-                auto frozen = freeze.WorkerSection();
-                RebaseToCurrent();
-                CheckAndFire();
-            }
-            lk.lock();
-            if (stop_.load(std::memory_order_acquire)) break;
-            if (Armed()) cv_.wait_for(lk, kPollInterval);
-            else         cv_.wait(lk);
-        }
-    }
+    GuestCycleClock*        clock_  = nullptr;
+    FreescaleTimerClocks*   clocks_ = nullptr;
+    GuestCycleClock::Event* event_  = nullptr;
+    CycleAnchoredCounter    counter_;
+
+    uint32_t cr_   = 0u;
+    uint32_t sr_   = 0u;
+    uint32_t lr_   = kLrReset;
+    uint32_t cmpr_ = 0u;
+
+    bool     counting_        = false;
+    bool     suspended_       = false;
+    bool     ocif_pending_    = false;
+    uint32_t base_value_      = kCntReset;
+    uint64_t base_tick_       = 0u;
+    uint64_t phase_           = 0u;
+    uint64_t phase_den_       = 1u;
+    uint64_t ratio_cycles_    = 0u;
+    uint64_t ratio_ticks_     = 0u;
 };
 
-}  /* namespace cerf_freescale_epit_detail */
+}

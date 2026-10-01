@@ -7,6 +7,7 @@
 #include "../../cpu/emulated_memory.h"
 #include "../../peripherals/peripheral_dispatcher.h"
 #include "../../state/state_stream.h"
+#include "../freescale_module_clocks.h"
 
 #include <algorithm>
 #include <array>
@@ -94,6 +95,7 @@ bool Imx51Nfc::ShouldRegister() {
 }
 
 void Imx51Nfc::OnReady() {
+    module_clocks_ = &emu_.Get<FreescaleModuleClocks>();
     emu_.Get<PeripheralDispatcher>().Register(this);
 }
 
@@ -183,6 +185,8 @@ void Imx51Nfc::NfcWrite(uint32_t addr, uint32_t value, uint32_t width) {
 }
 
 void Imx51Nfc::Launch(uint32_t value) {
+    if (value & (kLaunchFcmd | kLaunchFadd | kLaunchFdiMask | kLaunchFdoMask | kLaunchAutoMask))
+        module_clocks_->RequireRunning(FreescaleModule::kNfc, "starts a NAND operation");
     launch_ = value;
     if (value & kLaunchFcmd) {
         switch (nand_cmd_) {

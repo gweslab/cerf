@@ -1,15 +1,20 @@
-#include "../freescale_gpio_impl.h"
-#include "imx31_id.h"
+#include "imx31_gpio1.h"
+
+#include "imx31_avic.h"
+
+#include <cstdint>
 
 namespace {
 
-/* MCIMX31RM Table 5-3: GPIO1 at 0x53FC_C000. */
-class Imx31Gpio1
-    : public cerf_freescale_gpio_detail::FreescaleGpioBase<0x53FCC000u,
-                                                           SocId::Imx31> {
-    using FreescaleGpioBase::FreescaleGpioBase;
-};
+/* MCIMX31RM Table 2-3: interrupt 52, GPIO1 module. */
+constexpr uint32_t kAvicSourceGpio1 = 52u;
 
-}  /* namespace */
+}
+
+void Imx31Gpio1::DrivePortIrqLine(bool asserted) {
+    auto& avic = emu_.Get<Imx31Avic>();
+    if (asserted) avic.AssertSource(kAvicSourceGpio1);
+    else          avic.DeassertSource(kAvicSourceGpio1);
+}
 
 REGISTER_SERVICE(Imx31Gpio1);

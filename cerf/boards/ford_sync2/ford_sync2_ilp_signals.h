@@ -29,7 +29,6 @@ public:
     uint32_t    GroundedSignalIdAt(std::size_t i) const;
     uint8_t     GroundedSignalBitsAt(std::size_t i) const;
 
-    static constexpr std::size_t kMaxSubscribers = 4u;
     static constexpr uint32_t    kTakenSignal    = 0xFFFFFFFFu;
     static constexpr std::size_t kNoSubscriber   = ~static_cast<std::size_t>(0);
 
@@ -62,9 +61,7 @@ private:
     std::atomic<uint64_t> reported_[kSignalCount]   = {};
     std::atomic<bool>     reporting_[kSignalCount]  = {};
     std::atomic<bool>     pending_[kSignalCount]    = {};
-    std::atomic<uint8_t>  sub_count_[kSignalCount] = {};
-    std::atomic<uint16_t> sub_tid_[kSignalCount][kMaxSubscribers] = {};
-    bool                  warned_sub_overflow_   = false;
+    std::vector<uint16_t> sub_tids_[kSignalCount];
     bool                  warned_reply_truncated_ = false;
 
     std::size_t           cycle_ = 0u;

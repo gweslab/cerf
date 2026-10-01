@@ -1,13 +1,14 @@
 #include "imx31_kpp.h"
 
-#include "../../core/cerf_emulator.h"
 #include "../../boards/board_context.h"
-#include "imx31_id.h"
+#include "../../core/cerf_emulator.h"
+#include "../../core/fatal.h"
 #include "../../peripherals/peripheral_dispatcher.h"
-#include "../../state/emulation_freeze.h"
+#include "../guest_cpu_reset.h"
 #include "imx31_avic.h"
+#include "imx31_ccm.h"
+#include "imx31_id.h"
 
-#include <chrono>
 #include <cstdint>
 #include <mutex>
 
@@ -20,32 +21,23 @@ constexpr uint32_t kKddr = 0x04u;
 constexpr uint32_t kKpdr = 0x06u;
 
 /* KPSR fields - MCIMX31RM Table 27-6. */
-constexpr uint16_t kKpkd = 0x0001u;  /* key depress, W1C */
-constexpr uint16_t kKpkr = 0x0002u;  /* key release, W1C */
-constexpr uint16_t kKdsc = 0x0004u;  /* depress sync clear, self-clearing (reads 0) */
-constexpr uint16_t kKrss = 0x0008u;  /* release sync set, self-clearing (reads 0) */
-constexpr uint16_t kKdie = 0x0100u;  /* depress interrupt enable */
-constexpr uint16_t kKrie = 0x0200u;  /* release interrupt enable */
+constexpr uint16_t kKpkd = 0x0001u;
+constexpr uint16_t kKpkr = 0x0002u;
+constexpr uint16_t kKdsc = 0x0004u;
+constexpr uint16_t kKrss = 0x0008u;
+constexpr uint16_t kKdie = 0x0100u;
+constexpr uint16_t kKrie = 0x0200u;
 
-/* MCIMX31RM Ch 9 interrupt-source assignment table: source 24 = KPP. */
+constexpr uint16_t kMatrixRows = 0x001Fu;
+
+/* MCIMX31RM Table 27-6: the synchronizer delay is 4 cycles of the 32 kHz clock. */
+constexpr uint32_t kSyncCkilCycles = 4u;
+
 constexpr uint32_t kAvicSourceKpp = 24u;
 
-/* Held-key re-detect interval. Must be below the pyxis_keybd debounce
-   (sub_30F1CDC compares GetTickCount deltas against 0x28 = 40 ms). */
-constexpr auto kSyncDetectInterval = std::chrono::milliseconds(16);
-
-}  /* namespace */
-
-void Imx31Kpp::StopSyncThread() {
-    { std::lock_guard<std::mutex> lk(mtx_); stop_ = true; }
-    sync_cv_.notify_all();
-    if (sync_thread_.joinable()) sync_thread_.join();
 }
 
-/* Sync thread raises AVIC IRQs; stop it before any peer is destroyed. */
-void Imx31Kpp::OnShutdown() { StopSyncThread(); }
-
-Imx31Kpp::~Imx31Kpp() { StopSyncThread(); }
+REGISTER_SERVICE(Imx31Kpp);
 
 bool Imx31Kpp::ShouldRegister() {
     auto* bd = emu_.TryGet<BoardContext>();
@@ -53,18 +45,129 @@ bool Imx31Kpp::ShouldRegister() {
 }
 
 void Imx31Kpp::OnReady() {
+    clock_      = &emu_.Get<GuestCycleClock>();
+    sync_event_ = clock_->Add([this] { OnSync(); });
+    clock_->RegisterRateListener([this] { Retime(); });
+    host_requests_ = &emu_.Get<HostRequestChannel>();
+    host_requests_->RegisterListener([this] { OnHostKeys(); });
+    {
+        std::lock_guard<std::mutex> lk(mtx_);
+        SetRatio();
+        const uint64_t now = clock_->Cycles();
+        ckil_.Anchor(now, 0u);
+        ArmSyncLocked(now);
+    }
+    emu_.Get<GuestCpuReset>().RegisterResetListener([this](ResetLineKind) { ResetRegisters(); });
     emu_.Get<PeripheralDispatcher>().Register(this);
-    sync_thread_ = std::thread([this] { SyncDetectLoop(); });
 }
 
-/* Row sense (KPDR bits 0-4): a row reads low only where a pressed key shorts it
-   to a column currently strobed low (column data bit 8+c == 0). */
+/* MCIMX31RM Table 27-2: KPCR, KPSR and KDDR reset to 0; 27.3.3.4: KPDR is not
+   initialized by a reset. Table 27-6 KPKR: after reset de-asserts it follows the rows. */
+void Imx31Kpp::ResetRegisters() {
+    std::lock_guard<std::mutex> lk(mtx_);
+    kpcr_         = 0u;
+    kpsr_         = 0u;
+    kddr_         = 0u;
+    pending_kpsr_ = 0u;
+    depress_out_  = false;
+    release_out_  = true;
+    ArmSyncLocked(clock_->Cycles());
+    ApplyIrqLocked();
+}
+
+void Imx31Kpp::SetRatio() {
+    if (!ckil_.SetRatio(clock_->CpuHz(), emu_.Get<Imx31Ccm>().CkilHz())) {
+        emu_.Get<Fatal>().Die("Imx31Kpp: CKIL %llu Hz against the %llu Hz core clock "
+                              "does not reduce",
+                              static_cast<unsigned long long>(emu_.Get<Imx31Ccm>().CkilHz()),
+                              static_cast<unsigned long long>(clock_->CpuHz()));
+    }
+}
+
+void Imx31Kpp::Retime() {
+    std::lock_guard<std::mutex> lk(mtx_);
+    const uint64_t now = clock_->Cycles();
+    if (!ckil_.Rescale(now, clock_->CpuHz(), emu_.Get<Imx31Ccm>().CkilHz())) {
+        emu_.Get<Fatal>().Die("Imx31Kpp: CKIL rescale to the %llu Hz core clock does not "
+                              "reduce", static_cast<unsigned long long>(clock_->CpuHz()));
+    }
+    ArmEventLocked(now);
+}
+
 uint16_t Imx31Kpp::RowSenseLocked() const {
-    uint16_t rows = 0x1Fu;
+    uint16_t rows = kMatrixRows;
     for (uint8_t c = 0; c < 4; ++c)
         if (((kpdr_col_ >> (8u + c)) & 1u) == 0u)
             rows &= static_cast<uint16_t>(~pressed_[c]);
-    return rows & 0x1Fu;
+    return rows;
+}
+
+bool Imx31Kpp::AnyEnabledRowLowLocked() const {
+    return (static_cast<uint16_t>(~RowSenseLocked()) & kMatrixRows & kpcr_) != 0u;
+}
+
+void Imx31Kpp::ArmSyncLocked(uint64_t now) {
+    sync_tick_    = ckil_.CountAt(now) + kSyncCkilCycles;
+    sync_pending_ = true;
+    ArmEventLocked(now);
+}
+
+void Imx31Kpp::ArmEventLocked(uint64_t now) {
+    if (pending_kpsr_ != 0u) {
+        clock_->Arm(sync_event_, now);
+    } else if (sync_pending_) {
+        const int32_t ahead = static_cast<int32_t>(sync_tick_ - ckil_.CountAt(now));
+        clock_->Arm(sync_event_, ckil_.CycleOfTick(ckil_.TicksSince(now) +
+                                                   static_cast<uint64_t>(ahead > 0 ? ahead : 0)));
+    } else {
+        clock_->Disarm(sync_event_);
+    }
+}
+
+void Imx31Kpp::CaptureDueLocked(uint64_t now) {
+    if (!sync_pending_ || !clock_->IsDue(sync_event_, now)) return;
+    const uint16_t before = kpsr_;
+    EvaluateChainsLocked();
+    pending_kpsr_ = static_cast<uint16_t>(pending_kpsr_ | (kpsr_ & ~before));
+    kpsr_         = before;
+    sync_pending_ = false;
+}
+
+/* MCIMX31RM Table 27-6: KPKD sets when an enabled row is detected low after
+   synchronization, KPKR when all enabled rows are detected high after it. */
+void Imx31Kpp::EvaluateChainsLocked() {
+    const bool low = AnyEnabledRowLowLocked();
+    if (!depress_out_ && low) kpsr_ |= kKpkd;
+    if (release_out_ && !low) kpsr_ |= kKpkr;
+    depress_out_ = low;
+    release_out_ = low;
+}
+
+void Imx31Kpp::OnSync() {
+    std::lock_guard<std::mutex> lk(mtx_);
+    const uint64_t now = clock_->Cycles();
+    kpsr_         = static_cast<uint16_t>(kpsr_ | pending_kpsr_);
+    pending_kpsr_ = 0u;
+    if (sync_pending_ && static_cast<int32_t>(ckil_.CountAt(now) - sync_tick_) >= 0) {
+        sync_pending_ = false;
+        EvaluateChainsLocked();
+    }
+    ArmEventLocked(now);
+    ApplyIrqLocked();
+}
+
+void Imx31Kpp::DriveIrqLocked() {
+    auto& avic = emu_.Get<Imx31Avic>();
+    if (irq_on_) avic.AssertSource(kAvicSourceKpp);
+    else         avic.DeassertSource(kAvicSourceKpp);
+}
+
+void Imx31Kpp::ApplyIrqLocked() {
+    const bool desired = ((kpsr_ & kKpkd) && (kpsr_ & kKdie)) ||
+                         ((kpsr_ & kKpkr) && (kpsr_ & kKrie));
+    if (desired == irq_on_) return;
+    irq_on_ = desired;
+    DriveIrqLocked();
 }
 
 uint16_t Imx31Kpp::ReadReg16Locked(uint32_t off) {
@@ -77,109 +180,75 @@ uint16_t Imx31Kpp::ReadReg16Locked(uint32_t off) {
     HaltUnsupportedAccess("ReadReg16", kBase + off, 0);
 }
 
-bool Imx31Kpp::WriteReg16Locked(uint32_t off, uint16_t value) {
+void Imx31Kpp::WriteReg16Locked(uint32_t off, uint16_t value) {
+    CaptureDueLocked(clock_->Cycles());
+    const bool low_before = AnyEnabledRowLowLocked();
+    bool resync = false;
     switch (off) {
-        case kKpcr: kpcr_ = value; return false;
+        case kKpcr: kpcr_ = value; break;
         case kKpsr:
             kpsr_ = static_cast<uint16_t>(kpsr_ & ~(value & (kKpkd | kKpkr)));
+            pending_kpsr_ = static_cast<uint16_t>(pending_kpsr_ & ~(value & (kKpkd | kKpkr)));
             kpsr_ = static_cast<uint16_t>((kpsr_ & ~(kKdie | kKrie)) |
                                           (value & (kKdie | kKrie)));
-            return true;  /* enable/W1C change -> re-eval IRQ */
-        case kKddr: kddr_ = value; return false;
-        /* Columns are software-driven outputs; rows are sense inputs (ignored). */
-        case kKpdr: kpdr_col_ = value & 0xFF00u; return false;
+            if ((value & kKdsc) != 0u) { depress_out_ = false; resync = true; }
+            if ((value & kKrss) != 0u) { release_out_ = true;  resync = true; }
+            break;
+        case kKddr: kddr_ = value; break;
+        case kKpdr: kpdr_col_ = value & 0xFF00u; break;
+        default: HaltUnsupportedAccess("WriteReg16", kBase + off, value);
     }
-    HaltUnsupportedAccess("WriteReg16", kBase + off, value);
-}
-
-bool Imx31Kpp::IrqDesiredLocked() const {
-    return ((kpsr_ & kKpkd) && (kpsr_ & kKdie)) ||
-           ((kpsr_ & kKpkr) && (kpsr_ & kKrie));
-}
-
-bool Imx31Kpp::AnyPressedLocked() const {
-    return (pressed_[0] | pressed_[1] | pressed_[2] | pressed_[3]) != 0u;
-}
-
-/* Re-assert KPKD while a key is held so the driver re-scans: its KEYDOWN inject
-   needs a scan finding the key still down >=40 ms after the first, which one
-   IRQ-per-press edge can't supply. (KEYUP injects on the release edge, scan-once.) */
-void Imx31Kpp::SyncDetectLoop() {
-    auto& freeze = emu_.Get<EmulationFreeze>();
-    std::unique_lock<std::mutex> lk(mtx_);
-    while (!stop_) {
-        sync_cv_.wait(lk, [this] { return stop_ || AnyPressedLocked(); });
-        while (!stop_ && AnyPressedLocked()) {
-            if (kpsr_ & kKdie) {
-                lk.unlock();
-                {
-                    auto frozen = freeze.WorkerSection();
-                    lk.lock();
-                    kpsr_ |= kKpkd;
-                    const bool desired = IrqDesiredLocked();
-                    lk.unlock();
-                    ApplyIrq(desired);
-                }
-                lk.lock();
-            }
-            sync_cv_.wait_for(lk, kSyncDetectInterval);
-        }
-    }
-}
-
-void Imx31Kpp::ApplyIrq(bool desired) {
-    if (irq_on_.exchange(desired) == desired) return;
-    auto& avic = emu_.Get<Imx31Avic>();
-    if (desired) avic.AssertSource(kAvicSourceKpp);
-    else         avic.DeassertSource(kAvicSourceKpp);
-}
-
-/* Re-assert the AVIC line from the restored key/register state - the KPP IRQ is
-   a level the source re-drives after restore (driven directly, not via ApplyIrq,
-   whose change-gate skips a level already equal to the restored irq_on_). */
-void Imx31Kpp::PostRestore() {
-    std::lock_guard<std::mutex> lk(mtx_);
-    const bool desired = IrqDesiredLocked();
-    irq_on_.store(desired, std::memory_order_release);
-    auto& avic = emu_.Get<Imx31Avic>();
-    if (desired) avic.AssertSource(kAvicSourceKpp);
-    else         avic.DeassertSource(kAvicSourceKpp);
+    if (resync || AnyEnabledRowLowLocked() != low_before) ArmSyncLocked(clock_->Cycles());
+    ApplyIrqLocked();
 }
 
 void Imx31Kpp::SetMatrixKey(uint8_t col, uint8_t row, bool pressed) {
-    if (col >= 4u || row >= 5u) return;
-    bool desired;
+    if (col >= 4u || row >= 5u) {
+        emu_.Get<Fatal>().Die("Imx31Kpp: key cell col=%u row=%u is outside the 4x5 matrix",
+                              col, row);
+    }
     {
         std::lock_guard<std::mutex> lk(mtx_);
         const uint8_t bit = static_cast<uint8_t>(1u << row);
-        if (((pressed_[col] & bit) != 0) == pressed) return;
-        if (pressed) { pressed_[col] |= bit;  kpsr_ |= kKpkd; }
-        else         { pressed_[col] &= static_cast<uint8_t>(~bit); kpsr_ |= kKpkr; }
-        desired = IrqDesiredLocked();
+        if (((host_pressed_[col] & bit) != 0) == pressed) return;
+        if (pressed) host_pressed_[col] |= bit;
+        else         host_pressed_[col] &= static_cast<uint8_t>(~bit);
     }
-    ApplyIrq(desired);
-    if (pressed) sync_cv_.notify_all();  /* start re-detect for the held key */
+    host_requests_->Request();
+}
+
+/* MCIMX31RM Table 27-6: a row change reaches KPKD / KPKR through the synchronizer. */
+void Imx31Kpp::OnHostKeys() {
+    std::lock_guard<std::mutex> lk(mtx_);
+    CaptureDueLocked(clock_->Cycles());
+    const bool low_before = AnyEnabledRowLowLocked();
+    bool changed = false;
+    for (uint8_t c = 0; c < 4; ++c) {
+        changed |= pressed_[c] != host_pressed_[c];
+        pressed_[c] = host_pressed_[c];
+    }
+    if (!changed) return;
+    if (AnyEnabledRowLowLocked() != low_before) ArmSyncLocked(clock_->Cycles());
 }
 
 uint8_t Imx31Kpp::ReadByte(uint32_t addr) {
     const uint32_t off = (addr - kBase) & ~1u;
-    uint16_t v;
-    { std::lock_guard<std::mutex> lk(mtx_); v = ReadReg16Locked(off); }
+    std::lock_guard<std::mutex> lk(mtx_);
+    const uint16_t v = ReadReg16Locked(off);
     return ((addr & 1u) ? (v >> 8) : v) & 0xFFu;
 }
 
 void Imx31Kpp::WriteByte(uint32_t addr, uint8_t value) {
     const uint32_t off = (addr - kBase) & ~1u;
-    bool eval, desired = false;
-    {
-        std::lock_guard<std::mutex> lk(mtx_);
-        uint16_t v = ReadReg16Locked(off);
-        v = (addr & 1u) ? static_cast<uint16_t>((v & 0x00FFu) | (uint16_t(value) << 8))
-                        : static_cast<uint16_t>((v & 0xFF00u) | value);
-        eval = WriteReg16Locked(off, v);
-        if (eval) desired = IrqDesiredLocked();
+    std::lock_guard<std::mutex> lk(mtx_);
+    uint16_t v = ReadReg16Locked(off);
+    if ((addr & 1u) != 0u) {
+        v = static_cast<uint16_t>((v & 0x00FFu) | (uint16_t(value) << 8));
+        if (off == kKpsr) v = static_cast<uint16_t>(v & ~(kKpkd | kKpkr));
+    } else {
+        v = static_cast<uint16_t>((v & 0xFF00u) | value);
     }
-    if (eval) ApplyIrq(desired);
+    WriteReg16Locked(off, v);
 }
 
 uint16_t Imx31Kpp::ReadHalf(uint32_t addr) {
@@ -188,13 +257,8 @@ uint16_t Imx31Kpp::ReadHalf(uint32_t addr) {
 }
 
 void Imx31Kpp::WriteHalf(uint32_t addr, uint16_t value) {
-    bool eval, desired = false;
-    {
-        std::lock_guard<std::mutex> lk(mtx_);
-        eval = WriteReg16Locked(addr - kBase, value);
-        if (eval) desired = IrqDesiredLocked();
-    }
-    if (eval) ApplyIrq(desired);
+    std::lock_guard<std::mutex> lk(mtx_);
+    WriteReg16Locked(addr - kBase, value);
 }
 
 uint32_t Imx31Kpp::ReadWord(uint32_t addr) {
@@ -205,15 +269,65 @@ uint32_t Imx31Kpp::ReadWord(uint32_t addr) {
 
 void Imx31Kpp::WriteWord(uint32_t addr, uint32_t value) {
     const uint32_t off = addr - kBase;
-    bool eval, desired = false;
-    {
-        std::lock_guard<std::mutex> lk(mtx_);
-        const bool e0 = WriteReg16Locked(off, value & 0xFFFFu);
-        const bool e1 = WriteReg16Locked(off + 2, value >> 16);
-        eval = e0 || e1;
-        if (eval) desired = IrqDesiredLocked();
-    }
-    if (eval) ApplyIrq(desired);
+    std::lock_guard<std::mutex> lk(mtx_);
+    WriteReg16Locked(off, static_cast<uint16_t>(value & 0xFFFFu));
+    WriteReg16Locked(off + 2, static_cast<uint16_t>(value >> 16));
 }
 
-REGISTER_SERVICE(Imx31Kpp);
+void Imx31Kpp::SaveState(StateWriter& w) {
+    std::lock_guard<std::mutex> lk(mtx_);
+    const uint64_t now = clock_->Cycles();
+    w.Write("kpcr", kpcr_);
+    w.Write("kpsr", kpsr_);
+    w.Write("kddr", kddr_);
+    w.Write("kpdr_col", kpdr_col_);
+    w.WriteBytes("pressed", pressed_, sizeof(pressed_));
+    w.Write<uint8_t>("depress_out", depress_out_ ? 1u : 0u);
+    w.Write<uint8_t>("release_out", release_out_ ? 1u : 0u);
+    w.Write<uint8_t>("sync_pending", sync_pending_ ? 1u : 0u);
+    w.Write("sync_tick", sync_tick_);
+    w.Write("ckil_count", ckil_.CountAt(now));
+    w.Write("ckil_phase", ckil_.PhaseAt(now));
+    w.Write("ckil_phase_den", ckil_.PhaseDenominator());
+}
+
+void Imx31Kpp::RestoreState(StateReader& r) {
+    std::lock_guard<std::mutex> lk(mtx_);
+    uint8_t depress = 0, release = 0, pending = 0;
+    r.Read("kpcr", kpcr_);
+    r.Read("kpsr", kpsr_);
+    r.Read("kddr", kddr_);
+    r.Read("kpdr_col", kpdr_col_);
+    r.ReadBytes("pressed", pressed_, sizeof(pressed_));
+    r.Read("depress_out", depress);
+    r.Read("release_out", release);
+    r.Read("sync_pending", pending);
+    r.Read("sync_tick", sync_tick_);
+    r.Read("ckil_count", restored_count_);
+    r.Read("ckil_phase", restored_phase_);
+    r.Read("ckil_phase_den", restored_den_);
+    depress_out_  = depress != 0u;
+    release_out_  = release != 0u;
+    sync_pending_ = pending != 0u;
+    pending_kpsr_ = 0u;
+    const bool low_saved = AnyEnabledRowLowLocked();
+    for (uint8_t c = 0; c < 4; ++c) {
+        pressed_[c]      = 0u;
+        host_pressed_[c] = 0u;
+    }
+    if (AnyEnabledRowLowLocked() != low_saved) {
+        sync_tick_    = restored_count_ + kSyncCkilCycles;
+        sync_pending_ = true;
+    }
+    clock_->Disarm(sync_event_);
+}
+
+void Imx31Kpp::PostRestore() {
+    std::lock_guard<std::mutex> lk(mtx_);
+    const uint64_t now = clock_->Cycles();
+    SetRatio();
+    ckil_.AnchorAtPhase(now, restored_count_, restored_phase_, restored_den_);
+    ArmEventLocked(now);
+    irq_on_ = ((kpsr_ & kKpkd) && (kpsr_ & kKdie)) || ((kpsr_ & kKpkr) && (kpsr_ & kKrie));
+    DriveIrqLocked();
+}

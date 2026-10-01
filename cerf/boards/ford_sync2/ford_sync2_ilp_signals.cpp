@@ -74,23 +74,14 @@ uint8_t FordSync2IlpSignals::GroundedSignalBitsAt(std::size_t i) const {
 std::size_t FordSync2IlpSignals::NoteFilterRegistration(uint32_t sigid, uint16_t tid) {
     const std::size_t idx = IndexOf(sigid);
     if (idx == kSignalCount) return kNoSubscriber;
-    const std::size_t n = sub_count_[idx].load(std::memory_order_relaxed);
-    for (std::size_t s = 0; s < n; ++s) {
-        if (sub_tid_[idx][s].load(std::memory_order_relaxed) == tid) return s;
+    auto& tids = sub_tids_[idx];
+    for (std::size_t s = 0; s < tids.size(); ++s) {
+        if (tids[s] == tid) return s;
     }
-    if (n >= kMaxSubscribers) {
-        if (!warned_sub_overflow_) {
-            warned_sub_overflow_ = true;
-            LOG(Caution, "[VMCU] ILP subscriber table full for SigID=0x%08X tid=%u\n",
-                sigid, static_cast<unsigned>(tid));
-        }
-        return kNoSubscriber;
-    }
-    sub_tid_[idx][n].store(tid, std::memory_order_relaxed);
-    sub_count_[idx].store(static_cast<uint8_t>(n + 1u), std::memory_order_relaxed);
+    tids.push_back(tid);
     LOG(Board, "[VMCU] ILP filter SigID=0x%08X tid=%u subscriber=%zu\n", sigid,
-        static_cast<unsigned>(tid), n);
-    return n;
+        static_cast<unsigned>(tid), tids.size() - 1u);
+    return tids.size() - 1u;
 }
 
 std::size_t FordSync2IlpSignals::HeadWriteWidth(uint32_t sigid) {
@@ -107,9 +98,7 @@ std::size_t FordSync2IlpSignals::HeadWriteWidth(uint32_t sigid) {
 
 std::size_t FordSync2IlpSignals::SubscriberCount(uint32_t sigid) const {
     const std::size_t idx = IndexOf(sigid);
-    return idx == kSignalCount
-               ? 0u
-               : static_cast<std::size_t>(sub_count_[idx].load(std::memory_order_relaxed));
+    return idx == kSignalCount ? 0u : sub_tids_[idx].size();
 }
 
 bool FordSync2IlpSignals::IsReported(uint32_t sigid) const {
@@ -204,14 +193,13 @@ bool FordSync2IlpSignals::AppendSignalIndication(uint32_t sigid, std::size_t sub
     const std::size_t idx = IndexOf(sigid);
     if (idx == kSignalCount) return false;
     if (!reporting_[idx].load(std::memory_order_acquire)) return false;
-    if (sub >= static_cast<std::size_t>(sub_count_[idx].load(std::memory_order_relaxed)))
-        return false;
+    if (sub >= sub_tids_[idx].size()) return false;
 
     /* ford_sync_2 ipc_ilprot.dll sub_C08DD3FC passes bytes [2..3] to sub_C08DB2BC,
        which delivers only when they equal the TID sub_C08D9A10 stored at
        filter+0x34; a wrong TID is dropped silently unless ctx+0x744 (registry
        "VMCUSingleFilter") is set. sub_C08DC334 routes only above length 10. */
-    const uint16_t tid = sub_tid_[idx][sub].load(std::memory_order_relaxed);
+    const uint16_t tid = sub_tids_[idx][sub];
     pkt.push_back(0x0Au);
     /* StatusCode: ford_sync_2 ipc_ilprot.dll sub_C08DD3FC maps 0x00 / 0x81 / 0x82 to 2,
        0x20 to 0 and 0x88 to 1 in field +4 of the 24-byte record sub_C08DAF58 queues;
@@ -228,28 +216,21 @@ bool FordSync2IlpSignals::AppendSignalIndication(uint32_t sigid, std::size_t sub
 
 void FordSync2IlpSignals::SaveState(StateWriter& w) const {
     for (std::size_t i = 0; i < kSignalCount; ++i) {
-        w.Write<uint8_t>("sub_count", sub_count_[i].load(std::memory_order_relaxed));
-        for (std::size_t s = 0; s < kMaxSubscribers; ++s) {
-            w.Write<uint16_t>("sub_tid", sub_tid_[i][s].load(std::memory_order_relaxed));
-        }
+        w.Write<uint32_t>("subscriber_count", static_cast<uint32_t>(sub_tids_[i].size()));
+        w.WriteBytes("sub_tids", sub_tids_[i].data(), sub_tids_[i].size() * sizeof(uint16_t));
     }
     w.Write<uint32_t>("cycle", static_cast<uint32_t>(cycle_));
 }
 
 void FordSync2IlpSignals::RestoreState(StateReader& r) {
     for (std::size_t i = 0; i < kSignalCount; ++i) {
-        uint8_t subs = 0u;
-        r.Read("sub_count", subs);
-        for (std::size_t s = 0; s < kMaxSubscribers; ++s) {
-            uint16_t tid = 0u;
-            r.Read("sub_tid", tid);
-            sub_tid_[i][s].store(tid, std::memory_order_relaxed);
-        }
-        if (subs > kMaxSubscribers) subs = static_cast<uint8_t>(kMaxSubscribers);
+        uint32_t subs = 0u;
+        r.Read("subscriber_count", subs);
+        sub_tids_[i].resize(subs);
+        r.ReadBytes("sub_tids", sub_tids_[i].data(), sub_tids_[i].size() * sizeof(uint16_t));
         reported_[i].store(0, std::memory_order_relaxed);
         reporting_[i].store(false, std::memory_order_relaxed);
         pending_[i].store(false, std::memory_order_relaxed);
-        sub_count_[i].store(subs, std::memory_order_relaxed);
     }
     uint32_t cycle = 0u;
     r.Read("cycle", cycle);
@@ -294,12 +275,12 @@ std::size_t FordSync2IlpSignals::AppendBatchedIndication(uint32_t* sigids, std::
         const std::size_t idx = IndexOf(sigids[k]);
         if (idx == kSignalCount) continue;
         if (!reporting_[idx].load(std::memory_order_acquire)) continue;
-        if (sub_count_[idx].load(std::memory_order_relaxed) == 0u) continue;
+        if (sub_tids_[idx].empty()) continue;
         const std::size_t width = WireWidth(kGroundedSignals[idx].bits);
         if (emitted != 0u && CompositeGroup(sigids[k]) != group) continue;
         if (used + 4u + width > kMaxReplyPayload) break;
         if (emitted == 0u) {
-            tid   = sub_tid_[idx][0].load(std::memory_order_relaxed);
+            tid   = sub_tids_[idx][0];
             group = CompositeGroup(sigids[k]);
         }
         const uint32_t sigid = sigids[k];
@@ -323,7 +304,7 @@ std::size_t FordSync2IlpSignals::TakeChangedSignals(uint32_t* out, std::size_t m
     for (std::size_t i = 0; i < kSignalCount && n < max; ++i) {
         if (!pending_[i].load(std::memory_order_acquire)) continue;
         if (!reporting_[i].load(std::memory_order_acquire)) continue;
-        if (sub_count_[i].load(std::memory_order_relaxed) == 0u) continue;
+        if (sub_tids_[i].empty()) continue;
         out[n++] = kGroundedSignals[i].sigid;
     }
     return n;
@@ -333,7 +314,7 @@ uint32_t FordSync2IlpSignals::NextCyclicSignal() {
     for (std::size_t n = 0; n < kSignalCount; ++n) {
         const std::size_t i = (cycle_ + n) % kSignalCount;
         if (!reporting_[i].load(std::memory_order_acquire)) continue;
-        if (sub_count_[i].load(std::memory_order_relaxed) == 0u) continue;
+        if (sub_tids_[i].empty()) continue;
         cycle_ = (i + 1u) % kSignalCount;
         return kGroundedSignals[i].sigid;
     }

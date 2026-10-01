@@ -1539,6 +1539,16 @@
         "bin",
         "img"
       ]
+    },
+    {
+      "id": "primary",
+      "name": "iPAQ Upgrade Package",
+      "board_ids": [
+        "ipaq_gen1"
+      ],
+      "formats": [
+        "nbf"
+      ]
     }
   ],
   "storage_types": [

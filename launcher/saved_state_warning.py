@@ -30,6 +30,4 @@ class SavedStateEditWarning:
         show_info(
             self._window, "Saved state present",
             "This device has a saved state.\n\n"
-            "Most changes you make here take effect only after a cold boot - "
-            "discard the saved state to apply them. Some changes might instead "
-            "take effect on a soft reboot inside your saved state.")
+            "Some changes require soft/hard reset to be applied and some might damage your saved state image.")

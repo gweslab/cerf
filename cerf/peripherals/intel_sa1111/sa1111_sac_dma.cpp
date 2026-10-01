@@ -262,6 +262,8 @@ void Sa1111SacDma::CompleteBlock(uint64_t at, uint64_t seen) {
         buffer_b ? 'B' : 'A', sadtcs_, static_cast<unsigned long long>(at),
         static_cast<unsigned long long>(stream_->LandedCycle()),
         static_cast<unsigned long long>(seen));
+#else
+    (void)seen;
 #endif
     emu_.Get<AudioActivityWidget>().MarkTx();
     if (raise) {

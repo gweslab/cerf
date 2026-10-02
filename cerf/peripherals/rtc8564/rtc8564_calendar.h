@@ -34,6 +34,14 @@ public:
         }
     };
 
+    static constexpr Field kSec  {0x7Fu, 0u, 59u};
+    static constexpr Field kMin  {0x7Fu, 0u, 59u};
+    static constexpr Field kHour {0x3Fu, 0u, 23u};
+    static constexpr Field kDay  {0x3Fu, 1u, 31u};
+    static constexpr Field kWday {0x07u, 0u, 6u};
+    static constexpr Field kMonth{0x1Fu, 1u, 12u};
+    static constexpr Field kYear {0xFFu, 0u, 99u};
+
     static bool Parse(const Rtc8564Regs::File& regs, Time& out);
 
     bool Load(uint64_t cpu_hz, uint64_t now, const Time& t, uint64_t phase, uint64_t den);

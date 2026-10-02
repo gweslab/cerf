@@ -17,6 +17,19 @@ bool BcdCalendar::DecodeBcd(uint32_t bcd, uint32_t lo, uint32_t hi, uint32_t& ou
     return out >= lo && out <= hi;
 }
 
+bool BcdCalendar::DecodeField(const Field& f, uint32_t bcd, uint32_t& out) {
+    return DecodeBcd(bcd & f.mask, f.lo, f.hi, out);
+}
+
+bool BcdCalendar::IsCount(const Field& f, uint32_t bcd) {
+    uint32_t value = 0;
+    return DecodeField(f, bcd, value);
+}
+
+bool BcdCalendar::Holds(const Field& f, uint32_t value) {
+    return value >= f.lo && value <= f.hi;
+}
+
 /* S3C2410A UM p.17-1: "Leap year generator"; Epson RX-8564 ETM12E-03 section
    13.1.4 (p. 15): months 1, 3, 5, 7, 8, 10 and 12 have 31 days, 4, 6, 9 and 11
    have 30, and February has 29 when the year counter is a multiple of 4. */

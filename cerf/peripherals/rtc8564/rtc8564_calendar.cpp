@@ -13,51 +13,39 @@ uint8_t Bcd(uint32_t value) { return static_cast<uint8_t>(BcdCalendar::ToBcd(val
 
 struct AlarmField {
     uint8_t                          reg;
-    uint8_t                          mask;
-    uint32_t                         first;
-    uint32_t                         last;
-    bool                             bcd;
+    BcdCalendar::Field               field;
     bool                             per_day;
     uint8_t Rtc8564Calendar::Time::* value;
 };
 
 constexpr AlarmField kAlarmFields[4] = {
-    {0x09u, 0x7Fu, 0u, 59u, true, false, &Rtc8564Calendar::Time::min},
-    {0x0Au, 0x3Fu, 0u, 23u, true, false, &Rtc8564Calendar::Time::hour},
-    {0x0Bu, 0x3Fu, 1u, 31u, true, true, &Rtc8564Calendar::Time::day},
-    {0x0Cu, 0x07u, 0u, 6u, false, true, &Rtc8564Calendar::Time::wday},
+    {kMinuteAlarm, Rtc8564Calendar::kMin, false, &Rtc8564Calendar::Time::min},
+    {kHourAlarm, Rtc8564Calendar::kHour, false, &Rtc8564Calendar::Time::hour},
+    {kDayAlarm, Rtc8564Calendar::kDay, true, &Rtc8564Calendar::Time::day},
+    {kWeekdayAlarm, Rtc8564Calendar::kWday, true, &Rtc8564Calendar::Time::wday},
 };
 
 bool Accepts(const File& regs, const AlarmField& f, uint32_t value) {
     const uint8_t reg = regs[f.reg];
     if ((reg & kAlarmDisable) != 0u) return true;
-    const uint32_t expect = f.bcd ? static_cast<uint32_t>(Bcd(value)) : value;
-    return static_cast<uint32_t>(reg & f.mask) == expect;
+    return (reg & f.field.mask) == BcdCalendar::ToBcd(value);
 }
 
 bool FieldCanMatch(const File& regs, const AlarmField& f) {
     const uint8_t reg = regs[f.reg];
-    if ((reg & kAlarmDisable) != 0u) return true;
-    const uint32_t field = reg & f.mask;
-    uint32_t       value = 0;
-    if (f.bcd) return BcdCalendar::DecodeBcd(field, f.first, f.last, value);
-    return field >= f.first && field <= f.last;
+    return (reg & kAlarmDisable) != 0u || BcdCalendar::IsCount(f.field, reg);
 }
 
 }
 
 bool Rtc8564Calendar::Parse(const Rtc8564Regs::File& regs, Time& out) {
-    uint32_t sec = 0, min = 0, hour = 0, day = 0, month = 0, year = 0;
-    if (!DecodeBcd(regs[kSeconds] & 0x7Fu, 0u, 59u, sec) ||
-        !DecodeBcd(regs[kMinutes] & 0x7Fu, 0u, 59u, min) ||
-        !DecodeBcd(regs[kHours] & 0x3Fu, 0u, 23u, hour) ||
-        !DecodeBcd(regs[kMonths] & 0x1Fu, 1u, 12u, month) ||
-        !DecodeBcd(regs[kYears], 0u, 99u, year) ||
-        !DecodeBcd(regs[kDays] & 0x3Fu, 1u, 31u, day) || day > DaysInMonth(month, year)) {
+    uint32_t sec = 0, min = 0, hour = 0, day = 0, wday = 0, month = 0, year = 0;
+    if (!DecodeField(kSec, regs[kSeconds], sec) || !DecodeField(kMin, regs[kMinutes], min) ||
+        !DecodeField(kHour, regs[kHours], hour) || !DecodeField(kWday, regs[kWeekdays], wday) ||
+        !DecodeField(kMonth, regs[kMonths], month) || !DecodeField(kYear, regs[kYears], year) ||
+        !DecodeField(kDay, regs[kDays], day) || day > DaysInMonth(month, year)) {
         return false;
     }
-    const unsigned wday = regs[kWeekdays] & 0x07u;
-    if (wday > 6u) return false;
     out.sec     = static_cast<uint8_t>(sec);
     out.min     = static_cast<uint8_t>(min);
     out.hour    = static_cast<uint8_t>(hour);
@@ -65,7 +53,7 @@ bool Rtc8564Calendar::Parse(const Rtc8564Regs::File& regs, Time& out) {
     out.wday    = static_cast<uint8_t>(wday);
     out.month   = static_cast<uint8_t>(month);
     out.year    = static_cast<uint8_t>(year);
-    out.century = (regs[kMonths] & 0x80u) != 0u;
+    out.century = (regs[kMonths] & kCentury) != 0u;
     return true;
 }
 
@@ -223,7 +211,7 @@ void Rtc8564Calendar::Materialize(Rtc8564Regs::File& regs) const {
     regs[kHours]    = Bcd(t_.hour);
     regs[kDays]     = Bcd(t_.day);
     regs[kWeekdays] = t_.wday;
-    regs[kMonths]   = static_cast<uint8_t>((t_.century ? 0x80u : 0u) | Bcd(t_.month));
+    regs[kMonths]   = static_cast<uint8_t>((t_.century ? kCentury : 0u) | Bcd(t_.month));
     regs[kYears]    = Bcd(t_.year);
 }
 

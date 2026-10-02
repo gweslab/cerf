@@ -6,11 +6,6 @@
 
 class S3C2410RtcCalendar : public BcdCalendar {
 public:
-    struct Field {
-        uint32_t mask;
-        uint32_t lo;
-        uint32_t hi;
-    };
     static constexpr Field kSec {0x7Fu, 0u, 59u};
     static constexpr Field kMin {0x7Fu, 0u, 59u};
     static constexpr Field kHour{0x3Fu, 0u, 23u};
@@ -19,9 +14,7 @@ public:
     static constexpr Field kYear{0xFFu, 0u, 99u};
     static constexpr Field kDay {0x07u, 1u, 7u};
 
-    static bool Holds(const Field& f, uint32_t value);
-    static bool IsCount(const Field& f, uint32_t bcd);
-    bool        Valid() const;
+    bool Valid() const;
 
     uint32_t sec  = 0;
     uint32_t min  = 0;

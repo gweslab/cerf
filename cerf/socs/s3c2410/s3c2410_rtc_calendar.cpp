@@ -1,14 +1,5 @@
 #include "s3c2410_rtc_calendar.h"
 
-bool S3C2410RtcCalendar::Holds(const Field& f, uint32_t value) {
-    return value >= f.lo && value <= f.hi;
-}
-
-bool S3C2410RtcCalendar::IsCount(const Field& f, uint32_t bcd) {
-    uint32_t value = 0;
-    return DecodeBcd(bcd & f.mask, f.lo, f.hi, value);
-}
-
 bool S3C2410RtcCalendar::Valid() const {
     return Holds(kSec, sec) && Holds(kMin, min) && Holds(kHour, hour) &&
            Holds(kMon, mon) && Holds(kYear, year) && Holds(kDay, day) &&

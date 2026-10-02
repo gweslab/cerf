@@ -22,13 +22,22 @@ constexpr uint8_t kControl2Fixed = 0xA0u;
 constexpr uint8_t kTimerEnable = 0x80u;
 constexpr uint8_t kTimerFrequencyMask = 0x03u;
 constexpr uint8_t kClkoutEnable = 0x80u;
+constexpr uint8_t kClkoutFrequencyMask = 0x03u;
 
 /* Epson RTC-8564 MQ322-04 sections 8.1 and 8.2.1-8.2.5 (pp. 5-7): the bits
    each register holds; ETM11J-07 section 13.1.3 item 4 (p. 14): any write to
    Seconds clears VL. */
+using Cal = Rtc8564Calendar;
+
+constexpr uint8_t Bits(uint32_t mask) { return static_cast<uint8_t>(mask); }
+
 constexpr uint8_t kStoredBits[16] = {
-    kStop, kControl2Writable, 0x7Fu, 0x7Fu, 0x3Fu, 0x3Fu, 0x07u, 0x9Fu,
-    0xFFu, 0xFFu, 0xBFu, 0xBFu, 0x87u, 0x83u, kTimerEnable | kTimerFrequencyMask, 0xFFu,
+    kStop, kControl2Writable, Bits(Cal::kSec.mask), Bits(Cal::kMin.mask), Bits(Cal::kHour.mask),
+    Bits(Cal::kDay.mask), Bits(Cal::kWday.mask), Bits(kCentury | Cal::kMonth.mask),
+    Bits(Cal::kYear.mask), Bits(kAlarmDisable | Cal::kMin.mask),
+    Bits(kAlarmDisable | Cal::kHour.mask), Bits(kAlarmDisable | Cal::kDay.mask),
+    Bits(kAlarmDisable | Cal::kWday.mask), kClkoutEnable | kClkoutFrequencyMask,
+    kTimerEnable | kTimerFrequencyMask, 0xFFu,
 };
 
 class Rtc8564 final : public Rtc8564Core {
@@ -49,8 +58,8 @@ public:
         SeedCalendar(now);
         const Rtc8564Wiring::Retained retained = emu_.Get<Rtc8564Wiring>().RetainedRegisters();
         WriteRegister(kControl2, retained.control2, now);
-        for (uint8_t i = 0; i < 4u; ++i) WriteRegister(static_cast<uint8_t>(0x09u + i), retained.alarm[i], now);
-        WriteRegister(0x0Du, retained.clkout, now);
+        for (uint8_t i = 0; i < 4u; ++i) WriteRegister(static_cast<uint8_t>(kMinuteAlarm + i), retained.alarm[i], now);
+        WriteRegister(kClkout, retained.clkout, now);
         WriteRegister(kTimer, retained.timer, now);
         WriteRegister(kTimerControl, retained.timer_control, now);
         calendar_.Materialize(registers_);
@@ -385,14 +394,14 @@ void Rtc8564::WriteRegister(uint8_t index, uint8_t value, uint64_t now) {
     switch (index) {
     case kControl1: WriteControl1(value, now); return;
     case kControl2: WriteControl2(value); return;
-    case 0x09:
-    case 0x0A:
-    case 0x0B:
-    case 0x0C:
+    case kMinuteAlarm:
+    case kHourAlarm:
+    case kDayAlarm:
+    case kWeekdayAlarm:
         registers_[index] = value & kStoredBits[index];
         if (!Stopped()) calendar_.EvaluateAlarm(registers_);
         return;
-    case 0x0D:
+    case kClkout:
         if (value & kClkoutEnable) {
             emu_.Get<Fatal>().Die("RTC8564: CLKOUT write 0x%02X sets FE; the CLKOUT pin is not "
                                   "modelled", value);

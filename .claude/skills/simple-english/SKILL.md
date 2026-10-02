@@ -1,326 +1,93 @@
 ---
 name: simple-english
-version: 1.0.0
 description: |
-  Write or rewrite technical text with the rules of ASD-STE100 Simplified
-  Technical English so it is clear, unambiguous, and free of AI slop. Use for
-  documentation, READMEs, runbooks, procedures, error messages, release notes,
-  incident reports, and API guides. Also use when the user says "STE",
-  "Simplified Technical English", "ASD-STE100", "de-slop", "make this
+  Write or rewrite text in plain, layman-readable English in the spirit of
+  ASD-STE100 Simplified Technical English: short sentences, active voice,
+  simple tenses, one word one meaning, condition before command, every
+  technical term defined at first use, no AI slop. Default mode is Plain.
+  Strict mode applies full STE vocabulary compliance when the user names
+  STE, ASD-STE100, or compliance. Use for documentation, READMEs, runbooks,
+  procedures, error messages, release notes, incident reports, API guides,
+  and explanations for readers outside the field. Also use when the user
+  says "STE", "Simplified Technical English", "ASD-STE100", "plain English",
+  "layman's terms", "explain it simply", "no jargon", "de-slop", "make this
   readable", "write for non-native readers", or asks for docs that translate
-  well. Enforces the standard's 53 rules: 20/25-word sentence limits, one word
-  one meaning, simple tenses, active voice, condition before command.
+  well. The same rules govern the reply: answer first, prose only.
 license: MIT
 compatibility: claude-code cursor codex gemini-cli opencode
 metadata:
+  version: "2.1.1"
   standard: ASD-STE100 Issue 9 (2025-01-15)
 ---
 
-# Simple English: Write Like an Aerospace Manual
+# Simple English
 
-Write technical text with the rules of ASD-STE100 Simplified Technical English. STE is the controlled language that aerospace and defense manufacturers use for maintenance documentation. The rules exist so that a tired reader who is not a native English speaker cannot misread an instruction. They remove the usual signs of AI-generated text as a side effect: long sentences, synonym rotation, hedges, filler, and decorative clauses.
+Write plain English that a smart reader outside your field understands on one read. The rules come from ASD-STE100, the controlled language that aerospace uses for maintenance manuals. Two registers exist: the document you write or rewrite, and the reply you type in chat. Each has its own short rule set below.
 
-Write for that tired reader. Each sentence must survive one read.
+## The Document
 
-## Your Task
+When asked to write or rewrite documentation, apply these rules to the prose:
 
-When asked to write or rewrite technical text:
+1. Classify each passage. Procedural text tells the reader what to do: imperative mood, 20 words per sentence, one instruction per sentence. Descriptive text explains: simple tenses, 25 words per sentence, one topic per paragraph, six sentences per paragraph at most.
+2. Never touch code, identifiers, commands, flags, file paths, quoted errors, product names, or facts. When the source gives no number or cause, keep the general statement.
+3. Condition before command, with a comma: "If the build fails, read the log."
+4. Use simple tenses and active voice. No present perfect ("has completed" → "completed"). No "-ing" verb after a comma (", making it easy" → new sentence). Name the actor: "You run the migration."
+5. Modals: can, will, must. Never should, would, may, might, could. A required "should" becomes "must". An optional one is deleted.
+6. Use complete grammar. No contractions, keep articles, keep "that". Write short sentences, not telegraph style.
+7. No semicolons and no em-dashes. Write two sentences, or name the relation.
+8. One word, one meaning, for the whole document. Use `make sure that` for check, verify, confirm, validate, ensure. Use `configuration` for config, settings, options. Break noun chains over three words with a preposition ("the timeout value for the connection pool").
+9. Give the reader each term and each fact before the step that needs it. Define a concept term at its first use, under ten words, one per sentence. Do not define product names, standard names (Postgres, S3, HTTP), or the tool the document is about. Also name the host, the flag, or the prior step that a command depends on. "Restart the service" becomes "Restart the `sync` service on the host that runs the job."
+10. State the fact, not its importance. Delete words that carry no fact: simply, seamlessly, robust, powerful, comprehensive, leverage, crucial, "in order to", "it is worth noting". No "not just X, it is Y". No decorative triplets. No "in conclusion".
+11. Use formatting only where it carries structure. No bold lead-ins, no bold as emphasis, no emoji, no heading over two sentences. A vertical list is for three or more parallel items or steps: colon on the lead-in, uppercase start, one instruction per item.
+12. Warnings: command or condition first, then the risk. "Do not run this against production. The command deletes rows."
 
-1. **Select the mode** (pragmatic or strict, below).
-2. **Classify each passage** as procedural or descriptive. Every other rule depends on this.
-3. **Fix your vocabulary before drafting.** Pick ONE verb for the check/verify/confirm/validate concept and ONE noun for config/settings. Use no other word for these concepts in the whole document.
-4. **Apply the rules** from the catalog below.
-5. **Run the self-check** before you deliver. This step is not optional.
-6. **Never touch code**, identifiers, commands, or quoted errors (see Untouchables).
+Use American spelling. `references/word-swaps.md` maps the overused words to plain ones. For an error message, a runbook, an incident report, release notes, a commit message, or UI copy, read `references/use-cases.md` first. It names the mode and the pattern for each.
 
-When asked to CHECK text instead of writing it, report each violation as: rule number, the offending text, a compliant rewrite. Cite only rule numbers that exist in this file. Do not cite rule numbers from memory: the numbering is unintuitive and models invent it (tested — an agent without this file cited "Rule 3.1: short sentences"; the real Rule 3.1 is about verb forms).
+Before (AI output):
 
-## Two Modes
+> **Connection timeouts.** If sqlpipe hangs or fails with `dial tcp: i/o timeout`, check that the host running sqlpipe can reach the Postgres port (usually 5432) — this is often a security group or firewall rule blocking the connection. If you're connecting to a managed database (RDS, Cloud SQL, etc.), confirm the instance allows connections from sqlpipe's IP.
 
-| Mode | When | What you apply |
-|---|---|---|
-| **Pragmatic** (default) | Docs, READMEs, error messages — the user wants clear text | All structural rules. Domain words stay ("idempotent", "webhook"). |
-| **Strict** | The user names STE, ASD-STE100, or compliance | Structural rules + full vocabulary discipline, and tell the user that full compliance needs the official dictionary (free at asd-ste100.org). |
+After (procedural, headed, numbered):
 
-## Step 1: Classify the Text
+> ## Connection timeouts
+>
+> sqlpipe stops with `dial tcp: i/o timeout` when it cannot connect to the Postgres port (5432 by default).
+>
+> 1. Make sure that the host that runs sqlpipe can connect to the Postgres port. A firewall or security group usually blocks it.
+> 2. If the database is managed (RDS, Cloud SQL), make sure that the instance accepts connections from the IP of sqlpipe.
 
-| | Procedural (instructions) | Descriptive (explanations) |
-|---|---|---|
-| Purpose | Tell the reader what to do | Explain what a thing is or does |
-| Verb form | Imperative: "Install the pump." | Simple present/past/future |
-| Sentence limit | **20 words** (Rule 5.1) | **25 words** (Rule 6.3) |
-| Unit rule | One instruction per sentence (5.2) | One topic per paragraph (6.5), max six sentences per paragraph (6.6) |
+## The Reply
 
-Do not mix the two in one passage. A "Getting started" section is procedural. An "Architecture" section is descriptive. A note inside a procedure is descriptive (25-word limit, no imperative).
+Every chat reply, in every mode, follows these rules:
 
-## THE RULE CATALOG
+1. Answer in prose. No headers, no bullet lists, no bold, no tables. A code block is legal when the reader must copy it.
+2. The first sentence gives the answer or the result. Do not restate the question.
+3. No em-dashes. Name the relation ("because", "but", "for example") or write two sentences.
+4. Define a concept term in a few words the first time you use it: "idempotent (safe to run twice)". Do not define product names.
+5. No contractions. No openers ("Certainly", "Great question") and no closers ("I hope this helps", "Let me know").
+6. Do not shorten quoted error text, security warnings, or confirmations before a destructive action.
 
-53 rules in 9 sections, paraphrased from ASD-STE100 Issue 9 with software examples. The official wording is in the free standard at asd-ste100.org.
-
-### Section 1 — Words (Rules 1.1-1.14)
-
-| Rule | Instruction |
-|---|---|
-| 1.1 | Use only approved words, technical nouns, or technical verbs. |
-| 1.2 | Use an approved word only as its listed part of speech. |
-| 1.3 | Use an approved word only with its approved meaning. |
-| 1.4 | Use only the approved forms of verbs and adjectives. |
-| 1.5 | You can use domain words as technical nouns ("webhook", "commit", "endpoint"). |
-| 1.6 | Use an unapproved word only when it is a technical noun or part of one. |
-| 1.7 | Do not use technical nouns as verbs. |
-| 1.8 | Use the technical nouns of your project or industry. |
-| 1.9 | When you pick a technical noun, pick a short and clear one. |
-| 1.10 | No regional, slang, or jargon words as technical nouns. |
-| 1.11 | One item, one name. Do not call it "config" here and "settings" there. |
-| 1.12 | You can use domain verbs as technical verbs ("deploy", "compile", "merge"). |
-| 1.13 | Do not use technical verbs as nouns. |
-| 1.14 | Use American English spelling. |
-
-In pragmatic mode, rules 1.5, 1.8, and 1.12 do the heavy lifting: your domain vocabulary is legal. The ones agents break are 1.7, 1.11, and 1.13.
-
-**Before:** You can webhook the event, then do a deploy.
-**After:** Send the event to the webhook. Then deploy the service.
-
-### Section 2 — Multi-word nouns (Rules 2.1-2.2)
-
-| Rule | Instruction |
-|---|---|
-| 2.1 | Write multi-word nouns of three words or fewer. |
-| 2.2 | When a technical noun needs more than three words, write it in full once, then give a short form or hyphenate the units. |
-
-Break long noun chains with prepositions (of, on, in, for):
-
-**Before:** the connection pool timeout configuration value
-**After:** the timeout value for the connection pool
-
-### Section 3 — Verbs (Rules 3.1-3.7)
-
-| Rule | Instruction |
-|---|---|
-| 3.1 | Use only the verb forms that the dictionary gives. |
-| 3.2 | Use only: infinitive, imperative, simple present, simple past, simple future, past participle as adjective. |
-| 3.3 | Use the past participle only as an adjective ("the cached response"). |
-| 3.4 | No auxiliary verbs for complex constructions. No present perfect, no "is to be installed". |
-| 3.5 | Use an "-ing" form only as a technical noun or inside one ("logging", "the mounting bracket") — never as a verb. |
-| 3.6 | Active voice. In descriptive text, passive is legal only when the agent is unknown. |
-| 3.7 | Describe an action with a verb, not a noun ("compress the file", not "perform compression of the file"). |
-
-**Approved modals: can, will, must. Banned: should, would, may, might, could.**
-The standard rejects "could" even for possibility: write "an explosion can occur", never "could occur". For "should": a requirement becomes "must"; a suggestion is stated as fact or deleted. This matters double for agent instructions — models read "should" as optional.
-
-**Before:** The migration has completed and the table is being rebuilt.
-**After:** The migration is complete. The database rebuilds the table.
-
-**Before:** The flag can be set in the config file, making restarts unnecessary.
-**After:** You can set the flag in the config file. Then a restart is not necessary.
-
-**Before:** The temperature must be adjusted.
-**After:** Adjust the temperature.
-
-### Section 4 — Sentences (Rules 4.1-4.5)
-
-| Rule | Instruction |
-|---|---|
-| 4.1 | Write short and clear sentences. |
-| 4.2 | Do not omit words or use contractions to shorten sentences. Keep articles, keep "that". |
-| 4.3 | Use a vertical list for complex text. |
-| 4.4 | Use connecting words between sentences on related topics ("Then", "As a result"). |
-| 4.5 | Put an article (the, a, an) or a demonstrative adjective (this, these) before nouns where applicable. |
-
-Rule 4.2 is the anti-terseness rule. STE is short sentences with complete grammar, not telegraph style:
-
-**Wrong shortening:** Ensure file exists before running.
-**STE:** Make sure that the file exists before you run the command.
-
-### Section 5 — Procedural writing (Rules 5.1-5.5)
-
-| Rule | Instruction |
-|---|---|
-| 5.1 | Maximum 20 words per sentence. Warnings and cautions included. |
-| 5.2 | One instruction per sentence, unless two actions happen at the same time. |
-| 5.3 | Write instructions in the imperative: "Run the migration." |
-| 5.4 | Put a required condition before the command, divided by a comma: "If the build fails, read the log." |
-| 5.5 | Notes give information, never instructions. Notes get the 25-word limit. |
-
-**Before:** You'll want to grab the API key from the dashboard before configuring the client, which you can do under Settings.
-**After:** Get the API key from the dashboard, under Settings. Then configure the client with this key.
-
-### Section 6 — Descriptive writing (Rules 6.1-6.6)
-
-| Rule | Instruction |
-|---|---|
-| 6.1 | Give information gradually: one new fact per sentence. |
-| 6.2 | Use key words and phrases to give the text a logical structure. |
-| 6.3 | Maximum 25 words per sentence. |
-| 6.4 | Group related information in paragraphs. |
-| 6.5 | One topic per paragraph. |
-| 6.6 | Maximum six sentences per paragraph. |
-
-No imperative in descriptive text. Descriptions explain; procedures instruct.
-
-### Section 7 — Safety instructions (Rules 7.1-7.3)
-
-| Rule | Instruction |
-|---|---|
-| 7.1 | Use a word that shows the risk level ("WARNING" = injury, "CAUTION" = damage). |
-| 7.2 | Start with a clear command or condition. |
-| 7.3 | Then give the risk or the possible result. |
-
-Never bury the instruction after the explanation. The pattern transfers directly to destructive CLI flags, irreversible migrations, and dangerous API options.
-
-**Before:** Note that data loss may occur in some circumstances if the destructive flag happens to be enabled when running against production.
-**After:** CAUTION: Do not use the `--force` flag against production. The flag deletes rows that do not match the source.
-
-### Section 8 — Punctuation and word count (Rules 8.1-8.7)
-
-| Rule | Instruction |
-|---|---|
-| 8.1 | All standard punctuation is legal except the semicolon. Write two sentences instead. |
-| 8.2 | Use hyphens to connect words that act as one unit. |
-| 8.3 | Parentheses are legal for references, item numbers, abbreviations, plural forms, explanations, alternatives. |
-| 8.4 | In a vertical list, the lead-in colon ends a sentence for word count. |
-| 8.5 | Text inside parentheses counts as one word. |
-| 8.6 | Count as one word each: numbers, numbers with units, abbreviations, alphanumeric identifiers, quoted text, titles, labels, proper nouns. |
-| 8.7 | A hyphenated word counts as one word. |
-
-Rule 8.6 matters for software text: `sqlpipe run --config sqlpipe.yaml` in backticks is quoted text and counts as one word. Long identifiers do not blow your sentence budget.
-
-### Section 9 — Writing practices (Rules 9.1-9.4, GR-1 to GR-8)
-
-| Rule | Instruction |
-|---|---|
-| 9.1 | When a word-for-word replacement does not work, restructure the sentence. |
-| 9.2 | Use each approved word correctly: approved meaning, approved part of speech. |
-| 9.3 | Do not build phrasal verbs ("go down" → "decrease", "set up" → "install" or "configure"). |
-| 9.4 | Keep one consistent style and terminology through the whole document. |
-
-General recommendations GR-1 to GR-8: keep the conjunction "that", be careful with "with", give pronouns clear referents, prefer "this + noun" over bare "this", avoid false friends, avoid Latin abbreviations, use inclusive language, and use the possessive apostrophe form only when you are sure it is correct (GR-8: if unsure, do not use it — non-native readers find it hard).
-
-GR-6 for software docs: "e.g." → "for example", "i.e." → "that is", and delete "etc." — name the items or write "and more".
-
-## VOCABULARY DISCIPLINE
-
-The official dictionary (~900 approved words, ~1,200 banned words with alternatives) is copyrighted by ASD and is not reproduced here. Its mechanics apply without it: **one word, one meaning, one part of speech.**
-
-Known part-of-speech rulings, useful as patterns:
-
-| Word | Ruling |
-|---|---|
-| test, check, work | Noun only. "Do a test", not "test the pump". "Check that X" becomes "make sure that X". |
-| oil | Noun only as used in STE examples. For the verb, the dictionary gives "lubricate". |
-| help | Verb only. For the noun, the dictionary gives "aid": "with the aid of". |
-| fall | "To move down by gravity" only, never "decrease". |
-| follow | "To come after" only, never "obey". Write "obey the instructions". |
-| above, below | Physical positions only. For limits write "more than", "less than". |
-
-### The modal ladder
-
-| You wrote | STE writes |
-|---|---|
-| should (requirement) | must |
-| should (recommendation) | Delete it, or state it as fact: "X is better because Y." |
-| may / might / could (possibility) | can |
-| may (permission) | can |
-| would (hypothetical) | Restructure: "If X occurs, Y occurs." |
-
-### Slop-to-simple substitutions
-
-This table is ours, not the ASD dictionary. It maps the words AI-generated docs overuse to plain replacements. If the word carries no fact, delete it instead of replacing it.
-
-| Slop | Write instead |
-|---|---|
-| leverage, utilize | use |
-| in order to | to |
-| prior to | before |
-| ensure | make sure that |
-| it is worth noting that | (delete) |
-| it's important to, crucially | (delete — state the fact) |
-| simply, just, easily, seamlessly, effortlessly | (delete) |
-| robust, powerful, comprehensive, performant | (delete, or give the measurable property) |
-| functionality | function, feature |
-| enables you to, allows you to | you can |
-| is designed to, aims to | (delete — say what it does) |
-| facilitate | help, make possible |
-| dive into, delve into | read, examine |
-| when it comes to | for |
-| in the event that | if |
-| due to the fact that | because |
-| as needed, as necessary | (state the condition) |
-| and/or | Pick one, or write "X, or Y, or both" |
-| e.g. / i.e. / etc. | for example / that is / (name the items) |
-| gracefully handles | (say what it does: "retries three times, then stops") |
-| out of the box | by default |
-| under the hood | internally |
-| blazingly fast, state-of-the-art | fast (give the number) / (delete) |
-| streamline | make simpler, make faster |
-| plethora, myriad | many |
-| addresses the issue, tackles | corrects the fault, removes the error |
-
-### Consistency pass
-
-Collapse these common rotations to one term each (Rules 1.11, 9.4):
-
-- check / verify / confirm / validate / ensure → pick one
-- config / configuration / settings / options → pick one
-- delete / remove / drop / destroy → one per meaning, kept consistent
-- error / issue / problem / failure → "error" for errors, "failure" for failed operations
-- run / execute / invoke / launch → pick one
-- show / display / render / present → pick one
-
-## Untouchables
-
-These are technical names (Rules 1.5, 8.6). Leave them exact, even when they break vocabulary rules:
-
-- Code blocks, inline code, identifiers, CLI commands, flags, file paths
-- Quoted error messages and log lines
-- Product names, API endpoint names, config keys
-- Numbers with units — each counts as one word in the sentence limit
-
-## Beyond Documentation
-
-Same rules, different targets. Full adaptations in `references/use-cases.md`:
-
-- **Error messages**: state what happened (simple past), the cause if known, then the fix as an imperative. No "Oops", no "Please ensure", no apology filler.
-- **Runbooks**: STE's home turf. Imperative steps, conditions first, warnings before the step.
-- **Incident reports**: simple past only. "We have identified an issue that may have impacted" becomes "Between 14:02 and 14:31 UTC, 12% of requests failed."
-- **Release notes**: breaking changes follow the warning pattern — command first, risk second.
-- **Agent instructions (prompts, AGENTS.md)**: a system prompt is a procedure for a reader that cannot ask questions. One instruction per sentence, no "should", condition first.
-- **Translation prep**: STE's original job. One meaning per word plus complete grammar removes most translation ambiguity.
+Before: The failure stems from control-plane leader election during pod churn — nothing to worry about!
+After: The pods restarted and the queue lost its leader for a short time. It recovered without help. You do not have to do anything.
 
 ## Self-Check Before You Deliver
 
-This step is not optional. Run these four checks on your draft:
+1. Reply: search for `—`, `**`, `#`, and a line that starts with `-`. Remove each one.
+2. Document: count the words in your three longest sentences. Over 20 or 25, split. Search for `'`, `has been`, `should`, `may`, `;`, `—`, `, making`, `**`, `check`, `verify`, `config`, and any heading that covers fewer than three sentences. Fix each hit. Read each step: does it name a host, a flag, or a prior step the reader must already have? If not, add it or point to it.
 
-1. Count words in your three longest sentences. Over the 20/25 limit → split them.
-2. Search your draft for: `'ll`, `'re`, `'s` (contraction), `has been`, `have been`, `should`, `-ing` verbs after a comma, semicolons.
-3. Search for every `if` and `when`. Each one stands at the START of its sentence, before the command. "Increase the timeout if the network is slow" → "If the network is slow, increase the timeout."
-4. Search for the verbs you did NOT pick in Your Task step 3 (the check/verify/confirm set). Replace every hit with your chosen verb.
+## Modes
 
-Fix what you find, then deliver. For a full audit, run `references/checklist.md`.
+Plain is the default and is all of the above. Strict applies when the user names STE, ASD-STE100, or compliance: read `references/strict-vocabulary.md` before you draft the document, and say once that no tool guarantees compliance. The reply stays Plain in every mode.
 
-## Full Example
-
-**Before (real unedited AI output):**
-
-> **Connection timeouts.** If sqlpipe hangs or fails with `dial tcp: i/o timeout`, check that the host running sqlpipe can reach the Postgres port (usually 5432) — this is often a security group or firewall rule blocking the connection. If you're connecting to a managed database (RDS, Cloud SQL, etc.), confirm the instance allows connections from sqlpipe's IP. You can also try increasing `source.connect_timeout_seconds` in your config, since a slow network path can trip the default timeout even when the connection eventually succeeds.
-
-**After (classified procedural, verb = "make sure", conditions first, one instruction per sentence):**
-
-> **Connection timeouts.** sqlpipe stops with `dial tcp: i/o timeout` when it cannot reach the Postgres port (5432 by default).
->
-> 1. Make sure that the host that runs sqlpipe can reach the Postgres port. A firewall or security group usually blocks it.
-> 2. If the database is managed (RDS, Cloud SQL), make sure that the instance accepts connections from the IP of sqlpipe.
-> 3. If the network is slow, increase `source.connect_timeout_seconds` in the configuration.
-
-What changed: 40-word sentences split under 20; "you're" expanded; "check/confirm" collapsed to "make sure that"; every condition moved before its command; "etc." removed; code and error strings untouched.
+When asked to CHECK text instead of writing it, first open `references/rule-catalog.md`. Then report each violation as: rule number quoted from that file, the offending text, a compliant rewrite. Never cite a rule number from memory. When the user asked for compliance, end with one sentence: no tool can guarantee ASD-STE100 compliance, and the standard is a free download at asd-ste100.org.
 
 ## Limits
 
-STE is for technical facts and instructions. Do not apply it to marketing copy, blog voice, or brand writing — it deletes persuasion by design. When a user asks for STE on marketing text, say so and offer it for the docs instead.
-
-This skill is an unofficial aid. It is not affiliated with or endorsed by ASD or STEMG, and no tool can guarantee STE compliance. ASD-STE100 is a registered trademark of ASD. The official standard is a free download at asd-ste100.org.
+These rules are for facts and instructions, not marketing copy or brand writing, because they delete persuasion. Say so, and offer them for the docs instead.
 
 ## References
 
-- `references/checklist.md` — full verification pass with searchable patterns, for check mode and final audits
-- `references/use-cases.md` — long-form adaptations: error messages, runbooks, incident reports, commits, UI copy, i18n
+- `references/rule-catalog.md`: the 53 rules of Issue 9 with software examples, for CHECK mode
+- `references/strict-vocabulary.md`: the dictionary discipline for Strict mode
+- `references/word-swaps.md`: a map from overused words to plain ones
+- `references/use-cases.md`: the mode and the pattern for error messages, runbooks, incident reports, release notes, commits, agent prompts, UI copy, and translation prep

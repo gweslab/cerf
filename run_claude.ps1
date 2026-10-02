@@ -53,6 +53,8 @@ while ($i -lt $args.Count) {
 Set-Location -LiteralPath $PSScriptRoot
 Clear-Host
 
+$env:CLAUDE_CODE_DISABLE_BG_SHELL_PRESSURE_REAP = '1'
+
 # First-run gate. Until the user has acknowledged what this launcher does, show
 # a one-time welcome + warnings and wait for Enter. The acknowledgement is
 # recorded by creating .claude_gate (gitignored, per-machine); once it exists

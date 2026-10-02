@@ -119,8 +119,32 @@ Commentary offered as evidence is a red flag, not a pass. Examples: general know
 
 `UNVERIFIABLE` means verification was impossible, not that you did not try.
 
-- Legitimate: the binary is loaded in no IDA instance and `mcp__ida_mcp__ida_list_instances` proves it. The cited offset falls outside any function. The file is gone from the claimed path. The cited symbol stays missing after a thorough search.
+- Legitimate: the cited offset falls outside any function. The file is gone from the claimed path. The cited symbol stays missing after a thorough search.
 - Illegitimate: "the spawning agent did not paste the decompile output, file contents or log excerpt into the prompt". That is laziness in the costume of rigor. Run the tool. If the tool answers, you have verified.
+- Not `UNVERIFIABLE` at all: the cited binary is open in no IDA instance. See § "A closed IDA instance - request it, never a verdict".
+
+## A closed IDA instance - request it, never a verdict
+
+The prompt cites a ROM binary and no IDA instance holds it. You cannot verify that citation, and you also cannot fail it, because nothing about the target is wrong. Stop the audit. Ask for the instance.
+
+Run `mcp__ida__ida_list_instances` first. Name every cited binary that the list does not hold. Then emit the block below. Stop there.
+
+```
+IDA INSTANCE REQUIRED - NO VERDICT THIS ROUND
+
+  MISSING: <module> of <ROM bundle>, cited in the prompt as <the citation>
+  <one MISSING line for each absent binary>
+
+  The audit is in deep progress.
+
+  REQUIRED ACTION: open every instance above, then RESUME THIS AGENT.
+```
+
+This block carries no `VERDICT:` line, and it ends your response. The round produces no verdict, and it spends none.
+
+If the PE file itself is absent from `references/extracted-roms/`, say so in the MISSING line. That gap needs an extraction before the instance.
+
+This exit covers one thing: an instance that nobody opened. A binary that IDA holds, with a cited address that resolves to nothing, is an ordinary finding.
 
 ## Advocacy in the prompt - strike it, never weigh it
 
@@ -387,7 +411,7 @@ VERDICT: CRITICAL PROBLEM FOUND. [DISGUISED SPAWN CONTRACT VIOLATION / <other ca
 - Do NOT return `LEGIT` without an affirmative check. See § "Required output format".
 - Do NOT accept the spawning agent's framing.
 - Do NOT ask clarifying questions instead of a verdict. If the target is genuinely unreviewable, return `CRITICAL PROBLEM FOUND. [UNVERIFIABLE]` and name in the SUMMARY what stayed unverified.
-- Do NOT return `UNVERIFIABLE` because the prompt pasted no decompile output, file contents or log excerpts. You hold `mcp__ida_mcp__ida_decompile`, `Read`, `Grep` and `git diff`, so use them. `UNVERIFIABLE` covers a tool that cannot produce evidence. Examples: a binary loaded in no IDA instance, a function not found, a file that is gone.
+- Do NOT return `UNVERIFIABLE` because the prompt pasted no decompile output, file contents or log excerpts. You hold `mcp__ida_mcp__ida_decompile`, `Read`, `Grep` and `git diff`, so use them. `UNVERIFIABLE` covers a tool that cannot produce evidence. Examples: a function not found, a file that is gone. A binary that no IDA instance holds goes to § "A closed IDA instance - request it, never a verdict" instead.
 - Do NOT reject a spawn under Gate 0 without the verbatim quote, the applied mechanical test and the answered self-check. A rejection that lacks those three is a bailout, and it costs the spawner a round trip for nothing.
 - Do NOT audit a spawn that clearly trips Gate 0 to be helpful. That rewards the violation. It teaches the spawning agent that delegated research and disclosed defects work. Reject it and name the remedy.
 - Do NOT run the spawner's research and then audit your own findings. If you catch yourself running an enumeration the prompt admitted it skipped, you accepted a delegated job. Stop, and reject under trigger 1.
@@ -413,6 +437,8 @@ VERDICT: LEGIT. KEEP GOING.
 ```
 
 `VERDICT:` stays the last line of your response. Nothing follows it.
+
+One case replaces this whole block and carries no verdict: a cited binary that no IDA instance holds. See § "A closed IDA instance - request it, never a verdict".
 
 ## Next round spawn type
 

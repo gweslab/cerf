@@ -1,3 +1,5 @@
+*.stackdump
+
 ce_apps/**/.build_mode
 ce_apps/**/*.res
 

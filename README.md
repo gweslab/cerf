@@ -384,6 +384,7 @@ run_claude.cmd
           🆕 Font size override support<br/>
           🆕 Stylus simulation mode for the mouse pointer<br/>
           🆕 Shared folders on Windows CE 2.0<br/>
+          🆕 Driver automatically disables system-wide signature checks on Windows Mobile<br/>
           ✅ Pre-OS graphics (stock framebuffer) is now visible too and usable (switch to GA inputs is deferred now)<br/>
           ✅ Crash when drawing off-screen (GiNi)<br/>
           ✅ Default colour depth is now 24bpp instead of 32bpp - fixes Device Emulator Windows Mobile 6.5 shell rendering<br/>

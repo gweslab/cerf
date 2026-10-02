@@ -47,6 +47,7 @@
       Font size override support
       Stylus simulation mode for the mouse pointer
       Shared folders on Windows CE 2.0
+      Driver automatically disables system-wide signature checks on Windows Mobile
     fixed: |
       Pre-OS graphics (stock framebuffer) is now visible too and usable (switch to GA inputs is deferred now)
       Crash when drawing off-screen (GiNi)

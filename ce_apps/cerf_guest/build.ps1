@@ -22,7 +22,7 @@ $sources = @("main.cpp","cerf_virt_base.cpp","cerf_regs_map.cpp","cerf_debug_log
              "cerf_power.cpp",
              "cerf_cursor.cpp",
              "cerf_getversionexw.cpp",
-             "cerf_registry_customizations.cpp",
+             "cerf_registry_customizations.cpp","cerf_allow_unsigned_apps.cpp",
              "cerf_ndis.cpp","cerf_ndis_slot.cpp","cerf_ndis_miniport.cpp",
              "cerf_ndis_install.cpp",
              "cerf_ndis_packet_rx.cpp","cerf_ndis_oids.cpp",

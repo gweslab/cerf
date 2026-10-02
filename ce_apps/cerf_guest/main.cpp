@@ -12,6 +12,7 @@
 #include "cerf/peripherals/cerf_virt/cerf_virt_addr_map.h"
 #include "cerf/peripherals/cerf_virt/cerf_virt_color_scheme_regs.h"
 #include "cerf/peripherals/cerf_virt/cerf_virt_fb_regs.h"
+#include "cerf_allow_unsigned_apps.h"
 #include "cerf_autorun.h"
 #include "cerf_dma_arena.h"
 #include "cerf_ddgpe.h"
@@ -218,6 +219,7 @@ extern "C" BOOL APIENTRY DrvEnableDriver(ULONG iEngineVersion,
     CERF_LOG_X("cerf_guest: DrvEnableDriver cj", cj);
     CERF_LOG_X("cerf_guest: DrvEnableDriver slots", cj / sizeof(void*));
     CerfReadFbRegs();
+    CerfAllowUnsignedApps();
     CerfApplyRegistryCustomizations();
 
     if (pded == NULL || pCallbacks == NULL || cj < 26 * sizeof(void*)) return FALSE;

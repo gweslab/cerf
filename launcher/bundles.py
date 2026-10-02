@@ -2,7 +2,9 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import re
+import stat
 import time
 import urllib.parse
 import urllib.request
@@ -151,6 +153,24 @@ def is_safe_bundle_name(name: str) -> bool:
     if name.split(".")[0].rstrip(" ").upper() in _WINDOWS_RESERVED_NAMES:
         return False
     return name not in {".", ".."}
+
+
+def bundle_dir_under(devices_dir: Path, name: str) -> Path:
+    if not is_safe_bundle_name(name):
+        raise BundleError(f"unsafe bundle name: {name!r}")
+    devices = Path(os.path.abspath(str(devices_dir)))
+    path = Path(os.path.abspath(str(devices / name)))
+    try:
+        path.relative_to(devices)
+    except ValueError as exc:
+        raise BundleError(f"refusing to operate outside {devices}") from exc
+    try:
+        attributes = os.lstat(str(path)).st_file_attributes
+    except FileNotFoundError:
+        return path
+    if attributes & stat.FILE_ATTRIBUTE_REPARSE_POINT:
+        raise BundleError(f"refusing to operate on a link: {path}")
+    return path
 
 
 def is_large_download(archive_size: Optional[int]) -> bool:

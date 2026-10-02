@@ -2,6 +2,7 @@
 cerf.exe, the app icon, the feature-icon assets, and the CERF version."""
 from __future__ import annotations
 
+import os
 import re
 import sys
 from pathlib import Path
@@ -10,11 +11,13 @@ from typing import List, Optional, Tuple
 
 LAUNCHER_DIR_NAME = "launcher"
 
+_HERE = Path(os.path.abspath(__file__)).parent
+
 
 def exe_dir() -> Path:
     if getattr(sys, "frozen", False):
-        return Path(sys.executable).resolve().parent
-    return Path(__file__).resolve().parent
+        return Path(os.path.abspath(sys.executable)).parent
+    return _HERE
 
 
 def install_root() -> Path:
@@ -45,7 +48,7 @@ def resolve_icon(name: str = "cerf.ico") -> Optional[Path]:
         return candidate
     repo_candidate = exe_dir() / ".." / "cerf" / "assets" / name
     if repo_candidate.is_file():
-        return repo_candidate.resolve()
+        return Path(os.path.abspath(str(repo_candidate)))
     return None
 
 
@@ -55,7 +58,7 @@ def resolve_icons_dir() -> Optional[Path]:
     if meipass:
         candidates.append(Path(meipass) / "assets" / "icons")
     candidates.append(exe_dir() / "assets" / "icons")
-    candidates.append(Path(__file__).resolve().parent / "assets" / "icons")
+    candidates.append(_HERE / "assets" / "icons")
     for path in candidates:
         if path.is_dir():
             return path
@@ -68,9 +71,8 @@ def resolve_asset(name: str) -> Optional[Path]:
     if meipass:
         candidates.append(Path(meipass) / "assets" / name)
     candidates.append(exe_dir() / "assets" / name)
-    here = Path(__file__).resolve().parent
-    candidates.append(here / "assets" / name)
-    candidates.append(here.parent / "cerf" / "assets" / name)
+    candidates.append(_HERE / "assets" / name)
+    candidates.append(_HERE.parent / "cerf" / "assets" / name)
     for path in candidates:
         if path.is_file():
             return path

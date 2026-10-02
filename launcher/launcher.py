@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 
+import os
 import sys
 import traceback
 from pathlib import Path
 from typing import List
 
-_THIS_DIR = Path(__file__).resolve().parent
+_THIS_DIR = Path(os.path.abspath(__file__)).parent
 if str(_THIS_DIR) not in sys.path:
     sys.path.insert(0, str(_THIS_DIR))
 

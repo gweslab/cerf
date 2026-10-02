@@ -268,16 +268,16 @@ Give every text-mode `open`, `read_text` and `write_text` an explicit `encoding`
 Without it, Python 3.7 uses the ANSI code page of the host. Python then reads and
 writes non-ASCII text differently on each locale.
 
+Make a path absolute with `os.path.abspath`, never with `Path.resolve()`. In
+Python 3.7, `resolve()` asks the volume for the final name of the path. Some
+volumes refuse that query, and the call then raises. A RAM disk that holds
+`%TEMP%` is one example. When code must refuse a junction before it deletes or
+extracts, it tests the reparse-point attribute directly. That attribute marks a
+junction or a symbolic link.
+
 Run the cached interpreter on every launcher file:
 
     references/python/cpython-3.7.9-x86/python.exe -m py_compile launcher/*.py
-
-`launcher/build.ps1` runs PyInstaller 5.13.2 with that interpreter in
-one-directory mode. The launcher directory includes the UCRT redistributable. The
-script copies that directory to `bundled/launcher/`, and it compiles the
-forwarder with MSVC into `bundled/launcher.exe`. The top-level `build.ps1` runs
-the script when any launcher file changes. `CopyBundledFiles` puts both into the
-build output.
 
 ## Rules
 

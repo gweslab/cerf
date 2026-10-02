@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import random
 import shutil
 import string
@@ -19,6 +20,7 @@ from bundles import (
     BundleError,
     PARALLEL_WORKERS,
     RemoteBundle,
+    bundle_dir_under,
     is_safe_bundle_name,
     load_analytics,
     load_merged_manifest,
@@ -324,11 +326,11 @@ class BundleManager:
         if not target.is_dir():
             return []
         from device_file_types import storage_files
-        root = target.resolve()
+        root = Path(os.path.abspath(str(target)))
         kept: List[str] = []
         for path in storage_files(target):
             try:
-                rel = path.resolve().relative_to(root)
+                rel = Path(os.path.abspath(str(path))).relative_to(root)
             except ValueError:
                 continue
             if rel.parts and (target / rel.parts[0]).exists():
@@ -487,12 +489,4 @@ class BundleManager:
             save_local_manifest(self.local_manifest_path, self.installed)
 
     def _bundle_dir(self, name: str) -> Path:
-        if not is_safe_bundle_name(name):
-            raise BundleError(f"unsafe bundle name: {name!r}")
-        path = (self.devices_dir / name).resolve()
-        devices = self.devices_dir.resolve()
-        try:
-            path.relative_to(devices)
-        except ValueError as exc:
-            raise BundleError(f"refusing to operate outside {devices}") from exc
-        return path
+        return bundle_dir_under(self.devices_dir, name)

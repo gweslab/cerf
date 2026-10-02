@@ -2,6 +2,7 @@
 package archives."""
 from __future__ import annotations
 
+import os
 import shutil
 import threading
 import urllib.request
@@ -68,13 +69,13 @@ def verify_download(path: Path, label: str,
 
 
 def safe_extract(zip_path: Path, destination: Path) -> None:
-    destination_resolved = destination.resolve()
+    destination_absolute = Path(os.path.abspath(str(destination)))
     with zipfile.ZipFile(zip_path) as archive:
         for member in archive.infolist():
-            member_path = destination / member.filename
-            member_resolved = member_path.resolve()
+            member_absolute = Path(os.path.abspath(
+                str(destination / member.filename)))
             try:
-                member_resolved.relative_to(destination_resolved)
+                member_absolute.relative_to(destination_absolute)
             except ValueError as exc:
                 raise BundleError(
                     f"unsafe path in archive: {member.filename}"

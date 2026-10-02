@@ -5,9 +5,13 @@ hide:
 
 # Download
 
-[:fontawesome-solid-download: Download Installer (Windows, x86)](https://cerf-bundles.dz3n.net/cerf_installer/cerf_installer.exe){ .md-button .md-button--primary }
+[:fontawesome-solid-download: Download stable release (Windows, x86)](https://github.com/gweslab/cerf/releases/latest){ .md-button .md-button--primary }
 
 <br>
+
+!!! tip "Running emulator"
+    
+    Once you have downloaded the archive, the only thing that's left is to unpack anywhere you like and run **`launcher.exe`**. This will open a virtual machine manager window, where you can create new devices, configure and run them.
 
 !!! warning "Supported platforms"
 
@@ -19,5 +23,5 @@ hide:
 
 If you would like to use unstable builds, built directly from the tree which are pending release - you can:
 
-- open the launcher, Settings dialog and pick the unstable release channel. You will upgrade to one instantly.
+- open Launcher, Settings dialog and pick the unstable release channel. You will upgrade to one instantly.
 - or you can download builds directly at [build list](https://github.com/gweslab/cerf/actions/workflows/build.yml?query=branch%3Amain+is%3Asuccess)

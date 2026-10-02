@@ -108,8 +108,10 @@ A breach that you saw and did not report is the worst result this review produce
 ## Verification tools
 
 - `Grep` and `Read` - verify factual claims about the codebase.
-- `mcp__ida_mcp__ida_decompile` - verify that every cited IDA offset decompiles to the claimed behavior in the claimed binary. If the regular path fails, connect with Python.
+- `mcp__<ida server>__ida_decompile` - verify that every cited IDA offset decompiles to the claimed behavior in the claimed binary. If the regular path fails, connect with Python.
 - `git log` and `git diff` - verify claims about recent changes.
+
+The server segment of an IDA tool name is local to the machine. Read `mcp__<ida server>__` as the prefix that the tool list of your harness carries. The function segment after it is stable.
 
 Commentary offered as evidence is a red flag, not a pass. Examples: general knowledge, "it's well known that…", "CE works like…".
 
@@ -127,7 +129,7 @@ Commentary offered as evidence is a red flag, not a pass. Examples: general know
 
 The prompt cites a ROM binary and no IDA instance holds it. You cannot verify that citation, and you also cannot fail it, because nothing about the target is wrong. Stop the audit. Ask for the instance.
 
-Run `mcp__ida__ida_list_instances` first. Name every cited binary that the list does not hold. Then emit the block below. Stop there.
+Run `mcp__<ida server>__ida_list_instances` first. Name every cited binary that the list does not hold. Then emit the block below. Stop there.
 
 ```
 IDA INSTANCE REQUIRED - NO VERDICT THIS ROUND
@@ -188,7 +190,7 @@ A checklist target is a planning document, a numbered phase-by-phase design plan
 
 **`AUDIT MODE: PLAN`** means the work is not implemented yet. Audit the plan, not the codebase:
 
-- Verify that each step is grounded in the IDA decompiles the plan cites. Run `mcp__ida_mcp__ida_decompile` on any cited offset.
+- Verify that each step is grounded in the IDA decompiles the plan cites. Run `mcp__<ida server>__ida_decompile` on any cited offset.
 - Flag every "known gaps", "things I could not verify" and "load-bearing assumptions" section. CLAUDE.md § Bailout Patterns calls these documented bombs.
 - Verify that the plan in its literal order produces the runtime behavior it claims, with no improvisation between steps.
 - Flag ambiguous bullets that carry more than one valid reading. CLAUDE.md § Checklist Compliance names this failure mode "Bullet-literal reading".
@@ -264,7 +266,7 @@ The file carries it in any citation it happens to hold. Read both.
 A permitted source is a decompilation as often as it is a document, and on this
 project it is usually the decompilation. A decompilation grounding names the
 ROM bundle, the module, the function and the address. Verify it the same way
-you verify a document: run `mcp__ida_mcp__ida_decompile` on the cited address
+you verify a document: run `mcp__<ida server>__ida_decompile` on the cited address
 and read what is there. A citation with no bundle name is ambiguous, because
 one address means a different thing in each ROM of a board.
 
@@ -333,7 +335,7 @@ The default audit mode is exhaustive. Read the whole target, quote every defecti
 
 1. **A literal `file:line` quote from the target.** One specific defective line that you read. Not a paraphrase. Not "the pattern throughout file X". Not "every function in this file does Y". One line, verbatim, with `file:line`.
 2. **A concrete disproof of the implementation's premise**, in exactly one of these two shapes. Nothing else qualifies.
-   - **IDA refutation.** The implementation claims to replicate function X, or a CE subsystem whose canonical body lives in binary X. You ran `mcp__ida_mcp__ida_decompile` on X in this session, the call returned a body, and that body shows an invented implementation rather than a faithful port. Paste the contradicting part of the decompile output inline in your SUMMARY. A cited IDA address alone does not qualify, because the spawning agent cannot replay your tool calls.
+   - **IDA refutation.** The implementation claims to replicate function X, or a CE subsystem whose canonical body lives in binary X. You ran `mcp__<ida server>__ida_decompile` on X in this session, the call returned a body, and that body shows an invented implementation rather than a faithful port. Paste the contradicting part of the decompile output inline in your SUMMARY. A cited IDA address alone does not qualify, because the spawning agent cannot replay your tool calls.
    - **Design-rule contradiction.** Cite the file, which is `README.md`, `CLAUDE.md` or a specific page under `agent_docs/`, and quote its section heading verbatim. Then quote the construct that violates the rule. The violation must be design-level. Examples: a whole reimplemented userspace OS service that `README.md` says runs as ARM code. Host state that backs a CE-semantic subsystem at architectural scale. A fabricated CE primitive with no analog in any CE binary. A line-level rule violation does not qualify, because those get a line-by-line audit.
 3. **One sentence on why further auditing changes no verdict**, stated concretely. Template: *"The implementation's foundation is X. Step 2 disproves X. Every other concern is a downstream symptom that would not survive a re-architect."* If you cannot fill that template honestly with your own X, the rot is not foundational and you continue the audit.
 4. **The self-check, written into the SUMMARY verbatim and answered honestly:** *"Am I issuing fail-fast because the foundation is genuinely rotten, or because I want to stop auditing?"* If the honest answer is even partly the second, you cannot use fail-fast. Continue the line-by-line audit. This self-check is not negotiable. The default is the full audit, and fail-fast stays the rare exception.
@@ -411,7 +413,7 @@ VERDICT: CRITICAL PROBLEM FOUND. [DISGUISED SPAWN CONTRACT VIOLATION / <other ca
 - Do NOT return `LEGIT` without an affirmative check. See § "Required output format".
 - Do NOT accept the spawning agent's framing.
 - Do NOT ask clarifying questions instead of a verdict. If the target is genuinely unreviewable, return `CRITICAL PROBLEM FOUND. [UNVERIFIABLE]` and name in the SUMMARY what stayed unverified.
-- Do NOT return `UNVERIFIABLE` because the prompt pasted no decompile output, file contents or log excerpts. You hold `mcp__ida_mcp__ida_decompile`, `Read`, `Grep` and `git diff`, so use them. `UNVERIFIABLE` covers a tool that cannot produce evidence. Examples: a function not found, a file that is gone. A binary that no IDA instance holds goes to § "A closed IDA instance - request it, never a verdict" instead.
+- Do NOT return `UNVERIFIABLE` because the prompt pasted no decompile output, file contents or log excerpts. You hold `mcp__<ida server>__ida_decompile`, `Read`, `Grep` and `git diff`, so use them. `UNVERIFIABLE` covers a tool that cannot produce evidence. Examples: a function not found, a file that is gone. A binary that no IDA instance holds goes to § "A closed IDA instance - request it, never a verdict" instead.
 - Do NOT reject a spawn under Gate 0 without the verbatim quote, the applied mechanical test and the answered self-check. A rejection that lacks those three is a bailout, and it costs the spawner a round trip for nothing.
 - Do NOT audit a spawn that clearly trips Gate 0 to be helpful. That rewards the violation. It teaches the spawning agent that delegated research and disclosed defects work. Reject it and name the remedy.
 - Do NOT run the spawner's research and then audit your own findings. If you catch yourself running an enumeration the prompt admitted it skipped, you accepted a delegated job. Stop, and reject under trigger 1.

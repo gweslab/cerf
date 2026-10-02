@@ -77,3 +77,9 @@ Skill(verify) wont let agent smuggle guesses and rule violations into the tree. 
 That also aligns with the AI-preferred model. AI can build an enormous system accross many session, but can't in one prompt. Everything AI builds here is a simple, dumb fatal <-> implement case, each is a separate chunk. Prompt "AI, implement enormous subsystem now" would give you broken subsystem where AI replaces implementations with broken stubs. Fatal <-> implement loop gives AI an ability to split chunk clearly: from fatal to implementation and repeat with static verification. That's a resolution to all AI problems at once and also is an incredible verification pattern.
 
 All fatals are usually up to shell boot, once there is no fatal the investigation starts. It's either about "why no fatal and no shell" or "why touch/key interactions give no shell". The end result is having an interactive basic device, with everything rendering, and the most important interaction devices being implemented. 
+
+## A background task under `/goal`
+
+Claude Code can hold back the completion notice of a background task while a `/goal` stop hook is active. The task ends, but the stop hook reaches the agent first. The notice arrives only after the next tool call.
+
+If the stop hook fires while a background task that you started runs, the task has probably ended. Make one tool call that reads the result of the task, for example the tail of the build log or the built file. The held notice then arrives. Then continue the work, and do not end the turn on the hook. This one call is not polling, because it reads the task once, after the task has probably ended.

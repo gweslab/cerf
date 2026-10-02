@@ -4,7 +4,6 @@
 #include "../core/log.h"
 #include "boot_screen.h"
 #include "frame_renderer.h"
-#include "host_canvas.h"
 #include "host_window.h"
 #include "hw_screen.h"
 
@@ -19,8 +18,6 @@ void GuestPowerNotifier::Banner(const char* line) {
 
 void GuestPowerNotifier::NotifyPowerDown() {
     Banner("!! CERF: CPU Sleep !!");
-    emu_.Get<HostWindow>().RunOnUiThread([this] { emu_.Get<HostCanvas>().RememberTabForResume(); });
-    emu_.Get<HostWindow>().ShowHwScreenTab(false);
 }
 
 void GuestPowerNotifier::NotifyReboot() {
@@ -33,7 +30,6 @@ void GuestPowerNotifier::NotifyReboot() {
 void GuestPowerNotifier::NotifyResume(ResumeSource src) {
     Banner(src == ResumeSource::Hardware ? "!! CERF: CPU Resume by hardware !!"
                                          : "!! CERF: CPU Resume by user !!");
-    emu_.Get<HostWindow>().RunOnUiThread([this] { emu_.Get<HostCanvas>().RestoreTabForResume(); });
 }
 
 void GuestPowerNotifier::NotifyHardReset() {

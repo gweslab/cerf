@@ -137,8 +137,9 @@ void HostMenu::OnInitMenuPopup(HMENU popup) {
         AppendMenuW(actions, MF_STRING, kIdLoadState, L"Load state...");
         AppendMenuW(actions, MF_SEPARATOR, 0, nullptr);
         auto& host_key = emu_.Get<HostKeyBinding>();
-        AppendMenuW(actions, MF_STRING, kIdPause,
-                    ((emu_.Get<EmulationPause>().IsPaused()
+        auto& pause = emu_.Get<EmulationPause>();
+        AppendMenuW(actions, MF_STRING | (pause.UserCanToggle() ? 0u : MF_GRAYED), kIdPause,
+                    ((pause.IsUserPaused()
                           ? std::wstring(L"Resume\t") : std::wstring(L"Pause\t")) +
                      host_key.LabelWith(L"P")).c_str());
         AppendMenuW(actions, MF_STRING, kIdCtrlAltDel,

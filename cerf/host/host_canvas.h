@@ -46,9 +46,6 @@ public:
        first frame, so a guest reboot returns to Framebuffer when video resumes. */
     void RearmFramebufferAutoSwitch();
 
-    void RememberTabForResume();
-    void RestoreTabForResume();
-
     bool Antialias() const     { return canvas_.Antialias(); }
     void SetAntialias(bool on) { canvas_.SetAntialias(on); }
 
@@ -74,14 +71,12 @@ public:
     bool HandleInput(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp,
                      LRESULT& out) override;
     bool ShouldDesaturatePresent() override;
+    void RenderOverlay(HDC dc, int w, int h) override;
 
 private:
     Tab  tab_  = Tab::Boot;   /* set from DeviceConfig.start_tab in CreateOn */
     bool user_picked_view_ = false;
     bool latched_once_     = false;
-
-    Tab  resume_tab_       = Tab::Boot;
-    bool have_resume_tab_  = false;
 
     PresenterCanvas canvas_{nullptr, this};
 };

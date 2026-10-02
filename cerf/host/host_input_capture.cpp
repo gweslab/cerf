@@ -7,7 +7,6 @@
 #include "emulation_pause.h"
 #include "host_canvas.h"
 #include "host_key_binding.h"
-#include "host_key_prompt.h"
 #include "host_window.h"
 #include "keyboard_router.h"
 
@@ -101,15 +100,6 @@ bool HostInputCapture::OnHookKey(WPARAM wParam, const KBDLLHOOKSTRUCT* k) {
 
     const bool  key_up = (wParam == WM_KEYUP || wParam == WM_SYSKEYUP);
     const DWORD vk      = k->vkCode;
-
-    /* A HwScreen key prompt (boot prompt, restore-failure hold) owns the
-       keyboard while it is showing. */
-    if (!key_up) {
-        if (auto* kp = emu_.TryGet<HostKeyPrompt>(); kp && kp->Armed()) {
-            kp->OnKey(vk);
-            return true;
-        }
-    }
 
     auto& host_key = emu_.Get<HostKeyBinding>();
     const int member = host_key.IndexOf(vk);

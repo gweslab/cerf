@@ -24,6 +24,7 @@ public:
     void Attach(std::unique_ptr<UsbDevice> device);
     void Detach();
     void SetRestoreFactory(Factory factory) { factory_ = std::move(factory); }
+    void SetRequiresDevice() { requires_device_ = true; }
 
     bool       IsConnected() const { return device_ != nullptr; }
     UsbDevice* Device() const { return device_.get(); }
@@ -37,4 +38,5 @@ private:
     int                       port_index_;
     std::unique_ptr<UsbDevice> device_;
     Factory                   factory_;
+    bool                      requires_device_ = false;
 };

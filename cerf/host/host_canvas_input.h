@@ -5,6 +5,8 @@
 #define NOMINMAX
 #include <windows.h>
 
+#include <cstdint>
+
 class HostCanvasInput : public Service {
 public:
     using Service::Service;
@@ -19,6 +21,7 @@ public:
 
 private:
     bool RoutePointerInput(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp);
+    bool RouteNotificationInput(HWND hwnd, UINT msg, LPARAM lp, LRESULT& out);
 
     /* Warp the cursor back to centre each move so motion reads as relative
        deltas (RelativeMouseInput); without the warp it drifts to an edge and
@@ -30,4 +33,5 @@ private:
     bool pen_down_            = false;
     bool mouse_locked_active_ = false;
     bool lock_hint_shown_     = false;
+    uint32_t notification_click_mask_ = 0;
 };

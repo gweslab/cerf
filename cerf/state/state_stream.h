@@ -59,6 +59,7 @@ public:
     StateWriter& operator=(const StateWriter&) = delete;
 
     bool Ok() const { return ok_; }
+    const std::string& Error() const { return error_; }
 
     template <typename T>
     void Write(const char* name, const T& v) {
@@ -90,12 +91,14 @@ private:
     void WriteTag(uint8_t kind, const char* name, uint64_t size);
     void PatchAt(uint64_t offset, const void* src, size_t n);
     void CloseHandle_();
+    void Fail(const char* what, DWORD gle);
 
     std::wstring          final_path_;
     std::wstring          temp_path_;
     HANDLE                file_          = INVALID_HANDLE_VALUE;
     uint64_t              bytes_written_ = 0;
     std::vector<uint64_t> frames_;
+    std::string           error_;
     bool                  ok_            = false;
     bool                  committed_     = false;
 };
@@ -109,6 +112,7 @@ public:
     StateReader& operator=(const StateReader&) = delete;
 
     bool Ok() const { return ok_; }
+    const std::string& Error() const { return error_; }
 
     template <typename T>
     void Read(const char* name, T& v) {
@@ -155,6 +159,7 @@ private:
     std::vector<Frame> frames_;
     uint32_t           fields_     = 0;
     const char*        field_name_ = "";
+    std::string        error_;
     bool               ok_         = false;
 };
 

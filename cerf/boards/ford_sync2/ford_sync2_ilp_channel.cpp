@@ -6,9 +6,6 @@
 #include "../../core/byte_order.h"
 #include "../../core/cerf_emulator.h"
 #include "../../core/log.h"
-#include "../../host/emulation_pause.h"
-#include "../../jit/jit_runner.h"
-#include "../../state/emulation_freeze.h"
 #include "../../state/state_stream.h"
 #include <algorithm>
 #include <utility>
@@ -187,19 +184,6 @@ void FordSync2IlpChannel::OnWatchdogPet() {
     for (const auto& device : devices_)
         if (device.watchdog) device.watchdog(watchdog_pets_);
     PublishPending(true);
-}
-
-void FordSync2IlpChannel::ApplyHostChange(const std::function<void()>& change) {
-    auto& runner = emu_.Get<JitRunner>();
-    const bool paused = emu_.Get<EmulationPause>().IsPaused();
-    runner.Pause();
-    {
-        auto freeze = emu_.Get<EmulationFreeze>().WorkerSection();
-        change();
-        Refresh();
-        PublishPending();
-    }
-    if (!paused) runner.Resume();
 }
 
 FordSync2IlpChannel::Counters FordSync2IlpChannel::ReadCounters() const {

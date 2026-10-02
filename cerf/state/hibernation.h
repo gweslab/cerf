@@ -31,13 +31,9 @@ public:
     HANDLE DoneEvent() const { return done_event_; }
 
     bool Save(const std::wstring& path);
-    bool Restore(const std::wstring& path, bool ram_only = false,
-                 bool cold_boot_on_failure = false);
+    bool Restore(const std::wstring& path, bool ram_only = false);
 
-    /* Runs the op on a worker. on_done (if set) fires on that worker thread
-       at completion - UI work inside it must marshal to the UI thread.
-       Serialized: a new call joins the previous worker first. */
-    void SaveAsync(const std::wstring& path, std::function<void()> on_done = {});
+    void SaveAsync(const std::wstring& path, std::function<void(bool)> on_done = {});
     void RestoreAsync(const std::wstring& path, bool ram_only = false);
 
     void OnShutdown() override;
@@ -45,17 +41,17 @@ public:
 private:
     std::wstring     DeviceDirFile(const wchar_t* name) const;
     StateImageHeader LiveHeader() const;
-    bool             WriteImage(const std::wstring& path);
+    bool             WriteImage(const std::wstring& path, std::string& error);
     void             SaveSection(StateWriter& w, StateSection section);
     void             RestoreSection(StateReader& r, StateSection section);
     void             ReadHeader(StateReader& r);
     void             ApplyImage(StateReader& r, bool ram_only);
+    bool             ApplyStateFile(StateReader& r, bool ram_only, std::string& reason);
     void             RollBack(const std::wstring& rollback_path);
     void             RestorePeripherals(StateReader& r);
     void             RestorePresentation(StateReader& r);
     uint32_t         PeripheralLayoutSig() const;
     void     Progress(const char* fmt, ...);
-    void     AwaitFailureAck(bool cold_boot);
     void     JoinWorker();
 
     std::thread worker_;

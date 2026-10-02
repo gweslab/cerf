@@ -10,6 +10,24 @@
 
 REGISTER_SERVICE(HostGdiPlus);
 
+namespace {
+
+void AddRoundRect(Gdiplus::GraphicsPath& path, Gdiplus::REAL x, Gdiplus::REAL y,
+                  Gdiplus::REAL w, Gdiplus::REAL h, Gdiplus::REAL radius) {
+    if (radius <= 0.0f) {
+        path.AddRectangle(Gdiplus::RectF(x, y, w, h));
+        return;
+    }
+    const Gdiplus::REAL d = radius * 2.0f;
+    path.AddArc(x,         y,         d, d, 180.0f, 90.0f);
+    path.AddArc(x + w - d, y,         d, d, 270.0f, 90.0f);
+    path.AddArc(x + w - d, y + h - d, d, d,   0.0f, 90.0f);
+    path.AddArc(x,         y + h - d, d, d,  90.0f, 90.0f);
+    path.CloseFigure();
+}
+
+}
+
 void HostGdiPlus::OnReady() {
     Gdiplus::GdiplusStartupInput in;
     Gdiplus::GdiplusStartup(&gdiplus_token_, &in, nullptr);
@@ -57,6 +75,42 @@ void HostGdiPlus::FillPolygonAA(HDC dc, const POINT* pts, int count,
     Gdiplus::Pen pen(
         Gdiplus::Color(GetRValue(rim), GetGValue(rim), GetBValue(rim)), 1.0f);
     g.DrawPolygon(&pen, p.data(), count);
+}
+
+void HostGdiPlus::FillRoundRectAA(HDC dc, const RECT& r, int radius,
+                                  COLORREF fill, COLORREF rim) {
+    Gdiplus::Graphics g(dc);
+    g.SetSmoothingMode(Gdiplus::SmoothingModeAntiAlias);
+    g.SetPixelOffsetMode(Gdiplus::PixelOffsetModeHalf);
+
+    Gdiplus::GraphicsPath path;
+    AddRoundRect(path, (Gdiplus::REAL)r.left + 0.5f, (Gdiplus::REAL)r.top + 0.5f,
+                 (Gdiplus::REAL)(r.right - r.left) - 1.0f,
+                 (Gdiplus::REAL)(r.bottom - r.top) - 1.0f, (Gdiplus::REAL)radius);
+
+    Gdiplus::SolidBrush brush(
+        Gdiplus::Color(GetRValue(fill), GetGValue(fill), GetBValue(fill)));
+    g.FillPath(&brush, &path);
+
+    Gdiplus::Pen pen(
+        Gdiplus::Color(GetRValue(rim), GetGValue(rim), GetBValue(rim)), 1.0f);
+    g.DrawPath(&pen, &path);
+}
+
+void HostGdiPlus::FillRoundRectAlphaAA(HDC dc, const RECT& r, int radius,
+                                       COLORREF fill, BYTE alpha) {
+    Gdiplus::Graphics g(dc);
+    g.SetSmoothingMode(Gdiplus::SmoothingModeAntiAlias);
+    g.SetPixelOffsetMode(Gdiplus::PixelOffsetModeHalf);
+
+    Gdiplus::GraphicsPath path;
+    AddRoundRect(path, (Gdiplus::REAL)r.left, (Gdiplus::REAL)r.top,
+                 (Gdiplus::REAL)(r.right - r.left), (Gdiplus::REAL)(r.bottom - r.top),
+                 (Gdiplus::REAL)radius);
+
+    Gdiplus::SolidBrush brush(
+        Gdiplus::Color(alpha, GetRValue(fill), GetGValue(fill), GetBValue(fill)));
+    g.FillPath(&brush, &path);
 }
 
 Gdiplus::Bitmap* HostGdiPlus::DecodeResourcePng(const wchar_t* name) {

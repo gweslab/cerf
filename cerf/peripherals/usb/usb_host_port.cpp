@@ -22,6 +22,8 @@ void UsbHostPort::SaveState(StateWriter& w) {
 
 void UsbHostPort::RestoreState(StateReader& r) {
     const uint32_t kind = r.EnterFrame();
+    UsbState::Require(r, kind != 0 || !requires_device_,
+                      "the image has no device on a port that is always connected");
     device_.reset();
     std::unique_ptr<UsbDevice> restored;
     if (kind) {

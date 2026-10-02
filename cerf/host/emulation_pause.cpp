@@ -4,23 +4,58 @@
 
 #include "../core/cerf_emulator.h"
 #include "../jit/jit_runner.h"
+#include "notification_stack.h"
 
 #include <windows.h>
 
 REGISTER_SERVICE(EmulationPause);
 
-void EmulationPause::Toggle() { SetPaused(!IsPaused()); }
+bool EmulationPause::UserCanToggle() const {
+    return !state_operation_.load(std::memory_order_acquire) &&
+           emu_.Get<JitRunner>().Started();
+}
 
-void EmulationPause::SetPaused(bool paused) {
-    if (paused == paused_.load(std::memory_order_acquire)) return;
+void EmulationPause::Toggle() {
+    std::lock_guard<std::mutex> lk(mtx_);
+    if (!UserCanToggle()) return;
+    const bool user = !user_.load(std::memory_order_acquire);
+    Apply(user, false);
+    ShowUserCard(user);
+}
+
+void EmulationPause::BeginStateOperation() {
+    std::lock_guard<std::mutex> lk(mtx_);
+    Apply(user_.load(std::memory_order_acquire), true);
+}
+
+void EmulationPause::EndStateOperation(bool release_user_pause) {
+    std::lock_guard<std::mutex> lk(mtx_);
+    const bool was_user = user_.load(std::memory_order_acquire);
+    const bool user     = was_user && !release_user_pause;
+    Apply(user, false);
+    if (was_user && !user) ShowUserCard(false);
+}
+
+void EmulationPause::Apply(bool user, bool state_operation) {
+    const bool was = IsPaused();
+    const bool now = user || state_operation;
+    if (now && !was) pause_tick_ms_.store(GetTickCount64(), std::memory_order_release);
+    user_.store(user, std::memory_order_release);
+    state_operation_.store(state_operation, std::memory_order_release);
+    if (now == was) return;
     auto& runner = emu_.Get<JitRunner>();
-    if (paused) {
-        pause_tick_ms_.store(GetTickCount64(), std::memory_order_release);
-        runner.Pause();
+    if (now) runner.Pause();
+    else     runner.Resume();
+}
+
+void EmulationPause::ShowUserCard(bool shown) {
+    auto& stack = emu_.Get<NotificationStack>();
+    if (shown) {
+        stack.Show(NotificationId::EmulatorPaused, NotificationKind::Warning,
+                   L"The emulator is paused\nResume it in Actions menu");
     } else {
-        runner.Resume();
+        stack.Close(NotificationId::EmulatorPaused);
     }
-    paused_.store(paused, std::memory_order_release);
 }
 
 uint64_t EmulationPause::AnimationTickMs() const {

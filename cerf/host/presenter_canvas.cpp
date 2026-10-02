@@ -10,13 +10,20 @@ namespace {
 constexpr wchar_t kCanvasClass[] = L"CerfPresenterCanvas";
 constexpr UINT    kPresentMsg    = WM_APP + 1;
 
-void DesaturatePresent(uint32_t* px, int count) {
+constexpr uint32_t kPausedColorQ10 = 416;
+constexpr uint32_t kPausedLumaQ10  = 250;
+
+void DesaturateAndDim(uint32_t* px, int count) {
     for (int i = 0; i < count; ++i) {
         const uint32_t p = px[i];
-        const uint32_t y = (((p >> 16) & 0xFFu) * 77u +
-                            ((p >> 8)  & 0xFFu) * 150u +
-                            ( p        & 0xFFu) * 29u) >> 8;  /* Rec.601 luma */
-        px[i] = (p & 0xFF000000u) | (y << 16) | (y << 8) | y;
+        const uint32_t r = (p >> 16) & 0xFFu;
+        const uint32_t g = (p >> 8)  & 0xFFu;
+        const uint32_t b =  p        & 0xFFu;
+        const uint32_t y = ((r * 77u + g * 150u + b * 29u) >> 8) * kPausedLumaQ10;
+        px[i] = (p & 0xFF000000u) |
+                (((r * kPausedColorQ10 + y) >> 10) << 16) |
+                (((g * kPausedColorQ10 + y) >> 10) << 8) |
+                 ((b * kPausedColorQ10 + y) >> 10);
     }
 }
 }  /* namespace */
@@ -121,7 +128,8 @@ void PresenterCanvas::TickAndPresent() {
     if (!alt) presenter_.ComposeInto(present_dc_, present_bits_);
 
     if (host_ && host_->ShouldDesaturatePresent())
-        DesaturatePresent(present_bits_, canvas_w_ * canvas_h_);
+        DesaturateAndDim(present_bits_, canvas_w_ * canvas_h_);
+    if (host_) host_->RenderOverlay(present_dc_, canvas_w_, canvas_h_);
 }
 
 LRESULT CALLBACK PresenterCanvas::WndProcStatic(HWND hwnd, UINT msg,

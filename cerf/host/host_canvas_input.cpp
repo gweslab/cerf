@@ -10,6 +10,8 @@
 #include "host_input_capture.h"
 #include "host_key_binding.h"
 #include "keyboard_router.h"
+#include "notification_overlay.h"
+#include "notification_stack.h"
 #include "pointer_input.h"
 #include "pointer_router.h"
 #include "pointer_source.h"
@@ -130,6 +132,44 @@ bool HostCanvasInput::RouteCapturedMouse(HWND hwnd, UINT msg, WPARAM wp,
     return true;
 }
 
+bool HostCanvasInput::RouteNotificationInput(HWND hwnd, UINT msg, LPARAM lp,
+                                             LRESULT& out) {
+    uint32_t button = 0;
+    switch (msg) {
+        case WM_LBUTTONDOWN: case WM_LBUTTONUP: button = MK_LBUTTON; break;
+        case WM_RBUTTONDOWN: case WM_RBUTTONUP: button = MK_RBUTTON; break;
+        case WM_MBUTTONDOWN: case WM_MBUTTONUP: button = MK_MBUTTON; break;
+        case WM_SETCURSOR:                                            break;
+        default: return false;
+    }
+    const bool up = msg == WM_LBUTTONUP || msg == WM_RBUTTONUP || msg == WM_MBUTTONUP;
+    if (up) {
+        if (!(notification_click_mask_ & button)) return false;
+        notification_click_mask_ &= ~button;
+        return true;
+    }
+
+    POINT p;
+    if (msg == WM_SETCURSOR) {
+        if (LOWORD(lp) != HTCLIENT) return false;
+        GetCursorPos(&p);
+        ScreenToClient(hwnd, &p);
+    } else {
+        p = { (int)(short)LOWORD(lp), (int)(short)HIWORD(lp) };
+    }
+    uint32_t id = 0;
+    if (!emu_.Get<NotificationOverlay>().HitTest(p.x, p.y, id)) return false;
+
+    if (msg == WM_SETCURSOR) {
+        SetCursor(LoadCursorW(nullptr, IDC_HAND));
+        out = TRUE;
+        return true;
+    }
+    notification_click_mask_ |= button;
+    if (msg == WM_LBUTTONDOWN) emu_.Get<NotificationStack>().Dismiss(id);
+    return true;
+}
+
 bool HostCanvasInput::Handle(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp, LRESULT& out) {
     auto& hc = emu_.Get<HostCanvas>();
     out = 0;
@@ -137,6 +177,16 @@ bool HostCanvasInput::Handle(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp, LRESULT&
     if (msg == WM_TIMER && emu_.Get<StylusAltTap>().OnTimer(wp)) return true;
 
     const bool framebuffer = hc.CurrentTab() == HostCanvas::Tab::Framebuffer;
+
+    PointerKind kind = PointerKind::Absolute;
+    if (auto* a = emu_.Get<PointerRouter>().Active()) kind = a->Kind();
+    const bool relative_active = kind == PointerKind::Relative;
+    const bool stylus_active   = kind == PointerKind::Stylus;
+
+    auto* cap = emu_.TryGet<HostInputCapture>();
+    const bool locked = relative_active && cap && cap->IsCaptured() && framebuffer;
+
+    if (!locked && RouteNotificationInput(hwnd, msg, lp, out)) return true;
 
     if (hc.CurrentTab() == HostCanvas::Tab::Boot) {
         auto& boot = emu_.Get<BootScreen>();
@@ -156,17 +206,6 @@ bool HostCanvasInput::Handle(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp, LRESULT&
         }
     }
 
-    PointerKind kind = PointerKind::Absolute;
-    if (auto* a = emu_.Get<PointerRouter>().Active()) kind = a->Kind();
-    const bool relative_active = kind == PointerKind::Relative;
-    const bool stylus_active   = kind == PointerKind::Stylus;
-
-    /* The host-capture mouse lock (click-to-lock, hidden cursor, warp-to-centre,
-       relative deltas) engages ONLY when a Relative source is the active device;
-       for Absolute/Stylus the whole lock path stays off. Right-Ctrl keyboard
-       capture is independent of this and works in every mode. */
-    auto* cap = emu_.TryGet<HostInputCapture>();
-    const bool locked = relative_active && cap && cap->IsCaptured() && framebuffer;
     if (locked) {
         if (RouteCapturedMouse(hwnd, msg, wp, lp, out)) return true;
     } else {

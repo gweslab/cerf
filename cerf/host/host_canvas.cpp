@@ -10,6 +10,7 @@
 #include "host_focus_policy.h"
 #include "boot_screen.h"
 #include "hw_screen.h"
+#include "notification_overlay.h"
 #include "refresh_rate_service.h"
 
 REGISTER_SERVICE(HostCanvas);
@@ -58,17 +59,6 @@ void HostCanvas::OnPresentTick() {
     }
 }
 
-void HostCanvas::RememberTabForResume() {
-    resume_tab_      = tab_;
-    have_resume_tab_ = true;
-}
-
-void HostCanvas::RestoreTabForResume() {
-    if (!have_resume_tab_) return;
-    have_resume_tab_ = false;
-    SetTab(resume_tab_, false);
-}
-
 bool HostCanvas::RenderAltContent(HDC dc, uint32_t* bits, int w, int h) {
     if (tab_ == Tab::Framebuffer) return false;   /* canvas composes the frame */
     if (tab_ == Tab::Boot) {
@@ -81,6 +71,10 @@ bool HostCanvas::RenderAltContent(HDC dc, uint32_t* bits, int w, int h) {
 
 bool HostCanvas::ShouldDesaturatePresent() {
     return tab_ == Tab::Framebuffer && emu_.Get<EmulationPause>().IsPaused();
+}
+
+void HostCanvas::RenderOverlay(HDC dc, int w, int h) {
+    emu_.Get<NotificationOverlay>().RenderInto(canvas_.Hwnd(), dc, w, h);
 }
 
 bool HostCanvas::HandleInput(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp,

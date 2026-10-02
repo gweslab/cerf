@@ -104,12 +104,6 @@ void HostWindow::FitToResolution(uint32_t sw, uint32_t sh) {
     FitWindowToSurface(sw, sh);
 }
 
-void HostWindow::ShowHwScreenTab(bool rearm_framebuffer) {
-    if (hwnd_)
-        PostMessageW(hwnd_, kShowTabMsg, (WPARAM)HostCanvas::Tab::Hw,
-                     rearm_framebuffer ? 1 : 0);
-}
-
 void HostWindow::ShowStartupTab(bool rearm_framebuffer) {
     if (hwnd_)
         PostMessageW(hwnd_, kShowTabMsg, (WPARAM)emu_.Get<DeviceConfig>().start_tab,

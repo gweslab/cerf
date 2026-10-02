@@ -23,6 +23,11 @@ public:
     void FillPolygonAA(HDC dc, const POINT* pts, int count, COLORREF fill,
                        COLORREF rim);
 
+    void FillRoundRectAA(HDC dc, const RECT& r, int radius, COLORREF fill,
+                         COLORREF rim);
+    void FillRoundRectAlphaAA(HDC dc, const RECT& r, int radius, COLORREF fill,
+                              BYTE alpha);
+
     /* Decode an RT_RCDATA PNG resource to a GDI+ bitmap; caller owns it. */
     Gdiplus::Bitmap* DecodeResourcePng(const wchar_t* name);
 

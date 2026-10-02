@@ -8,8 +8,7 @@
 #include "../../host/host_widget_registry.h"
 #include "../../host/host_icon_cache.h"
 #include "../../host/host_window.h"
-#include "../../host/emulation_pause.h"
-#include "../../jit/jit_runner.h"
+#include "../../core/fatal.h"
 #include "ford_sync2_media_hub.h"
 #include "ford_sync2_media_hub_sd_reader.h"
 
@@ -47,9 +46,12 @@ public:
     void OnReady() override {
         controller_ = &emu_.Get<Imx51Usboh3>();
         auto locked = controller_->LockHostPort();
-        controller_->OtgHostRootPort().SetRestoreFactory([](uint32_t kind) -> std::unique_ptr<UsbDevice> {
+        auto& root = controller_->OtgHostRootPort();
+        root.SetRestoreFactory([](uint32_t kind) -> std::unique_ptr<UsbDevice> {
             return kind == FordSync2MediaHub::kStateKind ? std::make_unique<FordSync2MediaHub>() : nullptr;
         });
+        root.SetRequiresDevice();
+        root.Attach(std::make_unique<FordSync2MediaHub>());
         for (int i = 0; i < FordSync2MediaHub::kPortCount; ++i) {
             for (const auto& media : Entries(i)) {
                 if (!media.insert_on_launch) continue;
@@ -58,7 +60,7 @@ public:
                     LOG(Caution, "Media Hub: cannot open launch image '%s'\n", media.file.c_str());
                     continue;
                 }
-                EnsureHub().SetMedia(i, std::move(device));
+                Hub().SetMedia(i, std::move(device));
             }
             widgets_[i] = std::make_unique<SlotWidget>(*this, i);
             emu_.Get<HostWidgetRegistry>().Register(widgets_[i].get());
@@ -70,13 +72,14 @@ private:
         const auto& cfg = emu_.Get<DeviceConfig>();
         return slot == FordSync2MediaHub::kSdPort ? cfg.bundled_sd_cards : cfg.bundled_usb_disks;
     }
-    FordSync2MediaHub* Hub() const {
+    FordSync2MediaHub& Hub() const {
         auto* device = controller_->OtgHostRootPort().Device();
-        return device && device->StateKind() == FordSync2MediaHub::kStateKind ? static_cast<FordSync2MediaHub*>(device) : nullptr;
+        if (!device || device->StateKind() != FordSync2MediaHub::kStateKind)
+            emu_.Get<Fatal>().Die("Media Hub: the USB root port does not hold the Media Hub");
+        return *static_cast<FordSync2MediaHub*>(device);
     }
-    FordSync2MediaHub& EnsureHub() {
-        if (!Hub()) controller_->OtgHostRootPort().Attach(std::make_unique<FordSync2MediaHub>());
-        return *Hub();
+    UsbMassStorageDevice* Current(int slot) const {
+        return static_cast<UsbMassStorageDevice*>(Hub().Port(slot).Device());
     }
     std::unique_ptr<UsbMassStorageDevice> Open(int slot, const BundledUsbMedia& media) {
         std::unique_ptr<UsbMassStorageDevice> device;
@@ -88,43 +91,37 @@ private:
     }
     std::wstring MediaName(int slot) const {
         auto locked = controller_->LockHostPort();
-        auto* hub = Hub();
-        auto* device = hub ? hub->Port(slot).Device() : nullptr;
+        auto* device = Current(slot);
         if (!device) return L"Empty";
-        return Utf8ToWide(static_cast<UsbMassStorageDevice*>(device)->ImageName().c_str());
+        return Utf8ToWide(device->ImageName().c_str());
     }
     void Apply(int slot, uint64_t generation, const BundledUsbMedia* media) {
-        bool failed = false;
-        auto& runner = emu_.Get<JitRunner>();
-        const bool was_paused = emu_.Get<EmulationPause>().IsPaused();
-        runner.Pause();
+        const std::string path = media
+            ? ResolveDeviceFile(emu_.Get<DeviceConfig>().device_name, media->file) : std::string();
         {
             auto locked = controller_->LockHostPort();
-            if (generation_[slot] == generation) {
-                auto* hub = Hub();
-                auto* current = hub ? static_cast<UsbMassStorageDevice*>(hub->Port(slot).Device()) : nullptr;
-                bool unchanged = false;
-                if (media && current && current->ImagePath() ==
-                    ResolveDeviceFile(emu_.Get<DeviceConfig>().device_name, media->file)) {
-                    unchanged = slot == FordSync2MediaHub::kUsbPort || static_cast<FordSync2MediaHubSdReader*>(current)->Cid() == media->cid;
-                    if (!unchanged) hub->SetMedia(slot, {});
-                }
-                if (!unchanged) {
-                    auto device = media ? Open(slot, *media) : nullptr;
-                    failed = media && !device;
-                    if (!failed) {
-                        if (media) EnsureHub().SetMedia(slot, std::move(device));
-                        else if (hub) hub->SetMedia(slot, {});
-                    }
-                    ++generation_[slot];
-                }
+            if (generation_[slot] != generation) return;
+            auto* current = Current(slot);
+            const bool same_file = media && current && current->ImagePath() == path;
+            if (same_file && (slot == FordSync2MediaHub::kUsbPort ||
+                              static_cast<FordSync2MediaHubSdReader*>(current)->Cid() == media->cid))
+                return;
+            if (!media || same_file) {
+                Hub().SetMedia(slot, {});
+                generation = ++generation_[slot];
             }
         }
-        if (!was_paused) runner.Resume();
-        if (failed) {
+        if (!media) return;
+        auto device = Open(slot, *media);
+        if (!device) {
             const auto message = L"Cannot open existing media image: " + Utf8ToWide(media->file.c_str());
             MessageBoxW(emu_.Get<HostWindow>().Hwnd(), message.c_str(), L"Media Hub", MB_OK | MB_ICONERROR);
+            return;
         }
+        auto locked = controller_->LockHostPort();
+        if (generation_[slot] != generation) return;
+        Hub().SetMedia(slot, std::move(device));
+        ++generation_[slot];
     }
     void Browse(int slot, uint64_t generation) {
         wchar_t file[MAX_PATH]{};

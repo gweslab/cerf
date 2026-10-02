@@ -1,7 +1,6 @@
 #include "ford_sync2_temperature_section.h"
 
 #include "ford_sync2_ambient_temperature.h"
-#include "ford_sync2_ilp_channel.h"
 #include "../../core/cerf_emulator.h"
 #include "../../state/state_stream.h"
 #include <cwchar>
@@ -31,24 +30,18 @@ std::vector<WidgetMenuItem> TemperatureSection::BuildItems() {
         WidgetMenuItem item;
         item.label = std::to_wstring(imperial_ ? fahrenheit[i] : celsius[i]) + (imperial_ ? L" °F" : L" °C");
         item.checked = snapshot.available && snapshot.half_celsius == half;
-        item.on_click = [this, half] {
-            emu_.Get<FordSync2IlpChannel>().ApplyHostChange([&] { emu_.Get<FordSync2AmbientTemperature>().Set(half); });
-        };
+        item.on_click = [this, half] { emu_.Get<FordSync2AmbientTemperature>().Set(half); };
         items.push_back(std::move(item));
     }
     WidgetMenuItem invalid;
     invalid.label = L"No reading";
     invalid.checked = snapshot.available && !snapshot.half_celsius;
-    invalid.on_click = [this] {
-        emu_.Get<FordSync2IlpChannel>().ApplyHostChange([&] { emu_.Get<FordSync2AmbientTemperature>().Set(std::nullopt); });
-    };
+    invalid.on_click = [this] { emu_.Get<FordSync2AmbientTemperature>().Set(std::nullopt); };
     items.push_back(std::move(invalid));
     WidgetMenuItem clear;
     clear.label = L"Stop reporting outside temperature";
     clear.checked = !snapshot.available;
-    clear.on_click = [this] {
-        emu_.Get<FordSync2IlpChannel>().ApplyHostChange([&] { emu_.Get<FordSync2AmbientTemperature>().Clear(); });
-    };
+    clear.on_click = [this] { emu_.Get<FordSync2AmbientTemperature>().Clear(); };
     items.push_back(std::move(clear));
     WidgetMenuItem units;
     units.label = L"Show presets in °F";

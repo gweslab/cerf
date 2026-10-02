@@ -39,6 +39,8 @@ public:
        poll for a clean CPU stop after RequestStop without blocking on Join. */
     bool Stopped() const { return stopped_.load(std::memory_order_acquire); }
 
+    bool Started() const { return started_.load(std::memory_order_acquire); }
+
     /* Host thread only - calling from the JIT thread self-deadlocks.
        Returns once the guest CPU is parked between blocks. */
     void Pause();
@@ -52,7 +54,7 @@ private:
     std::thread             thread_;
     std::atomic<bool>       stop_requested_{false};
     std::atomic<bool>       stopped_{false};
-    bool                    started_ = false;
+    std::atomic<bool>       started_{false};
 
     std::atomic<bool>       pause_requested_{false};
     bool                    paused_ = false;          /* guarded by pause_mutex_ */

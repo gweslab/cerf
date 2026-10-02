@@ -31,9 +31,9 @@ across power cycles. CERF instead wipes all guest RAM on close. Every exit is
 effectively a cold boot, and all guest state from since boot is lost. Hibernation
 preserves the full running machine across an exit.
 
-**Triggers:** the Actions-menu Save/Load state, a Shutdown dialog on window close
-(save-on-exit), and a boot-time prompt when a default `state.img` exists in the
-device directory.
+**Triggers:** the Actions-menu Save/Load state, and a Shutdown dialog on window
+close (save-on-exit). At startup, the `--boot` mode selects what CERF does with a
+default `state.img` in the device directory.
 
 ## The `.img` format
 

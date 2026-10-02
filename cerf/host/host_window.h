@@ -37,12 +37,6 @@ public:
        scrollbars adapt. Used by the Change-resolution dialog. */
     void FitToResolution(uint32_t sw, uint32_t sh);
 
-    /* Any thread. Marshal a switch to the Hardware Screen (text) tab to the UI
-       thread (so a guest power-down / save-progress notice is visible).
-       rearm_framebuffer re-arms the framebuffer auto-switch so a rebooting
-       guest's video returns to it. */
-    void ShowHwScreenTab(bool rearm_framebuffer);
-
     /* Any thread. Switch to the configured startup tab (DeviceConfig.start_tab):
        the boot screen in production, the hardware screen in dev. Used on guest
        reboot / deep-sleep resume. */
@@ -65,6 +59,7 @@ public:
     void ToggleFullscreen();
 
     void BeginShutdownTeardown();
+    void CancelShutdown() { shutdown_pending_ = false; }
 
 private:
     void StopUiThread();   /* idempotent: close window + join the UI thread */

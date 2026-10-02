@@ -21,11 +21,11 @@ void ShutdownAction::Perform(ShutdownChoice c) {
             emu_.Get<GuestColdBoot>().RequestHardReset();
             return;
         case ShutdownChoice::ExitSave:
-            win.ShowHwScreenTab(false);
-            emu_.Get<Hibernation>().SaveAsync(L"", [this] {
-                auto& w = emu_.Get<HostWindow>();
-                w.RunOnUiThread([this] {
-                    emu_.Get<HostWindow>().BeginShutdownTeardown();
+            emu_.Get<Hibernation>().SaveAsync(L"", [this](bool saved) {
+                emu_.Get<HostWindow>().RunOnUiThread([this, saved] {
+                    auto& w = emu_.Get<HostWindow>();
+                    if (saved) w.BeginShutdownTeardown();
+                    else       w.CancelShutdown();
                 });
             });
             return;

@@ -395,6 +395,9 @@ concretes (strategy pattern, selected by `BoardContext`).
   `BootBar`.
   - `cerf/host/hw_screen.{h,cpp}`
 
+- **`NotificationStack`** is the card stack over every canvas tab, and it takes
+  only notices that interrupt the user's workflow, never routine events.
+
 - **`BootScreen`** - the CERF-logo boot animation behind the `Tab::Boot` tab,
   plus the `BootBar`. The 60 Hz present loop drives it in time, with no
   thread. `Restart` (guest reboot / deep-sleep wake) and

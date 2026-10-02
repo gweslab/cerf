@@ -1,6 +1,7 @@
 #include "state_stream.h"
 
 #include "../core/log.h"
+#include "../core/windows_error_text.h"
 
 #include <cstdarg>
 #include <cstddef>
@@ -23,11 +24,19 @@ StateWriter::StateWriter(const std::wstring& path)
     file_ = CreateFileW(temp_path_.c_str(), GENERIC_WRITE, 0, nullptr,
                         CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
     if (file_ == INVALID_HANDLE_VALUE) {
+        const DWORD gle = GetLastError();
         LOG(Caution, "StateWriter: CreateFile('%ls') failed gle=%lu\n",
-            temp_path_.c_str(), GetLastError());
+            temp_path_.c_str(), gle);
+        Fail("the state file cannot be created", gle);
         return;
     }
     ok_ = true;
+}
+
+void StateWriter::Fail(const char* what, DWORD gle) {
+    ok_ = false;
+    if (!error_.empty()) return;
+    error_ = gle ? std::string(what) + ": " + WindowsErrorText(gle) : std::string(what);
 }
 
 StateWriter::~StateWriter() {
@@ -50,9 +59,10 @@ void StateWriter::WriteRaw(const void* src, size_t n) {
         const DWORD chunk = n > kIoChunk ? kIoChunk : static_cast<DWORD>(n);
         DWORD wrote = 0;
         if (!WriteFile(file_, p, chunk, &wrote, nullptr) || wrote != chunk) {
+            const DWORD gle = GetLastError();
             LOG(Caution, "StateWriter: WriteFile failed gle=%lu (%lu/%lu)\n",
-                GetLastError(), wrote, chunk);
-            ok_ = false;
+                gle, wrote, chunk);
+            Fail("a write to the state file failed", gle);
             return;
         }
         p              += chunk;
@@ -93,20 +103,23 @@ void StateWriter::PatchAt(uint64_t offset, const void* src, size_t n) {
     LARGE_INTEGER li;
     li.QuadPart = static_cast<LONGLONG>(offset);
     if (!SetFilePointerEx(file_, li, nullptr, FILE_BEGIN)) {
-        LOG(Caution, "StateWriter: PatchAt seek failed gle=%lu\n", GetLastError());
-        ok_ = false;
+        const DWORD gle = GetLastError();
+        LOG(Caution, "StateWriter: PatchAt seek failed gle=%lu\n", gle);
+        Fail("a write to the state file failed", gle);
         return;
     }
     DWORD wrote = 0;
     if (!WriteFile(file_, src, static_cast<DWORD>(n), &wrote, nullptr) || wrote != n) {
-        LOG(Caution, "StateWriter: PatchAt write failed gle=%lu\n", GetLastError());
-        ok_ = false;
+        const DWORD gle = GetLastError();
+        LOG(Caution, "StateWriter: PatchAt write failed gle=%lu\n", gle);
+        Fail("a write to the state file failed", gle);
         return;
     }
     LARGE_INTEGER end{};
     if (!SetFilePointerEx(file_, end, nullptr, FILE_END)) {
-        LOG(Caution, "StateWriter: PatchAt seek-back failed gle=%lu\n", GetLastError());
-        ok_ = false;
+        const DWORD gle = GetLastError();
+        LOG(Caution, "StateWriter: PatchAt seek-back failed gle=%lu\n", gle);
+        Fail("a write to the state file failed", gle);
     }
 }
 
@@ -123,10 +136,11 @@ bool StateWriter::Commit() {
     CloseHandle_();
     if (!MoveFileExW(temp_path_.c_str(), final_path_.c_str(),
                      MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH)) {
+        const DWORD gle = GetLastError();
         LOG(Caution, "StateWriter: MoveFileEx('%ls' -> '%ls') failed gle=%lu\n",
-            temp_path_.c_str(), final_path_.c_str(), GetLastError());
+            temp_path_.c_str(), final_path_.c_str(), gle);
         DeleteFileW(temp_path_.c_str());
-        ok_ = false;
+        Fail("the state file cannot be replaced", gle);
         return false;
     }
     committed_ = true;
@@ -136,9 +150,15 @@ bool StateWriter::Commit() {
 StateReader::StateReader(const std::wstring& path) {
     file_ = CreateFileW(path.c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr,
                         OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
-    if (file_ == INVALID_HANDLE_VALUE) return;
+    if (file_ == INVALID_HANDLE_VALUE) {
+        error_ = "the state file cannot be opened: " + WindowsErrorText(GetLastError());
+        return;
+    }
     LARGE_INTEGER sz{};
-    if (!GetFileSizeEx(file_, &sz)) return;
+    if (!GetFileSizeEx(file_, &sz)) {
+        error_ = "the state file cannot be read: " + WindowsErrorText(GetLastError());
+        return;
+    }
     file_size_ = static_cast<uint64_t>(sz.QuadPart);
     ok_ = true;
 }

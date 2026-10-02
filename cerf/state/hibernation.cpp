@@ -12,9 +12,10 @@
 #include "../core/log.h"
 #include "../core/string_utils.h"
 #include "../cpu/emulated_memory.h"
+#include "../host/emulation_pause.h"
 #include "../host/host_canvas.h"
-#include "../host/host_key_prompt.h"
 #include "../host/host_screenshot.h"
+#include "../host/notification_stack.h"
 #include "../host/guest_deep_sleep.h"
 #include "../boot/guest_cold_boot.h"
 #include "../host/host_widget_registry.h"
@@ -23,7 +24,6 @@
 #include "../host/host_window.h"
 #include "../host/hw_screen.h"
 #include "../jit/guest_engine.h"
-#include "../jit/jit_runner.h"
 #include "../peripherals/peripheral_base.h"
 #include "../peripherals/peripheral_dispatcher.h"
 
@@ -52,13 +52,13 @@ void Hibernation::JoinWorker() {
     if (worker_.joinable()) worker_.join();
 }
 
-void Hibernation::SaveAsync(const std::wstring& path, std::function<void()> on_done) {
+void Hibernation::SaveAsync(const std::wstring& path, std::function<void(bool)> on_done) {
     JoinWorker();
     ResetEvent(done_event_);
     worker_ = std::thread([this, path, on_done = std::move(on_done)] {
-        Save(path);
+        const bool saved = Save(path);
         SetEvent(done_event_);
-        if (on_done) on_done();
+        if (on_done) on_done(saved);
     });
 }
 
@@ -80,16 +80,6 @@ void Hibernation::Progress(const char* fmt, ...) {
     va_end(ap);
     emu_.Get<HwScreen>().AddLine(buf);
     LOG(Cerf, "[HIBERNATE] %s\n", buf);
-}
-
-void Hibernation::AwaitFailureAck(bool cold_boot) {
-    Progress(cold_boot ? "Press any key for cold boot."
-                       : "Press any key to resume.");
-    auto& kp = emu_.Get<HostKeyPrompt>();
-    kp.Arm();
-    kp.Wait(INFINITE);
-    kp.Disarm();
-    Progress(cold_boot ? "Performing cold boot..." : "Resuming...");
 }
 
 std::wstring Hibernation::DeviceDirFile(const wchar_t* name) const {
@@ -126,9 +116,12 @@ StateImageHeader Hibernation::LiveHeader() const {
     return h;
 }
 
-bool Hibernation::WriteImage(const std::wstring& path) {
+bool Hibernation::WriteImage(const std::wstring& path, std::string& error) {
     StateWriter w(path);
-    if (!w.Ok()) return false;
+    if (!w.Ok()) {
+        error = w.Error();
+        return false;
+    }
     w.WriteRaw(kStateMagic, sizeof(kStateMagic));
     const StateImageHeader h = LiveHeader();
     w.Write("rom_entry_va", h.rom_entry_va);
@@ -141,7 +134,9 @@ bool Hibernation::WriteImage(const std::wstring& path) {
         SaveSection(w, section);
         w.EndFrame();
     }
-    return w.Ok() && w.Commit();
+    const bool ok = w.Ok() && w.Commit();
+    if (!ok) error = w.Error();
+    return ok;
 }
 
 void Hibernation::SaveSection(StateWriter& w, StateSection section) {
@@ -178,23 +173,31 @@ void Hibernation::SaveSection(StateWriter& w, StateSection section) {
 
 bool Hibernation::Save(const std::wstring& path_in) {
     const std::wstring path = path_in.empty() ? DefaultStatePath() : path_in;
-    auto& runner = emu_.Get<JitRunner>();
+    auto& pause = emu_.Get<EmulationPause>();
+    auto& stack = emu_.Get<NotificationStack>();
 
-    emu_.Get<HostWindow>().ShowHwScreenTab(false);
+    stack.Show(NotificationId::SavingState, NotificationKind::Warning,
+               L"Saving the machine state…");
     Progress("Saving state...");
     Progress("Saving RAM (%llu MB)...", static_cast<unsigned long long>(
         emu_.Get<EmulatedMemory>().VolatileByteCount() >> 20));
 
-    runner.Pause();
+    pause.BeginStateOperation();
     bool ok = false;
+    std::string error;
     {
         auto snap = emu_.Get<EmulationFreeze>().SnapshotSection();
-        ok = WriteImage(path);
+        ok = WriteImage(path, error);
     }
-    runner.Resume();
+    pause.EndStateOperation(false);
 
-    Progress(ok ? "State saved." : "Save FAILED.");
-    emu_.Get<HostWindow>().ShowHwScreenTab(true);
+    stack.Close(NotificationId::SavingState);
+    if (ok) {
+        Progress("State saved.");
+    } else {
+        Progress("Save FAILED: %s", error.c_str());
+        stack.PostError(L"Failed to save the machine state\n" + Utf8ToWide(error.c_str()));
+    }
 
     if (ok) {
         const std::wstring png = DeviceDirFile(L"saved_state.png");
@@ -298,7 +301,7 @@ void Hibernation::RestoreSection(StateReader& r, StateSection section) {
 void Hibernation::RollBack(const std::wstring& rollback_path) {
     StateReader r(rollback_path);
     try {
-        if (!r.Ok()) throw StateImageRejected("the rollback image cannot be opened");
+        if (!r.Ok()) throw StateImageRejected("the rollback image cannot be opened: " + r.Error());
         ReadHeader(r);
         ApplyImage(r, false);
     } catch (const StateImageRejected& e) {
@@ -307,31 +310,41 @@ void Hibernation::RollBack(const std::wstring& rollback_path) {
     }
 }
 
-bool Hibernation::Restore(const std::wstring& path_in, bool ram_only,
-                          bool cold_boot_on_failure) {
+bool Hibernation::Restore(const std::wstring& path_in, bool ram_only) {
     const std::wstring path = path_in.empty() ? DefaultStatePath() : path_in;
-    auto& runner = emu_.Get<JitRunner>();
+    auto& stack = emu_.Get<NotificationStack>();
 
-    emu_.Get<HostWindow>().ShowHwScreenTab(false);
+    stack.Show(NotificationId::LoadingState, NotificationKind::Warning,
+               L"Loading the machine state…");
     Progress(ram_only ? "Warm boot: restoring RAM..." : "Restoring state...");
 
-    StateReader r(path);
-    if (!r.Ok()) {
-        Progress("Cannot open state image.");
-        AwaitFailureAck(cold_boot_on_failure);
-        emu_.Get<HostWindow>().ShowHwScreenTab(true);
-        return false;
-    }
-
-    runner.Pause();
-    auto snap = emu_.Get<EmulationFreeze>().SnapshotSection();
     bool ok = false;
     std::string reason;
+    StateReader r(path);
+    if (r.Ok()) {
+        ok = ApplyStateFile(r, ram_only, reason);
+    } else {
+        reason = r.Error();
+        Progress("Cannot open state image: %s", reason.c_str());
+    }
+
+    stack.Close(NotificationId::LoadingState);
+    if (!ok)
+        stack.PostError(L"Failed to load the save state\n" + Utf8ToWide(reason.c_str()));
+    return ok;
+}
+
+bool Hibernation::ApplyStateFile(StateReader& r, bool ram_only, std::string& reason) {
+    auto& pause = emu_.Get<EmulationPause>();
+    pause.BeginStateOperation();
+    auto snap = emu_.Get<EmulationFreeze>().SnapshotSection();
+    bool ok = false;
     try {
         ReadHeader(r);
         const std::wstring rollback = DeviceDirFile(kRollbackStateFile);
-        if (!WriteImage(rollback))
-            throw StateImageRejected("the rollback image cannot be written");
+        std::string write_error;
+        if (!WriteImage(rollback, write_error))
+            throw StateImageRejected("the rollback image cannot be written: " + write_error);
         try {
             ApplyImage(r, ram_only);
             ok = true;
@@ -353,10 +366,7 @@ bool Hibernation::Restore(const std::wstring& path_in, bool ram_only,
         if (!ram_only) emu_.Get<GuestDeepSleep>().OnFullRestore();
     } else {
         Progress("Restore refused: %s", reason.c_str());
-        AwaitFailureAck(cold_boot_on_failure);
     }
-    runner.Resume();
-
-    emu_.Get<HostWindow>().ShowHwScreenTab(true);
+    pause.EndStateOperation(ok);
     return ok;
 }

@@ -1,6 +1,6 @@
 ---
 name: verify
-description: Spawn a hostile-reviewer subagent to cold-check a claim, diff, file, or code snippet against CLAUDE.md and the project's reference pages. Catches hacks, reader-side suppression, fabricated IDA citations, rule violations, guessed implementations, host-state leaks, and agents rationalizing bad code. Returns a binary verdict - CRITICAL PROBLEM FOUND or LEGIT - that the main agent MUST respect. Invoke when the user types `/verify …` or when the main agent itself suspects it just rationalized something and wants an independent check before handing back.
+description: Spawn a hostile reviewer that checks a claim or a diff against the project rules.
 ---
 
 # Verify - Reality Check

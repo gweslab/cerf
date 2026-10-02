@@ -32,15 +32,8 @@ def main() -> int:
     for blob in blobs:
         if PRAGMA_LIB_RE.search(blob):
             reason = (
-                "BLOCKED: '#pragma comment(lib, ...)' is forbidden in "
-                "CERF source. Library link dependencies belong in "
-                "cerf/cerf.vcxproj, not as in-source pragmas. Scattering "
-                "lib pragmas across source files makes the link surface "
-                "invisible to the build system, routes dependency changes "
-                "through source edits rather than project metadata, and "
-                "bypasses per-config / per-platform link selection. Add "
-                "the library to cerf/cerf.vcxproj under <AdditionalDependencies>"
-                " (or the matching ItemGroup) instead."
+                "BLOCKED: Source files must not contain '#pragma comment(lib, "
+                "...)'. Add the library to cerf/cerf.vcxproj."
             )
             out = {
                 "hookSpecificOutput": {

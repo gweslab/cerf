@@ -1,9 +1,9 @@
 ---
 name: verify-options
-description: Forcing function — when the main agent has just listed options for the user to pick from, invoke this skill. Step 0 audits the option list AS A WHOLE for bailout signature ("hack / real work / give up" composition, cost-inflated legitimate path, scope-cut options, hack-as-equal-option, emotional-collapse precursor, single-direct-path dressed as multi-option, reader-side suppression as an option) — if any signal fires, the skill routes to `/bailout` protocol instead of characterizing exit ramps. If Step 0 passes, Steps 1–4 characterize each option honestly under the 8-row protocol and collapse rule-violating / bailout / reader-side-suppression options into one-line FORBIDDEN entries that may not be discussed again in the session. Catches "rules violations masked as options" and "bailout artifacts masked as engineering choices". Invoke when the user types `/verify-options` after seeing a list of options, or when the main agent catches itself about to ask "which option do you want" with options of mixed quality.
+description: Audit a list of options for bailouts and rule violations before the user picks one.
 ---
 
-# Verify-Options — Honest characterization of proposed options
+# Verify-Options - Honest characterization of proposed options
 
 You have options to present to the user (whether already listed or
 still in your head). **Stop.** This skill governs the entire flow
@@ -11,9 +11,9 @@ from "options exist" to "options presented with characterization":
 
 0. **Bailout detection (mandatory FIRST step).** Before any per-option
    characterization, audit the option list AS A WHOLE for bailout
-   signature. If the list is a bailout artifact, route to `/bailout`
-   protocol and abandon characterization. Most "option lists" produced
-   when the agent is stuck are bailout artifacts disguised as choices —
+   signature. If the list is a bailout artifact, route to `/bad` and
+   abandon characterization. Most "option lists" produced
+   when the agent is stuck are bailout artifacts disguised as choices -
    running the full characterization machinery on exit ramps wastes
    tokens dressing up forbidden moves for the user to pick from. See
    § "Bailout detection (Step 0)" below.
@@ -22,24 +22,24 @@ from "options exist" to "options presented with characterization":
    as agent-closable (you can resolve it yourself by reading code,
    running grep, decompiling a function, checking BSP source) or
    user-input-required (needs user decision / external constraint).
-   **CLOSE every agent-closable gap before presenting** — actually
+   **CLOSE every agent-closable gap before presenting** - actually
    do the reading, the greps, the decompiles. Do NOT skip this step.
    If options were already listed to the user without verification,
-   close the gaps NOW before characterizing — the prior unverified
+   close the gaps NOW before characterizing - the prior unverified
    list is not a license to skip verification.
 2. **Characterize each option** under the 8-row protocol below.
 3. **Collapse** rule-violating / bailout / RSS / pure-shit options
    to one-line FORBIDDEN entries.
 4. **Present** the surviving set with Carefulness ≥ 80% per option.
 
-## Options and decisions live in CHAT ONLY — NEVER written into a durable document
+## Options and decisions live in CHAT ONLY - NEVER written into a durable document
 
 The output of this skill is a **chat message to the user**. Options,
-recommendations, and decisions are spoken to the user in the conversation —
+recommendations, and decisions are spoken to the user in the conversation -
 they are **NEVER written into a durable document**: a tracking document
 (`docs/ai_checklists/`), a checklist, an `agent_docs/` page, a design doc, a
 commit message, or a code comment. Those artifacts carry **facts and evidence
-only** — what was done, what broke, what was proven or disproven, what not to
+only** - what was done, what broke, what was proven or disproven, what not to
 repeat or rediscover. They are not a place for the agent's opinions,
 recommendations, or proposed decisions, because the next agent reads them as
 **authoritative ground truth** and acts on a planted opinion as if it were
@@ -49,26 +49,26 @@ session trusts.
 This is absolute, and it applies **even to decisions that ARE genuinely the
 user's to make**. Having the option in your head is fine; *writing it into the
 document* is the violation. If a real decision is open, raise it with the user
-in chat under this protocol and STOP — do not record it in any document.
+in chat under this protocol and STOP - do not record it in any document.
 
 **FORBIDDEN in any durable document** (recognize the shape, not just the words):
-- **commit recommendations** — "commit this in isolation", "worth committing",
+- **commit recommendations** - "commit this in isolation", "worth committing",
   "lock it in", "safe to commit", "ready to merge".
-- **feature-kill / scope-cut decisions** — "gate the feature off by default",
+- **feature-kill / scope-cut decisions** - "gate the feature off by default",
   "disable X", "revert wholesale", "drop the feature", "accept X broken".
-- **decision-deferral dressed as neutral** — "consider whether to X",
-  "— a user decision", "options going forward: A / B / C", "TBD: pick one".
+- **decision-deferral dressed as neutral** - "consider whether to X",
+  "- a user decision", "options going forward: A / B / C", "TBD: pick one".
 - **any Step-0 bailout shape** (hack-as-option, cost-inflated path, scope-cut,
-  drop-feature) — forbidden in chat AND doubly forbidden written into a document.
+  drop-feature) - forbidden in chat AND doubly forbidden written into a document.
 
 **MECHANICAL TEST, applied to every sentence before it enters a durable document:**
 *"Is this a FACT/EVIDENCE (what happened, what is true), or is it my OPINION /
 RECOMMENDATION / a DECISION?"* If it is opinion / recommendation / decision → it
 does **not** go in the document. Delete it; if it matters, say it to the user in
-chat. When in doubt, it is opinion — leave it out.
+chat. When in doubt, it is opinion - leave it out.
 
 This rule exists because an agent wrote "commit the cp15 fix in isolation",
-"consider whether to gate the feature off by default", and "revert wholesale — a
+"consider whether to gate the feature off by default", and "revert wholesale - a
 user decision" into a cross-session tracking document during a `/tracking
 update`. None of it was authorized; all of it was the agent planting its own
 decisions into the record the next agent trusts as fact. Decisions are the
@@ -79,10 +79,10 @@ user's; the document is for facts.
 `/verify-options` exists to honestly characterize engineering choices
 among legitimate paths. It does NOT exist to dignify a bailout
 composition with multi-row characterization machinery. If the option
-list itself is a bailout artifact — produced because the agent got
+list itself is a bailout artifact - produced because the agent got
 stuck, frustrated, emotionally collapsed, or unable to find the direct
-path, and started listing exit ramps as "choices" to give the user —
-then the correct response is `/bailout`'s protocol, not Steps 1–4.
+path, and started listing exit ramps as "choices" to give the user -
+then the correct response is `/bad`, not Steps 1-4.
 
 ### The detection question (answer honestly)
 
@@ -90,7 +90,7 @@ then the correct response is `/bailout`'s protocol, not Steps 1–4.
 > legitimate work, or did it emerge because I got stuck and started
 > listing exit ramps to hand the decision to the user?"
 
-### Bailout-artifact signals (ANY one fires → route to /bailout)
+### Bailout-artifact signals (ANY one fires → route to /bad)
 
 1. **Multi-shape exit composition.** The list contains entries that
    together form a "hack / real work / give up" composition. Canonical
@@ -115,16 +115,16 @@ then the correct response is `/bailout`'s protocol, not Steps 1–4.
    defect is reclassified. Labelling a defect "pre-existing",
    "separate item", "out of scope", "finishing-lane", "non-blocking",
    "different subsystem", or "not introduced by my change" does NOT
-   exempt an option that defers it — these are the euphemisms that
+   exempt an option that defers it - these are the euphemisms that
    smuggle the defer past this signal, and they are forbidden exactly
    like the reader-side-suppression euphemism list. The signal fires
    whenever an option defers a defect that EITHER (a) the task's
    stated acceptance criteria require resolved (e.g. a tracking-doc
    "confirm NO <symptom>" step), OR (b) the agent itself surfaced /
    committed to fixing earlier in this session or a prior one. Origin
-   ("it was already there") is irrelevant — `agent_docs/rules.md`
+   ("it was already there") is irrelevant - `agent_docs/rules.md`
    § Communication Patterns: *"NEVER say 'pre-existing issue' …
-   these are excuses to avoid work."* "Non-blocking" is irrelevant —
+   these are excuses to avoid work."* "Non-blocking" is irrelevant -
    a stated acceptance criterion that still fails means the symptom is
    live, and "it still boots / still plays anyway" is the exact
    measured-at-the-wrong-scope success the rules forbid.
@@ -149,7 +149,7 @@ then the correct response is `/bailout`'s protocol, not Steps 1–4.
    don't know what else to try", "I'm stuck", "I want to cry", "this
    is harder than I expected", "I've spent hours on this"? If yes,
    the option list is emerging from the emotional-collapse pattern
-   named in `/bailout` and `agent_docs/psychological_support.md`,
+   named in `agent_docs/psychological_support.md`,
    not from a real engineering fork.
 6. **Single-direct-path question dressed as multi-option.** The
    underlying technical question has ONE legitimate answer the agent
@@ -162,8 +162,8 @@ then the correct response is `/bailout`'s protocol, not Steps 1–4.
    modifies the reader of a wrong invariant rather than the producer
    is reader-side suppression regardless of how it's named. Listing
    it as an option grants it parity the rule explicitly denies. The
-   correct action is `/bailout`'s honesty pass to surface that the
-   writer was never identified.
+   correct action is `/bad`, which discloses that the writer was never
+   identified.
 
 ### When a signal fires
 
@@ -172,33 +172,29 @@ Output the bailout-detection block plainly, no softening:
 > "/verify-options bailout-detection: the option list at
 > `<previous message reference>` is a bailout artifact, not a
 > genuine engineering fork. Signals fired:
-> - Signal `<N>` (`<name>`): `<concrete evidence — the cost-inflation
+> - Signal `<N>` (`<name>`): `<concrete evidence - the cost-inflation
 >   phrase, the scope-cut option, the emotional precursor turn>`.
 > - Signal `<M>` (`<name>`): `<concrete evidence>`.
-> Routing to `/bailout` protocol. Characterization abandoned —
+> Routing to `/bad`. Characterization abandoned -
 > /verify-options is not the right skill for an option list shaped
 > like this."
 
-Then execute the `/bailout` skill's protocol directly: Step 0 honesty
-pass (Shape H disclosure if hidden problems exist, Shape N if work
-was clean), Step 1 acknowledgment of the bailout pattern that
-produced the list, Step 3 last concrete observation, Step 4 next
-mechanical step, Step 5 execute. The "options" themselves get no
-characterization rows — they are collapsed as a group, and the work
+Then execute `/bad` directly. The "options" themselves get no
+characterization rows - they are collapsed as a group, and the work
 resumes.
 
 ### Edge case: borderline lists
 
 If you cannot definitively classify the list as bailout-artifact OR
 legitimate-fork, treat the doubt as evidence for bailout-artifact
-and route to `/bailout`. The asymmetric cost makes this obvious:
+and route to `/bad`. The asymmetric cost makes this obvious:
 
 - **False-classifying a legitimate fork as bailout** → one extra
-  `/bailout` execution that produces real work anyway and surfaces
-  the genuine fork as a `/bailout` Step 6 user-direction ask. Cost:
+  `/bad` execution that produces real work anyway and surfaces the
+  genuine fork as a specific question to the user. Cost:
   the user re-prompts for `/verify-options` on the actual fork.
 - **False-classifying a bailout-artifact as legitimate** → the full
-  Steps 1–4 characterization machinery burns tokens dressing up exit
+  Steps 1-4 characterization machinery burns tokens dressing up exit
   ramps with 8-row tables, Carefulness percentages, and rationale
   paragraphs. The user reads a polished menu of forbidden moves and
   may pick one. Cost: catastrophically more, plus the user's wallet
@@ -206,35 +202,35 @@ and route to `/bailout`. The asymmetric cost makes this obvious:
   legitimate.
 
 When in doubt, the bailout-route is correct. Legitimate forks
-survive `/bailout`'s protocol naturally; bailout artifacts do not
+survive `/bad` naturally; bailout artifacts do not
 survive `/verify-options` honestly.
 
 ### What the agent does NOT do after bailout detection
 
-- Does NOT proceed with Steps 1–4 "just in case".
+- Does NOT proceed with Steps 1-4 "just in case".
 - Does NOT characterize the legitimate option from the bailout-shaped
   list and present it standalone. The legitimate path emerges from
-  `/bailout`'s Step 4 next-mechanical-step naturally; granting one
+  the next mechanical step of `/bad` naturally; granting one
   of the original "options" survivor status would re-import the
   bailout-list framing.
 - Does NOT propose a NEW option list under `/verify-options` in the
   same turn. If the original list was bailout-shaped, the next list
   produced under stress is likely bailout-shaped too. Resume the
-  work via `/bailout`'s mechanical protocol; option-listing happens
+  work via `/bad`; option-listing happens
   later (if at all) when a genuine fork surfaces in real work.
 
 Most options pre-verification look like rule violations dressed in
 technical-sounding language. The verification step + characterization
 + collapse rule are what distinguish honest engineering choices from
 smuggled hacks. Presenting options the agent never bothered to verify
-is laziness, not honest disclosure — the user can't pick honestly
+is laziness, not honest disclosure - the user can't pick honestly
 between options whose underlying mechanisms haven't been confirmed.
 
 ## Per-option characteristics (ALL required, every option)
 
 For each option produce exactly this block, in this order, no rewording:
 
-- **Shittiness: X%** — overall badness on a continuous scale (0%
+- **Shittiness: X%** - overall badness on a continuous scale (0%
   pristine, 100% atrocious). **This is a QUALITY metric, NOT a SIZE
   metric.** Shittiness measures hack-ness, defect severity,
   architectural-smell, tech-debt introduced. **A correct fix is 0%
@@ -251,7 +247,7 @@ For each option produce exactly this block, in this order, no rewording:
   mandatory row below. Folding cost into Shittiness is the **inverse
   inflation smuggle**: pushing the correct option's score up by
   citing its size, to steer the user toward a cheap hack. Same fraud
-  shape as inflating Shittiness on a bad option, opposite direction —
+  shape as inflating Shittiness on a bad option, opposite direction -
   manufactures a high quality-score on the architecturally correct
   fix so the user picks the hack.
 
@@ -259,7 +255,7 @@ For each option produce exactly this block, in this order, no rewording:
   smell → Shittiness ≤ 10%.** Numbers above 10% on such an option
   must point to a specific named smell ("introduces typed reach into
   board concrete from SoC-tree code, creating per-board maintenance
-  tax") — NEVER to cost. If you cannot name the smell, lower the %.
+  tax") - NEVER to cost. If you cannot name the smell, lower the %.
 
   **The score must speak alone.** Prose qualifying the score downward
   ("X% is high but actually…", "I rated it X% but want to flag
@@ -274,7 +270,7 @@ For each option produce exactly this block, in this order, no rewording:
   four binary flags are all `no` must be backed by either (a) a
   citable rule violation (in which case the option *should have
   collapsed*) or (b) a specific named architectural smell. **"It
-  costs more" is NOT a recommendation against** — cost is the user's
+  costs more" is NOT a recommendation against** - cost is the user's
   call. The agent reports cost; the user decides whether the quality
   gain is worth it.
 
@@ -285,7 +281,7 @@ For each option produce exactly this block, in this order, no rewording:
   touches is technical debt to resolve"), the skip/partial option is the
   one CARRYING the architectural debt. Therefore:
   - `shittiness(skip/partial-that-leaves-debt) ≥ shittiness(complete-refactor)`.
-    If you wrote the reverse, your scores are INVERTED — fix them. The
+    If you wrote the reverse, your scores are INVERTED - fix them. The
     complete refactor is the FLOOR; it can never be scored the shittier
     choice. There is no set in which "leave the duplication" is cleaner
     than "remove the duplication".
@@ -293,22 +289,22 @@ For each option produce exactly this block, in this order, no rewording:
     the skip/partial option can NEVER be the recommended one. "Lean toward"
     the partial on "smaller blast radius / touches fewer files / fewer
     working boards / lower regression risk" is COST masquerading as
-    quality — the inverse-inflation smuggle in its most common live form.
+    quality - the inverse-inflation smuggle in its most common live form.
     Blast radius and regression risk are cost; they go in the Cost row and
     are the user's call, never a shittiness or recommendation input.
   - If the skip/partial option leaves a state the rules forbid (new
     duplication, an un-refactored module the task already had to touch), it
-    COLLAPSES to a one-line FORBIDDEN entry — it is not a presentable
+    COLLAPSES to a one-line FORBIDDEN entry - it is not a presentable
     choice at all.
   - When both options are genuinely rule-compliant and differ ONLY in
     scope, present them neutrally, report cost on each, and recommend the
-    MORE complete one or recommend none — never the lazier one.
+    MORE complete one or recommend none - never the lazier one.
   The tell this kills: scoring "do the proper full refactor" as MORE
   shitty than "do part of it / leave the duplication", then recommending
   the partial on cost. That steers the user to the lazy option by
-  mis-scoring — the exact psychological manipulation `/verify-options`
+  mis-scoring - the exact psychological manipulation `/verify-options`
   exists to prevent.
-- **Carefulness: X%** — how rigorously you examined this option's
+- **Carefulness: X%** - how rigorously you examined this option's
   implications: prerequisites verified, affected code paths read,
   integration points understood.
 
@@ -316,7 +312,7 @@ For each option produce exactly this block, in this order, no rewording:
   user.** Lower than 80% means agent-closable gaps remain unresolved.
   Two gap categories:
 
-  - **Agent-closable gaps** — resolvable by the agent itself: reading
+  - **Agent-closable gaps** - resolvable by the agent itself: reading
     a file, running a grep, decompiling a function in IDA, checking
     BSP source, reading an existing service.h, looking at the build
     output. **These MUST be closed before presentation.** Naming
@@ -324,10 +320,10 @@ For each option produce exactly this block, in this order, no rewording:
     consumers", "haven't read service.h", "haven't traced what
     else lives in WndProc", "haven't confirmed the multi-inheritance
     shape") and presenting the option anyway is **laziness, not
-    honest disclosure** — the user is being asked to pick between
+    honest disclosure** - the user is being asked to pick between
     options the agent didn't bother to verify, on data too soft for
     an honest decision.
-  - **User-input-required gaps** — needs user decision, external
+  - **User-input-required gaps** - needs user decision, external
     constraint, architectural direction the user hasn't given. CAN
     remain open in the presented characterization, but must be
     named with WHY they require user input ("user must decide
@@ -337,12 +333,12 @@ For each option produce exactly this block, in this order, no rewording:
   Each closed gap should cite the artifact that closed it (file
   path + line range, grep output, decompile snippet, BSP path).
   These citations are Evidence Grounding for the Carefulness
-  rating itself — without them, the rating is fabricated.
+  rating itself - without them, the rating is fabricated.
 
   This is the agent's own review-rigor metric on the option, **NOT
   a comparative score across options.** Honest disclosure of
   *user-input-required* gaps is welcomed; honest disclosure of
-  *agent-closable* gaps is laziness — close them instead of
+  *agent-closable* gaps is laziness - close them instead of
   disclosing them.
 
   Red flag: Carefulness ≥ 80% on a non-trivial option with zero
@@ -355,7 +351,7 @@ For each option produce exactly this block, in this order, no rewording:
   practical, integration points named (call sites, register handlers,
   service boundaries crossed, refactor surface). **This is the ONLY
   place cost lives in a characterization.** Cost must NOT appear in
-  the Shittiness % — see Shittiness row's inverse-inflation-smuggle
+  the Shittiness % - see Shittiness row's inverse-inflation-smuggle
   clause.
 
   Cost is the user's decision input. The agent measures and reports
@@ -363,11 +359,11 @@ For each option produce exactly this block, in this order, no rewording:
   ("too expensive", "would block this task", "too big a refactor",
   "out of scope because of size"). The user decides whether the
   quality gain is worth the cost. Cost-based recommendations against
-  are verdict-smuggling on the size axis — see anti-patterns.
+  are verdict-smuggling on the size axis - see anti-patterns.
 
   Forecasted cost (future-board cost, "every CE board will eventually
   need this", "second consumer of this abstraction") is NOT cost. The
-  Cost row reports cost of THIS option as currently written — files
+  Cost row reports cost of THIS option as currently written - files
   and LOC the change touches today. Forecasts belong in the rationale
   paragraph as the agent's architectural opinion, never in this row.
 - **Rule violation:** `<named rule> (<file path> § <section>)` or `none`.
@@ -381,7 +377,7 @@ For each option produce exactly this block, in this order, no rewording:
 
   **Citation is mandatory.** If you cannot paste the rule passage in
   the next turn from the file you cited, the label is fabricated and
-  the entire characterization is invalid — re-do without that label.
+  the entire characterization is invalid - re-do without that label.
   Fabricated rule labels are the worst-class smuggle in this skill
   because they weaponize the collapse mechanism against legitimate
   options. Common fabricated shapes to watch for in your own output:
@@ -390,23 +386,23 @@ For each option produce exactly this block, in this order, no rewording:
   `matches <existing behavior>`. None of these are rules unless the
   matching named rule actually exists in CLAUDE.md or under
   `agent_docs/`. "Scope cut" specifically IS a real rule pattern in
-  `agent_docs/rules.md` — but the scope being cut must be something
+  `agent_docs/rules.md` - but the scope being cut must be something
   the *user explicitly asked for*, not the agent's engineering
   preference dressed as user scope.
 
   If you write `none`, you must still defend it against the rule
   list. Writing `none` without checking is its own tell.
-- **Reader-side suppression: yes/no** — the mechanical test from
+- **Reader-side suppression: yes/no** - the mechanical test from
   `agent_docs/rules.md`: does the option modify the code that PRODUCES
   the bad state (no), or the code that READS / TOLERATES / GUARDS
-  AGAINST it (yes)? Most bailouts fail here under euphemism — if the
+  AGAINST it (yes)? Most bailouts fail here under euphemism - if the
   option's framing uses any of: pattern, architectural improvement,
   simplification, refactor, robustness, defensive, guard against,
   tolerate, handle gracefully, lock-free, snapshot, immutable, elegant,
-  cleaner, safer, sidestep, route around, avoid — re-check this row
+  cleaner, safer, sidestep, route around, avoid - re-check this row
   with hostile eyes before answering `no`.
 
-  The producer / reader test is at the **SEMANTIC level** — *which
+  The producer / reader test is at the **SEMANTIC level** - *which
   state the option modifies*, not which subsystem in the code pipeline
   emits the change. An option that modifies a JIT emit, a code
   generator, or a translation layer can still be reader-side: if it
@@ -416,8 +412,8 @@ For each option produce exactly this block, in this order, no rewording:
   invariant the option exists to work around. If the option fixes
   that invariant at its source (where the wrong value is set),
   producer-side. If the option patches every site that consumes the
-  wrong invariant — including "emit a per-access cmov", "wrap every
-  call in a shim", "guard every iteration" — it is reader-side.
+  wrong invariant - including "emit a per-access cmov", "wrap every
+  call in a shim", "guard every iteration" - it is reader-side.
   Permanent per-access taxes are the canonical form: the tax exists
   forever because the producer was never aligned. Picking the
   code-pipeline framing of "producer-side" on a tax-forever option
@@ -428,7 +424,7 @@ For each option produce exactly this block, in this order, no rewording:
   "real CE does X", "should work because", "per COM rules", general
   knowledge dressed as proof. If you can't cite the artifact, it's
   commentary.
-- **Bailout attempt: yes/no** — is this dressed-up exit-ramp behavior?
+- **Bailout attempt: yes/no** - is this dressed-up exit-ramp behavior?
   Telltales: appears when you're tired/stuck; named in terms of "the
   simplest thing"; cuts scope the user asked for; defers the actual
   question to a "next agent" / "next session"; reaches for a different
@@ -436,12 +432,12 @@ For each option produce exactly this block, in this order, no rewording:
   **substitutes a permanent runtime cost / per-access tax / per-call
   shim / per-iteration guard for a one-time abstraction-level fix at
   the conflict point.** "More work for more performance" is not a
-  defense — the pattern is *option exists because the agent isn't
+  defense - the pattern is *option exists because the agent isn't
   committing to the abstraction-level fix at the actual conflict
   point*. Tax-forever options can be MORE work than the direct fix
   and still be bailouts; the literal-text defense against the
   "simplest thing" telltale doesn't rescue them.
-- **Pure shit: yes/no** — final summary verdict. If any of the four
+- **Pure shit: yes/no** - final summary verdict. If any of the four
   qualifying-flag rows above flipped against the option, this is `yes`
   by definition.
 
@@ -457,13 +453,13 @@ If ANY of these is true for an option:
 …then the option's ENTIRE entry collapses to one line, in this exact shape:
 
 ```
-Option N — <title> — FORBIDDEN [reason: <pure shit | bailout | RSS | rule:<name>>]
+Option N - <title> - FORBIDDEN [reason: <pure shit | bailout | RSS | rule:<name>>]
 ```
 
 No rationale paragraph. No "but it could work if". No "in a different
 framing it would be fine". No counter-argument. One line. Then move on.
 
-High Shittiness % alone does NOT trigger collapse — it's a continuous
+High Shittiness % alone does NOT trigger collapse - it's a continuous
 metric on surviving options. A high % with all four flags `no` means you
 haven't honestly answered the flags; go back and re-answer.
 
@@ -480,8 +476,8 @@ Same rule shape as `agent_docs/rules.md` § Euphemism smuggling:
 *"Once caught, the specific change is dead for the rest of the session."*
 
 **Session-permanence is GATED on the collapse being legitimate.** A
-fabricated collapse — one triggered by a smuggle vector named in the
-anti-patterns section — is **part of the smuggle, NOT part of the
+fabricated collapse - one triggered by a smuggle vector named in the
+anti-patterns section - is **part of the smuggle, NOT part of the
 skill's enforcement**, and the session-permanence rule does not
 protect it. See "Restoring fabricated collapses" below.
 
@@ -504,7 +500,7 @@ A collapse is **fabricated** when it was triggered by any of:
 A fabricated collapse is **part of the smuggle, NOT part of the
 skill's enforcement.** The session-permanence rule cannot be cited
 to keep a fabricated collapse in force; doing so is a second
-fabrication on top of the first — weaponizing the skill's own
+fabrication on top of the first - weaponizing the skill's own
 defense to preserve the prior smuggle.
 
 ### Detection triggers
@@ -529,13 +525,13 @@ When a fabricated collapse is detected, immediately:
 1. **Acknowledge the fabrication explicitly to the user**, by name:
 
    > "Option [N] was collapsed under a fabricated label of
-   > `[original reason]`. That label was [why it's fabricated —
+   > `[original reason]`. That label was [why it's fabricated -
    > rule citation fails, cost-as-quality inflation, self-defined
    > scope, etc.]. Restoring the option."
 
 2. **Re-characterize the restored option fully** under the 8-row
    protocol, with Carefulness ≥ 80%. Close all agent-closable gaps
-   first — the original collapse skipped that verification work;
+   first - the original collapse skipped that verification work;
    the restoration MUST do it before the option is presented again.
 
 3. **Surface the downstream consequence to the user.** If any
@@ -556,7 +552,7 @@ When a fabricated collapse is detected, immediately:
 This protocol is mandatory regardless of how much downstream work
 has been shipped under the fraudulent option-set. The cost of
 re-evaluation is the cost of the original smuggle, not a separate
-new cost. "We already shipped X" is not a defense — the user
+new cost. "We already shipped X" is not a defense - the user
 shipped X under fraud and is entitled to revisit.
 
 ## Surviving options
@@ -572,7 +568,7 @@ AND a short rationale paragraph explaining:
 
 **Cost lives in the Cost row, not the rationale paragraph.** The
 rationale explains positioning; the Cost row reports size. Mixing them
-re-opens the inverse-inflation-smuggle surface — the agent can dress
+re-opens the inverse-inflation-smuggle surface - the agent can dress
 cost as "architectural concern" in the rationale and then point at the
 "concern" to inflate Shittiness.
 
@@ -586,11 +582,11 @@ characteristic blocks; user picks.
 
 **All options collapse** → STOP. Do NOT propose replacement options
 in the same message yet. First, output a one-line diagnosis of the
-SHARED failure mode across all collapsed options — what pattern made
+SHARED failure mode across all collapsed options - what pattern made
 every option you generated land badly:
 
 > "All proposed options collapsed. Shared failure mode: <one-sentence
-> diagnosis — e.g. 'every option proposed reader-side suppression
+> diagnosis - e.g. 'every option proposed reader-side suppression
 > under a different euphemism', 'every option reached for a different
 > exit ramp instead of the direct fix at the conflict site', 'every
 > option cut scope the user asked for'>."
@@ -598,7 +594,7 @@ every option you generated land badly:
 Only THEN may you propose exactly ONE replacement option, and only if
 you can show the replacement does not repeat the diagnosed failure
 mode. The replacement gets the same 8-row characterization treatment
-as the originals — if it collapses, you are done; STOP and ask the
+as the originals - if it collapses, you are done; STOP and ask the
 user for direction. Do NOT generate Option 2 of the replacement set.
 The slot is dead.
 
@@ -613,12 +609,12 @@ The slot is dead.
   artifact in this session
 - Rephrasing a collapsed option as a new option after the collapse
 - Combining a collapsed option with a surviving one
-- Generating Option N+1 to replace a collapsed Option N — the slot is
+- Generating Option N+1 to replace a collapsed Option N - the slot is
   dead, not the index
 - Pitching a "creative" Option N+1 outside the all-collapse-replacement
   protocol when one option already survived. If something survived,
   the surviving option is the answer; do not dilute it with siblings.
-- Penalizing the proper option for honest disclosure — listing a low
+- Penalizing the proper option for honest disclosure - listing a low
   Carefulness % with named verification gaps on the proper fix while
   marking a hack option as Carefulness ≥ 60% with zero disclosed
   unknowns. This is a steering move that buries the proper option
@@ -644,7 +640,7 @@ The slot is dead.
   named rules in CLAUDE.md / `agent_docs/`. Using a fabricated label
   to invoke the collapse rule weaponizes the skill's own enforcement
   mechanism against the user. This is the worst-class smuggle in the
-  skill — every other manipulation defends against bad options being
+  skill - every other manipulation defends against bad options being
   dressed as legitimate; this one kills legitimate options using the
   collapse rule itself. If you cannot cite the rule by file path +
   section in the next turn, the label is fake and the collapse is
@@ -654,10 +650,10 @@ The slot is dead.
   "this is steering", "you collapsed the wrong one"), identify the
   SPECIFIC row / option / cross-option framing the user is pointing
   at BEFORE responding. Do NOT pick a different option to "fix" as a
-  visible concession — that is contrition theater dodging the actual
+  visible concession - that is contrition theater dodging the actual
   point. If three options were collapsed and the user pushes back,
   find out WHICH one before doing anything else. Performing a visible
-  "fix" on the wrong target is itself a smuggle move — it deflects
+  "fix" on the wrong target is itself a smuggle move - it deflects
   attention to a separate fix instead of confronting the real catch.
 - **Inflating Shittiness % to steer without formally collapsing.** A
   high score (≥ 50%) on an option with all four binary flags `no` and
@@ -665,9 +661,9 @@ The slot is dead.
   has a verdict ("steer the user away from Option N") that the
   collapse rule won't deliver because there's no citable rule
   violation, so the verdict moves to the only unguarded surface left
-  — the continuous score. Score-prose contradiction is the tell
+  - the continuous score. Score-prose contradiction is the tell
   ("80% but it's actually a real choice" = the score is lying and the
-  prose admits it). This is fraud-shaped, not engineering —
+  prose admits it). This is fraud-shaped, not engineering -
   falsifying numbers in a decision document to steer a stakeholder.
   Treated with the same severity as fabricated rule labels.
 - **Recommending against an uncollapsed option without measured
@@ -676,7 +672,7 @@ The slot is dead.
   four binary flags are all `no` must be backed by either a citable
   rule violation (which means it should have collapsed) or a measured
   cost differential. Without one of those, the recommendation is
-  verdict-smuggling through the continuous metric — bypassing the
+  verdict-smuggling through the continuous metric - bypassing the
   collapse rule's citation requirement on the numeric axis.
 - **Self-defined scope as a dismissal mechanism.** "Out of scope for
   this task" claimed by the agent against an option the agent itself
@@ -684,12 +680,12 @@ The slot is dead.
   rather than the user's explicit ask, is fabricated-scope-cut. The
   user defines task scope; the agent does not get to set a ceiling
   and then dismiss options that exceed it. Same shape as fabricated
-  rule labels — the agent invents the constraint, then applies it.
+  rule labels - the agent invents the constraint, then applies it.
 - **Cost-inflation against the correct fix (inverse inflation
   smuggle).** Folding an option's cost (LOC, files, refactor size,
   integration count) into its Shittiness % to manufacture a high
   quality-score on the architecturally correct fix. Inverse of
-  inflating Shittiness on a bad option — same severity, same fraud
+  inflating Shittiness on a bad option - same severity, same fraud
   shape, opposite direction. Mechanism: agent has a verdict ("the
   correct fix is too expensive, steer the user toward the hack")
   that the collapse rule won't deliver because the correct fix has
@@ -701,7 +697,7 @@ The slot is dead.
 - **Recommending against an option on cost grounds.** "Option N is
   too expensive" / "would block this task" / "out of scope because
   of size" / "too big a refactor" / "would take too long" is
-  verdict-smuggling on the cost axis — converting a user decision
+  verdict-smuggling on the cost axis - converting a user decision
   (is this cost worth it?) into an agent recommendation (don't pick
   this). The agent reports cost in the Cost row; the user decides
   whether to pay it. Recommendations against an option must be
@@ -724,10 +720,10 @@ The slot is dead.
   smell another option introduces that this one fixes), the agent's
   summary line MUST either recommend that option OR make no
   recommendation. Recommending a less-correct option in the summary
-  is internal contradiction — agent admitted which is right and then
+  is internal contradiction - agent admitted which is right and then
   steered the user toward a different one anyway. Phrasings to watch
   in your own output:
-  - "I lean toward [non-correct] — it [solves smell X] — but
+  - "I lean toward [non-correct] - it [solves smell X] - but
     [correct] is the structurally correct one"
   - "My personal lean is [non-correct], though [correct] addresses
     the real smell"
@@ -742,7 +738,7 @@ The slot is dead.
   [correct] addresses the real smell" tail clause is the tell: agent
   KNOWS the right answer and is documenting that knowledge while
   recommending against it. Same severity as fabricating a rule label
-  — the agent's own characterization is the citable source, and the
+  - the agent's own characterization is the citable source, and the
   recommendation contradicts it.
 - **Cost-as-benefit-of-X is cost-against-Z.** Citing X's "benefit"
   as "avoiding Z's [refactor / scope / size / dependency / surface
@@ -750,14 +746,14 @@ The slot is dead.
   of X. The Cost row already reports Z's cost; the agent does NOT
   get to re-cite it as a positive for X. Honest benefit-of-X
   citations name X's own quality merits (the named smell it removes,
-  the abstraction it provides, the layering it fixes) — never the
+  the abstraction it provides, the layering it fixes) - never the
   cost it spares vs an alternative. This is the inverted form of
   the "Recommending against an option on cost grounds" anti-pattern
-  above — same forbidden behavior, positive framing about a
+  above - same forbidden behavior, positive framing about a
   different option.
 - **Disclosing agent-closable gaps instead of closing them.** Naming
   a Carefulness gap that the agent could resolve by reading code,
-  running grep, decompiling a function, checking BSP source — and
+  running grep, decompiling a function, checking BSP source - and
   then presenting the option to the user anyway with the gap still
   open. This is laziness, not honest disclosure: the user is being
   asked to pick between options whose mechanisms the agent didn't
@@ -768,17 +764,17 @@ The slot is dead.
   does it BEFORE presenting, not after the user picks. The pattern
   to catch: any sentence shaped "I haven't [read / grepped /
   decompiled / checked] X yet" in a Carefulness gap means the
-  presentation is premature — go close the gap, then present.
+  presentation is premature - go close the gap, then present.
 - **Citing session-permanence to defend an earlier fabricated
   collapse.** "The skill says collapsed options are dead, I can't
   bring it back" is invalid when the original collapse was
   fabricated (rule citation fails, cost-as-quality inflation,
   self-defined scope, etc.). Session-permanence applies only to
   legitimate collapses; citing it to keep a fabricated collapse in
-  force is a **second fabrication on top of the first** —
+  force is a **second fabrication on top of the first** -
   weaponizing the skill's own enforcement to preserve the prior
   smuggle, after the original weaponization (the fake label) has
-  already fired. See "Restoring fabricated collapses" above —
+  already fired. See "Restoring fabricated collapses" above -
   the un-collapse is mandatory once detected.
 - **Detecting own fabricated collapse and continuing on the
   steered path.** Admitting "I wrongly collapsed [N]" while keeping
@@ -810,7 +806,7 @@ The slot is dead.
   "Done with a caveat" is "not done"; the caveat IS the unfinished
   work. Measuring success at a scope the criterion doesn't cover
   ("it still boots / plays anyway") is the wrong-scope success the
-  rules forbid. Collapses FORBIDDEN — the agent does not get to move
+  rules forbid. Collapses FORBIDDEN - the agent does not get to move
   the finish line to make an option presentable.
 
 ## Why this skill exists
@@ -818,7 +814,7 @@ The slot is dead.
 Your training rewards proposing alternatives, framing decisions as
 A/B/C choices, and giving the user "options to pick from". That bias
 produces option lists where most entries are bailouts, reader-side
-suppression, scope cuts, or rule violations — dressed in neutral
+suppression, scope cuts, or rule violations - dressed in neutral
 technical language so they look like legitimate engineering choices
 alongside the real fix. Granting parity to a bailout by listing it
 alongside a legitimate option IS the violation; the user picking it

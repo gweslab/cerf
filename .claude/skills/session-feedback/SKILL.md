@@ -1,6 +1,6 @@
 ---
 name: session-feedback
-description: Invoke at the end of a session, or when the user asks "anything to add to CLAUDE.md?", "session feedback", "learnings", or types `/session-feedback`. Decides whether a failure hit this session will hit the next agent too, then proposes a durable entry that prevents it - in `agent_docs/` or CLAUDE.md for project knowledge, in user memory for machine-specific facts. Proposes entries for approval first and edits no file until the user approves. Use this skill whenever the user wants a lesson, rule, or gotcha from the session captured so nobody rediscovers it.
+description: Propose a durable rule from a failure in this session, for the user to approve.
 ---
 
 # Session Feedback

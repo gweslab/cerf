@@ -1,6 +1,6 @@
 ---
 name: supported-devices
-description: The user invokes `/supported-devices` after board work landed - either a whole new board bring-up or a single feature on an existing board. It syncs the board's row in `bundled/db.json` with reality (append the device row / flip `supported` / flip the feature entries the agent actually worked on), then runs `./compile_readme.py` to regenerate `README.md`. Invoke when the user types `/supported-devices` or asks to update the supported boards list.
+description: Update the supported-boards list after work on a board (only user triggered, no agent self-invocation).
 ---
 
 # supported-devices - sync the boards list with what just landed

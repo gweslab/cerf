@@ -1,6 +1,6 @@
 ---
 name: start-board-implementation
-description: The user invokes `/start-board-implementation` to begin bringing up a NEW board/ROM in CERF. It acquires the ROM (naming the board is enough - no path required), checks IDA MCP, then independently confirms - from the ROM bytes and the internet - the board identity, the SoC/CPU family, what CERF already supports, and any reusable SoC. It shows a fixed emoji readiness table + session estimate and asks `[yes|no]`. On `yes` it seeds a cross-session tracking doc and drives the boot-driven bring-up loop (build → run → read the first fault → research → implement fully → `/verify` → repeat). Invoke when the user types `/start-board-implementation`.
+description: Start the bring-up of a new board or ROM in CERF.
 ---
 
 # Start Board Implementation - new-board bring-up

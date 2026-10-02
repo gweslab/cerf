@@ -1,6 +1,6 @@
 ---
 name: changelog-append
-description: The user invokes `/changelog-append` to record a change just made (bug fix, feature, etc.) as a concise changelog entry. It appends one raw line under the right component group + subcategory of the top (latest) version block in `docs/changelog.yml`, then runs `./compile_readme.py` to regenerate `README.md`. Invoke when the user types `/changelog-append` or asks to add a changelog entry.
+description: Add a changelog entry for a change that was just made (only user triggered, no agent self-invocation).
 ---
 
 # changelog-append - record one change in the changelog

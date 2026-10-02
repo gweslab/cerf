@@ -1,6 +1,6 @@
 ---
 name: cerf
-description: The user types `/cerf` to see the index of the project skills. The skill lists each skill in `.claude/skills/`, with one line for each. Then it offers the environment doctor (`setup.ps1 -Check`) and stops. The doctor runs only when the user agrees. The doctor makes sure that the git hooks are active through core.hooksPath, that the .claude hooks are present and compile, that the submodules are initialized, and that vcpkg is integrated. Invoke when the user types `/cerf`.
+description: List the project skills and offer the environment doctor.
 ---
 
 # /cerf - project skill index

@@ -23,46 +23,22 @@ def main() -> int:
     except ValueError:
         rel = file_path.replace("\\", "/")
 
-    if rel == "CLAUDE.md":
-        category = "CLAUDE-MD"
-        body = (
-            "CLAUDE.md is the source of truth for the entire project. Your "
-            "edit reshapes every future agent's system prompt. Per user "
-            "memory § 'CLAUDE.md is source of truth': edits require "
-            "explicit user direction."
-        )
-    elif rel.startswith("agent_docs/"):
-        category = "AGENT-DOCS"
-        body = (
-            "Per CLAUDE.md: 'All agent_docs/ pages are user-curated. Do NOT "
-            "edit them drive-by because a filename looks like where your "
-            "note belongs - these files land in every future agent's system "
-            "prompt and a stray edit silently reshapes it. Edits happen "
-            "only when the user directs one or when an approved skill "
-            "(e.g. session-feedback) runs with explicit user sign-off.'"
-        )
-    else:
+    if rel != "CLAUDE.md" and not rel.startswith("agent_docs/"):
         return 0
 
     msg = (
-        f"{category}-EDIT: you just modified {rel}. {body} If the user did "
-        f"NOT explicitly authorize THIS specific edit in this turn, REVERT "
-        f"immediately and surface the deviation back to the user. Silent "
-        f"agent rewrites of project documentation are how rules get "
-        f"rewritten without the user noticing. Exception is when you actually "
-        f"change a real subsystem, coordinated with user or it's a /verify agent "
-        f"requirement. Any changes ALWAYS follow Skill(leak) and Skill(simple-english) "
-        f"invocations to reduce retarded AI slop."
+        f"You edited {rel}. If the user did not authorize this edit, revert "
+        f"it. If the edit is the task, or the task depends on it, run /leak "
+        f"and /simple-english over it."
     )
 
-    out = {
+    json.dump({
         "hookSpecificOutput": {
             "hookEventName": "PostToolUse",
             "additionalContext": msg,
         },
-        "systemMessage": f"[CLAUDE.md hook] {category} edited: {rel}",
-    }
-    json.dump(out, sys.stdout)
+        "systemMessage": f"[CLAUDE.md hook] project docs edited: {rel}",
+    }, sys.stdout)
     return 0
 
 

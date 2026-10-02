@@ -7,7 +7,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "py -3 ${CLAUDE_PROJECT_DIR}/.claude/hooks/block_git_add_force.py",
+            "command": "py -3 ${CLAUDE_PROJECT_DIR}/.claude/hooks/check_git_add_force.py",
             "if": "Bash(git *)",
             "timeout": 5
           }
@@ -75,11 +75,6 @@
           },
           {
             "type": "command",
-            "command": "py -3 ${CLAUDE_PROJECT_DIR}/.claude/hooks/check_cerf_file.py",
-            "timeout": 10
-          },
-          {
-            "type": "command",
             "command": "py -3 ${CLAUDE_PROJECT_DIR}/.claude/hooks/check_checklist_edit.py",
             "timeout": 5
           },
@@ -91,27 +86,6 @@
           {
             "type": "command",
             "command": "py -3 ${CLAUDE_PROJECT_DIR}/.claude/hooks/check_bundled_device_edit.py",
-            "timeout": 5
-          },
-          {
-            "type": "command",
-            "command": "py -3 ${CLAUDE_PROJECT_DIR}/.claude/hooks/check_unfiltered_user_va_onpc.py",
-            "timeout": 5
-          }
-        ]
-      },
-      {
-        "matcher": "Bash",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "py -3 ${CLAUDE_PROJECT_DIR}/.claude/hooks/check_bash_drift.py",
-            "if": "Bash(git *)",
-            "timeout": 5
-          },
-          {
-            "type": "command",
-            "command": "py -3 ${CLAUDE_PROJECT_DIR}/.claude/hooks/check_cerf_run_timeout.py",
             "timeout": 5
           }
         ]

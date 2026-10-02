@@ -1,6 +1,6 @@
 ---
 name: commit
-description: The user invokes `/commit` to create a git commit. Agents reflexively narrate the session into the commit body - conversation echoes, incident history, essays about a one-line edit. This skill forces a short, self-contained message that describes the DIFF and nothing else. Fewer words is better. A one-line title is the target. Invoke when the user types `/commit` or asks to commit changes.
+description: Create a git commit with a short message that describes the diff.
 ---
 
 # Commit - short, leak-free git commit

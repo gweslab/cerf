@@ -68,7 +68,7 @@ Claude can implement a board end-to-end without user interaction through the fol
 
 Hit fatal exit -> Implemented the feature -> Ran - it works -> Spawning Skill(verify) until LEGIT -> Repeat
 
-It is also suggested for user to set /goal harness, which demands UI working rendering and device confirmed to be usable. In the same /goal user should demand autonomous workflow per project rules and invoking /bad, /verify-options, /bailout on turn ends.
+It is also suggested for user to set /goal harness, which demands UI working rendering and device confirmed to be usable. In the same /goal user should demand autonomous workflow per project rules and invoking /bad and /verify-options on turn ends.
 
 The user also should manually invoke /tracking skill on session boundaries (never agent invoked).
 

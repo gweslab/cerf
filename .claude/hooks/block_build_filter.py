@@ -33,26 +33,9 @@ def main() -> int:
 
     bad = (subst or tail_hit).group(0).replace("\n", "\\n")
     reason = (
-        f"BLOCKED: something runs after build.ps1 in this call "
-        f"(found `{bad}` after the build.ps1 token). build.ps1 must be "
-        f"the LAST thing that runs - anything chained after it masks "
-        f"its exit code, so a failed build reports success.\n\n"
-        f"Only output redirection may follow build.ps1. A trailing "
-        f"command, pipe, `&&`/`||`/`;`/newline, `echo $?`, command "
-        f"substitution (`$( )` / backticks), or another program after "
-        f"build is blocked - each makes the exit status come from the "
-        f"trailing construct instead of build, or hides build's "
-        f"output.\n\n"
-        f"Use exactly one of these two forms:\n"
-        f"  1. Run build.ps1 with nothing after it - full output and "
-        f"exit code reach you directly.\n"
-        f"  2. `build.ps1 > build.log 2>&1` with nothing after the "
-        f"redirection, then Read build.log in a SEPARATE call.\n\n"
-        f"Running the build and inspecting its result are TWO separate "
-        f"calls. If you run the build in the background, the same rule "
-        f"holds: nothing may follow build.ps1, or the completion "
-        f"notification's exit code is the trailing command's, not the "
-        f"build's."
+        f"BLOCKED: `{bad}` after build.ps1 masks the build exit code. Run "
+        f"build.ps1 last, with nothing after it but an output redirect. Read "
+        f"the log in a separate call."
     )
 
     out = {
@@ -61,10 +44,7 @@ def main() -> int:
             "permissionDecision": "deny",
             "permissionDecisionReason": reason,
         },
-        "systemMessage": (
-            f"[CLAUDE.md hook] BLOCKED: command runs after build.ps1 "
-            f"(masks exit code)"
-        ),
+        "systemMessage": "[CLAUDE.md hook] BLOCKED: command after build.ps1",
     }
     json.dump(out, sys.stdout)
     return 0

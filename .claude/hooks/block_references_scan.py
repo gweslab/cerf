@@ -8,6 +8,8 @@ import sys
 RELATIVE_ROOTS = {".", "./", "*", "**", ""}
 REFERENCES_ROOTS = {"references", "references/*", "references/**"}
 PATTERN_TOOLS = ("grep", "rg", "select-string", "sls")
+REPO_ROOT = "the repository root and all of references/"
+REFERENCES = "all of references/"
 
 RECURSIVE_BASH = re.compile(
     r"(?:^|[;&|]\s*)(?:sudo\s+)?(grep|rg|find|ls|du)\b([^;&|]*)")
@@ -77,12 +79,12 @@ def offending(cmd, powershell, root):
         if low in PATTERN_TOOLS and ops:
             ops = ops[1:]
         if not ops:
-            return (tool, "the repo root")
+            return (tool, REPO_ROOT)
         for path in ops:
             if is_references_root(path, root):
-                return (tool, "references/")
+                return (tool, REFERENCES)
             if is_repo_root(path, root):
-                return (tool, "the repo root")
+                return (tool, REPO_ROOT)
     return None
 
 
@@ -103,7 +105,7 @@ def main():
                 or strip_root(pattern, root).startswith("references/")
                 or is_references_root(path, root)):
             return 0
-        hit = ("Glob", "references/")
+        hit = ("Glob", REFERENCES)
     else:
         cmd = tool_input.get("command", "")
         if not cmd:
@@ -113,16 +115,9 @@ def main():
             return 0
 
     reason = (
-        "BLOCKED: `%s` recurses into %s, so it walks all of references/. "
-        "That tree is terabytes, so the scan never finishes. You can "
-        "search references/. This guard blocks only the recursive walk.\n"
-        "Use instead:\n"
-        "  - the Grep tool with a narrowed `path`. It searches references/ "
-        "and every subdirectory under it.\n"
-        "  - `ls references/<subdir>/` to see what one directory holds. The "
-        "tree is several levels deep.\n"
-        "  - `git grep <pat>` for tracked files only. It cannot see "
-        "references/ at all."
+        "BLOCKED: `%s` walks %s recursively. That scan never finishes. Use "
+        "the Grep tool with a narrowed `path`, or run `ls` on one "
+        "subdirectory of references/."
     ) % hit
 
     json.dump({

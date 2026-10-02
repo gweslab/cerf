@@ -50,13 +50,17 @@ void HostAutoResize::OnUserResizeEnd(uint32_t canvas_w, uint32_t canvas_h) {
 
 std::wstring HostAutoResize::Tooltip() const {
     if (!emu_.Get<GuestAdditionsUiPolicy>().LiveResizeAvailable())
-        return L"Guest Additions - right-click for tools";
+        return L"Guest Additions - click for tools";
     return Enabled()
         ? L"Guest Additions - auto-resize ON (click to disable, right-click for tools)"
         : L"Guest Additions - auto-resize OFF (click to enable, right-click for tools)";
 }
 
-void HostAutoResize::OnPrimaryAction() { Toggle(); }
+bool HostAutoResize::TryPrimaryAction() {
+    if (!emu_.Get<GuestAdditionsUiPolicy>().LiveResizeAvailable()) return false;
+    Toggle();
+    return true;
+}
 
 std::vector<WidgetMenuItem> HostAutoResize::BuildMenu() {
     std::vector<WidgetMenuItem> items;

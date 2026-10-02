@@ -24,7 +24,6 @@ public:
     std::wstring Tooltip() const override;
     void DrawIcon(HDC dc, const RECT& box) const override;
     std::vector<WidgetMenuItem> BuildMenu() override;
-    bool PrimaryActionOpensMenu() const override { return true; }
     bool PollDirty() override;
 
 private:

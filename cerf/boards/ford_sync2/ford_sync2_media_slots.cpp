@@ -30,7 +30,6 @@ public:
         SlotWidget(FordSync2MediaSlots& owner, int slot) : owner_(owner), slot_(slot) {}
         std::wstring WidgetName() const override { return slot_ == FordSync2MediaHub::kSdPort ? L"Media Hub SD" : L"Media Hub USB"; }
         WidgetGroup Group() const override { return WidgetGroup::Usb; }
-        bool PrimaryActionOpensMenu() const override { return true; }
         void DrawIcon(HDC dc, const RECT& box) const override {
             owner_.emu_.Get<HostIconCache>().DrawCentered(dc, box,
                 slot_ == FordSync2MediaHub::kSdPort ? L"ICON_SD_MAP" : L"ICON_USB");

@@ -39,18 +39,16 @@ std::wstring PointerWidget::Tooltip() const {
     auto& router = emu_.Get<PointerRouter>();
     PointerSource* active = router.Active();
     std::wstring tip = active ? active->SourceName() : L"Pointing device";
-    if (router.Sources().size() > 1)      tip += L" - click to switch input device";
-    else if (PrimaryActionOpensMenu())    tip += L" - click to configure";
+    if (router.Sources().size() > 1)                       tip += L" - click to switch input device";
+    else if (AltTapItemVisible() || StylusSimItemVisible()) tip += L" - click to configure";
     return tip;
 }
 
-void PointerWidget::OnPrimaryAction() {
-    emu_.Get<PointerRouter>().CycleNext();
-}
-
-bool PointerWidget::PrimaryActionOpensMenu() const {
-    return emu_.Get<PointerRouter>().Sources().size() < 2 &&
-           (AltTapItemVisible() || StylusSimItemVisible());
+bool PointerWidget::TryPrimaryAction() {
+    auto& router = emu_.Get<PointerRouter>();
+    if (router.Sources().size() < 2) return false;
+    router.CycleNext();
+    return true;
 }
 
 std::vector<WidgetMenuItem> PointerWidget::BuildMenu() {

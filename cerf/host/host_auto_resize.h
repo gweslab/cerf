@@ -28,7 +28,7 @@ public:
     std::wstring WidgetName() const override { return L"Guest Additions"; }
     WidgetGroup  Group() const override { return WidgetGroup::GuestAdditions; }
     std::wstring Tooltip() const override;
-    void OnPrimaryAction() override;
+    bool TryPrimaryAction() override;
     std::vector<WidgetMenuItem> BuildMenu() override;
     void DrawIcon(HDC dc, const RECT& box) const override;
     bool PollDirty() override;

@@ -37,7 +37,7 @@ public:
             return L"Shared folder: off - click to configure";
         return L"Shared folder: " + cfg.HostRoot();
     }
-    void OnPrimaryAction() override { Configure(); }
+    bool MenuIsOneAction() const override { return true; }
     std::vector<WidgetMenuItem> BuildMenu() override {
         std::vector<WidgetMenuItem> items;
         WidgetMenuItem configure;

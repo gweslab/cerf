@@ -38,7 +38,7 @@ private:
     void RebuildTooltips();
     void UpdateTipText(size_t idx, std::wstring text);       /* flicker-free live refresh */
     HostWidget* WidgetAt(int x) const;
-    void PopWidgetMenu(HostWidget* w, int x, int y, UINT button_flag);
+    void SecondaryAction(HostWidget* w, int x, int y, UINT button_flag);
 
     HWND    hwnd_            = nullptr;
     HWND    tip_hwnd_        = nullptr;

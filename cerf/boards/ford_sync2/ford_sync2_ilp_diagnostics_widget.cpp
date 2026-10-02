@@ -19,7 +19,6 @@ public:
     void OnReady() override { emu_.Get<HostWidgetRegistry>().Register(this); }
     std::wstring WidgetName() const override { return L"ILP diagnostics"; }
     WidgetGroup Group() const override { return WidgetGroup::Debug; }
-    bool PrimaryActionOpensMenu() const override { return true; }
     /* Latch the rejection badge after unsupported, invalid, unavailable or malformed
        requests. Dismissal acknowledges the menu's captured failure count without
        clearing counters; any later failure lights the badge again. */

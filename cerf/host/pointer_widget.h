@@ -21,8 +21,7 @@ public:
     std::wstring WidgetName() const override { return L"Pointing device"; }
     WidgetGroup  Group() const override { return WidgetGroup::InputControl; }
     std::wstring Tooltip() const override;
-    void OnPrimaryAction() override;
-    bool PrimaryActionOpensMenu() const override;
+    bool TryPrimaryAction() override;
     std::vector<WidgetMenuItem> BuildMenu() override;
     void DrawIcon(HDC dc, const RECT& box) const override;
     bool PollDirty() override;

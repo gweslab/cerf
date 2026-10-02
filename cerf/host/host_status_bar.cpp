@@ -186,9 +186,15 @@ HostWidget* HostStatusBar::WidgetAt(int x) const {
     return nullptr;
 }
 
-void HostStatusBar::PopWidgetMenu(HostWidget* w, int x, int y, UINT button_flag) {
+void HostStatusBar::SecondaryAction(HostWidget* w, int x, int y, UINT button_flag) {
     auto& reg = emu_.Get<HostWidgetRegistry>();
-    HMENU m = reg.BuildContextMenu(w);
+    auto items = w->BuildMenu();
+    if (w->MenuIsOneAction() && items.size() == 1 && items[0].enabled &&
+        items[0].on_click && items[0].submenu.empty()) {
+        items[0].on_click();
+        return;
+    }
+    HMENU m = reg.BuildContextMenu(items);
     POINT pt = { x, y };
     ClientToScreen(hwnd_, &pt);
     const int id = (int)TrackPopupMenu(m, TPM_RETURNCMD | TPM_LEFTALIGN | button_flag,
@@ -285,18 +291,15 @@ LRESULT HostStatusBar::WndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
         case WM_LBUTTONDOWN: {
             const int x = (int)(short)LOWORD(lp);
             HostWidget* w = WidgetAt(x);
-            if (!w) return 0;
-            if (w->PrimaryActionOpensMenu())
-                PopWidgetMenu(w, x, (int)(short)HIWORD(lp), TPM_LEFTBUTTON);
-            else
-                w->OnPrimaryAction();
+            if (w && !w->TryPrimaryAction())
+                SecondaryAction(w, x, (int)(short)HIWORD(lp), TPM_LEFTBUTTON);
             return 0;
         }
 
         case WM_RBUTTONUP: {
             const int x = (int)(short)LOWORD(lp);
             if (HostWidget* w = WidgetAt(x))
-                PopWidgetMenu(w, x, (int)(short)HIWORD(lp), TPM_RIGHTBUTTON);
+                SecondaryAction(w, x, (int)(short)HIWORD(lp), TPM_RIGHTBUTTON);
             return 0;
         }
 

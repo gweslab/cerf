@@ -46,8 +46,8 @@ The peripheral or board service that owns the LED registers also implements
 
 Some boards put a button in the LED. The LED and its button are one widget.
 
-- `OnPrimaryAction()` presses the button.
-- `BuildMenu()` offers the same press as a named item.
+- The left click presses the button.
+- The menu offers the same press as a named item.
 - **The press drives the pin that the board wires.** The Jornada 720 button is
   GPIO 13. `OnReady` drives that input to its idle level, and the press drives
   the edge. The guest driver turns that edge into an interrupt.

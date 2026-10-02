@@ -26,7 +26,7 @@ public:
     std::wstring WidgetName() const override { return L"Notification LED"; }
     WidgetGroup  Group() const override { return WidgetGroup::Indicator; }
     std::wstring Tooltip() const override;
-    void         OnPrimaryAction() override { PressButton(); }
+    bool         TryPrimaryAction() override { PressButton(); return true; }
     std::vector<WidgetMenuItem> BuildMenu() override;
     void         DrawIcon(HDC dc, const RECT& box) const override;
     bool         PollDirty() override;

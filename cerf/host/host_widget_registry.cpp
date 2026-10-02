@@ -58,10 +58,10 @@ void HostWidgetRegistry::AppendItems(HMENU menu,
     }
 }
 
-HMENU HostWidgetRegistry::BuildContextMenu(HostWidget* w) {
+HMENU HostWidgetRegistry::BuildContextMenu(const std::vector<WidgetMenuItem>& items) {
     ResetIds();
     HMENU m = CreatePopupMenu();
-    AppendItems(m, w->BuildMenu());
+    AppendItems(m, items);
     return m;
 }
 

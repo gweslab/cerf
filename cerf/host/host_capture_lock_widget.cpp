@@ -31,7 +31,10 @@ public:
             : L"Input free - " + key +
                   L" (or click) to capture (Alt+Tab etc. -> guest)";
     }
-    void OnPrimaryAction() override { emu_.Get<HostInputCapture>().Toggle(); }
+    bool TryPrimaryAction() override {
+        emu_.Get<HostInputCapture>().Toggle();
+        return true;
+    }
     std::vector<WidgetMenuItem> BuildMenu() override {
         const std::wstring key = emu_.Get<HostKeyBinding>().Label();
         WidgetMenuItem it;

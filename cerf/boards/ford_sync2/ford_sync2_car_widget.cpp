@@ -23,7 +23,6 @@ public:
     WidgetGroup Group() const override { return WidgetGroup::Indicator; }
     std::wstring Tooltip() const override;
     std::vector<WidgetMenuItem> BuildMenu() override;
-    bool PrimaryActionOpensMenu() const override { return true; }
     void DrawIcon(HDC dc, const RECT& box) const override;
     bool PollDirty() override;
     void SaveWidgetState(StateWriter& w) const override;

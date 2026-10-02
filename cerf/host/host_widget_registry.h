@@ -27,8 +27,7 @@ public:
     static constexpr int kIdEnd  = 0xCFFF;
     bool OwnsCommand(int id) const { return id >= kIdBase && id <= kIdEnd; }
 
-    /* Fresh popup from w->BuildMenu(); caller DestroyMenu()s it. */
-    HMENU BuildContextMenu(HostWidget* w);
+    HMENU BuildContextMenu(const std::vector<WidgetMenuItem>& items);
 
     /* Append a separator + name/submenu per ordered widget (Actions replica). */
     void AppendAllToMenu(HMENU dest);

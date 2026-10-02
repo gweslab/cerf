@@ -1,54 +1,60 @@
 # ROM bundle repositories
 
-The launcher installs and updates ROMs from **bundle repositories**: static HTTP hosting that
-publishes a `manifest.json` catalog and one archive per device. CERF ships with one repository
-configured. You can add others, or run your own.
+The launcher installs and updates ROMs from bundle repositories. A bundle repository is a set of
+static files on an HTTP server. The launcher reads `<repository-url>/manifest.json`, lists the
+devices in it, and downloads one archive for each device over HTTPS. A repository needs no account,
+no API and no code on the server.
 
-A repository is plain file hosting. The launcher reads `<repository-url>/manifest.json`, lists what
-it finds, and fetches archives over HTTPS. No account, no API, no server-side code.
+## Finding and adding a repository
+
+CERF ships with an empty list of repositories. Members of the community run their own repositories.
+You can find them on the [CERF Discord server](https://discord.gg/QREE9Y2v2d).
+
+To add a repository:
+
+1. In the launcher, click **New**, then click **Download ROMs**.
+2. Click **Sources...**.
+3. Click **Add...**.
+4. Type the base URL of the repository, for example `https://example.com/bundles`, and click **OK**.
+   Do not type the path to `manifest.json`.
+5. Click **OK** in the **Bundle repositories** window.
+
+The launcher enables a new repository. To disable a repository, clear its tick. To remove a
+repository, select it and click **Delete**.
+
+CERF keeps the list in `cerf.json` next to `cerf.exe`, under the `bundle_repositories` key.
+[The configuration files](cerf-json.md) describes this file.
 
 ## What the launcher does with a repository
 
-- **Catalog.** Every enabled repository's manifest is fetched and merged into one list in **Download
-  ROMs**. Two repositories may publish a device under the same name; both stay installable.
-- **Metadata before download.** A manifest entry carries that device's whole `cerf.json`, so the
-  board, OS, screen size and notes are known without fetching a single byte of ROM.
-- **Updates.** An installed device records the repository it came from. When the manifest's archive
-  hash changes, the launcher offers an update. When only the metadata changed, it rewrites
-  `cerf.json` and does not re-download the ROM.
-- **Sizes and integrity.** Entries carry the compressed and unpacked size, and a SHA-256 that is
-  verified after download.
-
-### Managing repositories
-
-Open **Download ROMs**, then **Sources...**. Add a repository by its base URL
-(`https://example.com/bundles`, not the path to the manifest), tick it to enable it, or delete it.
-The list lives in `cerf.json` next to `cerf.exe`, under `bundle_repositories` - see
-[the configuration files](cerf-json.md).
+- The launcher downloads the manifest of each enabled repository. It merges the manifests into one
+  list in **Download ROMs**. Two repositories can publish a device under the same name, and you can
+  install both.
+- Each manifest entry contains the full `cerf.json` of its device. The launcher therefore knows the
+  board, the OS, the screen size and the notes before it downloads the ROM.
+- An installed device records the repository that it came from. When the archive hash in the
+  manifest changes, the launcher offers an update. When only the `cerf.json` in the entry changes,
+  the launcher writes the new `cerf.json` and does not download the ROM again.
+- Each entry gives the compressed size and the unpacked size of the archive. It also gives a SHA-256
+  hash, and the launcher compares the downloaded archive with that hash.
 
 ## Running your own repository
 
-The contract, the toolchain and the documentation are at
-**[gweslab/bundles](https://github.com/gweslab/bundles)**. It packs a ROM tree into archives, builds
-`manifest.json`, and publishes the result.
+To run your own repository, use the toolchain at
+[gweslab/bundles](https://github.com/gweslab/bundles). The toolchain packs a ROM tree into archives,
+makes `manifest.json`, and publishes the result. The same place has the contract that a repository
+must follow, and its documentation.
 
 ## Copyright removal
 
-### The main repository
+The CERF project does not host, control or audit bundle repositories. It cannot remove anything from
+them.
 
-If you hold the copyright to content on the repository CERF ships with, or represent the holder,
-send a removal request to **cerfabuse@dz3n.net**. Requests are acted on as soon as possible and the
-content is deleted.
+Each repository can publish its own contact address for removal requests. The address is optional.
+The launcher shows the addresses in the **Copyright removal** window. This window opens from the
+**Download ROMs** window and from the confirmation that the launcher shows before a download. It
+lists each repository of your configuration with its address. A repository also publishes its
+address in the top-level `abuse_email` field of its `manifest.json`.
 
-### Any other repository
-
-The CERF project does not host, control or audit third-party repositories and cannot remove anything
-from them. A repository publishes its own contact address, and that address is optional. Where it
-exists, it is available in two places:
-
-- **The launcher.** **Copyright removal**, in the Download ROMs window and in the download
-  confirmation, lists every configured repository with its contact.
-- **`manifest.json`.** The top-level `abuse_email` field.
-
-A repository that publishes no address gives you no contact. Address its operator or its host
-directly.
+If a repository publishes no contact address, send your request directly to its operator or to its
+host.

@@ -9,6 +9,7 @@ REPO_ROOT = THIS_DIR.parent
 if str(THIS_DIR) not in sys.path:
     sys.path.insert(0, str(THIS_DIR))
 import exe_version
+from branding import PRODUCT_NAME
 from tcl_data_filter import drop_unused_tcl_data
 from PyInstaller.utils.hooks import collect_data_files
 
@@ -69,5 +70,5 @@ exe = EXE(
     entitlements_file=None,
     icon=ICON_PATH,
     version=exe_version.build(VERSION_PATH, NAME + ".exe", NAME,
-                              "Universal Windows CE emulator setup"),
+                              PRODUCT_NAME + " setup"),
 )

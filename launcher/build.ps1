@@ -85,7 +85,7 @@ function Build-LauncherStub([string]$python, [string]$outDir) {
     $obj     = Join-Path $outDir "launcher_stub.obj"
     $out     = Join-Path $outDir "launcher.exe"
     $src     = Join-Path $PSScriptRoot "stub\launcher_stub.c"
-    & $python -c "import sys, exe_version; open(sys.argv[1], 'w', encoding='utf-8').write(exe_version.rc_script(sys.argv[2], 'launcher.exe', 'launcher', 'Universal Windows CE emulator', sys.argv[3:]))" `
+    & $python -c "import sys, exe_version, branding; open(sys.argv[1], 'w', encoding='utf-8').write(exe_version.rc_script(sys.argv[2], 'launcher.exe', 'launcher', branding.PRODUCT_NAME, sys.argv[3:]))" `
         $rc (Join-Path $repo "cerf\version.h") (Join-Path $assets "cerf.ico") (Join-Path $assets "cerf_error.ico")
     if ($LASTEXITCODE -ne 0) {
         Write-Host "[LAUNCHER] FAILED! stub resource script generation returned $LASTEXITCODE"

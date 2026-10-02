@@ -11,10 +11,5 @@
     "ddraw_ipu.dll",
     "ddi_vgx.dll"
   ],
-  "bundle_repositories": [
-    {
-      "url": "https://cerf-bundles.dz3n.net/cerf-bundles",
-      "enabled": true
-    }
-  ]
+  "bundle_repositories": []
 }

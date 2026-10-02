@@ -31,7 +31,7 @@ values into each device's configuration before it reads that device's own file.
     "s3c2410disp.dll"
   ],
   "bundle_repositories": [
-    { "url": "https://cerf-bundles.dz3n.net/cerf-bundles", "enabled": true }
+    { "url": "https://example.com/bundles", "enabled": true }
   ],
   "last_save_state_mode": false,
   "discord_rich_presence": false,
@@ -160,7 +160,7 @@ file is lost. The launcher therefore writes your choices here instead:
 ```json
 {
   "launcher": {
-    "repository_url": "https://cerf-bundles.dz3n.net/cerf-bundles",
+    "repository_url": "https://example.com/bundles",
     "name_on_repository": "devemu_ce5"
   },
   "meta": { "name": "My CE 5 box" },

@@ -19,27 +19,25 @@ class RefreshMixin:
             if isinstance(exc, ManifestVersionError):
                 self._show_manifest_version_error(exc)
             elif exc is not None:
-                self.status_bar.set_status(
-                    "Bundle catalog unavailable - local devices only.")
+                show_error(self, "Operation failed", str(exc))
             else:
                 self._surface_repo_errors()
             self._reload_device_list()
         self._await_future(future, done)
 
     def _surface_repo_errors(self) -> None:
-        errors = getattr(self.manager, "repo_errors", [])
-        if errors:
-            self.status_bar.set_status(
-                f"{len(errors)} bundle repository(ies) unavailable")
+        count = len(self.manager.repo_errors)
+        if count:
+            self.status_bar.set_status("{} bundle {} unavailable".format(
+                count, "repository" if count == 1 else "repositories"))
 
     def _reload_download_sources(
             self,
             done: Callable[[List[DeviceBundle], list, Optional[dict]], None]
     ) -> None:
         if self.busy or self.catalog_loading:
-            done(self.tree_panel.devices,
-                 getattr(self.manager, "repo_errors", []),
-                 getattr(self.manager, "download_places", None))
+            done(self.tree_panel.devices, self.manager.repo_errors,
+                 self.manager.download_places)
             return
         self._set_catalog_loading(True, "Fetching bundle catalog…")
         future = self.manager.submit_refresh()
@@ -49,15 +47,16 @@ class RefreshMixin:
             if isinstance(exc, ManifestVersionError):
                 self._show_manifest_version_error(exc)
             elif exc is not None:
-                show_error(self, "Remote manifest unavailable",
-                           f"{exc}\n\nLocal devices remain available to launch. "
-                           f"Download / update require a reachable remote "
-                           f"manifest - try again later or check your network.")
-            self._surface_repo_errors()
+                show_error(self, "Operation failed", str(exc))
+            else:
+                if self.manager.all_repositories_failed:
+                    show_error(self, "Remote manifest unavailable", "\n\n".join(
+                        "Repository {} failed to load\n\n{}".format(url, error)
+                        for url, error in self.manager.repo_errors))
+                self._surface_repo_errors()
             self._reload_device_list()
-            done(self.manager.list_devices(),
-                 getattr(self.manager, "repo_errors", []),
-                 getattr(self.manager, "download_places", None))
+            done(self.manager.list_devices(), self.manager.repo_errors,
+                 self.manager.download_places)
         self._await_future(future, cb)
 
     def _show_manifest_version_error(self, exc: ManifestVersionError) -> None:

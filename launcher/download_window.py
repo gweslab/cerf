@@ -10,11 +10,13 @@ from device_model import (GROUP_IID_PREFIX, _device_group_key,
                           _device_search_haystack, _table_device_label,
                           _table_os_label)
 from board_info import board_soc_label, board_support_state
+from bundle_repositories import read_repositories
 from copyright_removal_dialog import (BUTTON_LABEL as COPYRIGHT_BUTTON_LABEL,
                                       ContactsFn, show_copyright_removal)
 from dialog_buttons import pack_actions
 from screen_geometry import fit_geometry
 from sources_dialog import SourcesDialog
+from ui_dialogs import BUNDLE_REPOSITORIES_URL, link_label
 import ui_theme as theme
 
 _OSNOTE_PREFIX = "osnote::"
@@ -95,6 +97,15 @@ class DownloadWindow:
         tree.tag_configure("osnote", foreground=theme.FG_DIM)
         tree.bind("<Button-1>", self._on_click)
         self.tree = tree
+        self.vsb = vsb
+
+        self.no_sources = ttk.Frame(body)
+        self.no_sources.grid(row=1, column=0, columnspan=2)
+        ttk.Label(self.no_sources, text="No bundle repositories available.\n",
+                  justify="center").pack()
+        link_label(self.no_sources, "See how to find a bundle repository",
+                   BUNDLE_REPOSITORIES_URL).pack()
+        self._sync_sources_state()
 
         footer = ttk.Frame(body)
         footer.grid(row=2, column=0, columnspan=2, sticky="ew", pady=(8, 0))
@@ -143,8 +154,19 @@ class DownloadWindow:
         self._candidates = self._compute_candidates(devices)
         self._checked.intersection_update(d.key for d in self._candidates)
         self.btn_sources.config(state="normal")
+        self._sync_sources_state()
         self._sync_sort_availability()
         self._refill()
+
+    def _sync_sources_state(self) -> None:
+        if any(r.enabled for r in read_repositories()):
+            self.no_sources.grid_remove()
+            self.tree.grid()
+            self.vsb.grid()
+        else:
+            self.tree.grid_remove()
+            self.vsb.grid_remove()
+            self.no_sources.grid()
 
     def _sync_sort_availability(self) -> None:
         if self._places is None:

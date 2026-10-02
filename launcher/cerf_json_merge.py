@@ -6,8 +6,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from bundle_repositories import (CONFIG_KEY, merge_repositories,
-                                 strip_manifest_from_repos)
+from bundle_repositories import (CONFIG_KEY, installed_repositories,
+                                 merge_repositories)
 
 
 def merge_preserving_old(old, new):
@@ -46,7 +46,6 @@ def migrate_cerf_json(new_path: Path, installed_path: Path) -> None:
         old = _load(installed_path)
         merged = merge_preserving_old(old, new)
         merged[CONFIG_KEY] = merge_repositories(
-            strip_manifest_from_repos(old.get(CONFIG_KEY)),
-            new.get(CONFIG_KEY))
+            installed_repositories(old), new.get(CONFIG_KEY))
     installed_path.write_text(json.dumps(merged, indent=2) + "\n",
                               encoding="utf-8")

@@ -61,7 +61,7 @@ BEGIN
         BLOCK "040904E4"
         BEGIN
             VALUE "CompanyName",      "Yaroslav Kibysh"
-            VALUE "FileDescription",  "Universal Windows CE emulator"
+            VALUE "FileDescription",  "CE Runtime Foundation"
             VALUE "FileVersion",      CERF_VERSION_DISPLAY_STR
             VALUE "InternalName",     "cerf"
             VALUE "LegalCopyright",   "Copyright (c) Yaroslav Kibysh"

@@ -59,6 +59,7 @@ class BundleManager:
         self.remote_bundles: List[RemoteBundle] = []
         self._remote_index: Dict[Tuple[str, str], RemoteBundle] = {}
         self.repo_errors: List[Tuple[str, str]] = []
+        self.all_repositories_failed = False
         self.repo_abuse_emails: Dict[str, str] = {}
         self.download_places: Optional[Dict[Tuple[str, str], int]] = None
         # Local install manifest, keyed by device DIRECTORY name.
@@ -96,6 +97,8 @@ class BundleManager:
         repositories = read_repositories()
         (self.remote_bundles, self.repo_errors,
          self.repo_abuse_emails) = load_merged_manifest(repositories)
+        enabled = sum(1 for r in repositories if r.enabled)
+        self.all_repositories_failed = 0 < enabled == len(self.repo_errors)
         self._remote_index = {(rb.repo_url, rb.name): rb
                               for rb in self.remote_bundles}
         self.download_places = load_analytics(repositories)

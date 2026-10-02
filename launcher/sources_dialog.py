@@ -1,21 +1,31 @@
 from __future__ import annotations
 
+import queue
+import threading
 import tkinter as tk
 from tkinter import ttk
-from typing import Callable, List
+from typing import Callable, Dict, List
 
 from bundle_repositories import (BundleRepository, read_repositories,
                                  write_repositories)
+from bundles import repository_online
 from dialog_buttons import pack_actions
 from screen_geometry import fit_geometry
 from ui_dialogs import ask_text, show_info
 import ui_theme as theme
+
+_CHECKING = "Checking…"
+_ONLINE = "Online"
+_DEAD = "Dead"
+_POLL_MS = 100
 
 
 class SourcesDialog:
     def __init__(self, parent: tk.Misc, on_applied: Callable[[], None]) -> None:
         self._on_applied = on_applied
         self._repos: List[BundleRepository] = read_repositories()
+        self._status: Dict[str, str] = {}
+        self._results: queue.Queue = queue.Queue()
 
         dlg = tk.Toplevel(parent)
         self._dlg = dlg
@@ -27,12 +37,14 @@ class SourcesDialog:
         body.rowconfigure(0, weight=1)
         body.columnconfigure(0, weight=1)
 
-        tree = ttk.Treeview(body, columns=("url",), show="tree headings",
-                            selectmode="browse")
+        tree = ttk.Treeview(body, columns=("url", "status"),
+                            show="tree headings", selectmode="browse")
         tree.heading("#0", text="On")
         tree.heading("url", text="Repository URL")
+        tree.heading("status", text="Status")
         tree.column("#0", width=44, minwidth=44, anchor="center", stretch=False)
-        tree.column("url", width=560, minwidth=180, anchor="w", stretch=True)
+        tree.column("url", width=520, minwidth=180, anchor="w", stretch=True)
+        tree.column("status", width=90, minwidth=70, anchor="w", stretch=False)
         tree.grid(row=0, column=0, sticky="nsew")
         vsb = ttk.Scrollbar(body, orient="vertical", command=tree.yview)
         vsb.grid(row=0, column=1, sticky="ns")
@@ -53,18 +65,47 @@ class SourcesDialog:
         actions.grid(row=2, column=0, columnspan=2, sticky="e", pady=(10, 0))
         pack_actions(actions, [("OK", self._ok), ("Cancel", dlg.destroy)])
 
+        for r in self._repos:
+            self._probe(r.url)
+        self._poll_id = dlg.after(_POLL_MS, self._poll_results)
+        dlg.bind("<Destroy>", self._on_destroy, add="+")
+
         self._reload_table()
         theme.apply_titlebar(dlg)
         dlg.minsize(360, 220)
         fit_geometry(dlg, 720, 380, parent=parent)
         dlg.grab_set()
 
+    def _probe(self, url: str) -> None:
+        self._status[url] = _CHECKING
+        results = self._results
+
+        def work() -> None:
+            results.put((url, repository_online(url)))
+
+        threading.Thread(target=work, daemon=True).start()
+
+    def _poll_results(self) -> None:
+        try:
+            while True:
+                url, online = self._results.get_nowait()
+                self._status[url] = _ONLINE if online else _DEAD
+                if self.tree.exists(url):
+                    self.tree.set(url, "status", self._status[url])
+        except queue.Empty:
+            pass
+        self._poll_id = self._dlg.after(_POLL_MS, self._poll_results)
+
+    def _on_destroy(self, event: tk.Event) -> None:
+        if event.widget is self._dlg:
+            self._dlg.after_cancel(self._poll_id)
+
     def _reload_table(self) -> None:
         self.tree.delete(*self.tree.get_children())
         for r in self._repos:
             glyph = "☑" if r.enabled else "☐"
             self.tree.insert("", "end", iid=r.url, text=glyph,
-                             values=(r.url,))
+                             values=(r.url, self._status.get(r.url, "")))
         self._sync_buttons()
 
     def _sync_buttons(self) -> None:
@@ -97,6 +138,7 @@ class SourcesDialog:
                       "That repository URL is already in the list.")
             return
         self._repos.append(BundleRepository(url=url, enabled=True))
+        self._probe(url)
         self._reload_table()
 
     def _delete(self) -> None:

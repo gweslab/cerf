@@ -21,6 +21,7 @@
       Right Click simulation mode for the stock stylus (synths LAlt+Tap)
       Shutdown dialog has received reboot options
       Host key is now reassignable
+      Improved UI and added notification cards
     fixed: |
       ARM JIT and JIT core full rewrite. ARM JIT/peripherals massive performance optimizations
       Media instructions for Zune 30 - music is now playable
@@ -56,6 +57,7 @@
       Crash/artifacts when scrolling under complex rendering
       Apps run from a shared folder no longer crash
       Shared folders no longer crash Explorer on Windows CE .NET
+      Fixed memory errors on Windows CE 6 branch
 
 - version: v6.7
   date: 23 Jul 2026

@@ -363,6 +363,7 @@ run_claude.cmd
           🆕 Right Click simulation mode for the stock stylus (synths LAlt+Tap)<br/>
           🆕 Shutdown dialog has received reboot options<br/>
           🆕 Host key is now reassignable<br/>
+          🆕 Improved UI and added notification cards<br/>
           ✅ ARM JIT and JIT core full rewrite. ARM JIT/peripherals massive performance optimizations<br/>
           ✅ Media instructions for Zune 30 - music is now playable<br/>
           ✅ System clock improvements<br/>
@@ -391,7 +392,8 @@ run_claude.cmd
           ✅ Mouse and keyboard no longer stop working for the whole session when input arrives early during boot<br/>
           ✅ Crash/artifacts when scrolling under complex rendering<br/>
           ✅ Apps run from a shared folder no longer crash<br/>
-          ✅ Shared folders no longer crash Explorer on Windows CE .NET</p>
+          ✅ Shared folders no longer crash Explorer on Windows CE .NET<br/>
+          ✅ Fixed memory errors on Windows CE 6 branch</p>
       </td>
     </tr>
     <tr>

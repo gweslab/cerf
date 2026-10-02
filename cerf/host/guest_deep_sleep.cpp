@@ -9,6 +9,7 @@
 #include "../state/shutdown_dialog.h"
 #include "guest_power_notifier.h"
 #include "host_window.h"
+#include "notification_stack.h"
 
 #include <chrono>
 
@@ -151,6 +152,16 @@ void GuestDeepSleep::Enter() {
             static_cast<long long>(due_in));
     }
     emu_.Get<HostWindow>().RunOnUiThread([this] { Recover(); });
+}
+
+void GuestDeepSleep::ObserveAsleep(bool asleep) {
+    asleep_.store(asleep, std::memory_order_release);
+    auto& stack = emu_.Get<NotificationStack>();
+    if (asleep)
+        stack.Show(NotificationId::GuestSleeping, NotificationKind::Warning,
+                   L"Guest is in sleep mode");
+    else
+        stack.Close(NotificationId::GuestSleeping);
 }
 
 void GuestDeepSleep::TearDownPromptForHardwareWake() {

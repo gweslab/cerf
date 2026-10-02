@@ -88,6 +88,9 @@ public:
 
     void Enter();
 
+    void ObserveAsleep(bool asleep);
+    bool Asleep() const { return asleep_.load(std::memory_order_acquire); }
+
     /* Hibernation worker, after a full restore: a machine saved mid-deep-sleep
        comes back with deep_sleep set, so auto-wake it (the dialog's Cancel
        action) - otherwise the JIT parks forever at "State restored". */
@@ -114,6 +117,7 @@ private:
     DeepSleepWaker*            waker_                  = nullptr;
     SleepResumeVectorProvider* resume_vector_provider_ = nullptr;
     std::atomic<bool>          active_{false};
+    std::atomic<bool>          asleep_{false};
     std::atomic<bool>          hw_resumed_{false};
     std::mutex                 resume_mtx_;
     std::condition_variable    resume_cv_;

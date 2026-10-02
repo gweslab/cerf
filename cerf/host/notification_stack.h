@@ -14,6 +14,7 @@ enum class NotificationId : uint32_t {
     EmulatorPaused = 1,
     SavingState    = 2,
     LoadingState   = 3,
+    GuestSleeping  = 4,
 };
 
 struct NotificationCard {

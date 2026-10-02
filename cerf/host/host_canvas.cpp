@@ -6,6 +6,7 @@
 #include "../core/log.h"
 #include "emulation_pause.h"
 #include "frame_renderer.h"
+#include "guest_deep_sleep.h"
 #include "host_canvas_input.h"
 #include "host_focus_policy.h"
 #include "boot_screen.h"
@@ -70,7 +71,8 @@ bool HostCanvas::RenderAltContent(HDC dc, uint32_t* bits, int w, int h) {
 }
 
 bool HostCanvas::ShouldDesaturatePresent() {
-    return tab_ == Tab::Framebuffer && emu_.Get<EmulationPause>().IsPaused();
+    return tab_ == Tab::Framebuffer &&
+           (emu_.Get<EmulationPause>().IsPaused() || emu_.Get<GuestDeepSleep>().Asleep());
 }
 
 void HostCanvas::RenderOverlay(HDC dc, int w, int h) {

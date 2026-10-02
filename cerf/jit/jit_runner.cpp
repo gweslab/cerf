@@ -127,6 +127,7 @@ void JitRunner::RunLoop() {
                 prev_deep_sleep, ds, static_cast<int>(engine.ResetPending()),
                 static_cast<int>(pause_requested_.load(std::memory_order_acquire)));
             prev_deep_sleep = ds;
+            deep_sleep.ObserveAsleep(ds);
         }
         if (pause_requested_.load(std::memory_order_acquire) || engine.DeepSleep()) {
             if (cycle_clock != nullptr) cycle_clock->OnDispatch();

@@ -7,6 +7,7 @@
 #include "../../core/byte_order.h"
 #include "../../core/cerf_emulator.h"
 #include "../../core/device_config.h"
+#include "../../core/fatal.h"
 #include "../../core/log.h"
 
 namespace CerfVirt {
@@ -128,7 +129,7 @@ bool CerfVirtBlitter::Execute(const CerfBltDescriptor& d) {
     if (!ResolveSurface(d.dst, d_subbyte ? 1u : d_bpp, &dst)) FatalSurface("dst", d.dst);
 
     if ((d.rop4 & 0xFFFFu) == 0xAAF0u && d.has_mask != 0u &&
-        d.mask.format == kCerfFmt4Bpp) {
+        (d.mask.format == kCerfFmt4Bpp || d.mask.format == kCerfFmt8Bpp)) {
         if (d_indexed) {
             LOG(Cerf, "[CerfVirtBlitter] UNIMPLEMENTED AA text to indexed dst "
                       "format %u (%u bpp)\n", d.dst.format, d_bits);
@@ -392,7 +393,9 @@ bool CerfVirtBlitter::BlendAAText(const CerfBltDescriptor& d, Surface& dst,
     Surface mask;
     if (!ResolveSurface(d.mask, 1u, &mask)) FatalSurface("AA-text mask", d.mask);
     AATextContext aa;
+    const bool clear_type = d.mask.format == kCerfFmt8Bpp;
     aa.Build(d_masks, d.solid_color);
+    if (clear_type) aa.UseClearType();
     const uint32_t on_color = d.solid_color & cerf::ByteWidthMask(d_bpp);
 
     const int32_t width  = d.dst_rect.right  - d.dst_rect.left;
@@ -410,23 +413,28 @@ bool CerfVirtBlitter::BlendAAText(const CerfBltDescriptor& d, Surface& dst,
             const int32_t mask_x = d.mask_rect.left + ix;
 
             uint32_t mrun = 0;
-            uint8_t* mp = PixelPtr(mask, mask_x >> 1, mask_y, 1u, &mrun);
+            uint8_t* mp = PixelPtr(mask, clear_type ? mask_x : (mask_x >> 1), mask_y, 1u, &mrun);
             if (!mp) FatalPixel("AA-text mask", d.mask, mask_x, mask_y);
-            const uint32_t cov = (mask_x & 1) ? (uint32_t)(*mp & 0x0Fu)
-                                              : (uint32_t)(*mp >> 4);
+            const uint32_t cov = clear_type     ? (uint32_t)*mp
+                                 : (mask_x & 1) ? (uint32_t)(*mp & 0x0Fu)
+                                                : (uint32_t)(*mp >> 4);
             if (cov == 0u) continue;
             uint32_t drun = 0;
             uint8_t* dp = PixelPtr(dst, dst_x, dst_y, d_bpp, &drun);
             if (!dp) FatalPixel("AA-text dst", d.dst, dst_x, dst_y);
             const bool straddle = (drun < d_bpp);
             uint32_t v;
-            if (cov >= 15u) {
+            if (clear_type && cov > 114u)
+                emu_.Get<Fatal>().Die("[CerfVirtBlitter] ClearType mask index %u outside "
+                                      "the 115-entry table at x=%d y=%d: fmt=%u stride=%d",
+                                      cov, mask_x, mask_y, d.mask.format, d.mask.stride);
+            if ((!clear_type && cov >= 15u) || (clear_type && cov == 114u)) {
                 v = on_color;
             } else {
                 const uint32_t dv = straddle
                     ? ReadStraddlePixel(dst, dst_x, dst_y, d_bpp)
                     : BltPixelOps::ReadPixel(dp, d_bpp);
-                v = aa.BlendAA(dv, cov);
+                v = clear_type ? aa.BlendClearType(dv, cov) : aa.BlendAA(dv, cov);
             }
             if (straddle) WriteStraddlePixel(dst, dst_x, dst_y, d_bpp, v);
             else          BltPixelOps::WritePixel(dp, d_bpp, v);

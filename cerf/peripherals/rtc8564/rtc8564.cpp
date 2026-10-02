@@ -1,351 +1,194 @@
+#include "rtc8564_calendar.h"
+#include "rtc8564_core.h"
+#include "rtc8564_registers.h"
 #include "rtc8564_wiring.h"
 
 #include "../../core/cerf_emulator.h"
-#include "../../core/steady_time.h"
-#include "../../socs/iop13xx/iop13xx_i2c_device.h"
-#include "../../state/emulation_freeze.h"
+#include "../../core/fatal.h"
+#include "../../core/log.h"
+#include "../../core/tick_scale.h"
+#include "../../jit/guest_cycle_clock.h"
 #include "../../state/state_stream.h"
 
-#include <array>
-#include <atomic>
 #include <cstdint>
-#include <ctime>
 #include <mutex>
-#include <thread>
 
 namespace {
 
-constexpr uint8_t kAddressWrite = 0xA2u;
-constexpr uint8_t kAddressRead = 0xA3u;
-constexpr uint8_t kControl1 = 0x00u;
-constexpr uint8_t kControl2 = 0x01u;
-constexpr uint8_t kSeconds = 0x02u;
-constexpr uint8_t kMinutes = 0x03u;
-constexpr uint8_t kHours = 0x04u;
-constexpr uint8_t kDays = 0x05u;
-constexpr uint8_t kWeekdays = 0x06u;
-constexpr uint8_t kMonths = 0x07u;
-constexpr uint8_t kYears = 0x08u;
-constexpr uint8_t kTimerControl = 0x0Eu;
-constexpr uint8_t kTimer = 0x0Fu;
-constexpr uint8_t kStop = 0x20u;
-constexpr uint8_t kTie = 0x01u;
-constexpr uint8_t kAie = 0x02u;
-constexpr uint8_t kTf = 0x04u;
-constexpr uint8_t kAf = 0x08u;
-constexpr uint8_t kTiTp = 0x10u;
+using namespace Rtc8564Regs;
+
 constexpr uint8_t kControl2Writable = kTie | kAie | kTf | kAf | kTiTp;
+constexpr uint8_t kControl2Fixed = 0xA0u;
 constexpr uint8_t kTimerEnable = 0x80u;
 constexpr uint8_t kTimerFrequencyMask = 0x03u;
+constexpr uint8_t kClkoutEnable = 0x80u;
 
-std::tm LocalTime(std::time_t value) {
-    std::tm result{};
-#if defined(_WIN32)
-    localtime_s(&result, &value);
-#else
-    localtime_r(&value, &result);
-#endif
-    return result;
-}
+/* Epson RTC-8564 MQ322-04 sections 8.1 and 8.2.1-8.2.5 (pp. 5-7): the bits
+   each register holds; ETM11J-07 section 13.1.3 item 4 (p. 14): any write to
+   Seconds clears VL. */
+constexpr uint8_t kStoredBits[16] = {
+    kStop, kControl2Writable, 0x7Fu, 0x7Fu, 0x3Fu, 0x3Fu, 0x07u, 0x9Fu,
+    0xFFu, 0xFFu, 0xBFu, 0xBFu, 0x87u, 0x83u, kTimerEnable | kTimerFrequencyMask, 0xFFu,
+};
 
-uint8_t BinToBcd(int value) {
-    return static_cast<uint8_t>(((value / 10) << 4) | (value % 10));
-}
-
-bool BcdToBin(uint8_t value, int maximum, int& result) {
-    const int high = (value >> 4) & 0x0F;
-    const int low = value & 0x0F;
-    if (high > 9 || low > 9) return false;
-    result = high * 10 + low;
-    return result <= maximum;
-}
-
-class Rtc8564 final : public Iop13xxI2cDevice {
+class Rtc8564 final : public Rtc8564Core {
 public:
-    using Iop13xxI2cDevice::Iop13xxI2cDevice;
+    using Rtc8564Core::Rtc8564Core;
 
     bool ShouldRegister() override { return emu_.TryGet<Rtc8564Wiring>() != nullptr; }
 
     void OnReady() override {
-        MaterializeClockRegisters();
-        registers_[kControl2] = kTie | kTiTp;
-        registers_[0x09] = 0x80u;
-        registers_[0x0A] = 0x80u;
-        registers_[0x0B] = 0x80u;
-        registers_[0x0C] = 0x80u;
-        registers_[0x0D] = 0;
-        registers_[kTimerControl] = kTimerEnable | 0x02u;
-        registers_[kTimer] = 0x01u;
-        RestartTimer();
-        timer_thread_ = std::thread(&Rtc8564::TimerLoop, this);
+        clock_       = &emu_.Get<GuestCycleClock>();
+        cpu_hz_      = clock_->CpuHz();
+        timer_event_ = clock_->Add([this] { OnClockEvent(); });
+        pulse_event_ = clock_->Add([this] { OnClockEvent(); });
+        alarm_event_ = clock_->Add([this] { OnClockEvent(); });
+        clock_->RegisterRateListener([this] { OnRateChange(); });
+        std::lock_guard<std::mutex> guard(mutex_);
+        const uint64_t now = clock_->Cycles();
+        SeedCalendar(now);
+        const Rtc8564Wiring::Retained retained = emu_.Get<Rtc8564Wiring>().RetainedRegisters();
+        WriteRegister(kControl2, retained.control2, now);
+        for (uint8_t i = 0; i < 4u; ++i) WriteRegister(static_cast<uint8_t>(0x09u + i), retained.alarm[i], now);
+        WriteRegister(0x0Du, retained.clkout, now);
+        WriteRegister(kTimer, retained.timer, now);
+        WriteRegister(kTimerControl, retained.timer_control, now);
+        calendar_.Materialize(registers_);
+        calendar_.EvaluateAlarm(registers_);
+        Rearm(now);
     }
 
     void OnShutdown() override {
-        timer_stop_.store(true, std::memory_order_release);
-        if (timer_thread_.joinable()) timer_thread_.join();
         std::lock_guard<std::mutex> guard(mutex_);
         SetInterrupt(false);
     }
 
-    bool Address(uint8_t address_byte) override {
+    void Update() override {
         std::lock_guard<std::mutex> guard(mutex_);
-        if (address_byte == kAddressWrite) {
-            phase_ = 1;
-            read_mode_ = false;
-        } else if (address_byte == kAddressRead) {
-            phase_ = 3;
-            read_mode_ = true;
-        } else {
-            phase_ = 0;
-            read_mode_ = false;
-            return false;
-        }
-        UpdateInterrupt(HostSteadyMicros());
-        return true;
+        Service(clock_->Cycles());
     }
 
-    bool WriteByte(uint8_t value) override {
+    void WriteAt(uint8_t index, uint8_t value) override {
         std::lock_guard<std::mutex> guard(mutex_);
-        if (phase_ == 1) {
-            pointer_ = value & 0x0Fu;
-            phase_ = 2;
-            return true;
-        }
-        if (phase_ != 2 || read_mode_) return false;
-        WriteRegister(pointer_, value);
-        IncrementPointer();
-        UpdateInterrupt(HostSteadyMicros());
-        return true;
+        const uint64_t now = clock_->Cycles();
+        Materialize(now);
+        WriteRegister(index, value, now);
+        Service(now);
     }
 
-    bool ReadByte(uint8_t& value) override {
+    /* Epson RTC-8564 ETM11J-07 section 13.1.8 (p. 16) and section 13.2.2
+       (p. 21): reading the timer register shows the count during operation;
+       TE 1 to 0 makes the count and the preset invalid. */
+    uint8_t ReadAt(uint8_t index) override {
         std::lock_guard<std::mutex> guard(mutex_);
-        if (phase_ != 3 || !read_mode_) {
-            value = 0xFFu;
-            return false;
+        index &= 0x0Fu;
+        if (index == kTimer && !TimerRunning()) {
+            emu_.Get<Fatal>().Die("RTC8564: read of the timer register with TE = 0 (timer "
+                                  "control 0x%02X)", registers_[kTimerControl]);
         }
-        value = ReadRegister(pointer_);
-        IncrementPointer();
-        UpdateInterrupt(HostSteadyMicros());
-        return true;
+        const uint64_t now = clock_->Cycles();
+        Materialize(now);
+        const uint8_t value = registers_[index];
+        Service(now);
+        return value;
     }
 
-    void Stop() override {
+    bool StopSet() override {
         std::lock_guard<std::mutex> guard(mutex_);
-        phase_ = 0;
-        read_mode_ = false;
+        return Stopped();
     }
 
-    void SaveState(StateWriter& writer) override {
-        std::lock_guard<std::mutex> guard(mutex_);
-        const uint64_t now = HostSteadyMicros();
-        MaterializeTimer();
-        if (!Stopped()) {
-            MaterializeClockRegisters();
-            MaterializeAlarm();
-        }
-        const uint64_t timer_elapsed_us = TimerElapsedMicros(now);
-        const uint64_t pulse_remaining_us = interrupt_pulse_until_ > now ? interrupt_pulse_until_ - now : 0;
-        writer.Write("pointer", pointer_);
-        writer.Write("phase", phase_);
-        writer.Write("read_mode", read_mode_);
-        writer.Write("epoch_delta_seconds", epoch_delta_seconds_);
-        writer.Write("timer_elapsed_us", timer_elapsed_us);
-        writer.Write("timer_reload", timer_reload_);
-        writer.Write("interrupt_asserted", interrupt_asserted_);
-        writer.Write("pulse_remaining_us", pulse_remaining_us);
-        writer.WriteBytes("registers", registers_.data(), registers_.size());
-    }
-
-    void RestoreState(StateReader& reader) override {
-        std::lock_guard<std::mutex> guard(mutex_);
-        reader.Read("pointer", pointer_);
-        reader.Read("phase", phase_);
-        reader.Read("read_mode", read_mode_);
-        reader.Read("epoch_delta_seconds", epoch_delta_seconds_);
-        uint64_t timer_elapsed_us = 0;
-        reader.Read("timer_elapsed_us", timer_elapsed_us);
-        reader.Read("timer_reload", timer_reload_);
-        reader.Read("interrupt_asserted", interrupt_asserted_);
-        uint64_t pulse_remaining_us = 0;
-        reader.Read("pulse_remaining_us", pulse_remaining_us);
-        reader.ReadBytes("registers", registers_.data(), registers_.size());
-        pointer_ &= 0x0Fu;
-        phase_ = phase_ <= 3 ? phase_ : 0;
-        const uint64_t now = HostSteadyMicros();
-        interrupt_pulse_until_ = pulse_remaining_us != 0 ? now + pulse_remaining_us : 0;
-        if (!TimerEnabled()) {
-            timer_epoch_us_ = 0;
-            timer_reload_ = 0;
-        } else {
-            const uint64_t interval = TimerIntervalMicros();
-            if (interval != 0) {
-                timer_elapsed_us %= interval;
-                timer_epoch_us_ = now - timer_elapsed_us;
-            } else {
-                RestartTimer();
-            }
-        }
-        alarm_match_latched_ = AlarmMatchesNow();
-    }
+    void SaveState(StateWriter& writer) override;
+    void RestoreState(StateReader& reader) override;
 
     void PostRestore() override {
         std::lock_guard<std::mutex> guard(mutex_);
         const bool restored_asserted = interrupt_asserted_;
         interrupt_asserted_ = !restored_asserted;
         SetInterrupt(restored_asserted);
-        UpdateInterrupt(HostSteadyMicros());
+        Service(clock_->Cycles());
     }
 
 private:
+    [[noreturn]] void RatioOverflow() const {
+        emu_.Get<Fatal>().Die("RTC8564: the %llu Hz CPU clock overflows the cycle ratio",
+                              static_cast<unsigned long long>(cpu_hz_));
+    }
+
+    void SeedCalendar(uint64_t now) {
+        int host_year = 0;
+        if (!calendar_.SeedFromHost(cpu_hz_, now, emu_.Get<Rtc8564Wiring>().CalendarYearBase(),
+                                    host_year)) {
+            emu_.Get<Fatal>().Die("RTC8564: host year %d is outside the calendar range of this "
+                                  "board, or the CPU clock overflows the cycle ratio", host_year);
+        }
+    }
+
     bool Stopped() const { return (registers_[kControl1] & kStop) != 0; }
 
-    void IncrementPointer() { pointer_ = static_cast<uint8_t>((pointer_ + 1u) & 0x0Fu); }
-
-    uint8_t ReadRegister(uint8_t index) {
-        index &= 0x0Fu;
-        MaterializeTimer();
-        if (!Stopped()) {
-            MaterializeClockRegisters();
-            MaterializeAlarm();
-        }
-        return registers_[index];
-    }
-
-    void WriteRegister(uint8_t index, uint8_t value) {
-        index &= 0x0Fu;
-        if (index == kControl1) {
-            const bool was_stopped = Stopped();
-            if (!was_stopped && (value & kStop)) MaterializeClockRegisters();
-            registers_[index] = value & kStop;
-            if (was_stopped && !Stopped()) CommitClockRegisters();
+    void Materialize(uint64_t now) {
+        if (Stopped()) {
+            registers_[kTimer] = TimerRunning() ? static_cast<uint8_t>(timer_left_) : preset_;
             return;
         }
-
-        switch (index) {
-        case kControl2:
-            MaterializeTimer();
-            WriteControl2(value);
-            break;
-        case 0x02: registers_[index] = value & 0x7Fu; break;
-        case 0x03: registers_[index] = value & 0x7Fu; break;
-        case 0x04: registers_[index] = value & 0x3Fu; break;
-        case 0x05: registers_[index] = value & 0x3Fu; break;
-        case 0x06: registers_[index] = value & 0x07u; break;
-        case 0x07: registers_[index] = value & 0x9Fu; break;
-        case 0x08: registers_[index] = value; break;
-        case 0x09: registers_[index] = value; break;
-        case 0x0A: registers_[index] = value & 0xBFu; break;
-        case 0x0B: registers_[index] = value & 0xBFu; break;
-        case 0x0C: registers_[index] = value & 0x87u; break;
-        case 0x0D: registers_[index] = value & 0x83u; break;
-        case kTimerControl:
-            MaterializeTimer();
-            registers_[index] = value & (kTimerEnable | kTimerFrequencyMask);
-            ResetTimerState();
-            break;
-        case kTimer:
-            MaterializeTimer();
-            registers_[index] = value;
-            ResetTimerState();
-            break;
-        }
-
-        if (!Stopped() && index >= kSeconds && index <= kYears) CommitClockRegisters();
-        if (!Stopped()) {
-            MaterializeClockRegisters();
-            if (index >= 0x09u && index <= 0x0Cu) alarm_match_latched_ = AlarmMatchesNow();
-            MaterializeAlarm();
-        }
+        calendar_.Advance(now, registers_);
+        calendar_.Materialize(registers_);
+        MaterializeTimer(now);
     }
 
-    void ResetTimerState() {
-        if (TimerEnabled())
-            RestartTimer();
-        else {
-            timer_epoch_us_ = 0;
-            timer_reload_ = 0;
+    void Service(uint64_t now) {
+        Materialize(now);
+        UpdateInterrupt(now);
+        Rearm(now);
+    }
+
+    void OnClockEvent() {
+        std::lock_guard<std::mutex> guard(mutex_);
+        Service(clock_->Cycles());
+    }
+
+    void WriteControl1(uint8_t value, uint64_t now);
+    void WriteTimerControl(uint8_t value, uint64_t now);
+    void WriteTimer(uint8_t value);
+    void WriteRegister(uint8_t index, uint8_t value, uint64_t now);
+
+    bool TimerRunning() const { return (registers_[kTimerControl] & kTimerEnable) != 0; }
+
+    uint8_t SourceSelect() const { return registers_[kTimerControl] & kTimerFrequencyMask; }
+
+    uint64_t TimerLeft(uint64_t now) const {
+        return Stopped() ? timer_left_ : timer_next_ - calendar_.SourceTicks(SourceSelect(), now);
+    }
+
+    void SetTimerLeft(uint64_t now, uint64_t left) {
+        timer_left_ = left;
+        if (!Stopped()) timer_next_ = calendar_.SourceTicks(SourceSelect(), now) + left;
+    }
+
+    /* Epson RTC-8564 ETM11J-07 section 13.2.2 (p. 21) items 4-5: while TE = 1 the
+       countdown, the event and the preset reload repeat in either mode; section
+       13.2.1 (p. 18): in level mode TF and /INT hold until TF is written 0. */
+    void MaterializeTimer(uint64_t now) {
+        if (!TimerRunning()) {
+            registers_[kTimer] = preset_;
+            return;
         }
-    }
-
-    bool TimerEnabled() const { return (registers_[kTimerControl] & kTimerEnable) != 0 && registers_[kTimer] != 0; }
-
-    uint64_t TimerTickMicros() const {
-        /* NXP PCF8564A Rev. 3, section 8.8.1, Table 24. */
-        switch (registers_[kTimerControl] & kTimerFrequencyMask) {
-        case 0: return 244u;
-        case 1: return 15625u;
-        case 2: return 1000000u;
-        case 3: return 60000000u;
-        default: return 1000000u;
-        }
-    }
-
-    uint64_t TimerIntervalMicros() const {
-        if (!TimerEnabled() || timer_reload_ == 0) return 0;
-        return static_cast<uint64_t>(timer_reload_) * TimerTickMicros();
-    }
-
-    uint64_t TimerElapsedMicros(uint64_t now) const {
-        const uint64_t interval = TimerIntervalMicros();
-        if (interval == 0 || timer_epoch_us_ == 0) return 0;
-        const uint64_t elapsed = now >= timer_epoch_us_ ? now - timer_epoch_us_ : 0;
-        return elapsed % interval;
-    }
-
-    void RestartTimer() {
-        timer_reload_ = registers_[kTimer];
-        timer_epoch_us_ = HostSteadyMicros();
-    }
-
-    bool MaterializeTimer() {
-        if (!TimerEnabled()) {
-            timer_epoch_us_ = 0;
-            timer_reload_ = 0;
-            return false;
-        }
-        if (timer_epoch_us_ == 0 || timer_reload_ == 0) {
-            RestartTimer();
-            return false;
-        }
-        const uint64_t interval = TimerIntervalMicros();
-        const uint64_t now = HostSteadyMicros();
-        const uint64_t elapsed = now - timer_epoch_us_;
-        if (interval == 0) return false;
-        const bool expired = elapsed >= interval;
-        if (expired) {
+        const uint8_t  td = SourceSelect();
+        const uint64_t k  = calendar_.SourceTicks(td, now);
+        if (k >= timer_next_) {
+            const uint64_t n    = preset_;
+            const uint64_t last = timer_next_ + (k - timer_next_) / n * n;
+            timer_next_ = last + n;
             registers_[kControl2] |= kTf;
-            timer_epoch_us_ += (elapsed / interval) * interval;
+            if (TimerInterruptEnabled() && RepeatedTimerMode())
+                pulse_end_ = calendar_.CycleOfSourceTick(td, last) + PulseCycles();
         }
-        const uint64_t elapsed_ticks = (now - timer_epoch_us_) / TimerTickMicros();
-        registers_[kTimer] = static_cast<uint8_t>(timer_reload_ - elapsed_ticks);
-        return expired;
-    }
-
-    bool AlarmFieldEnabled(uint8_t alarm_index) const { return (registers_[alarm_index] & 0x80u) == 0u; }
-
-    bool AlarmMatches(uint8_t alarm_index, uint8_t clock_index, uint8_t mask) const {
-        const uint8_t alarm = registers_[alarm_index];
-        if (!AlarmFieldEnabled(alarm_index)) return true;
-        return (alarm & mask) == (registers_[clock_index] & mask);
-    }
-
-    bool AlarmMatchesNow() const {
-        /* NXP PCF8564A Rev. 3, section 8.6.5: AF is set when every enabled
-           alarm register comparison matches the current time. */
-        const bool any_enabled = AlarmFieldEnabled(0x09u) || AlarmFieldEnabled(0x0Au) || AlarmFieldEnabled(0x0Bu) ||
-                                 AlarmFieldEnabled(0x0Cu);
-        return any_enabled && AlarmMatches(0x09u, kMinutes, 0x7Fu) && AlarmMatches(0x0Au, kHours, 0x3Fu) &&
-               AlarmMatches(0x0Bu, kDays, 0x3Fu) && AlarmMatches(0x0Cu, kWeekdays, 0x07u);
-    }
-
-    void MaterializeAlarm() {
-        const bool matches = AlarmMatchesNow();
-        if (matches && !alarm_match_latched_) registers_[kControl2] |= kAf;
-        alarm_match_latched_ = matches;
+        registers_[kTimer] = static_cast<uint8_t>(timer_next_ - k);
     }
 
     bool TimerInterruptEnabled() const { return (registers_[kControl2] & kTie) != 0; }
+
+    bool AlarmInterruptEnabled() const { return (registers_[kControl2] & kAie) != 0; }
 
     bool RepeatedTimerMode() const { return (registers_[kControl2] & kTiTp) != 0; }
 
@@ -355,88 +198,89 @@ private:
         return alarm || timer;
     }
 
-    uint64_t PulseRecoveryMicros() const {
-        if (!RepeatedTimerMode()) return 0;
-        const bool count_is_one = registers_[kTimer] == 1;
-        switch (registers_[kTimerControl] & kTimerFrequencyMask) {
-        case 0: return count_is_one ? 122u : 244u;
-        case 1: return count_is_one ? 7813u : 15625u;
-        default: return 15625u;
+    /* Epson RTC-8564 ETM11J-07 section 13.2.2 (p. 20): /INT auto recovery time
+       tRTN in repeated interrupt mode, by source clock, for preset n = 1 and
+       1 < n. */
+    uint64_t PulseCycles() const {
+        const bool n_is_one = preset_ == 1u;
+        uint64_t   den      = 64u;
+        switch (SourceSelect()) {
+        case 0: den = n_is_one ? 8192u : 4096u; break;
+        case 1: den = n_is_one ? 128u : 64u; break;
+        default: break;
         }
+        return ScaleU64Ceil(cpu_hz_, 1u, den);
     }
 
+    /* Epson RTC-8564 ETM11J-07 section 13.2.2 (p. 21) and section 13.3.2
+       (p. 26): writing 0 clears TF or AF; writing 1 is invalid. */
     void WriteControl2(uint8_t value) {
-        /* NXP PCF8564A Rev. 3, section 8.3.2.1: AF/TF clear on writing zero. */
+        if ((value & kControl2Fixed) != 0u) {
+            emu_.Get<Fatal>().Die("RTC8564: Control2 write 0x%02X sets a fixed-0 bit", value);
+        }
         const uint8_t flags = registers_[kControl2] & (kTf | kAf);
         const uint8_t requested = value & kControl2Writable;
         uint8_t next = requested & ~(kTf | kAf);
         if ((requested & kTf) && (flags & kTf)) next |= kTf;
         if ((requested & kAf) && (flags & kAf)) next |= kAf;
         registers_[kControl2] = next;
-    }
-
-    void MaterializeClockRegisters() {
-        const std::time_t now = std::time(nullptr) + static_cast<std::time_t>(epoch_delta_seconds_);
-        const std::tm local = LocalTime(now);
-        const int base = emu_.Get<Rtc8564Wiring>().CalendarYearBase();
-        int year = local.tm_year + 1900 - base;
-        if (year < 0) year = 0;
-        if (year > 99) year = 99;
-        registers_[kSeconds] = BinToBcd(local.tm_sec);
-        registers_[kMinutes] = BinToBcd(local.tm_min);
-        registers_[kHours] = BinToBcd(local.tm_hour);
-        registers_[kDays] = BinToBcd(local.tm_mday);
-        registers_[kWeekdays] = static_cast<uint8_t>(local.tm_wday & 0x07);
-        registers_[kMonths] = BinToBcd(local.tm_mon + 1);
-        registers_[kYears] = BinToBcd(year);
-    }
-
-    void CommitClockRegisters() {
-        int second = 0, minute = 0, hour = 0, day = 0, month = 0, year = 0;
-        if (!BcdToBin(registers_[kSeconds] & 0x7Fu, 59, second) ||
-            !BcdToBin(registers_[kMinutes] & 0x7Fu, 59, minute) || !BcdToBin(registers_[kHours] & 0x3Fu, 23, hour) ||
-            !BcdToBin(registers_[kDays] & 0x3Fu, 31, day) || day < 1 ||
-            !BcdToBin(registers_[kMonths] & 0x1Fu, 12, month) || month < 1 || !BcdToBin(registers_[kYears], 99, year)) {
-            return;
+        /* NXP PCF8563 Rev. 10 Fig 6 (p. 9): the interface's clear TF also clears
+           PULSE GENERATOR 2. */
+        if ((requested & kTf) == 0u) {
+            pulse_end_  = 0;
+            pulse_held_ = 0;
         }
-        std::tm target{};
-        target.tm_sec = second;
-        target.tm_min = minute;
-        target.tm_hour = hour;
-        target.tm_mday = day;
-        target.tm_mon = month - 1;
-        target.tm_year = emu_.Get<Rtc8564Wiring>().CalendarYearBase() + year - 1900;
-        target.tm_isdst = -1;
-        const std::time_t timestamp = std::mktime(&target);
-        if (timestamp != static_cast<std::time_t>(-1))
-            epoch_delta_seconds_ = static_cast<int64_t>(timestamp - std::time(nullptr));
     }
 
-    void TimerLoop() {
-        auto& freeze = emu_.Get<EmulationFreeze>();
-        while (!timer_stop_.load(std::memory_order_acquire)) {
-            {
-                auto frozen = freeze.WorkerSection();
-                std::lock_guard<std::mutex> guard(mutex_);
-                const bool event = MaterializeTimer();
-                if (!Stopped()) {
-                    MaterializeClockRegisters();
-                    MaterializeAlarm();
-                }
-                if (event && TimerInterruptEnabled() && RepeatedTimerMode()) {
-                    interrupt_pulse_until_ = HostSteadyMicros() + PulseRecoveryMicros();
-                }
-                UpdateInterrupt(HostSteadyMicros());
+    void Rearm(uint64_t now) {
+        const bool tf_latched = (registers_[kControl2] & kTf) != 0u;
+        if (TimerRunning() && !Stopped() && TimerInterruptEnabled() &&
+            (RepeatedTimerMode() || !tf_latched))
+            clock_->Arm(timer_event_, calendar_.CycleOfSourceTick(SourceSelect(), timer_next_));
+        else
+            clock_->Disarm(timer_event_);
+        if (pulse_end_ > now)
+            clock_->Arm(pulse_event_, pulse_end_);
+        else
+            clock_->Disarm(pulse_event_);
+        bool alarm_armed = false;
+        if (!Stopped() && AlarmInterruptEnabled() && (registers_[kControl2] & kAf) == 0u) {
+            if (!alarm_known_ || (alarm_has_due_ && alarm_due_ <= now)) {
+                alarm_has_due_ = calendar_.NextAlarmCycle(registers_, alarm_due_);
+                alarm_known_   = true;
             }
-            std::this_thread::sleep_for(std::chrono::milliseconds(1));
+            alarm_armed = alarm_has_due_;
         }
+        if (alarm_armed)
+            clock_->Arm(alarm_event_, alarm_due_);
+        else
+            clock_->Disarm(alarm_event_);
     }
 
+    void OnRateChange() {
+        std::lock_guard<std::mutex> guard(mutex_);
+        const uint64_t now    = clock_->Cycles();
+        const uint64_t new_hz = clock_->CpuHz();
+        Materialize(now);
+        const bool     live = TimerRunning();
+        const uint64_t left = live ? TimerLeft(now) : 0u;
+        if (!Stopped() && !calendar_.Rescale(now, new_hz, registers_)) RatioOverflow();
+        if (pulse_end_ > now) pulse_end_ = now + ScaleU64Ceil(pulse_end_ - now, new_hz, cpu_hz_);
+        if (pulse_held_ != 0u) pulse_held_ = ScaleU64Ceil(pulse_held_, new_hz, cpu_hz_);
+        cpu_hz_       = new_hz;
+        alarm_known_  = false;
+        if (live) SetTimerLeft(now, left);
+        UpdateInterrupt(now);
+        Rearm(now);
+    }
+
+    /* Epson RTC-8564 ETM11J-07 sections 13.2.1 (p. 18), 13.2.2 (p. 22) and
+       13.4 (p. 28): /INT is shared by the timer and alarm; a repeated-mode
+       event holds it low for tRTN, and TIE = 0 releases the timer's /INT. */
     void UpdateInterrupt(uint64_t now) {
-        if (interrupt_pulse_until_ != 0 && now >= interrupt_pulse_until_) interrupt_pulse_until_ = 0;
-        /* NXP PCF8564A Rev. 3, section 8.3.2.1: INT is the logical OR of
-           enabled timer and alarm conditions; I2C bus activity is not an input. */
-        SetInterrupt(interrupt_pulse_until_ != 0 || LevelInterruptActive());
+        if (pulse_end_ != 0 && now >= pulse_end_) pulse_end_ = 0;
+        const bool pulse = pulse_end_ != 0 || pulse_held_ != 0;
+        SetInterrupt((pulse && TimerInterruptEnabled()) || LevelInterruptActive());
     }
 
     void SetInterrupt(bool active) {
@@ -445,21 +289,159 @@ private:
         emu_.Get<Rtc8564Wiring>().SetInterrupt(active);
     }
 
-    std::array<uint8_t, 16> registers_{};
-    uint8_t pointer_ = 0;
-    uint32_t phase_ = 0;
-    bool read_mode_ = false;
-    int64_t epoch_delta_seconds_ = 0;
-    uint64_t timer_epoch_us_ = 0;
-    uint8_t timer_reload_ = 0;
-    std::mutex mutex_;
-    std::thread timer_thread_;
-    std::atomic<bool> timer_stop_{false};
-    bool interrupt_asserted_ = false;
-    uint64_t interrupt_pulse_until_ = 0;
-    bool alarm_match_latched_ = false;
+    GuestCycleClock*        clock_       = nullptr;
+    GuestCycleClock::Event* timer_event_ = nullptr;
+    GuestCycleClock::Event* pulse_event_ = nullptr;
+    GuestCycleClock::Event* alarm_event_ = nullptr;
+    Rtc8564Calendar         calendar_;
+    uint64_t                cpu_hz_     = 1;
+    uint64_t                timer_next_ = 0;
+    uint64_t                timer_left_ = 0;
+    uint64_t                pulse_end_  = 0;
+    uint64_t                pulse_held_ = 0;
+    uint64_t                alarm_due_  = 0;
+    bool                    alarm_has_due_ = false;
+    bool                    alarm_known_   = false;
+    Rtc8564Regs::File       registers_{};
+    uint8_t                 preset_ = 0;
+    bool                    preset_invalid_ = false;
+    std::mutex              mutex_;
+    bool                    interrupt_asserted_ = false;
 };
 
-REGISTER_SERVICE_AS(Rtc8564, Iop13xxI2cDevice);
+/* Epson RTC-8564 ETM11J-07 section 13.1.1 (p. 12): STOP = 1 stops the clock,
+   calendar, alarm and timer; the TEST bits and the fixed bits are written 0. */
+void Rtc8564::WriteControl1(uint8_t value, uint64_t now) {
+    if ((value & ~kStop) != 0u) {
+        emu_.Get<Fatal>().Die("RTC8564: Control1 write 0x%02X sets a TEST or fixed-0 bit", value);
+    }
+    const bool was_stopped = Stopped();
+    /* Epson MQ322-04 section 8.2.1 (p. 5): STOP = 1 puts all internal count down
+       chain in the zero clear state; NXP PCF8563 Rev. 10 section 8.3.2.1 (p. 9):
+       the countdown pulse generator uses an internal clock. */
+    if (!was_stopped && (value & kStop)) {
+        if (TimerRunning()) timer_left_ = TimerLeft(now);
+        if (pulse_end_ > now) pulse_held_ = pulse_end_ - now;
+        pulse_end_ = 0;
+    }
+    registers_[kControl1] = value;
+    if (!was_stopped || Stopped()) return;
+    Rtc8564Calendar::Time t;
+    if (!Rtc8564Calendar::Parse(registers_, t)) {
+        emu_.Get<Fatal>().Die("RTC8564: STOP released on an impossible time (regs 02-08 = %02X "
+                              "%02X %02X %02X %02X %02X %02X)", registers_[kSeconds],
+                              registers_[kMinutes], registers_[kHours], registers_[kDays],
+                              registers_[kWeekdays], registers_[kMonths], registers_[kYears]);
+    }
+    LOG(SocRtc, "RTC8564: STOP released at %02u:%02u:%02u day %u month %u year %u weekday %u\n",
+        t.hour, t.min, t.sec, t.day, t.month, t.year, t.wday);
+    if (!calendar_.Load(cpu_hz_, now, t, 1u, 2u)) RatioOverflow();
+    calendar_.EvaluateAlarm(registers_);
+    if (TimerRunning()) SetTimerLeft(now, timer_left_);
+    if (pulse_held_ != 0u) {
+        pulse_end_  = now + pulse_held_;
+        pulse_held_ = 0;
+    }
+}
+
+/* Epson RTC-8564 ETM11J-07 sections 13.1.7 (p. 16) and 13.2.2 (pp. 20-21):
+   the preset is written with TE = 0, TE = 1 starts the countdown and TE = 0
+   stops it and invalidates the count and the preset. */
+void Rtc8564::WriteTimerControl(uint8_t value, uint64_t now) {
+    const bool running = TimerRunning();
+    const bool enable  = (value & kTimerEnable) != 0;
+    if (running && enable) {
+        emu_.Get<Fatal>().Die("RTC8564: timer control write 0x%02X while the timer runs", value);
+    }
+    if (!running && enable && (preset_invalid_ || preset_ == 0u)) {
+        emu_.Get<Fatal>().Die("RTC8564: timer control write 0x%02X sets TE without a valid "
+                              "preset", value);
+    }
+    registers_[kTimerControl] = value & kStoredBits[kTimerControl];
+    if (running && !enable) {
+        preset_invalid_ = true;
+        return;
+    }
+    if (enable) SetTimerLeft(now, preset_);
+}
+
+/* ETM11J-07 section 13.1.8 (p. 16): the preset is 01h to FFh. */
+void Rtc8564::WriteTimer(uint8_t value) {
+    if (TimerRunning()) {
+        emu_.Get<Fatal>().Die("RTC8564: timer register write 0x%02X while TE = 1", value);
+    }
+    if (value == 0u) emu_.Get<Fatal>().Die("RTC8564: timer register write of preset 00h");
+    preset_         = value;
+    preset_invalid_ = false;
+}
+
+void Rtc8564::WriteRegister(uint8_t index, uint8_t value, uint64_t now) {
+    index &= 0x0Fu;
+    alarm_known_ = false;
+    if (index >= kSeconds && index <= kYears && !Stopped()) {
+        emu_.Get<Fatal>().Die("RTC8564: write 0x%02X to time register 0x%02X with STOP "
+                              "clear; a running time write is not modelled", value, index);
+    }
+    switch (index) {
+    case kControl1: WriteControl1(value, now); return;
+    case kControl2: WriteControl2(value); return;
+    case 0x09:
+    case 0x0A:
+    case 0x0B:
+    case 0x0C:
+        registers_[index] = value & kStoredBits[index];
+        if (!Stopped()) calendar_.EvaluateAlarm(registers_);
+        return;
+    case 0x0D:
+        if (value & kClkoutEnable) {
+            emu_.Get<Fatal>().Die("RTC8564: CLKOUT write 0x%02X sets FE; the CLKOUT pin is not "
+                                  "modelled", value);
+        }
+        registers_[index] = value & kStoredBits[index];
+        return;
+    case kTimerControl: WriteTimerControl(value, now); return;
+    case kTimer: WriteTimer(value); return;
+    default: registers_[index] = value & kStoredBits[index]; return;
+    }
+}
+
+void Rtc8564::SaveState(StateWriter& writer) {
+    std::lock_guard<std::mutex> guard(mutex_);
+    const uint64_t                now = clock_->Cycles();
+    Materialize(now);
+    const uint64_t pulse_left = Stopped() ? pulse_held_ : pulse_end_ > now ? pulse_end_ - now : 0u;
+    calendar_.SaveState(writer, now, Stopped());
+    writer.Write("preset", preset_);
+    writer.Write("preset_invalid", preset_invalid_);
+    writer.Write<uint64_t>("timer_ticks_left", TimerRunning() ? TimerLeft(now) : 0u);
+    writer.Write<int64_t>("pulse_remaining_ns", clock_->CyclesToNs(pulse_left));
+    writer.Write("interrupt_asserted", interrupt_asserted_);
+    writer.WriteBytes("registers", registers_.data(), registers_.size());
+}
+
+void Rtc8564::RestoreState(StateReader& reader) {
+    std::lock_guard<std::mutex> guard(mutex_);
+    const uint64_t now = clock_->Cycles();
+    int64_t        pulse_ns   = 0;
+    uint64_t       ticks_left = 0;
+    cpu_hz_ = clock_->CpuHz();
+    calendar_.RestoreState(reader, cpu_hz_, now);
+    reader.Read("preset", preset_);
+    reader.Read("preset_invalid", preset_invalid_);
+    reader.Read("timer_ticks_left", ticks_left);
+    reader.Read("pulse_remaining_ns", pulse_ns);
+    reader.Read("interrupt_asserted", interrupt_asserted_);
+    reader.ReadBytes("registers", registers_.data(), registers_.size());
+    timer_next_ = 0;
+    timer_left_ = 0;
+    if (TimerRunning()) SetTimerLeft(now, ticks_left);
+    const uint64_t pulse_left = pulse_ns != 0 ? clock_->NsToCycles(pulse_ns) : 0u;
+    pulse_held_  = Stopped() ? pulse_left : 0u;
+    pulse_end_   = !Stopped() && pulse_left != 0u ? now + pulse_left : 0u;
+    alarm_known_ = false;
+    Rearm(now);
+}
+
+REGISTER_SERVICE_AS(Rtc8564, Rtc8564Core);
 
 } // namespace

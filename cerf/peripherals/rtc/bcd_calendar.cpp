@@ -1,11 +1,20 @@
 #include "bcd_calendar.h"
 
+#include <algorithm>
+#include <ctime>
+
 uint32_t BcdCalendar::ToBcd(uint32_t value) {
     return ((value / 10u) << 4) | (value % 10u);
 }
 
 uint32_t BcdCalendar::FromBcd(uint32_t value) {
     return ((value >> 4) & 0xFu) * 10u + (value & 0xFu);
+}
+
+bool BcdCalendar::DecodeBcd(uint32_t bcd, uint32_t lo, uint32_t hi, uint32_t& out) {
+    if ((bcd & 0xFu) > 9u || (bcd >> 4) > 9u) return false;
+    out = FromBcd(bcd);
+    return out >= lo && out <= hi;
 }
 
 /* S3C2410A UM p.17-1: "Leap year generator"; Epson RX-8564 ETM12E-03 section
@@ -18,9 +27,37 @@ uint32_t BcdCalendar::DaysInMonth(uint32_t month, uint32_t year) {
     return kLen[month - 1u];
 }
 
-std::tm BcdCalendar::HostLocalTime() {
+uint64_t BcdCalendar::AddSeconds(uint32_t& sec, uint32_t& min, uint32_t& hour, uint64_t secs) {
+    uint64_t t = sec + secs;
+    sec        = static_cast<uint32_t>(t % 60u);
+    t          = min + t / 60u;
+    min        = static_cast<uint32_t>(t % 60u);
+    t          = hour + t / 60u;
+    hour       = static_cast<uint32_t>(t % 24u);
+    return t / 24u;
+}
+
+bool BcdCalendar::NextDate(uint32_t& date, uint32_t& month, uint32_t& year) {
+    if (++date <= DaysInMonth(month, year)) return false;
+    date = 1u;
+    if (++month <= 12u) return false;
+    month = 1u;
+    if (++year <= 99u) return false;
+    year = 0u;
+    return true;
+}
+
+BcdCalendar::HostDate BcdCalendar::HostNow() {
     const std::time_t t = std::time(nullptr);
     std::tm           lt{};
     localtime_s(&lt, &t);
-    return lt;
+    HostDate d;
+    d.sec   = static_cast<uint32_t>(std::min(lt.tm_sec, 59));
+    d.min   = static_cast<uint32_t>(lt.tm_min);
+    d.hour  = static_cast<uint32_t>(lt.tm_hour);
+    d.date  = static_cast<uint32_t>(lt.tm_mday);
+    d.month = static_cast<uint32_t>(lt.tm_mon + 1);
+    d.year  = static_cast<uint32_t>(lt.tm_year + 1900);
+    d.wday  = static_cast<uint32_t>(lt.tm_wday);
+    return d;
 }

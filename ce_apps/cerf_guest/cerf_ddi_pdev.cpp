@@ -102,6 +102,7 @@ extern "C" DHPDEV APIENTRY DrvEnablePDEV(DEVMODEW* pdm, LPWSTR, ULONG, HSURF*,
 
     ULONG text_caps = 0;
     if (bpp > 8) text_caps |= GCAPS_GRAY16;
+    if (bpp > 8) text_caps |= GCAPS_CLEARTYPE;
 
     const ULONG graphics_caps = pGPE->GetGraphicsCaps() | text_caps;
     const ULONG gdi_text_caps = graphics_caps & GCAPS_TEXT_CAPS;

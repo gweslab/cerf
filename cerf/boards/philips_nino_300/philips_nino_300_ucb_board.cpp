@@ -78,9 +78,6 @@ public:
         return emu_.Get<Ucb1x00TouchPanel>().Down() ? kPressureDown : kPressureUp;
     }
 
-    /* philips_nino_300 sib.dll sub_18D1654 writes IO_DIR = 0x83FF, driving all ten
-       I/O ports (NetBSD hpcmips ucb1200reg.h UCB1200_IOPORT_MAX 10), so the port reads
-       back what the driver drives. sub_18D14E0 idles a subframe with a read of it. */
     /* philips_nino_300 sib.dll sub_18D14E0(0) reads IO_DATA while every pin is an input
        and never takes the result from SF0STAT. */
     uint16_t IoInputs(uint16_t) override { return 0u; }

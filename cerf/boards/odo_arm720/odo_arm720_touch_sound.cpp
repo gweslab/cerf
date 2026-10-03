@@ -82,7 +82,7 @@ void OdoArm720TouchSound::ResetLine() {
     {
         std::lock_guard<std::mutex> lk(state_mutex_);
         io_adc_cntr_   = 0u;
-        io_adc_str_    = 0u;
+        io_adc_str_   &= kUcbIntr;
         ucb_cntr_      = 0u;
         ucb_str_       = 0u;
         ucb_register_  = 0u;

@@ -1,7 +1,7 @@
-#include "../../peripherals/philips_ucb1200/ucb1x00_board.h"
+#include "../../peripherals/philips_ucb1200/ucb1x00_sib_board.h"
 
 #include "philips_nino_300_battery.h"
-#include "philips_nino_300_touch_panel.h"
+#include "../../peripherals/philips_ucb1200/ucb1x00_touch_panel.h"
 #include "../board_context.h"
 #include "philips_nino_300_id.h"
 #include "../../core/cerf_emulator.h"
@@ -16,39 +16,33 @@ namespace {
     CerfFatalExit(CERF_FATAL_RUNTIME_ERROR);
 }
 
-/* gwes.exe (sub_82C18) reads the UCB1200 auxiliary ADC channels over SIB1: IOCTL
-   1, whose in-buffer LENGTH is the channel index: AD0 the main battery, AD2 the
-   backup cell, AD3 a battery-type sense, each a raw 10-bit count. ADC_CR INP 4..7
-   maps to AuxAdc channel 0..3, so AD0 is channel 0. */
+/* philips_nino_300 gwes.exe sub_82C18 issues SIB1 IOCTL 1 with nInBufSize 0 (main
+   battery), 2 (backup cell) and 3 (battery-type sense). */
 constexpr uint8_t kAuxMain      = 0;   /* AD0 */
 constexpr uint8_t kAuxBackup    = 2;   /* AD2 */
 constexpr uint8_t kAuxChemistry = 3;   /* AD3 */
 
-/* gwes.exe sub_83088 flags the main battery HIGH at raw > MainLow (0x133) and
-   CRITICAL at raw <= MainCritical (0x11E) - ControlPanel\Battery\Alkaline, the set
-   AD3 selects - and never fills BatteryLifePercent, so only the flag shows.
-   kMainAdcFull must stay above MainNotLow (0x141) or a full battery reads LOW. */
+/* philips_nino_300 gwes.exe sub_83088 bands the AD0 average against ControlPanel\
+   Battery\Alkaline MainNotLow/MainLow/MainNotCritical/MainCritical, in-image defaults
+   0x170/0x140/0x139/0x12C at 0x84A64. */
 constexpr int kMainAdcEmpty = 0x100;
 constexpr int kMainAdcFull  = 0x200;
 
-/* gwes.exe sub_82FE4 reports the AD2 backup cell HIGH at raw >= 0x140; the
-   emulated coin cell is always fresh. */
+/* philips_nino_300 gwes.exe sub_82FE4 reports the AD2 backup cell HIGH at raw >= 0x13C
+   when its previous flag was not LOW. */
 constexpr uint16_t kBackupAdcHealthy = 0x200;
 
-/* gwes.exe sub_82C18 selects the Alkaline threshold set when AD3 < 0x104, else
-   NiMH; the Nino ships two AA alkaline cells. */
+/* philips_nino_300 gwes.exe sub_82C18 selects the Alkaline threshold set when
+   AD3 < 0x104, else NiMH. */
 constexpr uint16_t kChemistryAlkalineAdc = 0x80;
 
-/* touch.dll's sampler thresholds the pen-mode reading (sub_1891B84 vs word_18B5960);
-   return full scale while down and zero while up so any threshold registers. */
+/* philips_nino_300 touch.dll sub_1891B84 compares the averaged reading with
+   word_18B5960, ControlPanel\Touch "Threshhold" (default 90). */
 constexpr uint16_t kPressureDown = 0x3FF;
 constexpr uint16_t kPressureUp   = 0u;
 
 uint16_t Clamp10(int v) { return static_cast<uint16_t>(v < 0 ? 0 : (v > 1023 ? 1023 : v)); }
 
-/* The wizard fits an affine map from CERF's raw samples to pixels
-   (TouchPanelSetCalibration -> TouchPanelCalibrateAPoint), so any monotonic
-   linear pixel->raw response calibrates correctly; the base/step are free. */
 uint16_t PixelToAdc(int px) { return Clamp10(64 + (px < 0 ? 0 : px) * 3); }
 
 uint16_t MainBatteryAdc(int fill_percent) {
@@ -59,9 +53,9 @@ uint16_t MainBatteryAdc(int fill_percent) {
     return static_cast<uint16_t>(raw);
 }
 
-class PhilipsNino300UcbBoard : public Ucb1x00Board {
+class PhilipsNino300UcbBoard : public Ucb1x00SibBoard {
 public:
-    using Ucb1x00Board::Ucb1x00Board;
+    using Ucb1x00SibBoard::Ucb1x00SibBoard;
 
     bool ShouldRegister() override {
         auto* bd = emu_.TryGet<BoardContext>();
@@ -78,23 +72,24 @@ public:
         }
     }
 
-    bool     TouchDown() const override { return emu_.Get<PhilipsNino300TouchPanel>().Down(); }
-    uint16_t TouchAdcX() override { return PixelToAdc(emu_.Get<PhilipsNino300TouchPanel>().X()); }
-    uint16_t TouchAdcY() override { return PixelToAdc(emu_.Get<PhilipsNino300TouchPanel>().Y()); }
+    uint16_t TouchAdcX() override { return PixelToAdc(emu_.Get<Ucb1x00TouchPanel>().X()); }
+    uint16_t TouchAdcY() override { return PixelToAdc(emu_.Get<Ucb1x00TouchPanel>().Y()); }
     uint16_t TouchAdcPressure() override {
-        return emu_.Get<PhilipsNino300TouchPanel>().Down() ? kPressureDown : kPressureUp;
+        return emu_.Get<Ucb1x00TouchPanel>().Down() ? kPressureDown : kPressureUp;
     }
 
-    /* sib.dll sub_18D1654 writes IO_DIR = 0x83FF, driving all ten I/O ports
-       (ucb1200reg.h:56 UCB1200_IOPORT_MAX 10), so the port reads back what the
-       driver drives. sub_18D14E0 idles a subframe with a read of this register. */
-    uint16_t IoData(uint16_t driven) override { return driven; }
+    /* philips_nino_300 sib.dll sub_18D1654 writes IO_DIR = 0x83FF, driving all ten
+       I/O ports (NetBSD hpcmips ucb1200reg.h UCB1200_IOPORT_MAX 10), so the port reads
+       back what the driver drives. sub_18D14E0 idles a subframe with a read of it. */
+    /* philips_nino_300 sib.dll sub_18D14E0(0) reads IO_DATA while every pin is an input
+       and never takes the result from SF0STAT. */
+    uint16_t IoInputs(uint16_t) override { return 0u; }
 
-    uint16_t PenIrqStatus() override { return emu_.Get<PhilipsNino300TouchPanel>().PenIrqStatus(); }
-    void ClearPenIrq(uint16_t mask) override { emu_.Get<PhilipsNino300TouchPanel>().ClearPenIrq(mask); }
-    void SetPenIrqArmed(uint16_t bits) override {
-        emu_.Get<PhilipsNino300TouchPanel>().SetPenIrqArmed(bits);
-    }
+    bool AdcExternalReference() const override { return false; }
+
+    bool TsCrLowBitsSetOnTouch() const override { return true; }
+
+    SocResetReach CodecSocResetReach() const override { return SocResetReach::Unknown; }
 };
 
 }  /* namespace */

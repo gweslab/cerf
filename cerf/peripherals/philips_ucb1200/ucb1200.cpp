@@ -9,8 +9,12 @@
 
 namespace {
 
-/* NetBSD ucb1200reg.h:226 UCB1200_ID 0x1004 (version 4, device 0, supplier 1). */
+/* NetBSD hpcmips ucb1200reg.h UCB1200_ID 0x1004 (version 4, device 0, supplier 1). */
 constexpr uint16_t kIdUcb1200 = 0x1004u;
+
+/* UCB1200 datasheet p.49: TEL_DIV resets to 16, AUD_DIV to 6. */
+constexpr uint16_t kResetTelDiv = 16u;
+constexpr uint16_t kResetAudDiv = 6u;
 
 class Ucb1200 : public Ucb1x00Codec {
 public:
@@ -25,8 +29,15 @@ public:
 
 protected:
     uint16_t DeviceId() const override { return kIdUcb1200; }
+
+    std::array<uint16_t, 16> PowerOnRegs() const override {
+        std::array<uint16_t, 16> r{};
+        r[5] = kResetTelDiv;
+        r[7] = kResetAudDiv;
+        return r;
+    }
 };
 
-}  /* namespace */
+}
 
 REGISTER_SERVICE_AS(Ucb1200, Ucb1x00Codec);

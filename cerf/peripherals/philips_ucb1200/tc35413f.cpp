@@ -8,7 +8,7 @@
 
 namespace {
 
-/* NetBSD ucb1200reg.h:230 TC35413F_ID 0x9712 (TOSHIBA); ucb1200.c:95 ucb_id[]
+/* NetBSD hpcmips ucb1200reg.h TC35413F_ID 0x9712 (TOSHIBA); ucb1200.c ucb_id[]
    drives the TC35413F with the UCB1200 register map. */
 constexpr uint16_t kIdTc35413f = 0x9712u;
 
@@ -23,8 +23,10 @@ public:
 
 protected:
     uint16_t DeviceId() const override { return kIdTc35413f; }
+
+    std::array<uint16_t, 16> PowerOnRegs() const override { return {}; }
 };
 
-}  /* namespace */
+}
 
 REGISTER_SERVICE_AS(Tc35413f, Ucb1x00Codec);

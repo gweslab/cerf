@@ -2,23 +2,22 @@
 
 #include "odo_arm720_audio_player.h"
 #include "odo_arm720_touch_sound.h"
-#include "odo_arm720_board_intc.h"
 
 #include "../../peripherals/peripheral_base.h"
 
 #include "../../core/cerf_emulator.h"
+#include "../../core/fatal.h"
 #include "../../core/log.h"
 #include "../../boards/board_context.h"
 #include "odo_id.h"
 #include "../../cpu/emulated_memory.h"
 #include "../../host/audio_activity_widget.h"
 #include "../../peripherals/peripheral_dispatcher.h"
-#include "../../state/emulation_freeze.h"
+#include "../../peripherals/philips_ucb1200/ucb1x00_codec.h"
+#include "../../socs/guest_cpu_reset.h"
 #include "../../state/state_stream.h"
-#include "../../socs/irq_controller.h"
 
 #include <cstdint>
-#include <cstring>
 #include <mutex>
 
 namespace {
@@ -31,11 +30,31 @@ constexpr uint32_t kSlotDmaHigh    = 0x04u;
 
 constexpr uint32_t kDramPaBase     = 0x0C000000u;
 
-constexpr uint16_t kIoSoundStrPlaybackIntr    = (1u << 13);
-constexpr uint16_t kIoSoundStrPlaybackEndIntr = (1u << 12);
+constexpr uint16_t kIoSoundStrPlaybackPageDone = (1u << 13);
 
-constexpr UINT kMsgStartPlayback = WM_USER + 0x1u;
-constexpr UINT kMsgStopPlayback  = WM_USER + 0x2u;
+constexpr uint64_t kSampleRate    = 22050u;
+constexpr uint16_t kChannels      = 1u;
+constexpr uint16_t kBitsPerSample = 16u;
+constexpr uint32_t kPageSamples   = 1024u;
+constexpr uint32_t kPageBytes     = kPageSamples * sizeof(uint16_t);
+constexpr uint32_t kPages         = 2u;
+constexpr uint32_t kRingSamples   = kPageSamples * kPages;
+
+constexpr GuestCycleClock::Rate kSampleClock{kSampleRate, 1u};
+
+RasterScanClock::Frame RingFrame() {
+    RasterScanClock::Frame frame;
+    frame.ticks   = kRingSamples;
+    frame.edge[0] = kPageSamples;
+    frame.edge[1] = kRingSamples;
+    frame.edges   = kPages;
+    return frame;
+}
+
+/* UCB1300 datasheet p.50: audio control register A, AUD_DIV[n] in bits 0 to 6. */
+constexpr uint8_t  kUcbRegAudioCtlA = 7u;
+constexpr uint16_t kAudDivMask      = 0x7Fu;
+constexpr uint16_t kAudDivModelled  = 5u;
 
 class AudioDmaPair : public Peripheral {
 public:
@@ -68,18 +87,12 @@ public:
 
     uint16_t ReadHalf(uint32_t addr) override {
         const uint32_t off = addr - MmioBase();
-        uint16_t value;
-        {
-            std::lock_guard<std::mutex> lk(state_mutex_);
-            if      (off == kSlotDmaLow)  value = dma_low_;
-            else if (off == kSlotDmaHigh) value = dma_high_;
-            else                          HaltUnsupportedAccess("ReadHalf", addr, 0);
+        if (off != kSlotDmaLow && off != kSlotDmaHigh) {
+            HaltUnsupportedAccess("ReadHalf", addr, 0);
         }
-#if CERF_DEV_MODE
-        LOG(Periph, "Odo %s read  +0x%02X -> 0x%04X\n",
-            PortName(), off, value);
-#endif
-        return value;
+        emu_.Get<Fatal>().Die(
+            "odo audio: %s read at +0x%02X; the running transfer address the register "
+            "returns is not modelled", PortName(), off);
     }
 
     uint32_t GetEffectivePa() {
@@ -119,7 +132,7 @@ public:
     const char* PortName() const override { return "AUDIO PLAYBACK_DMA"; }
 };
 
-}  /* namespace */
+}
 
 REGISTER_SERVICE(OdoArm720AudioRecordDma);
 REGISTER_SERVICE(OdoArm720AudioPlaybackDma);
@@ -131,112 +144,135 @@ bool OdoArm720AudioPlayer::ShouldRegister() {
     return bd && bd->GetBoardId() == BoardId::Odo;
 }
 
-void OdoArm720AudioPlayer::OnShutdown() { sink_.Stop(); }
-
 void OdoArm720AudioPlayer::OnReady() {
-    for (uint32_t i = 0; i < kPagesPerBuffer; ++i) {
-        pages_[i].hdr.lpData         = reinterpret_cast<LPSTR>(pages_[i].bytes);
-        pages_[i].hdr.dwBufferLength = kPageSize;
-        pages_[i].hdr.dwUser         = i;
-    }
-    sink_.Start(
-        [this] {
-            sink_.EnsureFormat(kSampleRate, kChannels, kBitsPerSample,
-                               /*allow_resampler=*/false, /*busy=*/false);
-        },
-        [this](const MSG& msg) { OnThreadMessage(msg); },
-        "OdoArm720Audio");
+    clock_ = &emu_.Get<GuestCycleClock>();
+    event_ = clock_->Add([this] { OnPageEnd(); });
+    clock_->RegisterRateListener([this] { OnRateChange(); });
+    emu_.Get<GuestCpuReset>().RegisterResetListener([this](ResetLineKind) { ResetLine(); });
+    out_.Start("OdoArm720Audio", static_cast<uint32_t>(kSampleRate), kChannels,
+               kBitsPerSample, true);
     emu_.Get<AudioActivityWidget>().NotePresent();
 }
 
-void OdoArm720AudioPlayer::OnThreadMessage(const MSG& msg) {
-    if (msg.message == kMsgStartPlayback) {
-        playback_enabled_.store(true, std::memory_order_release);
-        {
-            std::lock_guard<std::mutex> lk(state_mutex_);
-            current_page_index_ = 0;
-            submitted_pages_    = 0;
-        }
-        for (uint32_t i = 0; i < kPagesPerBuffer; ++i) {
-            SubmitNextPage();
-        }
-        return;
-    }
-    if (msg.message == kMsgStopPlayback) {
-        playback_enabled_.store(false, std::memory_order_release);
-        sink_.Reset();
-        return;
-    }
-    if (msg.message == MM_WOM_DONE) {
-        auto* hdr = reinterpret_cast<LPWAVEHDR>(msg.lParam);
-        if (hdr) sink_.Unprepare(hdr);
-        uint32_t done_page = hdr ? hdr->dwUser : 0;
+void OdoArm720AudioPlayer::OnShutdown() { out_.Stop(); }
 
-        uint16_t bits = kIoSoundStrPlaybackIntr;
-        if (done_page == kPagesPerBuffer - 1) {
-            bits |= kIoSoundStrPlaybackEndIntr;
-        }
-        bool already_set;
-        {
-            auto frozen = emu_.Get<EmulationFreeze>().WorkerSection();
-            already_set = emu_.Get<OdoArm720TouchSound>().RaiseSoundStrBits(bits);
-            if (already_set) {
-                emu_.Get<IrqController>().DeAssertIrq(kSourceTouchAudioAdcIntr);
-            } else if (emu_.Get<OdoArm720TouchSound>().SoundIntrEnabled()) {
-                emu_.Get<IrqController>().AssertIrq(kSourceTouchAudioAdcIntr);
-            }
-        }
-
-        if (already_set) {
-            playback_enabled_.store(false, std::memory_order_release);
-            std::lock_guard<std::mutex> lk(state_mutex_);
-            if (submitted_pages_ > 0) --submitted_pages_;
-            return;
-        }
-
-        {
-            std::lock_guard<std::mutex> lk(state_mutex_);
-            if (submitted_pages_ > 0) --submitted_pages_;
-        }
-        if (playback_enabled_.load(std::memory_order_acquire)) {
-            SubmitNextPage();
-        }
-    }
-}
-
-void OdoArm720AudioPlayer::SubmitNextPage() {
-    auto&          dma     = emu_.Get<OdoArm720AudioPlaybackDma>();
-    auto&          mem     = emu_.Get<EmulatedMemory>();
-    const uint32_t base_pa = dma.GetEffectivePa();
-
-    uint32_t  page_index;
-    PageSlot* slot;
-    {
-        std::lock_guard<std::mutex> lk(state_mutex_);
-        if (submitted_pages_ >= kPagesPerBuffer) return;
-        page_index = current_page_index_;
-        slot       = &pages_[page_index];
-        current_page_index_ = (current_page_index_ + 1) % kPagesPerBuffer;
-        ++submitted_pages_;
-    }
-
-    const uint32_t pa = base_pa + page_index * kPageSize;
-    {
-        auto frozen = emu_.Get<EmulationFreeze>().WorkerSection();
-        for (uint32_t i = 0; i < kPageSize; ++i) {
-            slot->bytes[i] = mem.ReadByte(pa + i);
-        }
-    }
-
-    std::memset(&slot->hdr, 0, sizeof(slot->hdr));
-    slot->hdr.lpData         = reinterpret_cast<LPSTR>(slot->bytes);
-    slot->hdr.dwBufferLength = kPageSize;
-    slot->hdr.dwUser         = page_index;
-
-    sink_.Play(&slot->hdr);
-    emu_.Get<AudioActivityWidget>().MarkTx();
+void OdoArm720AudioPlayer::ResetLine() {
+    playing_ = false;
+    clock_->Disarm(event_);
+    out_.StopAudioOut();
 }
 
 void OdoArm720AudioPlayer::SetPlaybackEnabled(bool enabled) {
-    sink_.Post(enabled ? kMsgStartPlayback : kMsgStopPlayback, 0, 0);
+    if (enabled == playing_) return;
+    if (!enabled) {
+        playing_ = false;
+        clock_->Disarm(event_);
+        out_.FinishAudioOut();
+        return;
+    }
+    CheckDacRate();
+    const uint64_t now = clock_->Cycles();
+    RequireScan(scan_.Start(now, clock_->ClockRate(), kSampleClock, RingFrame()),
+                "the playback sample grid");
+    playing_ = true;
+    out_.BeginAudioOut({});
+    QueuePage(0u, 0u);
+    ArmPageEnd(now);
+}
+
+void OdoArm720AudioPlayer::CheckDacRate() {
+    const uint16_t aud_div = static_cast<uint16_t>(
+        emu_.Get<Ucb1x00Codec>().ReadReg(kUcbRegAudioCtlA) & kAudDivMask);
+    if (aud_div != kAudDivModelled) {
+        emu_.Get<Fatal>().Die(
+            "odo audio: playback with codec AUD_DIV %u; the DAC rate is modelled only "
+            "for AUD_DIV %u (%llu Hz)", aud_div, kAudDivModelled,
+            static_cast<unsigned long long>(kSampleRate));
+    }
+}
+
+void OdoArm720AudioPlayer::RequireScan(bool placed, const char* what) {
+    if (placed) return;
+    const GuestCycleClock::Rate core = clock_->ClockRate();
+    emu_.Get<Fatal>().Die(
+        "odo audio: %s does not fit the 64-bit scale of the %llu Hz sample clock "
+        "against the %llu/%llu Hz core", what,
+        static_cast<unsigned long long>(kSampleRate),
+        static_cast<unsigned long long>(core.num),
+        static_cast<unsigned long long>(core.den));
+}
+
+void OdoArm720AudioPlayer::ArmPageEnd(uint64_t now) {
+    uint64_t at = 0;
+    RequireScan(scan_.EdgeCycle(scan_.EdgesThrough(now), at), "the next page end");
+    clock_->Arm(event_, at);
+}
+
+void OdoArm720AudioPlayer::OnPageEnd() {
+    const uint64_t now = clock_->Cycles();
+    CheckDacRate();
+    const uint32_t page = static_cast<uint32_t>(scan_.TickInFrame(now) / kPageSamples);
+    if (emu_.Get<OdoArm720TouchSound>().RaiseSoundStrBits(kIoSoundStrPlaybackPageDone)) {
+        emu_.Get<Fatal>().Die(
+            "odo audio: playback page %u ended with the previous page-done "
+            "(ioSoundStr bit 13) still set; the underrun is not modelled",
+            (page + kPages - 1u) % kPages);
+    }
+    QueuePage(page, 0u);
+    ArmPageEnd(now);
+}
+
+void OdoArm720AudioPlayer::QueuePage(uint32_t page, uint32_t first_sample) {
+    uint8_t        bytes[kPageBytes];
+    const uint32_t offset = first_sample * static_cast<uint32_t>(sizeof(uint16_t));
+    const uint32_t length = kPageBytes - offset;
+    const uint32_t pa     = emu_.Get<OdoArm720AudioPlaybackDma>().GetEffectivePa() +
+                            page * kPageBytes + offset;
+    emu_.Get<EmulatedMemory>().CopyOut(pa, bytes, length);
+    out_.QueueOutput(bytes, length);
+    emu_.Get<AudioActivityWidget>().MarkTx();
+}
+
+void OdoArm720AudioPlayer::OnRateChange() {
+    if (!playing_) return;
+    const uint64_t now = clock_->Cycles();
+    RequireScan(scan_.Rescale(now, clock_->ClockRate(), kSampleClock),
+                "the playback sample grid at the new core rate");
+    ArmPageEnd(now);
+}
+
+void OdoArm720AudioPlayer::SaveState(StateWriter& w) {
+    const uint64_t now = clock_->Cycles();
+    const RasterScanClock::Position at =
+        playing_ ? scan_.PositionAt(now) : RasterScanClock::Position{};
+    w.Write<uint32_t>("playback_running", playing_ ? 1u : 0u);
+    w.Write<uint32_t>("playback_sample",
+                      playing_ ? static_cast<uint32_t>(scan_.TickInFrame(now)) : 0u);
+    w.Write<uint64_t>("playback_phase", at.phase);
+    w.Write<uint64_t>("playback_phase_den", at.phase_den);
+}
+
+void OdoArm720AudioPlayer::RestoreState(StateReader& r) {
+    uint32_t running = 0, sample = 0;
+    uint64_t phase = 0, phase_den = 0;
+    r.Read("playback_running", running);
+    r.Read("playback_sample", sample);
+    r.Read("playback_phase", phase);
+    r.Read("playback_phase_den", phase_den);
+    ResetLine();
+    if (running == 0u) return;
+    const uint64_t now = clock_->Cycles();
+    RequireScan(scan_.Resume(now, clock_->ClockRate(), kSampleClock, RingFrame(),
+                             RasterScanClock::Position{sample, phase, phase_den}),
+                "the restored playback sample grid");
+    playing_ = true;
+    ArmPageEnd(now);
+}
+
+void OdoArm720AudioPlayer::PostRestore() {
+    if (!playing_) return;
+    const uint64_t sample = scan_.TickInFrame(clock_->Cycles());
+    out_.BeginAudioOut({});
+    QueuePage(static_cast<uint32_t>(sample / kPageSamples),
+              static_cast<uint32_t>(sample % kPageSamples));
 }

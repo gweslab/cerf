@@ -9,6 +9,7 @@
 #include "../../peripherals/peripheral_dispatcher.h"
 #include "../../boards/board_context.h"
 #include "odo_id.h"
+#include "../../socs/guest_cpu_reset.h"
 #include "../../state/state_stream.h"
 
 #include <mutex>
@@ -26,6 +27,14 @@ constexpr uint32_t kSlotCpuMr         = 0x04u;
 bool OdoArm720BoardIntc::ShouldRegister() {
     auto* bd = emu_.TryGet<BoardContext>();
     return bd && bd->GetBoardId() == BoardId::Odo;
+}
+
+void OdoArm720BoardIntc::OnReady() {
+    emu_.Get<GuestCpuReset>().RegisterResetListener([this](ResetLineKind) {
+        std::lock_guard<std::mutex> lk(state_mutex_);
+        cpu_mr_ = 0u;
+        PublishIrqLineLocked();
+    });
 }
 
 bool OdoArm720BoardIntc::HasPendingUnmaskedLocked() const {

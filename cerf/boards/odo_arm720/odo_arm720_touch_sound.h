@@ -1,21 +1,19 @@
 #pragma once
 
 #include "../../peripherals/peripheral_base.h"
+#include "odo_arm720_pen_timer.h"
 
-#include <atomic>
-#include <condition_variable>
 #include <cstdint>
 #include <mutex>
-#include <thread>
+
+class Ucb1x00Codec;
 
 class OdoArm720TouchSound : public Peripheral {
 public:
     using Peripheral::Peripheral;
-    ~OdoArm720TouchSound() override;
 
     bool ShouldRegister() override;
     void OnReady() override;
-    void OnShutdown() override;
 
     uint32_t MmioBase() const override { return 0x1000A000u; }
     uint32_t MmioSize() const override { return 0x20u; }
@@ -27,15 +25,15 @@ public:
 
     bool RaiseSoundStrBits(uint16_t bits);
 
-    bool SoundIntrEnabled() const;
-    bool PlaybackEnabled() const;
-
     void OnPenDown(int host_x, int host_y);
     void OnPenMove(int host_x, int host_y);
     void OnPenUp  ();
 
+    void SetUcbIrqOut(bool asserted);
+
     void SaveState(StateWriter& w) override;
     void RestoreState(StateReader& r) override;
+    void PostRestore() override;
 
 private:
     static const char* SlotName(uint32_t off);
@@ -45,8 +43,12 @@ private:
     void RecomputeTouchAudioIrq();
     bool ShouldTouchAudioBeLiveLocked() const;
     void DoAdcSampleLocked(uint16_t io_adc_cntr_write);
-    void PenTimerMain();
-    void StopPenTimerThread();
+    void TransferUcbRegister(uint16_t value);
+    void WriteStatusW1c(uint32_t addr, uint16_t value, uint16_t w1c_mask, uint16_t& reg);
+    void CheckModelledBits(uint32_t off, uint16_t value, uint16_t modelled);
+    void OnPenTimingPeriod();
+    bool PenTimingPending();
+    void ResetLine();
 
     mutable std::mutex state_mutex_;
     uint16_t io_adc_cntr_   = 0;
@@ -58,16 +60,10 @@ private:
     uint16_t io_sound_str_  = 0;
     uint16_t intr_mask_     = 0;
 
-    uint16_t ucb_regs_[16]  = {0};
-
     uint16_t adc_x_ = 0;
     uint16_t adc_y_ = 0;
 
-    std::atomic<bool> pen_down_{false};
-
-    std::thread             pen_timer_thread_;
-    std::condition_variable pen_timer_cv_;
-    std::mutex              pen_timer_cv_mtx_;
-    std::atomic<bool>       pen_timer_enabled_{false};
-    std::atomic<bool>       shutdown_{false};
+    Ucb1x00Codec*     codec_ = nullptr;
+    OdoArm720PenTimer pen_timer_{emu_, [this] { OnPenTimingPeriod(); },
+                                 [this] { return PenTimingPending(); }};
 };

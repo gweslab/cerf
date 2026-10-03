@@ -1,19 +1,19 @@
 #include "odo_arm720_touch_sound.h"
 
 #include "../../core/cerf_emulator.h"
-#include "../../core/device_config.h"
+#include "../../core/fatal.h"
 #include "../../core/log.h"
 #include "../../boards/board_context.h"
 #include "odo_id.h"
 #include "../../peripherals/peripheral_dispatcher.h"
-#include "../../state/emulation_freeze.h"
+#include "../../peripherals/philips_ucb1200/ucb1x00_codec.h"
 #include "../../state/state_stream.h"
+#include "../../socs/guest_cpu_reset.h"
 #include "../../socs/irq_controller.h"
 
 #include "odo_arm720_audio_player.h"
 #include "odo_arm720_board_intc.h"
 
-#include <chrono>
 #include <cstdint>
 #include <mutex>
 
@@ -28,17 +28,17 @@ constexpr uint32_t kSlotIoSoundCntr  = 0x14u;
 constexpr uint32_t kSlotIoSoundStr   = 0x18u;
 constexpr uint32_t kSlotIntrMask     = 0x1Cu;
 
-constexpr uint16_t kIoAdcStrW1cMask    = (1u << 4) | (1u << 3) | (1u << 2);
+constexpr uint16_t kIoAdcStrW1cMask    = (1u << 4) | (1u << 2);
 constexpr uint16_t kUcbStrW1cMask      = (1u << 0);
 constexpr uint16_t kIoSoundStrW1cMask  = (1u << 15) | (1u << 14)
                                        | (1u << 13) | (1u << 12);
 
-constexpr uint16_t kIoSoundCntrPlaybackEn = (1u << 14);
+constexpr uint16_t kIoSoundCntrPlaybackEn      = (1u << 14);
 
-constexpr uint16_t kPenIntr           = 0x0010u;  /* ioAdcStr bit 4 */
-constexpr uint16_t kPenTimingIntr     = 0x0004u;  /* ioAdcStr bit 2 */
-constexpr uint16_t kUcbIntr           = 0x0008u;  /* ioAdcStr bit 3 */
-constexpr uint16_t kRegIntr           = 0x0001u;  /* ucbStr   bit 0 */
+constexpr uint16_t kPenIntr           = 0x0010u;
+constexpr uint16_t kPenTimingIntr     = 0x0004u;
+constexpr uint16_t kUcbIntr           = 0x0008u;
+constexpr uint16_t kRegIntr           = 0x0001u;
 
 constexpr uint16_t kRegIntrMask        = 0x0001u;
 constexpr uint16_t kSoundIntrMask      = 0x0002u;
@@ -46,31 +46,25 @@ constexpr uint16_t kPenTimingIntrMask  = 0x0004u;
 constexpr uint16_t kUcbIntrMask        = 0x0008u;
 constexpr uint16_t kPenIntrMask        = 0x0010u;
 
-constexpr uint16_t kIoAdcCntrDoSample     = 0x4000u; /* bit 14 */
-constexpr uint16_t kIoAdcCntrAdcSelY      = 0x0800u; /* bit 11 */
-constexpr uint16_t kIoAdcCntrPenTimingEn  = 0x0400u; /* bit 10 */
+constexpr uint16_t kIoAdcCntrDoSample     = 0x4000u;
+constexpr uint16_t kIoAdcCntrAdcSelY      = 0x0800u;
+constexpr uint16_t kIoAdcCntrPenTimingEn  = 0x0400u;
 constexpr uint16_t kTouchSampleValid      = 0x0FFFu;
+
+constexpr uint16_t kUcbCntrRegMask = 0x000Fu;
+constexpr uint16_t kUcbCntrWrite   = 0x0010u;
+
+constexpr uint16_t kIoAdcCntrModelled =
+    kIoAdcCntrDoSample | kIoAdcCntrAdcSelY | kIoAdcCntrPenTimingEn;
+constexpr uint16_t kUcbCntrModelled  = kUcbCntrRegMask | kUcbCntrWrite;
+constexpr uint16_t kIntrMaskModelled = kRegIntrMask | kSoundIntrMask | kPenTimingIntrMask |
+                                       kUcbIntrMask | kPenIntrMask;
 
 constexpr int     kCalScaleFactor          = 4;
 
-constexpr uint16_t kUcbRegisterPenState   = 0x1000u;
-
-}  /* namespace */
-
-REGISTER_SERVICE(OdoArm720TouchSound);
-
-void OdoArm720TouchSound::StopPenTimerThread() {
-    shutdown_.store(true, std::memory_order_release);
-    pen_timer_enabled_.store(true, std::memory_order_release);
-    pen_timer_cv_.notify_all();
-    if (pen_timer_thread_.joinable()) pen_timer_thread_.join();
 }
 
-/* Pen timer raises IRQs via IrqController and drives the audio player; stop it
-   before any peer is destroyed. */
-void OdoArm720TouchSound::OnShutdown() { StopPenTimerThread(); }
-
-OdoArm720TouchSound::~OdoArm720TouchSound() { StopPenTimerThread(); }
+REGISTER_SERVICE(OdoArm720TouchSound);
 
 bool OdoArm720TouchSound::ShouldRegister() {
     auto* bd = emu_.TryGet<BoardContext>();
@@ -78,8 +72,26 @@ bool OdoArm720TouchSound::ShouldRegister() {
 }
 
 void OdoArm720TouchSound::OnReady() {
+    codec_ = &emu_.Get<Ucb1x00Codec>();
+    pen_timer_.Attach();
+    emu_.Get<GuestCpuReset>().RegisterResetListener([this](ResetLineKind) { ResetLine(); });
     emu_.Get<PeripheralDispatcher>().Register(this);
-    pen_timer_thread_ = std::thread([this] { PenTimerMain(); });
+}
+
+void OdoArm720TouchSound::ResetLine() {
+    {
+        std::lock_guard<std::mutex> lk(state_mutex_);
+        io_adc_cntr_   = 0u;
+        io_adc_str_    = 0u;
+        ucb_cntr_      = 0u;
+        ucb_str_       = 0u;
+        ucb_register_  = 0u;
+        io_sound_cntr_ = 0u;
+        io_sound_str_  = 0u;
+        intr_mask_     = 0u;
+    }
+    pen_timer_.SetEnabled(false);
+    RecomputeTouchAudioIrq();
 }
 
 const char* OdoArm720TouchSound::SlotName(uint32_t off) {
@@ -158,6 +170,47 @@ void OdoArm720TouchSound::DoAdcSampleLocked(uint16_t io_adc_cntr_write) {
     io_adc_str_ |= kPenIntr;
 }
 
+void OdoArm720TouchSound::TransferUcbRegister(uint16_t value) {
+    uint16_t cntr;
+    {
+        std::lock_guard<std::mutex> lk(state_mutex_);
+        cntr = ucb_cntr_;
+    }
+    const uint8_t reg    = static_cast<uint8_t>(cntr & kUcbCntrRegMask);
+    uint16_t      result = value;
+    if (cntr & kUcbCntrWrite) codec_->WriteReg(reg, value);
+    else                      result = codec_->ReadReg(reg);
+    {
+        std::lock_guard<std::mutex> lk(state_mutex_);
+        ucb_register_ = result;
+        ucb_str_     |= kRegIntr;
+    }
+    RecomputeTouchAudioIrq();
+}
+
+void OdoArm720TouchSound::CheckModelledBits(uint32_t off, uint16_t value,
+                                            uint16_t modelled) {
+    if ((value & ~modelled) != 0u) {
+        emu_.Get<Fatal>().Die(
+            "odo touch: %s write 0x%04X sets bits 0x%04X outside the modelled 0x%04X",
+            SlotName(off), value, static_cast<uint16_t>(value & ~modelled), modelled);
+    }
+}
+
+void OdoArm720TouchSound::WriteStatusW1c(uint32_t addr, uint16_t value,
+                                         uint16_t w1c_mask, uint16_t& reg) {
+    if ((value & ~w1c_mask) != 0) {
+        emu_.Get<Fatal>().Die(
+            "odo touch: %s write 0x%04X has bits outside the write-one-to-clear "
+            "mask 0x%04X", SlotName(addr - MmioBase()), value, w1c_mask);
+    }
+    {
+        std::lock_guard<std::mutex> lk(state_mutex_);
+        reg &= static_cast<uint16_t>(~value);
+    }
+    RecomputeTouchAudioIrq();
+}
+
 void OdoArm720TouchSound::WriteHalf(uint32_t addr, uint16_t value) {
     const uint32_t off = addr - MmioBase();
 #if CERF_DEV_MODE
@@ -165,126 +218,58 @@ void OdoArm720TouchSound::WriteHalf(uint32_t addr, uint16_t value) {
         SlotName(off), off, value);
 #endif
 
-    if (off == kSlotIoAdcCntr) {
-        bool need_recompute   = false;
-        bool timer_enable_now = false;
-        bool timer_disable    = false;
-        {
-            std::lock_guard<std::mutex> lk(state_mutex_);
-            const bool old_timing = (io_adc_cntr_ & kIoAdcCntrPenTimingEn) != 0;
-            io_adc_cntr_ = value;
-            DoAdcSampleLocked(value);
-            const bool new_timing = (value & kIoAdcCntrPenTimingEn) != 0;
-            if (new_timing && !old_timing) timer_enable_now = true;
-            if (!new_timing && old_timing) timer_disable    = true;
-            need_recompute = true;
-        }
-        if (timer_enable_now) {
-            pen_timer_enabled_.store(true, std::memory_order_release);
-            pen_timer_cv_.notify_all();
-        }
-        if (timer_disable) {
-            pen_timer_enabled_.store(false, std::memory_order_release);
-        }
-        if (need_recompute) RecomputeTouchAudioIrq();
-        return;
-    }
-
-    if (off == kSlotUcbCntr) {
-        std::lock_guard<std::mutex> lk(state_mutex_);
-        ucb_cntr_ = value;
-        return;
-    }
-    if (off == kSlotUcbRegister) {
-        {
-            std::lock_guard<std::mutex> lk(state_mutex_);
-            const uint8_t  reg     = static_cast<uint8_t>(ucb_cntr_ & 0xFu);
-            const bool     is_write = (ucb_cntr_ & 0x10u) != 0u;
-            if (is_write) {
-                ucb_regs_[reg] = value;
-                ucb_register_  = value;
-            } else {
-                uint16_t v = ucb_regs_[reg];
-                if (reg == 0x0A) v |= 0x0C00u;
-                if (reg == 0x09) {
-                    if (pen_down_.load(std::memory_order_acquire)) {
-                        v &= static_cast<uint16_t>(~kUcbRegisterPenState);
-                    } else {
-                        v |= kUcbRegisterPenState;
-                    }
-                }
-                ucb_register_ = v;
+    switch (off) {
+        case kSlotIoAdcCntr:
+            CheckModelledBits(off, value, kIoAdcCntrModelled);
+            {
+                std::lock_guard<std::mutex> lk(state_mutex_);
+                io_adc_cntr_ = value;
+                DoAdcSampleLocked(value);
             }
-            ucb_str_ |= kRegIntr;
-        }
-        RecomputeTouchAudioIrq();
-        return;
-    }
-
-    if (off == kSlotIoSoundCntr) {
-        uint16_t old_value;
-        {
+            pen_timer_.SetEnabled((value & kIoAdcCntrPenTimingEn) != 0);
+            RecomputeTouchAudioIrq();
+            return;
+        case kSlotUcbCntr: {
+            CheckModelledBits(off, value, kUcbCntrModelled);
             std::lock_guard<std::mutex> lk(state_mutex_);
-            old_value      = io_sound_cntr_;
-            io_sound_cntr_ = value;
+            ucb_cntr_ = value;
+            return;
         }
-        NotifyAudioControlChange(old_value, value);
-        return;
+        case kSlotUcbRegister:
+            TransferUcbRegister(value);
+            return;
+        case kSlotIoSoundCntr: {
+            CheckModelledBits(off, value, kIoSoundCntrPlaybackEn);
+            uint16_t old_value;
+            {
+                std::lock_guard<std::mutex> lk(state_mutex_);
+                old_value      = io_sound_cntr_;
+                io_sound_cntr_ = value;
+            }
+            NotifyAudioControlChange(old_value, value);
+            return;
+        }
+        case kSlotIntrMask:
+            CheckModelledBits(off, value, kIntrMaskModelled);
+            {
+                std::lock_guard<std::mutex> lk(state_mutex_);
+                intr_mask_ = value;
+            }
+            RecomputeTouchAudioIrq();
+            return;
+        case kSlotIoAdcStr:
+            WriteStatusW1c(addr, value, kIoAdcStrW1cMask, io_adc_str_);
+            if ((value & kPenTimingIntr) != 0u) pen_timer_.OnStatusCleared();
+            return;
+        case kSlotUcbStr:
+            WriteStatusW1c(addr, value, kUcbStrW1cMask, ucb_str_);
+            return;
+        case kSlotIoSoundStr:
+            WriteStatusW1c(addr, value, kIoSoundStrW1cMask, io_sound_str_);
+            return;
+        default:
+            HaltUnsupportedAccess("WriteHalf", addr, value);
     }
-
-    if (off == kSlotIntrMask) {
-        {
-            std::lock_guard<std::mutex> lk(state_mutex_);
-            intr_mask_ = value;
-        }
-        RecomputeTouchAudioIrq();
-        return;
-    }
-
-    if (off == kSlotIoAdcStr) {
-        if ((value & ~kIoAdcStrW1cMask) != 0) {
-            LOG(Caution, "Odo TOUCH_SOUND: ioAdcStr write = 0x%04X "
-                    "has bits outside W1C mask 0x%04X (pen/UCB/"
-                    "pen-tmg).\n", value, kIoAdcStrW1cMask);
-            CerfFatalExit(CERF_FATAL_RUNTIME_ERROR);
-        }
-        {
-            std::lock_guard<std::mutex> lk(state_mutex_);
-            io_adc_str_ &= static_cast<uint16_t>(~(value & kIoAdcStrW1cMask));
-        }
-        RecomputeTouchAudioIrq();
-        return;
-    }
-    if (off == kSlotUcbStr) {
-        if ((value & ~kUcbStrW1cMask) != 0) {
-            LOG(Caution, "Odo TOUCH_SOUND: ucbStr write = 0x%04X "
-                    "has bits outside W1C mask 0x%04X "
-                    "(ucbStrRegIntr).\n", value, kUcbStrW1cMask);
-            CerfFatalExit(CERF_FATAL_RUNTIME_ERROR);
-        }
-        {
-            std::lock_guard<std::mutex> lk(state_mutex_);
-            ucb_str_ &= static_cast<uint16_t>(~(value & kUcbStrW1cMask));
-        }
-        RecomputeTouchAudioIrq();
-        return;
-    }
-    if (off == kSlotIoSoundStr) {
-        if ((value & ~kIoSoundStrW1cMask) != 0) {
-            LOG(Caution, "Odo TOUCH_SOUND: ioSoundStr write = 0x%04X "
-                    "has bits outside W1C mask 0x%04X (record/"
-                    "playback intrs).\n", value, kIoSoundStrW1cMask);
-            CerfFatalExit(CERF_FATAL_RUNTIME_ERROR);
-        }
-        {
-            std::lock_guard<std::mutex> lk(state_mutex_);
-            io_sound_str_ &= static_cast<uint16_t>(~(value & kIoSoundStrW1cMask));
-        }
-        RecomputeTouchAudioIrq();
-        return;
-    }
-
-    HaltUnsupportedAccess("WriteHalf", addr, value);
 }
 
 uint32_t OdoArm720TouchSound::ReadWord(uint32_t addr) {
@@ -321,16 +306,6 @@ bool OdoArm720TouchSound::RaiseSoundStrBits(uint16_t bits) {
     return already;
 }
 
-bool OdoArm720TouchSound::PlaybackEnabled() const {
-    std::lock_guard<std::mutex> lk(state_mutex_);
-    return (io_sound_cntr_ & kIoSoundCntrPlaybackEn) != 0;
-}
-
-bool OdoArm720TouchSound::SoundIntrEnabled() const {
-    std::lock_guard<std::mutex> lk(state_mutex_);
-    return (intr_mask_ & kSoundIntrMask) != 0;
-}
-
 uint16_t OdoArm720TouchSound::HostPixelToRaw(int host_v) {
     if (host_v < 0) host_v = 0;
     const int raw = host_v * kCalScaleFactor;
@@ -349,71 +324,71 @@ void OdoArm720TouchSound::OnPenDown(int host_x, int host_y) {
         std::lock_guard<std::mutex> lk(state_mutex_);
         adc_x_ = x12;
         adc_y_ = y12;
-        io_adc_str_ |= kUcbIntr;
     }
-    pen_down_.store(true, std::memory_order_release);
-    RecomputeTouchAudioIrq();
+    codec_->SetTouchPressed(true);
 }
 
 void OdoArm720TouchSound::OnPenMove(int host_x, int host_y) {
-    if (!pen_down_.load(std::memory_order_acquire)) return;
+    if (!codec_->PenDown()) return;
     std::lock_guard<std::mutex> lk(state_mutex_);
     adc_x_ = HostPixelToRaw(host_x);
     adc_y_ = HostPixelToRaw(host_y);
 }
 
 void OdoArm720TouchSound::OnPenUp() {
-    pen_down_.store(false, std::memory_order_release);
+    codec_->SetTouchPressed(false);
 }
 
-void OdoArm720TouchSound::PenTimerMain() {
-    auto& freeze = emu_.Get<EmulationFreeze>();
-    while (!shutdown_.load(std::memory_order_acquire)) {
-        {
-            std::unique_lock<std::mutex> lk(pen_timer_cv_mtx_);
-            pen_timer_cv_.wait(lk, [this] {
-                return shutdown_.load(std::memory_order_acquire)
-                    || pen_timer_enabled_.load(std::memory_order_acquire);
-            });
-        }
-        if (shutdown_.load(std::memory_order_acquire)) break;
-
-        while (pen_timer_enabled_.load(std::memory_order_acquire)
-               && !shutdown_.load(std::memory_order_acquire)) {
-            std::this_thread::sleep_for(std::chrono::milliseconds(5));
-            if (!pen_timer_enabled_.load(std::memory_order_acquire)) break;
-            {
-                auto frozen = freeze.WorkerSection();
-                {
-                    std::lock_guard<std::mutex> lk(state_mutex_);
-                    io_adc_str_ |= kPenTimingIntr;
-                }
-                RecomputeTouchAudioIrq();
-            }
-        }
+void OdoArm720TouchSound::SetUcbIrqOut(bool asserted) {
+    {
+        std::lock_guard<std::mutex> lk(state_mutex_);
+        if (asserted) io_adc_str_ |= kUcbIntr;
+        else          io_adc_str_ &= static_cast<uint16_t>(~kUcbIntr);
     }
+    RecomputeTouchAudioIrq();
+}
+
+void OdoArm720TouchSound::OnPenTimingPeriod() {
+    {
+        std::lock_guard<std::mutex> lk(state_mutex_);
+        io_adc_str_ |= kPenTimingIntr;
+    }
+    RecomputeTouchAudioIrq();
+}
+
+bool OdoArm720TouchSound::PenTimingPending() {
+    std::lock_guard<std::mutex> lk(state_mutex_);
+    return (io_adc_str_ & kPenTimingIntr) != 0u;
 }
 
 void OdoArm720TouchSound::SaveState(StateWriter& w) {
-    std::lock_guard<std::mutex> lk(state_mutex_);
-    w.Write("io_adc_cntr", io_adc_cntr_);  w.Write("io_adc_str", io_adc_str_);
-    w.Write("ucb_cntr", ucb_cntr_);     w.Write("ucb_str", ucb_str_);  w.Write("ucb_register", ucb_register_);
-    w.Write("io_sound_cntr", io_sound_cntr_); w.Write("io_sound_str", io_sound_str_);
-    w.Write("intr_mask", intr_mask_);
-    w.WriteBytes("ucb_regs", ucb_regs_, sizeof(ucb_regs_));
-    w.Write("adc_x", adc_x_);  w.Write("adc_y", adc_y_);
+    {
+        std::lock_guard<std::mutex> lk(state_mutex_);
+        w.Write("io_adc_cntr", io_adc_cntr_);  w.Write("io_adc_str", io_adc_str_);
+        w.Write("ucb_cntr", ucb_cntr_);     w.Write("ucb_str", ucb_str_);  w.Write("ucb_register", ucb_register_);
+        w.Write("io_sound_cntr", io_sound_cntr_); w.Write("io_sound_str", io_sound_str_);
+        w.Write("intr_mask", intr_mask_);
+        w.Write("adc_x", adc_x_);  w.Write("adc_y", adc_y_);
+    }
+    codec_->SaveState(w);
+    pen_timer_.SaveState(w);
+    emu_.Get<OdoArm720AudioPlayer>().SaveState(w);
 }
 
 void OdoArm720TouchSound::RestoreState(StateReader& r) {
-    std::lock_guard<std::mutex> lk(state_mutex_);
-    r.Read("io_adc_cntr", io_adc_cntr_);  r.Read("io_adc_str", io_adc_str_);
-    r.Read("ucb_cntr", ucb_cntr_);     r.Read("ucb_str", ucb_str_);  r.Read("ucb_register", ucb_register_);
-    r.Read("io_sound_cntr", io_sound_cntr_); r.Read("io_sound_str", io_sound_str_);
-    r.Read("intr_mask", intr_mask_);
-    r.ReadBytes("ucb_regs", ucb_regs_, sizeof(ucb_regs_));
-    r.Read("adc_x", adc_x_);  r.Read("adc_y", adc_y_);
-    /* No host pen is held after a restore; drop the touch coupling so a saved
-       pen-down doesn't stick. */
-    pen_down_.store(false, std::memory_order_release);
-    pen_timer_enabled_.store(false, std::memory_order_release);
+    {
+        std::lock_guard<std::mutex> lk(state_mutex_);
+        r.Read("io_adc_cntr", io_adc_cntr_);  r.Read("io_adc_str", io_adc_str_);
+        r.Read("ucb_cntr", ucb_cntr_);     r.Read("ucb_str", ucb_str_);  r.Read("ucb_register", ucb_register_);
+        r.Read("io_sound_cntr", io_sound_cntr_); r.Read("io_sound_str", io_sound_str_);
+        r.Read("intr_mask", intr_mask_);
+        r.Read("adc_x", adc_x_);  r.Read("adc_y", adc_y_);
+    }
+    codec_->RestoreState(r);
+    pen_timer_.RestoreState(r);
+    emu_.Get<OdoArm720AudioPlayer>().RestoreState(r);
+}
+
+void OdoArm720TouchSound::PostRestore() {
+    emu_.Get<OdoArm720AudioPlayer>().PostRestore();
 }

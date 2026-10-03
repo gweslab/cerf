@@ -1,11 +1,14 @@
 #pragma once
 
 #include "../../core/service.h"
-#include "../../host/wave_out_sink.h"
+#include "../../host/paced_wave_out.h"
+#include "../../jit/guest_cycle_clock.h"
+#include "../../socs/raster_scan_clock.h"
 
-#include <atomic>
 #include <cstdint>
-#include <mutex>
+
+class StateWriter;
+class StateReader;
 
 class OdoArm720AudioPlayer : public Service {
 public:
@@ -17,27 +20,22 @@ public:
 
     void SetPlaybackEnabled(bool enabled);
 
+    void SaveState(StateWriter& w);
+    void RestoreState(StateReader& r);
+    void PostRestore();
+
 private:
-    void OnThreadMessage(const MSG& msg);
-    void SubmitNextPage();
+    void ResetLine();
+    void CheckDacRate();
+    void RequireScan(bool placed, const char* what);
+    void ArmPageEnd(uint64_t now);
+    void OnPageEnd();
+    void QueuePage(uint32_t page, uint32_t first_sample);
+    void OnRateChange();
 
-    static constexpr uint32_t kSampleRate     = 44100u;
-    static constexpr uint16_t kChannels       = 2u;
-    static constexpr uint16_t kBitsPerSample  = 16u;
-
-    static constexpr uint32_t kPageSize       = 2048u;
-    static constexpr uint32_t kPagesPerBuffer = 4u;
-
-    WaveOutSink       sink_;
-    std::atomic<bool> playback_enabled_{false};
-
-    std::mutex state_mutex_;
-    uint32_t   current_page_index_ = 0;
-    uint32_t   submitted_pages_    = 0;
-
-    struct PageSlot {
-        WAVEHDR hdr;
-        uint8_t bytes[2048];
-    };
-    PageSlot pages_[kPagesPerBuffer]{};
+    GuestCycleClock*        clock_   = nullptr;
+    GuestCycleClock::Event* event_   = nullptr;
+    RasterScanClock         scan_;
+    PacedWaveOut            out_;
+    bool                    playing_ = false;
 };

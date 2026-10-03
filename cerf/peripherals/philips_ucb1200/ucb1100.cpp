@@ -8,9 +8,12 @@
 
 namespace {
 
-/* NetBSD ucb1200reg.h:224 UCB1100_ID 0x1003 (version 3, device 0, supplier 1).
+/* NetBSD hpcmips ucb1200reg.h UCB1100_ID 0x1003 (version 3, device 0, supplier 1).
    PR31500.PDF p.2 names the UCB1100 as the PR31500's analog companion. */
 constexpr uint16_t kIdUcb1100 = 0x1003u;
+
+constexpr uint16_t kResetTelDiv = 16u;
+constexpr uint16_t kResetAudDiv = 6u;
 
 class Ucb1100 : public Ucb1x00Codec {
 public:
@@ -23,8 +26,15 @@ public:
 
 protected:
     uint16_t DeviceId() const override { return kIdUcb1100; }
+
+    std::array<uint16_t, 16> PowerOnRegs() const override {
+        std::array<uint16_t, 16> r{};
+        r[5] = kResetTelDiv;
+        r[7] = kResetAudDiv;
+        return r;
+    }
 };
 
-}  /* namespace */
+}
 
 REGISTER_SERVICE_AS(Ucb1100, Ucb1x00Codec);

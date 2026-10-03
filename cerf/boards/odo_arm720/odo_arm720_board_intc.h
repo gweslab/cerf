@@ -21,6 +21,7 @@ public:
     using IrqController::IrqController;
 
     bool ShouldRegister() override;
+    void OnReady() override;
 
     void AssertIrq   (int source_bit)                          override;
     void AssertSubIrq(int main_source_bit, int sub_source_bit) override;

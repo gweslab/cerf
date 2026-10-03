@@ -3,14 +3,14 @@
 #include "../board_context.h"
 #include "jornada_820_id.h"
 #include "../../core/cerf_emulator.h"
+#include "../../core/fatal.h"
 
 #include <cstdint>
 
 namespace {
 
-/* The Jornada 820's touch panel hangs off the nCS3 ASIC, not the codec, so no
-   plate is driven and every converted channel reads mid-scale. */
-constexpr uint16_t kNominalSample = 0x0200u;
+constexpr uint8_t  kAuxBackup        = 0;
+constexpr uint16_t kBackupAdcHealthy = 0x0200u;
 
 class Jornada820UcbBoard : public Ucb1x00Board {
 public:
@@ -21,18 +21,37 @@ public:
         return bd && bd->GetBoardId() == BoardId::Jornada820;
     }
 
-    uint16_t AuxAdc(uint8_t) override { return kNominalSample; }
+    uint16_t AuxAdc(uint8_t channel) override {
+        if (channel == kAuxBackup) return kBackupAdcHealthy;
+        emu_.Get<Fatal>().Die("jornada820: UCB AD%u conversion; only the AD0 backup cell "
+                              "is modelled on this board", channel);
+    }
 
-    bool     TouchDown() const override { return false; }
-    uint16_t TouchAdcX() override { return kNominalSample; }
-    uint16_t TouchAdcY() override { return kNominalSample; }
-    uint16_t TouchAdcPressure() override { return kNominalSample; }
+    uint16_t TouchAdcX() override { DieTouchConversion("X"); }
+    uint16_t TouchAdcY() override { DieTouchConversion("Y"); }
+    uint16_t TouchAdcPressure() override { DieTouchConversion("pressure"); }
 
-    uint16_t IoData(uint16_t driven) override { return driven; }
+    uint16_t IoInputs(uint16_t input_mask) override {
+        emu_.Get<Fatal>().Die("jornada820: UCB IO_DATA read with input pins 0x%03X; no "
+                              "codec I/O input is modelled on this board", input_mask);
+    }
 
-    uint16_t PenIrqStatus() override { return 0; }
-    void     ClearPenIrq(uint16_t) override {}
-    void     SetPenIrqArmed(uint16_t) override {}
+    bool AdcExternalReference() const override { return false; }
+
+    bool TsCrLowBitsSetOnTouch() const override { return true; }
+    void OnIrqOutChanged(bool asserted) override {
+        emu_.Get<Fatal>().Die(
+            "jornada820: UCB IRQOUT -> %d; the pin the codec interrupt drives on "
+            "this board is not modelled", asserted ? 1 : 0);
+    }
+
+    SocResetReach CodecSocResetReach() const override { return SocResetReach::Unknown; }
+
+private:
+    [[noreturn]] void DieTouchConversion(const char* what) {
+        emu_.Get<Fatal>().Die("jornada820: UCB touch plate %s conversion; no touch plate "
+                              "is modelled on this board's codec", what);
+    }
 };
 
 }  /* namespace */

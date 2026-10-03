@@ -30,6 +30,8 @@ constexpr uint32_t kCtl1Writable = 0x00FF000Cu;
 /* CARDET<24>, "the status of the CARDET (carrier detect) input pin" (§10.5.1). */
 constexpr uint32_t kCtl1CarDet = 1u << 24;
 
+constexpr uint32_t kCtl1RxPwr = 1u << 2;
+
 /* Interrupt Status 5 (§8.3.5): POSCARINT<15> is set on a CARDET 0->1 transition and
    NEGCARINT<14> on a 1->0 transition. */
 constexpr uint32_t kStatus5Set    = 4u;
@@ -66,7 +68,16 @@ void Pr31x00Ir::WriteWord(uint32_t addr, uint32_t value) {
     if (value & kCtl1Unmodeled) {
         HaltUnsupportedAccess("PR31x00 IR_CTL1 arms the IR state machines", addr, value);
     }
+    const uint32_t old = ctl1_;
     ctl1_ = value & kCtl1Writable;   /* CARDET is read-only */
+    if (((old ^ ctl1_) & kCtl1RxPwr) != 0u) {
+        for (auto& cb : rxpwr_observers_) cb((ctl1_ & kCtl1RxPwr) != 0u);
+    }
+}
+
+void Pr31x00Ir::RegisterRxPwrObserver(RxPwrObserver cb) {
+    cb((ctl1_ & kCtl1RxPwr) != 0u);
+    rxpwr_observers_.push_back(std::move(cb));
 }
 
 void Pr31x00Ir::DriveCarDetInput(bool level) {

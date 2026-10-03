@@ -1,30 +1,30 @@
-#include "../../peripherals/philips_ucb1200/ucb1x00_board.h"
+#include "../../peripherals/philips_ucb1200/ucb1x00_sib_board.h"
 
 #include "philips_velo_1_battery.h"
-#include "philips_velo_1_touch_panel.h"
+#include "../../peripherals/philips_ucb1200/ucb1x00_touch_panel.h"
 #include "../board_context.h"
 #include "philips_velo_1_id.h"
 #include "../../core/cerf_emulator.h"
+#include "../../core/fatal.h"
 #include "../../core/log.h"
 
 #include <cstdint>
 
 namespace {
 
-/* gwes.exe sub_739B0 reads the UCB aux ADC over SIB1: IOCTL 1 (serial.dll
-   sub_1EB9200): a3==2 -> INP AD2 -> main gauge (OAL globals+40), a3==3 -> INP AD3
-   -> backup coin cell (globals+54). ADC_CR INP 4..7 maps to AuxAdc channel 0..3,
-   so AD2 is channel 2 and AD3 is channel 3. */
-constexpr uint8_t kAuxMain   = 2;   /* AD2 */
-constexpr uint8_t kAuxBackup = 3;   /* AD3 */
+/* philips_velo_1_ce1 serial.dll sub_1EB9200 converts INP AD2 into shared word +40
+   and INP AD3 into +54; gwes.exe sub_739B0 reads +40 as the main battery and +54
+   as the backup cell. */
+constexpr uint8_t kAuxMain   = 2;
+constexpr uint8_t kAuxBackup = 3;
 
-/* sub_739B0 bands the averaged main raw: <0x89 no gauge, >=0x141 HIGH, >=0x12D
-   MED, else LOW. Empty sits at the 0x89 valid floor (reads LOW), full above 0x141. */
+/* philips_velo_1_ce1 gwes.exe sub_739B0 flags the main average below 0x89 as no
+   battery, from 0x141 HIGH, from 0x12D LOW, else CRITICAL. */
 constexpr int kMainAdcEmpty = 0x89;
 constexpr int kMainAdcFull  = 0x200;
 
-/* sub_739B0 bands the backup coin cell >=0x16F HIGH, >=0x13C MED, >=0xD4 LOW; the
-   emulated cell is always fresh. */
+/* philips_velo_1_ce1 gwes.exe sub_739B0 flags the backup cell below 0xD4 as no
+   battery, from 0x16F HIGH, from 0x13C LOW, else CRITICAL. */
 constexpr uint16_t kBackupAdcHealthy = 0x200;
 
 uint16_t MainBatteryAdc(int fill_percent) {
@@ -36,17 +36,16 @@ uint16_t MainBatteryAdc(int fill_percent) {
 
 uint16_t Clamp10(int v) { return static_cast<uint16_t>(v < 0 ? 0 : (v > 1023 ? 1023 : v)); }
 
-/* touch.dll (sub_1F211C0 -> TouchPanelCalibrateAPoint) calibrates any monotonic
-   pixel->raw map, but the 10-bit ADC caps it: base + slope*max_coord must stay <= 1023,
-   and X runs to 479 on the 480x240 panel, so slope is 2 (64 + 479*2 = 1022). */
+/* philips_velo_1_ce1 touch.dll sub_1F211C0 passes the raw ADC pair to
+   TouchPanelCalibrateAPoint. */
 uint16_t PixelToAdc(int px) { return Clamp10(64 + (px < 0 ? 0 : px) * 2); }
 
 constexpr uint16_t kPressureDown = 0x3FF;
 constexpr uint16_t kPressureUp   = 0u;
 
-class PhilipsVelo1UcbBoard : public Ucb1x00Board {
+class PhilipsVelo1UcbBoard : public Ucb1x00SibBoard {
 public:
-    using Ucb1x00Board::Ucb1x00Board;
+    using Ucb1x00SibBoard::Ucb1x00SibBoard;
 
     bool ShouldRegister() override {
         auto* bd = emu_.TryGet<BoardContext>();
@@ -63,23 +62,22 @@ public:
         }
     }
 
-    bool TouchDown() const override { return emu_.Get<PhilipsVelo1TouchPanel>().Down(); }
-    uint16_t TouchAdcX() override { return PixelToAdc(emu_.Get<PhilipsVelo1TouchPanel>().X()); }
-    uint16_t TouchAdcY() override { return PixelToAdc(emu_.Get<PhilipsVelo1TouchPanel>().Y()); }
+    uint16_t TouchAdcX() override { return PixelToAdc(emu_.Get<Ucb1x00TouchPanel>().X()); }
+    uint16_t TouchAdcY() override { return PixelToAdc(emu_.Get<Ucb1x00TouchPanel>().Y()); }
     uint16_t TouchAdcPressure() override {
-        return emu_.Get<PhilipsVelo1TouchPanel>().Down() ? kPressureDown : kPressureUp;
+        return emu_.Get<Ucb1x00TouchPanel>().Down() ? kPressureDown : kPressureUp;
     }
 
-    uint16_t IoData(uint16_t) override {
-        LOG(Caution, "PhilipsVelo1UcbBoard: codec I/O pins unmodeled\n");
-        CerfFatalExit(CERF_FATAL_RUNTIME_ERROR);
+    uint16_t IoInputs(uint16_t input_mask) override {
+        emu_.Get<Fatal>().Die("velo: UCB IO_DATA read with input pins 0x%03X; no codec I/O "
+                              "input is modelled on this board", input_mask);
     }
 
-    uint16_t PenIrqStatus() override { return emu_.Get<PhilipsVelo1TouchPanel>().PenIrqStatus(); }
-    void ClearPenIrq(uint16_t mask) override { emu_.Get<PhilipsVelo1TouchPanel>().ClearPenIrq(mask); }
-    void SetPenIrqArmed(uint16_t bits) override {
-        emu_.Get<PhilipsVelo1TouchPanel>().SetPenIrqArmed(bits);
-    }
+    bool AdcExternalReference() const override { return true; }
+
+    bool TsCrLowBitsSetOnTouch() const override { return true; }
+
+    SocResetReach CodecSocResetReach() const override { return SocResetReach::Unknown; }
 };
 
 }  /* namespace */

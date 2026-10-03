@@ -30,7 +30,6 @@ public:
     }
     void SaveState(StateWriter& w) override    { emu_.Get<Ucb1x00Codec>().SaveState(w); }
     void RestoreState(StateReader& r) override { emu_.Get<Ucb1x00Codec>().RestoreState(r); }
-    void PostRestore() override                { emu_.Get<Ucb1x00Codec>().PostRestore(); }
 };
 
 }  /* namespace */

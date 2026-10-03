@@ -4,6 +4,8 @@
 
 #include <atomic>
 #include <cstdint>
+#include <functional>
+#include <vector>
 
 /* Philips PR31x00 IR Module, TMPR3911/3912 ch.10. */
 class Pr31x00Ir : public Peripheral {
@@ -24,6 +26,10 @@ public:
        NEGCARINT, both in Interrupt Status 5 (§8.3.5). */
     void DriveCarDetInput(bool level);
 
+    /* TMPR3911 §10.5.1: "This bit is connected to the RXPWR pin." */
+    using RxPwrObserver = std::function<void(bool level)>;
+    void RegisterRxPwrObserver(RxPwrObserver cb);
+
     uint8_t  ReadByte(uint32_t addr) override { HaltUnsupportedAccess("PR31x00 IR ReadByte", addr, 0); }
     uint16_t ReadHalf(uint32_t addr) override { HaltUnsupportedAccess("PR31x00 IR ReadHalf", addr, 0); }
     void WriteByte(uint32_t addr, uint8_t  v) override { HaltUnsupportedAccess("PR31x00 IR WriteByte", addr, v); }
@@ -35,4 +41,6 @@ public:
 private:
     uint32_t          ctl1_ = 0;
     std::atomic<bool> cardet_{false};
+
+    std::vector<RxPwrObserver> rxpwr_observers_;
 };

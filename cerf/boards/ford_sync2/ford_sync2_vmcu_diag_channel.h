@@ -22,6 +22,7 @@ public:
 
     /* A reliable-data frame the head sent on a diagnostic Cid; msg[0] = TP type. */
     void HandleInbound(uint8_t cid, const uint8_t* msg, std::size_t n);
+    void OnLinkReset();
 
     /* Forwarded from FordSync2VmcuPeer's Save/Restore (this is a plain Service,
        not auto-enumerated for hibernation). */

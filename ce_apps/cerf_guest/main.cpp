@@ -23,7 +23,6 @@
 #include "cerf_power.h"
 #include "cerf_registry_customizations.h"
 #include "cerf_service_pump.h"
-#include "cerf_sync2_shell_replace.h"
 #include "main.h"
 
 #define CERF_GPE_DESC_VA          0x000u
@@ -203,7 +202,6 @@ static DHPDEV APIENTRY CerfEnablePDEVWrap(
     if (result) CerfStartInputPump();
     if (result) CerfStartDriverInDriver();
     if (result) CerfAdvertiseDisplayPower();
-    if (result) CerfStartSync2ShellReplace();
     if (result) CerfStartAutorun();
     if (result) CerfStartServicePump();
     return result;

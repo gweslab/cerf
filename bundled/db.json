@@ -1387,11 +1387,10 @@
         }
       ],
       "notes": [
-        "THIS BOARD IS NOT EMULATED WELL AT ALL! All it can do is a boot to a glitching home screen and that's it",
-        "On the first boot, guest flashes the ~2GB NAND image from .sec file. It will take some time and x2 disk space. After first boot, you can remove .sec file if you are not going to re-flash.",
-        "GPU has severe visual artifacts.",
-        "A click on screen will likely crash CERF due to missing GPU implementation",
-        "Guest additions are launching if re-run with complete NAND image. Sync2UI is automatically hijacked and replaced with CE Explorer. OpenVG/Sync2 UI wont render."
+        "The board is not emulated well: most stock features will crash the GPU",
+        "GPU has visual artifacts",
+        "Guest Additions driver runs only AFTER first NAND flash. Restart emulator if you want a CE Shell.",
+        "Guest Additions driver will OVERWRITE your registry and permanently force WinCE Shell even for stock device runs."
       ],
       "lcd_panel_size": {
         "width": 800,

@@ -1,3 +1,5 @@
 #pragma once
 
-extern "C" void CerfStartSync2ShellReplace(void);
+#include <windows.h>
+
+extern "C" BOOL CerfSync2ReplaceShell(void);

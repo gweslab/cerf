@@ -286,8 +286,21 @@ void FordSync2VmcuPeer::InjectReliable(uint8_t cid, uint8_t seq,
     uart_->InjectRx(f.data(), f.size());
 }
 
+void FordSync2VmcuPeer::ResetLink() {
+    LOG(Periph, "[VMCU] LINK_SETUP after link up - link reset, election restarts\n");
+    state_ = PeerState::Down;
+    next_rx_.fill(0u);
+    pm_tx_seq_ = 0u;
+    inbound_tx_seq_ = 0u;
+    pm_state_pushed_ = false;
+    emu_.Get<FordSync2IlpChannel>().OnLinkReset();
+    emu_.Get<FordSync2VmcuDiagChannel>().OnLinkReset();
+}
+
 void FordSync2VmcuPeer::OnHeadMessage(uint8_t type) {
     if (type == kMsgSetup) {
+        /* sync_2 ipc.dll sub_C093C7EC case 7, msg 1 -> sub_C093BFC0 (LinkReset). */
+        if (state_ == PeerState::CplSent) ResetLink();
         /* Reply with our LINK_SETUP once. The head re-sends LINK_SETUP until
            answered; an extra reply arriving after it reaches state 6 hits
            ipc.dll's RX SM (sub_C093C7EC case 6, msg 1) "Re-starting Link Setup"

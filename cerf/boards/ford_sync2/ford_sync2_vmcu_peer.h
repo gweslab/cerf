@@ -63,6 +63,7 @@ private:
     static constexpr uint8_t  kWdgCid     = 4u;
 
     void OnHeadMessage(uint8_t type);
+    void ResetLink();
     /* A reliable data packet the head sent on a data channel (Cid>3): reply with
        the transport ACK that clears the head's TX slot (ipc.dll RX-ACK handler
        sub_C093BE18), so its resend timer (sub_C093C574) stops before MaxResends

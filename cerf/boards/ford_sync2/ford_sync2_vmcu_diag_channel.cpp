@@ -63,6 +63,11 @@ void FordSync2VmcuDiagChannel::HandleInbound(uint8_t cid, const uint8_t* msg,
     tx_seq_[idx] = static_cast<uint8_t>((tx_seq_[idx] + 1u) & 0x7Fu);
 }
 
+void FordSync2VmcuDiagChannel::OnLinkReset() {
+    tx_seq_[0] = 0u;
+    tx_seq_[1] = 0u;
+}
+
 void FordSync2VmcuDiagChannel::SaveState(StateWriter& w) {
     w.Write("tx_seq", tx_seq_[0]);
     w.Write("tx_seq", tx_seq_[1]);

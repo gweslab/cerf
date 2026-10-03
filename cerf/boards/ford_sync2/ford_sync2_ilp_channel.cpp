@@ -178,6 +178,10 @@ void FordSync2IlpChannel::PublishPending(bool cyclic) {
     }
 }
 
+void FordSync2IlpChannel::OnLinkReset() {
+    tx_seq_ = 0;
+}
+
 void FordSync2IlpChannel::OnWatchdogPet() {
     Refresh();
     ++watchdog_pets_;

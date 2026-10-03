@@ -4,15 +4,13 @@
 #include "cerf_regs_map.h"
 #include "cerf_shell_watch.h"
 #include "cerf_gwes_ready.h"
+#include "cerf_init_table.h"
 #include "cerf_toolhelp.h"
 #include "cerf_window_owner.h"
 
 #define CERF_SHELLWATCH_MAX_LAUNCH 48
-#define CERF_SHELLWATCH_EXE_WCHARS 64
 #define CERF_SHELLWATCH_MAX_CB     8
 #define CERF_SHELLWATCH_TIMEOUT_TICKS 120u
-
-typedef struct { int ord; WCHAR exe[CERF_SHELLWATCH_EXE_WCHARS]; } CerfLaunchEntry;
 
 typedef void (*CerfOnShellIsUp)(void);
 
@@ -53,51 +51,6 @@ static int CerfEqualsCIW(const WCHAR* a, const WCHAR* b) {
         if (ca != cb) return 0;
     }
     return *a == *b;
-}
-
-static int CerfParseLaunchName(const WCHAR* name, int* ord) {
-    const WCHAR* pfx = L"launch";
-    const WCHAR* p   = name;
-    int v = 0;
-    for (; *pfx; ++pfx, ++p) {
-        WCHAR c = *p;
-        if (c >= L'A' && c <= L'Z') c = (WCHAR)(c + 32);
-        if (c != *pfx) return 0;
-    }
-    if (!(*p >= L'0' && *p <= L'9')) return 0;
-    for (; *p >= L'0' && *p <= L'9'; ++p) v = v * 10 + (int)(*p - L'0');
-    if (*p != 0) return 0;
-    *ord = v;
-    return 1;
-}
-
-static int CerfReadInitTable(CerfLaunchEntry* tbl, int max) {
-    HKEY  hk;
-    DWORD idx = 0;
-    int   n   = 0;
-    if (RegOpenKeyExW(HKEY_LOCAL_MACHINE, L"init", 0, 0, &hk) != ERROR_SUCCESS)
-        return -1;
-    for (;;) {
-        WCHAR name[CERF_SHELLWATCH_EXE_WCHARS];
-        WCHAR data[MAX_PATH];
-        DWORD nlen = CERF_SHELLWATCH_EXE_WCHARS;
-        DWORD dlen = sizeof(data);
-        DWORD type = 0;
-        int   ord, i;
-        if (RegEnumValueW(hk, idx, name, &nlen, NULL, &type, (LPBYTE)data, &dlen) != ERROR_SUCCESS)
-            break;
-        idx++;
-        if (type != REG_SZ) continue;
-        if (!CerfParseLaunchName(name, &ord)) continue;
-        if (n >= max) break;
-        tbl[n].ord = ord;
-        for (i = 0; i < CERF_SHELLWATCH_EXE_WCHARS - 1 && data[i]; ++i)
-            tbl[n].exe[i] = data[i];
-        tbl[n].exe[i] = 0;
-        n++;
-    }
-    RegCloseKey(hk);
-    return n;
 }
 
 static BOOL CerfShellWatchPollOnce(const CerfLaunchEntry* tbl, int n, int gwes_ord) {

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../jit/guest_cycle_clock.h"
+#include "dma_burst_fifo.h"
 #include "oscillator_ticks.h"
 
 #include <cstdint>
@@ -69,8 +70,8 @@ private:
     static bool ShapeKnown(const FreescaleSsiFrameShape& shape);
 
     void     Settle();
-    void     Burst();
-    bool     DmaOn() const { return dma_request_ && burst_ != 0u; }
+    void     UpdateSupply();
+    bool     DmaOn() const { return dma_request_ && fifo_.Burst() != 0u; }
     uint64_t DataSlotsBefore(uint64_t slot) const;
     uint64_t TxDataSlots(uint64_t from, uint64_t to) const;
     uint64_t NthDataSlot(uint64_t from, uint64_t n) const;
@@ -102,11 +103,8 @@ private:
     bool     tfen0_       = false;
     bool     dma_request_ = false;
     uint32_t tfwm_        = 0;
-    uint32_t level_       = 0;
     uint64_t settled_     = 0;
     uint64_t tx_start_    = kNever;
     uint64_t tx_stop_     = kNever;
-    uint32_t threshold_   = 0;
-    uint32_t burst_       = 0;
-    uint64_t dma_words_   = 0;
+    DmaBurstFifo fifo_;
 };

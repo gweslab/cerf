@@ -72,7 +72,9 @@ void GuestCpuReset::OnResetDelivered() {
     const ResetLineKind kind =
         pending_kind_.exchange(ResetLineKind::Other, std::memory_order_acq_rel);
     delivered_is_resume_ = pending_is_resume_.exchange(false, std::memory_order_acq_rel);
+    line_held_ = true;
     for (auto& fn : reset_listeners_) fn(kind);
     emu_.Get<GuestColdBoot>().ExecuteIfPending();
+    line_held_ = false;
     for (auto& fn : release_listeners_) fn();
 }

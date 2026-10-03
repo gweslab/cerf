@@ -1,18 +1,33 @@
 #include "sa11xx_uart_base.h"
 
 #include "../../core/cerf_emulator.h"
-#include "../../core/log.h"
+#include "../../core/fatal.h"
 #include "../../boards/board_context.h"
 #include "sa1110_id.h"
 #include "sa1100_id.h"
+#include "../../jit/guest_cycle_clock.h"
 #include "../../tracing/kernel_debug_sink.h"
 #include "../../peripherals/peripheral_dispatcher.h"
 #include "../../state/state_stream.h"
+#include "../guest_cpu_reset.h"
 #include "sa11xx_intc.h"
+#include "sa11xx_uart_receiver.h"
+#include "sa11xx_uart_regs.h"
+#include "sa11xx_uart_transmitter.h"
 
-#include <cstdio>
 #include <string>
 
+using namespace sa11xx_uart;
+
+namespace {
+
+/* SA-1110 §11.11.7 UTSR0 (printed 11-122): TFS 0; §11.11.8 UTSR1 (printed 11-125): TBY 0,
+   TNF 2. */
+constexpr uint32_t kUtsr0Tfs = 1u << 0;
+constexpr uint32_t kUtsr1Tby = 1u << 0;
+constexpr uint32_t kUtsr1Tnf = 1u << 2;
+
+}
 
 bool Sa11xxUartBase::ShouldRegister() {
     auto* bd = emu_.TryGet<BoardContext>();
@@ -20,6 +35,12 @@ bool Sa11xxUartBase::ShouldRegister() {
 }
 
 void Sa11xxUartBase::OnReady() {
+    clock_ = &emu_.Get<GuestCycleClock>();
+    tx_    = &emu_.Get<Sa11xxUartTransmitter>();
+    rx_    = &emu_.Get<Sa11xxUartReceiver>();
+    port_    = tx_->Attach(this, MmioBase() + 0x14u, TransmitDeviceSelect(), ChannelName());
+    rx_port_ = rx_->Attach(this, MmioBase() + 0x14u, ReceiveDeviceSelect(), ChannelName());
+    emu_.Get<GuestCpuReset>().RegisterResetListener([this](ResetLineKind) { OnResetLine(); });
     emu_.Get<PeripheralDispatcher>().Register(this);
 }
 
@@ -38,52 +59,41 @@ void Sa11xxUartBase::TxByte(uint8_t b) {
     if (tx_listener_) tx_listener_(b);
 }
 
-uint8_t Sa11xxUartBase::PopRxByteLocked() {
-    if (rx_fifo_.empty()) return 0;
-    uint8_t b = rx_fifo_.front();
-    rx_fifo_.pop_front();
+void Sa11xxUartBase::Emit(const std::vector<uint8_t>& out) {
+    for (uint8_t b : out) TxByte(b);
+}
+
+void Sa11xxUartBase::OnTransmitted(const std::vector<uint8_t>& out) {
+    {
+        std::lock_guard<std::mutex> lk(state_mtx_);
+        RefreshIrqLocked();
+    }
+    Emit(out);
+}
+
+void Sa11xxUartBase::OnReceived() {
+    std::lock_guard<std::mutex> lk(state_mtx_);
     RefreshIrqLocked();
-    return b;
 }
 
 uint32_t Sa11xxUartBase::Utsr1Locked() const {
-    uint32_t v = 0x04u;                       /* TNF=1 (instant TX) */
-    if (!rx_fifo_.empty()) v |= 0x02u;        /* RNE=1 when RX has data */
+    uint32_t v = rx_->Utsr1(rx_port_);
+    if (tx_->Tby(port_)) v |= kUtsr1Tby;
+    if (tx_->Tnf(port_)) v |= kUtsr1Tnf;
     return v;
 }
-
-/* SA-1110 §11.9.10 / Linux SA-1100.h:
-     UTSR0_RFS = bit 1 (auto-tracks FIFO 1/3..2/3 full)
-     UTSR0_RID = bit 2 (sticky pulse after burst; cleared by W1C)
-   UART asserts INTC source while UTSR0 RFS|RID is non-zero. */
-static constexpr uint32_t kUtsr0Rfs = 1u << 1;
-static constexpr uint32_t kUtsr0Rid = 1u << 2;
-
-/* SA-1110 §11.11.7.1: UTSR0 TFS = bit 0 - set while the transmit FIFO
-   is half-full or less. §11.11.5.5: UTCR3 TIE = bit 4 - when set, TFS
-   asserts the UART INTC source. CERF flushes TX synchronously so the
-   FIFO is always empty → TFS is always set. */
-static constexpr uint32_t kUtsr0Tfs = 1u << 0;
-static constexpr uint32_t kUtcr3Tie = 1u << 4;
-
-/* SA-1110 §11.11.5.4: UTCR3 RIE = bit 3 gates the RFS/RID interrupt (RIE=0 ->
-   RFS/RID ignored by the INTC). The J820 OAL clears RIE to silence the SP1 source
-   while its IST drains (nk.exe 0x80059EB0); ignoring RIE keeps the source asserted,
-   the OAL re-enters before the IST runs, and it storms returning NOP. */
-static constexpr uint32_t kUtcr3Rie = 1u << 3;
 
 uint32_t Sa11xxUartBase::ComputeUtsr0Locked() const {
-    uint32_t v = utsr0_pending_ | kUtsr0Tfs;
-    if (!rx_fifo_.empty()) v |= kUtsr0Rfs;
-    return v;
+    return rx_->Utsr0(rx_port_) | (tx_->Tfs(port_) ? kUtsr0Tfs : 0u);
 }
 
+/* §11.11.5.4 / §11.11.5.5 (printed 11-117): RIE gates RFS and RID, TIE gates TFS, toward the
+   interrupt controller. */
 void Sa11xxUartBase::RefreshIrqLocked() {
     const int bit = IntcSourceBit();
     if (bit < 0) return;
-    const uint32_t utsr0 = ComputeUtsr0Locked();
-    const bool rx_irq = (utcr3_ & kUtcr3Rie) && (utsr0 & (kUtsr0Rfs | kUtsr0Rid));
-    const bool tx_irq = (utcr3_ & kUtcr3Tie) && (utsr0 & kUtsr0Tfs);
+    const bool rx_irq = rx_->InterruptRequest(rx_port_);
+    const bool tx_irq = (utcr3_ & kUtcr3Tie) && tx_->Tfs(port_);
     const bool want = rx_irq || tx_irq;
     if (want && !intc_asserted_) {
         intc_asserted_ = true;
@@ -95,69 +105,83 @@ void Sa11xxUartBase::RefreshIrqLocked() {
 }
 
 void Sa11xxUartBase::PushRxByte(uint8_t b) {
-    std::lock_guard<std::mutex> lk(state_mtx_);
-    rx_fifo_.push_back(b);
-    utsr0_pending_ |= kUtsr0Rid;
-    RefreshIrqLocked();
+    rx_->Push(rx_port_, &b, 1u);
 }
 
 void Sa11xxUartBase::PushRxBurst(const uint8_t* data, size_t n) {
+    rx_->Push(rx_port_, data, n);
+}
+
+/* §11.11.1 (printed 11-109): "Following hardware reset, the UART is disabled"; "Reset also causes
+   the UART's transmit and receive FIFOs to be flushed"; UTCR3 reset row: RXE 0, TXE 0. */
+void Sa11xxUartBase::OnResetLine() {
     std::lock_guard<std::mutex> lk(state_mtx_);
-    for (size_t i = 0; i < n; ++i) rx_fifo_.push_back(data[i]);
-    utsr0_pending_ |= kUtsr0Rid;
+    utcr3_ &= ~(kUtcr3Rxe | kUtcr3Txe);
+    tx_->Reset(port_);
+    rx_->Reset(rx_port_);
     RefreshIrqLocked();
 }
 
 uint32_t Sa11xxUartBase::ReadReg(uint32_t off) {
-    std::lock_guard<std::mutex> lk(state_mtx_);
-    switch (off) {
-        case 0x00: return utcr0_;
-        case 0x04: return utcr1_;
-        case 0x08: return utcr2_;
-        case 0x0C: return utcr3_;
-        case 0x10: return utcr4_;
-        case 0x14: return PopRxByteLocked();
-        case 0x1C: return ComputeUtsr0Locked();           /* UTSR0 RFS|RID */
-        case 0x20: return Utsr1Locked();
-        default:   return 0;
+    std::vector<uint8_t> out;
+    uint32_t v = 0;
+    {
+        std::lock_guard<std::mutex> lk(state_mtx_);
+        const uint64_t now = clock_->Cycles();
+        tx_->Settle(port_, now, out);
+        rx_->Settle(rx_port_, now);
+        switch (off) {
+            case 0x00: v = utcr0_; break;
+            case 0x04: v = utcr1_; break;
+            case 0x08: v = utcr2_; break;
+            case 0x0C: v = utcr3_; break;
+            case 0x10: v = utcr4_; break;
+            case 0x14: v = rx_->Pop(rx_port_, now); break;
+            case 0x1C: v = ComputeUtsr0Locked(); break;
+            case 0x20: v = Utsr1Locked(); break;
+            default:   break;
+        }
+        RefreshIrqLocked();
     }
+    Emit(out);
+    return v;
 }
 
+/* §11.11.3.7 (printed 11-113) UTCR0 and §11.10.4 (printed 11-93) UTCR4: the UART "must be disabled
+   (RXE=TXE=0) when changing the state of" their bits; §11.11.4.1 (printed 11-115): the same
+   "whenever these registers are written" for UTCR1 / UTCR2. */
 void Sa11xxUartBase::WriteReg(uint32_t off, uint32_t value) {
-    std::lock_guard<std::mutex> lk(state_mtx_);
-    switch (off) {
-        case 0x00: utcr0_ = value; break;
-        case 0x04: utcr1_ = value; break;
-        case 0x08: utcr2_ = value; break;
-        case 0x0C:
-            utcr3_ = value;
-            /* RIE may have just been enabled with FIFO already
-               non-empty - re-evaluate the IRQ line now or that data
-               sits until the next push/pop. */
-            RefreshIrqLocked();
-            break;
-        case 0x10: utcr4_ = value; break;
-        case 0x14:
-            /* TX path: release the lock around TxByte - the
-               listener can do arbitrary work (e.g. MicroP parser)
-               and re-entering with state_mtx_ held risks deadlock. */
-            {
-                const uint8_t tx = static_cast<uint8_t>(value & 0xFFu);
-                state_mtx_.unlock();
-                TxByte(tx);
-                state_mtx_.lock();
-            }
-            break;
-        case 0x1C:
-            /* W1C: kernel writes UTSR0_RID etc. to ack. RFS is
-               read-only (auto-tracks FIFO size) so masking it is
-               a no-op. After ACK, UART may deassert INTC. */
-            utsr0_pending_ &= ~value;
-            RefreshIrqLocked();
-            break;
-        case 0x20: break;          /* UTSR1 R-O */
-        default:   break;
+    std::vector<uint8_t> out;
+    bool port_change = false;
+    {
+        std::lock_guard<std::mutex> lk(state_mtx_);
+        const uint64_t now = clock_->Cycles();
+        const bool enabled = (utcr3_ & (kUtcr3Rxe | kUtcr3Txe)) != 0u;
+        if (enabled && (off == 0x04 || off == 0x08 || (off == 0x00 && value != utcr0_) ||
+                        (off == 0x10 && value != utcr4_))) {
+            emu_.Get<Fatal>().Die("%s: UTCR%u write 0x%02X while the UART is enabled (UTCR3 0x%02X); "
+                                  "not modelled", ChannelName(), off / 4u, value, utcr3_);
+        }
+        switch (off) {
+            case 0x00: utcr0_ = value; break;
+            case 0x04: utcr1_ = value; break;
+            case 0x08: utcr2_ = value; break;
+            case 0x0C: utcr3_ = value; break;
+            case 0x10: utcr4_ = value; break;
+            case 0x14: tx_->Write(port_, now, static_cast<uint8_t>(value & 0xFFu), out); break;
+            case 0x1C: rx_->ClearStatus(rx_port_, now, value); break;
+            default:   break;
+        }
+        if (off <= 0x0C) {
+            port_change = tx_->WriteControl(
+                port_, now, Sa11xxUartTransmitter::Control{utcr0_, utcr1_, utcr2_, utcr3_}, out);
+            rx_->WriteControl(rx_port_, now,
+                              Sa11xxUartReceiver::Control{utcr0_, utcr1_, utcr2_, utcr3_});
+        }
+        RefreshIrqLocked();
     }
+    Emit(out);
+    if (port_change) tx_->NotifyDma();
 }
 
 uint8_t Sa11xxUartBase::ReadByte(uint32_t addr) {
@@ -179,7 +203,7 @@ void Sa11xxUartBase::WriteByte(uint32_t addr, uint8_t value) {
     const uint32_t base  = off & ~0x3u;
     const uint32_t shift = (off & 0x3u) * 8;
     if (!IsKnown(base)) HaltUnsupportedAccess("WriteByte", addr, value);
-    if (base == 0x14) { TxByte(value); return; }
+    if (base == 0x14) { WriteReg(base, value); return; }
     const uint32_t cur     = ReadReg(base);
     const uint32_t cleared = cur & ~(0xFFu << shift);
     WriteReg(base, cleared | (static_cast<uint32_t>(value) << shift));
@@ -198,10 +222,9 @@ void Sa11xxUartBase::SaveState(StateWriter& w) {
     w.Write("utcr2", utcr2_);
     w.Write("utcr3", utcr3_);
     w.Write("utcr4", utcr4_);
-    w.Write("utsr0_pending", utsr0_pending_);
     w.Write("intc_asserted", intc_asserted_);
-    w.Write<uint32_t>("rx_fifo_count", static_cast<uint32_t>(rx_fifo_.size()));
-    for (uint8_t b : rx_fifo_) w.Write("rx_fifo", b);
+    tx_->Save(port_, w);
+    rx_->Save(rx_port_, w);
 }
 
 void Sa11xxUartBase::RestoreState(StateReader& r) {
@@ -211,14 +234,14 @@ void Sa11xxUartBase::RestoreState(StateReader& r) {
     r.Read("utcr2", utcr2_);
     r.Read("utcr3", utcr3_);
     r.Read("utcr4", utcr4_);
-    r.Read("utsr0_pending", utsr0_pending_);
     r.Read("intc_asserted", intc_asserted_);
-    rx_fifo_.clear();
-    uint32_t n = 0;
-    r.Read("rx_fifo_count", n);
-    for (uint32_t i = 0; i < n; ++i) {
-        uint8_t b = 0;
-        r.Read("rx_fifo", b);
-        rx_fifo_.push_back(b);
-    }
+    tx_->Restore(port_, r);
+    rx_->Restore(rx_port_, r);
+}
+
+void Sa11xxUartBase::PostRestore() {
+    std::lock_guard<std::mutex> lk(state_mtx_);
+    tx_->PostRestore(port_);
+    rx_->PostRestore(rx_port_);
+    RefreshIrqLocked();
 }

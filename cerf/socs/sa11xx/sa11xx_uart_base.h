@@ -3,16 +3,16 @@
 #include "../../peripherals/peripheral_base.h"
 
 #include <cstdint>
-#include <deque>
 #include <functional>
 #include <mutex>
 #include <vector>
 
-/* SA-1110 §11.9 / §11.11: SP1, SP2 and SP3 share the same UART
-   register surface (UTCR0..3, UTDR, UTSR0/1). MmioBase is the only
-   per-port difference at the silicon level; RX-FIFO and TX-listener
-   are software opt-ins (e.g. iPaq MicroP on SP1). */
+class GuestCycleClock;
+class Sa11xxUartReceiver;
+class Sa11xxUartTransmitter;
 
+/* SA-1110 §11.9 / §11.11: SP1, SP2 and SP3 share one UART register surface (UTCR0..3, UTDR,
+   UTSR0/1). */
 class Sa11xxUartBase : public Peripheral {
 public:
     using Peripheral::Peripheral;
@@ -29,56 +29,47 @@ public:
 
     void SaveState(StateWriter& w) override;
     void RestoreState(StateReader& r) override;
+    void PostRestore() override;
 
     void SetTxListener(std::function<void(uint8_t)> fn) {
         tx_listener_ = std::move(fn);
     }
+    bool HasTxListener() const { return static_cast<bool>(tx_listener_); }
     void PushRxByte(uint8_t b);
-
-    /* Deliver a whole frame atomically (queue all bytes under one lock, raise the
-       IRQ once). A streaming source must use this: a mid-frame FIFO underrun can
-       leave the guest ISR's sticky RX status set and storm the interrupt. */
     void PushRxBurst(const uint8_t* data, size_t n);
+    void OnTransmitted(const std::vector<uint8_t>& out);
+    void OnReceived();
 
 protected:
-    /* "UART1", "UART3", … - used as the log prefix on TX flush. */
     virtual const char* ChannelName() const = 0;
-
-    /* SA-1110 §9.2.1.1 INTC source bit for this serial port. SP1 = 15,
-       SP2 = 16, SP3 = 17. Return -1 (default) to skip IRQ assertion
-       (silent FIFO mode - only useful for ports the kernel polls). */
-    virtual int IntcSourceBit() const { return -1; }
+    virtual int         IntcSourceBit() const { return -1; }
+    virtual uint32_t    TransmitDeviceSelect() const = 0;
+    virtual uint32_t    ReceiveDeviceSelect() const = 0;
 
 private:
-    /* Serializes rx_fifo_ + utcr3_ + INTC source bit. Host UI thread
-       (PushRxByte) and JIT thread (PopRxByte / UTSR reads / UTCR3
-       writes) both touch this state. */
     mutable std::mutex state_mtx_;
 
     uint32_t utcr0_ = 0;
     uint32_t utcr1_ = 0;
     uint32_t utcr2_ = 0;
     uint32_t utcr3_ = 0;
-    uint32_t utcr4_ = 0;     /* SP2-only IrDA control (§11.10.4) */
-    /* UTSR0 bits 1 (RFS), 2 (RID) are the level-source bits the
-       Linux ISR (drivers/mfd/ipaq-micro.c micro_serial_isr) checks
-       and ACKs via W1C. RFS auto-tracks rx_fifo_ size; RID is a
-       sticky pulse set after each PushRxByte and cleared by W1C. */
-    uint32_t utsr0_pending_ = 0;
-    std::deque<uint8_t> rx_fifo_;
+    uint32_t utcr4_ = 0;
     std::function<void(uint8_t)> tx_listener_;
     std::vector<uint8_t> tx_line_;
-
-    /* IRQ-line state mirror: true iff we currently have INTC bit
-       asserted. Held so we don't double-assert / double-deassert. */
     bool intc_asserted_ = false;
+    GuestCycleClock*       clock_   = nullptr;
+    Sa11xxUartTransmitter* tx_      = nullptr;
+    Sa11xxUartReceiver*    rx_      = nullptr;
+    uint32_t               port_    = 0;
+    uint32_t               rx_port_ = 0;
 
     void TxByte(uint8_t b);
     void FlushLine();
-    uint8_t PopRxByteLocked();          /* caller holds state_mtx_ */
-    uint32_t Utsr1Locked() const;       /* caller holds state_mtx_ */
-    uint32_t ComputeUtsr0Locked() const;/* caller holds state_mtx_ */
-    void RefreshIrqLocked();            /* caller holds state_mtx_ */
+    void Emit(const std::vector<uint8_t>& out);
+    uint32_t Utsr1Locked() const;
+    uint32_t ComputeUtsr0Locked() const;
+    void     RefreshIrqLocked();
+    void     OnResetLine();
 
     uint32_t ReadReg(uint32_t off);
     void     WriteReg(uint32_t off, uint32_t value);

@@ -3,7 +3,9 @@
 #include "../../peripherals/peripheral_base.h"
 
 #include <cstdint>
+#include <functional>
 #include <mutex>
+#include <vector>
 
 /* SA-1110 Dev Man §11.13: PPC peripheral-pin control, 22 pins. Register block:
    PPDR (+0x0) pin direction (0=input/1=output, reset 0=all input), PPSR (+0x4)
@@ -33,7 +35,18 @@ public:
        as output in PPDR has no effect on PPSR reads (§11.13.4). */
     void DriveInputPin(uint32_t pin, bool level);
 
+    uint32_t Mccr1() const { return mccr1_; }
+    uint32_t Ppar() const;
+    void     RegisterMccr1Listener(std::function<void()> fn);
+    void     RegisterPparListener(std::function<void()> fn);
+
 private:
+    void WriteMccr1(uint32_t value);
+    void NotifyIfPpar(uint32_t index);
+
+    std::vector<std::function<void()>> mccr1_listeners_;
+    std::vector<std::function<void()>> ppar_listeners_;
+    static constexpr uint32_t kPparIndex        = 2u;
     static constexpr uint32_t kReservedIrdaPoke = 0x28u;  /* HPIrDA sub_EE4B88. */
     static constexpr uint32_t kMccr1Offset      = 0x30u;  /* SA-1110 Dev Man: MCCR1 R/W. */
     static constexpr uint32_t kPpsrIndex        = 1u;     /* PPSR = +0x4. */

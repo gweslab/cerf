@@ -20,14 +20,18 @@ void FreescaleSsiTransmitter::Reset() {
     tdmae_ = tfen0_ = dma_request_ = false;
     shape_     = FreescaleSsiFrameShape{};
     tfwm_      = 0u;
-    level_     = 0u;
     settled_   = 0u;
     tx_start_  = kNever;
     tx_stop_   = kNever;
-    threshold_ = 0u;
-    burst_     = 0u;
-    dma_words_ = 0u;
+    fifo_.Configure(depth_, 0u, 0u);
+    fifo_.Clear();
+    fifo_.ResetMoved();
+    UpdateSupply();
     clock_->Disarm(underrun_event_);
+}
+
+void FreescaleSsiTransmitter::UpdateSupply() {
+    fifo_.SetSupply(DmaOn() ? DmaBurstFifo::kUnlimited : 0u);
 }
 
 bool FreescaleSsiTransmitter::ShapeKnown(const FreescaleSsiFrameShape& shape) {
@@ -86,32 +90,9 @@ void FreescaleSsiTransmitter::Settle() {
     if (end <= settled_) return;
     const uint64_t n = TxDataSlots(settled_, end);
     settled_ = end;
-    if (n != 0u) {
-        if (DmaOn()) {
-            const uint64_t lead = level_ - threshold_;
-            if (n >= lead) {
-                const uint64_t bursts = (n - lead) / burst_ + 1u;
-                dma_words_ += bursts * burst_;
-                level_ = static_cast<uint32_t>(level_ + bursts * burst_ - n);
-            } else {
-                level_ -= static_cast<uint32_t>(n);
-            }
-        } else if (n > level_) {
-            underrun_ = true;
-            level_    = 0u;
-        } else {
-            level_ -= static_cast<uint32_t>(n);
-        }
-    }
+    if (fifo_.Take(n) != 0u) underrun_ = true;
     if (tx_stop_ != kNever && settled_ >= tx_stop_) tx_start_ = tx_stop_ = kNever;
-    Burst();
-}
-
-void FreescaleSsiTransmitter::Burst() {
-    if (!DmaOn() || level_ > threshold_) return;
-    const uint32_t bursts = (threshold_ - level_) / burst_ + 1u;
-    level_ += bursts * burst_;
-    dma_words_ += static_cast<uint64_t>(bursts) * burst_;
+    fifo_.Refill();
 }
 
 /* Table 45-9 SSIEN: "When disabled, all SSI status bits are preset to the same state
@@ -119,7 +100,7 @@ void FreescaleSsiTransmitter::Burst() {
    cleared. When SSI is disabled, all internal clocks are disabled". */
 void FreescaleSsiTransmitter::Enable(const FreescaleSsiFrameShape& shape) {
     enabled_  = true;
-    level_    = 0u;
+    fifo_.Clear();
     settled_  = 0u;
     underrun_ = false;
     tx_start_ = tx_stop_ = kNever;
@@ -137,13 +118,13 @@ void FreescaleSsiTransmitter::Enable(const FreescaleSsiFrameShape& shape) {
         tx_start_ = AcceptedFrame(0u, grid_.Now());
     }
     RequireDmaTarget();
-    Burst();
+    fifo_.Refill();
 }
 
 void FreescaleSsiTransmitter::Disable() {
     enabled_  = false;
     grid_on_  = false;
-    level_    = 0u;
+    fifo_.Clear();
     settled_  = 0u;
     underrun_ = false;
     tx_start_ = tx_stop_ = kNever;
@@ -259,14 +240,16 @@ void FreescaleSsiTransmitter::WriteDmaControl(uint32_t sier, uint32_t stcr, uint
     tfen0_       = (stcr & ssi::kStcrTfen0) != 0u;
     dma_request_ = tdmae_ && tfen0_;
     tfwm_        = sfcsr & ssi::kSfcsrTfwm0Mask;
-    threshold_   = tfwm_ <= depth_ ? depth_ - tfwm_ : 0u;
+    fifo_.Configure(depth_, tfwm_ <= depth_ ? depth_ - tfwm_ : 0u, fifo_.Burst());
+    UpdateSupply();
     RequireDmaTarget();
-    Burst();
+    fifo_.Refill();
     ArmUnderrun();
 }
 
 void FreescaleSsiTransmitter::RequireDmaTarget() const {
-    if (burst_ == 0u) return;
+    const uint32_t burst = fifo_.Burst();
+    if (burst == 0u) return;
     if (tdmae_ && !tfen0_) {
         emu_.Get<Fatal>().Die("SSI %08X: TDMAE with transmit FIFO 0 disabled; the TDE-driven "
                               "DMA request is not modeled", base_);
@@ -279,9 +262,9 @@ void FreescaleSsiTransmitter::RequireDmaTarget() const {
     if (tfwm_ == 0u || tfwm_ > depth_) {
         emu_.Get<Fatal>().Die("SSI %08X: TFWM0 %u is reserved", base_, tfwm_);
     }
-    if (burst_ > tfwm_) {
+    if (burst > tfwm_) {
         emu_.Get<Fatal>().Die("SSI %08X: a %u-word DMA burst exceeds the %u empty slots TFWM0 "
-                              "guarantees; the overflow is not modeled", base_, burst_, tfwm_);
+                              "guarantees; the overflow is not modeled", base_, burst, tfwm_);
     }
 }
 
@@ -294,22 +277,23 @@ void FreescaleSsiTransmitter::WriteStx0(uint32_t scr, uint32_t stcr) {
                               base_, scr, stcr);
     }
     Settle();
-    if (level_ < depth_) ++level_;
+    fifo_.Put();
     ArmUnderrun();
 }
 
 void FreescaleSsiTransmitter::SetDmaBurst(uint32_t words) {
     Settle();
-    burst_     = words;
-    dma_words_ = 0u;
+    fifo_.Configure(depth_, fifo_.Threshold(), words);
+    fifo_.ResetMoved();
+    UpdateSupply();
     RequireDmaTarget();
-    Burst();
+    fifo_.Refill();
     ArmUnderrun();
 }
 
 uint32_t FreescaleSsiTransmitter::Level() {
     Settle();
-    return level_;
+    return fifo_.Level();
 }
 
 bool FreescaleSsiTransmitter::Transmitting() {
@@ -325,18 +309,19 @@ void FreescaleSsiTransmitter::ClearUnderrun() {
 
 uint64_t FreescaleSsiTransmitter::DmaWords() {
     Settle();
-    return dma_words_;
+    return fifo_.Moved();
 }
 
 bool FreescaleSsiTransmitter::CycleOfDmaWords(uint64_t words, uint64_t& cycle) {
     Settle();
-    if (words <= dma_words_) {
+    if (words <= fifo_.Moved()) {
         cycle = clock_->Cycles();
         return true;
     }
     if (!DmaOn() || !enabled_ || !grid_on_) return false;
-    const uint64_t bursts = (words - dma_words_ + burst_ - 1u) / burst_;
-    const uint64_t slot   = NthDataSlot(settled_, (level_ - threshold_) + (bursts - 1u) * burst_);
+    uint64_t takes = 0;
+    if (!fifo_.TakesToMove(words, takes)) return false;
+    const uint64_t slot = NthDataSlot(settled_, takes);
     if (slot == kNever) return false;
     cycle = CycleOfSlot(slot);
     return true;
@@ -344,7 +329,7 @@ bool FreescaleSsiTransmitter::CycleOfDmaWords(uint64_t words, uint64_t& cycle) {
 
 bool FreescaleSsiTransmitter::CycleOfUnderrun(uint64_t& cycle) {
     if (DmaOn() || !enabled_ || !grid_on_) return false;
-    const uint64_t slot = NthDataSlot(settled_, static_cast<uint64_t>(level_) + 1u);
+    const uint64_t slot = NthDataSlot(settled_, fifo_.TakesBeforeEmpty() + 1u);
     if (slot == kNever) return false;
     cycle = CycleOfSlot(slot);
     return true;
@@ -384,17 +369,19 @@ void FreescaleSsiTransmitter::Save(StateWriter& w) {
     w.Write<uint32_t>("tx_data", shape_.data);
     w.Write<uint32_t>("tx_bits", shape_.bits);
     w.Write<uint32_t>("tx_tfwm", tfwm_);
-    w.Write<uint32_t>("tx_level", level_);
+    w.Write<uint32_t>("tx_level", fifo_.Level());
     w.Write<uint64_t>("tx_settled", settled_);
     w.Write<uint64_t>("tx_start", tx_start_);
     w.Write<uint64_t>("tx_stop", tx_stop_);
-    w.Write<uint32_t>("tx_burst", burst_);
-    w.Write<uint64_t>("tx_dma_words", dma_words_);
+    w.Write<uint32_t>("tx_burst", fifo_.Burst());
+    w.Write<uint64_t>("tx_dma_words", fifo_.Moved());
     grid_.Save(w);
 }
 
 void FreescaleSsiTransmitter::Restore(StateReader& r) {
     uint8_t enabled = 0, grid_on = 0, te = 0, irq = 0, underrun = 0, tdmae = 0, tfen0 = 0;
+    uint32_t level = 0, burst = 0;
+    uint64_t moved = 0;
     r.Read("tx_enabled", enabled);
     r.Read("tx_grid_on", grid_on);
     r.Read("tx_te", te);
@@ -407,12 +394,12 @@ void FreescaleSsiTransmitter::Restore(StateReader& r) {
     r.Read("tx_data", shape_.data);
     r.Read("tx_bits", shape_.bits);
     r.Read("tx_tfwm", tfwm_);
-    r.Read("tx_level", level_);
+    r.Read("tx_level", level);
     r.Read("tx_settled", settled_);
     r.Read("tx_start", tx_start_);
     r.Read("tx_stop", tx_stop_);
-    r.Read("tx_burst", burst_);
-    r.Read("tx_dma_words", dma_words_);
+    r.Read("tx_burst", burst);
+    r.Read("tx_dma_words", moved);
     grid_.Restore(r);
     enabled_     = enabled != 0u;
     grid_on_     = grid_on != 0u;
@@ -422,7 +409,9 @@ void FreescaleSsiTransmitter::Restore(StateReader& r) {
     tdmae_       = tdmae != 0u;
     tfen0_       = tfen0 != 0u;
     dma_request_ = tdmae_ && tfen0_;
-    threshold_   = tfwm_ <= depth_ ? depth_ - tfwm_ : 0u;
+    fifo_.Configure(depth_, tfwm_ <= depth_ ? depth_ - tfwm_ : 0u, burst);
+    fifo_.Restore(level, moved);
+    UpdateSupply();
     clock_->Disarm(underrun_event_);
 }
 

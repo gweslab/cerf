@@ -1,11 +1,14 @@
 #pragma once
 
 #include "../../peripherals/peripheral_base.h"
+#include "../../jit/guest_cycle_clock.h"
+#include "sa11xx_dma_clients.h"
+#include "sa11xx_dma_stream.h"
 
 #include <cstdint>
-#include <functional>
-#include <mutex>
 #include <vector>
+
+class Sa11xxDmaPort;
 
 class Sa11xxDma : public Peripheral {
 public:
@@ -24,67 +27,59 @@ public:
     void     WriteHalf(uint32_t addr, uint16_t value) override;
     void     WriteWord(uint32_t addr, uint32_t value) override;
 
-    struct ChannelState {
-        uint32_t channel_index;
-        uint32_t ddar;
-        uint32_t dbsa;
-        uint32_t dbta;
-        uint32_t dbsb;
-        uint32_t dbtb;
-        bool     buffer_b;
-    };
-
-    /* Sink returns true if it claims the transfer and will call
-       CompleteTransfer asynchronously; false to let the default
-       instant-DONE path run. */
-    using SinkFn = std::function<bool(const ChannelState&)>;
-    void RegisterSink(SinkFn fn);
-
-    void CompleteTransfer(uint32_t channel_index, bool buffer_b);
+    void RegisterPort(uint32_t device_select, Sa11xxDmaPort* port);
+    void RegisterTransmitObserver(Sa11xxDmaTransmitObserver* observer);
+    void RegisterReceiveSource(Sa11xxDmaReceiveSource* source);
+    void OnPortChange();
 
     void SaveState(StateWriter& w) override;
     void RestoreState(StateReader& r) override;
+    void PostRestore() override;
 
     static constexpr uint32_t kChannelCount  = 6;
     static constexpr uint32_t kChannelStride = 0x20u;
 
 private:
-    struct Channel {
-        uint32_t ddar = 0;
-        uint32_t dcsr = 0;
-        uint32_t dbsa = 0;
-        uint32_t dbta = 0;
-        uint32_t dbsb = 0;
-        uint32_t dbtb = 0;
-        /* Buffer claimed by a sink, CompleteTransfer not yet called.
-           §11.6.1.3: RUN clear pauses, RUN re-set resumes the transfer -
-           a RUN 0→1 edge must not re-submit a buffer a sink still owns. */
-        bool in_flight_a = false;
-        bool in_flight_b = false;
-        uint8_t pad[2] = {};
-    };
+    static constexpr uint8_t kUnbound = 0xFFu;
 
     template <typename F>
-    static constexpr void VisitChannel(Channel& c, F& field) {
+    static constexpr void VisitChannel(Sa11xxDmaChannelRegs& c, F& field) {
         field("ddar", c.ddar);
         field("dcsr", c.dcsr);
         field("dbsa", c.dbsa);
         field("dbta", c.dbta);
         field("dbsb", c.dbsb);
         field("dbtb", c.dbtb);
-        field.Skip(c.in_flight_a);
-        field.Skip(c.in_flight_b);
-        field.Skip(c.pad);
     }
 
-    mutable std::mutex   state_mtx_;
-    Channel              ch_[kChannelCount]{};
-    std::vector<SinkFn>  sinks_;
-
     static bool DecodeOffset(uint32_t off, uint32_t& ch, uint32_t& reg);
-    uint32_t ReadRegLocked(uint32_t off);
-    void     WriteRegLocked(uint32_t off, uint32_t value);
-    void     KickIfStartedLocked(uint32_t channel_index, Channel& c,
-                                 uint32_t newly_set);
-    void     RefreshIrqLineLocked(uint32_t channel_index, Channel& c);
+    uint32_t StoredReg(uint32_t off) const;
+    uint32_t ReadReg(uint32_t off);
+    uint32_t ReadBuffer(uint32_t ch, uint32_t reg);
+    void     WriteReg(uint32_t off, uint32_t value);
+    Sa11xxDmaPort* PortFor(uint32_t ddar) const;
+    bool           SelectsPort(uint32_t ddar) const;
+    void           RequireSupportedTransfer(uint32_t ch, uint32_t dcsr) const;
+    void     Bind(uint32_t ch, Sa11xxDmaPort* port);
+    void     OnResetLine();
+    void     RequireBuffers(uint32_t ch) const;
+    void     WriteDdar(uint32_t ch, uint32_t value);
+    void     WriteDcsrSet(uint32_t ch, uint32_t value);
+    void     WriteDcsrClear(uint32_t ch, uint32_t value);
+    void     WriteBuffer(uint32_t ch, uint32_t reg, uint32_t value);
+    void     KickUnbound(uint32_t ch, uint32_t newly_set);
+    void     Update();
+    void     ArmDone(uint32_t ch);
+    void     RefreshIrqLine(uint32_t ch);
+    void     Transmit(uint32_t ddar, uint32_t pa, uint32_t bytes, GuestCycleClock::Rate rate);
+    void     Receive(uint32_t ddar, uint32_t pa, uint32_t bytes, GuestCycleClock::Rate rate);
+
+    GuestCycleClock*        clock_ = nullptr;
+    GuestCycleClock::Event* done_[kChannelCount] = {};
+    Sa11xxDmaChannelRegs    ch_[kChannelCount]{};
+    Sa11xxDmaStream         stream_[kChannelCount];
+    Sa11xxDmaPort*          ports_[16] = {};
+    Sa11xxDmaStream::Hooks  hooks_;
+    std::vector<Sa11xxDmaTransmitObserver*> transmit_;
+    std::vector<Sa11xxDmaReceiveSource*>    receive_;
 };

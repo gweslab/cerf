@@ -14,11 +14,6 @@ namespace {
 constexpr uint32_t kSspAudioTxDdarMask  = 0xFFFFFFF0u;
 constexpr uint32_t kSspAudioTxDdarValue = 0x81C01BE0u;
 
-/* 44100 Hz is the wavedev's hardware playback rate (dword_1B88090): sub_1B82784
-   resamples every OS request to it (ratio = dword_1B88090 / requested_rate), so
-   the playback DMA always carries 44100 Hz PCM. */
-constexpr uint32_t kSampleRateHz = 44100u;
-
 class SmartBookG138AudioPlayer : public Sa11xxDmaAudioPlayer {
 public:
     using Sa11xxDmaAudioPlayer::Sa11xxDmaAudioPlayer;
@@ -34,7 +29,6 @@ protected:
                  /*channels=*/2, /*bits=*/16, /*max_page=*/0x2000u,
                  /*allow_resampler=*/true, "SmartBookAudio" };
     }
-    uint32_t SampleRateHz() override { return kSampleRateHz; }
 };
 
 }  /* namespace */

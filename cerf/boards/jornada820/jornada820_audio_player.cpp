@@ -1,5 +1,4 @@
 #include "../../socs/sa11xx/sa11xx_dma_audio_player.h"
-#include "../../socs/sa11xx/sa11xx_mcp.h"
 
 #include "../../boards/board_context.h"
 #include "jornada_820_id.h"
@@ -30,9 +29,6 @@ protected:
         return { kMcpAudioTxDdarMask, kMcpAudioTxDdarValue,
                  /*channels=*/1, /*bits=*/16, /*max_page=*/0x2000u,
                  /*allow_resampler=*/false, "J820Audio" };
-    }
-    uint32_t SampleRateHz() override {
-        return emu_.Get<Sa11xxMcp>().GetAudioSampleRateHz();
     }
 };
 

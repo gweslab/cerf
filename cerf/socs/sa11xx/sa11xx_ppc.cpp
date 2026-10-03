@@ -7,6 +7,7 @@
 #include "sa1100_id.h"
 #include "../../peripherals/peripheral_dispatcher.h"
 #include "../../state/state_stream.h"
+#include "../guest_cpu_reset.h"
 
 /* SA-1110 Dev Man §11.13.3 PPDR - 0=input, 1=output, reset all-0 (all input).
    §11.13.4 PPSR - 22 pin-state bits; an output pin reads its PPC-controlled
@@ -20,7 +21,41 @@ bool Sa11xxPpc::ShouldRegister() {
 }
 
 void Sa11xxPpc::OnReady() {
+    /* SA-1110 §11.13.6 (printed 11-173): "reset is asserted to all of the SA-1110's peripherals
+       and to the PPC unit", PSDR "is not reset like PPDR"; PPDR, PPAR and MCCR1 reset rows 0
+       (printed 11-169, 11-173, 11-141). */
+    emu_.Get<GuestCpuReset>().RegisterResetListener([this](ResetLineKind) {
+        std::lock_guard<std::mutex> lk(mtx_);
+        regs_[0] = 0u;
+        regs_[2] = 0u;
+        mccr1_   = 0u;
+    });
     emu_.Get<PeripheralDispatcher>().Register(this);
+}
+
+uint32_t Sa11xxPpc::Ppar() const {
+    std::lock_guard<std::mutex> lk(mtx_);
+    return regs_[2];
+}
+
+void Sa11xxPpc::RegisterMccr1Listener(std::function<void()> fn) {
+    mccr1_listeners_.push_back(std::move(fn));
+}
+
+void Sa11xxPpc::RegisterPparListener(std::function<void()> fn) {
+    ppar_listeners_.push_back(std::move(fn));
+}
+
+void Sa11xxPpc::NotifyIfPpar(uint32_t index) {
+    if (index != kPparIndex) return;
+    for (auto& fn : ppar_listeners_) fn();
+}
+
+void Sa11xxPpc::WriteMccr1(uint32_t value) {
+    const uint32_t old = mccr1_;
+    mccr1_ = value;
+    if (value == old) return;
+    for (auto& fn : mccr1_listeners_) fn();
 }
 
 void Sa11xxPpc::DriveInputPin(uint32_t pin, bool level) {
@@ -71,14 +106,17 @@ void Sa11xxPpc::WriteByte(uint32_t addr, uint8_t value) {
     const uint32_t shift = (off & 0x3u) * 8;
     uint32_t index;
     if (OffsetToIndex(base, &index)) {
-        std::lock_guard<std::mutex> lk(mtx_);
-        const uint32_t cleared = regs_[index] & ~(0xFFu << shift);
-        regs_[index] = cleared | (static_cast<uint32_t>(value) << shift);
+        {
+            std::lock_guard<std::mutex> lk(mtx_);
+            const uint32_t cleared = regs_[index] & ~(0xFFu << shift);
+            regs_[index] = cleared | (static_cast<uint32_t>(value) << shift);
+        }
+        NotifyIfPpar(index);
         return;
     }
     if (base == kMccr1Offset) {
         const uint32_t cleared = mccr1_ & ~(0xFFu << shift);
-        mccr1_ = cleared | (static_cast<uint32_t>(value) << shift);
+        WriteMccr1(cleared | (static_cast<uint32_t>(value) << shift));
         return;
     }
     if (base == kReservedIrdaPoke) {
@@ -92,11 +130,14 @@ void Sa11xxPpc::WriteWord(uint32_t addr, uint32_t value) {
     const uint32_t off = addr - MmioBase();
     uint32_t index;
     if (OffsetToIndex(off, &index)) {
-        std::lock_guard<std::mutex> lk(mtx_);
-        regs_[index] = value;
+        {
+            std::lock_guard<std::mutex> lk(mtx_);
+            regs_[index] = value;
+        }
+        NotifyIfPpar(index);
         return;
     }
-    if (off == kMccr1Offset) { mccr1_ = value; return; }
+    if (off == kMccr1Offset) { WriteMccr1(value); return; }
     if (off == kReservedIrdaPoke) {
         LOG(Periph, "[Sa11xxPpc] reserved write +0x%02X = 0x%08X (ignored)\n", off, value);
         return;

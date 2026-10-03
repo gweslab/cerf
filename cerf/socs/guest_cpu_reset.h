@@ -57,6 +57,7 @@ public:
     void OnResetDelivered();
 
     bool DeliveredResetWasResume() const { return delivered_is_resume_; }
+    bool LineHeld() const { return line_held_; }
 
     void SaveState(StateWriter& w) const;
     void RestoreState(StateReader& r);
@@ -68,4 +69,5 @@ private:
     std::atomic<ResetLineKind>                      pending_kind_{ResetLineKind::Other};
     std::atomic<bool>                               pending_is_resume_{false};
     bool                                            delivered_is_resume_ = false;
+    bool                                            line_held_           = false;
 };

@@ -5,120 +5,73 @@
 #include "../../core/cerf_emulator.h"
 #include "../../core/log.h"
 #include "../../cpu/emulated_memory.h"
-#include "../../state/emulation_freeze.h"
 #include "../../host/audio_activity_widget.h"
+#include "sa11xx_dma.h"
 
+#include <algorithm>
 #include <vector>
 
 namespace {
-constexpr UINT kMsgEnsureOpen = WM_USER + 0x10u;
-}  /* namespace */
+constexpr UINT kMsgOpen = WM_USER + 0x10u;
+}
 
 void Sa11xxDmaCapture::OnReady() {
     cfg_ = AudioConfig();
-    sink_.Start(nullptr,
-                [this](const MSG& msg) { OnThreadMessage(msg); },
-                cfg_.log_tag);
-    emu_.Get<Sa11xxDma>().RegisterSink(
-        [this](const Sa11xxDma::ChannelState& st) { return OnDmaStart(st); });
+    sink_.Start(nullptr, [this](const MSG& msg) { OnThreadMessage(msg); }, cfg_.log_tag);
+    emu_.Get<Sa11xxDma>().RegisterReceiveSource(this);
     emu_.Get<AudioActivityWidget>().NotePresent();
 }
 
-void Sa11xxDmaCapture::OnShutdown() {
-    sink_.Stop();
-}
+void Sa11xxDmaCapture::OnShutdown() { sink_.Stop(); }
 
-bool Sa11xxDmaCapture::OnDmaStart(const Sa11xxDma::ChannelState& st) {
-    if ((st.ddar & cfg_.ddar_mask) != cfg_.ddar_value) return false;
-
-    /* No host capture device: decline the receive page. Sa11xxDma then leaves
-       DONE unset and the wavedev IST blocks - the faithful "receive with no
-       incoming data" state, never a fake completion. */
-    if (live_.load(std::memory_order_acquire) == kDead) return false;
-
-    const uint32_t dst_pa = st.buffer_b ? st.dbsb : st.dbsa;
-    const uint32_t bytes  = st.buffer_b ? st.dbtb : st.dbta;
-    if (bytes == 0 || bytes > cfg_.max_page_bytes) return false;
-
+bool Sa11xxDmaCapture::FillReceived(uint32_t ddar, uint32_t pa, uint32_t bytes,
+                                    GuestCycleClock::Rate word_rate) {
+    if ((ddar & cfg_.ddar_mask) != cfg_.ddar_value) return false;
+    const uint64_t den  = word_rate.den * cfg_.channels;
+    const uint32_t rate = static_cast<uint32_t>((word_rate.num + den / 2u) / den);
+    if (requested_rate_.exchange(rate) != rate) sink_.Post(kMsgOpen);
+    std::vector<uint8_t> data(bytes, 0u);
+    size_t taken = 0;
     {
         std::lock_guard<std::mutex> lk(mtx_);
-        pending_.push_back({st.channel_index, st.buffer_b, dst_pa, bytes});
+        taken = std::min<size_t>(bytes, fifo_.size());
+        std::copy(fifo_.begin(), fifo_.begin() + taken, data.begin());
+        fifo_.erase(fifo_.begin(), fifo_.begin() + taken);
     }
-    if (!open_posted_.exchange(true)) sink_.Post(kMsgEnsureOpen);
+    emu_.Get<EmulatedMemory>().CopyIn(pa, data.data(), bytes);
+    if (taken != 0u) emu_.Get<AudioActivityWidget>().MarkRx();
     return true;
 }
 
 void Sa11xxDmaCapture::OnThreadMessage(const MSG& msg) {
-    if (msg.message == kMsgEnsureOpen) {
-        EnsureOpenOnThread();
+    if (msg.message == kMsgOpen) {
+        OpenOnThread();
     } else if (msg.message == MM_WIM_DATA) {
         auto* hdr = reinterpret_cast<LPWAVEHDR>(msg.lParam);
         if (!hdr) return;
-        OnRecordedData(reinterpret_cast<const uint8_t*>(hdr->lpData),
-                       hdr->dwBytesRecorded);
+        OnRecordedData(reinterpret_cast<const uint8_t*>(hdr->lpData), hdr->dwBytesRecorded);
         sink_.Requeue(hdr);
     }
 }
 
-void Sa11xxDmaCapture::EnsureOpenOnThread() {
-    if (sink_.EnsureFormat(SampleRateHz(), cfg_.channels, cfg_.bits_per_sample)) {
-        live_.store(kLive, std::memory_order_release);
-        return;
-    }
-
-    /* Open failed: no host capture device. Leave the optimistically-claimed
-       receive pages uncompleted and decline future ones (OnDmaStart) so DONE
-       stays unset and the wavedev IST blocks - the faithful idle-receive state,
-       never a manufactured completion. */
-    live_.store(kDead, std::memory_order_release);
+void Sa11xxDmaCapture::OpenOnThread() {
+    const uint32_t rate = requested_rate_.load();
+    if (rate == open_rate_) return;
+    open_rate_ = rate;
     {
         std::lock_guard<std::mutex> lk(mtx_);
-        pending_.clear();
         fifo_.clear();
     }
-    LOG(Caution, "[%s] microphone capture unavailable (host waveIn open failed); "
-                 "guest record will not progress\n", cfg_.log_tag);
+    if (!sink_.EnsureFormat(rate, cfg_.channels, cfg_.bits_per_sample)) {
+        LOG(Caution, "[%s] microphone capture unavailable at %u Hz (host waveIn open failed); "
+                     "the guest records silence\n", cfg_.log_tag, rate);
+    }
 }
 
 void Sa11xxDmaCapture::OnRecordedData(const uint8_t* data, uint32_t bytes) {
-    if (bytes != 0) {
-        std::lock_guard<std::mutex> lk(mtx_);
-        fifo_.insert(fifo_.end(), data, data + bytes);
-        /* Bound latency when the guest stops draining but the mic keeps
-           streaming: drop the oldest beyond four max-size pages. */
-        const size_t cap = static_cast<size_t>(cfg_.max_page_bytes) * 4u;
-        if (fifo_.size() > cap) fifo_.erase(fifo_.begin(), fifo_.end() - cap);
-    }
-    DrainPending();
-}
-
-void Sa11xxDmaCapture::DrainPending() {
-    for (;;) {
-        PendingPage p{};
-        std::vector<uint8_t> buf;
-        {
-            std::lock_guard<std::mutex> lk(mtx_);
-            if (pending_.empty()) return;
-            p = pending_.front();
-            if (fifo_.size() < p.byte_count) return;
-            buf.assign(fifo_.begin(), fifo_.begin() + p.byte_count);
-            fifo_.erase(fifo_.begin(), fifo_.begin() + p.byte_count);
-            pending_.pop_front();
-        }
-        WriteAndComplete(p, buf.data());
-    }
-}
-
-void Sa11xxDmaCapture::WriteAndComplete(const PendingPage& p, const uint8_t* data) {
-    /* Freeze against a hibernation snapshot: this audio thread writes guest DRAM
-       and mutates the DMA's guest-visible DONE/IRQ state. Held only around the
-       guest-state touch, never across a wait. */
-    {
-        auto frozen = emu_.Get<EmulationFreeze>().WorkerSection();
-        emu_.Get<EmulatedMemory>().CopyIn(p.dst_pa, data, p.byte_count);
-        emu_.Get<Sa11xxDma>().CompleteTransfer(p.channel, p.buffer_b);
-    }
-    emu_.Get<AudioActivityWidget>().MarkRx();
-    LOG(Periph, "[%s] capture DONE ch=%u buf=%c bytes=%u\n",
-        cfg_.log_tag, p.channel, p.buffer_b ? 'B' : 'A', p.byte_count);
+    if (bytes == 0u) return;
+    std::lock_guard<std::mutex> lk(mtx_);
+    fifo_.insert(fifo_.end(), data, data + bytes);
+    const size_t cap = static_cast<size_t>(cfg_.max_page_bytes) * 4u;
+    if (fifo_.size() > cap) fifo_.erase(fifo_.begin(), fifo_.end() - cap);
 }

@@ -15,6 +15,9 @@ public:
 
 protected:
     const char* ChannelName() const override { return "UART2"; }
+    /* SA-1110 Table 11-6 (printed 11-9): Serial port 2 UART transmit DS 0110, receive DS 0111. */
+    uint32_t    TransmitDeviceSelect() const override { return 0x6u; }
+    uint32_t    ReceiveDeviceSelect() const override { return 0x7u; }
 };
 
 }  /* namespace */

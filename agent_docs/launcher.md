@@ -185,20 +185,21 @@ installation, not a supported state.
 
 ## Bundles
 
-A bundle is one ROM package on a remote repository. `bundle_repositories.py`
-reads the repository list from the global `cerf.json`. The default repository is
-`https://cerf-bundles.dz3n.net/cerf-bundles`. Each repository serves
-`manifest.json` (version 2 only) and `analytics.json`.
+A bundle is one ROM package on a remote repository. Each repository serves
+`manifest.json` and `analytics.json`. The launcher reads only version 2 of
+`manifest.json`.
 
 A bundle update replaces the device directory with the new bundle. The update
-**keeps** `cerf-user.json`, every installed add-on package and every storage file
+keeps `cerf-user.json`, every installed add-on package and every storage file
 inside the device directory.
-`devices/manifest.json` records what is installed, keyed by directory name. A
-bundle is out of date when its recorded archive SHA-256 differs from the remote
-one.
 
-The launcher verifies the size and the SHA-256 of every archive. Extraction
-rejects any member that escapes the target directory.
+The launcher records each installed bundle in `devices/manifest.json`, under the
+name of its device directory. A bundle is out of date when the SHA-256 of its
+archive in that file differs from the SHA-256 in the remote manifest.
+
+The launcher makes sure that the size and the SHA-256 of each archive match the
+manifest. During extraction, it rejects each file in the archive whose path is
+outside the target directory.
 
 ## Starting cerf.exe
 

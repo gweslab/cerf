@@ -7,7 +7,6 @@ from typing import List
 
 from app_paths import install_root
 
-MAIN_REPOSITORY_URL = "https://cerf-bundles.dz3n.net/cerf-bundles"
 CONFIG_KEY = "bundle_repositories"
 _MANIFEST_NAME = "manifest.json"
 _ANALYTICS_NAME = "analytics.json"
@@ -82,12 +81,6 @@ def strip_manifest_from_repos(value):
             e["url"] = e["url"][:-len(suffix)]
         out.append(e)
     return out
-
-
-def installed_repositories(installed_config: dict):
-    if CONFIG_KEY not in installed_config:
-        return [{"url": MAIN_REPOSITORY_URL, "enabled": True}]
-    return strip_manifest_from_repos(installed_config[CONFIG_KEY])
 
 
 def merge_repositories(old_value, new_value):

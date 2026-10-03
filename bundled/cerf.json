@@ -1,5 +1,5 @@
 {
-  "device": "cerfos",
+  "device": "",
   "video_driver_names_for_guest_additions": [
     "ddi.dll",
     "DeviceEmulator_lcd.dll",

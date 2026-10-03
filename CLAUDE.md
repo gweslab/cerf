@@ -81,7 +81,7 @@ powershell -ExecutionPolicy Bypass -File claude_cerf_runner.ps1 --timeout=20 --l
 
 The runner is the queue. It waits for `.build_lock`, so a run never starts during a build. It holds one `.cerf_lock.N` run slot while cerf.exe runs. More than one run can occur at the same time. When every slot is held, the next run waits for a free slot.
 
-- **Three flags are mandatory: `--timeout=SECONDS`, `--log-file=PATH`, `--device=NAME`.** The runner forwards every other argument to `cerf.exe` unchanged. Without `--device`, cerf boots stock cerfos.
+- **Three flags are mandatory: `--timeout=SECONDS`, `--log-file=PATH`, `--device=NAME`.** The runner forwards every other argument to `cerf.exe` unchanged.
 - **The runner replaces GNU `timeout`. Never wrap the runner in `timeout`.** An external kill stops the runner before it deletes its `.cerf_lock.N` slot, and the next build then waits for that stale slot. Give the limit to `--timeout=`.
 - `cerf.exe` implements `--timeout` itself and exits with `CERF_FATAL_TIMEOUT` (124). That exit flushes the log file and keeps `live_state.png` on disk. When cerf.exe outlives its own timeout, the runner kills the process, and that is a CERF bug.
 - Write the log path in the form that is natural. The runner converts msys and mixed-slash paths to Windows form.

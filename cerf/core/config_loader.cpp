@@ -4,6 +4,7 @@
 #include "cerf_emulator.h"
 #include "config_json.h"
 #include "config_mutable_fields.h"
+#include "device_not_selected_service.h"
 #include "main_config.h"
 #include "log.h"
 #include "cerf_paths.h"
@@ -362,7 +363,7 @@ void ConfigLoader::LoadInto(DeviceConfig& config) {
     }
     if (cli.device_override && cli.device_override[0])
         device_name = cli.device_override;
-    if (device_name.empty()) device_name = "cerfos";
+    if (device_name.empty()) emu_.Get<DeviceNotSelectedService>().Halt(top_path);
     config.device_name = device_name;
 
     const std::string dev_path = GetDeviceDir(device_name) + "cerf.json";

@@ -7,7 +7,6 @@ below is for running `cerf.exe` directly.
 
 | Command | Action |
 | --- | --- |
-| `cerf.exe` | Boot the default device |
 | `cerf.exe --device=devemu_ce6` | Boot a specific device |
 | `cerf.exe --guest-additions` | Boot with [Guest Additions](guest-additions.md) |
 | `cerf.exe --log=ALL` | Enable every log channel |

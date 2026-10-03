@@ -12,8 +12,7 @@ There are **three layers**, read in this order:
 | 3 | `cerf-user.json` | `devices/<name>/` | the launcher, on your behalf - optional |
 
 CERF applies each layer on top of the previous one, key by key. CERF applies the command line last,
-so a flag always wins over a file. Every field is optional, and CERF runs when none of them are
-present.
+so a flag always wins over a file. Every field is optional.
 
 CERF ignores unknown keys. If a file is unreadable or malformed, CERF names the file and the key,
 then exits.
@@ -25,7 +24,7 @@ values into each device's configuration before it reads that device's own file.
 
 ```json
 {
-  "device": "cerfos",
+  "device": "jornada720",
   "video_driver_names_for_guest_additions": [
     "ddi.dll",
     "s3c2410disp.dll"
@@ -41,7 +40,7 @@ values into each device's configuration before it reads that device's own file.
 
 | Key | Type | Meaning |
 | --- | --- | --- |
-| `device` | string | The device directory to boot when the command line has no `--device=`. |
+| `device` | string | The device directory to boot when the command line has no `--device=`. When this key and `--device=` are both empty, CERF exits with an error. |
 | `video_driver_names_for_guest_additions` | array of strings | The ROM display-driver module names that [Guest Additions](guest-additions.md) can replace with the CERF driver. |
 | `bundle_repositories` | array of `{ url, enabled }` | The [ROM bundle repositories](bundle-repositories.md) that the launcher installs and updates from. Launcher only - `cerf.exe` does not read it. |
 | `last_save_state_mode` | boolean | The default state of **Save the state** in the shutdown dialog. |

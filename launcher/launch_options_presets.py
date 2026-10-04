@@ -26,15 +26,15 @@ RES_PRESETS = [
     (3840, 2160, "4K UHD"),
 ]
 
-# DPI override slider bounds. The entry stays free-form so any value (including
-# extreme ones) is typable past the slider's range.
-DPI_SLIDER_MIN = 48
-DPI_SLIDER_MAX = 480
+DPI_BASE = 96
+DPI_SCALE_PERCENTS = (100, 125, 150, 175, 200, 225, 250, 300, 350, 400, 450,
+                      500)
 
-FONT_SIZE_SLIDER_MIN = 6
-FONT_SIZE_SLIDER_MAX = 48
+FONT_SIZE_MIN = 6
+FONT_SIZE_MAX = 48
 
 SCALE_PRESETS = (
+    ("Standard", 96, 12),
     ("2K", 144, 18),
     ("4K", 192, 24),
 )

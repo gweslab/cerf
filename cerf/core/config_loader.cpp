@@ -95,6 +95,7 @@ void LoadFeatures(const json& root, DeviceConfig& config, const std::string& pat
         }
         CfgLoadColorScheme(ga, config, path);
         CfgLoadGaFontSize(ga, config, path);
+        CfgLoadGaClearType(ga, config, path);
         CfgLoadShareFolder(ga, config, path);
         CfgLoadShareFolderMountPoint(ga, config, path);
         LoadGaAutorun(ga, config, path);

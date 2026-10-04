@@ -24,6 +24,7 @@ typedef struct {
     BOOL            gwes;
     BOOL            built;
     BOOL            by_window;
+    BOOL            up;
     DWORD           ticks;
 } CerfSwState;
 
@@ -37,8 +38,13 @@ extern "C" void CerfShellWatchRegister(void (*cb)(void)) {
         sw->cbs[sw->cb_count++] = (CerfOnShellIsUp)cb;
 }
 
+extern "C" BOOL CerfShellWatchIsUp(void) {
+    return Sw()->up;
+}
+
 static void CerfShellWatchFireCallbacks(CerfSwState* sw) {
     int i;
+    sw->up = TRUE;
     for (i = 0; i < sw->cb_count; ++i)
         if (sw->cbs[i]) sw->cbs[i]();
 }

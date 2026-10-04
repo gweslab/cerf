@@ -289,10 +289,8 @@ The guest side runs two permanent pump threads. `DrvEnablePDEV` starts both.
   with the CE priority boost. It carries the pointer and the keyboard. It is
   the only pump that can block on `CerfWaitGwesApiSet()`, because it shares its
   thread with nothing.
-- **Service pump** (`ce_apps/cerf_guest/cerf_service_pump.cpp`) - one 250 ms
-  loop that calls each housekeeping task in turn. The task manager runs on each
-  second tick. The resize, shell watch and calibration watch run on each fourth
-  tick.
+- **Service pump** (`ce_apps/cerf_guest/cerf_service_pump.cpp`) - one thread
+  calls each housekeeping task in turn.
 
 Each housekeeping task is a `CerfXxxTick()` function in its own module. The
 header of that module declares it. Three rules hold for every task.

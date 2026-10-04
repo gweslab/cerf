@@ -23,10 +23,12 @@ def link(text: str, action: Callable[[], None]) -> Segment:
 
 
 class RichText(tk.Text):
-    def __init__(self, parent: tk.Misc, segments: Sequence[Segment]) -> None:
+    def __init__(self, parent: tk.Misc, segments: Sequence[Segment],
+                 foreground: Optional[str] = None) -> None:
         tk.Text.__init__(self, parent, wrap="word", relief="flat",
                          borderwidth=0, highlightthickness=0, padx=0, pady=0,
-                         background=theme.BG, foreground=theme.FG,
+                         background=theme.BG,
+                         foreground=foreground or theme.FG,
                          inactiveselectbackground=theme.BG,
                          takefocus=0, height=1, width=1)
         base = tkfont.nametofont("TkDefaultFont")
@@ -63,7 +65,7 @@ class RichText(tk.Text):
         self.after_idle(self.fit)
 
     def fit(self) -> None:
-        if not self.winfo_exists():
+        if not self.winfo_exists() or self.winfo_width() <= 1:
             return
         crossed = self.count("1.0", "end-1c", "update", "displaylines")
         if isinstance(crossed, (tuple, list)):

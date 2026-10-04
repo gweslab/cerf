@@ -7,6 +7,7 @@
 #include "cerf_resize_pump.h"
 #include "cerf_shell_watch.h"
 #include "cerf_calib_warning_pump.h"
+#include "cerf_cleartype_pump.h"
 
 #define CERF_SERVICE_TICK_MS 250u
 
@@ -21,6 +22,7 @@ static DWORD WINAPI CerfServicePumpThread(LPVOID) {
             CerfResizeTick();
             CerfShellWatchTick();
             CerfCalibWarningTick();
+            CerfClearTypeTick();
         }
     }
 }

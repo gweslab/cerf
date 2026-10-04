@@ -6,49 +6,85 @@ from tkinter import filedialog, ttk
 from typing import Callable, Dict, List, Optional
 
 from board_info import board_display_name, supported_boards
+from branded_dialog import scaled
 from cerf_user_json import resolve_device_file
 from device_file_types import (DeviceFileType, FileKey, device_file_types,
                                file_problem)
+from rich_text import plain
+from settings_card import SettingsColumn, path_width, wrapping_label
 
-_FIRST_FILE_ROW = 2
+_GAP_DIP = 6
+_FILE_ROW_GAP_DIP = 10
+_BOARD_LIST_ROWS = 12
+
+BindWheel = Callable[[tk.Misc], None]
+
+
+class _FileCard:
+    def __init__(self, column: SettingsColumn, title: str) -> None:
+        self.group = column.group()
+        self.group.row(title)
+        self.body = self.group.body()
+        self.body.frame.columnconfigure(1, minsize=path_width(self.body.frame))
+        self.rows = 0
+        self._widgets: List[tk.Widget] = []
+
+    def clear(self) -> None:
+        for widget in self._widgets:
+            widget.destroy()
+        self._widgets = []
+        self.rows = 0
+
+    def add(self, widget: tk.Widget) -> None:
+        self._widgets.append(widget)
+
+    def show(self) -> None:
+        if self.rows:
+            self.group.frame.grid()
+        else:
+            self.group.frame.grid_remove()
 
 
 class BoardRomForm:
     def __init__(self, parent: tk.Misc, window: tk.Misc,
                  on_change: Callable[[], None],
                  name_follows_board: bool,
-                 base_dir: Optional[Path] = None) -> None:
+                 base_dir: Optional[Path] = None,
+                 bind_wheel: Optional[BindWheel] = None) -> None:
         self._window = window
         self._on_change = on_change
         self._name_follows_board = name_follows_board
         self._base_dir = base_dir
+        self._bind_wheel = bind_wheel
         self._prefilled_name: Optional[str] = None
         self._boards: List[dict] = list(supported_boards())
         self._types: List[DeviceFileType] = []
         self._vars: Dict[FileKey, tk.StringVar] = {}
-        self._file_widgets: List[tk.Widget] = []
         self._inputs: List[tk.Widget] = []
         self._enabled = True
 
-        self.frame = ttk.Frame(parent)
-        self.frame.columnconfigure(1, weight=1)
+        column = SettingsColumn(parent)
+        self.frame = column.frame
+        ident = column.group()
 
-        ttk.Label(self.frame, text="Board:").grid(row=0, column=0, sticky="w",
-                                                  padx=(0, 8), pady=(0, 8))
-        self.var_board = tk.StringVar()
-        self.board_combo = ttk.Combobox(self.frame, textvariable=self.var_board,
-                                        state="readonly")
-        self.board_combo.grid(row=0, column=1, columnspan=2, sticky="ew",
-                              pady=(0, 8))
-        self.board_combo.bind("<<ComboboxSelected>>", self._on_board_changed)
-
-        ttk.Label(self.frame, text="Name:").grid(row=1, column=0, sticky="w",
-                                                 padx=(0, 8), pady=(0, 8))
+        row = ident.row("Name", [
+            plain("How the device reads in the launcher tree.")])
         self.var_name = tk.StringVar()
         self.var_name.trace_add("write", lambda *_: self._on_change())
-        self.name_entry = ttk.Entry(self.frame, textvariable=self.var_name)
-        self.name_entry.grid(row=1, column=1, columnspan=2, sticky="ew",
-                             pady=(0, 8))
+        self.name_entry = ttk.Entry(row.frame, textvariable=self.var_name,
+                                    width=1)
+        row.control(self.name_entry)
+
+        row = ident.row("Board", [plain("The type of device to emulate.")])
+        self.var_board = tk.StringVar()
+        self.board_combo = ttk.Combobox(row.frame, textvariable=self.var_board,
+                                        state="readonly", width=1,
+                                        height=_BOARD_LIST_ROWS)
+        row.control(self.board_combo)
+        self.board_combo.bind("<<ComboboxSelected>>", self._on_board_changed)
+
+        self._rom = _FileCard(column, "ROM")
+        self._storage = _FileCard(column, "Storage")
         self._fill_combo()
 
     def select_first_board(self) -> None:
@@ -121,35 +157,47 @@ class BoardRomForm:
         return var
 
     def _rebuild_files(self) -> None:
-        for w in self._file_widgets:
-            w.destroy()
-        self._file_widgets = []
+        self._rom.clear()
+        self._storage.clear()
         self._inputs = []
         self._types = device_file_types(self.board_id())
-        row = _FIRST_FILE_ROW
         for ftype in self._types:
-            var = self._var(ftype.key, ftype.default_value())
-            label = ttk.Label(self.frame, text=ftype.name + ":")
-            label.grid(row=row, column=0, sticky="w", padx=(0, 8), pady=(0, 8))
-            entry = ttk.Entry(self.frame, textvariable=var)
-            entry.grid(row=row, column=1, sticky="ew", pady=(0, 8))
-            browse = ttk.Button(self.frame, text="Browse…",
-                                command=lambda t=ftype: self._browse(t))
-            browse.grid(row=row, column=2, sticky="e", padx=(6, 0), pady=(0, 8))
-            self._file_widgets += [label, entry, browse]
-            self._inputs += [entry, browse]
-            row += 1
-            if ftype.note:
-                note = ttk.Label(self.frame, text=ftype.note,
-                                 style="Hint.TLabel", wraplength=1,
-                                 justify="left")
-                note.grid(row=row, column=1, columnspan=2, sticky="ew",
-                          pady=(0, 8))
-                note.bind("<Configure>",
-                          lambda e, n=note: n.config(wraplength=max(1, e.width)))
-                self._file_widgets.append(note)
-                row += 1
+            self._add_file_row(self._storage if ftype.is_storage
+                               else self._rom, ftype)
+        self._rom.show()
+        self._storage.show()
         self.set_enabled(self._enabled)
+        if self._bind_wheel is not None:
+            self._bind_wheel(self.frame)
+
+    def _add_file_row(self, card: _FileCard, ftype: DeviceFileType) -> None:
+        frame = card.body.frame
+        gap = scaled(frame, _GAP_DIP)
+        top = scaled(frame, _FILE_ROW_GAP_DIP) if card.rows else 0
+        row = card.rows
+        var = self._var(ftype.key, ftype.default_value())
+
+        label = ttk.Label(frame, text=ftype.name)
+        label.grid(row=row, column=0, sticky="w", padx=(0, 2 * gap),
+                   pady=(top, 0))
+        block = ttk.Frame(frame)
+        block.grid(row=row, column=1, sticky="ew", pady=(top, 0))
+        block.columnconfigure(0, weight=1)
+        entry = ttk.Entry(block, textvariable=var, width=1)
+        entry.grid(row=0, column=0, sticky="ew")
+        browse = ttk.Button(block, text="Browse…",
+                            command=lambda t=ftype: self._browse(t))
+        browse.grid(row=0, column=1, padx=(gap, 0))
+        card.add(label)
+        card.add(block)
+        self._inputs += [entry, browse]
+        row += 1
+        if ftype.note:
+            note = wrapping_label(frame, ftype.note)
+            note.grid(row=row, column=1, sticky="ew", pady=(gap // 2, 0))
+            card.add(note)
+            row += 1
+        card.rows = row
 
     def _on_board_changed(self, _event: object = None) -> None:
         board = self._selected_board()

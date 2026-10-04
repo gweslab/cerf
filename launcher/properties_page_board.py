@@ -4,7 +4,7 @@ import tkinter as tk
 from pathlib import Path
 from typing import Callable, Dict
 
-from board_rom_form import BoardRomForm
+from board_rom_form import BindWheel, BoardRomForm
 from cerf_user_json import ROM_BLOCK, STORAGE_BLOCK
 from device_file_types import FileKey
 from ui_dialogs import show_error
@@ -14,15 +14,17 @@ PAGE_BOARD = "board"
 
 class BoardRomPage:
     key = PAGE_BOARD
-    title = "Board/ROM"
+    title = "Board Settings"
 
     def __init__(self, parent: tk.Misc, window: tk.Misc, device_dir: Path,
-                 on_board_changed: Callable[[], None]) -> None:
+                 on_board_changed: Callable[[], None],
+                 bind_wheel: BindWheel) -> None:
         self._window = window
         self._on_board_changed = on_board_changed
         self._board_id = ""
         self.form = BoardRomForm(parent, window, self._on_form_changed,
-                                 name_follows_board=False, base_dir=device_dir)
+                                 name_follows_board=False, base_dir=device_dir,
+                                 bind_wheel=bind_wheel)
         self.frame = self.form.frame
 
     def load(self, model: dict) -> None:
@@ -47,7 +49,7 @@ class BoardRomPage:
     def validate(self) -> bool:
         reason = self.form.problem()
         if reason is not None:
-            show_error(self._window, "Board/ROM", reason)
+            show_error(self._window, self.title, reason)
             return False
         return True
 

@@ -171,55 +171,18 @@ def confirm_rom_license(parent: tk.Misc, display_name: str,
     )
 
 
-def show_dpi_help(parent: tk.Misc) -> None:
-    show_info(
-        parent,
-        "Display DPI override",
-        "Overrides the logical DPI (pixels-per-inch) the CERF guest display "
-        "driver reports to the OS. It changes what the OS believes the screen "
-        "density is - it most likely causes rendering artifacts and broken "
-        "graphics."
-    )
-
-
 def show_bpp_help(parent: tk.Misc) -> None:
     show_info(
         parent,
-        "Color depth override",
-        "Some boards and guest additions allow to change BPP. Windows CE "
-        "guest apps are often very picky.\n\n"
-        "• Auto - Make CERF automatically pick depth per known values.\n"
-        "• 8 bpp - Should be used for Windows CE 2.0.\n"
-        "• 16 bpp - Known to work best for Windows CE 2.11-3 era.\n"
-        "• 24 bpp - Known to work best for all CE eras.\n"
-        "• 32 bpp - Supported ~since CE 2.11+ but often breaks rendering "
-        "in guest apps."
-    )
-
-
-def show_color_scheme_help(parent: tk.Misc) -> None:
-    show_info(
-        parent,
-        "Color scheme override",
-        "Forces a fixed system color scheme onto the guest. Handy to colorize "
-        "grayscale devices (which render everything in black and white) with a "
-        "proper colored theme, or to restyle any CE desktop.\n\n"
-        "It is applied by force and may refuse to work on some ROMs, because "
-        "the approach is hacky rather than a supported OS feature."
-    )
-
-
-def show_mount_point_help(parent: tk.Misc) -> None:
-    show_info(
-        parent,
-        "Shared folder mount point",
-        "Some apps expect their files under \\Storage Card. You can use that "
-        "name, but some ROMs reserve it for their own volume, Windows CE 2.0 "
-        "among them. The shared folder then mounts under a numbered name, "
-        "such as \\Storage Card2.\n\n"
-        "A ROM can reserve other names too, so a custom name is at your own "
-        "risk. If the shared folder stops working, click Reset to restore the "
-        "default name."
+        "Color depth",
+        "Some values can break the guest. Keep the default value unless you "
+        "have a reason to change it.\n\n"
+        "• Auto - the depth that is known to work on this device.\n"
+        "• 8bpp - for Windows CE 2.0.\n"
+        "• 16bpp - works best for Windows CE 2.11 and 3.0.\n"
+        "• 24bpp - works for every Windows CE version.\n"
+        "• 32bpp - Windows CE 2.11 and later. It often breaks the rendering "
+        "of guest apps."
     )
 
 

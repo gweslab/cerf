@@ -47,6 +47,7 @@ _DARK_PALETTE: Dict[str, str] = {
     "DANGER_FG": "#f48771", "WARN_FG": "#ffb900",
     "CARD_RUNNING_BG": "#1e3a1e", "CARD_UPDATE_BG": "#3a2f12",
     "CARD_RUNNING_SEL": "#2e5a2e", "CARD_UPDATE_SEL": "#5c4a1e",
+    "PAGE_BG": "#141414", "CARD_BORDER": "#2f2f2f",
 }
 _LIGHT_PALETTE: Dict[str, str] = {
     "BG": "#fafafa", "BG_LIGHTER": "#ffffff", "BG_FIELD": "#ffffff",
@@ -57,6 +58,7 @@ _LIGHT_PALETTE: Dict[str, str] = {
     "DANGER_FG": "#c42b1c", "WARN_FG": "#8a5a00",
     "CARD_RUNNING_BG": "#dff3df", "CARD_UPDATE_BG": "#fbeecb",
     "CARD_RUNNING_SEL": "#bfe6bf", "CARD_UPDATE_SEL": "#f2dca0",
+    "PAGE_BG": "#f0f0f0", "CARD_BORDER": "#e0e0e0",
 }
 
 IS_DARK = system_uses_dark()
@@ -81,6 +83,8 @@ CARD_RUNNING_BG = _PALETTE["CARD_RUNNING_BG"]
 CARD_UPDATE_BG  = _PALETTE["CARD_UPDATE_BG"]
 CARD_RUNNING_SEL = _PALETTE["CARD_RUNNING_SEL"]
 CARD_UPDATE_SEL  = _PALETTE["CARD_UPDATE_SEL"]
+PAGE_BG     = _PALETTE["PAGE_BG"]
+CARD_BORDER = _PALETTE["CARD_BORDER"]
 
 
 def _build_state_tint() -> dict:
@@ -104,6 +108,7 @@ def refresh_palette() -> bool:
     global SEPARATOR
     global UPDATE_LINK, LINK_FG, GROUP_BG, PREVIEW_STOPPED, DANGER_FG, WARN_FG
     global CARD_RUNNING_BG, CARD_UPDATE_BG, CARD_RUNNING_SEL, CARD_UPDATE_SEL
+    global PAGE_BG, CARD_BORDER
     dark = system_uses_dark()
     if dark == IS_DARK:
         return False
@@ -128,6 +133,8 @@ def refresh_palette() -> bool:
     CARD_UPDATE_BG  = _PALETTE["CARD_UPDATE_BG"]
     CARD_RUNNING_SEL = _PALETTE["CARD_RUNNING_SEL"]
     CARD_UPDATE_SEL  = _PALETTE["CARD_UPDATE_SEL"]
+    PAGE_BG     = _PALETTE["PAGE_BG"]
+    CARD_BORDER = _PALETTE["CARD_BORDER"]
     STATE_TINT = _build_state_tint()
     return True
 
@@ -239,6 +246,10 @@ def apply_theme(root: tk.Tk) -> None:
     style.configure("Danger.TLabel", foreground=DANGER_FG)
 
     style.configure("Help.TButton", padding=(4, 1))
+
+    style.configure("Page.TFrame", background=PAGE_BG)
+    style.configure("Section.TLabel", background=PAGE_BG, foreground=FG,
+                    font=("Segoe UI", 10, "bold"))
 
     root.option_add("*TCombobox*Listbox.background", BG_FIELD)
     root.option_add("*TCombobox*Listbox.foreground", FG)

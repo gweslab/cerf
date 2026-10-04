@@ -5,14 +5,20 @@ from pathlib import PureWindowsPath
 from tkinter import ttk
 from typing import Callable, List, Tuple
 
-from board_info import board_display_name
-from color_schemes import CS_KEY_TO_LABEL
+from board_info import board_display_name, board_ga_color_depth
+from color_schemes import color_scheme_label
 from device_file_types import device_file_types
+from launch_options_bpp import bpp_label, model_bpp
+from launch_options_dpi import dpi_label, model_dpi
+from launch_options_font_size import font_size_label, model_font_size
 from properties_model import PropertiesModel
-from properties_page_board import PAGE_BOARD
-from properties_page_display import PAGE_DISPLAY
-from properties_page_emulator import PAGE_EMULATOR
-from properties_page_ga import PAGE_GUEST_ADDITIONS
+from properties_page_board import BoardRomPage, PAGE_BOARD
+from properties_page_display import DisplayPage, PAGE_DISPLAY
+from properties_page_emulator import EmulatorSettingsPage, PAGE_EMULATOR
+from properties_page_ga import (GuestAdditionsPage, PAGE_GUEST_ADDITIONS,
+                                cleartype_label, model_cleartype)
+from resolution_block import model_size, resolution_label
+from share_folder_block import MOUNT_PREFIX
 from side_block import SideBlock
 
 Rows = List[Tuple[str, str]]
@@ -20,17 +26,6 @@ Rows = List[Tuple[str, str]]
 
 def _on_off(value: bool) -> str:
     return "On" if value else "Off"
-
-
-def _resolution_text(values: dict, auto_size: Tuple[int, int]) -> str:
-    if "width" in values and "height" in values:
-        return "{} × {}".format(values["width"], values["height"])
-    return "Auto ({} × {})".format(*auto_size)
-
-
-def _bpp_text(values: dict) -> str:
-    bpp = values.get("bpp")
-    return "{} bpp".format(bpp) if bpp else "Auto"
 
 
 class ConfigPreviewPanel:
@@ -46,10 +41,10 @@ class ConfigPreviewPanel:
             b.body.columnconfigure(1, weight=1)
             return b
 
-        self.board = block("Board/ROM", 0, PAGE_BOARD)
-        self.ga = block("Guest Additions", 1, PAGE_GUEST_ADDITIONS)
-        self.display = block("Display", 2, PAGE_DISPLAY)
-        self.emulator = block("Emulator Settings", 3, PAGE_EMULATOR)
+        self.board = block(BoardRomPage.title, 0, PAGE_BOARD)
+        self.ga = block(GuestAdditionsPage.title, 1, PAGE_GUEST_ADDITIONS)
+        self.display = block(DisplayPage.title, 2, PAGE_DISPLAY)
+        self.emulator = block(EmulatorSettingsPage.title, 3, PAGE_EMULATOR)
         self._blocks = [self.board, self.ga, self.display, self.emulator]
         self.clear()
 
@@ -80,14 +75,16 @@ class ConfigPreviewPanel:
         self._fill(self.board, board_rows)
 
         if subject.guest_additions_available(board_id):
-            self._fill(self.ga, self._ga_rows(values, auto_size))
+            self._fill(self.ga, self._ga_rows(values, auto_size,
+                                              board_ga_color_depth(board_id)))
         else:
             self.ga.grid_remove()
 
         if subject.display_page_available(values):
             self._fill(self.display, [
-                ("Resolution", _resolution_text(values, auto_size)),
-                ("Color depth", _bpp_text(values))])
+                ("Resolution",
+                 resolution_label(model_size(values), auto_size)),
+                ("Color depth", bpp_label(model_bpp(values), None))])
         else:
             self.display.grid_remove()
 
@@ -99,23 +96,24 @@ class ConfigPreviewPanel:
              else "Detached"),
             ("Verbose logs", _on_off(values.get("verbose_logs", False)))])
 
-    def _ga_rows(self, values: dict, auto_size: Tuple[int, int]) -> Rows:
+    def _ga_rows(self, values: dict, auto_size: Tuple[int, int],
+                 auto_depth: int) -> Rows:
         if not values.get("guest_additions", False):
             return [("Status", "Disabled")]
         share = values.get("share_folder")
         rows: Rows = [("Status", "Enabled"),
                       ("Shared folder", share or "None")]
         if share:
-            rows.append(("Mount point", values.get("mount_point", "")))
-        rows += [("Resolution", _resolution_text(values, auto_size)),
-                 ("Color depth", _bpp_text(values)),
-                 ("DPI", str(values["dpi"]) if "dpi" in values
-                  else "Default"),
-                 ("Font size", str(values["font_size"])
-                  if "font_size" in values else "Default")]
-        key = values.get("color_scheme", "")
-        rows.append(("Color scheme",
-                     CS_KEY_TO_LABEL.get(key, "None") if key else "None"))
+            rows.append(("Mount point",
+                         MOUNT_PREFIX + values.get("mount_point", "")))
+        rows += [("Resolution",
+                  resolution_label(model_size(values), auto_size)),
+                 ("Color depth", bpp_label(model_bpp(values), auto_depth)),
+                 ("DPI", dpi_label(model_dpi(values))),
+                 ("Font size", font_size_label(model_font_size(values))),
+                 ("ClearType", cleartype_label(model_cleartype(values))),
+                 ("Color scheme",
+                  color_scheme_label(values.get("color_scheme", "")))]
         return rows
 
     def _fill(self, block: SideBlock, rows: Rows) -> None:

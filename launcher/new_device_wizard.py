@@ -9,12 +9,21 @@ from tkinter import ttk
 from typing import Callable, Dict, List, Optional
 
 from board_rom_form import BoardRomForm
+from branded_dialog import scaled
 from cerf_user_json import resolve_device_file
 from rounded_style import rounded_frame, rounded_style
 from screen_geometry import fit_geometry
+from settings_card import SettingsColumn, switch
 from ui_dialogs import show_error
+from ui_scroll import ScrollColumn
 from user_device_create import UserDeviceSpec, validate_device_name
 import ui_theme as theme
+
+STEP1_WIDTH_PX = 560
+STEP1_HEIGHT_PX = 360
+STEP2_WIDTH_DIP = 820
+STEP2_HEIGHT_DIP = 600
+PAGE_PAD_DIP = 14
 
 
 class _PivotButton:
@@ -62,6 +71,7 @@ class NewDeviceWizard:
                  devices_dir: Path,
                  on_download_roms: Callable[[], None],
                  on_create: Callable[[UserDeviceSpec], None]) -> None:
+        self._parent = parent
         self._devices_dir = devices_dir
         self._on_download_roms = on_download_roms
         self._on_create = on_create
@@ -74,14 +84,12 @@ class NewDeviceWizard:
             dlg.transient(parent)
 
         self._step1 = ttk.Frame(dlg, padding=12)
-        self._step2 = ttk.Frame(dlg, padding=12)
+        self._step2 = ttk.Frame(dlg)
         self._build_step1(icons_dir)
         self._build_step2()
         self._show_step1()
 
-        dlg.update_idletasks()
         theme.apply_titlebar(dlg)
-        fit_geometry(dlg, 560, 360, parent=parent)
         dlg.grab_set()
 
     def _load_icon(self, icons_dir: Optional[Path],
@@ -120,19 +128,29 @@ class NewDeviceWizard:
     def _build_step2(self) -> None:
         body = self._step2
         body.columnconfigure(0, weight=1)
+        body.rowconfigure(0, weight=1)
 
-        self.form = BoardRomForm(body, self._dlg, self._sync_create_state,
-                                 name_follows_board=True)
-        self.form.frame.grid(row=0, column=0, sticky="ew")
+        scroll = ScrollColumn(body, width=1, page=True)
+        scroll.grid(row=0, column=0, sticky="nsew")
+        pad = scaled(body, PAGE_PAD_DIP)
+        column = SettingsColumn(scroll.inner)
+        column.frame.grid(row=0, column=0, sticky="nsew", padx=pad, pady=pad)
+
+        self.form = BoardRomForm(column.frame, self._dlg,
+                                 self._sync_create_state,
+                                 name_follows_board=True,
+                                 bind_wheel=scroll.bind_wheel)
+        column.place(self.form.frame)
 
         self.var_copy = tk.BooleanVar(value=True)
-        ttk.Checkbutton(body, text="Copy to device directory",
-                        variable=self.var_copy).grid(
-            row=1, column=0, sticky="w", pady=(8, 0))
+        row = column.group().row("Copy files to device directory")
+        row.control(switch(row.frame, self.var_copy), wide=False)
+        scroll.bind_wheel(scroll.inner)
 
-        body.rowconfigure(2, weight=1)
-        footer = ttk.Frame(body)
-        footer.grid(row=3, column=0, sticky="e", pady=(12, 0))
+        tk.Frame(body, height=1, bg=theme.SEPARATOR).grid(
+            row=1, column=0, columnspan=2, sticky="ew")
+        footer = ttk.Frame(body, padding=12)
+        footer.grid(row=2, column=0, columnspan=2, sticky="e")
         ttk.Button(footer, text="Back",
                    command=self._show_step1).pack(side="left", padx=(0, 6))
         self.btn_create = ttk.Button(footer, text="Create",
@@ -151,10 +169,14 @@ class NewDeviceWizard:
     def _show_step1(self) -> None:
         self._step2.pack_forget()
         self._step1.pack(fill="both", expand=True)
+        fit_geometry(self._dlg, STEP1_WIDTH_PX, STEP1_HEIGHT_PX,
+                     parent=self._parent)
 
     def _show_step2(self) -> None:
         self._step1.pack_forget()
         self._step2.pack(fill="both", expand=True)
+        fit_geometry(self._dlg, scaled(self._dlg, STEP2_WIDTH_DIP),
+                     scaled(self._dlg, STEP2_HEIGHT_DIP), parent=self._parent)
         self._sync_create_state()
 
     def _choose_download(self) -> None:

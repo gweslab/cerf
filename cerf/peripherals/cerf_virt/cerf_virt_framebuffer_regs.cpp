@@ -27,6 +27,7 @@ using CerfVirt::kFbRegRefreshRate;
 using CerfVirt::kFbRegSystemFontHeight;
 using CerfVirt::kFbRegSystemFontPresent;
 using CerfVirt::kFbRegCustomizationsApplied;
+using CerfVirt::kFbRegClearType;
 
 class CerfVirtFramebufferRegs : public Peripheral {
 public:
@@ -66,6 +67,8 @@ public:
                 return (uint32_t)emu_.Get<DeviceConfig>().guest_additions_font_size;
             case kFbRegSystemFontPresent:
                 return emu_.Get<DeviceConfig>().guest_additions_font_size_set ? 1u : 0u;
+            case kFbRegClearType:
+                return ClearTypeMode();
             default:              return 0u;
         }
     }
@@ -82,6 +85,13 @@ public:
     }
 
 private:
+    uint32_t ClearTypeMode() const {
+        const auto& cfg = emu_.Get<DeviceConfig>();
+        if (!cfg.guest_additions_cleartype_set) return CerfVirt::kFbClearTypeDefault;
+        return cfg.guest_additions_cleartype ? CerfVirt::kFbClearTypeOn
+                                             : CerfVirt::kFbClearTypeOff;
+    }
+
     CerfVirtFramebuffer* fb_ = nullptr;
 };
 

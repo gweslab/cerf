@@ -1,87 +1,59 @@
 from __future__ import annotations
 
 import tkinter as tk
-from tkinter import ttk
+from typing import Callable, List, Optional
 
+from choice_combo import ChoiceCombo
+from rich_text import Segment, link, plain
+from settings_card import SettingsRow
 from ui_dialogs import show_bpp_help
 
-BPP_STOPS = (0, 8, 16, 24, 32)
+BPP_CHOICES = (None, 8, 16, 24, 32)
 
 
-def bpp_label(value: int) -> str:
-    if value == 0:
-        return "Auto"
-    if value in BPP_STOPS:
-        return "{} bpp".format(value)
-    return "Custom - {} bpp".format(value)
+def bpp_description(window: tk.Misc) -> List[Segment]:
+    return [plain("A wrong value breaks the guest. "),
+            link("Learn more", lambda: show_bpp_help(window))]
 
 
-def nearest_stop_index(value: int) -> int:
-    if value in BPP_STOPS:
-        return BPP_STOPS.index(value)
-    return min(range(1, len(BPP_STOPS)),
-               key=lambda i: abs(BPP_STOPS[i] - value))
+def bpp_label(value: Optional[int], auto_depth: Optional[int]) -> str:
+    if value is None:
+        return "Auto - {}bpp".format(auto_depth) if auto_depth else "Auto"
+    return "{}bpp".format(value)
+
+
+def model_bpp(model: dict) -> Optional[int]:
+    value = model.get("bpp")
+    if isinstance(value, int) and not isinstance(value, bool) and value > 0:
+        return value
+    return None
 
 
 class BppOptionBlock:
-    def __init__(self, parent: tk.Misc, window: tk.Misc) -> None:
-        self._window = window
-        self._sync_guard = False
-        self._value = 0
-        self.var_index = tk.DoubleVar(value=0)
+    def __init__(self, row: SettingsRow,
+                 on_change: Optional[Callable[[], None]] = None) -> None:
+        self._auto_depth: Optional[int] = None
+        self.combo = ChoiceCombo(row.frame, on_change=on_change)
+        row.control(self.combo.widget)
+        self._configure()
 
-        self.frame = ttk.Frame(parent)
-        self.frame.columnconfigure(0, weight=1)
-        head = ttk.Frame(self.frame)
-        head.grid(row=0, column=0, sticky="ew")
-        head.columnconfigure(0, weight=1)
-        ttk.Label(head, text="Color depth").grid(row=0, column=0, sticky="w")
-        self.help = ttk.Button(head, text="?", width=2, style="Help.TButton",
-                               command=lambda: show_bpp_help(self._window))
-        self.help.grid(row=0, column=1, sticky="e")
-
-        self.slider = ttk.Scale(self.frame, from_=0, to=len(BPP_STOPS) - 1,
-                                orient="horizontal",
-                                style="Res.Horizontal.TScale",
-                                variable=self.var_index,
-                                command=self._on_slider)
-        self.slider.grid(row=1, column=0, sticky="ew", pady=(6, 0))
-        self.label = ttk.Label(self.frame, text=bpp_label(0),
-                               style="Hint.TLabel")
-        self.label.grid(row=2, column=0, sticky="w")
+    def set_auto_depth(self, depth: Optional[int]) -> None:
+        self._auto_depth = depth
+        self._configure()
 
     def load(self, model: dict) -> None:
-        value = model.get("bpp", 0)
-        if not isinstance(value, int) or value < 0:
-            value = 0
-        self._set_value(value)
+        self.combo.set(model_bpp(model))
 
     def store(self, model: dict) -> None:
-        if self._value:
-            model["bpp"] = self._value
-        else:
+        value = self.combo.get()
+        if value is None:
             model.pop("bpp", None)
+        else:
+            model["bpp"] = value
 
     def set_enabled(self, enabled: bool) -> None:
-        state = "normal" if enabled else "disabled"
-        self.slider.config(state=state)
-        self.help.config(state=state)
+        self.combo.set_enabled(enabled)
 
-    def _set_value(self, value: int) -> None:
-        self._value = value
-        self._sync_guard = True
-        try:
-            self.slider.set(nearest_stop_index(value))
-        finally:
-            self._sync_guard = False
-        self.label.config(text=bpp_label(value))
-
-    def _on_slider(self, raw: str) -> None:
-        if self._sync_guard:
-            return
-        index = max(0, min(len(BPP_STOPS) - 1, int(round(float(raw)))))
-        if abs(float(raw) - index) > 1e-9:
-            self.slider.set(index)
-            return
-        if BPP_STOPS[index] != self._value:
-            self._set_value(BPP_STOPS[index])
+    def _configure(self) -> None:
+        self.combo.configure(BPP_CHOICES,
+                             lambda v: bpp_label(v, self._auto_depth))

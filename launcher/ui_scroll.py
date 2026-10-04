@@ -22,14 +22,17 @@ class ScrollColumn:
     so the mouse wheel keeps scrolling over them."""
 
     def __init__(self, parent: tk.Misc, width: int,
-                 on_width_changed: Optional[Callable[[int], None]] = None):
-        self._canvas = tk.Canvas(parent, bg=theme.BG, highlightthickness=0,
-                                 width=width)
+                 on_width_changed: Optional[Callable[[int], None]] = None,
+                 page: bool = False):
+        self._page = page
+        self._canvas = tk.Canvas(parent, bg=self._background(),
+                                 highlightthickness=0, width=width)
         self.scrollbar = ttk.Scrollbar(parent, orient="vertical",
                                        command=self._canvas.yview)
         self._canvas.configure(yscrollcommand=self.scrollbar.set)
 
-        self.inner = ttk.Frame(self._canvas)
+        self.inner = ttk.Frame(self._canvas,
+                               style="Page.TFrame" if page else "TFrame")
         self._inner_id = self._canvas.create_window((0, 0), window=self.inner,
                                                     anchor="nw")
         self.inner.columnconfigure(0, weight=1)
@@ -47,8 +50,17 @@ class ScrollColumn:
         self.bind_wheel(self._canvas)
         self.bind_wheel(self.inner)
 
+    def _background(self) -> str:
+        return theme.PAGE_BG if self._page else theme.BG
+
     def retheme(self) -> None:
-        self._canvas.config(bg=theme.BG)
+        self._canvas.config(bg=self._background())
+
+    def set_width(self, width: int) -> None:
+        self._canvas.config(width=width)
+
+    def scroll_to_top(self) -> None:
+        self._canvas.yview_moveto(0.0)
 
     def grid(self, row: int, column: int, **kwargs) -> None:
         self._canvas.grid(row=row, column=column, **kwargs)

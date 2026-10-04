@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import tkinter as tk
-from tkinter import ttk
+
+from rich_text import plain
+from settings_card import SettingsColumn, switch
 
 PAGE_EMULATOR = "emulator"
 
@@ -15,19 +17,20 @@ class EmulatorSettingsPage:
         self.var_detach_net = tk.BooleanVar(value=False)
         self.var_verbose = tk.BooleanVar(value=False)
 
-        self.frame = ttk.Frame(parent)
-        self.frame.columnconfigure(0, weight=1)
-        self._checks = []
-        for row, (text, var) in enumerate((
-                ("Borderless full screen", self.var_full_screen),
-                ("Detach internet connection", self.var_detach_net),
-                ("Verbose logs", self.var_verbose))):
-            check = ttk.Checkbutton(self.frame, text=text, variable=var)
-            check.grid(row=row, column=0, sticky="w", pady=(0, 4))
-            self._checks.append(check)
-        ttk.Label(self.frame, text="Will be reset on next launcher restart",
-                  style="Hint.TLabel").grid(row=3, column=0, sticky="w",
-                                            padx=(22, 0))
+        page = SettingsColumn(parent)
+        self.frame = page.frame
+        group = page.group()
+        self._switches = []
+        for title, description, var in (
+                ("Borderless full screen", None, self.var_full_screen),
+                ("Detach internet connection", None, self.var_detach_net),
+                ("Verbose logs",
+                 [plain("Resets when the launcher restarts.")],
+                 self.var_verbose)):
+            row = group.row(title, description)
+            check = switch(row.frame, var)
+            row.control(check, wide=False)
+            self._switches.append(check)
 
     def load(self, model: dict) -> None:
         self.var_full_screen.set(bool(model.get("full_screen", False)))
@@ -43,5 +46,5 @@ class EmulatorSettingsPage:
         return True
 
     def set_enabled(self, enabled: bool) -> None:
-        for check in self._checks:
+        for check in self._switches:
             check.config(state="normal" if enabled else "disabled")

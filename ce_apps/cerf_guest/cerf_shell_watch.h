@@ -8,6 +8,7 @@ extern "C" {
 
 void CerfShellWatchTick(void);
 void CerfShellWatchRegister(void (*cb)(void));
+BOOL CerfShellWatchIsUp(void);
 
 #ifdef __cplusplus
 }

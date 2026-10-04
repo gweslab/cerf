@@ -49,7 +49,7 @@
       Shared folders on Windows CE 2.0
       Driver automatically disables system-wide signature checks on Windows Mobile
       Hack to the WinCE shell for Ford SYNC 2
-      ClearType support (by @RaulMerelli)
+      ClearType support (by @RaulMerelli) and configuration
     fixed: |
       Pre-OS graphics (stock framebuffer) is now visible too and usable (switch to GA inputs is deferred now)
       Crash when drawing off-screen (GiNi)

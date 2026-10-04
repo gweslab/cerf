@@ -1,11 +1,11 @@
 from __future__ import annotations
 
 import tkinter as tk
-from tkinter import ttk
 from typing import Tuple
 
-from launch_options_bpp import BppOptionBlock
+from launch_options_bpp import BppOptionBlock, bpp_description
 from resolution_block import ResolutionBlock
+from settings_card import SettingsColumn
 
 PAGE_DISPLAY = "display"
 
@@ -15,14 +15,13 @@ class DisplayPage:
     title = "Display"
 
     def __init__(self, parent: tk.Misc, window: tk.Misc) -> None:
-        self.frame = ttk.Frame(parent)
-        self.frame.columnconfigure(0, weight=1)
-        self.resolution = ResolutionBlock(self.frame, window)
-        self.resolution.frame.grid(row=0, column=0, sticky="new")
-        ttk.Separator(self.frame, orient="horizontal").grid(
-            row=1, column=0, sticky="ew", pady=10)
-        self.bpp = BppOptionBlock(self.frame, window)
-        self.bpp.frame.grid(row=2, column=0, sticky="new")
+        page = SettingsColumn(parent)
+        self.frame = page.frame
+        group = page.group()
+        self.resolution = ResolutionBlock(group.row("Display resolution"),
+                                          window)
+        self.bpp = BppOptionBlock(group.row("Color depth",
+                                            bpp_description(window)))
 
     def set_auto_size(self, size: Tuple[int, int]) -> None:
         self.resolution.set_auto_size(size)
@@ -36,7 +35,7 @@ class DisplayPage:
         self.bpp.store(model)
 
     def validate(self) -> bool:
-        return self.resolution.validate()
+        return True
 
     def set_enabled(self, enabled: bool) -> None:
         self.resolution.set_enabled(enabled)

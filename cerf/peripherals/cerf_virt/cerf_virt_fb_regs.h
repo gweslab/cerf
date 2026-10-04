@@ -28,4 +28,10 @@ const uint32_t kFbRegSystemFontPresent = 0x30u;
 
 const uint32_t kFbRegCustomizationsApplied = 0x34u;
 
+const uint32_t kFbRegClearType = 0x38u;
+
+const uint32_t kFbClearTypeDefault = 0u;
+const uint32_t kFbClearTypeOn      = 1u;
+const uint32_t kFbClearTypeOff     = 2u;
+
 }

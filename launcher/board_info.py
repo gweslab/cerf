@@ -62,6 +62,17 @@ def board_configurable_screen(board_id: str) -> bool:
     return bool(entry.get("configurable_screen", False)) if entry else False
 
 
+DEFAULT_GA_COLOR_DEPTH = 24
+
+
+def board_ga_color_depth(board_id: str) -> int:
+    entry = device(board_id)
+    depth = entry.get("ga_color_depth") if entry else None
+    if isinstance(depth, int) and not isinstance(depth, bool) and depth > 0:
+        return depth
+    return DEFAULT_GA_COLOR_DEPTH
+
+
 def board_panel_size(board_id: str) -> Optional[tuple]:
     entry = device(board_id)
     if entry is None:

@@ -12,7 +12,7 @@ from persisted_options import (PERSIST_KEYS, auto_resolution,
                                effective_values, persist_subset)
 
 GA_KEYS = ("guest_additions", "share_folder", "mount_point", "width",
-           "height", "bpp", "dpi", "font_size", "color_scheme")
+           "height", "bpp", "dpi", "font_size", "cleartype", "color_scheme")
 REBOOT_KEYS = ("bpp", "dpi", "font_size", "color_scheme")
 LIVE_RESIZE_KEYS = ("width", "height")
 LIVE_RESIZE_MIN_CE_MAJOR = 4

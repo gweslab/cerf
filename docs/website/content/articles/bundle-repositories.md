@@ -7,8 +7,8 @@ no API and no code on the server.
 
 ## Finding and adding a repository
 
-CERF ships with an empty list of repositories. Members of the community run their own repositories.
-You can find them on the [CERF Discord server](https://discord.gg/QREE9Y2v2d).
+CERF distributes no ROMs out of box. There are chances you might run into a 
+community hosted repository. Seek those on our [Discord server](https://discord.gg/QREE9Y2v2d).
 
 To add a repository:
 

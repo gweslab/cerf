@@ -2,22 +2,21 @@
 
 Guest Additions is a very complex guest driver, that covers every Windows CE version starting from 2.0 and up to Windows Embedded Compact 2013.
 
+!!! warning
+
+    The driver might get your guest broken due to a hacky injection approach. Consider disabling Guest Additions when something goes wrong.
+
 ## Features
 
 - **Resolution**: Supports up to 4K resolution on **all** devices. Can live resize since CE 4. Matches **refresh rate** with your monitor.
 - **Input**: mouse and keyboard are directly passed as the native devices into the guest. This can conflict - check the status bar tools to configure
 - **Accelerated drawing**: Guest Additions driver draws only exclusively through the host process. This is the hardware acceleration for guests.
-- **Shared folders.** A folder on your PC appears inside the guest as a storage card. ``\CERF Storage\*``
+- **Shared folders.** A folder on your PC appears inside the guest as a storage card. `\CERF Storage\*`
 - **Task manager.** List, switch to and kill guest processes - and start new ones - from the host.
 - **Networking**. A virtual Ethernet adapter appears and reaches the internet even on boards which lack corresponding interfaces.
-- **Hacks.** The driver allows unsigned apps for Windows Mobile in guest registry.
+- **Customizations and hacks**. With Guest Additions enabled you receive a whole set of Windows appearance modifiers. Set a theme, configure fonts, force ClearType and much more. Guest Additions do automatically hack into the Windows CE shell on Ford Sync 2 and auomatically disable certificate checks for Windows Mobile ROMs.
 
-## Video driver
-
-The Guest Additions driver is literally a video driver. It replaces the stock one with a very small stub. That stub manual-maps the big real driver, which it receives over a virtual I/O channel.
-
-## What it looks like
-
+## Screenshots
 
 A Handheld PC on Windows CE 2.0. The stock panel is grayscale, but Guest Additions are giving a color to the OS.
 
@@ -79,5 +78,5 @@ guest runs the display driver its own ROM shipped.
 
     Guest Additions modify the ROM as it loads. Some ROMs do not survive it, and some behave
     oddly. It is off by default, and the launcher lists the boards where it is known to cause
-    trouble. If a device misbehaves, turn it off first. Launcher usually tells if Guest Additions 
+    trouble. If a device misbehaves, turn it off first. Launcher usually tells if Guest Additions
     supported or not.

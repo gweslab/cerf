@@ -16,16 +16,15 @@ even on if a device has no hardware capabalities for internet interface, or CERF
 
 ## NE2000 PC Card
 
-!!! note
-
-    Windows CE 2.0 needs a [network stack installed](#windows-ce-20-network-stack) for this to work
-
 **1.** Insert the **NE2000 Ethernet** card into a free PC Card slot.
 
 !!! note
 
     If a *PC Card driver not found* window appears, the guest has no NE2000 driver (or it is a CERF
     emulation bug) - this path will not work on that ROM.
+
+    If you are using Windows CE 2.0, it needs a [network stack installed](#windows-ce-20-network-stack) -
+    otherwise you will receive the same error.
 
 **2.** Configure it, which depends on the guest:
 

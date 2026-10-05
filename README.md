@@ -148,7 +148,7 @@ run_claude.cmd
     <tr>
       <td align="center"><img src="launcher/assets/icons/badge_mips.png" align="middle" title="MIPS" alt="MIPS"/><br/><b>NEC VR4122</b><br/><sub>MIPS III</sub></td>
       <td>
-        <img src="cerf/assets/icons_sources/board.svg" width="16" height="16" title="PDA" alt="PDA"/> <b>Casio Cassiopeia EM-500</b> <code>casio_cassiopeia_em500</code><br/>
+        <img src="cerf/assets/icons_sources/board.svg" width="16" height="16" title="PDA" alt="PDA"/> <b>Casio Cassiopeia EM-500/E-700</b> <code>casio_cassiopeia_em500</code><br/>
         Pocket PC 2000
       </td>
       <td><img src="cerf/assets/icons_sources/stylus.svg" width="32" height="32" title="Touch" alt="Touch"/> <img src="cerf/assets/icons_sources/ga_autoresize.svg" width="32" height="32" title="Guest Additions" alt="Guest Additions"/> <img src="cerf/assets/icons_sources/speaker_active.svg" width="32" height="32" title="Sound" alt="Sound"/></td>
@@ -350,6 +350,7 @@ run_claude.cmd
           🆕 Symbol Mk500 support (by @Katamaran21)<br/>
           🆕 Siemens MP377 support (by @RaulMerelli)<br/>
           🆕 Casio Toricomail: bezel touch buttons<br/>
+          🆕 Casio Cassiopeia E-700 support<br/>
           ✅ Philips Velo 1: 16 MB DRAM Miniature Card permanently fitted - 20 MB total for the guest<br/>
           ✅ Device Emulator: keyboard no longer drops or repeats keys while typing<br/>
           ✅ Device Emulator: sound no longer stutters<br/>

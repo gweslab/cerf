@@ -6,6 +6,7 @@
       Symbol Mk500 support (by @Katamaran21)
       Siemens MP377 support (by @RaulMerelli)
       Casio Toricomail: bezel touch buttons
+      Casio Cassiopeia E-700 support
     fixed: |
       Philips Velo 1: 16 MB DRAM Miniature Card permanently fitted - 20 MB total for the guest
       Device Emulator: keyboard no longer drops or repeats keys while typing

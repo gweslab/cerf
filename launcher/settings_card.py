@@ -77,19 +77,6 @@ class SettingsRow:
                     padx=(scaled(self.frame, CONTROL_GAP_DIP), 0))
 
 
-class SettingsBody:
-    def __init__(self, divider: tk.Frame, frame: ttk.Frame) -> None:
-        self._divider = divider
-        self.frame = frame
-
-    def show(self, visible: bool) -> None:
-        for widget in (self._divider, self.frame):
-            if visible:
-                widget.grid()
-            else:
-                widget.grid_remove()
-
-
 class SettingsGroup:
     def __init__(self, parent: tk.Misc) -> None:
         self.frame = rounded_frame(parent, theme.BG, theme.CARD_BORDER,
@@ -97,25 +84,24 @@ class SettingsGroup:
         self.frame.columnconfigure(0, weight=1)
         self._next = 0
 
-    def _place(self, widget: tk.Widget) -> tk.Frame:
-        divider = tk.Frame(self.frame, height=1, bd=0, bg=theme.CARD_BORDER)
+    def _place(self, widget: tk.Widget) -> None:
         if self._next:
-            divider.grid(row=self._next, column=0, sticky="ew")
+            tk.Frame(self.frame, height=1, bd=0, bg=theme.CARD_BORDER).grid(
+                row=self._next, column=0, sticky="ew")
         self._next += 1
         widget.grid(row=self._next, column=0, sticky="ew")
         self._next += 1
-        return divider
 
     def row(self, title: str, description: Description = None) -> SettingsRow:
         row = SettingsRow(self.frame, title, description)
         self._place(row.frame)
         return row
 
-    def body(self) -> SettingsBody:
+    def body(self) -> ttk.Frame:
         frame = ttk.Frame(self.frame, padding=row_padding(self.frame))
         frame.columnconfigure(0, weight=1)
-        divider = self._place(frame)
-        return SettingsBody(divider, frame)
+        self._place(frame)
+        return frame
 
     def note(self, text: str) -> None:
         frame = ttk.Frame(self.frame, padding=row_padding(self.frame))

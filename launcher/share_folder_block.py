@@ -37,14 +37,14 @@ class ShareFolderBlock:
         self.var_path = tk.StringVar(value="")
         self.var_mount = tk.StringVar(value=MOUNT_PREFIX + self._default_mount)
         self.var_mount.trace_add("write", self._keep_prefix)
+        self.var_path.trace_add("write", self._on_path_changed)
 
         row = group.row("Share folder", [
             plain("Mount a host folder as a guest file system.")])
         self.check = switch(row.frame, self.var_on, self._on_toggled)
         row.control(self.check, wide=False)
 
-        self.body = group.body()
-        frame = self.body.frame
+        frame = group.body()
         gap = scaled(frame, _GAP_DIP)
         frame.columnconfigure(3, minsize=control_width(frame))
         self.entry = ttk.Entry(frame, textvariable=self.var_path, width=1)
@@ -111,16 +111,18 @@ class ShareFolderBlock:
         self.mount_entry.icursor(cursor + len(MOUNT_PREFIX))
 
     def _refresh_state(self) -> None:
-        self.body.show(self.var_on.get())
         state = "normal" if self._enabled else "disabled"
         for widget in (self.entry, self.pick, self.mount_entry,
                        self.mount_reset):
             widget.config(state=state)
 
+    def _on_path_changed(self, *_args: object) -> None:
+        if not self.var_path.get().strip() and self.var_on.get():
+            self.var_on.set(False)
+
     def _on_toggled(self) -> None:
         if self.var_on.get() and not self.var_path.get().strip():
             self._on_pick()
-        self._refresh_state()
 
     def _on_pick(self) -> None:
         options = {"parent": self._window, "mustexist": True,
@@ -132,7 +134,7 @@ class ShareFolderBlock:
         if not picked:
             if not self.var_path.get().strip():
                 self.var_on.set(False)
-                self._refresh_state()
             return
         self.var_path.set(picked.replace("/", "\\"))
+        self.var_on.set(True)
         self.entry.xview_moveto(1.0)

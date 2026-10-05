@@ -25,7 +25,7 @@ class _FileCard:
         self.group = column.group()
         self.group.row(title)
         self.body = self.group.body()
-        self.body.frame.columnconfigure(1, minsize=path_width(self.body.frame))
+        self.body.columnconfigure(1, minsize=path_width(self.body))
         self.rows = 0
         self._widgets: List[tk.Widget] = []
 
@@ -171,7 +171,7 @@ class BoardRomForm:
             self._bind_wheel(self.frame)
 
     def _add_file_row(self, card: _FileCard, ftype: DeviceFileType) -> None:
-        frame = card.body.frame
+        frame = card.body
         gap = scaled(frame, _GAP_DIP)
         top = scaled(frame, _FILE_ROW_GAP_DIP) if card.rows else 0
         row = card.rows

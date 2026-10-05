@@ -1,27 +1,37 @@
 #pragma once
 
-#include "../ac97_codec.h"
+#include "../wolfson_wm97xx/wm97xx_codec.h"
 
 #include <cstdint>
 
-/* Wolfson WM9705 AC'97 audio + touch + battery codec (Falcon 4220 / Askey PC3xx).
-   Runtime touch coordinates stream over AC-link slot 5 to the controller's MODR
-   FIFO (Pxa255Ac97); the codec registers here serve device identity, the battery
-   ADC poll, and touch.dll's init X/Y panel-probe. */
-class Wm9705Codec : public Ac97Codec {
+class Wm9705Codec : public Wm97xxCodec {
 public:
-    using Ac97Codec::Ac97Codec;
+    using Wm97xxCodec::Wm97xxCodec;
 
     bool ShouldRegister() override;
     void OnReady() override;
 
-    uint16_t ReadReg(uint32_t reg) override;
-    void     WriteReg(uint32_t reg, uint16_t value) override;
+    uint16_t ReadReg(uint32_t reg, uint64_t frame) override;
+    void     WriteReg(uint32_t reg, uint16_t value, uint64_t frame) override;
+
+    void ColdReset() override;
+    bool DacPowered() override;
+    bool AdcPowered() override;
 
     void SaveState(StateWriter& w) override;
     void RestoreState(StateReader& r) override;
 
+protected:
+    uint16_t Peek(uint32_t reg) override;
+    void     Poke(uint32_t reg, uint16_t value) override;
+    const uint16_t* SupportedRates(uint32_t& count) const override;
+    uint16_t ConversionData(uint8_t tag) override;
+    void     Reconfigure(uint64_t frame, bool poll) override;
+
 private:
-    static constexpr uint32_t kNumRegs = 512u;  /* controller codec window 0x200..0x600. */
+    void LoadDefaults();
+    void RequireRegister(uint32_t reg);
+
+    static constexpr uint32_t kNumRegs = 512u;
     uint16_t reg_[kNumRegs] = {};
 };

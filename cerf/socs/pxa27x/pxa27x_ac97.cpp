@@ -1,296 +1,364 @@
-#include "pxa27x_ac97.h"
-
 #include "../../boards/board_context.h"
-#include "pxa270_id.h"
 #include "../../core/cerf_emulator.h"
-#include "../../host/audio_activity_widget.h"
+#include "../../core/fatal.h"
+#include "../../jit/guest_cycle_clock.h"
 #include "../../peripherals/ac97_codec.h"
+#include "../../peripherals/peripheral_base.h"
 #include "../../peripherals/peripheral_dispatcher.h"
 #include "../../state/state_stream.h"
+#include "../guest_cpu_reset.h"
+#include "../pxa2xx/pxa2xx_ac97_link.h"
+#include "../pxa2xx/pxa2xx_ac97_modem.h"
+#include "../pxa2xx/pxa2xx_ac97_pcm.h"
+#include "../pxa2xx/pxa2xx_ac97_pcm_in.h"
+#include "../pxa2xx/pxa2xx_dma.h"
+#include "pxa270_id.h"
+#include "pxa27x_clock_manager.h"
 
 #include <cstdint>
-#include <cstring>
-
-REGISTER_SERVICE(Pxa27xAc97);
 
 namespace {
 
-/* Table 13-10 (page 13-26) POCR, Table 13-11 (page 13-27) PCMICR, Table 13-16
-   (page 13-32) MCCR, Table 13-19 (page 13-35) MOCR, Table 13-20 (page 13-36)
-   MICR: "3 R/W FEIE", "1 R/W FSRIE", all other bits reserved. */
-constexpr uint32_t kCtrlFields = 0x0000000Au;
-
-/* Table 13-12 (page 13-28) POSR, Table 13-21 (page 13-37) MOSR: "4 R/W FIFOE
-   ... Cleared by writing 0b1 to this bit", "2 R FSR". */
-constexpr uint32_t kOutStatusW1c = 0x00000010u;
-/* Table 13-13 (page 13-29) PCMISR, Table 13-17 (page 13-33) MCSR, Table 13-22
-   (page 13-38) MISR: "4 R/W FIFOE", "3 R/W EOC", "2 R FSR". */
-constexpr uint32_t kInStatusW1c = 0x00000018u;
+/* Intel PXA27x Developer's Manual Table 13-10 (page 13-26) POCR, Table 13-11 PCMICR, Table 13-16
+   MCCR, Table 13-19 MOCR, Table 13-20 MICR: FEIE bit 3, FSRIE bit 1. */
+constexpr uint32_t kCtrlIrqEnables = (1u << 3) | (1u << 1);
+/* Intel PXA27x Developer's Manual Table 13-17 (page 13-33) MCSR and Table 13-22 (page 13-38) MISR:
+   FIFOE 4, EOC 3, FSR 2; Table 13-21 (page 13-37) MOSR: FIFOE 4, FSR 2. */
 constexpr uint32_t kFifoe = 1u << 4, kEoc = 1u << 3, kFsr = 1u << 2;
-
-/* Table 13-8 (pages 13-21, 13-22) GCR: "24 R/W nDMAEN", "19 R/W CDONE_IE",
-   "18 R/W SDONE_IE", "9 R/W SRDY_IE", "8 R/W PRDY_IE", "5 R/W SRES_IE",
-   "4 R/W PRES_IE", "3 R/W ACOFF", "2 R/W WRST", "1 R/W nCRST", "0 R/W
-   GPI_IE". */
-constexpr uint32_t kGcrFields = 0x010C033Fu;
+/* Intel PXA27x Developer's Manual Table 13-8 (pages 13-21, 13-22) GCR. */
+constexpr uint32_t kGcrNdmaen = 1u << 24;
+constexpr uint32_t kGcrIrqEnables = (1u << 19) | (1u << 18) | (1u << 9) | (1u << 8) | (1u << 5) |
+                                    (1u << 4) | (1u << 0);
 constexpr uint32_t kGcrAcoff = 1u << 3, kGcrWrst = 1u << 2, kGcrNcrst = 1u << 1;
-
-/* Table 13-9 (pages 13-23, 13-24, 13-25) GSR: CDONE, SDONE, RCS, SRESINT,
-   PRESINT and GSCI are each "cleared by software writing 0b1 to this
-   location". */
-constexpr uint32_t kGsrW1c = 0x000C8C01u;
-constexpr uint32_t kGsrCdone  = 1u << 19, kGsrSdone = 1u << 18;
-constexpr uint32_t kGsrPcrdy  = 1u << 8;
-constexpr uint32_t kGsrMcint  = 1u << 7, kGsrPoint = 1u << 6, kGsrPiint = 1u << 5;
+/* Intel PXA27x Developer's Manual Table 13-9 (pages 13-23 to 13-25) GSR. */
+constexpr uint32_t kGsrCdone = 1u << 19, kGsrSdone = 1u << 18, kGsrPcrdy = 1u << 8;
+constexpr uint32_t kGsrPoint = 1u << 6, kGsrPiint = 1u << 5;
 constexpr uint32_t kGsrAcoffd = 1u << 3, kGsrMoint = 1u << 2, kGsrMiint = 1u << 1;
+constexpr uint32_t kCaip = 1u << 0;
+/* Intel PXA27x Developer's Manual Table 3-33 (page 3-98): CKEN[2] "AC '97 Controller Clock Enable";
+   Table 13-7 (page 13-13): CKEN[31] 0 with CKEN[2] 1, "AC97_BITCLK enabled and is externally provided". */
+constexpr uint32_t kCkenAc97 = 2u, kCkenAc97Config = 31u;
 
-}  /* namespace */
+class Pxa27xAc97 : public Peripheral {
+public:
+    using Peripheral::Peripheral;
 
-bool Pxa27xAc97::ShouldRegister() {
-    auto* bd = emu_.TryGet<BoardContext>();
-    return bd && bd->GetSocId() == SocId::Pxa270;
+    bool ShouldRegister() override {
+        auto* bd = emu_.TryGet<BoardContext>();
+        return bd && bd->GetSocId() == SocId::Pxa270;
+    }
+
+    /* Intel PXA27x Developer's Manual Table 3-2 (page 3-12): "Any module not listed takes the reset
+       value for all of its registers". */
+    void OnReady() override {
+        clock_  = &emu_.Get<GuestCycleClock>();
+        clocks_ = &emu_.Get<Pxa27xClockManager>();
+        clocks_->RegisterClockEnableListener([this](uint32_t old_cken) { OnUnitClock(old_cken); });
+        link_  = &emu_.Get<Pxa2xxAc97Link>();
+        pcm_    = &emu_.Get<Pxa2xxAc97Pcm>();
+        pcm_in_ = &emu_.Get<Pxa2xxAc97PcmIn>();
+        modem_  = &emu_.Get<Pxa2xxAc97Modem>();
+        dma_   = &emu_.Get<Pxa2xxDma>();
+        codec_ = emu_.TryGet<Ac97Codec>();
+        emu_.Get<PeripheralDispatcher>().Register(this);
+        emu_.Get<GuestCpuReset>().RegisterResetListener([this](ResetLineKind) { ResetLine(); });
+    }
+
+    uint32_t MmioBase() const override { return 0x40500000u; }
+    uint32_t MmioSize() const override { return 0x00001000u; }
+
+    uint32_t ReadWord(uint32_t addr) override;
+    void     WriteWord(uint32_t addr, uint32_t value) override;
+    uint16_t ReadHalf(uint32_t addr) override;
+    void     WriteHalf(uint32_t addr, uint16_t value) override;
+
+    void SaveState(StateWriter& w) override;
+    void RestoreState(StateReader& r) override;
+    void PostRestore() override;
+
+private:
+    enum : uint32_t {
+        kPOCR = 0x000u, kPCMICR = 0x004u, kMCCR = 0x008u, kGCR = 0x00Cu, kPOSR = 0x010u,
+        kPCMISR = 0x014u, kMCSR = 0x018u, kGSR = 0x01Cu, kCAR = 0x020u, kPCDR = 0x040u,
+        kMCDR = 0x060u, kMOCR = 0x100u, kMICR = 0x108u, kMOSR = 0x110u, kMISR = 0x118u,
+        kMODR = 0x140u,
+    };
+
+    bool     InColdReset() const { return (gcr_ & kGcrNcrst) == 0u; }
+    uint32_t ModemOutStatus() const;
+    void     RequireUnitClock(uint32_t off);
+    void     OnUnitClock(uint32_t old_cken);
+    void     RequireExternalBitclk(uint32_t gcr);
+    void     RequireOutOfReset(uint32_t off);
+    uint32_t ReadGsr(uint64_t now);
+    void     WriteGcr(uint64_t now, uint32_t value);
+    void     WriteControl(uint32_t& reg, uint32_t value, const char* name);
+    void     ClearRegisters();
+    void     ResetLine();
+
+    GuestCycleClock*    clock_  = nullptr;
+    Pxa27xClockManager* clocks_ = nullptr;
+    Pxa2xxAc97Link*  link_  = nullptr;
+    Pxa2xxAc97Pcm*   pcm_    = nullptr;
+    Pxa2xxAc97PcmIn* pcm_in_ = nullptr;
+    Pxa2xxAc97Modem* modem_  = nullptr;
+    Pxa2xxDma*       dma_   = nullptr;
+    Ac97Codec*       codec_ = nullptr;
+
+    uint32_t gcr_ = 0, pocr_ = 0, pcmicr_ = 0, mccr_ = 0, mocr_ = 0, micr_ = 0;
+    bool     shut_down_ = false;
+};
+
+void Pxa27xAc97::ClearRegisters() {
+    pocr_ = pcmicr_ = mccr_ = mocr_ = micr_ = 0u;
+    shut_down_ = false;
 }
 
-void Pxa27xAc97::OnReady() {
-    emu_.Get<PeripheralDispatcher>().Register(this);
-    audio_out_.Start("Pxa27xAc97", kRate48k, kChannels, kBitsPerSamp,
-                     /*allow_resampler=*/false);
-    emu_.Get<AudioActivityWidget>().NotePresent();
+/* Intel PXA27x Developer's Manual Table 13-21 (page 13-37) MOSR FSR: "1 = FIFO needs servicing",
+   "This bit is updated independently of the value of its interrupt enable, FSRIE"; FIFOE is set on
+   a transmit underrun or a programmed-I/O overrun. */
+uint32_t Pxa27xAc97::ModemOutStatus() const { return link_->RequestsEnabled() ? kFsr : 0u; }
+
+/* Intel PXA27x Developer's Manual Table 13-8 (page 13-22) nCRST: "The value of this bit is retained after
+   suspends"; Table 24-2 (pages 24-7, 24-8): AC97_RESET_n is the output of GPIO 95 or GPIO 113. */
+void Pxa27xAc97::ResetLine() {
+    if (emu_.Get<GuestCpuReset>().DeliveredResetWasResume() && (gcr_ & kGcrNcrst) != 0u) {
+        emu_.Get<Fatal>().Die("Pxa27xAc97: sleep exit with GCR nCRST set; the codec reset across the sleep follows "
+                              "the sleep level of the GPIO that carries AC97_RESET_n; not modelled");
+    }
+    gcr_ = 0u;
+    ClearRegisters();
+    link_->ResetLine();
 }
 
-/* Stop the audio thread before any peer its completion callback re-enters is
-   destroyed. */
-void Pxa27xAc97::OnShutdown() { audio_out_.Stop(); }
-
-void Pxa27xAc97::BeginAudioOut(std::function<void()> on_block_done) {
-    audio_out_.BeginAudioOut(std::move(on_block_done));
+void Pxa27xAc97::RequireUnitClock(uint32_t off) {
+    if (clocks_->ClockEnabled(kCkenAc97)) return;
+    emu_.Get<Fatal>().Die("Pxa27xAc97: access at offset 0x%03X with CKEN[2] clear; not modelled", off);
 }
 
-void Pxa27xAc97::QueueOutput(const void* host_bytes, uint32_t length) {
-    audio_out_.QueueOutput(host_bytes, length);
-    emu_.Get<AudioActivityWidget>().MarkTx();
+/* Intel PXA27x Developer's Manual Table 13-7 (page 13-13): "Software must not set or clear CKEN[31] and
+   CKEN[2] at the same time"; CKEN[31] 1 with CKEN[2] 0: "AC97_RESET_n signal is asserted". */
+void Pxa27xAc97::OnUnitClock(uint32_t old_cken) {
+    const uint32_t old31 = (old_cken >> kCkenAc97Config) & 1u, old2 = (old_cken >> kCkenAc97) & 1u;
+    const uint32_t new31 = clocks_->ClockEnabled(kCkenAc97Config) ? 1u : 0u;
+    const uint32_t new2  = clocks_->ClockEnabled(kCkenAc97) ? 1u : 0u;
+    if ((old31 == new31 && old2 == new2) || InColdReset()) return;
+    emu_.Get<Fatal>().Die("Pxa27xAc97: CKEN[31] / CKEN[2] %u / %u -> %u / %u with GCR nCRST set; not modelled",
+                          old31, old2, new31, new2);
 }
 
-void Pxa27xAc97::StopAudioOut() { audio_out_.StopAudioOut(); }
+void Pxa27xAc97::RequireExternalBitclk(uint32_t gcr) {
+    if (!clocks_->ClockEnabled(kCkenAc97Config) && clocks_->ClockEnabled(kCkenAc97)) return;
+    emu_.Get<Fatal>().Die("Pxa27xAc97: GCR 0x%08X releases the cold reset with CKEN[31] %u and CKEN[2] %u; "
+                          "not modelled", gcr, clocks_->ClockEnabled(kCkenAc97Config) ? 1u : 0u,
+                          clocks_->ClockEnabled(kCkenAc97) ? 1u : 0u);
+}
 
-/* Section 13.8 (page 13-42): "All AC '97 controller registers are
-   word-addressable (32 bits wide) and increment in units of 0x00004. The
-   registers in the Codec are half-word-addressable (16 bits wide)." */
+void Pxa27xAc97::RequireOutOfReset(uint32_t off) {
+    if (!InColdReset()) return;
+    emu_.Get<Fatal>().Die("Pxa27xAc97: codec window access at offset 0x%03X while GCR nCRST holds "
+                          "the AC-link in cold reset; not modelled", off);
+}
+
+/* Intel PXA27x Developer's Manual section 13.6.1 (page 13-16): "When GCR[nCRST] is 0b0, all other
+   registers are in their reset state." */
 uint32_t Pxa27xAc97::ReadWord(uint32_t addr) {
     const uint32_t off = addr - MmioBase();
-    if (off == kGCR) return gcr_;
-    if (!LinkOutOfColdReset()) return IsRegister(off) ? 0u : Reject("ReadWord", addr, 0);
-    if (InCodecWindow(off)) return CodecRead(off);
+    const uint64_t now = clock_->Cycles();
+    RequireUnitClock(off);
+    if (Pxa2xxAc97Link::InCodecWindow(off)) {
+        RequireOutOfReset(off);
+        return link_->CodecWindowRead(now, off);
+    }
+    /* Intel PXA27x Developer's Manual Table 13-8 (page 13-22) WRST: "It remains set until the reset completes
+       and AC97_BITCLK is seen on the AC-link, after which it clears itself." */
+    if (off == kGCR) return gcr_ | (link_->WarmResetPending() ? kGcrWrst : 0u);
+    switch (off) {
+    case kPOCR: case kPCMICR: case kMCCR: case kPOSR: case kPCMISR: case kMCSR: case kGSR:
+    case kCAR: case kPCDR: case kMCDR: case kMOCR: case kMICR: case kMOSR: case kMISR: case kMODR:
+        if (InColdReset()) return 0u;
+        break;
+    default:
+        HaltUnsupportedAccess("ReadWord", addr, 0);
+    }
     switch (off) {
     case kPOCR:   return pocr_;
     case kPCMICR: return pcmicr_;
     case kMCCR:   return mccr_;
-    case kPOSR:   return posr_;
-    case kPCMISR: return pcmisr_;
-    case kMCSR:   return mcsr_;
-    case kGSR:    return ReadGsr();
-    case kCAR:    return ReadCar();
     case kMOCR:   return mocr_;
     case kMICR:   return micr_;
-    case kMOSR:   return mosr_;
-    case kMISR:   return misr_;
-    case kPCDR:   return ReadRxFifo(pcmisr_);
-    case kMCDR:   return ReadRxFifo(mcsr_);
-    case kMODR:   return ReadModemRx();
+    case kPOSR:   return pcm_->OutStatus(now) & (kFifoe | kFsr);
+    case kPCMISR: return pcm_in_->Status(now) & (kFifoe | kEoc | kFsr);
+    /* Intel PXA27x Developer's Manual section 13.4.2.7 (page 13-11): slot 6 carries the microphone
+       record data; Cirrus Logic WM9713L Rev 4.0 Table 10 (page 32): ADC data reaches slot 6 only
+       with ASS 10. */
+    case kMCSR:   return 0u;
+    case kMOSR:   return ModemOutStatus();
+    case kMISR:   return modem_->Status(now);
+    case kGSR:    return ReadGsr(now);
+    case kCAR:    return link_->ReadCar(now) ? kCaip : 0u;
+    case kPCDR:   return pcm_in_->ReadData(now, "PCDR");
+    case kMCDR:
+        emu_.Get<Fatal>().Die("Pxa27xAc97: MCDR read; the mic-in receive FIFO is not modelled");
+    default:      return modem_->ReadData(now, "MODR");
     }
-    return Reject("ReadWord", addr, 0);
 }
 
 void Pxa27xAc97::WriteWord(uint32_t addr, uint32_t value) {
     const uint32_t off = addr - MmioBase();
-    if (off == kGCR) { WriteGcr(value); return; }
-    if (!LinkOutOfColdReset()) {
-        if (!IsRegister(off)) Reject("WriteWord", addr, value);
+    const uint64_t now = clock_->Cycles();
+    RequireUnitClock(off);
+    if (Pxa2xxAc97Link::InCodecWindow(off)) {
+        RequireOutOfReset(off);
+        link_->CodecWindowWrite(now, off, static_cast<uint16_t>(value));
         return;
     }
-    if (InCodecWindow(off)) {
-        CodecWrite(off, static_cast<uint16_t>(value));
+    if (off == kGCR) {
+        WriteGcr(now, value);
         return;
     }
     switch (off) {
-    case kPOCR:   pocr_   = value & kCtrlFields; return;
-    case kPCMICR: pcmicr_ = value & kCtrlFields; return;
-    case kMCCR:   mccr_   = value & kCtrlFields; return;
-    case kMOCR:   mocr_   = value & kCtrlFields; return;
-    case kMICR:   micr_   = value & kCtrlFields; return;
-    case kPOSR:   posr_   &= ~(value & kOutStatusW1c); return;
-    case kMOSR:   mosr_   &= ~(value & kOutStatusW1c); return;
-    case kPCMISR: pcmisr_ &= ~(value & kInStatusW1c);  return;
-    case kMCSR:   mcsr_   &= ~(value & kInStatusW1c);  return;
-    case kMISR:   misr_   &= ~(value & kInStatusW1c);  return;
-    case kGSR:    gsr_    &= ~(value & kGsrW1c);       return;
-    /* Table 13-14 (page 13-30) CAR: "Software can also clear this bit by
-       writing 0b0 to this bit location". */
-    case kCAR:    car_caip_ = (value & 1u) != 0u; return;
-    /* Table 13-18 (page 13-34) MCDR: "This is a read-only register. A write
-       to this register has no effect." */
-    case kMODR: case kMCDR: return;
-    /* Table 13-15 (page 13-31) PCDR: the PCM data register is the transmit
-       FIFO on write; a DMA-paced channel routes through QueueOutput instead,
-       so a programmed-I/O write reaches the host mixer directly. */
-    case kPCDR:   QueueOutput(&value, sizeof(value)); return;
+    case kPOCR: case kPCMICR: case kMCCR: case kPOSR: case kPCMISR: case kMCSR: case kGSR:
+    case kCAR: case kPCDR: case kMCDR: case kMOCR: case kMICR: case kMOSR: case kMISR: case kMODR:
+        if (InColdReset()) return;
+        break;
+    default:
+        HaltUnsupportedAccess("WriteWord", addr, value);
     }
-    Reject("WriteWord", addr, value);
+    switch (off) {
+    case kPOCR:   WriteControl(pocr_, value, "POCR"); return;
+    case kPCMICR: WriteControl(pcmicr_, value, "PCMICR"); return;
+    case kMCCR:   WriteControl(mccr_, value, "MCCR"); return;
+    case kMOCR:   WriteControl(mocr_, value, "MOCR"); return;
+    case kMICR:   WriteControl(micr_, value, "MICR"); return;
+    case kPOSR:   pcm_->ClearOutStatus(now, value & kFifoe); return;
+    case kPCMISR: pcm_in_->ClearStatus(now, value & (kFifoe | kEoc)); return;
+    case kMCSR:   return;
+    case kMOSR:   return;
+    case kMISR:   modem_->ClearStatus(now, value & (kFifoe | kEoc)); return;
+    case kGSR:    link_->ClearDone(now, (value & kGsrCdone) != 0u, (value & kGsrSdone) != 0u); return;
+    /* Intel PXA27x Developer's Manual Table 13-14 (page 13-30) CAIP: "Software can also clear this
+       bit by writing 0b0 to this bit location". */
+    case kCAR:
+        if ((value & kCaip) != 0u) {
+            emu_.Get<Fatal>().Die("Pxa27xAc97: CAR write 0x%08X sets CAIP; not modelled", value);
+        }
+        link_->ClearCar(now);
+        return;
+    case kPCDR: pcm_->WriteData(now, value); return;
+    /* Intel PXA27x Developer's Manual Table 13-18 (page 13-34) MCDR: "This is a read-only register.
+       A write to this register has no effect." */
+    case kMCDR: return;
+    default:
+        emu_.Get<Fatal>().Die("Pxa27xAc97: MODR write 0x%08X; the modem transmit FIFO is not modelled",
+                              value);
+    }
 }
 
 uint16_t Pxa27xAc97::ReadHalf(uint32_t addr) {
     const uint32_t off = addr - MmioBase();
-    if (!InCodecWindow(off)) return static_cast<uint16_t>(Reject("ReadHalf", addr, 0));
-    return LinkOutOfColdReset() ? CodecRead(off) : 0u;
+    RequireUnitClock(off);
+    if (!Pxa2xxAc97Link::InCodecWindow(off)) HaltUnsupportedAccess("ReadHalf", addr, 0);
+    RequireOutOfReset(off);
+    return static_cast<uint16_t>(link_->CodecWindowRead(clock_->Cycles(), off));
 }
 
 void Pxa27xAc97::WriteHalf(uint32_t addr, uint16_t value) {
     const uint32_t off = addr - MmioBase();
-    if (!InCodecWindow(off)) { Reject("WriteHalf", addr, value); return; }
-    if (LinkOutOfColdReset()) CodecWrite(off, value);
+    RequireUnitClock(off);
+    if (!Pxa2xxAc97Link::InCodecWindow(off)) HaltUnsupportedAccess("WriteHalf", addr, value);
+    RequireOutOfReset(off);
+    link_->CodecWindowWrite(clock_->Cycles(), off, value);
+}
+
+void Pxa27xAc97::WriteControl(uint32_t& reg, uint32_t value, const char* name) {
+    if ((value & kCtrlIrqEnables) != 0u) {
+        emu_.Get<Fatal>().Die("Pxa27xAc97: %s 0x%08X enables an AC'97 FIFO interrupt; not modelled",
+                              name, value);
+    }
+    reg = 0u;
+}
+
+/* Intel PXA27x Developer's Manual Table 13-9 (page 13-24): POINT "Is set to 0b1 if either
+   POSR[FIFOE] or POSR[FSR] is 0b1", PIINT and MCINT also on EOC; ACOFFD "Is 0b1 if the AC-link has
+   been cleanly shutdown ... It is cleared when GCR[ACOFF] is cleared". */
+uint32_t Pxa27xAc97::ReadGsr(uint64_t now) {
+    uint32_t v = 0u;
+    if (link_->CommandDone(now)) v |= kGsrCdone;
+    if (link_->StatusDone(now)) v |= kGsrSdone;
+    if (link_->CodecReady(now)) v |= kGsrPcrdy;
+    if (pcm_->OutStatus(now) != 0u) v |= kGsrPoint;
+    if (pcm_in_->Status(now) != 0u) v |= kGsrPiint;
+    if (ModemOutStatus() != 0u) v |= kGsrMoint;
+    if (modem_->Status(now) != 0u) v |= kGsrMiint;
+    if (shut_down_) v |= kGsrAcoffd;
+    return v;
+}
+
+/* Intel PXA27x Developer's Manual section 13.6.2 (page 13-17): "Setting GCR[ACOFF] cleanly shuts down
+   the AC '97 controller"; "The GCR[nCRST] bit supersedes the GCR[ACOFF] bit and therefore prevents a
+   clean shutdown if set during or before the shutdown sequence." */
+void Pxa27xAc97::WriteGcr(uint64_t now, uint32_t value) {
+    if ((value & (kGcrIrqEnables | kGcrNdmaen)) != 0u) {
+        emu_.Get<Fatal>().Die("Pxa27xAc97: GCR 0x%08X enables an AC'97 interrupt or programmed-I/O "
+                              "FIFO service; not modelled", value);
+    }
+    const uint32_t old       = gcr_;
+    const bool     cold      = (value & kGcrNcrst) == 0u;
+    const bool     acoff_on  = (old & kGcrAcoff) == 0u && (value & kGcrAcoff) != 0u;
+    const bool     acoff_off = (old & kGcrAcoff) != 0u && (value & kGcrAcoff) == 0u;
+    gcr_ = value & (kGcrNcrst | kGcrAcoff);
+    if (cold) {
+        ClearRegisters();
+        link_->SetColdReset(now, true);
+        dma_->OnPortChange();
+        return;
+    }
+    if (acoff_on && (old & kGcrNcrst) == 0u) {
+        emu_.Get<Fatal>().Die("Pxa27xAc97: GCR 0x%08X releases the cold reset and sets ACOFF in one "
+                              "write; not modelled", value);
+    }
+    if (acoff_off && shut_down_) {
+        emu_.Get<Fatal>().Die("Pxa27xAc97: GCR 0x%08X clears ACOFF after a clean shutdown; not modelled",
+                              value);
+    }
+    if ((old & kGcrNcrst) == 0u) RequireExternalBitclk(value);
+    link_->SetColdReset(now, false);
+    if ((value & kGcrWrst) != 0u) link_->WarmReset(now);
+    if (acoff_on) {
+        link_->SetLinkOff(now, true, true);
+        shut_down_ = true;
+    }
+    dma_->OnPortChange();
 }
 
 void Pxa27xAc97::SaveState(StateWriter& w) {
-    w.Write("pocr", pocr_);   w.Write("pcmicr", pcmicr_); w.Write("mccr", mccr_);
-    w.Write("mocr", mocr_);   w.Write("micr", micr_);   w.Write("gcr", gcr_);
-    w.Write("posr", posr_);   w.Write("pcmisr", pcmisr_); w.Write("mcsr", mcsr_);
-    w.Write("mosr", mosr_);   w.Write("misr", misr_);   w.Write("gsr", gsr_);
-    w.Write("car_caip", car_caip_);
-    w.Write("vra", vra_);
-    w.Write("front_dac_rate", front_dac_rate_);
-    w.WriteBytes("codec", codec_, sizeof(codec_));
-    if (auto* c = emu_.TryGet<Ac97Codec>()) c->SaveState(w);
+    w.Write("gcr", gcr_);
+    w.Write<uint8_t>("shut_down", shut_down_ ? 1u : 0u);
+    link_->Save(w);
+    pcm_->Save(w);
+    pcm_in_->Save(w);
+    modem_->Save(w);
+    if (codec_ != nullptr) codec_->SaveState(w);
 }
 
 void Pxa27xAc97::RestoreState(StateReader& r) {
-    r.Read("pocr", pocr_);   r.Read("pcmicr", pcmicr_); r.Read("mccr", mccr_);
-    r.Read("mocr", mocr_);   r.Read("micr", micr_);   r.Read("gcr", gcr_);
-    r.Read("posr", posr_);   r.Read("pcmisr", pcmisr_); r.Read("mcsr", mcsr_);
-    r.Read("mosr", mosr_);   r.Read("misr", misr_);   r.Read("gsr", gsr_);
-    r.Read("car_caip", car_caip_);
-    r.Read("vra", vra_);
-    r.Read("front_dac_rate", front_dac_rate_);
-    r.ReadBytes("codec", codec_, sizeof(codec_));
-    if (auto* c = emu_.TryGet<Ac97Codec>()) c->RestoreState(r);
-    audio_out_.SetFormat(front_dac_rate_, kChannels, kBitsPerSamp);
+    uint8_t shut_down = 0;
+    r.Read("gcr", gcr_);
+    r.Read("shut_down", shut_down);
+    shut_down_ = shut_down != 0u;
+    link_->Restore(r);
+    pcm_->Restore(r);
+    pcm_in_->Restore(r);
+    modem_->Restore(r);
+    if (codec_ != nullptr) codec_->RestoreState(r);
 }
 
-bool Pxa27xAc97::InCodecWindow(uint32_t off) {
-    return off >= kCodecBase && off < kCodecEnd;
+void Pxa27xAc97::PostRestore() {
+    link_->PostRestore();
+    if (codec_ != nullptr) codec_->PostRestore();
 }
 
-bool Pxa27xAc97::IsRegister(uint32_t off) {
-    switch (off) {
-    case kPOCR: case kPCMICR: case kMCCR: case kGCR:
-    case kPOSR: case kPCMISR: case kMCSR: case kGSR:
-    case kCAR:  case kPCDR:   case kMCDR:
-    case kMOCR: case kMICR:   case kMOSR: case kMISR:
-    case kMODR:
-        return true;
-    default:
-        return InCodecWindow(off);
-    }
-}
+}  // namespace
 
-/* Section 13.6.1 (page 13-16): "When GCR[nCRST] is 0b0, all other registers
-   are in their reset state." */
-bool Pxa27xAc97::LinkOutOfColdReset() const { return (gcr_ & kGcrNcrst) != 0u; }
-
-/* Section 13.6.3 (pages 13-17, 13-18): "The AC '97 controller clears the
-   CAR[CAIP] bit when the Codec-write or Codec-read operation completes";
-   "sets the GSR[CDONE] bit after the completion of a Codec write
-   operation"; "the AC '97 controller sets the GSR[SDONE] bit". */
-uint16_t Pxa27xAc97::CodecRead(uint32_t off) {
-    car_caip_ = false;
-    gsr_ |= kGsrSdone;
-    const uint32_t win = CodecWindow(off), reg = CodecReg(off);
-    if (win == 0) {
-        if (auto* c = emu_.TryGet<Ac97Codec>()) return c->ReadReg(reg);
-    }
-    return codec_[win][reg];
-}
-
-void Pxa27xAc97::CodecWrite(uint32_t off, uint16_t value) {
-    car_caip_ = false;
-    gsr_ |= kGsrCdone;
-    const uint32_t win = CodecWindow(off), reg = CodecReg(off);
-    if (win == 0) {
-        SnoopRateRegister(reg, value);
-        if (auto* c = emu_.TryGet<Ac97Codec>()) { c->WriteReg(reg, value); return; }
-    }
-    codec_[win][reg] = value;
-}
-
-/* AC '97 Component Specification Revision 2.3 section 5.8.2: "VRA=1 enables
-   Variable Rate Audio mode (VRA uses sample rate control Registers 2C-32h) ...
-   When VRA is set to 0 the registers are forced to BB80h (48 kHz) because that
-   is the only rate supported, and any values previously written to these
-   registers are lost." */
-void Pxa27xAc97::SnoopRateRegister(uint32_t reg, uint16_t value) {
-    if (reg == kExtAudioStatCtrl) {
-        vra_ = (value & kExtCtrlVra) != 0u;
-        if (!vra_) front_dac_rate_ = kRate48k;
-    } else if (reg == kPcmFrontDacRate) {
-        front_dac_rate_ = vra_ ? value : kRate48k;
-    } else {
-        return;
-    }
-    if (front_dac_rate_ != 0u)
-        audio_out_.SetFormat(front_dac_rate_, kChannels, kBitsPerSamp);
-}
-
-/* Table 13-14 (page 13-30) CAR: "If no cycle is in progress, this bit is
-   0b0, and the act of reading the register sets this bit to 0b1, which
-   reserves the right for that software driver to perform the I/O cycle." */
-uint32_t Pxa27xAc97::ReadCar() {
-    const uint32_t v = car_caip_ ? 1u : 0u;
-    car_caip_ = true;
-    return v;
-}
-
-/* Table 13-13 (page 13-29) PCMISR[FIFOE]: "Receive FIFO underrun occurs.
-   Invalid data is read by the CPU. Pointers do not increment. This could
-   happen only if programmed I/O tries to read the receive FIFO when it is
-   empty." */
-uint32_t Pxa27xAc97::ReadRxFifo(uint32_t& status) {
-    status |= kFifoe;
-    return 0u;
-}
-
-/* Section 13.6.5 (page 13-18): "Modem receive FIFO, with sixteen 32-bit
-   entries (upper 16 bits are always 0)". */
-uint32_t Pxa27xAc97::ReadModemRx() {
-    uint16_t word = 0;
-    auto* codec = emu_.TryGet<Ac97Codec>();
-    if (codec && codec->PopModemSlot(word)) return word;
-    misr_ |= kFifoe;
-    return 0u;
-}
-
-/* Table 13-9 (page 13-24) "3 R ACOFFD ... Is 0b1 if the AC-link has been
-   cleanly shutdown"; (page 13-23) "8 R PCRDY Primary Codec Ready. Reflects
-   the state of the Codec Ready bit in AC97_SDATA_IN_0." */
-uint32_t Pxa27xAc97::ReadGsr() const {
-    uint32_t v = gsr_ | kGsrPcrdy;
-    if (gcr_ & kGcrAcoff) v |= kGsrAcoffd;
-    if (posr_   & (kFifoe | kFsr))        v |= kGsrPoint;
-    if (mosr_   & (kFifoe | kFsr))        v |= kGsrMoint;
-    if (pcmisr_ & (kFifoe | kEoc | kFsr)) v |= kGsrPiint;
-    if (mcsr_   & (kFifoe | kEoc | kFsr)) v |= kGsrMcint;
-    if (misr_   & (kFifoe | kEoc | kFsr)) v |= kGsrMiint;
-    return v;
-}
-
-/* Table 13-8 (page 13-22) "2 R/W WRST ... This bit is self-clearing"; "1
-   R/W nCRST ... 0 = Causes a cold reset to occur throughout the AC '97
-   circuitry. All data in the controller and the Codec is lost." */
-void Pxa27xAc97::WriteGcr(uint32_t value) {
-    gcr_ = value & kGcrFields & ~kGcrWrst;
-    if (LinkOutOfColdReset()) return;
-    pocr_ = pcmicr_ = mccr_ = mocr_ = micr_ = 0;
-    posr_ = pcmisr_ = mcsr_ = mosr_ = misr_ = gsr_ = 0;
-    car_caip_ = false;
-    vra_ = false;
-    front_dac_rate_ = kRate48k;
-    std::memset(codec_, 0, sizeof(codec_));
-}
+REGISTER_SERVICE(Pxa27xAc97);

@@ -156,6 +156,10 @@ void Pxa27xClockManager::RegisterLcdClockListener(std::function<void()> fn) {
     lcd_clock_listeners_.push_back(std::move(fn));
 }
 
+void Pxa27xClockManager::RegisterClockEnableListener(std::function<void(uint32_t)> fn) {
+    cken_listeners_.push_back(std::move(fn));
+}
+
 void Pxa27xClockManager::ApplyRate() {
     emu_.Get<GuestCycleClock>().SetClockHz(CoreHz(loaded_cccr_, clkcfg_));
     PublishLcdClock();
@@ -205,10 +209,15 @@ void Pxa27xClockManager::WriteWord(uint32_t addr, uint32_t value) {
             }
             cccr_ = value & kCccrMask;
             return;
-        case 0x04:
+        case 0x04: {
+            const uint32_t old = cken_;
             cken_ = value & kCkenMask;
             PublishLcdClock();
+            if (cken_ == old) return;
+            LOG(SocClkpwr, "Pxa27xClockManager: CKEN <= 0x%08X\n", cken_);
+            for (auto& fn : cken_listeners_) fn(old);
             return;
+        }
         /* Section 3.8.2.3 (page 3-99): "OON can be set only by software and
            cleared only by power-on or hardware reset", and "OOK sets 2-3
            seconds after OON is set". */

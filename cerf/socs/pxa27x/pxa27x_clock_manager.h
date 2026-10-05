@@ -32,6 +32,9 @@ public:
     bool     LcdClockEnabled() const { return (cken_ & kCkenLcd) != 0u; }
     void     RegisterLcdClockListener(std::function<void()> fn);
 
+    bool ClockEnabled(uint32_t cken_bit) const { return (cken_ & (1u << cken_bit)) != 0u; }
+    void RegisterClockEnableListener(std::function<void(uint32_t old_cken)> fn);
+
     static uint32_t __fastcall ReadClkcfgHelper(Pxa27xClockManager* self);
     static void __fastcall WriteClkcfgHelper(Pxa27xClockManager* self, uint32_t value);
 
@@ -67,6 +70,7 @@ private:
 
     std::vector<std::function<void()>> osc_listeners_;
     std::vector<std::function<void()>> lcd_clock_listeners_;
+    std::vector<std::function<void(uint32_t)>> cken_listeners_;
     uint64_t                           published_lcd_hz_ = 0u;
     bool                               published_lcd_on_ = false;
 };

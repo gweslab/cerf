@@ -85,6 +85,10 @@ void Pxa255ClockManager::RegisterMemoryClockListener(std::function<void()> fn) {
     memory_clock_listeners_.push_back(std::move(fn));
 }
 
+void Pxa255ClockManager::RegisterClockEnableListener(std::function<void(uint32_t)> fn) {
+    cken_listeners_.push_back(std::move(fn));
+}
+
 void Pxa255ClockManager::SetOscillatorStable() {
     const bool was_ok = ook_;
     oon_ = true;
@@ -170,7 +174,14 @@ uint32_t Pxa255ClockManager::ReadWord(uint32_t addr) {
 void Pxa255ClockManager::WriteWord(uint32_t addr, uint32_t value) {
     switch (addr - MmioBase()) {
         case 0x00: cccr_ = value & kCccrMask; return;
-        case 0x04: cken_ = value & kCkenMask; return;
+        case 0x04: {
+            const uint32_t old = cken_;
+            cken_ = value & kCkenMask;
+            if (cken_ == old) return;
+            LOG(SocClkpwr, "Pxa255ClockManager: CKEN <= 0x%05X\n", cken_);
+            for (auto& fn : cken_listeners_) fn(old);
+            return;
+        }
         /* Table 3-22: "Write zeros to reserved bits"; OON "write-once only bit",
            OOK "read-only bit". EMTS 278805-002 Table 13: tS_XT Stabilization Time
            min 2, max 10 s. */

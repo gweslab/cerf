@@ -3,6 +3,8 @@
 /guides/*       /articles/:splat           301
 /assets/guides/*  /assets/articles/:splat  301
 
+/discord https://discord.gg/QREE9Y2v2d 302
+/discord/ https://discord.gg/QREE9Y2v2d 302
 /getting-online       /articles/networking/   302
 /getting-online/      /articles/networking/   302
 /activesync           /articles/activesync/   302

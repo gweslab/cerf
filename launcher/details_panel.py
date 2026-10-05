@@ -6,6 +6,7 @@ from pathlib import Path
 from tkinter import ttk
 from typing import Callable, Dict, List, Optional
 
+from device_source_text import source_caption
 from device_state import DeviceBundle
 from board_database import FEATURE_SPECS
 from board_info import board_extra_notes, board_features
@@ -147,6 +148,7 @@ class DetailsPanel:
             self.source_value.grid_remove()
             self._source_url = None
             return
+        self.source_caption.config(text=source_caption(src))
         self.source_caption.grid()
         self.source_value.grid()
         self._source_url = src.website or src.origin or None

@@ -10,6 +10,7 @@ from typing import List, Optional, Tuple
 
 from app_paths import resolve_cerf_exe
 from bundles import BundleError, package_category_label
+from device_source_text import source_credit
 from device_state import DeviceBundle, format_size
 from operations import BundleManager
 
@@ -35,13 +36,10 @@ def _print_rom_license_notice(target: str) -> None:
 
 
 def _print_source_notice(device: DeviceBundle) -> None:
-    """Non-blocking CLI equivalent of the GUI preservation-source dialog: just
-    credit the source and print its visit/support links. No-op without a
-    source block."""
     src = device.meta.source
     if src is None:
         return
-    print(f"This ROM bundle was preserved and provided by {src.name}.")
+    print(source_credit(src))
     if src.website:
         print(f"  Visit them:   {src.website}")
     if src.donate:

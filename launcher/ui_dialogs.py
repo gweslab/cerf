@@ -11,6 +11,7 @@ from typing import Callable, Dict, Optional, Tuple
 
 from copyright_removal_dialog import (BUTTON_LABEL as COPYRIGHT_BUTTON_LABEL,
                                       ContactsFn, show_copyright_removal)
+from device_source_text import source_credit
 from device_state import DeviceSource
 from dialog_buttons import pack_actions
 import ui_theme as theme
@@ -197,12 +198,6 @@ def link_label(parent: tk.Misc, text: str, url: str) -> ttk.Label:
     return lbl
 
 
-def _maybe_link(parent: tk.Misc, text: str, url: str) -> ttk.Label:
-    """A clickable link when url is set, otherwise the same text as plain
-    (non-clickable) label."""
-    return link_label(parent, text, url) if url else ttk.Label(parent, text=text)
-
-
 def show_source_thanks(parent: tk.Misc, source: DeviceSource) -> None:
     show_sources_thanks(parent, [source] if source is not None else [])
 
@@ -211,7 +206,7 @@ def show_sources_thanks(parent: tk.Misc, sources) -> None:
     distinct: list = []
     seen: set = set()
     for s in sources:
-        if s is not None and s.has_links and s.name not in seen:
+        if s is not None and s.has_website_and_donate and s.name not in seen:
             seen.add(s.name)
             distinct.append(s)
     if not distinct:
@@ -230,14 +225,13 @@ def show_sources_thanks(parent: tk.Misc, sources) -> None:
         if i:
             ttk.Label(body, text="").pack(anchor="w")
         ttk.Label(body, wraplength=420, justify="left",
-                  text=f"This ROM bundle was preserved and provided by "
-                       f"{source.name}.").pack(anchor="w")
+                  text=source_credit(source)).pack(anchor="w")
         ask = ttk.Frame(body)
         ask.pack(anchor="w", pady=(6, 0))
         ttk.Label(ask, text="Would you like to ").pack(side="left")
-        _maybe_link(ask, "pay them a visit", source.website).pack(side="left")
+        link_label(ask, "pay them a visit", source.website).pack(side="left")
         ttk.Label(ask, text=" or ").pack(side="left")
-        _maybe_link(ask, "support them", source.donate).pack(side="left")
+        link_label(ask, "support them", source.donate).pack(side="left")
         ttk.Label(ask, text="?").pack(side="left")
         if source.origin:
             link_label(body, "Source data link", source.origin).pack(anchor="w")

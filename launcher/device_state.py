@@ -38,17 +38,15 @@ LIVE_STATE_SCREENSHOT_FILENAME = "live_state.png"
 
 @dataclass
 class DeviceSource:
-    """Who preserved/provided this ROM bundle. Optional in the manifest; when
-    present, `name` is mandatory. The three links are each optional."""
-
     name: str = ""
-    website: str = ""   # "pay them a visit" target
-    donate: str = ""    # "support them" target
-    origin: str = ""    # "Source data link" target (where the ROM came from)
+    website: str = ""
+    donate: str = ""
+    origin: str = ""
+    is_community_member: bool = False
 
     @property
-    def has_links(self) -> bool:
-        return bool(self.website or self.donate or self.origin)
+    def has_website_and_donate(self) -> bool:
+        return bool(self.website and self.donate)
 
 
 @dataclass
@@ -263,8 +261,6 @@ def parse_cerf_json_object(obj) -> tuple[DeviceMeta, Optional[int], Optional[int
         meta.notes = _str_list(m.get("notes"))
         src_block = m.get("source")
         if isinstance(src_block, dict):
-            # source.name is mandatory when the source block exists; without it
-            # the block is meaningless, so an unnamed source is ignored.
             src_name = _str_or_empty(src_block.get("name"))
             if src_name:
                 meta.source = DeviceSource(
@@ -272,6 +268,8 @@ def parse_cerf_json_object(obj) -> tuple[DeviceMeta, Optional[int], Optional[int
                     website=_str_or_empty(src_block.get("website")),
                     donate=_str_or_empty(src_block.get("donate")),
                     origin=_str_or_empty(src_block.get("origin")),
+                    is_community_member=(
+                        src_block.get("is_community_member") is True),
                 )
         os_block = m.get("os")
         if isinstance(os_block, dict):

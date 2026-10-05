@@ -929,7 +929,7 @@
     },
     {
       "id": "casio_cassiopeia_em500",
-      "name": "Casio Cassiopeia EM-500",
+      "name": "Casio Cassiopeia EM-500/E-700",
       "short_name": "EM-500",
       "supported": true,
       "soc_id": "vr4122",

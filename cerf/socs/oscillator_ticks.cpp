@@ -66,6 +66,7 @@ void OscillatorTicks::DrainPark() {
     if (total == slept_seen_) return;
     const uint64_t ns = static_cast<uint64_t>(total - slept_seen_);
     slept_seen_       = total;
+    if (ClockStopped()) return;
     park_ticks_ += CreditNs(ns);
 }
 
@@ -195,4 +196,31 @@ void OscillatorTicks::Restore(StateReader& r) {
     park_ticks_ = 0;
     credit_rem_   = rem;
     slept_seen_ = sleep_->SleptNs();
+}
+
+uint64_t StoppableOscillatorTicks::ClockCycles() {
+    return (stopped_ ? stopped_at_ : clock_->Cycles()) - stopped_span_;
+}
+
+void StoppableOscillatorTicks::SetCounting(bool counting) {
+    if (counting == !stopped_) return;
+    DrainPark();
+    const uint64_t now = clock_->Cycles();
+    if (counting) stopped_span_ += now - stopped_at_;
+    else          stopped_at_ = now;
+    stopped_ = !counting;
+}
+
+void StoppableOscillatorTicks::Save(StateWriter& w) {
+    w.Write<uint8_t>("osc_counting", stopped_ ? 0u : 1u);
+    OscillatorTicks::Save(w);
+}
+
+void StoppableOscillatorTicks::Restore(StateReader& r) {
+    uint8_t counting = 1u;
+    r.Read("osc_counting", counting);
+    stopped_      = counting == 0u;
+    stopped_at_   = clock_->Cycles();
+    stopped_span_ = 0u;
+    OscillatorTicks::Restore(r);
 }

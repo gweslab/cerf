@@ -1,253 +1,390 @@
 #include "../peripheral_base.h"
 
-#include "../../core/cerf_emulator.h"
-#include "../../core/log.h"
 #include "../../boards/board_context.h"
 #include "../../boards/nec_rockhopper/nec_rockhopper_id.h"
-#include "../peripheral_dispatcher.h"
+#include "../../core/cerf_emulator.h"
+#include "../../core/log.h"
+#include "../../host/guest_deep_sleep.h"
+#include "../../jit/guest_cycle_clock.h"
+#include "../../socs/oscillator_ticks.h"
 #include "../../state/state_stream.h"
+#include "../peripheral_dispatcher.h"
+#include "ds1386_clock.h"
+#include "ds1386_wiring.h"
 
-#include <chrono>
+#include <algorithm>
 #include <cstdint>
-#include <cstring>
-#include <ctime>
-#include <mutex>
-
 
 namespace {
 
-constexpr uint32_t kBase = 0x1A000000u;   /* BSP_REG_PA_NVRAM */
-constexpr uint32_t kSize = 0x00010000u;   /* NVRAM decode window: base..BSP_REG_PA_SWITCH */
+constexpr uint32_t kBase = 0x1A000000u;
+constexpr uint32_t kSize = 0x00010000u;
 
-enum : uint32_t {
-    kSECLL = 0x00, kSECTL = 0x01, kMINTL = 0x02, kAL_MIN = 0x03,
-    kHOURS = 0x04, kAL_HR = 0x05, kDAYS  = 0x06, kAL_DAY = 0x07,
-    kDATE  = 0x08, kMONTH = 0x09, kYEARS = 0x0A, kCMD    = 0x0B,
-    kWD0   = 0x0C, kWD1   = 0x0D, kRAM_BASE = 0x0E,
-};
+constexpr uint32_t kRegCommand    = 0xBu;
+constexpr uint32_t kRegWatchdogLo = 0xCu;
+constexpr uint32_t kRegWatchdogHi = 0xDu;
+constexpr uint32_t kRamBase       = 0xEu;
 
-constexpr uint8_t kCmdTE  = 0x80;   /* transfer enable */
-constexpr uint8_t kCmdWAF = 0x02;   /* watchdog alarm flag (read-only) */
-constexpr uint8_t kCmdTDF = 0x01;   /* time-of-day alarm flag (read-only) */
-constexpr uint8_t kCmdRwMask = 0xFC; /* TE/IPSW/IBH/PU/WAM/TDM are R/W; WAF/TDF read-only */
+/* DS1386 datasheet p. 9: command register. */
+constexpr uint8_t kCmdTe    = 0x80u;
+constexpr uint8_t kCmdIpsw  = 0x40u;
+constexpr uint8_t kCmdPulse = 0x10u;
+constexpr uint8_t kCmdWam   = 0x08u;
+constexpr uint8_t kCmdTdm   = 0x04u;
+constexpr uint8_t kCmdWaf   = 0x02u;
+constexpr uint8_t kCmdTdf   = 0x01u;
+constexpr uint8_t kCmdFlags = kCmdWaf | kCmdTdf;
 
-constexpr uint8_t kMonthEOSC = 0x80;  /* oscillator stop (1 = stopped) */
-constexpr uint8_t kMonthFlags = 0xC0; /* EOSC | ESQW - stored apart from the BCD month */
-constexpr uint8_t kHours1224  = 0x40; /* HOURS bit6: 1 = 12-hour, 0 = 24-hour */
-constexpr uint8_t kHoursAMPM  = 0x20; /* HOURS bit5: 1 = PM (12-hour mode) */
+/* DS1386 datasheet p. 9: in pulse mode the output is active for a minimum of
+   3 ms, and the flag reads 1 only while it is active. */
+constexpr uint64_t kPulseOscTicks = 99u;
 
-uint8_t ToBcd(uint32_t v)   { return static_cast<uint8_t>(((v / 10u) << 4) | (v % 10u)); }
-uint32_t FromBcd(uint8_t b) { return static_cast<uint32_t>((b >> 4) * 10u + (b & 0x0Fu)); }
+/* DS1386 datasheet p. 6: Months bit 7 EOSC (0 runs the oscillator), bit 6 ESQW. */
+constexpr uint8_t kMonthEosc  = 0x80u;
+constexpr uint8_t kMonthFlags = 0xC0u;
+
+constexpr uint64_t kOscHz = 32768u;
+constexpr uint64_t kNever = ~0ull;
+
+using Clock = Ds1386Clock;
 
 class Ds1386Rtc : public Peripheral {
 public:
     using Peripheral::Peripheral;
 
     bool ShouldRegister() override {
-        auto* bd = emu_.TryGet<BoardContext>();
-        return bd && bd->GetBoardId() == BoardId::NecRockhopper;
+        return emu_.Get<BoardContext>().GetBoardId() == BoardId::NecRockhopper;
     }
+
     void OnReady() override {
-        std::lock_guard<std::mutex> lk(mtx_);
-        /* DS1386 ships with EOSC set (oscillator off); the clock is frozen at
-           the host time until the OAL enables it (TE=1, EOSC=0). */
-        month_flags_ = kMonthEOSC;
-        running_     = false;
-        frozen_sec_  = HostSec();
+        clock_  = &emu_.Get<GuestCycleClock>();
+        wiring_ = &emu_.Get<Ds1386Wiring>();
+        event_  = clock_->Add([this] { OnEvent(); });
+        osc_.Attach(kOscHz, 1u);
+        osc_.SetCounting(Running());
+        cal_.SeedFromHost(0u);
+        ext_ = cal_.Format();
+        clock_->RegisterRateListener([this] {
+            osc_.Rescale();
+            Arm();
+        });
+        emu_.Get<GuestDeepSleep>().RegisterParkClock([this] { OnEvent(); });
         emu_.Get<PeripheralDispatcher>().Register(this);
     }
 
     uint32_t MmioBase() const override { return kBase; }
     uint32_t MmioSize() const override { return kSize; }
 
-    uint8_t ReadByte (uint32_t addr) override;
+    uint8_t ReadByte(uint32_t addr) override;
     void    WriteByte(uint32_t addr, uint8_t value) override;
 
     void SaveState(StateWriter& w) override;
     void RestoreState(StateReader& r) override;
+    void PostRestore() override;
 
 private:
-    /* Host wall-clock helpers. */
-    static int64_t HostMs() {
-        return std::chrono::duration_cast<std::chrono::milliseconds>(
-                   std::chrono::system_clock::now().time_since_epoch()).count();
-    }
-    static int64_t HostSec() { return HostMs() / 1000; }
+    bool     Running() const { return (month_flags_ & kMonthEosc) == 0u; }
+    uint64_t OscCount() { return osc_.Now(); }
+    uint64_t Hundredth() { return Clock::HundredthOf(OscCount()); }
 
-    /* The live guest epoch seconds: host+offset while running, else the frozen
-       value (TE=0 / EOSC=1 stop the internal->external transfer). */
-    int64_t GuestSec() const { return running_ ? HostSec() + offset_sec_ : frozen_sec_; }
+    Clock::Regs TimeRegs() const { return (cmd_ & kCmdTe) != 0u ? cal_.Format() : ext_; }
 
-    void SetRunning(bool r) {
-        if (r == running_) return;
-        if (r) { offset_sec_ = frozen_sec_ - HostSec(); }   /* resume from frozen value */
-        else   { frozen_sec_ = GuestSec(); }                /* capture current time */
-        running_ = r;
+    uint64_t WatchdogPeriod() const {
+        return BcdCalendar::FromBcd(wd_[0]) + BcdCalendar::FromBcd(wd_[1]) * 100u;
     }
 
-    void SetGuestSec(int64_t g) {
-        if (running_) offset_sec_ = g - HostSec();
-        else          frozen_sec_ = g;
+    bool TodActive() const { return (cmd_ & kCmdTdf) != 0u && (cmd_ & kCmdTdm) == 0u; }
+    bool WdActive() const { return (cmd_ & kCmdWaf) != 0u && (cmd_ & kCmdWam) == 0u; }
+    bool WantA() const { return (cmd_ & kCmdIpsw) != 0u ? TodActive() : WdActive(); }
+    bool WantB() const { return (cmd_ & kCmdIpsw) != 0u ? WdActive() : TodActive(); }
+
+    void OnEvent() {
+        Evaluate();
+        Commit(true);
     }
 
-    /* Recompute the clock offset after a guest write replaces one broken-down
-       field (TE=1 write-through; converges across the OAL's field-by-field set). */
-    void WriteClockField(int field, uint32_t value);
+    void Evaluate();
+    void Latch(uint8_t flag, uint64_t at_hundredth, uint64_t& pulse_end);
+    void EndPulse(uint8_t flag, uint64_t& pulse_end, uint64_t now);
+    void ClearFlag(uint8_t flag, uint64_t& pulse_end);
+    void Commit(bool deliver);
+    void Arm();
+    void DriveA(bool level);
+    void DriveB(bool level);
+    void Freeze(const Clock::Regs& before, uint32_t written);
+    void WriteCount(uint32_t reg, uint8_t Clock::Time::* field, const BcdCalendar::Field& f, uint8_t value);
+    void WriteHours(uint8_t value);
+    void WriteMonth(uint8_t value);
+    void WriteCommand(uint8_t value);
+    void RestartWatchdog();
 
-    void RefreshRunState() { SetRunning((cmd_ & kCmdTE) != 0 && (month_flags_ & kMonthEOSC) == 0); }
+    GuestCycleClock*        clock_  = nullptr;
+    Ds1386Wiring*           wiring_ = nullptr;
+    GuestCycleClock::Event* event_  = nullptr;
+    /* DS1386 datasheet p. 3: the internal clock and timers continue to run
+       regardless of the level of VCC. */
+    StoppableOscillatorTicks osc_{emu_, true};
+    Clock                    cal_;
+    Clock::Regs              ext_{};
 
-    mutable std::mutex mtx_;
+    uint8_t  cmd_         = 0u;
+    uint8_t  month_flags_ = kMonthEosc;
+    uint8_t  wd_[2]       = {0u, 0u};
+    uint64_t wd_start_    = 0u;
+    uint64_t wd_eval_     = 0u;
+    uint64_t tdf_pulse_   = kNever;
+    uint64_t waf_pulse_   = kNever;
+    bool     inta_        = false;
+    bool     intb_        = false;
 
-    /* Clock source. */
-    bool    running_     = false;
-    int64_t offset_sec_  = 0;   /* guest = host + offset while running (a delta - hibernation-safe) */
-    int64_t frozen_sec_  = 0;   /* guest epoch seconds while stopped */
-
-    /* Control / mode / alarm registers (the chip state the host clock can't supply). */
-    uint8_t cmd_         = 0;            /* command register (WAF/TDF in bits 1:0) */
-    uint8_t month_flags_ = kMonthEOSC;   /* EOSC | ESQW (bits 7:6 of MONTH) */
-    uint8_t hours_mode_  = 0;            /* 12/24 (bit6) | AM-PM (bit5) of HOURS */
-    uint8_t al_min_ = 0, al_hour_ = 0, al_day_ = 0;   /* TOD alarm (raw, incl. mask bit7) */
-    uint8_t wd_[2]  = {0, 0};                          /* watchdog alarm BCD */
-
-    /* User NV-SRAM: registers 0x0E.. over the board's NVRAM decode window. */
-    uint8_t nvram_[kSize - kRAM_BASE] = {};
+    uint8_t nvram_[kSize - kRamBase] = {};
 };
 
-uint8_t Ds1386Rtc::ReadByte(uint32_t addr) {
-    const uint32_t off = addr - kBase;
-    std::lock_guard<std::mutex> lk(mtx_);
+void Ds1386Rtc::Evaluate() {
+    const uint64_t        h = Hundredth();
+    const Clock::Advanced a = cal_.Advance(h);
+    if (a.alarms != 0u) Latch(kCmdTdf, a.last_alarm, tdf_pulse_);
+    const uint64_t w = WatchdogPeriod();
+    if (h > wd_eval_) {
+        const uint64_t k = w != 0u ? (h - wd_start_) / w : 0u;
+        if (w != 0u && k != (wd_eval_ - wd_start_) / w) Latch(kCmdWaf, wd_start_ + k * w, waf_pulse_);
+        wd_eval_ = h;
+    }
+    const uint64_t p = OscCount();
+    EndPulse(kCmdTdf, tdf_pulse_, p);
+    EndPulse(kCmdWaf, waf_pulse_, p);
+}
 
-    if (off >= kRAM_BASE) return nvram_[off - kRAM_BASE];
+void Ds1386Rtc::Latch(uint8_t flag, uint64_t at_hundredth, uint64_t& pulse_end) {
+    pulse_end = (cmd_ & kCmdPulse) != 0u ? Clock::OscTickOf(at_hundredth) + kPulseOscTicks : kNever;
+    if ((cmd_ & flag) != 0u) return;
+    cmd_ |= flag;
+    if (flag != kCmdTdf) return;
+    const Clock::Regs r = cal_.Format();
+    LOG(SocRtc, "DS1386: time-of-day alarm flag set at %02X:%02X:%02X.%02X day %X, command 0x%02X\n",
+        r[Clock::kRegHours], r[Clock::kRegMinutes], r[Clock::kRegSeconds],
+        r[Clock::kRegHundredths], r[Clock::kRegDays], cmd_);
+}
 
-    const int64_t g = GuestSec();
-    const std::time_t tt = static_cast<std::time_t>(g);
-    std::tm lt{};
-    localtime_s(&lt, &tt);
+void Ds1386Rtc::EndPulse(uint8_t flag, uint64_t& pulse_end, uint64_t now) {
+    if (pulse_end != kNever && now >= pulse_end) ClearFlag(flag, pulse_end);
+}
 
-    switch (off) {
-        case kSECLL: {
-            const uint32_t cs = running_ ? static_cast<uint32_t>((HostMs() % 1000) / 10) : 0u;
-            return ToBcd(cs);
+void Ds1386Rtc::ClearFlag(uint8_t flag, uint64_t& pulse_end) {
+    cmd_ &= static_cast<uint8_t>(~flag);
+    pulse_end = kNever;
+}
+
+void Ds1386Rtc::Commit(bool deliver) {
+    if (deliver) {
+        DriveA(WantA());
+        DriveB(WantB());
+    } else {
+        if (!WantA()) DriveA(false);
+        if (!WantB()) DriveB(false);
+    }
+    Arm();
+}
+
+void Ds1386Rtc::Arm() {
+    if ((WantA() && !inta_) || (WantB() && !intb_)) {
+        clock_->Arm(event_, clock_->Cycles());
+        return;
+    }
+    uint64_t next = kNever;
+    if (Running()) {
+        if ((cmd_ & (kCmdTdm | kCmdTdf)) == 0u) {
+            const uint64_t check = cal_.NextAlarmCheck();
+            if (check != Clock::kNever) next = Clock::OscTickOf(check);
         }
-        case kSECTL: return ToBcd(static_cast<uint32_t>(lt.tm_sec));
-        case kMINTL: return ToBcd(static_cast<uint32_t>(lt.tm_min));
-        case kHOURS: {
-            uint32_t hour = static_cast<uint32_t>(lt.tm_hour);   /* 0..23 */
-            if (hours_mode_ & kHours1224) {                      /* 12-hour mode */
-                const bool pm = hour >= 12u;
-                uint32_t h12 = hour % 12u; if (h12 == 0u) h12 = 12u;
-                return static_cast<uint8_t>(ToBcd(h12) | kHours1224 | (pm ? kHoursAMPM : 0u));
-            }
-            return ToBcd(hour);                                  /* 24-hour: bit6 = 0 */
+        const uint64_t w = WatchdogPeriod();
+        if ((cmd_ & (kCmdWam | kCmdWaf)) == 0u && w != 0u) {
+            const uint64_t due = wd_start_ + ((Hundredth() - wd_start_) / w + 1u) * w;
+            next               = std::min(next, Clock::OscTickOf(due));
         }
-        case kDAYS:  return static_cast<uint8_t>(lt.tm_wday + 1);   /* 1..7, single BCD digit */
-        case kDATE:  return ToBcd(static_cast<uint32_t>(lt.tm_mday));
-        case kMONTH: return static_cast<uint8_t>(ToBcd(static_cast<uint32_t>(lt.tm_mon + 1)) | month_flags_);
-        case kYEARS: return ToBcd(static_cast<uint32_t>(lt.tm_year % 100));   /* 2000-based, tm_year is 1900-based */
+        if (TodActive()) next = std::min(next, tdf_pulse_);
+        if (WdActive()) next = std::min(next, waf_pulse_);
+    }
+    if (next == kNever) {
+        clock_->Disarm(event_);
+        return;
+    }
+    osc_.ArmAt(event_, next);
+}
 
-        case kAL_MIN: cmd_ &= ~kCmdTDF; return al_min_;    /* reading a TOD-alarm reg clears TDF (datasheet p.9) */
-        case kAL_HR:  cmd_ &= ~kCmdTDF; return al_hour_;
-        case kAL_DAY: cmd_ &= ~kCmdTDF; return al_day_;
+void Ds1386Rtc::DriveA(bool level) {
+    if (level == inta_) return;
+    inta_ = level;
+    wiring_->SetIntA(level);
+}
 
-        case kCMD:    return cmd_;
-        case kWD0:    cmd_ &= ~kCmdWAF; return wd_[0];      /* accessing a watchdog reg clears WAF + reinit */
-        case kWD1:    cmd_ &= ~kCmdWAF; return wd_[1];
-        default:      return 0;
+void Ds1386Rtc::DriveB(bool level) {
+    if (level == intb_) return;
+    intb_ = level;
+    wiring_->SetIntB(level);
+}
+
+/* DS1386 datasheet p. 9: with TE = 0 the external clock registers are frozen and
+   reads or writes are not affected by updates. */
+void Ds1386Rtc::Freeze(const Clock::Regs& before, uint32_t written) {
+    if ((cmd_ & kCmdTe) != 0u) return;
+    const Clock::Regs after = cal_.Format();
+    for (uint32_t i = 0; i < after.size(); ++i) {
+        if (i == written || after[i] != before[i]) ext_[i] = after[i];
     }
 }
 
-void Ds1386Rtc::WriteClockField(int field, uint32_t value) {
-    const int64_t g = GuestSec();
-    const std::time_t tt = static_cast<std::time_t>(g);
-    std::tm lt{};
-    localtime_s(&lt, &tt);
-    lt.tm_isdst = -1;
+void Ds1386Rtc::WriteCount(uint32_t reg, uint8_t Clock::Time::* field, const BcdCalendar::Field& f,
+                           uint8_t value) {
+    uint32_t v = 0;
+    if (!BcdCalendar::DecodeField(f, value, v)) return;
+    const Clock::Regs before = cal_.Format();
+    cal_.SetField(field, static_cast<uint8_t>(v));
+    Freeze(before, reg);
+}
 
-    switch (field) {
-        case kSECTL: lt.tm_sec  = static_cast<int>(FromBcd(static_cast<uint8_t>(value)));        break;
-        case kMINTL: lt.tm_min  = static_cast<int>(FromBcd(static_cast<uint8_t>(value)));        break;
-        case kHOURS: {
-            if (value & kHours1224) {   /* 12-hour mode write */
-                uint32_t h12 = FromBcd(static_cast<uint8_t>(value & 0x1Fu));
-                if (h12 == 12u) h12 = 0u;
-                lt.tm_hour = static_cast<int>(h12 + ((value & kHoursAMPM) ? 12u : 0u));
-            } else {                    /* 24-hour mode write (bits 5:0) */
-                lt.tm_hour = static_cast<int>(FromBcd(static_cast<uint8_t>(value & 0x3Fu)));
-            }
+/* DS1386 datasheet p. 6: Hours bit 6 selects 12-hour format, where bit 5 is PM;
+   in 24-hour format bit 5 is the second 10-hour bit. */
+void Ds1386Rtc::WriteHours(uint8_t value) {
+    const bool hours12 = (value & Clock::kHours12) != 0u;
+    uint32_t   hour    = 0;
+    if (!BcdCalendar::DecodeField(hours12 ? Clock::kHour12 : Clock::kHour24, value, hour)) return;
+    if (hours12) hour = (hour == 12u ? 0u : hour) + ((value & Clock::kHoursPm) != 0u ? 12u : 0u);
+    const Clock::Regs before = cal_.Format();
+    cal_.SetHours(static_cast<uint8_t>(hour), hours12);
+    Freeze(before, Clock::kRegHours);
+}
+
+void Ds1386Rtc::WriteMonth(uint8_t value) {
+    WriteCount(Clock::kRegMonths, &Clock::Time::month, Clock::kMonth, value);
+    osc_.SetCounting((value & kMonthEosc) == 0u);
+    month_flags_ = value & kMonthFlags;
+}
+
+void Ds1386Rtc::WriteCommand(uint8_t value) {
+    const uint8_t next = static_cast<uint8_t>((value & ~kCmdFlags) | (cmd_ & kCmdFlags));
+    if ((cmd_ & kCmdTe) != 0u && (next & kCmdTe) == 0u) ext_ = cal_.Format();
+    cmd_ = next;
+}
+
+/* DS1386 datasheet p. 7: any access to register C or D reinitializes the
+   countdown from the entered value and clears the flag and the output. */
+void Ds1386Rtc::RestartWatchdog() {
+    wd_start_ = Hundredth();
+    wd_eval_  = wd_start_;
+    ClearFlag(kCmdWaf, waf_pulse_);
+}
+
+uint8_t Ds1386Rtc::ReadByte(uint32_t addr) {
+    const uint32_t off = addr - kBase;
+    if (off >= kRamBase) return nvram_[off - kRamBase];
+    Evaluate();
+    uint8_t value = 0;
+    switch (off) {
+        case Clock::kRegHundredths:
+        case Clock::kRegSeconds:
+        case Clock::kRegMinutes:
+        case Clock::kRegHours:
+        case Clock::kRegDays:
+        case Clock::kRegDate:
+        case Clock::kRegYears:
+            return TimeRegs()[off];
+        case Clock::kRegMonths:
+            return static_cast<uint8_t>(TimeRegs()[off] | month_flags_);
+        case kRegCommand:
+            return cmd_;
+        /* DS1386 datasheet p. 6: the flag and interrupt are cleared when the
+           alarm registers are read or written. */
+        case Clock::kRegMinuteAlarm:
+        case Clock::kRegHourAlarm:
+        case Clock::kRegDayAlarm:
+            value = cal_.Format()[off];
+            ClearFlag(kCmdTdf, tdf_pulse_);
             break;
-        }
-        case kDATE:  lt.tm_mday = static_cast<int>(FromBcd(static_cast<uint8_t>(value)));        break;
-        case kMONTH: lt.tm_mon  = static_cast<int>(FromBcd(static_cast<uint8_t>(value & 0x1Fu))) - 1; break;
-        case kYEARS: lt.tm_year = 100 + static_cast<int>(FromBcd(static_cast<uint8_t>(value)));  break;
-        default: return;
+        case kRegWatchdogLo:
+        case kRegWatchdogHi:
+            value = wd_[off - kRegWatchdogLo];
+            RestartWatchdog();
+            break;
+        default:
+            HaltUnsupportedAccess("ReadByte", addr, 0);
     }
-    const std::time_t ng = std::mktime(&lt);
-    if (ng != static_cast<std::time_t>(-1)) SetGuestSec(static_cast<int64_t>(ng));
+    Commit(false);
+    return value;
 }
 
 void Ds1386Rtc::WriteByte(uint32_t addr, uint8_t value) {
     const uint32_t off = addr - kBase;
-    std::lock_guard<std::mutex> lk(mtx_);
-
-    if (off >= kRAM_BASE) { nvram_[off - kRAM_BASE] = value; return; }
-
-    switch (off) {
-        case kSECLL: break;   /* sub-second write: offset is whole-second; OAL never writes SECLL */
-        case kSECTL: case kMINTL: case kDATE: case kYEARS:
-            WriteClockField(static_cast<int>(off), value);
-            break;
-        case kHOURS:
-            hours_mode_ = value & (kHours1224 | kHoursAMPM);
-            WriteClockField(kHOURS, value);
-            break;
-        case kDAYS:  break;   /* day-of-week is derived from the date (set via DATE/MONTH/YEARS) */
-        case kMONTH:
-            month_flags_ = value & kMonthFlags;       /* EOSC | ESQW */
-            WriteClockField(kMONTH, value);
-            RefreshRunState();                        /* EOSC change starts/stops the clock */
-            break;
-
-        case kAL_MIN: al_min_  = value; break;
-        case kAL_HR:  al_hour_ = value; break;
-        case kAL_DAY: al_day_  = value; break;
-
-        case kCMD:
-            cmd_ = static_cast<uint8_t>((cmd_ & ~kCmdRwMask) | (value & kCmdRwMask));  /* WAF/TDF read-only */
-            RefreshRunState();                        /* TE change enables/freezes transfer */
-            break;
-
-        /* Watchdog alarm: storage + WAF clear on access (datasheet p.7). The
-           countdown's interrupt output connects when the VRC5477 INTC + CP0
-           exception delivery exist; the chip-side state is complete here. */
-        case kWD0: wd_[0] = value; cmd_ &= ~kCmdWAF; break;
-        case kWD1: wd_[1] = value; cmd_ &= ~kCmdWAF; break;
-        default: break;
+    if (off >= kRamBase) {
+        nvram_[off - kRamBase] = value;
+        return;
     }
+    Evaluate();
+    switch (off) {
+        case Clock::kRegHundredths: WriteCount(off, &Clock::Time::cs, Clock::kCs, value); break;
+        case Clock::kRegSeconds:    WriteCount(off, &Clock::Time::sec, Clock::kSec, value); break;
+        case Clock::kRegMinutes:    WriteCount(off, &Clock::Time::min, Clock::kMin, value); break;
+        case Clock::kRegHours:      WriteHours(value); break;
+        case Clock::kRegDays:       WriteCount(off, &Clock::Time::wday, Clock::kWday, value); break;
+        case Clock::kRegDate:       WriteCount(off, &Clock::Time::date, Clock::kDate, value); break;
+        case Clock::kRegMonths:     WriteMonth(value); break;
+        case Clock::kRegYears:      WriteCount(off, &Clock::Time::year, Clock::kYear, value); break;
+        case Clock::kRegMinuteAlarm:
+        case Clock::kRegHourAlarm:
+        case Clock::kRegDayAlarm:
+            cal_.SetAlarm((off - Clock::kRegMinuteAlarm) / 2u, value);
+            ClearFlag(kCmdTdf, tdf_pulse_);
+            break;
+        case kRegCommand: WriteCommand(value); break;
+        case kRegWatchdogLo:
+        case kRegWatchdogHi:
+            wd_[off - kRegWatchdogLo] = value;
+            RestartWatchdog();
+            break;
+        default: HaltUnsupportedAccess("WriteByte", addr, value);
+    }
+    Commit(false);
 }
 
 void Ds1386Rtc::SaveState(StateWriter& w) {
-    std::lock_guard<std::mutex> lk(mtx_);
-    /* offset_sec_/frozen_sec_ are deltas/relative epochs, not host time_points,
-       so they restore correctly against the new host clock (hibernation.md). */
-    w.Write("running", static_cast<uint8_t>(running_ ? 1u : 0u));
-    w.Write("offset_sec", offset_sec_); w.Write("frozen_sec", frozen_sec_);
-    w.Write("cmd", cmd_); w.Write("month_flags", month_flags_); w.Write("hours_mode", hours_mode_);
-    w.Write("al_min", al_min_); w.Write("al_hour", al_hour_); w.Write("al_day", al_day_);
-    w.Write("wd", wd_[0]); w.Write("wd", wd_[1]);
+    osc_.Save(w);
+    cal_.Save(w);
+    w.WriteBytes("ds_ext", ext_.data(), ext_.size());
+    w.Write("ds_cmd", cmd_);
+    w.Write("ds_month_flags", month_flags_);
+    w.WriteBytes("ds_watchdog", wd_, 2u);
+    w.Write<uint64_t>("ds_wd_start", wd_start_);
+    w.Write<uint64_t>("ds_wd_eval", wd_eval_);
+    w.Write<uint64_t>("ds_tdf_pulse", tdf_pulse_);
+    w.Write<uint64_t>("ds_waf_pulse", waf_pulse_);
+    w.Write("ds_inta", inta_);
+    w.Write("ds_intb", intb_);
     w.WriteBytes("nvram", nvram_, sizeof(nvram_));
 }
 
 void Ds1386Rtc::RestoreState(StateReader& r) {
-    std::lock_guard<std::mutex> lk(mtx_);
-    uint8_t run = 0; r.Read("running", run); running_ = run != 0;
-    r.Read("offset_sec", offset_sec_); r.Read("frozen_sec", frozen_sec_);
-    r.Read("cmd", cmd_); r.Read("month_flags", month_flags_); r.Read("hours_mode", hours_mode_);
-    r.Read("al_min", al_min_); r.Read("al_hour", al_hour_); r.Read("al_day", al_day_);
-    r.Read("wd", wd_[0]); r.Read("wd", wd_[1]);
+    osc_.Restore(r);
+    cal_.Restore(r);
+    r.ReadBytes("ds_ext", ext_.data(), ext_.size());
+    r.Read("ds_cmd", cmd_);
+    r.Read("ds_month_flags", month_flags_);
+    r.ReadBytes("ds_watchdog", wd_, 2u);
+    r.Read("ds_wd_start", wd_start_);
+    r.Read("ds_wd_eval", wd_eval_);
+    r.Read("ds_tdf_pulse", tdf_pulse_);
+    r.Read("ds_waf_pulse", waf_pulse_);
+    r.Read("ds_inta", inta_);
+    r.Read("ds_intb", intb_);
     r.ReadBytes("nvram", nvram_, sizeof(nvram_));
+    clock_->Disarm(event_);
 }
 
-}  /* namespace */
+void Ds1386Rtc::PostRestore() {
+    wiring_->SetIntA(inta_);
+    wiring_->SetIntB(intb_);
+    Arm();
+}
+
+}
 
 REGISTER_SERVICE(Ds1386Rtc);

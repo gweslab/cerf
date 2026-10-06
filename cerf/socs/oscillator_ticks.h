@@ -33,12 +33,14 @@ public:
 
     GuestCycleClock::Rate OscRate() const { return GuestCycleClock::Rate{osc_num_, osc_den_}; }
 
-    void Save(StateWriter& w);
-    void Restore(StateReader& r);
+    virtual void Save(StateWriter& w);
+    virtual void Restore(StateReader& r);
 
 protected:
     virtual uint64_t ClockCycles();
     virtual bool     ClockStopped() { return false; }
+
+    void DrainPark();
 
     CerfEmulator&    emu_;
     GuestCycleClock* clock_ = nullptr;
@@ -49,7 +51,6 @@ private:
     bool     SetRatio();
     void     RatioOverflow();
     void     RescaleAt(uint64_t now);
-    void     DrainPark();
     uint64_t CreditNs(uint64_t ns);
 
     const bool           credits_park_;
@@ -59,4 +60,23 @@ private:
     uint64_t             park_ticks_ = 0;
     uint64_t             credit_rem_ = 0;
     int64_t              slept_seen_ = 0;
+};
+
+class StoppableOscillatorTicks : public OscillatorTicks {
+public:
+    using OscillatorTicks::OscillatorTicks;
+
+    void SetCounting(bool counting);
+
+    void Save(StateWriter& w) override;
+    void Restore(StateReader& r) override;
+
+protected:
+    uint64_t ClockCycles() override;
+    bool     ClockStopped() override { return stopped_; }
+
+private:
+    bool     stopped_      = false;
+    uint64_t stopped_at_   = 0;
+    uint64_t stopped_span_ = 0;
 };

@@ -157,10 +157,8 @@ class LauncherApp(OperationsMixin, RefreshMixin, SpawnMixin, PropertiesMixin,
 
         self.preview = PreviewTile(right, self.manager.devices_dir,
                                    int(300 * pscale), int(188 * pscale),
-                                   int(24 * pscale), theme.BG,
-                                   box_always=True, on_click=self._launch)
-        self.preview.canvas.grid(row=0, column=0, columnspan=2, sticky="n",
-                                 pady=8)
+                                   int(24 * pscale), on_click=self._launch)
+        self.preview.canvas.grid(row=0, column=0, columnspan=2, sticky="ew")
 
         def on_width(width: int) -> None:
             for panel in (self.details, self.config_preview):
@@ -304,7 +302,7 @@ class LauncherApp(OperationsMixin, RefreshMixin, SpawnMixin, PropertiesMixin,
         self.toolbar.retheme()
         self.split.retheme()
         self.status_bar.retheme()
-        self.preview.retheme(theme.BG)
+        self.preview.retheme()
         self.tree_panel.retheme()
 
     def _open_new_wizard(self) -> None:

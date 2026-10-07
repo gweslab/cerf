@@ -18,12 +18,15 @@ BOX_BG = "#000000"
 
 class PreviewTile:
     def __init__(self, parent: tk.Misc, devices_dir: Path, width: int,
-                 height: int, glyph: int, bg: str, box_always: bool = False,
+                 height: int, glyph: int,
                  on_click: Optional[Callable[[], None]] = None):
-        self.canvas = tk.Canvas(parent, width=width, height=height, bg=bg,
-                                highlightthickness=0, bd=0, cursor="hand2")
+        self.canvas = tk.Canvas(parent, width=width, height=height,
+                                bg=BOX_BG, highlightthickness=0, bd=0,
+                                cursor="hand2")
         self._init_drawing(self.canvas, "preview", devices_dir, width, height,
-                           glyph, box_always)
+                           glyph)
+        self.canvas.bind("<Configure>", lambda e: self.move_to(
+            (e.width - self._w) // 2, (e.height - self._h) // 2))
         if on_click is not None:
             self.canvas.bind("<Button-1>", lambda _e: on_click())
 
@@ -32,19 +35,16 @@ class PreviewTile:
                   width: int, height: int, glyph: int) -> "PreviewTile":
         tile = cls.__new__(cls)
         tile.canvas = canvas
-        tile._init_drawing(canvas, tag, devices_dir, width, height, glyph,
-                           False)
+        tile._init_drawing(canvas, tag, devices_dir, width, height, glyph)
         return tile
 
     def _init_drawing(self, canvas: tk.Canvas, tag: str, devices_dir: Path,
-                      width: int, height: int, glyph: int,
-                      box_always: bool) -> None:
+                      width: int, height: int, glyph: int) -> None:
         self._tag = tag
         self._x = 0
         self._y = 0
         self._devices_dir = devices_dir
         self._w, self._h, self._glyph = width, height, glyph
-        self._box_always = box_always
         self._device: Optional[DeviceBundle] = None
         self._sig = ""
         self._img: Optional[tk.PhotoImage] = None
@@ -62,8 +62,7 @@ class PreviewTile:
         self._device = d
         self.refresh()
 
-    def retheme(self, bg: str) -> None:
-        self.canvas.config(bg=bg)
+    def retheme(self) -> None:
         self._sig = ""
         self.refresh()
 
@@ -83,7 +82,7 @@ class PreviewTile:
         cv.delete(self._tag)
         self._img = None
         x0, y0 = self._x, self._y
-        if state != "stopped" or self._box_always:
+        if state != "stopped":
             cv.create_rectangle(x0 - 1, y0 - 1, x0 + self._w + 1,
                                 y0 + self._h + 1, fill=BOX_BG, outline="",
                                 tags=self._tag)

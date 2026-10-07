@@ -5,6 +5,7 @@ from tkinter import ttk
 from typing import Callable, Optional, Sequence
 
 from branded_dialog import scaled
+import glyph_images
 from rich_text import RichText, Segment
 from rounded_style import rounded_frame
 import ui_theme as theme
@@ -106,12 +107,8 @@ class SettingsGroup:
     def note(self, text: str) -> None:
         frame = ttk.Frame(self.frame, padding=row_padding(self.frame))
         frame.columnconfigure(1, weight=1)
-        size = scaled(frame, INFO_ICON_DIP)
-        icon = tk.Canvas(frame, width=size, height=size, bd=0,
-                         highlightthickness=0, bg=theme.BG)
-        icon.create_oval(1, 1, size - 1, size - 1, outline=theme.FG_DIM)
-        icon.create_text(size / 2.0, size / 2.0, text="i",
-                         fill=theme.FG_DIM, font=("Segoe UI", 8, "bold"))
+        icon = ttk.Label(frame, image=glyph_images.info(
+            frame, scaled(frame, INFO_ICON_DIP), theme.FG_DIM))
         icon.grid(row=0, column=0, sticky="n",
                   padx=(0, scaled(frame, ROW_PAD_X_DIP)))
         wrapping_label(frame, text).grid(row=0, column=1, sticky="ew")

@@ -7,6 +7,7 @@ from typing import Callable, Dict, Optional
 
 from launch_button import LaunchSplitButton
 from toolbar_overflow import OverflowBar
+import ui_theme as theme
 
 
 FEEDBACK_TEXT = "Feedback"
@@ -46,6 +47,11 @@ class Toolbar:
                                          on_feedback, side="right")
         self.btn_about = self._button("About", "help", on_about, side="right")
         self._bar.finish()
+        self._rule = tk.Frame(parent, height=1, bd=0, bg=theme.SEPARATOR)
+
+    def pack(self) -> None:
+        self.frame.pack(fill="x", side="top")
+        self._rule.pack(fill="x", side="top")
 
     def _button(self, text: str, stem: str, command: Callable[[], None],
                 side: str = "left", state: str = "normal") -> ttk.Button:
@@ -70,6 +76,7 @@ class Toolbar:
 
     def retheme(self) -> None:
         self._bar.retheme()
+        self._rule.config(bg=theme.SEPARATOR)
 
     def set_busy(self, busy: bool) -> None:
         state = "disabled" if busy else "normal"

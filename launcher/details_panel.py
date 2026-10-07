@@ -14,6 +14,8 @@ from side_block import SideBlock
 from ui_dialogs import bind_tooltip
 import ui_theme as theme
 
+SOURCE_GAP = 8
+
 
 class DetailsPanel:
     def __init__(self, inner: ttk.Frame, icons_dir: Optional[Path],
@@ -31,6 +33,7 @@ class DetailsPanel:
 
         self.meta_block = SideBlock(inner, "Description", row=0)
         meta = self.meta_block.body
+        meta.columnconfigure(0, weight=0)
         meta.columnconfigure(1, weight=1)
 
         self.desc_label = ttk.Label(meta, text="", wraplength=220,
@@ -38,10 +41,9 @@ class DetailsPanel:
         self.desc_label.grid(row=0, column=0, columnspan=2, sticky="w")
 
         self.source_caption = ttk.Label(meta, text="Source:")
-        self.source_caption.grid(row=1, column=0, sticky="w", padx=(0, 8),
-                                 pady=(8, 0))
+        self.source_caption.grid(row=1, column=0, sticky="w", padx=(0, 8))
         self.source_value = ttk.Label(meta, wraplength=220, justify="left")
-        self.source_value.grid(row=1, column=1, sticky="w", pady=(8, 0))
+        self.source_value.grid(row=1, column=1, sticky="w")
         self._source_url: Optional[str] = None
         self.source_value.bind("<Button-1>", self._on_source_click)
 
@@ -49,8 +51,7 @@ class DetailsPanel:
         self.features_icons = ttk.Frame(self.features_block.body)
         self.features_icons.pack(anchor="w")
 
-        self.notes_block = SideBlock(inner, "⚠ Notes & quirks", row=2,
-                                     warn=True)
+        self.notes_block = SideBlock(inner, "⚠ Notes", row=2, warn=True)
         self.notes_label = ttk.Label(self.notes_block.body, text="",
                                      wraplength=260, justify="left")
         self.notes_label.grid(row=0, column=0, sticky="w")
@@ -62,6 +63,8 @@ class DetailsPanel:
 
         self._blocks = [self.meta_block, self.features_block,
                         self.notes_block, self.addons_block]
+        for block in self._blocks:
+            block.adopt_children()
         self.features_block.grid_remove()
         self.desc_label.grid_remove()
         self.notes_block.grid_remove()
@@ -79,6 +82,9 @@ class DetailsPanel:
         self._update_source(device)
         self._update_description(device)
         has_desc = bool(device.meta.description.strip())
+        source_gap = (SOURCE_GAP, 0) if has_desc else 0
+        self.source_caption.grid_configure(pady=source_gap)
+        self.source_value.grid_configure(pady=source_gap)
         has_source = (device.meta.source is not None
                       and bool(device.meta.source.name))
         if has_desc or has_source:
@@ -123,6 +129,7 @@ class DetailsPanel:
                 btn.grid(row=0, column=1, sticky="e", padx=(4, 0))
                 self._addon_buttons.append(btn)
             r += 1
+        self.addons_block.adopt_children()
         self._bind_wheel(self.addons_body)
         if not self._addons_enabled:
             for b in self._addon_buttons:
@@ -198,6 +205,7 @@ class DetailsPanel:
             tip = label if supported else f"{label} (unsupported)"
             bind_tooltip(lbl, tip)
             shown += 1
+        self.features_block.adopt_children()
         self._bind_wheel(self.features_icons)
         if shown:
             self.features_block.grid()

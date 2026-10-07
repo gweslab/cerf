@@ -31,8 +31,6 @@ def os_ce_version(d: DeviceBundle) -> str:
 
 
 def card_title(d: DeviceBundle, collide: bool) -> str:
-    if d.meta.name:
-        return d.meta.name
     title = os_title(d)
     if collide:
         ce = os_ce_version(d)
@@ -42,6 +40,8 @@ def card_title(d: DeviceBundle, collide: bool) -> str:
 
 
 def card_heading(d: DeviceBundle, collide: bool) -> str:
+    if d.meta.name:
+        return d.meta.name
     title = card_title(d, collide)
     notes = SEP.join(n.strip() for n in d.meta.os_notes if n and n.strip())
     return f"{title}{SEP}{notes}" if notes else title

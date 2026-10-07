@@ -6,13 +6,14 @@ import tkinter as tk
 from tkinter import ttk
 from typing import Callable, Optional
 
+from sv_elements import PAGE_SCROLLBAR_STYLE, THIN_SCROLLBAR_STYLE
 import ui_theme as theme
 
 
-def fit_scrollregion(canvas: tk.Canvas) -> None:
+def fit_scrollregion(canvas: tk.Canvas, pad_bottom: int = 0) -> None:
     box = canvas.bbox("all")
     width = box[2] if box else 0
-    height = max(box[3] if box else 0, canvas.winfo_height())
+    height = max(box[3] + pad_bottom if box else 0, canvas.winfo_height())
     canvas.configure(scrollregion=(0, 0, width, height))
 
 
@@ -23,16 +24,18 @@ class ScrollColumn:
 
     def __init__(self, parent: tk.Misc, width: int,
                  on_width_changed: Optional[Callable[[int], None]] = None,
-                 page: bool = False):
+                 page: bool = False, pad_bottom: int = 0):
         self._page = page
         self._canvas = tk.Canvas(parent, bg=self._background(),
                                  highlightthickness=0, width=width)
-        self.scrollbar = ttk.Scrollbar(parent, orient="vertical",
-                                       command=self._canvas.yview)
+        self.scrollbar = ttk.Scrollbar(
+            parent, orient="vertical", command=self._canvas.yview,
+            style=PAGE_SCROLLBAR_STYLE if page else THIN_SCROLLBAR_STYLE)
         self._canvas.configure(yscrollcommand=self.scrollbar.set)
 
         self.inner = ttk.Frame(self._canvas,
-                               style="Page.TFrame" if page else "TFrame")
+                               style="Page.TFrame" if page else "TFrame",
+                               padding=(0, 0, 0, pad_bottom))
         self._inner_id = self._canvas.create_window((0, 0), window=self.inner,
                                                     anchor="nw")
         self.inner.columnconfigure(0, weight=1)

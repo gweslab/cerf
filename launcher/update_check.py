@@ -17,7 +17,6 @@ from upgrade_process import (INSTALL_FLAG, UPGRADE_DIR_NAME, UpgradeError,
                              launcher_exe_in, spawn_stage, stage_argument,
                              wait_for_cerf_exit)
 from upgrade_window import UpgradeWindow
-import ui_theme as theme
 
 
 class UpdateCheck:
@@ -30,8 +29,7 @@ class UpdateCheck:
         if read_update_channel() == CHANNEL_DISABLED:
             self._no_update()
             return
-        self.app.status_bar.set_update_status("Checking updates…", theme.FG_DIM,
-                                              link=False)
+        self.app.status_bar.set_update_status("Checking updates…")
         future = self.app.manager.submit_release_check()
 
         def done(exc: Optional[BaseException]) -> None:
@@ -53,11 +51,10 @@ class UpdateCheck:
 
     def _announce(self, version: str) -> None:
         self.app.status_bar.set_update_status(
-            f"CERF {version} is available", theme.UPDATE_LINK, link=True,
-            on_click=self.open_offer)
+            f"CERF {version} is available", on_click=self.open_offer)
 
     def _no_update(self) -> None:
-        self.app.status_bar.set_update_status("", theme.FG_DIM, link=False)
+        self.app.status_bar.set_update_status("")
 
     def _apply_release(self, release: AvailableUpdate) -> None:
         if not self._is_newer(release.tag):

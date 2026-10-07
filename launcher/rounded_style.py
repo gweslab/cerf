@@ -4,9 +4,11 @@ import tkinter as tk
 from tkinter import ttk
 from typing import Dict, List, Tuple
 
+from antialias import coverage, rounded_box
+
 RADIUS = 5
-SUPERSAMPLE = 4
 CONTENT_PADDING = 3
+CARD_MARGIN_X = 10
 STRETCH_CENTER = 64
 CORNER = RADIUS + 1
 
@@ -15,25 +17,6 @@ Rgb = Tuple[float, float, float]
 
 def _rgb(color: str) -> Rgb:
     return (int(color[1:3], 16), int(color[3:5], 16), int(color[5:7], 16))
-
-
-def _inside(px: float, py: float, x0: float, y0: float, x1: float, y1: float,
-            radius: float) -> bool:
-    dx = max(x0 + radius - px, 0.0, px - (x1 - radius))
-    dy = max(y0 + radius - py, 0.0, py - (y1 - radius))
-    return dx * dx + dy * dy <= radius * radius
-
-
-def _coverage(x: int, y: int, size: int, inset: float, radius: float) -> float:
-    hits = 0
-    for sy in range(SUPERSAMPLE):
-        for sx in range(SUPERSAMPLE):
-            px = x + (sx + 0.5) / SUPERSAMPLE
-            py = y + (sy + 0.5) / SUPERSAMPLE
-            if _inside(px, py, inset, inset, size - inset, size - inset,
-                       radius):
-                hits += 1
-    return hits / float(SUPERSAMPLE * SUPERSAMPLE)
 
 
 def _mix(parts: List[Tuple[Rgb, float]]) -> str:
@@ -47,12 +30,14 @@ def _mix(parts: List[Tuple[Rgb, float]]) -> str:
 def _corner_tile(fill: str, border: str, outer: str) -> List[List[str]]:
     size = 2 * (RADIUS + 1) + 1
     fill_c, border_c, outer_c = _rgb(fill), _rgb(border), _rgb(outer)
+    shape_sdf = rounded_box(0.0, 0.0, size, size, RADIUS)
+    body_sdf = rounded_box(1.0, 1.0, size - 1.0, size - 1.0, RADIUS - 1)
     tile = []
     for y in range(size):
         row = []
         for x in range(size):
-            shape = _coverage(x, y, size, 0.0, RADIUS)
-            body = _coverage(x, y, size, 1.0, RADIUS - 1)
+            shape = coverage(shape_sdf, x, y)
+            body = coverage(body_sdf, x, y)
             row.append(_mix([(outer_c, 1.0 - shape),
                              (border_c, shape - body),
                              (fill_c, body)]))

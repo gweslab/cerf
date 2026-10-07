@@ -28,6 +28,7 @@ from launcher_refresh import RefreshMixin
 from saved_state_warning import SavedStateEditWarning
 from new_device_wizard import NewDeviceWizard
 from settings_dialog import SettingsDialog
+from side_block import block_gap, content_inset
 from user_device_create import UserDeviceSpec
 from operations import BundleManager
 from screen_geometry import fit_geometry
@@ -65,8 +66,8 @@ class LauncherApp(OperationsMixin, RefreshMixin, SpawnMixin, PropertiesMixin,
         except tk.TclError:
             dpi = 96.0
 
-        scale = max(1.0, dpi / 96.0)
-        self.minsize(int(500 * scale), int(300 * scale))
+        self._scale = max(1.0, dpi / 96.0)
+        self.minsize(int(500 * self._scale), int(300 * self._scale))
 
         icon = resolve_icon()
         if icon is not None:
@@ -86,7 +87,7 @@ class LauncherApp(OperationsMixin, RefreshMixin, SpawnMixin, PropertiesMixin,
         self._saved_state_warning = SavedStateEditWarning(self)
 
         self._build_ui()
-        fit_geometry(self, int(1100 * scale), int(640 * scale))
+        fit_geometry(self, int(1100 * self._scale), int(640 * self._scale))
         self.manager.load_local()
         self._reload_device_list()
         self.update_idletasks()
@@ -108,9 +109,9 @@ class LauncherApp(OperationsMixin, RefreshMixin, SpawnMixin, PropertiesMixin,
 
     def _build_ui(self) -> None:
         self.status_bar = StatusBar(
-            self, on_search=lambda: self.tree_panel.toggle_search())
+            self, on_search=lambda text: self.tree_panel.set_query(text))
         for seq in ("<Control-f>", "<Control-F>"):
-            self.bind(seq, lambda _e: self.tree_panel.toggle_search())
+            self.bind(seq, lambda _e: self.status_bar.focus_search())
 
         self.toolbar = Toolbar(self, resolve_icons_dir(),
                                self.manager.devices_dir,
@@ -122,24 +123,20 @@ class LauncherApp(OperationsMixin, RefreshMixin, SpawnMixin, PropertiesMixin,
                                on_settings=self._open_settings,
                                on_about=self._open_about,
                                on_feedback=self._open_feedback)
-        self.toolbar.frame.pack(fill="x", side="top")
+        self.toolbar.pack()
         self.split = self.toolbar.start
 
         outer = ttk.Frame(self)
         outer.pack(fill="both", expand=True)
+        pscale = self._scale
 
-        try:
-            pscale = max(1.0, float(self.winfo_fpixels("1i")) / 96.0)
-        except tk.TclError:
-            pscale = 1.0
-
-        paned = tk.PanedWindow(outer, orient="horizontal", bg=theme.BORDER, bd=0,
-                               sashwidth=1, sashpad=0, sashrelief="flat",
+        paned = tk.PanedWindow(outer, orient="horizontal", bg=theme.SEPARATOR,
+                               bd=0, sashwidth=1, sashpad=0, sashrelief="flat",
                                showhandle=False, opaqueresize=True)
         paned.pack(fill="both", expand=True)
         self.paned = paned
 
-        left_pane = ttk.Frame(paned, padding=(8, 8, 0, 0))
+        left_pane = ttk.Frame(paned, style="Page.TFrame")
         left_pane.rowconfigure(0, weight=1)
         left_pane.columnconfigure(0, weight=1)
         self.tree_panel = DeviceCardList(
@@ -155,21 +152,22 @@ class LauncherApp(OperationsMixin, RefreshMixin, SpawnMixin, PropertiesMixin,
         right.rowconfigure(1, weight=1)
 
         paned.add(left_pane, minsize=int(420 * pscale), stretch="always")
-        paned.add(right, minsize=int(300 * pscale), width=int(384 * pscale),
+        paned.add(right, minsize=int(340 * pscale), width=int(440 * pscale),
                   stretch="never")
 
         self.preview = PreviewTile(right, self.manager.devices_dir,
                                    int(300 * pscale), int(188 * pscale),
-                                   int(24 * pscale), theme.BG, box_always=True,
-                                   on_click=self._launch)
+                                   int(24 * pscale), theme.BG,
+                                   box_always=True, on_click=self._launch)
         self.preview.canvas.grid(row=0, column=0, columnspan=2, sticky="n",
                                  pady=8)
 
         def on_width(width: int) -> None:
-            self.details.set_wraplength(max(120, width - 24))
-            self.config_preview.set_wraplength(max(120, width - 24))
-        self.scroll = ScrollColumn(right, width=int(340 * pscale),
-                                   on_width_changed=on_width)
+            for panel in (self.details, self.config_preview):
+                panel.set_wraplength(max(120, width - content_inset(right)))
+        self.scroll = ScrollColumn(right, width=int(400 * pscale),
+                                   on_width_changed=on_width,
+                                   pad_bottom=block_gap(right))
         self.scroll.grid(row=1, column=0, sticky="nsew")
 
         inner = self.scroll.inner
@@ -299,7 +297,7 @@ class LauncherApp(OperationsMixin, RefreshMixin, SpawnMixin, PropertiesMixin,
     def _retheme(self) -> None:
         theme.apply_theme(self)
         theme.apply_titlebar(self)
-        self.paned.config(bg=theme.BORDER)
+        self.paned.config(bg=theme.SEPARATOR)
         self.scroll.retheme()
         self.details.retheme()
         self.config_preview.retheme()

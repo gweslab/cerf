@@ -4,34 +4,34 @@ import tkinter as tk
 from tkinter import ttk
 from typing import Callable, Optional
 
+from search_box import SearchBox
 import ui_theme as theme
+
+SEARCH_HINT = "Search"
+SEARCH_WIDTH = 28
 
 
 class StatusBar:
-    def __init__(self, root: tk.Misc, on_search: Callable[[], None]):
-        bar = ttk.Frame(root, padding=(8, 4))
+    def __init__(self, root: tk.Misc, on_search: Callable[[str], None]):
+        bar = ttk.Frame(root, padding=(8, 6))
         bar.pack(fill="x", side="bottom")
+        self._rule = tk.Frame(root, height=1, bd=0, bg=theme.SEPARATOR)
+        self._rule.pack(fill="x", side="bottom")
         bar.columnconfigure(3, weight=1)
 
-        self.search_link = ttk.Label(bar, text="Search", foreground=theme.LINK_FG,
-                                     cursor="hand2")
-        self.search_link.grid(row=0, column=0, sticky="w", padx=(0, 12))
-        self.search_link.bind("<Button-1>", lambda _e: on_search())
+        self.search = SearchBox(bar, SEARCH_HINT, on_search, SEARCH_WIDTH)
+        self.search.entry.grid(row=0, column=0, sticky="w", padx=(0, 8))
 
-        self.update_var = tk.StringVar(value="")
-        self._update_click: Optional[Callable[[], None]] = None
-        self._update_is_link = False
-        self.update_link = ttk.Label(bar, textvariable=self.update_var, anchor="w")
-        self.update_link.grid(row=0, column=1, sticky="w")
-        self.update_link.bind("<Button-1>", self._on_update_link_click)
+        self.update_label = ttk.Label(bar, text="", style="Hint.TLabel")
+        self.update_label.grid(row=0, column=1, sticky="w")
+        self.update_button = ttk.Button(bar, takefocus=False)
+        self.update_button.grid(row=0, column=1, sticky="w")
+        self.update_button.grid_remove()
 
-        self._bundle_click: Optional[Callable[[], None]] = None
         self._bundle_count = 0
-        self.bundle_link = ttk.Label(bar, text="", anchor="w", cursor="hand2",
-                                     foreground=theme.UPDATE_LINK)
-        self.bundle_link.grid(row=0, column=2, sticky="w", padx=(12, 0))
-        self.bundle_link.grid_remove()
-        self.bundle_link.bind("<Button-1>", self._on_bundle_link_click)
+        self.bundle_button = ttk.Button(bar, takefocus=False)
+        self.bundle_button.grid(row=0, column=2, sticky="w", padx=(8, 0))
+        self.bundle_button.grid_remove()
 
         self.status_var = tk.StringVar(value="")
         self.status_label = ttk.Label(bar, textvariable=self.status_var,
@@ -51,40 +51,36 @@ class StatusBar:
         self.status_label.grid_remove()
         self.reset_progress()
 
-    def set_update_status(self, text: str, color: str, link: bool,
-                          on_click: Optional[Callable[[], None]] = None) -> None:
-        self._update_click = on_click
-        self._update_is_link = link
-        self.update_var.set(text)
-        self.update_link.config(foreground=color, cursor=("hand2" if link else ""))
+    def set_update_status(self, text: str,
+                          on_click: Optional[Callable[[], None]] = None
+                          ) -> None:
+        if on_click is None:
+            self.update_label.config(text=text)
+            self.update_button.grid_remove()
+            self.update_label.grid()
+            return
+        self.update_button.config(text=text, command=on_click)
+        self.update_label.grid_remove()
+        self.update_button.grid()
 
     def set_bundle_updates(self, count: int,
                            on_click: Callable[[], None]) -> None:
-        self._bundle_click = on_click
+        self.bundle_button.config(command=on_click)
         if count == self._bundle_count:
             return
         self._bundle_count = count
         if count <= 0:
-            self.bundle_link.grid_remove()
+            self.bundle_button.grid_remove()
             return
-        self.bundle_link.config(text="Update {} ROM{}".format(
+        self.bundle_button.config(text="Update {} ROM{}".format(
             count, "" if count == 1 else "s"))
-        self.bundle_link.grid()
+        self.bundle_button.grid()
+
+    def focus_search(self) -> None:
+        self.search.focus()
 
     def retheme(self) -> None:
-        self.update_link.config(
-            foreground=theme.UPDATE_LINK if self._update_is_link
-            else theme.FG_DIM)
-        self.bundle_link.config(foreground=theme.UPDATE_LINK)
-        self.search_link.config(foreground=theme.LINK_FG)
-
-    def _on_update_link_click(self, _event: object) -> None:
-        if self._update_click is not None:
-            self._update_click()
-
-    def _on_bundle_link_click(self, _event: object) -> None:
-        if self._bundle_click is not None:
-            self._bundle_click()
+        self._rule.config(bg=theme.SEPARATOR)
 
     def show_progress(self, done: int, total: Optional[int]) -> None:
         self.progress.grid()

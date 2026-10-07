@@ -8,9 +8,11 @@ from typing import Callable, Optional
 from device_state import (DeviceBundle, LIVE_STATE_SCREENSHOT_FILENAME,
                           SAVED_STATE_SCREENSHOT_FILENAME, running_status,
                           saved_state_info)
+import glyph_images
 import ui_theme as theme
 
 PLAY_RUNNING = "#3fb950"
+PAUSE_OUTLINE = "#101010"
 BOX_BG = "#000000"
 
 
@@ -91,13 +93,15 @@ class PreviewTile:
                 self._img = img
                 cv.create_image(x0 + self._w // 2, y0 + self._h // 2,
                                 image=img, anchor="center", tags=self._tag)
-        cx, cy, s = x0 + self._w / 2, y0 + self._h / 2, self._glyph
+        s = self._glyph
         if state == "running":
-            self._play(cv, cx, cy, s, PLAY_RUNNING)
+            glyph = glyph_images.play(cv, s, PLAY_RUNNING)
         elif state == "paused":
-            self._pause(cv, cx, cy, s, theme.UPDATE_LINK, "#101010")
+            glyph = glyph_images.pause(cv, s, theme.UPDATE_LINK, PAUSE_OUTLINE)
         else:
-            self._play(cv, cx, cy, s, theme.PREVIEW_STOPPED)
+            glyph = glyph_images.play(cv, s, theme.PREVIEW_STOPPED)
+        cv.create_image(x0 + self._w // 2, y0 + self._h // 2, image=glyph,
+                        anchor="center", tags=self._tag)
 
     def _state(self, d: DeviceBundle) -> str:
         dirpath = self._devices_dir / d.name
@@ -146,17 +150,3 @@ class PreviewTile:
         if b > 1:
             out = out.subsample(b, b)
         return out
-
-    def _play(self, cv: tk.Canvas, cx: float, cy: float, s: float,
-              fill: str, outline: str = "") -> None:
-        cv.create_polygon(cx - s * 0.6, cy - s, cx - s * 0.6, cy + s,
-                          cx + s, cy, fill=fill, outline=outline, width=1,
-                          tags=self._tag)
-
-    def _pause(self, cv: tk.Canvas, cx: float, cy: float, s: float,
-               fill: str, outline: str = "") -> None:
-        bw, gap, bh = s * 0.42, s * 0.32, s * 1.7
-        cv.create_rectangle(cx - gap - bw, cy - bh / 2, cx - gap, cy + bh / 2,
-                            fill=fill, outline=outline, tags=self._tag)
-        cv.create_rectangle(cx + gap, cy - bh / 2, cx + gap + bw, cy + bh / 2,
-                            fill=fill, outline=outline, tags=self._tag)

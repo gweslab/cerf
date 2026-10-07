@@ -6,12 +6,11 @@ from typing import Optional, Tuple
 
 from device_state import DeviceBundle
 from preview_tile import PreviewTile
-from rounded_style import CONTENT_PADDING, rounded_corners
+from rounded_style import CARD_MARGIN_X, CONTENT_PADDING, rounded_corners
 import ui_theme as theme
 
 HEADING_FONT = ("Segoe UI", 11, "bold")
 DETAIL_FONT = ("Segoe UI", 9)
-CARD_MARGIN_X = 2
 TILE_PAD_X = 4
 TILE_PAD_Y = 3
 TEXT_PAD_X = 6
@@ -33,10 +32,14 @@ class DeviceCard:
         self._tile_w, self._tile_h = tile_size
         self._line_h = line_height
         self._tile_box = (0, 0, 0, 0)
-        self._painted: Optional[Tuple[str, str]] = None
+        self._painted: Optional[str] = None
         self._badge_image: Optional[tk.PhotoImage] = None
         c, tags = canvas, (tag,)
-        self._bg = c.create_rectangle(0, 0, 0, 0, width=1, tags=tags)
+        self._bg = c.create_rectangle(0, 0, 0, 0, width=0, tags=tags)
+        self._left, self._right, self._top, self._bottom = (
+            c.create_rectangle(0, 0, 0, 0, width=0, fill=theme.CARD_BORDER,
+                               tags=tags)
+            for _ in range(4))
         self._corners = [c.create_image(0, 0, anchor=a, tags=tags)
                          for a in CORNER_ANCHORS]
         self._heading = c.create_text(0, 0, anchor="nw", font=HEADING_FONT,
@@ -81,7 +84,8 @@ class DeviceCard:
             return x
         return self.canvas.bbox(item)[2]
 
-    def layout(self, y: int, width: int, wrap: int) -> int:
+    def layout(self, y: int, width: int, wrap: int, first: bool,
+               last: bool) -> int:
         c = self.canvas
         x0 = CARD_MARGIN_X
         x1 = width - CARD_MARGIN_X - 1
@@ -108,22 +112,31 @@ class DeviceCard:
 
         y1 = max(line_y + 2 * self._line_h + TEXT_PAD_Y + CONTENT_PADDING,
                  ty + self._tile_h + TILE_PAD_Y + CONTENT_PADDING)
-        c.coords(self._bg, x0, y, x1, y1)
-        for item, (cx, cy) in zip(self._corners, ((x0, y), (x1 + 1, y),
-                                                  (x0, y1 + 1),
-                                                  (x1 + 1, y1 + 1))):
+        c.coords(self._bg, x0, y, x1 + 1, y1 + 1)
+        c.coords(self._left, x0, y, x0 + 1, y1 + 1)
+        c.coords(self._right, x1, y, x1 + 1, y1 + 1)
+        c.coords(self._top, x0, y, x1 + 1, y + 1)
+        c.itemconfigure(self._top, state="normal" if first else "hidden")
+        inset = 0 if last else CONTENT_PADDING
+        c.coords(self._bottom, x0 + inset, y1, x1 + 1 - inset, y1 + 1)
+        for item, (cx, cy), shown in zip(
+                self._corners,
+                ((x0, y), (x1 + 1, y), (x0, y1 + 1), (x1 + 1, y1 + 1)),
+                (first, first, last, last)):
             c.coords(item, cx, cy)
+            c.itemconfigure(item, state="normal" if shown else "hidden")
         self.top, self.bottom = y, y1
         return y1 + 1
 
-    def paint(self, fill: str, border: str) -> None:
-        if self._painted == (fill, border):
+    def paint(self, fill: str) -> None:
+        if self._painted == fill:
             return
-        self._painted = (fill, border)
+        self._painted = fill
         c = self.canvas
-        c.itemconfigure(self._bg, fill=fill, outline=border)
+        c.itemconfigure(self._bg, fill=fill)
         for item, image in zip(self._corners,
-                               rounded_corners(c, fill, border, theme.BG)):
+                               rounded_corners(c, fill, theme.CARD_BORDER,
+                                               theme.PAGE_BG)):
             c.itemconfigure(item, image=image)
 
     def hit(self, x: float, y: float) -> Optional[str]:

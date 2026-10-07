@@ -7,30 +7,25 @@ from pathlib import Path
 from tkinter import ttk
 from typing import Callable, Dict, List, Optional, Tuple, Union
 
+from board_database import sort_text
 from board_info import board_soc_cpu
-from device_card import CARD_MARGIN_X, DETAIL_FONT, DeviceCard
+from device_card import DETAIL_FONT, DeviceCard
 from device_card_text import card_detail_parts, card_heading, os_title
 from device_model import (TreeSelection, _board_group_key, _device_sort_key,
                           _device_search_haystack, _table_device_label)
 from device_state import DeviceBundle, format_size, running_status, \
     saved_state_info
+from rounded_style import CARD_MARGIN_X
+from sv_elements import PAGE_SCROLLBAR_STYLE
 from ui_scroll import fit_scrollregion
 import ui_theme as theme
 
 HOVER_BLEND = 0.5
 HEADER_FONT = ("Segoe UI", 13, "bold")
-HEADER_PAD_TOP = 9
-HEADER_PAD_BOTTOM = 3
-CARD_GAP = 2
+HEADER_PAD_TOP = 11
+HEADER_PAD_BOTTOM = 5
 MIN_WRAP = 160
-WRAP_RESERVE = 40
-
-
-def _lighten(color: str, delta: int) -> str:
-    r = min(255, int(color[1:3], 16) + delta)
-    g = min(255, int(color[3:5], 16) + delta)
-    b = min(255, int(color[5:7], 16) + delta)
-    return f"#{r:02x}{g:02x}{b:02x}"
+WRAP_RESERVE = 36
 
 
 class _Header:
@@ -72,6 +67,7 @@ class DeviceCardList:
         self._hovered: Optional[str] = None
         self._width = 0
         self._tag_serial = 0
+        self._query = ""
 
         try:
             dpi = float(parent.winfo_fpixels("1i"))
@@ -83,29 +79,17 @@ class DeviceCardList:
         self._line_h = tkfont.Font(parent, font=DETAIL_FONT).metrics(
             "linespace")
 
-        frame = ttk.Frame(parent)
+        frame = ttk.Frame(parent, style="Page.TFrame")
         frame.grid(row=0, column=0, sticky="nsew")
-        frame.rowconfigure(1, weight=1)
+        frame.rowconfigure(0, weight=1)
         frame.columnconfigure(0, weight=1)
         self.frame = frame
 
-        filter_bar = ttk.Frame(frame)
-        filter_bar.grid(row=0, column=0, columnspan=2, sticky="ew", pady=(0, 4))
-        self.var_search = tk.StringVar(value="")
-        self._search_entry = ttk.Entry(filter_bar, textvariable=self.var_search,
-                                       width=22)
-        self._search_entry.pack(side="right")
-        ttk.Label(filter_bar, text="Search:").pack(side="right", padx=(0, 4))
-        self.var_search.trace_add("write", lambda *_: self._refill())
-        self._search_entry.bind("<Escape>", lambda _e: self.toggle_search())
-        self._filter_bar = filter_bar
-        self._search_shown = False
-        filter_bar.grid_remove()
-
-        canvas = tk.Canvas(frame, bg=theme.BG, highlightthickness=0)
-        canvas.grid(row=1, column=0, sticky="nsew")
-        vsb = ttk.Scrollbar(frame, orient="vertical", command=canvas.yview)
-        vsb.grid(row=1, column=1, sticky="ns")
+        canvas = tk.Canvas(frame, bg=theme.PAGE_BG, highlightthickness=0)
+        canvas.grid(row=0, column=0, sticky="nsew")
+        vsb = ttk.Scrollbar(frame, orient="vertical", command=canvas.yview,
+                            style=PAGE_SCROLLBAR_STYLE)
+        vsb.grid(row=0, column=1, sticky="ns")
         canvas.configure(yscrollcommand=vsb.set)
         self._canvas = canvas
         canvas.bind("<Configure>", self._on_canvas_config)
@@ -119,15 +103,9 @@ class DeviceCardList:
     def set_busy(self, busy: bool) -> None:
         pass
 
-    def toggle_search(self) -> None:
-        self._search_shown = not self._search_shown
-        if self._search_shown:
-            self._filter_bar.grid()
-            self._search_entry.focus_set()
-            return
-        self._filter_bar.grid_remove()
-        self.var_search.set("")
-        self._canvas.focus_set()
+    def set_query(self, text: str) -> None:
+        self._query = text.strip().lower()
+        self._refill()
 
     def selection(self) -> TreeSelection:
         if self._selected and self._selected in self._cards:
@@ -137,7 +115,9 @@ class DeviceCardList:
 
     def reload(self, devices: List[DeviceBundle]) -> None:
         self.devices = sorted(
-            devices, key=lambda d: (_board_group_key(d), _device_sort_key(d)))
+            devices, key=lambda d: (_board_group_key(d),
+                                    sort_text(_table_device_label(d)),
+                                    _device_sort_key(d)))
         self._refill()
 
     def select_device(self, name: str) -> None:
@@ -151,7 +131,7 @@ class DeviceCardList:
         self._repaint_all()
 
     def retheme(self) -> None:
-        self._canvas.config(bg=theme.BG)
+        self._canvas.config(bg=theme.PAGE_BG)
         selected = self._selected
         for key in list(self._rows):
             self._rows.pop(key).delete()
@@ -162,7 +142,7 @@ class DeviceCardList:
             self._set_selected(selected, notify=False)
 
     def _refill(self) -> None:
-        query = self.var_search.get().strip().lower()
+        query = self._query
         filtered = [d for d in self.devices if d.is_installed
                     and (not query or query in _device_search_haystack(d))]
         title_counts: Dict[Tuple[str, str], int] = {}
@@ -172,10 +152,13 @@ class DeviceCardList:
 
         desired: List[Tuple[str, object, bool]] = []
         last_group: Optional[str] = None
+        header_counts: Dict[str, int] = {}
         for d in filtered:
             group = _table_device_label(d)
             if group != last_group:
-                desired.append((f"hdr:{group}", group, False))
+                n = header_counts.get(group, 0)
+                header_counts[group] = n + 1
+                desired.append((f"hdr:{n}:{group}", group, False))
                 last_group = group
             collide = title_counts[(group, os_title(d))] > 1
             desired.append((f"card:{d.name}", d, collide))
@@ -233,15 +216,21 @@ class DeviceCardList:
         width = self._width or self._canvas.winfo_width()
         if width <= 1:
             return
-        wrap = max(MIN_WRAP, width - self._tile_size[0] - WRAP_RESERVE)
+        wrap = max(MIN_WRAP, width - 2 * CARD_MARGIN_X - self._tile_size[0]
+                   - WRAP_RESERVE)
         y = 0
-        for key in self._order:
+        for i, key in enumerate(self._order):
             row = self._rows[key]
             if isinstance(row, DeviceCard):
-                y = row.layout(y + CARD_GAP, width, wrap) + CARD_GAP
+                first = i == 0 or not isinstance(
+                    self._rows[self._order[i - 1]], DeviceCard)
+                last = (i + 1 == len(self._order)
+                        or not isinstance(self._rows[self._order[i + 1]],
+                                          DeviceCard))
+                y = row.layout(y, width, wrap, first, last)
             else:
                 y = row.layout(y)
-        fit_scrollregion(self._canvas)
+        fit_scrollregion(self._canvas, HEADER_PAD_TOP)
 
     def _status_text(self, d: DeviceBundle) -> Tuple[str, str]:
         dirpath = self._devices_dir / d.name
@@ -257,22 +246,24 @@ class DeviceCardList:
             return label, theme.FG_DIM
         return "Powered off", theme.FG_DIM
 
-    def _card_colors(self, d: DeviceBundle) -> Tuple[str, str]:
+    def _card_colors(self, d: DeviceBundle) -> Tuple[str, str, str]:
         if running_status(self._devices_dir / d.name) is not None:
-            return theme.CARD_RUNNING_BG, theme.CARD_RUNNING_SEL
-        if d.has_update or d.has_cerf_json_update:
-            return theme.CARD_UPDATE_BG, theme.CARD_UPDATE_SEL
-        return theme.BG_LIGHTER, theme.BG_HOVER
+            base, bright = theme.CARD_RUNNING_BG, theme.CARD_RUNNING_SEL
+        elif d.has_update or d.has_cerf_json_update:
+            base, bright = theme.CARD_UPDATE_BG, theme.CARD_UPDATE_SEL
+        else:
+            return theme.BG, theme.CARD_HOVER, theme.BG_HOVER
+        return base, theme.blend(base, bright, HOVER_BLEND), bright
 
     def _paint(self, name: str) -> None:
         card = self._cards[name]
-        base, bright = self._card_colors(card.device)
+        base, hover, selected = self._card_colors(card.device)
         if name == self._selected:
-            card.paint(bright, _lighten(bright, 30))
+            card.paint(selected)
         elif name == self._hovered:
-            card.paint(theme.blend(base, bright, HOVER_BLEND), bright)
+            card.paint(hover)
         else:
-            card.paint(base, bright)
+            card.paint(base)
 
     def _repaint_all(self) -> None:
         for name in self._cards:
@@ -344,7 +335,7 @@ class DeviceCardList:
             self._width = e.width
             self._layout()
         else:
-            fit_scrollregion(self._canvas)
+            fit_scrollregion(self._canvas, HEADER_PAD_TOP)
 
     def _on_wheel(self, e: tk.Event) -> str:
         self._canvas.yview_scroll(int(-e.delta / 120), "units")

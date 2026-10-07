@@ -20,6 +20,9 @@ _ACCENT_STATES: Sequence[Tuple[Tuple[str, ...], str]] = (
 
 SPLIT_MAIN_STYLE = "SplitMain.Accent.TButton"
 SPLIT_DROP_STYLE = "SplitDrop.Accent.TButton"
+PAGE_SCROLLBAR_STYLE = "Page.Vertical.TScrollbar"
+THIN_SCROLLBAR_STYLE = "Thin.Vertical.TScrollbar"
+TROUGH_BORDER = 6
 
 
 def _theme_namespace(root: tk.Misc) -> str:
@@ -86,12 +89,62 @@ def _create_split_half(root: tk.Misc, style: ttk.Style,
                          sticky="nsew")
 
 
-def create(root: tk.Misc, style: ttk.Style) -> None:
+def _rgb(color: str) -> Tuple[int, int, int]:
+    return (int(color[1:3], 16), int(color[3:5], 16), int(color[5:7], 16))
+
+
+def _reblend(root: tk.Misc, keep: List[tk.PhotoImage], sprite: str,
+             old_bg: str, new_bg: str) -> tk.PhotoImage:
+    width = int(root.tk.call("image", "width", sprite))
+    height = int(root.tk.call("image", "height", sprite))
+    fg = [int(v) for v in root.tk.call(sprite, "get", width // 2,
+                                       height // 2)]
+    old, new = _rgb(old_bg), _rgb(new_bg)
+    rows = []
+    for y in range(height):
+        row = []
+        for x in range(width):
+            px = root.tk.call(sprite, "get", x, y)
+            out = []
+            for c in range(3):
+                span = fg[c] - old[c]
+                t = (int(px[c]) - old[c]) / float(span) if span else 1.0
+                t = max(0.0, min(1.0, t))
+                out.append(int(round(new[c] + t * (fg[c] - new[c]))))
+            row.append("#{:02x}{:02x}{:02x}".format(*out))
+        rows.append("{" + " ".join(row) + "}")
+    image = tk.PhotoImage(master=root, width=width, height=height)
+    image.put(" ".join(rows))
+    keep.append(image)
+    return image
+
+
+def _create_thin_scrollbar(root: tk.Misc, style: ttk.Style,
+                           keep: List[tk.PhotoImage], style_name: str,
+                           background: str) -> None:
+    trough = _reblend(root, keep, _sprite(root, "scrollbar-trough-vert"),
+                      _theme_background(root), background)
+    wide, width, height = widened(root, str(trough), (TROUGH_BORDER,))
+    element = style_name.split(".")[0] + ".Vertical.Scrollbar.trough"
+    style.element_create(element, "image", wide, border=TROUGH_BORDER,
+                         padding=(0, TROUGH_BORDER, 0, TROUGH_BORDER),
+                         width=width, height=height, sticky="ns")
+    style.layout(style_name, [
+        (element, {"sticky": "ns", "children": [
+            ("Vertical.Scrollbar.uparrow", {"side": "top"}),
+            ("Vertical.Scrollbar.downarrow", {"side": "bottom"}),
+            ("Vertical.Scrollbar.thumb", {"expand": "1"})]})])
+
+
+def create(root: tk.Misc, style: ttk.Style, page_bg: str) -> None:
     if "Toolbar.button" in style.element_names():
         return
     images: Dict[str, List[tk.PhotoImage]] = root.__dict__.setdefault(
         "_sv_element_images", {})
     keep = images.setdefault(_theme_namespace(root), [])
+    _create_thin_scrollbar(root, style, keep, PAGE_SCROLLBAR_STYLE, page_bg)
+    _create_thin_scrollbar(root, style, keep, THIN_SCROLLBAR_STYLE,
+                           _theme_background(root))
     _create_toolbar(root, style, keep)
     _create_split_half(root, style, keep, "SplitMain.button", left=True)
     _create_split_half(root, style, keep, "SplitDrop.button", left=False)

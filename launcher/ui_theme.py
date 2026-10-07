@@ -47,7 +47,7 @@ _DARK_PALETTE: Dict[str, str] = {
     "DANGER_FG": "#f48771", "WARN_FG": "#ffb900",
     "CARD_RUNNING_BG": "#1e3a1e", "CARD_UPDATE_BG": "#3a2f12",
     "CARD_RUNNING_SEL": "#2e5a2e", "CARD_UPDATE_SEL": "#5c4a1e",
-    "PAGE_BG": "#141414", "CARD_BORDER": "#2f2f2f",
+    "PAGE_BG": "#141414", "CARD_BORDER": "#2f2f2f", "CARD_HOVER": "#2c2c2c",
 }
 _LIGHT_PALETTE: Dict[str, str] = {
     "BG": "#fafafa", "BG_LIGHTER": "#ffffff", "BG_FIELD": "#ffffff",
@@ -58,7 +58,7 @@ _LIGHT_PALETTE: Dict[str, str] = {
     "DANGER_FG": "#c42b1c", "WARN_FG": "#8a5a00",
     "CARD_RUNNING_BG": "#dff3df", "CARD_UPDATE_BG": "#fbeecb",
     "CARD_RUNNING_SEL": "#bfe6bf", "CARD_UPDATE_SEL": "#f2dca0",
-    "PAGE_BG": "#f0f0f0", "CARD_BORDER": "#e0e0e0",
+    "PAGE_BG": "#f0f0f0", "CARD_BORDER": "#e0e0e0", "CARD_HOVER": "#f5f5f5",
 }
 
 IS_DARK = system_uses_dark()
@@ -85,6 +85,11 @@ CARD_RUNNING_SEL = _PALETTE["CARD_RUNNING_SEL"]
 CARD_UPDATE_SEL  = _PALETTE["CARD_UPDATE_SEL"]
 PAGE_BG     = _PALETTE["PAGE_BG"]
 CARD_BORDER = _PALETTE["CARD_BORDER"]
+CARD_HOVER  = _PALETTE["CARD_HOVER"]
+
+CARD_STYLE_PREFIX = "SideCard."
+HOVER_STYLE_PREFIX = "SideCardHover."
+CARD_STYLE_BASES = ("TFrame", "TLabel", "Hint.TLabel")
 
 
 def _build_state_tint() -> dict:
@@ -108,7 +113,7 @@ def refresh_palette() -> bool:
     global SEPARATOR
     global UPDATE_LINK, LINK_FG, GROUP_BG, PREVIEW_STOPPED, DANGER_FG, WARN_FG
     global CARD_RUNNING_BG, CARD_UPDATE_BG, CARD_RUNNING_SEL, CARD_UPDATE_SEL
-    global PAGE_BG, CARD_BORDER
+    global PAGE_BG, CARD_BORDER, CARD_HOVER
     dark = system_uses_dark()
     if dark == IS_DARK:
         return False
@@ -135,6 +140,7 @@ def refresh_palette() -> bool:
     CARD_UPDATE_SEL  = _PALETTE["CARD_UPDATE_SEL"]
     PAGE_BG     = _PALETTE["PAGE_BG"]
     CARD_BORDER = _PALETTE["CARD_BORDER"]
+    CARD_HOVER  = _PALETTE["CARD_HOVER"]
     STATE_TINT = _build_state_tint()
     return True
 
@@ -234,7 +240,7 @@ def _use_sun_valley(root: tk.Tk) -> None:
 def apply_theme(root: tk.Tk) -> None:
     _use_sun_valley(root)
     style = ttk.Style(root)
-    sv_elements.create(root, style)
+    sv_elements.create(root, style, PAGE_BG)
 
     style.configure("Toolbar.TButton", padding=(3, 1))
 
@@ -247,9 +253,16 @@ def apply_theme(root: tk.Tk) -> None:
 
     style.configure("Help.TButton", padding=(4, 1))
 
+    style.configure("Hint.TEntry", foreground=FG_DIM)
+
     style.configure("Page.TFrame", background=PAGE_BG)
     style.configure("Section.TLabel", background=PAGE_BG, foreground=FG,
                     font=("Segoe UI", 10, "bold"))
+    style.configure("Panel.Section.TLabel", background=BG)
+    style.configure("Warn.Panel.Section.TLabel", foreground=WARN_FG)
+    for base in CARD_STYLE_BASES:
+        style.configure(CARD_STYLE_PREFIX + base, background=BG_LIGHTER)
+        style.configure(HOVER_STYLE_PREFIX + base, background=CARD_HOVER)
 
     root.option_add("*TCombobox*Listbox.background", BG_FIELD)
     root.option_add("*TCombobox*Listbox.foreground", FG)

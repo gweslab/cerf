@@ -103,10 +103,20 @@ This repository includes [cerf.cx](https://cerf.cx) source code at `docs/website
 
 `python tools/build_site.py --serve` runs the website on your machine with live reload.
 
-## Claude Development Environment
+## AI Usage / Vibecode Notice
 
-> [!TIP]
-> Contributions made with AI are welcome - only if they correspond the quality level we maintain. But DO NOT turn this into an AI slop. Please read [Contribution Guidelines](.github/CONTRIBUTING.md)
+AI-assisted contributions are welcome. That's a nice thing to have in 2026 - you have access to tons of resources right in your pocket. Let me show generic use cases on this project:
+- study emulators, study JIT, study assembly on various archs, study every piece that affects your code that you don't understand how it works yet
+- learn and use AI to reverse engineer; use AI to reach for more correct architecture calls when you stall
+- use AI to find projects/resources with compatible license to learn/borrow something complex
+- use it to find manuals and papers for devices you target, SoCs/peripherals you target and to extract quotes from them
+- use it to work with and explain complex data structures and non trivial algorithms
+- use it to review your code and to criticize it 
+- the AI is an instrument to convert plain thoughts into a code - that's a replacement for typing code in order to get the same code you wanted but faster
+
+The vibe code is banned. Please read [Contribution Guidelines](.github/CONTRIBUTING.md). Do not turn this into an AI slop. We put an effort here and we maintain a quality level.
+
+## Claude Development Environment
 
 The environment includes several controversial things you need to know before using it.
 
@@ -118,7 +128,7 @@ The environment includes several controversial things you need to know before us
 - IDA MCP is ready to be installed at `tools\ida_server.py` and `tools\ida_claude.py`
 - FS Read MCP is a workaround for `Read()` tool, useful for `/tracking restore` and massive text files (`tools\fs_read_mcp.py`)
 
-The environment gives you the **`/start-board-implementation`** skill. Run the skill and agent will start the new board bring-up on its own. You need experience - the skill won't do all the work instead of you. (Tho honestly speaking, there have been cases where Claude alone brought a board to a bootable state)
+The environment gives you the **`/start-board-implementation`** skill. Run the skill and agent will start the new board bring-up on its own. You need experience - the skill won't do all the work instead of you. (it actually will do, and [that's the problem](#ai-usage--vibecode-notice))
 
 Run the environment:
 

@@ -10,7 +10,6 @@
     fixed: |
       Philips Velo 1: 16 MB DRAM Miniature Card permanently fitted - 20 MB total for the guest
       Device Emulator: keyboard no longer drops or repeats keys while typing
-      Device Emulator: sound no longer stutters
       Device Emulator: Windows Mobile 2003 SE no longer freezes
       Casio Toricomail: fixed rendering crashes
       Ford Sync 2: Massive rendering improvements, navigation maps and more (by @cavenderbi)
@@ -25,6 +24,7 @@
       Improved UI and added notification cards
     fixed: |
       ARM JIT and JIT core full rewrite. ARM JIT/peripherals massive performance optimizations
+      Audio systems were reworked - less sound stuttering
       Media instructions for Zune 30 - music is now playable
       System clock improvements
       Keyboard input no longer stops working after switching to another window and back

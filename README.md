@@ -363,7 +363,6 @@ run_claude.cmd
           🆕 Casio Cassiopeia E-700 support<br/>
           ✅ Philips Velo 1: 16 MB DRAM Miniature Card permanently fitted - 20 MB total for the guest<br/>
           ✅ Device Emulator: keyboard no longer drops or repeats keys while typing<br/>
-          ✅ Device Emulator: sound no longer stutters<br/>
           ✅ Device Emulator: Windows Mobile 2003 SE no longer freezes<br/>
           ✅ Casio Toricomail: fixed rendering crashes<br/>
           ✅ Ford Sync 2: Massive rendering improvements, navigation maps and more (by @cavenderbi)</p>
@@ -376,6 +375,7 @@ run_claude.cmd
           🆕 Host key is now reassignable<br/>
           🆕 Improved UI and added notification cards<br/>
           ✅ ARM JIT and JIT core full rewrite. ARM JIT/peripherals massive performance optimizations<br/>
+          ✅ Audio systems were reworked - less sound stuttering<br/>
           ✅ Media instructions for Zune 30 - music is now playable<br/>
           ✅ System clock improvements<br/>
           ✅ Keyboard input no longer stops working after switching to another window and back<br/>

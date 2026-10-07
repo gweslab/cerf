@@ -332,8 +332,8 @@
         }
       ],
       "notes": [
-        "Stock video: don't exceed 640x480 on Windows Mobile 6.5 or newer.",
-        "Stock video: don't exceed 800x600 on any OS."
+        "Stock video: don't exceed 640x480 on Windows Mobile 6.5 or newer - shell hang imminent.",
+        "Stock video: don't exceed 800x600 on any OS - CERF crash imminent."
       ],
       "configurable_screen": true,
       "lcd_panel_size": {
@@ -387,8 +387,7 @@
         }
       ],
       "notes": [
-        "CERF badly emulates stock video, it renders with artifacts. You can use it with Guest Additions instead",
-        "Audio has artifacts/glitches"
+        "Stock video: visual artifacts present"
       ],
       "lcd_panel_size": {
         "width": 240,
@@ -445,9 +444,7 @@
           "supported": true
         }
       ],
-      "notes": [
-        "Audio has artifacts/glitches"
-      ],
+      "notes": [],
       "lcd_panel_size": {
         "width": 240,
         "height": 320
@@ -607,14 +604,11 @@
           "supported": true
         }
       ],
-      "notes": [
-        "Audio has artifacts/glitches",
-        "Guest additions keyboard causes OS to HANG - switch to stock!"
-      ],
       "lcd_panel_size": {
         "width": 480,
         "height": 240
       },
+      "notes": [],
       "ga_color_depth": 24,
       "rom_placing_mode": "flat_container"
     },
@@ -650,9 +644,6 @@
           "supported": false
         }
       ],
-      "notes": [
-        "ROMs with Compositor are slower"
-      ],
       "ga_color_depth": 24,
       "rom_placing_mode": "flat_container"
     },
@@ -683,10 +674,7 @@
           "supported": false
         }
       ],
-      "notes": [
-        "CERF creates a blank HDD image on first boot when the HDD file does not exist",
-        "Guest additions: You can open apps through shared storage + task manager, only extremely simple apps will run (like literally blank Win32 skeletons)"
-      ],
+      "notes": [],
       "lcd_panel_size": {
         "width": 240,
         "height": 320
@@ -790,9 +778,7 @@
           "supported": true
         }
       ],
-      "notes": [
-        "Emulated with serious lags / audio / visual issues"
-      ],
+      "notes": [],
       "lcd_panel_size": {
         "width": 640,
         "height": 240
@@ -1022,7 +1008,8 @@
         }
       ],
       "notes": [
-        "Camera and microphone access crashes the emulator"
+        "Stock camera: access causes imminent crash",
+        "Stock microphone: access causes imminent crash"
       ],
       "lcd_panel_size": {
         "width": 320,
@@ -1387,10 +1374,9 @@
         }
       ],
       "notes": [
-        "The board is not emulated well: most stock features will crash the GPU",
-        "GPU has visual artifacts",
-        "Guest Additions driver runs only AFTER first NAND flash. Restart emulator if you want a CE Shell.",
-        "Guest Additions driver will OVERWRITE your registry and permanently force WinCE Shell even for stock device runs."
+        "Stock video: some visuals are glitching; most stock features might crash it",
+        "Guest Additions: do not use this mode when booting without NAND. Flash your device first.",
+        "Guest Additions: driver will OVERWRITE your registry and permanently force WinCE Shell even for stock device runs."
       ],
       "lcd_panel_size": {
         "width": 800,

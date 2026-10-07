@@ -7,6 +7,7 @@
    mips, ARM/_ARM_ for -Arch arm). Custom (base/size by hand) is common. */
 const Preset kPresets[] = {
 #if defined(MIPS)
+    { L"Universal MIPS Reset Vector 32MB", L"", 0x1E000000u, 32, 0 },
     /* MP790 ROM, ROMHDR VA 0x9F6FC504: physfirst 0x9E000000, physlast 0x9F70017C. */
     { L"VR41xx",
       L"NEC MP790",
@@ -19,6 +20,8 @@ const Preset kPresets[] = {
       0x1F000000u, 16, 0 },
     /* Velo 1 physfirst = PA 0x1F400000 (its ROMHDR); tighter 8 MB read. */
     { L"TX3912 Philips Velo 1", L"", 0x1F400000u, 8, 0 },
+#elif defined(SHx)
+    { L"Universal SH3 Reset Vector 32MB", L"", 0xA0000000u, 32, 0 },
 #else
     /* base = PA 0 (reset vector) for all. PXA255 stalls the bus on an
        unpopulated static chip-select, so it is sized to nCS0 (64 MB) only. */

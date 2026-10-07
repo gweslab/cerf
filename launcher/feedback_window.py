@@ -16,9 +16,8 @@ import ui_theme as theme
 TITLE = "Feedback"
 FEEDBACK_URL = "https://cerf.cx/feedback"
 CREATE_TEXT = "Create issue"
-HEADER_TEXT = ("Top-rated issues are treated as top priority and are taken "
-               "into the work first. You can open your own issue, or vote on "
-               "the ones already here, on GitHub.")
+HEADER_TEXT = ("The list of issues tracked by the developers. Be patient - some tickets might take "
+               "some time until taken into the work.")
 LOADING_TEXT = "Loading issues…"
 EMPTY_TEXT = "No open issues."
 BODY_PAD = 12

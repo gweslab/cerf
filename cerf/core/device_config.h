@@ -97,6 +97,8 @@ struct DeviceConfig : public Service {
        when the device has none. */
     std::string              rom_eeprom;
 
+    std::string              rom_ce_dictionary;
+
     std::string              rom_lumia800_user_area_erase;
 
     std::string storage_nand = "nand.img";

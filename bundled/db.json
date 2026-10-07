@@ -1534,6 +1534,18 @@
       "formats": [
         "nbf"
       ]
+    },
+    {
+      "id": "ce_dictionary",
+      "name": "Dictionary Dump",
+      "optional": true,
+      "board_ids": [
+        "casio_cassiopeia_e55",
+        "casio_cassiopeia_em500"
+      ],
+      "formats": [
+        "bin"
+      ]
     }
   ],
   "storage_types": [

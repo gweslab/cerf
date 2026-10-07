@@ -53,6 +53,10 @@ class ScrollColumn:
         self.bind_wheel(self._canvas)
         self.bind_wheel(self.inner)
 
+    @property
+    def canvas(self) -> tk.Canvas:
+        return self._canvas
+
     def _background(self) -> str:
         return theme.PAGE_BG if self._page else theme.BG
 

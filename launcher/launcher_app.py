@@ -26,6 +26,7 @@ from launcher_operations import OperationsMixin
 from launcher_properties import PropertiesMixin
 from launcher_refresh import RefreshMixin
 from saved_state_warning import SavedStateEditWarning
+from sash_grip import SashGrip
 from new_device_wizard import NewDeviceWizard
 from settings_dialog import SettingsDialog
 from side_block import block_gap, content_inset
@@ -167,6 +168,9 @@ class LauncherApp(OperationsMixin, RefreshMixin, SpawnMixin, PropertiesMixin,
                                    on_width_changed=on_width,
                                    pad_bottom=block_gap(right))
         self.scroll.grid(row=1, column=0, sticky="nsew")
+        self._sash_grip = SashGrip(paned, 0, right)
+        self._sash_grip.attach(self.preview.canvas, self.scroll.canvas,
+                               self.scroll.inner)
 
         inner = self.scroll.inner
         self.details = DetailsPanel(inner, resolve_icons_dir(), self.manager.devices_dir,

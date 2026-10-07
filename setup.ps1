@@ -127,16 +127,17 @@ function Test-CeToolchain {
         Report 'WARN' 'ce-toolchain' "absent -- optional; needed only to build ce_apps/ (see docs/ce_apps_setup.md)"
         return
     }
-    $tools = @('clarm.exe', 'clthumb.exe', 'clmips.exe', 'link.exe', 'lib.exe', 'rc.exe')
+    $tools = @('clarm.exe', 'clthumb.exe', 'clmips.exe', 'clsh.exe', 'link.exe', 'lib.exe', 'rc.exe')
+    $arches = @('Armv4', 'Armv4i', 'Mipsii', 'Mipsiv', 'Sh3')
     $missing = @($tools | Where-Object { -not (Test-Path (Join-Path "$root/bin" $_)) })
-    foreach ($a in @('Armv4', 'Armv4i', 'Mipsii', 'Mipsiv')) {
+    foreach ($a in $arches) {
         if (-not (Test-Path (Join-Path $root "STANDARDSDK/Include/$a")))       { $missing += "Include/$a" }
         if (-not (Test-Path (Join-Path $root "STANDARDSDK/Lib/$a/coredll.lib"))) { $missing += "Lib/$a/coredll.lib" }
     }
     if ($missing.Count) {
         Report 'FAIL' 'ce-toolchain' ("incomplete -- missing: " + ($missing -join ', ') + " (re-run tools/unpack_evc4.ps1 -Force)")
     } else {
-        Report 'OK' 'ce-toolchain' 'Armv4, Armv4i, Mipsii, Mipsiv'
+        Report 'OK' 'ce-toolchain' ($arches -join ', ')
     }
 }
 

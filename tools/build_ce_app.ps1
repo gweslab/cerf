@@ -1,7 +1,4 @@
-# Shared builder for CERF's CE apps and DLLs. -Arch selects the guest CPU:
-#   arm        plain ARMv4 (no-Thumb cores)
-#   arm_thumb  ARMV4I Thumb-interworking (Thumb-capable cores)
-#   mips       MIPS-IV / MIPS-II / MIPS-I, per -MipsIsa
+# Shared builder for CERF's CE apps and DLLs.
 #
 # Toolchain and SDK come from third_party/wince (eMbedded Visual C++ 4.0);
 # see docs/ce_apps_setup.md for the layout contract and how to produce it.
@@ -18,7 +15,7 @@ param(
     [string[]]$ForcedInclude = @(),
     [string]$DefFile,
     [string]$ObjDir = ".",
-    [ValidateSet("arm","arm_thumb","mips")][string]$Arch = "arm",
+    [ValidateSet("arm","arm_thumb","mips","sh3")][string]$Arch = "arm",
     # MIPS ISA level (only with -Arch mips): mips4 = MIPS-IV soft-float (machine
     # MIPSFPU), mips2 = MIPS-II, mips1 = MIPS-I / R3000 (mips1 and mips2 both use
     # machine MIPS); must match the SDK coredll machine.
@@ -90,6 +87,14 @@ switch ($Arch) {
         # (__prologue_helper_s0_sN) from the C runtime, not auto-linked under
         # /nodefaultlib.
         $ImplicitLibs = @("corelibc")
+    }
+    "sh3" {
+        $CL = Join-Path $BIN "clsh.exe"
+        $Machine = "SH3"
+        $ArchFlags = @("-Qsh3", "-DSH3", "-D_SH3_")
+        $CpuMacros = @("-DSHx")
+        $SdkSub = "Sh3"
+        $ImplicitLibs = @()
     }
     "arm_thumb" {
         $CL = Join-Path $BIN "clarm.exe"

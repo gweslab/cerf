@@ -30,40 +30,39 @@ static void CopyStrW(LPWSTR dst, LPCWSTR src, int cch) {
     dst[i] = 0;
 }
 
-static DWORD MapAndReadWindow(DWORD pa, BYTE* buf, VirtualCopyFn pVirtualCopy) {
-    DWORD p, faults = 0;
+typedef struct {
+    const BYTE* src;
+    void*       va;
+} PhysWindow;
 
+static void OpenPhysWindow(PhysWindow* win, DWORD pa, VirtualCopyFn pVirtualCopy) {
+    win->src = NULL;
+    win->va  = NULL;
     if (pVirtualCopy) {
-        /* PAGE_PHYSICAL maps by page-frame number: source = pa >> 8. */
-        void* va = VirtualAlloc(NULL, WIN_BYTES, MEM_RESERVE, PAGE_NOACCESS);
-        BOOL  mapped = FALSE;
-        if (va)
-            mapped = pVirtualCopy(va, (LPVOID)(pa >> 8), WIN_BYTES,
-                                  PAGE_READWRITE | PAGE_NOCACHE | PAGE_PHYSICAL);
-        for (p = 0; p < WIN_BYTES; p += PAGE_BYTES) {
-            if (mapped && ReadPageGuarded(buf + p, (BYTE*)va + p)) continue;
-            memset(buf + p, 0xFF, PAGE_BYTES);
-            faults++;
-        }
-        if (va) VirtualFree(va, 0, MEM_RELEASE);
-        return faults;
+        win->va = VirtualAlloc(NULL, WIN_BYTES, MEM_RESERVE, PAGE_NOACCESS);
+        if (win->va && pVirtualCopy(win->va, (LPVOID)(pa >> 8), WIN_BYTES,
+                                    PAGE_READWRITE | PAGE_NOCACHE | PAGE_PHYSICAL))
+            win->src = (const BYTE*)win->va;
+        return;
     }
-
 #if defined(MIPS)
-    /* CE 1.0 kseg1 (0xA0000000|pa) reaches only PA < 0x20000000; higher aliases. */
-    if (pa < 0x20000000u && pa + WIN_BYTES <= 0x20000000u) {
-        const BYTE* src = (const BYTE*)(0xA0000000u | pa);
-        for (p = 0; p < WIN_BYTES; p += PAGE_BYTES) {
-            if (ReadPageGuarded(buf + p, src + p)) continue;
-            memset(buf + p, 0xFF, PAGE_BYTES);
-            faults++;
-        }
-        return faults;
-    }
+    if (pa < 0x20000000u && pa + WIN_BYTES <= 0x20000000u)
+        win->src = (const BYTE*)(0xA0000000u | pa);
 #endif
+}
 
-    memset(buf, 0xFF, WIN_BYTES);
-    return WIN_BYTES / PAGE_BYTES;
+static void ClosePhysWindow(PhysWindow* win) {
+    if (win->va) VirtualFree(win->va, 0, MEM_RELEASE);
+}
+
+static DWORD ReadChunk(const PhysWindow* win, DWORD off, BYTE* buf) {
+    DWORD p, faults = 0;
+    for (p = 0; p < CHUNK_BYTES; p += PAGE_BYTES) {
+        if (win->src && ReadPageGuarded(buf + p, win->src + off + p)) continue;
+        memset(buf + p, 0xFF, PAGE_BYTES);
+        faults++;
+    }
+    return faults;
 }
 
 /* Post one heap-copied log line to the UI thread; StepDumpOnMessage frees it. */
@@ -80,22 +79,17 @@ DWORD WINAPI DumpThread(LPVOID param) {
     BYTE*  buf;
     DWORD  seg_bytes, num_segs, s;
     int    failed = 0, stopped = 0, last_pct = -1;
-    HMODULE       hCore;
     VirtualCopyFn pVirtualCopy;
 
-    buf = (BYTE*)LocalAlloc(LPTR, WIN_BYTES);
+    buf = (BYTE*)LocalAlloc(LPTR, CHUNK_BYTES);
     if (!buf) {
-        CopyStrW(st->err, L"Out of memory allocating window buffer.", 160);
+        CopyStrW(st->err, L"Out of memory allocating read buffer.", 160);
         st->ok = 0; st->finished = 1;
         PostMessageW(st->hwnd, WM_APP_DONE, 0, 0);
         return 0;
     }
 
-    /* coredll is already in-process; LoadLibraryW returns its handle + a refcount.
-       VirtualCopy is NULL on CE 1.0, which routes the read to the kseg1 path. */
-    hCore = LoadLibraryW(L"coredll.dll");
-    pVirtualCopy = hCore ? (VirtualCopyFn)GetProcAddressW(hCore, L"VirtualCopy")
-                         : (VirtualCopyFn)0;
+    pVirtualCopy = (VirtualCopyFn)CoreProc(L"VirtualCopy");
 
     /* length and seg_bytes are whole megabytes; the last part is the remainder
        (this_len < seg_bytes), never padded up - it can be smaller, never bigger. */
@@ -136,26 +130,29 @@ DWORD WINAPI DumpThread(LPVOID param) {
 
         for (w = 0; w < this_len; w += WIN_BYTES) {
             DWORD pa = seg_start + w;
-            DWORD wr, pct;
+            DWORD c, wr, pct;
+            PhysWindow win;
             if (st->cancel) break;
             st->cur_pa = pa;
-            st->fault_pages += MapAndReadWindow(pa, buf, pVirtualCopy);
-            /* Retry-on-full: the UI prompts Retry/Cancel so the user frees space
-               or swaps the card; on Retry rewind to this window and re-write. */
-            for (;;) {
-                wr = 0;
-                if (WriteFile(hf, buf, WIN_BYTES, &wr, NULL) && wr == WIN_BYTES) break;
-                st->fail_pa = pa;
-                st->storage_retry = 0;
-                PostMessageW(st->hwnd, WM_APP_STORAGE, 0, 0);
-                WaitForSingleObject(st->seg_event, INFINITE);
-                if (st->cancel || !st->storage_retry) {
-                    wsprintfW(line, L"Stopped 0x%08X   storage full", pa);
-                    PostLine(st->hwnd, line);
-                    stopped = 1; break;
+            OpenPhysWindow(&win, pa, pVirtualCopy);
+            for (c = 0; c < WIN_BYTES && !stopped; c += CHUNK_BYTES) {
+                st->fault_pages += ReadChunk(&win, c, buf);
+                for (;;) {
+                    wr = 0;
+                    if (WriteFile(hf, buf, CHUNK_BYTES, &wr, NULL) && wr == CHUNK_BYTES) break;
+                    st->fail_pa = pa;
+                    st->storage_retry = 0;
+                    PostMessageW(st->hwnd, WM_APP_STORAGE, 0, 0);
+                    WaitForSingleObject(st->seg_event, INFINITE);
+                    if (st->cancel || !st->storage_retry) {
+                        wsprintfW(line, L"Stopped 0x%08X   storage full", pa);
+                        PostLine(st->hwnd, line);
+                        stopped = 1; break;
+                    }
+                    SetFilePointer(hf, (LONG)(w + c), NULL, FILE_BEGIN);
                 }
-                SetFilePointer(hf, (LONG)w, NULL, FILE_BEGIN);
             }
+            ClosePhysWindow(&win);
             if (stopped || st->cancel) break;
             st->bytes_done = seg_off + w + WIN_BYTES;
             pct = st->length ? (st->bytes_done * 100) / st->length : 0;
@@ -194,7 +191,6 @@ DWORD WINAPI DumpThread(LPVOID param) {
     }
 
     LocalFree(buf);
-    if (hCore) FreeLibrary(hCore);
     st->ok = (!failed && !st->cancel && !stopped);
     st->finished = 1;
     PostMessageW(st->hwnd, WM_APP_DONE, 0, 0);

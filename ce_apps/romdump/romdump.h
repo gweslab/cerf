@@ -10,6 +10,7 @@ typedef BOOL (*VirtualCopyFn)(LPVOID lpvDest, LPVOID lpvSrc,
 
 #define WIN_BYTES    0x00100000u           /* 1 MB map window / address step  */
 #define PAGE_BYTES   0x00001000u           /* 4 KB SEH read granularity        */
+#define CHUNK_BYTES  0x00010000u
 
 /* Worker -> UI messages. */
 #define WM_APP_LOG      (WM_APP + 1)   /* lParam = LocalAlloc'd WCHAR*, UI frees */
@@ -95,8 +96,9 @@ typedef struct {
 DWORD WINAPI DumpThread(LPVOID param);
 
 /* Shell helpers (main.cpp) usable from step files. */
-void  AppLog(AppState* st, LPCWSTR text);            /* append one line to the log */
-RECT  ContentRect(HWND hwnd);                        /* client area above the panel */
+void    AppLog(AppState* st, LPCWSTR text);
+RECT    ContentRect(HWND hwnd);
+FARPROC CoreProc(LPCWSTR name);
 
 /* Per-step interface. Layout returns the step's content height (drives the
    scrollbar); OnNext returns TRUE to let the wizard advance (FALSE = stay);

@@ -38,6 +38,13 @@ RECT ContentRect(HWND hwnd) {
     return rc;
 }
 
+FARPROC CoreProc(LPCWSTR name) {
+    HMODULE core = LoadLibraryW(L"coredll.dll");
+    FARPROC p    = core ? GetProcAddressW(core, name) : NULL;
+    if (core) FreeLibrary(core);
+    return p;
+}
+
 void AppLog(AppState* st, LPCWSTR text) {
     HWND log = GetDlgItem(st->hwnd, ID_LOG);
     int  len;
@@ -288,10 +295,12 @@ static HWND NextTabstop(HWND parent, HWND cur, BOOL prev) {
 /* extern "C": /entry:WinMain needs an unmangled symbol; this file is C++. */
 extern "C" int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrev,
                               LPWSTR cmd, int show) {
+    typedef HCURSOR (*LoadCursorFn)(HINSTANCE, LPCWSTR);
     static AppState st;
-    WNDCLASSW wc, pc;
-    HWND      hwnd;
-    MSG       m;
+    WNDCLASSW    wc, pc;
+    HWND         hwnd;
+    MSG          m;
+    LoadCursorFn loadCursor;
 
     (void)hPrev; (void)cmd;
     memset(&st, 0, sizeof(st));
@@ -310,11 +319,8 @@ extern "C" int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrev,
     wc.cbWndExtra    = sizeof(LONG);         /* WNDX_STATE slot */
     wc.hInstance     = hInstance;
     wc.hIcon         = LoadIconW(hInstance, MAKEINTRESOURCEW(1));
-#ifdef IDC_ARROW
-    wc.hCursor       = LoadCursorW(NULL, IDC_ARROW);
-#else
-    wc.hCursor       = NULL;   /* pen-era CE (1.0/2.0) has no stock cursors */
-#endif
+    loadCursor       = (LoadCursorFn)CoreProc(L"LoadCursorW");
+    wc.hCursor       = loadCursor ? loadCursor(NULL, IDC_ARROW) : NULL;
     wc.hbrBackground = (HBRUSH)GetStockObject(WHITE_BRUSH);
     wc.lpszClassName = L"CerfRomDump";
     if (!RegisterClassW(&wc)) return 1;

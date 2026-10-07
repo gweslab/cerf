@@ -21,13 +21,14 @@ $EvcBinRel  = "COMMON/EVC/BIN"
 $EvcBinFiles = @("rc.exe", "rcdll.dll")
 
 $RequiredTools = @(
-    "clarm.exe", "clthumb.exe", "clmips.exe",
+    "clarm.exe", "clthumb.exe", "clmips.exe", "clsh.exe",
     "link.exe", "lib.exe", "rc.exe", "rcdll.dll", "cvtres.exe",
     "armasm.exe", "mipsasm.exe", "mspdb60.dll",
     "c1_arm.dll", "c1xx_arm.dll", "c2_arm.dll",
-    "c1_mp.dll",  "c1xx_mp.dll",  "c2_mp.dll"
+    "c1_mp.dll",  "c1xx_mp.dll",  "c2_mp.dll",
+    "c1_sh.dll",  "c1xx_sh.dll",  "c2_sh.dll"
 )
-$RequiredArches = @("Armv4", "Armv4i", "Mipsii", "Mipsiv")
+$RequiredArches = @("Armv4", "Armv4i", "Mipsii", "Mipsiv", "Sh3")
 
 function Fail($msg) { Write-Host "[evc4] ERROR: $msg" -ForegroundColor Red; exit 1 }
 function Info($msg) { Write-Host "[evc4] $msg" }

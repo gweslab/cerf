@@ -32,17 +32,17 @@ static DWORD ParseDec(LPCWSTR s) {
 static void SetHexField(AppState* st, int id, DWORD v) {
     WCHAR b[16];
     wsprintfW(b, L"0x%08X", v);
-    SetDlgItemText(st->hwnd, id, b);
+    SetWindowTextW(GetDlgItem(st->hwnd, id), b);
 }
 
 static void SetDecField(AppState* st, int id, DWORD v) {
     WCHAR b[16];
     wsprintfW(b, L"%u", v);
-    SetDlgItemText(st->hwnd, id, b);
+    SetWindowTextW(GetDlgItem(st->hwnd, id), b);
 }
 
 static void SyncSegEnable(AppState* st) {
-    BOOL on = SendDlgItemMessage(st->hwnd, ID_SEG, BM_GETCHECK, 0, 0)
+    BOOL on = SendMessageW(GetDlgItem(st->hwnd, ID_SEG), BM_GETCHECK, 0, 0)
               == BST_CHECKED;
     EnableWindow(GetDlgItem(st->hwnd, ID_SEGSIZE), on);
 }
@@ -98,7 +98,7 @@ void StepConfigShow(AppState* st, BOOL show) {
 
 void StepConfigEnter(AppState* st) {
     const Preset* p = &kPresets[st->preset_index];
-    if (st->outpath[0] == L'\0') SetDlgItemText(st->hwnd, ID_FILE, DEFAULT_PATH);
+    if (st->outpath[0] == L'\0') SetWindowTextW(GetDlgItem(st->hwnd, ID_FILE), DEFAULT_PATH);
     st->base   = p->base & MB_MASK;
     st->length = (DWORD)p->size_mb << 20;
     SetHexField(st, ID_BASE, st->base);
@@ -134,7 +134,7 @@ int StepConfigLayout(AppState* st, RECT area) {
 
 static void SyncFromBase(AppState* st) {
     WCHAR b[32];
-    GetDlgItemText(st->hwnd, ID_BASE, b, 32);
+    GetWindowTextW(GetDlgItem(st->hwnd, ID_BASE), b, 32);
     st->base = ParseHex(b) & MB_MASK;
     SetHexField(st, ID_BASE, st->base);
     SetHexField(st, ID_END,  st->base + st->length);
@@ -142,7 +142,7 @@ static void SyncFromBase(AppState* st) {
 
 static void SyncFromSize(AppState* st) {
     WCHAR b[32];
-    GetDlgItemText(st->hwnd, ID_SIZE, b, 32);
+    GetWindowTextW(GetDlgItem(st->hwnd, ID_SIZE), b, 32);
     st->length = (DWORD)ParseDec(b) << 20;
     SetHexField(st, ID_END, st->base + st->length);
 }
@@ -150,7 +150,7 @@ static void SyncFromSize(AppState* st) {
 static void SyncFromEnd(AppState* st) {
     WCHAR b[32];
     DWORD ne;
-    GetDlgItemText(st->hwnd, ID_END, b, 32);
+    GetWindowTextW(GetDlgItem(st->hwnd, ID_END), b, 32);
     ne = ParseHex(b) & MB_MASK;            /* round down: never read past End */
     SetHexField(st, ID_END, ne);
     if (ne > st->base) {
@@ -161,18 +161,16 @@ static void SyncFromEnd(AppState* st) {
 
 static void DoBrowse(AppState* st) {
     typedef BOOL (*GetSaveFn)(LPOPENFILENAMEW);
-    HMODULE  dll = LoadLibraryW(L"coredll.dll");
-    GetSaveFn fn = dll ? (GetSaveFn)GetProcAddressW(dll, L"GetSaveFileNameW") : NULL;
+    GetSaveFn fn = (GetSaveFn)CoreProc(L"GetSaveFileNameW");
     OPENFILENAMEW ofn;
     WCHAR path[MAX_PATH];
     if (!fn) {
-        if (dll) FreeLibrary(dll);
         MessageBoxW(st->hwnd,
                     L"No file dialog on this device. Type the output path by hand.",
                     L"CERF ROM dumper", MB_OK | MB_ICONINFORMATION);
         return;
     }
-    GetDlgItemText(st->hwnd, ID_FILE, path, MAX_PATH);
+    GetWindowTextW(GetDlgItem(st->hwnd, ID_FILE), path, MAX_PATH);
     memset(&ofn, 0, sizeof(ofn));
     ofn.lStructSize = sizeof(ofn);
     ofn.hwndOwner   = st->hwnd;
@@ -181,8 +179,7 @@ static void DoBrowse(AppState* st) {
     ofn.lpstrFilter = L"Dump (*.bin)\0*.bin\0All files\0*.*\0";
     ofn.lpstrDefExt = L"bin";
     ofn.Flags       = OFN_OVERWRITEPROMPT | OFN_PATHMUSTEXIST;
-    if (fn(&ofn)) SetDlgItemText(st->hwnd, ID_FILE, path);
-    FreeLibrary(dll);
+    if (fn(&ofn)) SetWindowTextW(GetDlgItem(st->hwnd, ID_FILE), path);
 }
 
 static void ShowSegHelp(HWND h) {
@@ -210,15 +207,15 @@ BOOL StepConfigCommand(AppState* st, WPARAM wp, LPARAM lp) {
 
 BOOL StepConfigOnNext(AppState* st) {
     WCHAR b[32];
-    GetDlgItemText(st->hwnd, ID_FILE, st->outpath, MAX_PATH);
+    GetWindowTextW(GetDlgItem(st->hwnd, ID_FILE), st->outpath, MAX_PATH);
     if (st->outpath[0] == L'\0') {
         MessageBoxW(st->hwnd, L"Enter an output file path.",
                     L"CERF ROM dumper", MB_OK | MB_ICONEXCLAMATION);
         return FALSE;
     }
-    GetDlgItemText(st->hwnd, ID_BASE, b, 32);
+    GetWindowTextW(GetDlgItem(st->hwnd, ID_BASE), b, 32);
     st->base = ParseHex(b) & MB_MASK;
-    GetDlgItemText(st->hwnd, ID_SIZE, b, 32);
+    GetWindowTextW(GetDlgItem(st->hwnd, ID_SIZE), b, 32);
     if (ParseDec(b) == 0) {
         MessageBoxW(st->hwnd, L"Size must be at least 1 MB.",
                     L"CERF ROM dumper", MB_OK | MB_ICONEXCLAMATION);
@@ -226,11 +223,11 @@ BOOL StepConfigOnNext(AppState* st) {
     }
     st->length = ParseDec(b) << 20;
 
-    st->segmented = SendDlgItemMessage(st->hwnd, ID_SEG, BM_GETCHECK, 0, 0)
+    st->segmented = SendMessageW(GetDlgItem(st->hwnd, ID_SEG), BM_GETCHECK, 0, 0)
                     == BST_CHECKED;
     if (st->segmented) {
         DWORD seg_mb;
-        GetDlgItemText(st->hwnd, ID_SEGSIZE, b, 32);
+        GetWindowTextW(GetDlgItem(st->hwnd, ID_SEGSIZE), b, 32);
         seg_mb = ParseDec(b);
         if (seg_mb == 0) {
             MessageBoxW(st->hwnd, L"Part size must be at least 1 MB.",

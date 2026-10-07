@@ -388,6 +388,9 @@ run_claude.cmd
           🆕 Configurable board types, ROM and storage sources<br/>
           ✅ Launcher does not wait depend on internet connection and it&#x27;s speed to let you use it<br/>
           ✅ Toolbar buttons are now properly trimmed when not enough width</p>
+        <p><b>💾 CE Apps</b><br/>
+          🆕 romdump: SH3 support<br/>
+          🆕 romdump: universal reset vector presets for MIPS and SH3</p>
         <p><b>✨ Guest Additions</b><br/>
           🆕 Virtual Ethernet adapter<br/>
           🆕 Persistant customization/settings from CERF UI<br/>

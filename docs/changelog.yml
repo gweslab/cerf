@@ -62,6 +62,10 @@
       Apps run from a shared folder no longer crash
       Shared folders no longer crash Explorer on Windows CE .NET
       Fixed memory errors on Windows CE 6 branch
+  ce_apps:
+    new: |
+      romdump: SH3 support
+      romdump: universal reset vector presets for MIPS and SH3
 
 - version: v6.7
   date: 23 Jul 2026

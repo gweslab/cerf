@@ -11,6 +11,7 @@
 #include "../../core/string_utils.h"
 #include "../../host/host_dark_mode.h"
 #include "../../host/host_window.h"
+#include "../../host/ui_language.h"
 
 #include <algorithm>
 #include <cstdint>
@@ -104,29 +105,43 @@ std::wstring CompactFlashMenu::CfImgPath() const {
 }
 
 std::wstring CompactFlashMenu::ChooseImageFile() const {
+    const auto& language = emu_.Get<UiLanguage>();
+    std::wstring filter = language.Text("pcmcia.cf.image_filter");
+    filter.push_back(L'\0');
+    filter += L"*.img;*.bin;*.ima";
+    filter.push_back(L'\0');
+    filter += language.Text("common.all_files");
+    filter.push_back(L'\0');
+    filter += L"*.*";
+    filter.push_back(L'\0');
+    filter.push_back(L'\0');
     wchar_t file[MAX_PATH] = {};
     OPENFILENAMEW ofn = {};
     ofn.lStructSize = sizeof(ofn);
     ofn.hwndOwner   = emu_.Get<HostWindow>().Hwnd();
-    ofn.lpstrFilter = L"CF image (*.img;*.bin;*.ima)\0*.img;*.bin;*.ima\0"
-                      L"All files\0*.*\0";
+    ofn.lpstrFilter = filter.c_str();
     ofn.lpstrFile   = file;
     ofn.nMaxFile    = MAX_PATH;
-    ofn.lpstrTitle  = L"Choose CompactFlash image";
+    ofn.lpstrTitle  = language.Text("pcmcia.cf.choose_image_title");
     ofn.Flags       = OFN_FILEMUSTEXIST | OFN_PATHMUSTEXIST | OFN_HIDEREADONLY;
     return GetOpenFileNameW(&ofn) ? std::wstring(file) : std::wstring();
 }
 
 std::vector<std::wstring> CompactFlashMenu::ChooseFilesToGenerate() const {
+    std::wstring filter = emu_.Get<UiLanguage>().Text("common.all_files");
+    filter.push_back(L'\0');
+    filter += L"*.*";
+    filter.push_back(L'\0');
+    filter.push_back(L'\0');
     std::vector<std::wstring> out;
     std::vector<wchar_t> buf(64u * 1024u, 0);   /* room for many paths */
     OPENFILENAMEW ofn = {};
     ofn.lStructSize = sizeof(ofn);
     ofn.hwndOwner   = emu_.Get<HostWindow>().Hwnd();
-    ofn.lpstrFilter = L"All files\0*.*\0";
+    ofn.lpstrFilter = filter.c_str();
     ofn.lpstrFile   = buf.data();
     ofn.nMaxFile    = static_cast<DWORD>(buf.size());
-    ofn.lpstrTitle  = L"Choose files to write into the CompactFlash image";
+    ofn.lpstrTitle  = emu_.Get<UiLanguage>().Text("pcmcia.cf.choose_payload_title");
     ofn.Flags = OFN_FILEMUSTEXIST | OFN_PATHMUSTEXIST | OFN_HIDEREADONLY |
                 OFN_ALLOWMULTISELECT | OFN_EXPLORER;
     if (!GetOpenFileNameW(&ofn)) return out;
@@ -159,8 +174,9 @@ uint32_t CompactFlashMenu::PayloadMb(
 }
 
 uint32_t CompactFlashMenu::PromptSizeMb(uint32_t min_mb) const {
-    wchar_t caption[96];
-    wsprintfW(caption, L"Card data size in MiB (minimum %u):", min_mb);
+    const auto& language = emu_.Get<UiLanguage>();
+    const auto caption = language.Format("pcmcia.cf.minimum_size",
+        {{"minimum", std::to_string(min_mb)}});
 
     DlgBuf t;
     /* DLGTEMPLATE header. */
@@ -172,7 +188,7 @@ uint32_t CompactFlashMenu::PromptSizeMb(uint32_t min_mb) const {
     t.W16(210); t.W16(72);          /* cx, cy (dialog units)*/
     t.W16(0);                       /* no menu              */
     t.W16(0);                       /* default class        */
-    t.Str(L"Generate CompactFlash image");
+    t.Str(language.Text("pcmcia.cf.generate_title"));
     t.W16(9);                       /* DS_SETFONT point size*/
     t.Str(L"Segoe UI");             /* ApplyToDialog re-applies the live UI font */
 
@@ -183,7 +199,7 @@ uint32_t CompactFlashMenu::PromptSizeMb(uint32_t min_mb) const {
     t.W16(7); t.W16(7); t.W16(196); t.W16(12);
     t.W16(0xFFFF);                  /* IDC_STATIC           */
     t.W16(0xFFFF); t.W16(0x0082);   /* Static class atom    */
-    t.Str(caption);
+    t.Str(caption.c_str());
     t.W16(0);
 
     /* Edit box (size in MiB). */
@@ -204,7 +220,7 @@ uint32_t CompactFlashMenu::PromptSizeMb(uint32_t min_mb) const {
     t.W16(96); t.W16(50); t.W16(50); t.W16(14);
     t.W16(IDOK);
     t.W16(0xFFFF); t.W16(0x0080);   /* Button class atom    */
-    t.Str(L"OK");
+    t.Str(language.Text("common.ok"));
     t.W16(0);
 
     t.Align();
@@ -213,7 +229,7 @@ uint32_t CompactFlashMenu::PromptSizeMb(uint32_t min_mb) const {
     t.W16(152); t.W16(50); t.W16(50); t.W16(14);
     t.W16(IDCANCEL);
     t.W16(0xFFFF); t.W16(0x0080);
-    t.Str(L"Cancel");
+    t.Str(language.Text("common.cancel"));
     t.W16(0);
 
     SizeDlgCtx ctx{ min_mb, &emu_.Get<HostDarkMode>() };
@@ -239,7 +255,7 @@ std::vector<WidgetMenuItem> CompactFlashMenu::BuildInsertMenu(
         if (GetFileAttributesW(path.c_str()) == INVALID_FILE_ATTRIBUTES)
             continue;
         WidgetMenuItem it;
-        it.label    = L"Insert - " + Utf8ToWide(card.name.c_str());
+        it.label    = emu_.Get<UiLanguage>().Format("pcmcia.insert_named", {{"name", card.name}});
         it.on_click = [this, inserter, path] {
             inserter(std::make_unique<CompactFlashCard>(emu_, path));
         };
@@ -248,7 +264,7 @@ std::vector<WidgetMenuItem> CompactFlashMenu::BuildInsertMenu(
 
     {
         WidgetMenuItem it;
-        it.label = L"Choose image...";
+        it.label = emu_.Get<UiLanguage>().Text("pcmcia.cf.choose_image");
         it.on_click = [this, inserter] {
             const std::wstring p = ChooseImageFile();
             if (!p.empty())
@@ -259,7 +275,7 @@ std::vector<WidgetMenuItem> CompactFlashMenu::BuildInsertMenu(
     {
         WidgetMenuItem it;
         const std::wstring cf = CfImgPath();
-        it.label   = L"Choose default image (CF.IMG)";
+        it.label   = emu_.Get<UiLanguage>().Text("pcmcia.cf.choose_default");
         it.enabled = GetFileAttributesW(cf.c_str()) != INVALID_FILE_ATTRIBUTES;
         it.on_click = [this, inserter, cf] {
             inserter(std::make_unique<CompactFlashCard>(emu_, cf));
@@ -268,7 +284,7 @@ std::vector<WidgetMenuItem> CompactFlashMenu::BuildInsertMenu(
     }
     {
         WidgetMenuItem it;
-        it.label = L"Generate FAT16 into CF.IMG and choose it...";
+        it.label = emu_.Get<UiLanguage>().Format("pcmcia.cf.generate_and_choose", {{"format", "FAT16"}});
         it.on_click = [this, inserter] {
             const std::vector<std::wstring> files = ChooseFilesToGenerate();
             if (files.empty()) return;
@@ -283,7 +299,7 @@ std::vector<WidgetMenuItem> CompactFlashMenu::BuildInsertMenu(
     }
     {
         WidgetMenuItem it;
-        it.label = L"Generate FAT32 into CF.IMG and choose it...";
+        it.label = emu_.Get<UiLanguage>().Format("pcmcia.cf.generate_and_choose", {{"format", "FAT32"}});
         it.on_click = [this, inserter] {
             const std::vector<std::wstring> files = ChooseFilesToGenerate();
             if (files.empty()) return;

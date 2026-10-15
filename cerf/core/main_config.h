@@ -3,6 +3,7 @@
 
 struct CerfConfig {
     const char* device_override = nullptr;
+    const char* language = nullptr;
 
     const char* log_file = nullptr;
     bool flush_outputs = false;

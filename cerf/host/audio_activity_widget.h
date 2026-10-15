@@ -16,10 +16,9 @@ public:
     void NotePresent();
 
     std::wstring WidgetName() const override { return L"Audio"; }
+    std::wstring MenuLabel() const override;
     WidgetGroup  Group() const override { return WidgetGroup::Indicator; }
-    std::wstring Tooltip() const override {
-        return L"Audio - TX: sound output, RX: microphone";
-    }
+    std::wstring Tooltip() const override;
 
     void DrawIcon(HDC dc, const RECT& box) const override;
 

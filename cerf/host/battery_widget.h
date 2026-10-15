@@ -26,6 +26,7 @@ public:
     void SetChangeHandler(std::function<void()> cb) { on_change_ = std::move(cb); }
 
     std::wstring WidgetName() const override { return L"Battery"; }
+    std::wstring MenuLabel() const override;
     WidgetGroup  Group() const override { return WidgetGroup::Power; }
     std::wstring Tooltip() const override;
     void DrawIcon(HDC dc, const RECT& box) const override;

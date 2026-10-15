@@ -1,6 +1,7 @@
 """One-time-per-device notice that editing launch options while a saved state
 exists will not fully apply until the state is discarded (a cold boot)."""
 from __future__ import annotations
+from i18n import t
 
 import tkinter as tk
 from pathlib import Path
@@ -28,6 +29,6 @@ class SavedStateEditWarning:
 
     def _show(self) -> None:
         show_info(
-            self._window, "Saved state present",
+            self._window, t("launcher.saved_state_warning.saved_state_present"),
             "This device has a saved state.\n\n"
             "Some changes require soft/hard reset to be applied and some might damage your saved state image.")

@@ -46,6 +46,7 @@ public:
 
     void OnReady() override { emu_.Get<KeyboardRouter>().Register(this); }
     std::wstring SourceName() const override { return L"SmartBook keyboard"; }
+    const char* SourceLabelKey() const override { return "input.smartbook_keyboard"; }
 
     void OnHostKey(uint8_t vk, bool key_up) override {
         uint32_t code;

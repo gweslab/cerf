@@ -1,4 +1,5 @@
 from __future__ import annotations
+from i18n import t
 
 import tkinter as tk
 from tkinter import ttk
@@ -7,7 +8,7 @@ from typing import Callable, Optional
 from search_box import SearchBox
 import ui_theme as theme
 
-SEARCH_HINT = "Search"
+SEARCH_HINT = 'launcher.status_bar.search'
 SEARCH_WIDTH = 28
 
 
@@ -19,7 +20,7 @@ class StatusBar:
         self._rule.pack(fill="x", side="bottom")
         bar.columnconfigure(3, weight=1)
 
-        self.search = SearchBox(bar, SEARCH_HINT, on_search, SEARCH_WIDTH)
+        self.search = SearchBox(bar, t(SEARCH_HINT), on_search, SEARCH_WIDTH)
         self.search.entry.grid(row=0, column=0, sticky="w", padx=(0, 8))
 
         self.update_label = ttk.Label(bar, text="", style="Hint.TLabel")
@@ -72,8 +73,7 @@ class StatusBar:
         if count <= 0:
             self.bundle_button.grid_remove()
             return
-        self.bundle_button.config(text="Update {} ROM{}".format(
-            count, "" if count == 1 else "s"))
+        self.bundle_button.config(text=t("launcher.bundle_updates", count=count))
         self.bundle_button.grid()
 
     def focus_search(self) -> None:

@@ -1,4 +1,6 @@
 from __future__ import annotations
+from i18n import t
+from database_text import field_text
 
 from dataclasses import dataclass
 from pathlib import Path
@@ -88,8 +90,10 @@ def _file_type(section: str, row: dict) -> DeviceFileType:
                 "storage_types '{}' has picker_type '{}', which this launcher "
                 "does not support".format(row["id"], picker))
     return DeviceFileType(
-        section=section, id=row["id"], name=_text(row, "name") or row["id"],
-        formats=_strings(row, "formats"), note=_text(row, "note"),
+        section=section, id=row["id"],
+        name=field_text("storage_types" if section == STORAGE_BLOCK else "rom_types", row),
+        formats=_strings(row, "formats"),
+        note=field_text("storage_types" if section == STORAGE_BLOCK else "rom_types", row, "note"),
         picker_type=picker,
         optional=row.get("optional") is True,
         optional_for_storage_ids=_strings(row, "optional_for_storage_ids"))
@@ -97,7 +101,9 @@ def _file_type(section: str, row: dict) -> DeviceFileType:
 
 def _check_storage_rows() -> None:
     for row in STORAGE_TYPES:
-        _file_type(STORAGE_BLOCK, row)
+        picker = _text(row, "picker_type") or PICKER_EXISTING_OR_POINT
+        if picker not in _STORAGE_PICKERS:
+            raise BoardDatabaseError("Unsupported storage picker type: " + picker)
 
 
 _check_storage_rows()
@@ -143,21 +149,19 @@ def file_problem(ftype: DeviceFileType, values: Dict[FileKey, str],
     value = values.get(ftype.key, "")
     if not value:
         if is_required(ftype, values, base_dir):
-            return "Pick the {}.".format(ftype.name)
+            return t("board.file.pick_required", name=ftype.name)
         return None
     path = resolve_device_file(value, base_dir)
     if not ftype.is_storage:
         if not path.is_file():
-            return "{} not found:\n{}".format(ftype.name, path)
+            return t("board.file.not_found", name=ftype.name, path=path)
         return None
     if not path.is_absolute():
         if Path(value).parent != Path("."):
-            return "The folder for the {} does not exist:\n{}".format(
-                ftype.name, Path(value).parent)
+            return t("board.file.folder_missing", name=ftype.name, path=Path(value).parent)
         return None
     if path.is_dir():
-        return "{} must be a file, not a folder:\n{}".format(ftype.name, path)
+        return t("board.file.must_be_file", name=ftype.name, path=path)
     if not path.parent.is_dir():
-        return "The folder for the {} does not exist:\n{}".format(
-            ftype.name, path.parent)
+        return t("board.file.folder_missing", name=ftype.name, path=path.parent)
     return None

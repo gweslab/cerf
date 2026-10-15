@@ -20,6 +20,7 @@ public:
     struct Entry {
         std::string  id;
         std::wstring display_name;
+        const char* display_key = nullptr;
         /* When set, the slot renders this entry as a submenu built here;
            each action builds a card and hands it to the inserter. Used by
            CompactFlash (Choose image / default / Generate actions). */

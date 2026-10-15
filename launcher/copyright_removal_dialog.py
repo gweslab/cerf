@@ -1,4 +1,5 @@
 from __future__ import annotations
+from i18n import t
 
 import tkinter as tk
 from tkinter import ttk
@@ -9,9 +10,9 @@ import ui_theme as theme
 
 ContactsFn = Callable[[], List[Tuple[str, Optional[str]]]]
 
-BUTTON_LABEL = "Copyright removal"
+BUTTON_LABEL = 'launcher.copyright_removal_dialog.copyright_removal'
 
-_TITLE = "Copyright removal"
+_TITLE = 'launcher.copyright_removal_dialog.copyright_removal'
 _NO_CONTACT = "-"
 _COPY = "Copy"
 _COPIED = "Copied"
@@ -19,21 +20,14 @@ _COPIED_MS = 1200
 _WRAP = 460
 
 _NOTICE = (
-    "ROM bundles are hosted by the bundle repositories listed below. The CERF "
-    "project does not host them.\n\n"
-    "If you hold the copyright to a ROM, or represent the holder, and want it "
-    "taken down, send a removal request to the contact address of the "
-    "repository that hosts it. Requests are acted on as soon as possible and "
-    "the content is deleted.\n\n"
-    "Repositories added to the launcher by its user are operated by third "
-    "parties and are unaffiliated with the CERF project."
+    'launcher.copyright_removal_dialog.rom_bundles_are_hosted_by_the_bundle'
 )
 
 _NO_CONTACT_HINT = (
-    "- marks a repository that publishes no removal contact."
+    'launcher.copyright_removal_dialog.marks_a_repository_that_publishes_no_removal'
 )
 
-_NO_REPOSITORIES = "No bundle repositories are configured."
+_NO_REPOSITORIES = 'launcher.copyright_removal_dialog.no_bundle_repositories_are_configured'
 
 
 class CopyrightRemovalDialog:
@@ -41,7 +35,7 @@ class CopyrightRemovalDialog:
                  contacts: List[Tuple[str, Optional[str]]]) -> None:
         dlg = tk.Toplevel(parent)
         self._dlg = dlg
-        dlg.title(_TITLE)
+        dlg.title(t(_TITLE))
         dlg.configure(bg=theme.BG)
         if parent.winfo_viewable():
             dlg.transient(parent)
@@ -49,7 +43,7 @@ class CopyrightRemovalDialog:
 
         body = ttk.Frame(dlg, padding=16)
         body.pack(fill="both", expand=True)
-        ttk.Label(body, text=_NOTICE, wraplength=_WRAP, justify="left").pack(
+        ttk.Label(body, text=t(_NOTICE), wraplength=_WRAP, justify="left").pack(
             anchor="w", pady=(0, 12))
 
         if contacts:
@@ -59,16 +53,16 @@ class CopyrightRemovalDialog:
             for i, (url, email) in enumerate(contacts):
                 self._add_row(rows, i, url, email)
             if any(email is None for _, email in contacts):
-                ttk.Label(body, text=_NO_CONTACT_HINT, style="Hint.TLabel",
+                ttk.Label(body, text=t(_NO_CONTACT_HINT), style="Hint.TLabel",
                           wraplength=_WRAP, justify="left").pack(
                     anchor="w", pady=(6, 0))
         else:
-            ttk.Label(body, text=_NO_REPOSITORIES, style="Hint.TLabel").pack(
+            ttk.Label(body, text=t(_NO_REPOSITORIES), style="Hint.TLabel").pack(
                 anchor="w")
 
         btns = ttk.Frame(body)
         btns.pack(anchor="e", pady=(14, 0))
-        pack_actions(btns, [("Close", dlg.destroy)])[0].focus_set()
+        pack_actions(btns, [(t("common.close"), dlg.destroy)])[0].focus_set()
         dlg.bind("<Return>", lambda _e: dlg.destroy())
         dlg.bind("<Escape>", lambda _e: dlg.destroy())
 

@@ -26,6 +26,7 @@ public:
     void OnUserResizeEnd(uint32_t canvas_w, uint32_t canvas_h);
 
     std::wstring WidgetName() const override { return L"Guest Additions"; }
+    std::wstring MenuLabel() const override;
     WidgetGroup  Group() const override { return WidgetGroup::GuestAdditions; }
     std::wstring Tooltip() const override;
     bool TryPrimaryAction() override;

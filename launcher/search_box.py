@@ -24,6 +24,12 @@ class SearchBox:
     def query(self) -> str:
         return "" if self._showing_hint else self._var.get()
 
+    def set_query(self, query: str) -> None:
+        self._hide_hint()
+        self._var.set(query)
+        if not query:
+            self._show_hint()
+
     def focus(self) -> None:
         self.entry.focus_set()
         self.entry.select_range(0, "end")

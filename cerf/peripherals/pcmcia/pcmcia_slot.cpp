@@ -5,6 +5,7 @@
 #include "../../core/cerf_emulator.h"
 #include "../../core/log.h"
 #include "../../host/host_icon_cache.h"
+#include "../../host/ui_language.h"
 #include "../../state/state_stream.h"
 
 #include <chrono>
@@ -286,7 +287,7 @@ std::vector<WidgetMenuItem> PcmciaSlot::BuildInsertSubmenuLocked(uint64_t gen) {
     std::vector<WidgetMenuItem> items;
     for (const auto& e : emu_.Get<PcmciaCardCatalog>().Entries()) {
         WidgetMenuItem it;
-        it.label = e.display_name;
+        it.label = e.display_key ? emu_.Get<UiLanguage>().Text(e.display_key) : e.display_name;
         if (e.insert_submenu) {
             /* Card kind contributes its own insert submenu; the inserter
                places a card it built (e.g. from a file dialog). */
@@ -326,24 +327,24 @@ std::vector<WidgetMenuItem> PcmciaSlot::BuildMenu() {
 
     if (!card_) {
         WidgetMenuItem insert;
-        insert.label   = L"Insert card";
+        insert.label   = emu_.Get<UiLanguage>().Text("pcmcia.insert_card");
         insert.submenu = BuildInsertSubmenuLocked(gen);
         items.push_back(std::move(insert));
         return items;
     }
 
     WidgetMenuItem header;
-    header.label   = card_->DisplayName();
+    header.label   = card_->MenuLabel();
     header.enabled = false;
     items.push_back(std::move(header));
 
     WidgetMenuItem eject;
-    eject.label    = L"Eject";
+    eject.label    = emu_.Get<UiLanguage>().Text("pcmcia.eject");
     eject.on_click = [this, gen] { MenuEject(gen); };
     items.push_back(std::move(eject));
 
     WidgetMenuItem swap;
-    swap.label   = L"Eject and insert";
+    swap.label   = emu_.Get<UiLanguage>().Text("pcmcia.eject_and_insert");
     swap.submenu = BuildInsertSubmenuLocked(gen);
     items.push_back(std::move(swap));
 
@@ -359,7 +360,7 @@ std::vector<WidgetMenuItem> PcmciaSlot::BuildMenu() {
 
 std::wstring PcmciaSlot::Tooltip() const {
     std::lock_guard<std::mutex> lk(bus_mutex_);
-    if (!card_) return label_ + L" - empty";
+    if (!card_) return label_ + L" - " + emu_.Get<UiLanguage>().Text("pcmcia.empty");
     return label_ + L" - " + card_->TooltipDetail();
 }
 

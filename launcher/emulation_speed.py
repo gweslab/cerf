@@ -1,4 +1,5 @@
 from __future__ import annotations
+from i18n import t
 
 from typing import Optional, Union
 
@@ -28,5 +29,5 @@ def model_choice(model: dict, key: str) -> Optional[Number]:
 
 def multiplier_label(value: Optional[Number]) -> str:
     if value is None:
-        return "Auto ({})".format(DEFAULT_MULTIPLIER)
+        return t("launcher.cpu_config.auto_text", text=DEFAULT_MULTIPLIER)
     return "{:g}".format(value)

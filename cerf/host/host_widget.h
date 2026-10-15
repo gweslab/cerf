@@ -57,8 +57,9 @@ public:
     virtual ~HostWidget() = default;
 
     virtual std::wstring WidgetName() const = 0;     /* sort key + default tooltip */
+    virtual std::wstring MenuLabel() const { return WidgetName(); }
     virtual WidgetGroup  Group() const = 0;
-    virtual std::wstring Tooltip() const { return WidgetName(); }
+    virtual std::wstring Tooltip() const { return MenuLabel(); }
 
     virtual bool TryPrimaryAction() { return false; }
     virtual std::vector<WidgetMenuItem> BuildMenu() { return {}; }  /* right-click + menu replica */

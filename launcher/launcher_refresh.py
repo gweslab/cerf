@@ -1,4 +1,5 @@
 from __future__ import annotations
+from i18n import t
 
 from typing import Callable, List, Optional
 
@@ -11,7 +12,7 @@ class RefreshMixin:
     def _refresh_manifest(self) -> None:
         if self.busy or self.catalog_loading:
             return
-        self._set_catalog_loading(True, "Fetching bundle catalog…")
+        self._set_catalog_loading(True, t("launcher.fetching_catalog"))
         future = self.manager.submit_refresh()
 
         def done(exc: Optional[BaseException]) -> None:
@@ -19,7 +20,7 @@ class RefreshMixin:
             if isinstance(exc, ManifestVersionError):
                 self._show_manifest_version_error(exc)
             elif exc is not None:
-                show_error(self, "Operation failed", str(exc))
+                show_error(self, t("launcher.launcher_operations.operation_failed"), str(exc))
             else:
                 self._surface_repo_errors()
             self._reload_device_list()
@@ -28,8 +29,7 @@ class RefreshMixin:
     def _surface_repo_errors(self) -> None:
         count = len(self.manager.repo_errors)
         if count:
-            self.status_bar.set_status("{} bundle {} unavailable".format(
-                count, "repository" if count == 1 else "repositories"))
+            self.status_bar.set_status(t("launcher.unavailable_repositories", count=count))
 
     def _reload_download_sources(
             self,
@@ -39,7 +39,7 @@ class RefreshMixin:
             done(self.tree_panel.devices, self.manager.repo_errors,
                  self.manager.download_places)
             return
-        self._set_catalog_loading(True, "Fetching bundle catalog…")
+        self._set_catalog_loading(True, t("launcher.fetching_catalog"))
         future = self.manager.submit_refresh()
 
         def cb(exc: Optional[BaseException]) -> None:
@@ -47,11 +47,11 @@ class RefreshMixin:
             if isinstance(exc, ManifestVersionError):
                 self._show_manifest_version_error(exc)
             elif exc is not None:
-                show_error(self, "Operation failed", str(exc))
+                show_error(self, t("launcher.launcher_operations.operation_failed"), str(exc))
             else:
                 if self.manager.all_repositories_failed:
-                    show_error(self, "Remote manifest unavailable", "\n\n".join(
-                        "Repository {} failed to load\n\n{}".format(url, error)
+                    show_error(self, t("launcher.launcher_refresh.remote_manifest_unavailable"), "\n\n".join(
+                        t('launcher.launcher_refresh.repository_url_failed_to_load_error', url=url, error=error)
                         for url, error in self.manager.repo_errors))
                 self._surface_repo_errors()
             self._reload_device_list()
@@ -61,14 +61,8 @@ class RefreshMixin:
 
     def _show_manifest_version_error(self, exc: ManifestVersionError) -> None:
         if exc.remote_is_newer:
-            show_info(self, "A newer CERF build is required",
-                      f"The bundle catalog uses a newer format (manifest "
-                      f"version {exc.remote_version}) than this build understands "
-                      f"({exc.supported_version}).\n\nDownload a newer CERF build:\n"
-                      f"https://cerf.cx/download/\n\n"
-                      f"Your installed devices remain available to launch.")
+            show_info(self, t("launcher.launcher_refresh.a_newer_cerf_build_is_required"),
+                      t('launcher.launcher_refresh.the_bundle_catalog_uses_a_newer_format', remote_version=exc.remote_version, supported_version=exc.supported_version))
         else:
-            show_error(self, "Remote manifest outdated",
-                       f"The server's catalog (manifest version "
-                       f"{exc.remote_version}) is older than this build expects "
-                       f"({exc.supported_version}). Usually temporary - try later.")
+            show_error(self, t("launcher.launcher_refresh.remote_manifest_outdated"),
+                       t('launcher.launcher_refresh.the_server_s_catalog_manifest_version_remote', remote_version=exc.remote_version, supported_version=exc.supported_version))

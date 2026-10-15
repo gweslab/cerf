@@ -27,6 +27,9 @@ from upgrade_process import UNINSTALL_FLAG
 
 
 def main(argv: List[str]) -> int:
+    from app_settings import read_language
+    from i18n import set_language
+    set_language(read_language())
     stage, wait_pid = parse_stage(argv)
     if stage == INSTALL_STAGE:
         enable_dpi_awareness()

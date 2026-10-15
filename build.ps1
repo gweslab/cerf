@@ -167,6 +167,7 @@ function Get-LauncherInputSignature {
     }
     $bands = Join-Path $PSScriptRoot "cerf\assets"
     $inputs += Get-ChildItem -Path $bands -Filter "about_band_*.png" -File -ErrorAction SilentlyContinue
+    $inputs += Get-ChildItem -Path (Join-Path $PSScriptRoot "langs") -Filter "*.yml" -File -ErrorAction SilentlyContinue
     ($inputs |
         ForEach-Object { "$($_.FullName)|$($_.LastWriteTimeUtc.Ticks)" } |
         Sort-Object) -join "`n"

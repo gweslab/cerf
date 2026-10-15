@@ -1,4 +1,5 @@
 from __future__ import annotations
+from i18n import t
 
 import tkinter as tk
 import webbrowser
@@ -14,10 +15,9 @@ from ui_dialogs import DISCORD_URL, PATREON_URL, WEBSITE_URL
 import ui_theme as theme
 
 
-TITLE = "About " + PRODUCT_NAME
 CONTRIBUTORS_ASSET = "contributors_generated.txt"
-CONTRIBUTORS_HEADER = "Thanks to project contributors:"
-EVERYONE_ELSE = "everyone else who helped"
+CONTRIBUTORS_HEADER = 'launcher.about_window.thanks_to_project_contributors'
+EVERYONE_ELSE = 'launcher.about_window.everyone_else_who_helped'
 SEPARATOR = "   •   "
 MARQUEE_DIP_PER_SEC = 34
 MARQUEE_FRAME_MS = 16
@@ -33,7 +33,7 @@ def contributors() -> str:
         except OSError:
             text = ""
         names = [line.strip() for line in text.splitlines() if line.strip()]
-    names.append(EVERYONE_ELSE)
+    names.append(t(EVERYONE_ELSE))
     return SEPARATOR.join(names)
 
 
@@ -82,7 +82,7 @@ class AboutWindow:
         if parent.winfo_viewable():
             self._dlg.transient(parent)
 
-        self._chrome = chrome = BrandedDialog(self._dlg, TITLE)
+        self._chrome = chrome = BrandedDialog(self._dlg, t("about.title", product=PRODUCT_NAME))
 
         body = chrome.body
         gap = scaled(self._dlg, 10)
@@ -113,9 +113,9 @@ class AboutWindow:
 
         links = ttk.Frame(body)
         links.pack(anchor="w")
-        for index, (label, url) in enumerate((("Website", WEBSITE_URL),
-                                              ("Discord", DISCORD_URL),
-                                              ("Patreon", PATREON_URL))):
+        for index, (label, url) in enumerate(((t("launcher.about_window.website"), WEBSITE_URL),
+                                              (t("about.discord"), DISCORD_URL),
+                                              (t("about.patreon"), PATREON_URL))):
             if index:
                 ttk.Label(links, text="·", style="Hint.TLabel").pack(
                     side="left", padx=scaled(self._dlg, 6))
@@ -128,15 +128,15 @@ class AboutWindow:
             ttk.Label(body, text=device_line, wraplength=text_w,
                       justify="left").pack(anchor="w", pady=(gap, 0))
 
-        ttk.Label(body, text=CONTRIBUTORS_HEADER, style="Hint.TLabel").pack(
+        ttk.Label(body, text=t(CONTRIBUTORS_HEADER), style="Hint.TLabel").pack(
             anchor="w", pady=(gap, 2))
         Marquee(body, contributors(), text_w).pack(anchor="w", fill="x")
 
-        RichText(body, [plain("Copyright (c) " + copyright_years() + " "),
+        RichText(body, [plain(t("launcher.about_window.copyright_c") + copyright_years() + " "),
                         link(AUTHOR, lambda: webbrowser.open(AUTHOR_URL))]
                  ).pack(anchor="w", fill="x", pady=(gap, 0))
 
-        chrome.add_button("OK", self._close, default=True)
+        chrome.add_button(t("common.ok"), self._close, default=True)
         self._dlg.bind("<Escape>", lambda _e: self._close())
         self._dlg.protocol("WM_DELETE_WINDOW", self._close)
 

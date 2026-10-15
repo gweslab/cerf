@@ -1,5 +1,6 @@
 #define NOMINMAX
 #include "task_manager_list_view.h"
+#include "ui_language.h"
 
 #include <commctrl.h>
 #include <uxtheme.h>
@@ -38,7 +39,8 @@ bool SameWins(const std::vector<CerfVirtTaskManager::WinEntry>& a,
 
 }  /* namespace */
 
-HWND TaskManagerListView::Create(HWND parent, int ctrl_id, HFONT font) {
+HWND TaskManagerListView::Create(HWND parent, int ctrl_id, HFONT font, UiLanguage& language) {
+    language_ = &language;
     INITCOMMONCONTROLSEX icc = { sizeof(icc), ICC_LISTVIEW_CLASSES };
     InitCommonControlsEx(&icc);
 
@@ -119,12 +121,12 @@ void TaskManagerListView::SetColumns() {
     for (int i = n - 1; i >= 0; --i) ListView_DeleteColumn(list_, i);
 
     struct Col { const wchar_t* title; int width; };
-    static const Col kWin[]  = {
-        { L"Title", 230 }, { L"HWND", 90 }, { L"PID", 90 }, { L"Visible", 60 },
+    const Col kWin[]  = {
+        { language_->Text("task_manager.column.title"), 230 }, { L"HWND", 90 }, { L"PID", 90 }, { language_->Text("task_manager.column.visible"), 60 },
     };
-    static const Col kProc[] = {
-        { L"Process", 150 }, { L"PID", 90 }, { L"Parent", 90 },
-        { L"Threads", 60 }, { L"Priority", 60 }, { L"Mem base", 90 },
+    const Col kProc[] = {
+        { language_->Text("task_manager.column.process"), 150 }, { L"PID", 90 }, { language_->Text("task_manager.column.parent"), 90 },
+        { language_->Text("task_manager.column.threads"), 60 }, { language_->Text("task_manager.column.priority"), 60 }, { language_->Text("task_manager.column.mem_base"), 90 },
     };
     const Col* cols = (mode_ == Mode::Windows) ? kWin : kProc;
     const int  cnt  = (mode_ == Mode::Windows) ? 4 : 6;
@@ -180,7 +182,7 @@ void TaskManagerListView::Fill() {
             LVITEMW it = {};
             it.mask    = LVIF_TEXT | LVIF_PARAM;
             it.iItem   = i;
-            it.pszText = (LPWSTR)(wd.title.empty() ? L"(no title)"
+            it.pszText = (LPWSTR)(wd.title.empty() ? language_->Text("task_manager.column.no_title")
                                                    : wd.title.c_str());
             it.lParam  = (LPARAM)wd.hwnd;
             ListView_InsertItem(list_, &it);
@@ -189,7 +191,7 @@ void TaskManagerListView::Fill() {
             _snwprintf_s(buf, _TRUNCATE, L"0x%08X", wd.pid);
             ListView_SetItemText(list_, i, 2, buf);
             ListView_SetItemText(list_, i, 3,
-                                 (LPWSTR)(wd.visible ? L"Yes" : L"No"));
+                                 (LPWSTR)(wd.visible ? language_->Text("common.yes") : language_->Text("common.no")));
             if (had_sel && wd.hwnd == sel) SelectRow(i);
         }
         displayed_ = (int)rows.size();

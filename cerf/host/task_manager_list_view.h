@@ -8,6 +8,8 @@
 #include <cstdint>
 #include <vector>
 
+class UiLanguage;
+
 /* The report-mode ListView inside the guest task-manager window. Renders one of
    two modes - top-level windows or processes - from a CerfVirtTaskManager
    snapshot while preserving the selected row (by lParam) across refreshes.
@@ -16,7 +18,7 @@ class TaskManagerListView {
 public:
     enum class Mode { Windows, Processes };
 
-    HWND Create(HWND parent, int ctrl_id, HFONT font);
+    HWND Create(HWND parent, int ctrl_id, HFONT font, UiLanguage& language);
     HWND Hwnd() const { return list_; }
     void ApplyDarkColors(COLORREF bg, COLORREF text);
     void Move(int x, int y, int w, int h);
@@ -35,6 +37,7 @@ public:
     bool SelectedWindow(uint32_t* hwnd, uint32_t* pid) const;
 
 private:
+    UiLanguage* language_ = nullptr;
     static LRESULT CALLBACK ListProcStatic(HWND, UINT, WPARAM, LPARAM);
     void SetColumns();
     void Fill();

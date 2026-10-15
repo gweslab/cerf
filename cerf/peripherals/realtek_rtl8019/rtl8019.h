@@ -22,6 +22,7 @@ public:
 
     std::wstring DisplayName() const override { return kDisplayName; }
     std::wstring TooltipDetail() const override;
+    std::wstring MenuLabel() const override;
     const wchar_t* IconResource() const override { return L"ICON_PCMCIA_ETHERNET"; }
 
     void OnInserted() override;

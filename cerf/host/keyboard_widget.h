@@ -20,6 +20,7 @@ public:
     void OnReady() override;
 
     std::wstring WidgetName() const override { return L"Keyboard"; }
+    std::wstring MenuLabel() const override;
     WidgetGroup  Group() const override { return WidgetGroup::InputControl; }
     std::wstring Tooltip() const override;
     void DrawIcon(HDC dc, const RECT& box) const override;

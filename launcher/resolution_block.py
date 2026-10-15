@@ -1,4 +1,5 @@
 from __future__ import annotations
+from i18n import t
 
 import tkinter as tk
 from typing import Callable, Optional, Tuple
@@ -16,8 +17,8 @@ _SIZES = [(w, h) for w, h, _name in RES_PRESETS]
 
 def resolution_label(size: Optional[Size], auto_size: Size) -> str:
     if size is None:
-        return "Auto - {}x{}".format(*auto_size)
-    return "{} - {}x{}".format(_NAMES.get(size, "Custom"), *size)
+        return t('launcher.resolution_block.auto_value1_x_value2', value1=auto_size[0], value2=auto_size[1])
+    return "{} - {}x{}".format(_NAMES.get(size, t("common.custom")), *size)
 
 
 def model_size(model: dict) -> Optional[Size]:
@@ -61,8 +62,8 @@ class ResolutionBlock:
 
     def _ask_custom(self, current: object) -> Optional[Size]:
         width, height = current if current is not None else self._auto_size
-        values = ask_numbers(self._window, "Display resolution",
-                             [("Width", width, "px"), ("Height", height, "px")])
+        values = ask_numbers(self._window, t("launcher.properties_page_display.display_resolution"),
+                             [(t("common.width"), width, "px"), (t("common.height"), height, "px")])
         if values is None:
             return None
         return (values[0], values[1])

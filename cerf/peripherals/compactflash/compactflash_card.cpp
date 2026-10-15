@@ -96,19 +96,6 @@ CompactFlashCard::~CompactFlashCard() {
     if (file_) std::fclose(file_);
 }
 
-std::wstring CompactFlashCard::DisplayName() const {
-    const std::size_t slash = image_path_.find_last_of(L"\\/");
-    const std::wstring name = slash == std::wstring::npos
-        ? image_path_ : image_path_.substr(slash + 1);
-    return L"CompactFlash (" + name + L")";
-}
-
-std::wstring CompactFlashCard::TooltipDetail() const {
-    if (!file_) return DisplayName() + L" - image not found";
-    return DisplayName() + L" - " +
-           std::to_wstring(total_sectors_ / 2048u) + L" MB";
-}
-
 void CompactFlashCard::PowerOn() {
     std::lock_guard<std::mutex> lk(mtx_);
     sectors_left_ = 0;

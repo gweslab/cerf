@@ -1,4 +1,5 @@
 #include "guest_calibration_warning.h"
+#include "ui_language.h"
 
 #include "../core/cerf_emulator.h"
 #include "../core/device_config.h"
@@ -79,6 +80,6 @@ void GuestCalibrationWarning::EndCycle() {
     LOG(GuestAdditions, "[CALIB] switched back to the Guest Additions pointer\n");
     emu_.Get<HostBalloonHint>().ShowUnderWidget(
         &emu_.Get<PointerWidget>(),
-        L"Switched back to the Guest Additions mouse pointer",
+        emu_.Get<UiLanguage>().Text("calibration.switched_back_to_the_guest_additions_mouse_pointer"),
         kSwitchBackHoldMs);
 }

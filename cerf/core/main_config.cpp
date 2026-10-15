@@ -2,6 +2,7 @@
 #include "log.h"
 #include "crash_report.h"
 #include "run_timeout.h"
+#include "../i18n/message_format.h"
 #include <cstdlib>
 #include <cstring>
 
@@ -17,6 +18,12 @@ ArgParseResult ParseCerfArgs(int argc, char* argv[], CerfConfig& cfg) {
             cfg.flush_outputs = true;
         } else if (strncmp(argv[i], "--device=", 9) == 0) {
             cfg.device_override = argv[i] + 9;
+        } else if (strncmp(argv[i], "--language=", 11) == 0) {
+            if (!cerf::i18n::IsLanguageCode(argv[i] + 11)) {
+                LOG(Caution, "Invalid language code: %s\n", argv[i] + 11);
+                return ArgParseResult::BadArgument;
+            }
+            cfg.language = argv[i] + 11;
         } else if (strncmp(argv[i], "--timeout=", 10) == 0) {
             char* end = nullptr;
             const long secs = strtol(argv[i] + 10, &end, 10);

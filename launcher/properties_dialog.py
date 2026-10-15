@@ -1,4 +1,5 @@
 from __future__ import annotations
+from i18n import t
 
 import tkinter as tk
 from tkinter import ttk
@@ -23,7 +24,7 @@ MODE_EDIT = "edit"
 MODE_LOCKED = "locked"
 MODE_LIVE = "live"
 
-REBOOT_REQUIRED = "Reboot required"
+REBOOT_REQUIRED = 'launcher.properties_dialog.reboot_required'
 
 PAGE_PAD_DIP = 14
 DEFAULT_WIDTH_DIP = 900
@@ -47,7 +48,7 @@ class PropertiesDialog:
 
         dlg = tk.Toplevel(parent)
         dlg.withdraw()
-        dlg.title("{} - Properties".format(self._subject.display_name))
+        dlg.title(t('launcher.properties_dialog.display_name_properties', display_name=self._subject.display_name))
         dlg.configure(bg=theme.BG)
         if parent.winfo_viewable():
             dlg.transient(parent)
@@ -59,12 +60,12 @@ class PropertiesDialog:
                                                          side="bottom")
         actions = ttk.Frame(footer)
         actions.pack(side="right")
-        self._ok = pack_actions(actions, [("OK", self._on_ok),
-                                          ("Cancel", self._on_cancel)])[0]
+        self._ok = pack_actions(actions, [(t("common.ok"), self._on_ok),
+                                          (t("common.cancel"), self._on_cancel)])[0]
         self._reboot_label = ttk.Label(footer, text="",
                                        foreground=theme.WARN_FG)
         self._reboot_label.pack(side="right", padx=(0, 12))
-        ttk.Button(footer, text="Open device directory",
+        ttk.Button(footer, text=t("launcher.launcher_app.open_device_directory"),
                    command=lambda: open_device_directory(
                        dlg, self._subject.device_dir)).pack(side="left")
 
@@ -160,7 +161,7 @@ class PropertiesDialog:
         self._keys = self._available()
         self._list.delete(0, "end")
         for key in self._keys:
-            self._list.insert("end", "  " + self._pages[key].title)
+            self._list.insert("end", "  " + t(self._pages[key].title))
         if self._current in self._keys:
             self._list.selection_set(self._keys.index(self._current))
 
@@ -219,7 +220,7 @@ class PropertiesDialog:
         if self._current is not None:
             self._pages[self._current].store(values)
         required = self._reboot_required(values)
-        self._reboot_label.config(text=REBOOT_REQUIRED if required else "")
+        self._reboot_label.config(text=t(REBOOT_REQUIRED) if required else "")
 
     def _refresh_auto_size(self) -> None:
         board_id = self._model.values.get("board_id", "")

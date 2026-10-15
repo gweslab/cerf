@@ -6,6 +6,7 @@ from bundle_repositories import config_path, load_config
 
 DISCORD_RICH_PRESENCE_KEY = "discord_rich_presence"
 UPDATE_CHANNEL_KEY = "update_channel"
+LANGUAGE_KEY = "language"
 
 CHANNEL_DISABLED = "disabled"
 CHANNEL_STABLE = "stable"
@@ -45,3 +46,16 @@ def read_update_channel() -> str:
 def write_update_channel(channel: str) -> None:
     write_key(UPDATE_CHANNEL_KEY,
               channel if channel in CHANNELS else CHANNEL_DEFAULT)
+
+
+def read_language() -> str:
+    from yaml_catalog import LANGUAGE_CODE
+    value = load_config(config_path()).get(LANGUAGE_KEY, "en")
+    return value if isinstance(value, str) and LANGUAGE_CODE.fullmatch(value) else "en"
+
+
+def write_language(language: str) -> None:
+    from yaml_catalog import LANGUAGE_CODE
+    if not LANGUAGE_CODE.fullmatch(language):
+        raise ValueError("Invalid language code")
+    write_key(LANGUAGE_KEY, language)

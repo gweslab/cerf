@@ -1,5 +1,6 @@
 #define NOMINMAX
 #include "keyboard_mapping_dialog.h"
+#include "ui_language.h"
 
 #include "../core/cerf_emulator.h"
 #include "host_dark_mode.h"
@@ -8,6 +9,8 @@
 #include "pc_keyboard_layout.h"
 
 #include <cstdio>
+#include "../core/string_utils.h"
+
 #include <cwchar>
 #include <string>
 
@@ -174,7 +177,7 @@ void KeyboardMappingDialog::Paint(HDC dc) {
     bool           active_is_toggle = false;
     for (const KeyBinding& b : emu_.Get<KeyboardMap>().Bindings()) {
         if (b.holds_layer == 0) continue;
-        const wchar_t* name = b.guest_label ? b.guest_label : L"modifier";
+        const wchar_t* name = b.guest_label ? b.guest_label : emu_.Get<UiLanguage>().Text("keyboard.modifier");
         if (b.holds_layer == active_layer_) active_name = name;
         if (b.holds_layer < 32 && !(seen_layers & (1u << b.holds_layer))) {
             seen_layers |= 1u << b.holds_layer;
@@ -186,27 +189,23 @@ void KeyboardMappingDialog::Paint(HDC dc) {
         for (const KeyboardToggleLayer& t : toggles)
             if (t.layer == active_layer_) { active_name = t.name; active_is_toggle = true; break; }
 
-    wchar_t header[200];
+    std::wstring header;
     if (active_layer_ != 0) {
-        const wchar_t* m = active_name ? active_name : L"the modifier";
-        _snwprintf_s(header, _TRUNCATE,
-                     active_is_toggle
-                         ? L"Previewing the %s layer - untick %s to return."
-                         : L"Previewing the %s layer - click %s again to return.",
-                     m, m);
+        const wchar_t* m = active_name ? active_name : emu_.Get<UiLanguage>().Text("keyboard.the_modifier");
+        header = emu_.Get<UiLanguage>().Format(
+            active_is_toggle ? "keyboard.preview_toggle" : "keyboard.preview_modifier",
+            {{"modifier", WideToUtf8(m)}});
     } else if (!mods.empty()) {
-        _snwprintf_s(header, _TRUNCATE,
-                     L"Dimmed keys are unmapped. Click a highlighted modifier "
-                     L"(%s) to preview its layer.", mods.c_str());
+        header = emu_.Get<UiLanguage>().Format("keyboard.preview_hint",
+                                              {{"modifiers", WideToUtf8(mods)}});
     } else {
-        wcscpy_s(header,
-                 L"Dimmed keys are unmapped; blue shows the guest action where it "
-                 L"differs from the key.");
+        header = emu_.Get<UiLanguage>().Text(
+            "keyboard.dimmed_keys_are_unmapped_blue_shows_the_guest_action");
     }
     RECT hr = { kMargin, kMargin, kClientW - kMargin, kMargin + 24 };
     SetBkMode(dc, TRANSPARENT);
     SetTextColor(dc, pal.text);
-    DrawTextW(dc, header, -1, &hr, DT_LEFT | DT_VCENTER | DT_SINGLELINE);
+    DrawTextW(dc, header.c_str(), -1, &hr, DT_LEFT | DT_VCENTER | DT_SINGLELINE);
 
     for (int i = 0; i < (int)toggles.size(); ++i) {
         const RECT r = ToggleRect(i);
@@ -289,7 +288,7 @@ void KeyboardMappingDialog::Show() {
 
     /* Modeless tool window owned by the main window: the user parks it beside
        the guest as a persistent key-map hint. Pumped by the UI thread loop. */
-    hwnd_ = CreateWindowExW(WS_EX_TOOLWINDOW, kClass, L"Keyboard mapping",
+    hwnd_ = CreateWindowExW(WS_EX_TOOLWINDOW, kClass, emu_.Get<UiLanguage>().Text("keyboard.keyboard_mapping"),
                             style, wx, wy, ww, wh, owner, nullptr,
                             GetModuleHandleW(nullptr), this);
     if (!hwnd_) return;

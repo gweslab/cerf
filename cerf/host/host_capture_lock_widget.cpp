@@ -1,5 +1,6 @@
 #define NOMINMAX
 #include <windows.h>
+#include "ui_language.h"
 
 #include "../core/cerf_emulator.h"
 #include "../core/service.h"
@@ -22,14 +23,15 @@ public:
         emu_.Get<HostWidgetRegistry>().Register(this);
     }
 
-    std::wstring WidgetName() const override { return L"Input Capture"; }
+    std::wstring WidgetName() const override { return L"Input capture"; }
+    std::wstring MenuLabel() const override { return emu_.Get<UiLanguage>().Text("input.capture.input_capture"); }
     WidgetGroup  Group() const override { return WidgetGroup::InputCapture; }
     std::wstring Tooltip() const override {
         const std::wstring key = emu_.Get<HostKeyBinding>().Label();
         return emu_.Get<HostInputCapture>().IsCaptured()
-            ? L"Input captured - " + key + L" (or click) to release"
-            : L"Input free - " + key +
-                  L" (or click) to capture (Alt+Tab etc. -> guest)";
+            ? emu_.Get<UiLanguage>().Text("input.capture.input_captured") + key + emu_.Get<UiLanguage>().Text("input.capture.or_click_to_release")
+            : emu_.Get<UiLanguage>().Text("input.capture.input_free") + key +
+                  emu_.Get<UiLanguage>().Text("input.capture.or_click_to_capture_alt_tab_etc_guest");
     }
     bool TryPrimaryAction() override {
         emu_.Get<HostInputCapture>().Toggle();
@@ -39,8 +41,8 @@ public:
         const std::wstring key = emu_.Get<HostKeyBinding>().Label();
         WidgetMenuItem it;
         it.label    = emu_.Get<HostInputCapture>().IsCaptured()
-                          ? L"Release input capture\t" + key
-                          : L"Capture input\t" + key;
+                          ? emu_.Get<UiLanguage>().Text("input.capture.release_input_capture") + key
+                          : emu_.Get<UiLanguage>().Text("input.capture.capture_input") + key;
         it.on_click = [this] { emu_.Get<HostInputCapture>().Toggle(); };
         return { std::move(it) };
     }

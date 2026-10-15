@@ -7,6 +7,7 @@ a browser / download manager. For the manual path the launcher pre-stages the
 device directory, cerf.json, and local-manifest entry so the user only has to
 unpack the ZIP. This is GUI-only - the CLI always streams in-process."""
 from __future__ import annotations
+from i18n import t
 
 import tkinter as tk
 import webbrowser
@@ -30,7 +31,7 @@ def _ask_large(parent: tk.Misc, *, headline: str, link_url: str,
     """Modal launcher-vs-manual-vs-cancel dialog with a clickable download
     link and unpack instructions. Returns _LAUNCHER / _MANUAL / _CANCEL."""
     dlg = tk.Toplevel(parent)
-    dlg.title("Large download")
+    dlg.title(t("launcher.ui_large_download.large_download"))
     dlg.configure(bg=theme.BG)
     if parent.winfo_viewable():
         dlg.transient(parent)
@@ -57,9 +58,9 @@ def _ask_large(parent: tk.Misc, *, headline: str, link_url: str,
     btns = ttk.Frame(body)
     btns.pack(anchor="e")
     pack_actions(btns, [
-        ("Continue download via launcher", lambda: choose(_LAUNCHER)),
-        ("Open download link in browser", lambda: choose(_MANUAL)),
-        ("Cancel", lambda: choose(_CANCEL))])
+        (t("launcher.ui_large_download.continue_in_launcher"), lambda: choose(_LAUNCHER)),
+        (t("launcher.ui_large_download.open_in_browser"), lambda: choose(_MANUAL)),
+        (t("common.cancel"), lambda: choose(_CANCEL))])
     dlg.bind("<Escape>", lambda _e: choose(_CANCEL))
 
     dlg.update_idletasks()
@@ -78,18 +79,12 @@ def gate_large_bundle(app, device: DeviceBundle) -> bool:
     if not is_large_download(remote.archive_size):
         return True
     name = device.name
-    verb = "update" if device.is_installed else "download"
+    verb = t("launcher.ui_large_download.operation_update" if device.is_installed
+             else "launcher.ui_large_download.operation_download")
     headline = (
-        f"{device.meta.device_name or name} is a large {verb} "
-        f"({format_size(remote.archive_size)}). On an unreliable connection "
-        f"the in-launcher download can fail partway. You can let the launcher "
-        f"download it (with progress), or download the ZIP yourself in a "
-        f"browser or download manager:")
+        t('launcher.ui_large_download.value_is_a_large_verb_value2_on', value=device.meta.device_name or name, verb=verb, value2=format_size(remote.archive_size)))
     instructions = (
-        f"Choosing the browser download pre-creates devices/{name}/ with its "
-        f"cerf.json and manifest entry now. When the download finishes, unpack "
-        f"the ZIP so its files land directly in devices/{name}/, then refresh "
-        f"the launcher.")
+        t('launcher.ui_large_download.choosing_the_browser_download_pre_creates_devices', name=name, name2=name))
     choice = _ask_large(app, headline=headline,
                         link_url=remote.archive_url, instructions=instructions)
     if choice == _MANUAL:
@@ -109,16 +104,13 @@ def _manual_bundle(app, device: DeviceBundle) -> None:
     try:
         dir_name = app.manager.prepare_manual_install(device)
     except BundleError as exc:
-        show_error(app, "Could not prepare manual download", str(exc))
+        show_error(app, t("launcher.ui_large_download.could_not_prepare_manual_download"), str(exc))
         return
     webbrowser.open(device.remote.archive_url)
     app._reload_device_list()
     show_info(
-        app, "Manual download started",
-        f"Your browser is downloading the ZIP. The launcher created "
-        f"devices/{dir_name}/ with its cerf.json.\n\n"
-        f"When the download finishes, unpack the ZIP so its files land "
-        f"directly in devices/{dir_name}/, then refresh the launcher.")
+        app, t("launcher.ui_large_download.manual_download_started"),
+        t('launcher.ui_large_download.your_browser_is_downloading_the_zip_the', dir_name=dir_name, dir_name2=dir_name))
 
 
 def gate_package_download(app, device: DeviceBundle, ps: PackageStatus) -> bool:
@@ -132,13 +124,10 @@ def gate_package_download(app, device: DeviceBundle, ps: PackageStatus) -> bool:
     if not is_large_download(ps.remote.archive_size):
         return True
     name = device.name
-    verb = "update" if ps.installed else "download"
+    verb = t("launcher.ui_large_download.operation_update" if ps.installed
+             else "launcher.ui_large_download.operation_download")
     headline = (
-        f"{ps.remote.name} for {device.meta.device_name or name} is a large "
-        f"{verb} ({format_size(ps.remote.archive_size)}). On an unreliable "
-        f"connection the in-launcher download can fail partway. You can let "
-        f"the launcher download it (with progress), or download the ZIP "
-        f"yourself in a browser or download manager:")
+        t('launcher.ui_large_download.name_for_value_is_a_large_verb', name=ps.remote.name, value=device.meta.device_name or name, verb=verb, value2=format_size(ps.remote.archive_size)))
     instructions = _package_manual_steps(name, ps)
     choice = _ask_large(app, headline=headline,
                         link_url=ps.remote.archive_url,
@@ -153,11 +142,9 @@ def gate_package_download(app, device: DeviceBundle, ps: PackageStatus) -> bool:
 def _package_manual_steps(name: str, ps: PackageStatus) -> str:
     if ps.remote.is_directory:
         return (
-            f"When the download finishes, unpack the ZIP so its contents fill "
-            f"devices/{name}/{ps.remote.key}/, then refresh the launcher.")
+            t('launcher.ui_large_download.when_the_download_finishes_unpack_the_zip_2', name=name, key=ps.remote.key))
     return (
-        f"When the download finishes, unpack the ZIP and place "
-        f"{ps.remote.key} into devices/{name}/, then refresh the launcher.")
+        t('launcher.ui_large_download.when_the_download_finishes_unpack_the_zip', key=ps.remote.key, name=name))
 
 
 def _manual_package(app, device: DeviceBundle, ps: PackageStatus) -> None:
@@ -165,13 +152,12 @@ def _manual_package(app, device: DeviceBundle, ps: PackageStatus) -> None:
         app.manager.prepare_manual_install_package(
             device.name, ps.remote.category, ps.remote.key)
     except BundleError as exc:
-        show_error(app, "Could not prepare manual download", str(exc))
+        show_error(app, t("launcher.ui_large_download.could_not_prepare_manual_download"), str(exc))
         return
     webbrowser.open(ps.remote.archive_url)
     app._reload_device_list()
-    show_info(app, "Manual download started",
-              f"Your browser is downloading the ZIP.\n\n"
-              f"{_package_manual_steps(device.name, ps)}")
+    show_info(app, t("launcher.ui_large_download.manual_download_started"),
+              t('launcher.ui_large_download.your_browser_is_downloading_the_zip_value', value=_package_manual_steps(device.name, ps)))
 
 
 def filter_update_all_targets(
@@ -194,19 +180,15 @@ def filter_update_all_targets(
              f"({format_size(d.remote.archive_size)})" for d in large_roms]
     lines += [f"  • {d.name}: {ps.remote.name} "
               f"({format_size(ps.remote.archive_size)})" for d, ps in large_pkgs]
-    message = (
-        "These updates are large (over 300 MB) and may be unreliable to "
-        "download in bulk:\n\n" + "\n".join(lines) + "\n\n"
-        "Update everything via the launcher, or skip the large ones and "
-        "update each individually from the table (where you can choose a "
-        "manual browser download)?")
-    choice = show_dialog(app, "Update all", message,
-                         buttons=("Update all via launcher",
-                                  "Skip large ones", "Cancel"),
-                         default="Cancel")
-    if choice == "Update all via launcher":
+    message = t("launcher.ui_large_download.bulk_update", items="\n".join(lines))
+    update_label = t("launcher.ui_large_download.update_all_in_launcher")
+    skip_label = t("launcher.ui_large_download.skip_large")
+    choice = show_dialog(app, t("launcher.launcher_operations.update_all"), message,
+                         buttons=(update_label, skip_label, t("common.cancel")),
+                         default=t("common.cancel"))
+    if choice == update_label:
         return rom_targets, pkg_targets
-    if choice != "Skip large ones":
+    if choice != skip_label:
         return None
     rom_targets = [d for d in rom_targets
                    if not is_large_download(d.remote.archive_size)]

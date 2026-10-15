@@ -1,4 +1,5 @@
 from __future__ import annotations
+from i18n import t
 
 from concurrent.futures import Future
 from typing import Callable, List, Optional, Tuple
@@ -24,24 +25,24 @@ class OperationsMixin:
             return
         if not gate_bundle_download(self, d):
             return
-        self._set_busy(True, f"Downloading {d.name}…")
+        self._set_busy(True, t('launcher.launcher_operations.downloading_name', name=d.name))
         f = self.manager.submit_install(d, progress=self._progress_cb,
                                         cancel_event=self.cancel_event)
-        self._await_future(f, lambda exc: self._after_op(exc, f"Downloaded {d.name}"))
+        self._await_future(f, lambda exc: self._after_op(exc, t('launcher.launcher_operations.downloaded_name', name=d.name)))
 
     def _download_package(self, d: DeviceBundle, ps: PackageStatus) -> None:
         if not d.is_installed:
-            show_error(self, "Cannot download package",
-                       f"{d.name} is not installed; install the device first.")
+            show_error(self, t("launcher.launcher_operations.cannot_download_package"),
+                       t('launcher.launcher_operations.name_is_not_installed_install_the_device', name=d.name))
             return
         if not gate_package_download(self, d, ps):
             return
-        self._set_busy(True, f"Downloading {ps.remote.name}…")
+        self._set_busy(True, t('launcher.launcher_operations.downloading_name', name=ps.remote.name))
         f = self.manager.submit_install_package(
             d.name, ps.remote.category, ps.remote.key,
             progress=self._progress_cb, cancel_event=self.cancel_event)
         self._await_future(f, lambda exc: self._after_op(
-            exc, f"Installed {ps.remote.name} for {d.name}"))
+            exc, t('launcher.launcher_operations.installed_name_for_name2', name=ps.remote.name, name2=d.name)))
 
     def _update_selected(self) -> None:
         sel = self.tree_panel.selection()
@@ -52,9 +53,8 @@ class OperationsMixin:
         if self.busy or self.catalog_loading:
             return
         if self._running_status_for(d) is not None:
-            show_error(self, "Device is running",
-                       f"{d.meta.device_name or d.name} was not updated because "
-                       f"its ROM is running. Close it and try again.")
+            show_error(self, t("launcher.launcher_operations.device_is_running"),
+                       t('launcher.launcher_operations.value_was_not_updated_because_its_rom', value=d.meta.device_name or d.name))
             return
         if d.has_update:
             self._download_selected()
@@ -64,24 +64,22 @@ class OperationsMixin:
     def _refresh_cerf_json(self, d: DeviceBundle) -> None:
         if self.busy or self.catalog_loading or d.remote is None:
             return
-        self._set_busy(True, f"Updating {d.name} config…")
+        self._set_busy(True, t('launcher.launcher_operations.updating_name_config', name=d.name))
         f = self.manager.submit_refresh_cerf_json(d.name)
         self._await_future(f, lambda exc: self._after_op(
-            exc, f"Updated {d.name} config"))
+            exc, t('launcher.launcher_operations.updated_name_config', name=d.name)))
 
     def _delete_package(self, d: DeviceBundle, ps: PackageStatus) -> None:
         if self.busy:
             return
-        if not ask_yesno(self, "Delete package",
-                         f"Remove {ps.remote.name} "
-                         f"(devices/{d.name}/{ps.remote.key})?\n"
-                         f"This cannot be undone."):
+        if not ask_yesno(self, t("launcher.launcher_operations.delete_package"),
+                         t('launcher.launcher_operations.remove_name_devices_name2_key_this_cannot', name=ps.remote.name, name2=d.name, key=ps.remote.key)):
             return
-        self._set_busy(True, f"Deleting {ps.remote.name}…")
+        self._set_busy(True, t('launcher.launcher_operations.deleting_name', name=ps.remote.name))
         f = self.manager.submit_delete_package(d.name, ps.remote.category,
                                                ps.remote.key)
         self._await_future(f, lambda exc: self._after_op(
-            exc, f"Deleted {ps.remote.name}"))
+            exc, t('launcher.launcher_operations.deleted_name', name=ps.remote.name)))
 
     def _delete_selected(self) -> None:
         sel = self.tree_panel.selection()
@@ -92,23 +90,21 @@ class OperationsMixin:
             return
         if sel.kind == "package" and sel.package is not None:
             ps = sel.package
-            if not ask_yesno(self, "Delete package",
-                             f"Remove {ps.remote.name} "
-                             f"(devices/{d.name}/{ps.remote.key})?\n"
-                             f"This cannot be undone."):
+            if not ask_yesno(self, t("launcher.launcher_operations.delete_package"),
+                             t('launcher.launcher_operations.remove_name_devices_name2_key_this_cannot', name=ps.remote.name, name2=d.name, key=ps.remote.key)):
                 return
-            self._set_busy(True, f"Deleting {ps.remote.name}…")
+            self._set_busy(True, t('launcher.launcher_operations.deleting_name', name=ps.remote.name))
             f = self.manager.submit_delete_package(d.name, ps.remote.category,
                                                    ps.remote.key)
             self._await_future(f, lambda exc: self._after_op(
-                exc, f"Deleted {ps.remote.name}"))
+                exc, t('launcher.launcher_operations.deleted_name', name=ps.remote.name)))
             return
-        if not ask_yesno(self, "Delete device",
-                         f"Remove devices/{d.name}/ and its files?\nThis cannot be undone."):
+        if not ask_yesno(self, t("launcher.launcher_operations.delete_device"),
+                         t('launcher.launcher_operations.remove_devices_name_and_its_files_this', name=d.name)):
             return
-        self._set_busy(True, f"Deleting {d.name}…")
+        self._set_busy(True, t('launcher.launcher_operations.deleting_name', name=d.name))
         f = self.manager.submit_delete(d.name)
-        self._await_future(f, lambda exc: self._after_op(exc, f"Deleted {d.name}"))
+        self._await_future(f, lambda exc: self._after_op(exc, t('launcher.launcher_operations.deleted_name', name=d.name)))
 
     def _update_all(self) -> None:
         if self.busy or self.catalog_loading:
@@ -127,13 +123,13 @@ class OperationsMixin:
             (d, ps) for d in devices for ps in d.packages
             if ps.has_update and d.name not in running]
         if skipped:
-            show_error(self, "Devices are running",
+            show_error(self, t("launcher.launcher_operations.devices_are_running"),
                        "These devices were not updated because their ROM is "
                        "running:\n" + "\n".join(
                            f"• {d.meta.device_name or d.name}" for d in skipped))
         if not rom_targets and not cfg_targets and not pkg_targets:
             if not skipped:
-                show_info(self, "Update all",
+                show_info(self, t("launcher.launcher_operations.update_all"),
                           "All installed bundles and packages are up to date.")
             return
         filtered = filter_update_all_targets(self, rom_targets, pkg_targets)
@@ -142,14 +138,14 @@ class OperationsMixin:
         rom_targets, pkg_targets = filtered
         total = len(rom_targets) + len(pkg_targets) + len(cfg_targets)
         if not total:
-            show_info(self, "Update all",
+            show_info(self, t("launcher.launcher_operations.update_all"),
                       "Only large bundles need updating - update each from the "
                       "table individually.")
             return
         if (rom_targets or pkg_targets) and not confirm_rom_license(
                 self, f"{total} item(s)", self.manager.repo_abuse_contacts):
             return
-        self._set_busy(True, f"Updating {total} item(s)…")
+        self._set_busy(True, t('launcher.launcher_operations.updating_total_item_s', total=total))
         work: List[Tuple[str, Callable[[], Future]]] = []
         for d in rom_targets:
             work.append((d.name, lambda dev=d: self.manager.submit_install(
@@ -173,7 +169,7 @@ class OperationsMixin:
                 self._set_busy(False)
                 if errors:
                     summary = "\n".join(f"{n}: {e}" for n, e in errors)
-                    show_error(self, "Sequence completed with errors", summary)
+                    show_error(self, t("launcher.launcher_operations.sequence_completed_with_errors"), summary)
                 self._reload_device_list()
                 return
             label, submit = work[idx]
@@ -191,10 +187,10 @@ class OperationsMixin:
         self._set_busy(False)
         if exc is not None:
             if isinstance(exc, CancelledError):
-                self.status_bar.set_status("Cancelled.")
+                self.status_bar.set_status(t("launcher.launcher_operations.cancelled"))
             else:
-                show_error(self, "Operation failed", str(exc))
-                self.status_bar.set_status("Error.")
+                show_error(self, t("launcher.launcher_operations.operation_failed"), str(exc))
+                self.status_bar.set_status(t("launcher.launcher_operations.error"))
         else:
             self.status_bar.set_status(success_msg)
         self._reload_device_list()

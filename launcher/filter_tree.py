@@ -1,4 +1,5 @@
 from __future__ import annotations
+from i18n import t
 
 import tkinter as tk
 from tkinter import ttk
@@ -24,7 +25,7 @@ def pack_search(parent: tk.Misc, variable: tk.StringVar,
                 on_change: Callable[[], None]) -> ttk.Entry:
     entry = ttk.Entry(parent, textvariable=variable, width=SEARCH_WIDTH)
     entry.pack(side="right")
-    ttk.Label(parent, text="Search:").pack(side="right", padx=(0, 4))
+    ttk.Label(parent, text=t("common.search")).pack(side="right", padx=(0, 4))
     variable.trace_add("write", lambda *_: on_change())
     return entry
 

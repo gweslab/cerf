@@ -35,7 +35,8 @@ a = Analysis(
     pathex=[str(THIS_DIR)],
     binaries=UCRT_BINARIES,
     datas=[(ICON_PATH, "."), (VERSION_PATH, ".")] + BAND_FILES + DIALOG_ICONS
-          + collect_data_files("sv_ttk"),
+          + collect_data_files("sv_ttk")
+          + [(str(REPO_ROOT / "langs"), "langs")],
     hiddenimports=[],
     hookspath=[],
     runtime_hooks=[],

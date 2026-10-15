@@ -1,4 +1,5 @@
 from __future__ import annotations
+from i18n import t
 
 import tkinter as tk
 from tkinter import filedialog, ttk
@@ -39,8 +40,8 @@ class ShareFolderBlock:
         self.var_mount.trace_add("write", self._keep_prefix)
         self.var_path.trace_add("write", self._on_path_changed)
 
-        row = group.row("Share folder", [
-            plain("Mount a host folder as a guest file system.")])
+        row = group.row(t("launcher.share_folder_block.share_folder"), [
+            plain(t("launcher.share_folder_block.mount_a_host_folder_as_a_guest_file_system"))])
         self.check = switch(row.frame, self.var_on, self._on_toggled)
         row.control(self.check, wide=False)
 
@@ -49,7 +50,7 @@ class ShareFolderBlock:
         frame.columnconfigure(3, minsize=control_width(frame))
         self.entry = ttk.Entry(frame, textvariable=self.var_path, width=1)
         self.entry.grid(row=0, column=0, sticky="ew")
-        self.pick = ttk.Button(frame, text="Browse…", command=self._on_pick)
+        self.pick = ttk.Button(frame, text=t("common.browse"), command=self._on_pick)
         self.pick.grid(row=0, column=1, padx=(gap, 0))
         ttk.Label(frame, text="→").grid(row=0, column=2, padx=(gap, gap))
         mount = ttk.Frame(frame)
@@ -62,7 +63,7 @@ class ShareFolderBlock:
                                      validatecommand=name_vcmd)
         self.mount_entry.grid(row=0, column=0, sticky="ew")
         self.mount_reset = ttk.Button(
-            mount, text="Reset",
+            mount, text=t("common.reset"),
             command=lambda: self.var_mount.set(
                 MOUNT_PREFIX + self._default_mount))
         self.mount_reset.grid(row=0, column=1, padx=(gap, 0))
@@ -90,10 +91,8 @@ class ShareFolderBlock:
         name = _mount_name(self.var_mount.get()).strip()
         if not self.var_on.get() or is_valid_mount_point_text(name):
             return True
-        show_error(self._window, "Invalid mount point",
-                   "A mount point name can have up to {} characters. It "
-                   "cannot contain control characters or any of "
-                   "\\ / : * ? \" < > |".format(MOUNT_POINT_MAX_CHARS))
+        show_error(self._window, t("launcher.share_folder_block.invalid_mount_point"),
+                   t('launcher.share_folder_block.a_mount_point_name_can_have_up', mount_point_max_chars=MOUNT_POINT_MAX_CHARS))
         self.mount_entry.focus_set()
         return False
 

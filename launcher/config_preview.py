@@ -1,4 +1,5 @@
 from __future__ import annotations
+from i18n import t
 
 import tkinter as tk
 import tkinter.font as tkfont
@@ -10,6 +11,7 @@ from board_info import board_display_name, board_ga_color_depth
 from board_support_label import apply_support_warning
 from color_schemes import color_scheme_label
 from device_file_types import device_file_types
+from database_text import field_text
 from emulation_speed import (CPU_RATE_KEY, THROTTLE_KEY, model_choice,
                              multiplier_label)
 from launch_options_bpp import bpp_label, model_bpp
@@ -35,7 +37,7 @@ WARNING_GAP = 6
 
 
 def _on_off(value: bool) -> str:
-    return "On" if value else "Off"
+    return t("launcher.config_preview.on") if value else t("common.off")
 
 
 class ConfigPreviewPanel:
@@ -45,18 +47,17 @@ class ConfigPreviewPanel:
         self._bind_wheel = bind_wheel
         self._reserve = chevron_reserve(inner)
         self._width = WIDTH_DEFAULT
-        self._font = tkfont.nametofont(ttk.Style(inner).lookup("TLabel",
-                                                               "font"))
+        self._font = tkfont.nametofont(str(ttk.Style(inner).lookup("TLabel", "font")))
 
         def block(title: str, row: int, page: str) -> SideBlock:
             return SideBlock(inner, title, row=first_row + row,
                              on_click=lambda: on_open(page))
 
-        self.board = block(BoardRomPage.title, 0, PAGE_BOARD)
-        self.ga = block(GuestAdditionsPage.title, 1, PAGE_GUEST_ADDITIONS)
-        self.display = block(DisplayPage.title, 2, PAGE_DISPLAY)
-        self.cpu = block(CpuConfigPage.title, 3, PAGE_CPU_CONFIG)
-        self.emulator = block(EmulatorSettingsPage.title, 4, PAGE_EMULATOR)
+        self.board = block(t(BoardRomPage.title), 0, PAGE_BOARD)
+        self.ga = block(t(GuestAdditionsPage.title), 1, PAGE_GUEST_ADDITIONS)
+        self.display = block(t(DisplayPage.title), 2, PAGE_DISPLAY)
+        self.cpu = block(t(CpuConfigPage.title), 3, PAGE_CPU_CONFIG)
+        self.emulator = block(t(EmulatorSettingsPage.title), 4, PAGE_EMULATOR)
         self._blocks = [self.board, self.ga, self.display, self.cpu,
                         self.emulator]
         self._rows: Dict[SideBlock, KeyValueRows] = {
@@ -98,7 +99,7 @@ class ConfigPreviewPanel:
         auto_size = subject.auto_size(board_id)
 
         board_rows: Rows = [
-            ("Board", board_display_name(board_id) or board_id or "-")]
+            (t("common.board"), board_display_name(board_id) or board_id or "-")]
         for ftype in device_file_types(board_id):
             value = (values.get(ftype.section, {}).get(ftype.id, "")
                      or ftype.default_value())
@@ -115,29 +116,29 @@ class ConfigPreviewPanel:
 
         if subject.display_page_available(values):
             self._fill(self.display, [
-                ("Resolution",
+                (t("common.resolution"),
                  resolution_label(model_size(values), auto_size)),
-                ("Color depth", bpp_label(model_bpp(values), None))])
+                (t("common.color_depth"), bpp_label(model_bpp(values), None))])
         else:
             self._hide(self.display)
 
         if cpu_config.available(board_id):
             self._fill(self.cpu,
-                       [("CPU rate multiplier",
+                       [(t("launcher.properties_page_cpu.cpu_rate_multiplier"),
                          multiplier_label(model_choice(values, CPU_RATE_KEY)))] +
                        self._cpu_rows(board_id, values.get("cpu_config")))
         else:
             self._hide(self.cpu)
 
         self._fill(self.emulator, [
-            ("Throttle multiplier",
+            (t("launcher.properties_page_emulator.throttle_multiplier"),
              multiplier_label(model_choice(values, THROTTLE_KEY))),
-            ("Borderless full screen", _on_off(values.get("full_screen",
+            (t("launcher.config_preview.borderless_full_screen"), _on_off(values.get("full_screen",
                                                           False))),
-            ("Internet connection",
-             "Attached" if values.get("network_enabled", True)
-             else "Detached"),
-            ("Verbose logs", _on_off(values.get("verbose_logs", False)))])
+            (t("common.internet_connection"),
+             t("common.attached") if values.get("network_enabled", True)
+             else t("common.detached")),
+            (t("launcher.config_preview.verbose_logs"), _on_off(values.get("verbose_logs", False)))])
         self._arrange()
 
     def _show_board_warning(self, board_id: str) -> None:
@@ -156,39 +157,39 @@ class ConfigPreviewPanel:
     def _ga_rows(self, values: dict, auto_size: Tuple[int, int],
                  auto_depth: int) -> Rows:
         if not values.get("guest_additions", False):
-            return [("Status", "Disabled")]
+            return [(t("launcher.config_preview.status"), t("common.disabled"))]
         share = values.get("share_folder")
-        rows: Rows = [("Status", "Enabled"),
-                      ("Shared folder", share or "None")]
+        rows: Rows = [(t("launcher.config_preview.status"), t("common.enabled")),
+                      (t("common.shared_folder"), share or t("common.none"))]
         if share:
-            rows.append(("Mount point",
+            rows.append((t("common.mount_point"),
                          MOUNT_PREFIX + values.get("mount_point", "")))
         size = model_size(values)
         if size is not None:
-            rows.append(("Resolution", resolution_label(size, auto_size)))
+            rows.append((t("common.resolution"), resolution_label(size, auto_size)))
         bpp = model_bpp(values)
         if bpp is not None:
-            rows.append(("Color depth", bpp_label(bpp, auto_depth)))
+            rows.append((t("common.color_depth"), bpp_label(bpp, auto_depth)))
         dpi = model_dpi(values)
         if dpi is not None:
             rows.append(("DPI", dpi_label(dpi)))
         font_size = model_font_size(values)
         if font_size is not None:
-            rows.append(("Font size", font_size_label(font_size)))
+            rows.append((t("launcher.config_preview.font_size"), font_size_label(font_size)))
         cleartype = model_cleartype(values)
         if cleartype is not None:
             rows.append(("ClearType", cleartype_label(cleartype)))
         scheme = values.get("color_scheme", "")
         if scheme:
-            rows.append(("Color scheme", color_scheme_label(scheme)))
+            rows.append((t("launcher.config_preview.color_scheme"), color_scheme_label(scheme)))
         return rows
 
     def _cpu_rows(self, board_id: str, overrides: object) -> Rows:
         overrides = cpu_config.applicable_overrides(board_id, overrides)
-        rows: Rows = [("Preset", cpu_config.preset_label(board_id, overrides))]
+        rows: Rows = [(t("launcher.config_preview.preset"), cpu_config.preset_label(board_id, overrides))]
         for param in cpu_config.params_for_arch(cpu_config.board_arch(board_id)):
             if param["id"] in overrides:
-                rows.append((param.get("name", param["id"]),
+                rows.append((field_text("cpu_config_params", param),
                              cpu_config.value_label(param,
                                                     overrides[param["id"]])))
         return rows

@@ -1,4 +1,5 @@
 from __future__ import annotations
+from i18n import t
 
 import subprocess
 import sys
@@ -16,8 +17,8 @@ from screen_geometry import fit_geometry
 import ui_theme as theme
 
 
-TITLE = "Unexpected error - CE Runtime Foundation"
-HEADING = "Something went wrong"
+TITLE = 'launcher.crash_window.unexpected_error_ce_runtime_foundation'
+HEADING = 'launcher.crash_window.something_went_wrong'
 CRASH_LOG_NAME = "cerf.crash.log"
 DEFAULT_LOG_NAME = "cerf.log"
 ICON_STEM = "cerf_error"
@@ -35,11 +36,11 @@ def _size_label(path: Optional[Path]) -> str:
     except OSError:
         return "missing"
     if size < 1024:
-        return "{} B".format(size)
+        return t('launcher.crash_window.size_b', size=size)
     kb = (size + 1023) // 1024
     if kb < 1024:
-        return "{} KB".format(kb)
-    return "{:.1f} MB".format(size / (1024.0 * 1024.0))
+        return t('launcher.crash_window.kb_kb', kb=kb)
+    return t('launcher.crash_window.value_mb', value=format(size / (1024.0 * 1024.0), '.1f'))
 
 
 def _locate(path: Path) -> None:
@@ -56,7 +57,7 @@ def _read_capped(path: Path, limit: int) -> str:
         with path.open("rb") as f:
             blob = f.read(limit + 1)
     except OSError as exc:
-        return "{} could not be read: {}".format(path.name, exc)
+        return t('launcher.crash_window.name_could_not_be_read_exc', name=path.name, exc=exc)
     text = blob.decode("utf-8", errors="replace")
     if len(blob) > limit:
         text = text[:limit] + "\n\n[… truncated for display …]"
@@ -70,7 +71,7 @@ class CrashWindow:
         self._crash_log = here / CRASH_LOG_NAME
         self._log = log_path if log_path is not None else here / DEFAULT_LOG_NAME
 
-        root.title(TITLE)
+        root.title(t(TITLE))
         root.configure(bg=theme.BG)
 
         body = ttk.Frame(root, padding=BODY_PAD)
@@ -98,7 +99,7 @@ class CrashWindow:
         base = tkfont.nametofont("TkDefaultFont")
         big = base.copy()
         big.configure(size=int(abs(base.cget("size")) * 1.6), weight="bold")
-        ttk.Label(head, text=HEADING, font=big).pack(side="left")
+        ttk.Label(head, text=t(HEADING), font=big).pack(side="left")
 
     def _build_dump(self, body: ttk.Frame) -> None:
         box = ttk.Frame(body)
@@ -123,10 +124,9 @@ class CrashWindow:
 
     def _build_links(self, body: ttk.Frame) -> None:
         RichText(body, [
-            plain("If you think you have found an actual bug - "),
-            link("see GitHub issues", self._open_feedback),
-            plain(".  Maybe someone has already reported that - you can "
-                  "upvote it."),
+            plain(t("launcher.crash_window.if_you_think_you_have_found_an_actual_bug")),
+            link(t("launcher.crash_window.see_github_issues"), self._open_feedback),
+            plain(t("launcher.crash_window.maybe_someone_has_already_reported_that_you_can_upvote")),
         ]).grid(row=2, column=0, sticky="ew", pady=(12, 10))
 
         cols = ttk.Frame(body)
@@ -142,15 +142,14 @@ class CrashWindow:
         notes.grid(row=0, column=1, sticky="ew")
         notes.columnconfigure(0, weight=1)
         RichText(notes, [
-            plain("Or you can "),
-            link("create your own ticket", self._open_feedback),
+            plain(t("launcher.crash_window.or_you_can")),
+            link(t("launcher.crash_window.create_your_own_ticket"), self._open_feedback),
             plain("."),
         ]).grid(row=0, column=0, sticky="ew")
         RichText(notes, [
-            plain("You must attach both log files - click to locate. Log "
-                  "files might include "),
+            plain(t("launcher.crash_window.you_must_attach_both_log_files_click_to_locate")),
             bold("personal data"),
-            plain(" like folder paths or computer specs. "),
+            plain(t("launcher.crash_window.like_folder_paths_or_computer_specs")),
             bold("GitHub profile is required"),
         ]).grid(row=1, column=0, sticky="ew", pady=(6, 0))
 
@@ -166,7 +165,7 @@ class CrashWindow:
         row = ttk.Frame(body)
         row.grid(row=5, column=0, sticky="ew")
         row.columnconfigure(0, weight=1)
-        exit_btn = ttk.Button(row, text="Exit", command=self._root.destroy)
+        exit_btn = ttk.Button(row, text=t("common.exit"), command=self._root.destroy)
         exit_btn.grid(row=0, column=1, sticky="e")
         exit_btn.focus_set()
         self._root.bind("<Return>", lambda _e: self._root.destroy())

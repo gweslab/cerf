@@ -1,4 +1,5 @@
 from __future__ import annotations
+from i18n import t
 
 import tkinter as tk
 from typing import Callable, List, Optional
@@ -12,14 +13,14 @@ BPP_CHOICES = (None, 8, 16, 24, 32)
 
 
 def bpp_description(window: tk.Misc) -> List[Segment]:
-    return [plain("A wrong value breaks the guest. "),
-            link("Learn more", lambda: show_bpp_help(window))]
+    return [plain(t("launcher.launch_options_bpp.a_wrong_value_breaks_the_guest")),
+            link(t("launcher.launch_options_bpp.learn_more"), lambda: show_bpp_help(window))]
 
 
 def bpp_label(value: Optional[int], auto_depth: Optional[int]) -> str:
     if value is None:
-        return "Auto - {}bpp".format(auto_depth) if auto_depth else "Auto"
-    return "{}bpp".format(value)
+        return t('launcher.launch_options_bpp.auto_auto_depth_bpp', auto_depth=auto_depth) if auto_depth else t("common.auto")
+    return t('launcher.launch_options_bpp.value_bpp', value=value)
 
 
 def model_bpp(model: dict) -> Optional[int]:

@@ -1,4 +1,5 @@
 #include "pointer_widget.h"
+#include "ui_language.h"
 
 #include "../core/cerf_emulator.h"
 #include "../core/device_config.h"
@@ -38,9 +39,12 @@ bool PointerWidget::StylusSimItemVisible() const {
 std::wstring PointerWidget::Tooltip() const {
     auto& router = emu_.Get<PointerRouter>();
     PointerSource* active = router.Active();
-    std::wstring tip = active ? active->SourceName() : L"Pointing device";
-    if (router.Sources().size() > 1)                       tip += L" - click to switch input device";
-    else if (AltTapItemVisible() || StylusSimItemVisible()) tip += L" - click to configure";
+    std::wstring tip = active
+        ? (active->SourceLabelKey() ? emu_.Get<UiLanguage>().Text(active->SourceLabelKey())
+                                    : active->SourceName())
+        : emu_.Get<UiLanguage>().Text("common.pointing_device");
+    if (router.Sources().size() > 1)                       tip += emu_.Get<UiLanguage>().Text("input.pointer.click_to_switch_input_device");
+    else if (AltTapItemVisible() || StylusSimItemVisible()) tip += emu_.Get<UiLanguage>().Text("input.pointer.click_to_configure");
     return tip;
 }
 
@@ -59,7 +63,8 @@ std::vector<WidgetMenuItem> PointerWidget::BuildMenu() {
     if (sources.size() > 1) {
         for (auto* s : sources) {
             WidgetMenuItem mi;
-            mi.label    = s->SourceName();
+            mi.label    = s->SourceLabelKey() ? emu_.Get<UiLanguage>().Text(s->SourceLabelKey())
+                                             : s->SourceName();
             mi.checked  = (s == active);
             mi.on_click = [this, s] { emu_.Get<PointerRouter>().SetActive(s); };
             items.push_back(std::move(mi));
@@ -69,7 +74,7 @@ std::vector<WidgetMenuItem> PointerWidget::BuildMenu() {
     std::vector<WidgetMenuItem> options;
     if (AltTapItemVisible()) {
         WidgetMenuItem mi;
-        mi.label    = L"Do Alt+Tap when you Right Click";
+        mi.label    = emu_.Get<UiLanguage>().Text("input.pointer.do_alt_tap_when_you_right_click");
         mi.checked  = emu_.Get<StylusAltTap>().Enabled();
         mi.on_click = [this] {
             auto& t = emu_.Get<StylusAltTap>();
@@ -79,7 +84,7 @@ std::vector<WidgetMenuItem> PointerWidget::BuildMenu() {
     }
     if (StylusSimItemVisible()) {
         WidgetMenuItem mi;
-        mi.label    = L"Send movement only when mouse is clicked (stylus simulation)";
+        mi.label    = emu_.Get<UiLanguage>().Text("input.pointer.send_movement_only_when_mouse_is_clicked_stylus_simulation");
         mi.checked  = emu_.Get<PointerStylusSimulation>().Enabled();
         mi.on_click = [this] {
             auto& s = emu_.Get<PointerStylusSimulation>();
@@ -135,4 +140,8 @@ void PointerWidget::RestoreWidgetState(StateReader& r) {
     r.Read("stylus_sim_enabled", stylus_sim);
     emu_.Get<PointerStylusSimulation>().SetEnabled(stylus_sim != 0);
     tap.RestoreState(r);
+}
+
+std::wstring PointerWidget::MenuLabel() const {
+    return emu_.Get<UiLanguage>().Text("common.pointing_device");
 }

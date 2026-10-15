@@ -1,4 +1,5 @@
 from __future__ import annotations
+from i18n import t
 
 import ctypes
 import queue
@@ -22,13 +23,13 @@ from toolbar import Toolbar
 from details_panel import DetailsPanel
 from config_preview import ConfigPreviewPanel
 from launcher_spawn import SpawnMixin
+from launcher_language import LanguageMixin
 from launcher_operations import OperationsMixin
 from launcher_properties import PropertiesMixin
 from launcher_refresh import RefreshMixin
 from saved_state_warning import SavedStateEditWarning
 from sash_grip import SashGrip
 from new_device_wizard import NewDeviceWizard
-from settings_dialog import SettingsDialog
 from side_block import block_gap, content_inset
 from user_device_create import UserDeviceSpec
 from operations import BundleManager
@@ -49,7 +50,7 @@ _WM_SETTINGCHANGE = 0x001A
 _GWLP_WNDPROC = -4
 
 
-class LauncherApp(OperationsMixin, RefreshMixin, SpawnMixin, PropertiesMixin,
+class LauncherApp(LanguageMixin, OperationsMixin, RefreshMixin, SpawnMixin, PropertiesMixin,
                   tk.Tk):
     def __init__(self, manager: BundleManager, cerf_exe: Optional[Path],
                  upgraded: bool = False):
@@ -59,7 +60,7 @@ class LauncherApp(OperationsMixin, RefreshMixin, SpawnMixin, PropertiesMixin,
         self.cerf_exe = cerf_exe
         self.update_check = UpdateCheck(self)
         version = resolve_version()
-        self.title(f"CE Runtime Foundation Launcher {version}" if version else "CE Runtime Foundation Launcher")
+        self.title(t('launcher.title', version=version) if version else t("launcher.launcher_app.ce_runtime_foundation_launcher"))
 
         try:
             dpi = float(self.winfo_fpixels("1i"))
@@ -101,8 +102,8 @@ class LauncherApp(OperationsMixin, RefreshMixin, SpawnMixin, PropertiesMixin,
         self.after(50, self._poll_runtime)
         if upgraded:
             self.after(200, lambda: show_info(
-                self, "Upgrade complete",
-                f"CE Runtime Foundation has been upgraded to {version}."
+                self, t("launcher.launcher_app.upgrade_complete"),
+                t('launcher.launcher_app.ce_runtime_foundation_has_been_upgraded_to', version=version)
                 if version
                 else "CE Runtime Foundation has been upgraded."))
 
@@ -186,9 +187,9 @@ class LauncherApp(OperationsMixin, RefreshMixin, SpawnMixin, PropertiesMixin,
         self.empty_frame = ttk.Frame(outer)
         empty_center = ttk.Frame(self.empty_frame)
         empty_center.place(relx=0.5, rely=0.5, anchor="center")
-        ttk.Label(empty_center, text="No devices yet",
+        ttk.Label(empty_center, text=t("launcher.launcher_app.no_devices_yet"),
                   font=("Segoe UI", 16, "bold")).pack()
-        ttk.Button(empty_center, text="＋  New", style="Accent.TButton",
+        ttk.Button(empty_center, text=t("launcher.launcher_app.new"), style="Accent.TButton",
                    command=self._open_new_wizard).pack(pady=(14, 0))
 
     def _update_empty_state(self) -> None:
@@ -316,21 +317,18 @@ class LauncherApp(OperationsMixin, RefreshMixin, SpawnMixin, PropertiesMixin,
                         on_download_roms=self._open_download_window,
                         on_create=self._create_user_device)
 
-    def _open_settings(self) -> None:
-        SettingsDialog(self, on_update_channel_changed=self.update_check.start)
-
     def _open_feedback(self) -> None:
         FeedbackWindow(self)
 
     def _create_user_device(self, spec: UserDeviceSpec) -> None:
         if self.busy:
             return
-        self._set_busy(True, f"Creating {spec.name}…")
+        self._set_busy(True, t('launcher.launcher_app.creating_name', name=spec.name))
         f = self.manager.submit_create_user_device(
             spec, progress=self._progress_cb, cancel_event=self.cancel_event)
 
         def done(exc: Optional[BaseException]) -> None:
-            self._after_op(exc, f"Created {spec.name}")
+            self._after_op(exc, t('launcher.launcher_app.created_name', name=spec.name))
             if exc is None:
                 self.tree_panel.select_device(spec.name)
         self._await_future(f, done)
@@ -361,7 +359,7 @@ class LauncherApp(OperationsMixin, RefreshMixin, SpawnMixin, PropertiesMixin,
         if not stream:
             self._reload_device_list()
             return
-        self._set_busy(True, f"Downloading {len(stream)} item(s)…")
+        self._set_busy(True, t('launcher.launcher_app.downloading_value_item_s', value=len(stream)))
         work: List[Tuple[str, Callable[[], Future]]] = [
             (d.name, lambda dev=d: self.manager.submit_install(
                 dev, progress=self._progress_cb, cancel_event=self.cancel_event))
@@ -387,9 +385,8 @@ class LauncherApp(OperationsMixin, RefreshMixin, SpawnMixin, PropertiesMixin,
         if saved_state_info(device_dir) is None:
             return
         name = d.meta.device_name or d.name
-        if not ask_yesno(self, "Delete saved state",
-                         f"Delete the saved state for {name}?\n"
-                         f"This cannot be undone."):
+        if not ask_yesno(self, t("launcher.launcher_app.delete_saved_state"),
+                         t('launcher.launcher_app.delete_the_saved_state_for_name_this', name=name)):
             return
         try:
             for fn in (STATE_IMAGE_FILENAME, SAVED_STATE_SCREENSHOT_FILENAME):
@@ -397,15 +394,15 @@ class LauncherApp(OperationsMixin, RefreshMixin, SpawnMixin, PropertiesMixin,
                 if p.exists():
                     p.unlink()
         except OSError as exc:
-            show_error(self, "Delete failed",
-                       f"Could not delete the saved state:\n{exc}")
+            show_error(self, t("launcher.launcher_app.delete_failed"),
+                       t('launcher.launcher_app.could_not_delete_the_saved_state_exc', exc=exc))
         self._reload_device_list()
 
     def _rename_device(self, d: DeviceBundle) -> None:
         """Rename = the cerf-user.json meta.name override. The device
         directory name never changes (mirrors VMware/VirtualBox)."""
         current = d.meta.name or (d.meta.device_name or d.name)
-        new = ask_text(self, "Rename device",
+        new = ask_text(self, t("launcher.launcher_app.rename_device"),
                        "Display name (leave empty to reset):",
                        initial=current)
         if new is None:
@@ -413,7 +410,7 @@ class LauncherApp(OperationsMixin, RefreshMixin, SpawnMixin, PropertiesMixin,
         try:
             write_user_meta_name(self.manager.devices_dir / d.name, new)
         except OSError as exc:
-            show_error(self, "Rename failed", str(exc))
+            show_error(self, t("launcher.launcher_app.rename_failed"), str(exc))
         self._reload_device_list()
 
     def _open_device_folder(self, d: DeviceBundle) -> None:
@@ -428,23 +425,23 @@ class LauncherApp(OperationsMixin, RefreshMixin, SpawnMixin, PropertiesMixin,
         d = sel.device
         menu = tk.Menu(self, tearoff=0)
         running = self._running_status_for(d) is not None
-        menu.add_command(label="Show CERF" if running else "Start", command=self._launch)
+        menu.add_command(label=t("launcher.launcher_app.show_cerf") if running else t("common.start"), command=self._launch)
         if saved_state_info(self.manager.devices_dir / d.name) is not None:
-            menu.add_command(label="Discard saved state",
+            menu.add_command(label=t("launcher.launcher_app.discard_saved_state"),
                              command=self._discard_state,
                              state="disabled" if running else "normal")
         if d.has_update or d.has_cerf_json_update:
-            menu.add_command(label="Update", command=self._update_selected)
+            menu.add_command(label=t("common.update"), command=self._update_selected)
         menu.add_separator()
-        menu.add_command(label="Open device directory",
+        menu.add_command(label=t("launcher.launcher_app.open_device_directory"),
                          command=lambda: self._open_device_folder(d))
         menu.add_separator()
-        menu.add_command(label="Remove", command=self._delete_selected,
+        menu.add_command(label=t("common.remove"), command=self._delete_selected,
                          state="disabled" if running else "normal")
-        menu.add_command(label="Rename…",
+        menu.add_command(label=t("launcher.launcher_app.rename"),
                          command=lambda: self._rename_device(d))
         menu.add_separator()
-        menu.add_command(label="Properties…",
+        menu.add_command(label=t("launcher.launcher_app.properties"),
                          command=lambda: self._open_properties())
         try:
             menu.tk_popup(event.x_root, event.y_root)

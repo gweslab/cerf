@@ -19,6 +19,7 @@ $PY37_SHA256  = "769bb7c74ad1df6d7d74071cc16a984ff6182e4016e11b8949b93db48797722
 $PY37_URL     = "https://www.python.org/ftp/python/$PY37_VERSION/python-$PY37_VERSION.exe"
 $PYINSTALLER  = "5.13.2"
 $SV_TTK       = "2.5.5"
+$PYYAML       = "6.0.1"
 
 function Get-LauncherPython {
     $repoRoot  = Split-Path $PSScriptRoot -Parent
@@ -141,7 +142,14 @@ if ($LASTEXITCODE -ne 0 -or $svTtkHave -ne $SV_TTK) {
 }
 
 $build = Join-Path $PSScriptRoot "build"
+$null = & $python -c "import yaml" 2>$null
+if ($LASTEXITCODE -ne 0) {
+    & $python -m pip install --quiet --disable-pip-version-check "PyYAML==$PYYAML"
+    if ($LASTEXITCODE -ne 0) { [Environment]::Exit(1) }
+}
 $dist  = Join-Path $PSScriptRoot "dist"
+& $python (Join-Path $PSScriptRoot "..\tools\validate_languages.py")
+if ($LASTEXITCODE -ne 0) { [Environment]::Exit(1) }
 if (Test-Path $build) { Remove-Item $build -Recurse -Force }
 if (Test-Path $dist)  { Remove-Item $dist  -Recurse -Force }
 
@@ -160,6 +168,7 @@ if (-not (Test-Path (Join-Path $built "$name.exe"))) {
 
 $bundledDir = Join-Path $PSScriptRoot "..\bundled"
 if (-not (Test-Path $bundledDir)) { New-Item -ItemType Directory -Path $bundledDir -Force | Out-Null }
+Copy-Item -LiteralPath (Join-Path $PSScriptRoot "..\langs") -Destination $bundledDir -Recurse -Force
 $bundledLauncher = Join-Path $bundledDir $name
 if (Test-Path $bundledLauncher) { Remove-Item $bundledLauncher -Recurse -Force }
 Copy-Item $built $bundledLauncher -Recurse

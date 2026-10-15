@@ -1,4 +1,5 @@
 from __future__ import annotations
+from i18n import t
 
 import os
 import threading
@@ -29,7 +30,7 @@ class UpdateCheck:
         if read_update_channel() == CHANNEL_DISABLED:
             self._no_update()
             return
-        self.app.status_bar.set_update_status("Checking updates…")
+        self.app.status_bar.set_update_status(t("launcher.update_check.checking_updates"))
         future = self.app.manager.submit_release_check()
 
         def done(exc: Optional[BaseException]) -> None:
@@ -51,7 +52,11 @@ class UpdateCheck:
 
     def _announce(self, version: str) -> None:
         self.app.status_bar.set_update_status(
-            f"CERF {version} is available", on_click=self.open_offer)
+            t('launcher.update_check.cerf_version_is_available', version=version), on_click=self.open_offer)
+
+    def refresh_text(self) -> None:
+        if self.release is not None:
+            self._announce(self.release.tag)
 
     def _no_update(self) -> None:
         self.app.status_bar.set_update_status("")
@@ -73,13 +78,13 @@ class UpdateCheck:
 
     def _cerf_is_clear(self) -> bool:
         def ask_retry(title: str, message: str) -> bool:
-            return show_dialog(self.app, title, message, ("Retry", "Cancel"),
-                               default="Cancel") == "Retry"
+            return show_dialog(self.app, title, message, ("Retry", t("common.cancel")),
+                               default=t("common.cancel")) == "Retry"
 
         try:
             return wait_for_cerf_exit(ask_retry, install_root())
         except UpgradeError as exc:
-            show_error(self.app, "Upgrade", str(exc))
+            show_error(self.app, t("launcher.update_check.upgrade"), str(exc))
             return False
 
     def _start_upgrade(self) -> None:
@@ -88,7 +93,7 @@ class UpdateCheck:
         install_dir = install_root()
         window = UpgradeWindow(
             self.app,
-            f"Upgrading CE Runtime Foundation to {self.release.tag}…",
+            t('launcher.update_check.upgrading_ce_runtime_foundation_to_tag', tag=self.release.tag),
             lambda exc: self._download_finished(exc, window, install_dir))
         threading.Thread(target=self._download, args=(window, install_dir),
                          daemon=True).start()
@@ -113,7 +118,7 @@ class UpdateCheck:
                 error = exc
         if error is not None:
             window.destroy()
-            show_error(self.app, "Upgrade failed",
-                       f"{error}\n\nYour installation is untouched.")
+            show_error(self.app, t("launcher.update_check.upgrade_failed"),
+                       t('launcher.update_check.error_your_installation_is_untouched', error=error))
             return
         self.app._on_close()

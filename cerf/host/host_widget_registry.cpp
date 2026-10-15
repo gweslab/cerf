@@ -76,14 +76,14 @@ void HostWidgetRegistry::AppendAllToMenu(HMENU dest) {
         auto items = w->BuildMenu();
         if (items.empty()) {
             /* No menu of its own - a disabled header keeps it discoverable. */
-            AppendMenuW(dest, MF_STRING | MF_GRAYED, 0, w->WidgetName().c_str());
+            AppendMenuW(dest, MF_STRING | MF_GRAYED, 0, w->MenuLabel().c_str());
         } else if (items.size() == 1 && items[0].submenu.empty()) {
             AppendItems(dest, items);
         } else {
             HMENU sub = CreatePopupMenu();
             AppendItems(sub, items);
             AppendMenuW(dest, MF_POPUP, reinterpret_cast<UINT_PTR>(sub),
-                        w->WidgetName().c_str());
+                        w->MenuLabel().c_str());
         }
     }
 }

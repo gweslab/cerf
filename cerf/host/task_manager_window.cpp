@@ -1,5 +1,6 @@
 #define NOMINMAX
 #include "task_manager_window.h"
+#include "ui_language.h"
 
 #include <windowsx.h>
 #include <commctrl.h>
@@ -10,6 +11,8 @@
 #include "../peripherals/cerf_virt/cerf_virt_task_manager_regs.h"
 #include "host_dark_mode.h"
 #include "host_window.h"
+
+#include "../core/string_utils.h"
 
 #include <cstdio>
 
@@ -50,19 +53,20 @@ constexpr COLORREF kTabStripBg = RGB(32, 32, 32);
 constexpr COLORREF kTabSelBg   = RGB(60, 60, 60);
 constexpr COLORREF kTabText    = RGB(230, 230, 230);
 
-const wchar_t* ActionName(uint32_t code) {
+}
+
+const wchar_t* TaskManagerWindow::ActionName(uint32_t code) const {
     switch (code) {
-        case CerfVirt::kTmCmdKill:        return L"kill";
-        case CerfVirt::kTmCmdSwitchTo:    return L"switch to";
-        case CerfVirt::kTmCmdSwitchToWin: return L"switch to";
-        case CerfVirt::kTmCmdRun:         return L"run";
-        case CerfVirt::kTmCmdList:        return L"list";
-        case CerfVirt::kTmCmdListWindows: return L"list";
-        default:                          return L"command";
+        case CerfVirt::kTmCmdKill:        return emu_.Get<UiLanguage>().Text("task_manager.kill");
+        case CerfVirt::kTmCmdSwitchTo:    return emu_.Get<UiLanguage>().Text("task_manager.switch_to");
+        case CerfVirt::kTmCmdSwitchToWin: return emu_.Get<UiLanguage>().Text("task_manager.switch_to");
+        case CerfVirt::kTmCmdRun:         return emu_.Get<UiLanguage>().Text("common.run");
+        case CerfVirt::kTmCmdList:        return emu_.Get<UiLanguage>().Text("task_manager.list");
+        case CerfVirt::kTmCmdListWindows: return emu_.Get<UiLanguage>().Text("task_manager.list");
+        default:                          return emu_.Get<UiLanguage>().Text("task_manager.command");
     }
 }
 
-}  /* namespace */
 
 bool TaskManagerWindow::ShouldRegister() {
     return emu_.Get<DeviceConfig>().guest_additions;
@@ -91,7 +95,7 @@ void TaskManagerWindow::Show() {
     const DWORD style = WS_OVERLAPPEDWINDOW;
     RECT wr = { 0, 0, 560, 420 };
     AdjustWindowRectEx(&wr, style, FALSE, 0);
-    hwnd_ = CreateWindowExW(0, kWndClass, L"Guest Task Manager", style,
+    hwnd_ = CreateWindowExW(0, kWndClass, emu_.Get<UiLanguage>().Text("task_manager.guest_task_manager"), style,
                             CW_USEDEFAULT, CW_USEDEFAULT,
                             wr.right - wr.left, wr.bottom - wr.top,
                             owner, nullptr, GetModuleHandleW(nullptr), this);
@@ -109,7 +113,7 @@ void TaskManagerWindow::Show() {
 
     awaiting_first_ = true;
     RequestActiveList();
-    SetStatus(L"Waiting for guest…", kClrInfo);
+    SetStatus(emu_.Get<UiLanguage>().Text("task_manager.waiting_for_guest"), kClrInfo);
 }
 
 void TaskManagerWindow::BuildControls() {
@@ -140,8 +144,8 @@ void TaskManagerWindow::BuildControls() {
     SendMessageW(tabs_, WM_SETFONT, (WPARAM)gui, TRUE);
     TCITEMW ti = {};
     ti.mask    = TCIF_TEXT;
-    ti.pszText = (LPWSTR)L"Windows";   TabCtrl_InsertItem(tabs_, kTabWindows, &ti);
-    ti.pszText = (LPWSTR)L"Processes"; TabCtrl_InsertItem(tabs_, kTabProcesses, &ti);
+    ti.pszText = (LPWSTR)emu_.Get<UiLanguage>().Text("task_manager.windows");   TabCtrl_InsertItem(tabs_, kTabWindows, &ti);
+    ti.pszText = (LPWSTR)emu_.Get<UiLanguage>().Text("task_manager.processes"); TabCtrl_InsertItem(tabs_, kTabProcesses, &ti);
     if (dark) {
         SetWindowLongPtrW(tabs_, GWLP_USERDATA, (LONG_PTR)this);
         tabs_base_proc_ = (WNDPROC)SetWindowLongPtrW(
@@ -149,14 +153,14 @@ void TaskManagerWindow::BuildControls() {
     }
 
     list_ = TaskManagerListView{};   /* default mode = Windows, matches tab 0 */
-    list_.Create(hwnd_, IDC_LIST, gui);
+    list_.Create(hwnd_, IDC_LIST, gui, emu_.Get<UiLanguage>());
 
-    btn_switch_ = mk(L"BUTTON", L"Switch to", BS_PUSHBUTTON | WS_TABSTOP, IDC_SWITCH);
-    btn_kill_   = mk(L"BUTTON", L"Kill",      BS_PUSHBUTTON | WS_TABSTOP, IDC_KILL);
-    run_label_  = mk(L"STATIC", L"Run:", 0, 0);
+    btn_switch_ = mk(L"BUTTON", emu_.Get<UiLanguage>().Text("common.switch_to"), BS_PUSHBUTTON | WS_TABSTOP, IDC_SWITCH);
+    btn_kill_   = mk(L"BUTTON", emu_.Get<UiLanguage>().Text("common.kill"),      BS_PUSHBUTTON | WS_TABSTOP, IDC_KILL);
+    run_label_  = mk(L"STATIC", emu_.Get<UiLanguage>().Text("task_manager.run"), 0, 0);
     run_edit_   = mk(L"EDIT", L"", WS_BORDER | WS_TABSTOP | ES_AUTOHSCROLL,
                      IDC_RUNEDIT);
-    btn_run_    = mk(L"BUTTON", L"Run", BS_DEFPUSHBUTTON | WS_TABSTOP, IDC_RUN);
+    btn_run_    = mk(L"BUTTON", emu_.Get<UiLanguage>().Text("common.run"), BS_DEFPUSHBUTTON | WS_TABSTOP, IDC_RUN);
     status_     = mk(L"STATIC", L"", SS_LEFTNOWORDWRAP, 0);
 
     SendMessageW(run_edit_, EM_SETLIMITTEXT, CerfVirt::kTmRunMaxWchars, 0);
@@ -208,7 +212,7 @@ void TaskManagerWindow::OnTabChanged() {
                                        : TaskManagerListView::Mode::Windows);
     awaiting_first_ = true;
     RequestActiveList();
-    SetStatus(L"Waiting for guest…", kClrInfo);
+    SetStatus(emu_.Get<UiLanguage>().Text("task_manager.waiting_for_guest"), kClrInfo);
 }
 
 void TaskManagerWindow::OnTick() {
@@ -216,31 +220,34 @@ void TaskManagerWindow::OnTick() {
     RequestActiveList();
 
     if (auto r = svc.TakeActionResult()) {
-        wchar_t buf[96];
+        std::wstring text;
         if (r->code == CerfVirt::kTmCmdRun) {
             if (r->ticket == run_ticket_) {
                 if (r->ok) {
-                    SetStatus(L"success", kClrOk);
+                    SetStatus(emu_.Get<UiLanguage>().Text("task_manager.success"), kClrOk);
                 } else {
-                    _snwprintf_s(buf, _TRUNCATE, L"failed (error %u)",
-                                 r->guest_err);
-                    SetStatus(buf, kClrFail);
+                    text = emu_.Get<UiLanguage>().Format("task_manager.failed",
+                        {{"error", std::to_string(r->guest_err)}});
+                    SetStatus(text, kClrFail);
                 }
             }
         } else if (r->code == CerfVirt::kTmCmdList ||
                    r->code == CerfVirt::kTmCmdListWindows) {
             if (!r->ok) {
-                _snwprintf_s(buf, _TRUNCATE, L"list failed (error %u)",
-                             r->guest_err);
-                SetStatus(buf, kClrFail);
+                text = emu_.Get<UiLanguage>().Format("task_manager.list_failed",
+                    {{"error", std::to_string(r->guest_err)}});
+                SetStatus(text, kClrFail);
             }
         } else if (r->ok) {
-            _snwprintf_s(buf, _TRUNCATE, L"%s: done", ActionName(r->code));
-            SetStatus(buf, kClrOk);
+            text = emu_.Get<UiLanguage>().Format("task_manager.action_done",
+                {{"action", WideToUtf8(ActionName(r->code))}});
+            SetStatus(text, kClrOk);
         } else {
-            _snwprintf_s(buf, _TRUNCATE, L"%s failed (error %u)",
-                         ActionName(r->code), r->guest_err);
-            SetStatus(buf, kClrFail);
+            text = emu_.Get<UiLanguage>().Format("task_manager.action_failed", {
+                {"action", WideToUtf8(ActionName(r->code))},
+                {"error", std::to_string(r->guest_err)},
+            });
+            SetStatus(text, kClrFail);
         }
     }
 
@@ -255,21 +262,21 @@ void TaskManagerWindow::OnTick() {
 }
 
 void TaskManagerWindow::UpdateTitle(const CerfVirtTaskManager::Snapshot& snap) {
-    wchar_t title[96];
+    const auto& language = emu_.Get<UiLanguage>();
+    std::wstring title;
     if (list_.GetMode() == TaskManagerListView::Mode::Windows) {
-        /* One row per process; the count is processes shown, not raw windows. */
-        _snwprintf_s(title, _TRUNCATE, L"Guest Task Manager - %u programs",
-                     (unsigned)list_.DisplayedCount());
+        title = language.Format("task_manager.program_count",
+                                {{"count", std::to_string(list_.DisplayedCount())}});
+    } else if (snap.guest_total > snap.procs.size()) {
+        title = language.Format("task_manager.process_count_partial", {
+            {"count", std::to_string(snap.procs.size())},
+            {"total", std::to_string(snap.guest_total)},
+        });
     } else {
-        if (snap.guest_total > snap.procs.size())
-            _snwprintf_s(title, _TRUNCATE,
-                         L"Guest Task Manager - %u of %u processes",
-                         (unsigned)snap.procs.size(), snap.guest_total);
-        else
-            _snwprintf_s(title, _TRUNCATE, L"Guest Task Manager - %u processes",
-                         (unsigned)snap.procs.size());
+        title = language.Format("task_manager.process_count",
+                                {{"count", std::to_string(snap.procs.size())}});
     }
-    SetWindowTextW(hwnd_, title);
+    SetWindowTextW(hwnd_, title.c_str());
 }
 
 void TaskManagerWindow::DoSwitchTo() {
@@ -277,19 +284,19 @@ void TaskManagerWindow::DoSwitchTo() {
     if (list_.GetMode() == TaskManagerListView::Mode::Windows) {
         uint32_t hwnd, pid;
         if (!list_.SelectedWindow(&hwnd, &pid)) {
-            SetStatus(L"no window selected", kClrFail);
+            SetStatus(emu_.Get<UiLanguage>().Text("task_manager.no_window_selected"), kClrFail);
             return;
         }
         svc.RequestSwitchToWindow(hwnd);
     } else {
         uint32_t pid;
         if (!list_.SelectedProc(&pid)) {
-            SetStatus(L"no process selected", kClrFail);
+            SetStatus(emu_.Get<UiLanguage>().Text("task_manager.no_process_selected"), kClrFail);
             return;
         }
         svc.RequestSwitchTo(pid);
     }
-    SetStatus(L"switching…", kClrInfo);
+    SetStatus(emu_.Get<UiLanguage>().Text("task_manager.switching"), kClrInfo);
 }
 
 void TaskManagerWindow::DoKill() {
@@ -297,32 +304,32 @@ void TaskManagerWindow::DoKill() {
     if (list_.GetMode() == TaskManagerListView::Mode::Windows) {
         uint32_t hwnd;
         if (!list_.SelectedWindow(&hwnd, &pid)) {
-            SetStatus(L"no window selected", kClrFail);
+            SetStatus(emu_.Get<UiLanguage>().Text("task_manager.no_window_selected"), kClrFail);
             return;
         }
     } else if (!list_.SelectedProc(&pid)) {
-        SetStatus(L"no process selected", kClrFail);
+        SetStatus(emu_.Get<UiLanguage>().Text("task_manager.no_process_selected"), kClrFail);
         return;
     }
     emu_.Get<CerfVirtTaskManager>().RequestKill(pid);
-    SetStatus(L"killing…", kClrInfo);
+    SetStatus(emu_.Get<UiLanguage>().Text("task_manager.killing"), kClrInfo);
 }
 
 void TaskManagerWindow::DoRun() {
     wchar_t buf[CerfVirt::kTmRunMaxWchars + 1] = { 0 };
     GetWindowTextW(run_edit_, buf, (int)(CerfVirt::kTmRunMaxWchars + 1));
     const std::wstring cmd = buf;
-    if (cmd.empty()) { SetStatus(L"enter a command", kClrFail); return; }
+    if (cmd.empty()) { SetStatus(emu_.Get<UiLanguage>().Text("task_manager.enter_a_command"), kClrFail); return; }
     run_ticket_ = emu_.Get<CerfVirtTaskManager>().RequestRun(cmd);
-    if (run_ticket_ == 0) { SetStatus(L"failed", kClrFail); return; }
-    SetStatus(L"running…", kClrInfo);
+    if (run_ticket_ == 0) { SetStatus(emu_.Get<UiLanguage>().Text("task_manager.failure_status"), kClrFail); return; }
+    SetStatus(emu_.Get<UiLanguage>().Text("task_manager.running"), kClrInfo);
 }
 
 void TaskManagerWindow::ShowRowMenu(int item, POINT screen_pt) {
     list_.SelectRow(item);
     HMENU m = CreatePopupMenu();
-    AppendMenuW(m, MF_STRING, IDM_ROW_SWITCH, L"Switch to");
-    AppendMenuW(m, MF_STRING, IDM_ROW_KILL, L"Kill");
+    AppendMenuW(m, MF_STRING, IDM_ROW_SWITCH, emu_.Get<UiLanguage>().Text("common.switch_to"));
+    AppendMenuW(m, MF_STRING, IDM_ROW_KILL, emu_.Get<UiLanguage>().Text("common.kill"));
     TrackPopupMenu(m, TPM_RIGHTBUTTON, screen_pt.x, screen_pt.y, 0, hwnd_,
                    nullptr);
     DestroyMenu(m);

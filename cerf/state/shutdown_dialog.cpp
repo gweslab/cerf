@@ -1,5 +1,6 @@
 #define NOMINMAX
 #include "shutdown_dialog.h"
+#include "../host/ui_language.h"
 
 #include "../core/cerf_emulator.h"
 #include "../core/config_loader.h"
@@ -47,22 +48,21 @@ constexpr int kBtnBottom  = 44;
 
 enum : int { IDC_ACTION = 3000, IDC_SAVE, IDC_SAVE_LINK, IDC_REMEMBER, IDC_DESC };
 
-constexpr wchar_t kSaveLinkMarkup[] =
-    L"<a href=\"https://cerf.cx/hibernation-warning\">only for CERF v"
-    CERF_VERSION_WSTR L"</a>";
-
 constexpr wchar_t kSaveTail[] = L")";
 
-constexpr wchar_t kSoftText[] =
-    L"The guest operating system restarts and keeps everything in RAM, so the "
-    L"object store and any open data survive.\r\n\r\n"
-    L"A ROM that does not support a warm start can still clear that data itself.";
+constexpr char kSoftText[] = "shutdown.soft_reset_description";
+constexpr char kHardText[] = "shutdown.hard_reset_description";
 
-constexpr wchar_t kHardText[] =
-    L"All guest RAM is wiped and the operating system starts with no earlier "
-    L"context, the same as a battery pull.\r\n\r\n"
-    L"Data that lives in persistent storage - flash, NAND or a disk image - is "
-    L"not touched.";
+std::wstring EscapeLinkText(const std::wstring& text) {
+    std::wstring escaped;
+    for (wchar_t c : text) {
+        if (c == L'&') escaped += L"&amp;";
+        else if (c == L'<') escaped += L"&lt;";
+        else if (c == L'>') escaped += L"&gt;";
+        else escaped += c;
+    }
+    return escaped;
+}
 }  /* namespace */
 
 int ShutdownDialog::SelectedAction() const {
@@ -107,7 +107,7 @@ void ShutdownDialog::SyncActionBlock() {
     ShowWindow(chk_remember_, exiting ? SW_SHOW : SW_HIDE);
     ShowWindow(desc_, exiting ? SW_HIDE : SW_SHOW);
     if (!exiting)
-        SetWindowTextW(desc_, action == 1 ? kSoftText : kHardText);
+        SetWindowTextW(desc_, emu_.Get<UiLanguage>().Text(action == 1 ? kSoftText : kHardText));
     InvalidateRect(Hwnd(), nullptr, TRUE);
 }
 
@@ -142,55 +142,59 @@ void ShutdownDialog::BuildControls(HWND hwnd) {
     };
 
     const wchar_t* intro = (trigger_ == ShutdownTrigger::DeepSleep)
-        ? L"The guest OS has requested a shut down."
-        : L"You have requested a shut down.";
+        ? emu_.Get<UiLanguage>().Text("shutdown.the_guest_os_has_requested_a_shut_down")
+        : emu_.Get<UiLanguage>().Text("shutdown.you_have_requested_a_shut_down");
     mk(L"STATIC", intro, SS_LEFT, S(kTextX), cb + S(kIntroDy),
        cw - S(kTextX) - S(kMarginR), S(kRowH), -1);
 
-    mk(L"STATIC", L"What do you want to do?", SS_LEFT, S(kTextX),
+    mk(L"STATIC", emu_.Get<UiLanguage>().Text("shutdown.what_do_you_want_to_do"), SS_LEFT, S(kTextX),
        cb + S(kAskDy), cw - S(kTextX) - S(kMarginR), S(kRowH), -1);
 
     combo_ = mk(L"COMBOBOX", L"",
                 CBS_DROPDOWNLIST | WS_TABSTOP | WS_VSCROLL, S(kTextX),
                 cb + S(kComboDy), cw - S(kTextX) - S(kMarginR),
                 S(kComboH) + 3 * S(kRowH), IDC_ACTION);
-    SendMessageW(combo_, CB_ADDSTRING, 0, (LPARAM)L"Exit emulator");
-    SendMessageW(combo_, CB_ADDSTRING, 0, (LPARAM)L"Soft reset");
-    SendMessageW(combo_, CB_ADDSTRING, 0, (LPARAM)L"Hard reset");
+    SendMessageW(combo_, CB_ADDSTRING, 0, (LPARAM)emu_.Get<UiLanguage>().Text("shutdown.exit_emulator"));
+    SendMessageW(combo_, CB_ADDSTRING, 0, (LPARAM)emu_.Get<UiLanguage>().Text("menu.soft_reset"));
+    SendMessageW(combo_, CB_ADDSTRING, 0, (LPARAM)emu_.Get<UiLanguage>().Text("shutdown.hard_reset"));
     SendMessageW(combo_, CB_SETCURSEL, 0, 0);
 
     const int block_y = cb + S(kBlockDy);
     const unsigned long long mb =
         emu_.Get<EmulatedMemory>().VolatileByteCount() >> 20;
-    wchar_t save_text[64];
-    swprintf(save_text, 64, L"Save the state (%llu MB, ", mb);
-    chk_save_ = mk(L"BUTTON", save_text, BS_AUTOCHECKBOX | WS_TABSTOP,
+    const std::wstring save_text = emu_.Get<UiLanguage>().Format(
+        "shutdown.save_state_size", {{"size", std::to_string(mb)}});
+    chk_save_ = mk(L"BUTTON", save_text.c_str(), BS_AUTOCHECKBOX | WS_TABSTOP,
                    S(kTextX), block_y, cw - S(kTextX) - S(kMarginR),
                    S(kRowH), IDC_SAVE);
     SendMessageW(chk_save_, BM_SETCHECK,
                  emu_.Get<DeviceConfig>().last_save_state_mode
                      ? BST_CHECKED : BST_UNCHECKED, 0);
 
-    save_link_ = mk(WC_LINK, kSaveLinkMarkup, WS_TABSTOP, S(kTextX), block_y,
+    const std::wstring version_label = emu_.Get<UiLanguage>().Format(
+        "shutdown.state_version", {{"version", CERF_VERSION_STR}});
+    const std::wstring markup = L"<a href=\"https://cerf.cx/hibernation-warning\">" +
+                                EscapeLinkText(version_label) + L"</a>";
+    save_link_ = mk(WC_LINK, markup.c_str(), WS_TABSTOP, S(kTextX), block_y,
                     S(kRowH), S(kRowH), IDC_SAVE_LINK);
     save_tail_ = mk(L"STATIC", kSaveTail, SS_LEFT, S(kTextX), block_y,
                     S(kRowH), S(kRowH), -1);
 
-    chk_remember_ = mk(L"BUTTON", L"Remember this choice",
+    chk_remember_ = mk(L"BUTTON", emu_.Get<UiLanguage>().Text("shutdown.remember_this_choice"),
                        BS_AUTOCHECKBOX | WS_TABSTOP, S(kTextX),
                        block_y + S(kRowH + 2),
                        cw - S(kTextX) - S(kMarginR), S(kRowH), IDC_REMEMBER);
 
-    desc_ = mk(L"STATIC", kSoftText, SS_LEFT, S(kTextX), block_y,
+    desc_ = mk(L"STATIC", emu_.Get<UiLanguage>().Text(kSoftText), SS_LEFT, S(kTextX), block_y,
                cw - S(kTextX) - S(kMarginR), S(kDescH), IDC_DESC);
     ShowWindow(desc_, SW_HIDE);
 
     const int btn_y = rc.bottom - S(kBtnBottom);
-    mk(L"BUTTON", L"OK", BS_DEFPUSHBUTTON | WS_TABSTOP,
+    mk(L"BUTTON", emu_.Get<UiLanguage>().Text("common.ok"), BS_DEFPUSHBUTTON | WS_TABSTOP,
        cw - S(kMarginR + kBtnGap) - 2 * S(kBtnW), btn_y, S(kBtnW), S(kBtnH),
        IDOK);
     mk(L"BUTTON",
-       trigger_ == ShutdownTrigger::DeepSleep ? L"Resume" : L"Cancel",
+       trigger_ == ShutdownTrigger::DeepSleep ? emu_.Get<UiLanguage>().Text("shutdown.resume") : emu_.Get<UiLanguage>().Text("common.cancel"),
        BS_PUSHBUTTON | WS_TABSTOP,
        cw - S(kMarginR) - S(kBtnW), btn_y, S(kBtnW), S(kBtnH), IDCANCEL);
 
@@ -261,14 +265,14 @@ void ShutdownDialog::OnPaint(HDC dc) {
     DeleteObject(red);
 
     painted_secs_ = RemainingSeconds();
-    wchar_t cd[32];
-    swprintf(cd, 32, L"(%ds left)", painted_secs_);
+    const std::wstring cd = emu_.Get<UiLanguage>().Format(
+        "shutdown.countdown", {{"seconds", std::to_string(painted_secs_)}});
     RECT text_rc = crc;
     SetBkMode(dc, TRANSPARENT);
     SetTextColor(dc, dark ? RGB(160, 160, 160) : RGB(96, 96, 96));
     HFONT   font = dm.UiFont();
     HGDIOBJ old  = SelectObject(dc, font ? font : GetStockObject(DEFAULT_GUI_FONT));
-    DrawTextW(dc, cd, -1, &text_rc, DT_CENTER);
+    DrawTextW(dc, cd.c_str(), -1, &text_rc, DT_CENTER);
     SelectObject(dc, old);
 }
 
@@ -350,7 +354,7 @@ ShutdownChoice ShutdownDialog::Show(ShutdownTrigger trigger) {
     const int client_h = band_h_ + MulDiv(kContentH, (int)dpi,
                                           USER_DEFAULT_SCREEN_DPI);
 
-    RunModal(owner, kClass, L"Shut down - CE Runtime Foundation",
+    RunModal(owner, kClass, emu_.Get<UiLanguage>().Text("shutdown.shut_down_ce_runtime_foundation"),
              client_w, client_h);
     return choice_;
 }

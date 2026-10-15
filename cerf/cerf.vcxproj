@@ -189,6 +189,14 @@
           RetryDelayMilliseconds="200" />
   </Target>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <Target Name="CopyLanguageCatalogs" AfterTargets="Build">
+    <ItemGroup>
+      <LanguageCatalog Include="$(ProjectDir)..\langs\*.yml" />
+    </ItemGroup>
+    <Copy SourceFiles="@(LanguageCatalog)"
+          DestinationFolder="$(OutDir)langs"
+          SkipUnchangedFiles="true" />
+  </Target>
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>
 </Project>

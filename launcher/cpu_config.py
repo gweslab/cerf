@@ -1,4 +1,6 @@
 from __future__ import annotations
+from i18n import t, data_text
+from database_text import record_key
 
 import re
 from typing import Dict, List, Optional
@@ -12,7 +14,7 @@ TYPE_HEX = "hex"
 TYPE_ENUM = "enum"
 
 AUTO = "auto"
-CUSTOM_LABEL = "Custom"
+CUSTOM_LABEL = 'common.custom'
 
 _HEX_TEXT = re.compile(r"^0[xX][0-9a-fA-F]{1,8}$")
 _DECIMAL_TEXT = re.compile(r"^[0-9]{1,10}$")
@@ -84,11 +86,12 @@ def normalized(param: dict, value: object) -> object:
 def value_label(param: dict, value: object) -> str:
     kind = param.get("type")
     if kind == TYPE_BOOLEAN:
-        return "Enabled" if value else "Disabled"
+        return t("common.enabled") if value else t("common.disabled")
     if kind == TYPE_ENUM:
         for option in param.get("enum_values", []):
             if option.get("id") == value:
-                return option.get("name", value)
+                return data_text(record_key("cpu_config_params", param) +
+                                 ".enum_values." + str(value), option.get("name", value))
         return str(value)
     if kind == TYPE_HEX:
         number = normalized(param, value)
@@ -97,7 +100,7 @@ def value_label(param: dict, value: object) -> str:
 
 
 def auto_label(text: str) -> str:
-    return "Auto ({})".format(text)
+    return t('launcher.cpu_config.auto_text', text=text)
 
 
 def param_value_label(param: dict, default: object,
@@ -117,7 +120,7 @@ def preset_label(board_id: object, overrides: Dict[str, object]) -> str:
         return auto_preset_label(board_id)
     match = matching_preset(board_arch(board_id),
                             effective(board_defaults(board_id), overrides))
-    return preset_name(match) if match else CUSTOM_LABEL
+    return preset_name(match) if match else t(CUSTOM_LABEL)
 
 
 def available(board_id: object) -> bool:

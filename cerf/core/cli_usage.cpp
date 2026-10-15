@@ -22,6 +22,7 @@ void CliUsage::Print(const char* prog) {
     printf("  --timeout=SECONDS        Stop the run after SECONDS and exit with code %d\n", CERF_FATAL_TIMEOUT);
     printf("  --allow-flood            Disable stdout anti-flood\n");
     printf("  --quiet                  Disable all log output\n");
+    printf("  --language=CODE          Host UI language from langs/CODE.yml (default: en)\n");
     printf("  --disable-network        Force-disable network backend\n");
     printf("  --screen-width=N         Override device cerf.json board.configurable_screen_width\n");
     printf("  --screen-height=N        Override device cerf.json board.configurable_screen_height\n");

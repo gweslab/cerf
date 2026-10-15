@@ -1,4 +1,5 @@
 #include "keyboard_widget.h"
+#include "ui_language.h"
 
 #include "../core/cerf_emulator.h"
 #include "../core/device_config.h"
@@ -25,12 +26,14 @@ void KeyboardWidget::OnReady() {
 std::wstring KeyboardWidget::Tooltip() const {
     auto& router = emu_.Get<KeyboardRouter>();
     KeyboardInput* active = router.Active();
-    std::wstring tip = active ? active->SourceName() : L"Keyboard";
+    std::wstring tip = active
+        ? emu_.Get<UiLanguage>().Text(active->SourceLabelKey())
+        : emu_.Get<UiLanguage>().Text("common.keyboard");
     /* The click hint is only true when BuildMenu yields something: a source
        radio (>1 source) or the mapping section (a KeyboardMap exists). */
     const bool has_menu = router.Sources().size() > 1 ||
                           emu_.TryGet<KeyboardMap>() != nullptr;
-    if (has_menu) tip += L" - click to configure input / see key mappings";
+    if (has_menu) tip += emu_.Get<UiLanguage>().Text("input.keyboard.click_to_configure_input_see_key_mappings");
     return tip;
 }
 
@@ -56,7 +59,7 @@ std::vector<WidgetMenuItem> KeyboardWidget::BuildMenu() {
         KeyboardInput* active = router.Active();
         for (auto* s : sources) {
             WidgetMenuItem mi;
-            mi.label    = s->SourceName();
+            mi.label    = emu_.Get<UiLanguage>().Text(s->SourceLabelKey());
             mi.checked  = (s == active);
             mi.on_click = [this, s] { emu_.Get<KeyboardRouter>().SetActive(s); };
             items.push_back(std::move(mi));
@@ -67,7 +70,7 @@ std::vector<WidgetMenuItem> KeyboardWidget::BuildMenu() {
         if (!items.empty()) items.push_back(WidgetMenuItem{});   /* separator */
 
         WidgetMenuItem see;
-        see.label    = L"See keyboard mapping";
+        see.label    = emu_.Get<UiLanguage>().Text("input.keyboard.see_keyboard_mapping");
         see.on_click = [this] { emu_.Get<KeyboardMappingDialog>().Show(); };
         items.push_back(std::move(see));
 
@@ -100,4 +103,8 @@ void KeyboardWidget::RestoreWidgetState(StateReader& r) {
     uint8_t picked = 0;
     r.Read("user_picked", picked);
     emu_.Get<KeyboardRouter>().RestoreUserPicked(picked != 0);
+}
+
+std::wstring KeyboardWidget::MenuLabel() const {
+    return emu_.Get<UiLanguage>().Text("common.keyboard");
 }

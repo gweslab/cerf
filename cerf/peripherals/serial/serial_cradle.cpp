@@ -11,6 +11,7 @@
 #include "../../core/cerf_emulator.h"
 #include "../../core/string_utils.h"
 #include "../../host/host_icon_cache.h"
+#include "../../host/ui_language.h"
 #include "../../state/state_stream.h"
 
 #include <cstdint>
@@ -107,13 +108,13 @@ std::vector<WidgetMenuItem> SerialCradle::BuildInsertSubmenuLocked(uint64_t gen)
     std::vector<WidgetMenuItem> items;
 
     WidgetMenuItem modem;
-    modem.label   = serial_endpoint_kind::kModemName;
+    modem.label   = emu_.Get<UiLanguage>().Text("pcmcia.serial_modem");
     modem.submenu = emu_.Get<SerialModemCardMenu>().BuildInsertMenu(
         [this, gen] { SwapModem(gen); });
     items.push_back(std::move(modem));
 
     WidgetMenuItem fwd;
-    fwd.label   = serial_endpoint_kind::kForwardName;
+    fwd.label   = emu_.Get<UiLanguage>().Text("pcmcia.serial_forward");
     fwd.submenu = emu_.Get<SerialForwardCardMenu>().BuildInsertMenu(
         [this, gen](std::wstring port) { SwapForward(gen, std::move(port)); });
     items.push_back(std::move(fwd));
@@ -128,25 +129,25 @@ std::vector<WidgetMenuItem> SerialCradle::BuildMenu() {
 
     if (kind_ == Kind::None) {
         WidgetMenuItem insert;
-        insert.label   = L"Insert card";
+        insert.label   = emu_.Get<UiLanguage>().Text("pcmcia.insert_card");
         insert.submenu = BuildInsertSubmenuLocked(gen);
         items.push_back(std::move(insert));
         return items;
     }
 
     WidgetMenuItem header;
-    header.label   = (kind_ == Kind::Modem) ? serial_endpoint_kind::kModemName
-                                            : serial_endpoint_kind::kForwardName;
+    header.label   = emu_.Get<UiLanguage>().Text(kind_ == Kind::Modem
+        ? "pcmcia.serial_modem" : "pcmcia.serial_forward");
     header.enabled = false;
     items.push_back(std::move(header));
 
     WidgetMenuItem eject;
-    eject.label    = L"Eject";
+    eject.label    = emu_.Get<UiLanguage>().Text("pcmcia.eject");
     eject.on_click = [this, gen] { Eject(gen); };
     items.push_back(std::move(eject));
 
     WidgetMenuItem swap;
-    swap.label   = L"Eject and insert";
+    swap.label   = emu_.Get<UiLanguage>().Text("pcmcia.eject_and_insert");
     swap.submenu = BuildInsertSubmenuLocked(gen);
     items.push_back(std::move(swap));
 
@@ -186,12 +187,12 @@ std::wstring SerialCradle::Tooltip() const {
     std::lock_guard<std::mutex> lk(mtx_);
     switch (kind_) {
         case Kind::Modem:
-            return label_ + L" - " + serial_endpoint_kind::kModemName;
+            return label_ + L" - " + emu_.Get<UiLanguage>().Text("pcmcia.serial_modem");
         case Kind::Forward:
-            return label_ + L" - " + serial_endpoint_kind::kForwardName +
-                   L" -> host " + host_port_;
+            return label_ + L" - " + emu_.Get<UiLanguage>().Format(
+                "pcmcia.forward_to_host", {{"port", WideToUtf8(host_port_)}});
         case Kind::None:
-            return label_ + L" - empty";
+            return label_ + L" - " + emu_.Get<UiLanguage>().Text("pcmcia.empty");
     }
     return label_;
 }

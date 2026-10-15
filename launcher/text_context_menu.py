@@ -1,4 +1,5 @@
 from __future__ import annotations
+from i18n import t
 
 import tkinter as tk
 
@@ -42,12 +43,12 @@ class TextContextMenu:
                     activebackground=theme.BG_HOVER, activeforeground=theme.FG,
                     disabledforeground=theme.FG_DIM)
         menu.delete(0, "end")
-        self._add(menu, widget, "Cut", "<<Cut>>", editable and has_selection)
-        self._add(menu, widget, "Copy", "<<Copy>>", has_selection)
-        self._add(menu, widget, "Paste", "<<Paste>>", editable and has_clip)
-        self._add(menu, widget, "Delete", "<<Clear>>", editable and has_selection)
+        self._add(menu, widget, t("common.cut"), "<<Cut>>", editable and has_selection)
+        self._add(menu, widget, t("common.copy"), "<<Copy>>", has_selection)
+        self._add(menu, widget, t("common.paste"), "<<Paste>>", editable and has_clip)
+        self._add(menu, widget, t("common.delete"), "<<Clear>>", editable and has_selection)
         menu.add_separator()
-        self._add(menu, widget, "Select all", "<<SelectAll>>", True)
+        self._add(menu, widget, t("common.select_all"), "<<SelectAll>>", True)
         try:
             menu.tk_popup(event.x_root, event.y_root)
         finally:

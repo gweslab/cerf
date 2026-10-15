@@ -2,6 +2,7 @@
 own ROM and downloading ROMs from the public repositories; step 2 is the
 dynamic new-device form (board, name, ROM file, copy choice)."""
 from __future__ import annotations
+from i18n import t
 
 import tkinter as tk
 from pathlib import Path
@@ -78,7 +79,7 @@ class NewDeviceWizard:
 
         dlg = tk.Toplevel(parent)
         self._dlg = dlg
-        dlg.title("New")
+        dlg.title(t("common.new"))
         dlg.configure(bg=theme.BG)
         if parent.winfo_viewable():
             dlg.transient(parent)
@@ -109,20 +110,20 @@ class NewDeviceWizard:
 
         new_btn = _PivotButton(
             body, self._load_icon(icons_dir, "local_rom.png"),
-            "New device", "Create a device from your local ROM",
+            t("launcher.new_device_wizard.new_device"), t("launcher.new_device_wizard.create_a_device_from_your_local_rom"),
             self._show_step2)
         new_btn.frame.grid(row=0, column=0, sticky="nsew", padx=(0, 6))
 
         dl_btn = _PivotButton(
             body, self._load_icon(icons_dir, "download.png"),
-            "Download ROMs",
-            "Get ready-to-run ROMs from public sources",
+            t("launcher.download_window.download_roms"),
+            t("launcher.new_device_wizard.get_ready_to_run_roms_from_public_sources"),
             self._choose_download)
         dl_btn.frame.grid(row=0, column=1, sticky="nsew", padx=(6, 0))
 
         footer = ttk.Frame(body)
         footer.grid(row=1, column=0, columnspan=2, sticky="e", pady=(12, 0))
-        ttk.Button(footer, text="Cancel",
+        ttk.Button(footer, text=t("common.cancel"),
                    command=self._dlg.destroy).pack(side="right")
 
     def _build_step2(self) -> None:
@@ -143,7 +144,7 @@ class NewDeviceWizard:
         column.place(self.form.frame)
 
         self.var_copy = tk.BooleanVar(value=True)
-        row = column.group().row("Copy files to device directory")
+        row = column.group().row(t("launcher.new_device_wizard.copy_files_to_device_directory"))
         row.control(switch(row.frame, self.var_copy), wide=False)
         scroll.bind_wheel(scroll.inner)
 
@@ -151,13 +152,13 @@ class NewDeviceWizard:
             row=1, column=0, columnspan=2, sticky="ew")
         footer = ttk.Frame(body, padding=12)
         footer.grid(row=2, column=0, columnspan=2, sticky="e")
-        ttk.Button(footer, text="Back",
+        ttk.Button(footer, text=t("common.back"),
                    command=self._show_step1).pack(side="left", padx=(0, 6))
-        self.btn_create = ttk.Button(footer, text="Create",
+        self.btn_create = ttk.Button(footer, text=t("common.create"),
                                      style="Accent.TButton",
                                      command=self._create)
         self.btn_create.pack(side="left", padx=(0, 6))
-        ttk.Button(footer, text="Cancel",
+        ttk.Button(footer, text=t("common.cancel"),
                    command=self._dlg.destroy).pack(side="left")
 
         self.form.select_first_board()
@@ -192,7 +193,7 @@ class NewDeviceWizard:
         if reason is None:
             reason = self.form.problem()
         if reason is not None:
-            show_error(self._dlg, "Cannot create device", reason)
+            show_error(self._dlg, t("launcher.new_device_wizard.cannot_create_device"), reason)
             return
         rom_files: Dict[str, Path] = {}
         storage: Dict[str, str] = {}

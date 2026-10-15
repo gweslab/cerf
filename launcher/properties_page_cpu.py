@@ -1,4 +1,6 @@
 from __future__ import annotations
+from i18n import t
+from database_text import field_text
 
 import tkinter as tk
 from tkinter import ttk
@@ -18,7 +20,7 @@ from settings_card import CONTROL_GAP_DIP, SettingsColumn, SettingsGroup, Settin
 from ui_dialogs import show_error
 
 PAGE_CPU_CONFIG = "cpu_config"
-WARNING = "Tweaking these settings will render emulation broken. Expect crashes or wrong behaviour."
+WARNING = 'launcher.properties_page_cpu.tweaking_these_settings_will_render_emulation_broken'
 
 PresetChoice = Union[str, int, None]
 
@@ -67,7 +69,7 @@ class _TextParam:
         self.var = tk.StringVar()
         self.entry = ttk.Entry(frame, textvariable=self.var, width=1)
         self.entry.grid(row=0, column=0, sticky="ew")
-        self.reset = ttk.Button(frame, text="Reset", command=self._on_reset)
+        self.reset = ttk.Button(frame, text=t("common.reset"), command=self._on_reset)
         self.reset.grid(row=0, column=1,
                         padx=(scaled(frame, CONTROL_GAP_DIP) // 2, 0))
         row.control(frame)
@@ -114,10 +116,8 @@ class _TextParam:
 
     def invalid_message(self) -> str:
         if self.param.get("type") == TYPE_HEX:
-            return "Enter a hexadecimal value such as 0x1F for {}.".format(
-                self.param.get("name", self.param["id"]))
-        return "Enter a whole number for {}.".format(
-            self.param.get("name", self.param["id"]))
+            return t('launcher.properties_page_cpu.enter_a_hexadecimal_value_such_as_0x1f', value=field_text("cpu_config_params", self.param))
+        return t('launcher.properties_page_cpu.enter_a_whole_number_for_value', value=field_text("cpu_config_params", self.param))
 
     def set_enabled(self, enabled: bool) -> None:
         state = "normal" if enabled else "disabled"
@@ -130,7 +130,7 @@ ParamRow = Union[_ChoiceParam, _TextParam]
 
 class CpuConfigPage:
     key = PAGE_CPU_CONFIG
-    title = "CPU Configuration"
+    title = "properties.cpu"
 
     def __init__(self, parent: tk.Misc, window: tk.Misc,
                  bind_wheel: Callable[[tk.Misc], None]) -> None:
@@ -146,11 +146,10 @@ class CpuConfigPage:
 
         page = SettingsColumn(parent)
         self.frame = page.frame
-        page.group().note(WARNING)
+        page.group().note(t(WARNING))
         self.rate = MultiplierOptionBlock(
-            page.group().row("CPU rate multiplier", [
-                plain("Multiply the guest CPU clock. The guest does more work "
-                      "in each second.")]),
+            page.group().row(t("launcher.properties_page_cpu.cpu_rate_multiplier"), [
+                plain(t("launcher.properties_page_cpu.multiply_the_guest_cpu_clock_the_guest_does_more"))]),
             CPU_RATE_KEY, CPU_RATE_PRESETS)
         self._holder = page.column().frame
         self.set_board("")
@@ -170,14 +169,14 @@ class CpuConfigPage:
         self._group = SettingsGroup(self._holder)
         self._group.frame.grid(row=0, column=0, sticky="ew")
         self._holder.columnconfigure(0, weight=1)
-        row = self._group.row("Preset")
+        row = self._group.row(t("launcher.config_preview.preset"))
         self.preset = ChoiceCombo(row.frame, on_change=self._on_preset)
         row.control(self.preset.widget)
         self.preset.configure([AUTO] + list(range(len(self._presets))),
                               self._preset_label)
         self._rows = []
         for param in params_for_arch(self._arch):
-            row = self._group.row(param.get("name", param["id"]))
+            row = self._group.row(field_text("cpu_config_params", param))
             default = self._defaults.get(param["id"])
             if param.get("type") in (TYPE_BOOLEAN, TYPE_ENUM):
                 self._rows.append(_ChoiceParam(row, param, default,
@@ -194,7 +193,7 @@ class CpuConfigPage:
             return auto_preset_label(self._board_id)
         if isinstance(value, int):
             return preset_name(self._presets[value])
-        return CUSTOM_LABEL
+        return t(CUSTOM_LABEL)
 
     def _overrides(self) -> Dict[str, object]:
         out: Dict[str, object] = {}
@@ -242,7 +241,7 @@ class CpuConfigPage:
         for row in self._rows:
             if row.commit():
                 continue
-            show_error(self._window, "Invalid value", row.invalid_message())
+            show_error(self._window, t("launcher.properties_page_cpu.invalid_value"), row.invalid_message())
             row.entry.focus_set()
             return False
         return True

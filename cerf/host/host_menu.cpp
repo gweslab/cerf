@@ -1,6 +1,7 @@
 #define NOMINMAX
 
 #include "host_menu.h"
+#include "ui_language.h"
 
 #include "../boot/guest_cold_boot.h"
 #include "../core/cerf_emulator.h"
@@ -57,36 +58,36 @@ HMENU HostMenu::Build() {
     HMENU bar = CreateMenu();
 
     HMENU actions = CreatePopupMenu();
-    AppendMenuW(bar, MF_POPUP, (UINT_PTR)actions, L"Actions");
+    AppendMenuW(bar, MF_POPUP, (UINT_PTR)actions, emu_.Get<UiLanguage>().Text("menu.actions"));
 
     HMENU view = CreatePopupMenu();
-    AppendMenuW(view, MF_STRING, kIdViewBoot, L"Boot Screen");
-    AppendMenuW(view, MF_STRING, kIdViewHw,   L"Hardware Screen");
-    AppendMenuW(view, MF_STRING, kIdViewFb,     L"Framebuffer");
+    AppendMenuW(view, MF_STRING, kIdViewBoot, emu_.Get<UiLanguage>().Text("menu.boot_screen"));
+    AppendMenuW(view, MF_STRING, kIdViewHw,   emu_.Get<UiLanguage>().Text("menu.hardware_screen"));
+    AppendMenuW(view, MF_STRING, kIdViewFb,     emu_.Get<UiLanguage>().Text("menu.framebuffer"));
     AppendMenuW(view, MF_SEPARATOR, 0, nullptr);
-    AppendMenuW(view, MF_STRING, kIdVpOriginal, L"Original view");
-    AppendMenuW(view, MF_STRING, kIdVpAspect,   L"Resize + match aspect ratio");
-    AppendMenuW(view, MF_STRING, kIdVpStretch,  L"Stretch");
-    AppendMenuW(view, MF_STRING, kIdVpInteger2, L"Integer scale 2x");
-    AppendMenuW(view, MF_STRING, kIdVpInteger3, L"Integer scale 3x");
-    AppendMenuW(view, MF_STRING, kIdVpInteger5, L"Integer scale 5x");
-    AppendMenuW(view, MF_STRING, kIdAliasing,   L"Apply aliasing");
+    AppendMenuW(view, MF_STRING, kIdVpOriginal, emu_.Get<UiLanguage>().Text("menu.original_view"));
+    AppendMenuW(view, MF_STRING, kIdVpAspect,   emu_.Get<UiLanguage>().Text("menu.resize_match_aspect_ratio"));
+    AppendMenuW(view, MF_STRING, kIdVpStretch,  emu_.Get<UiLanguage>().Text("menu.stretch"));
+    AppendMenuW(view, MF_STRING, kIdVpInteger2, emu_.Get<UiLanguage>().Text("menu.integer_scale_2x"));
+    AppendMenuW(view, MF_STRING, kIdVpInteger3, emu_.Get<UiLanguage>().Text("menu.integer_scale_3x"));
+    AppendMenuW(view, MF_STRING, kIdVpInteger5, emu_.Get<UiLanguage>().Text("menu.integer_scale_5x"));
+    AppendMenuW(view, MF_STRING, kIdAliasing,   emu_.Get<UiLanguage>().Text("menu.apply_aliasing"));
     AppendMenuW(view, MF_SEPARATOR, 0, nullptr);
     AppendMenuW(view, MF_STRING, kIdFullscreen,
-                (L"Full screen\t" +
+                (emu_.Get<UiLanguage>().Text("menu.full_screen") +
                  emu_.Get<HostKeyBinding>().LabelWith(L"F")).c_str());
     AppendMenuW(view, MF_SEPARATOR, 0, nullptr);
-    AppendMenuW(view, MF_STRING, kIdSaveShot,   L"Save screenshot");
-    AppendMenuW(view, MF_STRING, kIdCopyShot,   L"Copy screenshot");
+    AppendMenuW(view, MF_STRING, kIdSaveShot,   emu_.Get<UiLanguage>().Text("menu.save_screenshot"));
+    AppendMenuW(view, MF_STRING, kIdCopyShot,   emu_.Get<UiLanguage>().Text("menu.copy_screenshot"));
     AppendMenuW(view, MF_SEPARATOR, 0, nullptr);
-    AppendMenuW(view, MF_STRING, kIdMatchGuest, L"Match guest size");
-    AppendMenuW(bar, MF_POPUP, (UINT_PTR)view, L"View");
+    AppendMenuW(view, MF_STRING, kIdMatchGuest, emu_.Get<UiLanguage>().Text("menu.match_guest_size"));
+    AppendMenuW(bar, MF_POPUP, (UINT_PTR)view, emu_.Get<UiLanguage>().Text("menu.view"));
 
     HMENU help = CreatePopupMenu();
-    AppendMenuW(help, MF_STRING, kIdArticles, L"Articles (opens in browser)");
+    AppendMenuW(help, MF_STRING, kIdArticles, emu_.Get<UiLanguage>().Text("menu.articles_opens_in_browser"));
     AppendMenuW(help, MF_SEPARATOR, 0, nullptr);
-    AppendMenuW(help, MF_STRING, kIdAbout, L"About");
-    AppendMenuW(bar, MF_POPUP, (UINT_PTR)help, L"Help");
+    AppendMenuW(help, MF_STRING, kIdAbout, emu_.Get<UiLanguage>().Text("common.about"));
+    AppendMenuW(bar, MF_POPUP, (UINT_PTR)help, emu_.Get<UiLanguage>().Text("common.help"));
 
     bar_ = bar;
     return bar;
@@ -133,23 +134,23 @@ void HostMenu::OnInitMenuPopup(HMENU popup) {
     if (popup == actions && actions) {
         while (GetMenuItemCount(actions) > 0)
             DeleteMenu(actions, 0, MF_BYPOSITION);
-        AppendMenuW(actions, MF_STRING, kIdSaveState, L"Save state...");
-        AppendMenuW(actions, MF_STRING, kIdLoadState, L"Load state...");
+        AppendMenuW(actions, MF_STRING, kIdSaveState, emu_.Get<UiLanguage>().Text("menu.save_state"));
+        AppendMenuW(actions, MF_STRING, kIdLoadState, emu_.Get<UiLanguage>().Text("menu.load_state"));
         AppendMenuW(actions, MF_SEPARATOR, 0, nullptr);
         auto& host_key = emu_.Get<HostKeyBinding>();
         auto& pause = emu_.Get<EmulationPause>();
         AppendMenuW(actions, MF_STRING | (pause.UserCanToggle() ? 0u : MF_GRAYED), kIdPause,
                     ((pause.IsUserPaused()
-                          ? std::wstring(L"Resume\t") : std::wstring(L"Pause\t")) +
+                          ? std::wstring(emu_.Get<UiLanguage>().Text("menu.resume")) : std::wstring(emu_.Get<UiLanguage>().Text("menu.pause"))) +
                      host_key.LabelWith(L"P")).c_str());
         AppendMenuW(actions, MF_STRING, kIdCtrlAltDel,
-                    (L"Send Ctrl+Alt+Del\t" +
+                    (emu_.Get<UiLanguage>().Text("menu.send_ctrl_alt_del") +
                      host_key.LabelWith(L"Del")).c_str());
         AppendMenuW(actions, MF_SEPARATOR, 0, nullptr);
-        AppendMenuW(actions, MF_STRING, kIdSoftReset, L"Soft reset");
-        AppendMenuW(actions, MF_STRING, kIdHardReset, L"Hard reset...");
+        AppendMenuW(actions, MF_STRING, kIdSoftReset, emu_.Get<UiLanguage>().Text("menu.soft_reset"));
+        AppendMenuW(actions, MF_STRING, kIdHardReset, emu_.Get<UiLanguage>().Text("menu.hard_reset"));
         AppendMenuW(actions, MF_SEPARATOR, 0, nullptr);
-        AppendMenuW(actions, MF_STRING, kIdSettings, L"Settings...");
+        AppendMenuW(actions, MF_STRING, kIdSettings, emu_.Get<UiLanguage>().Text("menu.settings"));
         AppendMenuW(actions, MF_SEPARATOR, 0, nullptr);
         emu_.Get<HostWidgetRegistry>().AppendAllToMenu(actions);
     }
@@ -193,10 +194,8 @@ void HostMenu::HandleCommand(int id) {
         case kIdSoftReset:  emu_.Get<GuestCpuReset>().WarmReset(); break;
         case kIdHardReset:
             if (MessageBoxW(emu_.Get<HostWindow>().Hwnd(),
-                    L"Hard reset clears all guest RAM.\n"
-                    L"Unsaved guest data and the object store are lost.\n\n"
-                    L"Continue?",
-                    L"Hard reset - CE Runtime Foundation",
+                    emu_.Get<UiLanguage>().Text("menu.hard_reset_clears_all_guest_ram_unsaved_guest_data"),
+                    emu_.Get<UiLanguage>().Text("menu.hard_reset_ce_runtime_foundation"),
                     MB_YESNO | MB_ICONWARNING | MB_DEFBUTTON2) == IDYES) {
                 emu_.Get<GuestColdBoot>().RequestHardReset();
             }

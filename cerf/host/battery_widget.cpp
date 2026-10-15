@@ -1,8 +1,11 @@
 #include "battery_widget.h"
+#include "ui_language.h"
 
 #include "../core/cerf_emulator.h"
 #include "../state/state_stream.h"
 #include "host_gdiplus.h"
+
+#include "../core/string_utils.h"
 
 #include <cstdint>
 
@@ -54,13 +57,15 @@ std::wstring BatteryWidget::Tooltip() const {
         on_batt = on_battery_;
         fill    = fill_percent_;
     }
-    const wchar_t* level = fill >= kLevelHigh ? L"High"
-                         : fill >= kLevelLow  ? L"Low"
-                                              : L"Critical";
-    wchar_t buf[96];
-    swprintf_s(buf, L"Battery - %s, %d%% (%s)",
-               on_batt ? L"on battery" : L"on AC", fill, level);
-    return buf;
+    const wchar_t* level = fill >= kLevelHigh ? emu_.Get<UiLanguage>().Text("battery.high")
+                         : fill >= kLevelLow  ? emu_.Get<UiLanguage>().Text("battery.low")
+                                              : emu_.Get<UiLanguage>().Text("battery.critical");
+    const auto& language = emu_.Get<UiLanguage>();
+    return language.Format("battery.tooltip", {
+        {"source", WideToUtf8(on_batt ? language.Text("battery.on_battery")
+                                    : language.Text("battery.on_ac"))},
+        {"level", WideToUtf8(level)}, {"percent", std::to_string(fill)},
+    });
 }
 
 void BatteryWidget::DrawIcon(HDC dc, const RECT& box) const {
@@ -132,7 +137,7 @@ std::vector<WidgetMenuItem> BatteryWidget::BuildMenu() {
     std::vector<WidgetMenuItem> items;
 
     WidgetMenuItem ac;
-    ac.label    = L"On battery power";
+    ac.label    = emu_.Get<UiLanguage>().Text("battery.on_battery_power");
     ac.checked  = on_batt;
     ac.on_click = [this, on_batt] { SetOnBattery(!on_batt); };
     items.push_back(std::move(ac));
@@ -140,7 +145,7 @@ std::vector<WidgetMenuItem> BatteryWidget::BuildMenu() {
     items.push_back(WidgetMenuItem{});  /* separator */
 
     WidgetMenuItem level;
-    level.label = L"Charge level";
+    level.label = emu_.Get<UiLanguage>().Text("battery.charge_level");
     for (int preset : { 100, 80, 60, 40, 20, 5 }) {
         WidgetMenuItem p;
         wchar_t lbl[16];
@@ -188,4 +193,8 @@ void BatteryWidget::RestoreWidgetState(StateReader& r) {
        lock since the handler re-reads the getters. Pull-based owners have no
        handler and read the restored state live. */
     if (on_change_) on_change_();
+}
+
+std::wstring BatteryWidget::MenuLabel() const {
+    return emu_.Get<UiLanguage>().Text("common.battery");
 }

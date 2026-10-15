@@ -1,4 +1,5 @@
 from __future__ import annotations
+from i18n import t
 
 import tkinter as tk
 from pathlib import Path
@@ -14,7 +15,7 @@ PAGE_BOARD = "board"
 
 class BoardRomPage:
     key = PAGE_BOARD
-    title = "Board Settings"
+    title = "properties.board"
 
     def __init__(self, parent: tk.Misc, window: tk.Misc, device_dir: Path,
                  on_board_changed: Callable[[], None],
@@ -49,7 +50,7 @@ class BoardRomPage:
     def validate(self) -> bool:
         reason = self.form.problem()
         if reason is not None:
-            show_error(self._window, self.title, reason)
+            show_error(self._window, t(self.title), reason)
             return False
         return True
 

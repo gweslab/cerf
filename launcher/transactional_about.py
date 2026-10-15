@@ -1,4 +1,5 @@
 from __future__ import annotations
+from i18n import t
 
 from typing import Optional
 
@@ -10,7 +11,7 @@ def _device_line(query: dict) -> str:
     soc = query.get("soc_name")
     if not isinstance(board, str) or not board:
         return ""
-    line = "Emulating:  " + board
+    line = t("about.emulated_device", device=board)
     if isinstance(soc, str) and soc:
         line += "  ·  " + soc
     return line

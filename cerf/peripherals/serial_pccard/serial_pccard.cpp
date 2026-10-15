@@ -7,6 +7,7 @@
 #include "../pcmcia/pcmcia_slot.h"
 #include "../../core/cerf_emulator.h"
 #include "../../core/string_utils.h"
+#include "../../host/ui_language.h"
 #include "../../state/emulation_freeze.h"
 #include "../../state/state_stream.h"
 
@@ -23,10 +24,16 @@ SerialPcCard::SerialPcCard(CerfEmulator& emu, std::wstring host_com_port)
       host_port_(std::move(host_com_port)) { BuildCis(); }
 SerialPcCard::~SerialPcCard() = default;
 
+std::wstring SerialPcCard::MenuLabel() const {
+    return emu_.Get<UiLanguage>().Text(mode_ == Mode::HostForward
+        ? "pcmcia.serial_forward" : "pcmcia.serial_modem");
+}
+
 std::wstring SerialPcCard::TooltipDetail() const {
     if (mode_ == Mode::HostForward)
-        return std::wstring(kForwardDisplayName) + L" → host " + host_port_;
-    return kDisplayName;
+        return emu_.Get<UiLanguage>().Format("pcmcia.forward_to_host",
+            {{"port", WideToUtf8(host_port_)}});
+    return MenuLabel();
 }
 
 void SerialPcCard::BuildCis() {

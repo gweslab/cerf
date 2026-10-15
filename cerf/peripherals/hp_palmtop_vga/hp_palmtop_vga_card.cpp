@@ -5,6 +5,7 @@
 #include "../../core/byte_order.h"
 #include "../../core/cerf_emulator.h"
 #include "../../core/log.h"
+#include "../../host/ui_language.h"
 #include "../../state/state_stream.h"
 
 namespace {
@@ -33,6 +34,10 @@ const uint8_t kMagic[8] = { 0x55, 0x00, 0x40, 0x00, 0x61, 0x00, 0x34, 0x00 };
 
 HpPalmtopVgaCard::HpPalmtopVgaCard(CerfEmulator& emu) : PcmciaCard(emu) {}
 HpPalmtopVgaCard::~HpPalmtopVgaCard() { if (window_) window_->Close(); }
+
+std::wstring HpPalmtopVgaCard::MenuLabel() const {
+    return emu_.Get<UiLanguage>().Text("pcmcia.hp_vga");
+}
 
 void HpPalmtopVgaCard::OnInserted() {
     /* The window's eject is a posted UI job; this card can be gone and another

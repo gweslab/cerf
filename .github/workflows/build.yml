@@ -133,6 +133,29 @@ jobs:
         shell: pwsh
         run: ./build.ps1 -Config ${{matrix.configuration}} -Mode production
 
+      - name: Validate i18n catalogs and frontends
+        shell: pwsh
+        run: |
+          $python = "$PWD/references/python/cpython-3.7.9-x86/python.exe"
+          & $python tools/validate_languages.py
+          if ($LASTEXITCODE -ne 0) { throw "Catalog validation failed" }
+          & $python -m unittest discover -s tests/i18n -p 'test_*.py'
+          if ($LASTEXITCODE -ne 0) { throw "Python i18n tests failed" }
+          $vswhere = "${env:ProgramFiles(x86)}/Microsoft Visual Studio/Installer/vswhere.exe"
+          $vsRoot = & $vswhere -latest -prerelease -property installationPath
+          $toolsVersion = Get-ChildItem "$vsRoot/VC/Tools/MSVC" -Directory |
+            Select-Object -ExpandProperty Name |
+            Where-Object { $_ -notlike '14.51.*' -and [version]$_ -ge [version]'14.30' } |
+            Sort-Object { [version]$_ } | Select-Object -First 1
+          if (-not $toolsVersion) { throw "No usable MSVC toolset" }
+          $toolset = if ([version]$toolsVersion -ge [version]'14.50') { 'v145' } else { 'v143' }
+          cmake -S tests/i18n -B build/i18n-tests -A Win32 -T "$toolset,version=$toolsVersion" "-DCMAKE_PREFIX_PATH=$PWD/vcpkg_installed/x86-windows-static/x86-windows-static"
+          if ($LASTEXITCODE -ne 0) { throw "Native i18n test configuration failed" }
+          cmake --build build/i18n-tests --config Release
+          if ($LASTEXITCODE -ne 0) { throw "Native i18n test build failed" }
+          ctest --test-dir build/i18n-tests -C Release --output-on-failure
+          if ($LASTEXITCODE -ne 0) { throw "Native i18n tests failed" }
+
       - name: Reduce the payload to what a user runs
         shell: pwsh
         run: |

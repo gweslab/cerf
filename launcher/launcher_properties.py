@@ -1,4 +1,5 @@
 from __future__ import annotations
+from i18n import t
 
 import tkinter as tk
 from typing import Optional, Set
@@ -34,7 +35,7 @@ class PropertiesMixin:
             try:
                 model.save_all()
             except OSError as exc:
-                show_error(dlg, "Properties", "Could not save:\n{}".format(exc))
+                show_error(dlg, t("common.properties"), t('launcher.launcher_properties.could_not_save_exc', exc=exc))
                 return False
             if model.values["verbose_logs"]:
                 self._verbose_devices.add(d.name)

@@ -1,4 +1,5 @@
 from __future__ import annotations
+from i18n import t
 
 import tkinter as tk
 from tkinter import ttk
@@ -52,7 +53,7 @@ class _NumberDialog:
         buttons = ttk.Frame(body)
         buttons.grid(row=len(fields) + 1, column=0, columnspan=3, sticky="e",
                      pady=(10, 0))
-        pack_actions(buttons, [("OK", self._on_ok), ("Cancel", dlg.destroy)])
+        pack_actions(buttons, [(t("common.ok"), self._on_ok), (t("common.cancel"), dlg.destroy)])
         dlg.bind("<Return>", lambda _e: self._on_ok())
         dlg.bind("<Escape>", lambda _e: dlg.destroy())
         entries[0].focus_set()
@@ -78,8 +79,7 @@ class _NumberDialog:
             text = var.get().strip()
             value = int(text, 10) if text else 0
             if value < self._minimum:
-                self._error.config(text="Enter a whole number of {} or "
-                                        "more.".format(self._minimum))
+                self._error.config(text=t('launcher.number_dialog.enter_a_whole_number_of_minimum_or', minimum=self._minimum))
                 return
             values.append(value)
         self.result = values

@@ -1,4 +1,5 @@
 from __future__ import annotations
+from i18n import t
 
 from typing import Callable, Optional
 
@@ -8,7 +9,7 @@ from settings_card import SettingsRow
 
 
 def font_size_label(size: Optional[int]) -> str:
-    return "Default" if size is None else str(size)
+    return t("common.default") if size is None else str(size)
 
 
 def model_font_size(model: dict) -> Optional[int]:

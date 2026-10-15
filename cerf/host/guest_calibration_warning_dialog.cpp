@@ -1,5 +1,6 @@
 #define NOMINMAX
 #include "guest_calibration_warning_dialog.h"
+#include "ui_language.h"
 
 #include "../core/cerf_emulator.h"
 #include "../core/device_config.h"
@@ -35,37 +36,24 @@ enum : int {
 struct BodyBlock {
     const wchar_t* icon_a;
     const wchar_t* icon_b;
-    const wchar_t* text;
+    const char* message_key;
 };
 
 const BodyBlock kBody[] = {
     { nullptr, nullptr,
-      L"Guest Additions driver detected that guest OS displays a calibration "
-      L"window." },
+      "calibration.detected" },
     { nullptr, nullptr,
-      L"The enhanced mouse pointer will NOT work on the calibration screen - "
-      L"you need to switch to the stock input device. After you complete the "
-      L"calibration CERF will switch you back to an enhanced mouse pointer." },
+      "calibration.pointer_warning" },
     { nullptr, nullptr,
-      L"If this doesn't happen or you want to deal with this manually:" },
+      "calibration.manual_hint" },
     { L"ICON_INPUT_GA_POINTER", nullptr,
-      L"If this icon is shown in the status bar, this means you are using "
-      L"enhanced Guest Additions mouse pointer. Click it to switch to stock "
-      L"input device." },
+      "calibration.guest_pointer_hint" },
     { L"ICON_INPUT_STYLUS", nullptr,
-      L"This icon represents stock input device is currently active. Click it "
-      L"to switch back to an enhanced Guest Additions mouse pointer." },
+      "calibration.stock_pointer_hint" },
     { L"ICON_GA", L"ICON_GA_DISABLED",
-      L"If you are using non-native resolution, the stock input might freak out "
-      L"and wont work. Right click this icon and pick \"Change resolution\" - "
-      L"switch it to the stock one and soft reset - this will bring back the "
-      L"stock input to a proper functioning state. Once you finish the welcome "
-      L"wizard (calibration wizard), you can switch back to any resolution you "
-      L"like, the guest OS most likely has a capability to remember that you "
-      L"have finished the calibration." },
+      "calibration.resolution_hint" },
     { L"ICON_DISPLAY", nullptr,
-      L"If you are running a Handheld PC / desktop OS, some versions allow you "
-      L"to skip calibration by pressing the Esc key." },
+      "calibration.skip_hint" },
 };
 
 }
@@ -104,17 +92,18 @@ int GuestCalibrationWarningDialog::LayoutBody(HDC dc, int width, bool draw) {
 
     int y = kMargin;
     for (const BodyBlock& b : kBody) {
+        const wchar_t* text = emu_.Get<UiLanguage>().Text(b.message_key);
         const int text_x = kMargin + (b.icon_a ? kIconBox + kIconGap : 0);
         const int text_w = width - text_x - kMargin;
 
         RECT tr = { text_x, y, text_x + text_w, y };
-        DrawTextW(dc, b.text, -1, &tr, DT_WORDBREAK | DT_CALCRECT);
+        DrawTextW(dc, text, -1, &tr, DT_WORDBREAK | DT_CALCRECT);
         const int text_h = tr.bottom - tr.top;
         const int row_h  = (b.icon_a && text_h < kIconBox) ? kIconBox : text_h;
 
         if (draw) {
             RECT dr = { text_x, y, text_x + text_w, y + text_h };
-            DrawTextW(dc, b.text, -1, &dr, DT_WORDBREAK);
+            DrawTextW(dc, text, -1, &dr, DT_WORDBREAK);
             if (b.icon_a) {
                 RECT ir = { kMargin, y, kMargin + kIconBox, y + kIconBox };
                 if (b.icon_b) DrawIconPair(dc, ir, b.icon_a, b.icon_b);
@@ -144,11 +133,11 @@ void GuestCalibrationWarningDialog::BuildControls(HWND hwnd) {
     const int chres_x  = close_x - kButtonGap - kChangeResW;
     const int switch_x = chres_x - kButtonGap - kSwitchW;
 
-    mk(L"Switch to stock input", BS_DEFPUSHBUTTON | WS_TABSTOP | WS_GROUP,
+    mk(emu_.Get<UiLanguage>().Text("calibration.switch_to_stock_input"), BS_DEFPUSHBUTTON | WS_TABSTOP | WS_GROUP,
        switch_x, kSwitchW, IDOK);
-    mk(L"Change resolution", BS_PUSHBUTTON | WS_TABSTOP, chres_x, kChangeResW,
+    mk(emu_.Get<UiLanguage>().Text("calibration.change_resolution"), BS_PUSHBUTTON | WS_TABSTOP, chres_x, kChangeResW,
        IDC_CHANGE_RES);
-    mk(L"Close", BS_PUSHBUTTON | WS_TABSTOP, close_x, kCloseW, IDCANCEL);
+    mk(emu_.Get<UiLanguage>().Text("common.close"), BS_PUSHBUTTON | WS_TABSTOP, close_x, kCloseW, IDCANCEL);
 
     HFONT gui = emu_.Get<HostDarkMode>().UiFont();
     if (!gui) gui = (HFONT)GetStockObject(DEFAULT_GUI_FONT);
@@ -177,7 +166,7 @@ CalibWarningChoice GuestCalibrationWarningDialog::Show() {
     body_h_ = LayoutBody(screen, kClientW, false);
     ReleaseDC(nullptr, screen);
 
-    RunModal(emu_.Get<HostWindow>().Hwnd(), kClass, L"Guest Additions Warning",
+    RunModal(emu_.Get<HostWindow>().Hwnd(), kClass, emu_.Get<UiLanguage>().Text("calibration.guest_additions_warning"),
              kClientW, body_h_ + kButtonRow);
     return choice_;
 }

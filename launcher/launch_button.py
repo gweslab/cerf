@@ -1,6 +1,7 @@
 """Launch split-button: the "Start" button plus a boot-mode dropdown
 (warm/cold) that appears only when the selected device has a saved state.img."""
 from __future__ import annotations
+from i18n import t
 
 import tkinter as tk
 from pathlib import Path
@@ -25,7 +26,7 @@ class LaunchSplitButton:
         self._on_resize = on_resize
         self._dropdown = False
         self.frame = ttk.Frame(parent)
-        self.btn_launch = ttk.Button(self.frame, text="Start", image=icon,
+        self.btn_launch = ttk.Button(self.frame, text=t("common.start"), image=icon,
                                      compound="top",
                                      style="Toolbar.TButton",
                                      takefocus=False,
@@ -36,9 +37,9 @@ class LaunchSplitButton:
                              background=theme.BG_FIELD, foreground=theme.FG,
                              activebackground=theme.BG_HOVER,
                              activeforeground=theme.FG)
-        self._menu.add_command(label="Warm boot",
+        self._menu.add_command(label=t("launcher.launch_button.warm_boot"),
                                command=lambda: on_launch("warm"))
-        self._menu.add_command(label="Cold boot",
+        self._menu.add_command(label=t("launcher.launch_button.cold_boot"),
                                command=lambda: on_launch("cold"))
         self._btn_boot = ttk.Button(self.frame, text="▾", width=2,
                                      takefocus=False,
@@ -68,7 +69,7 @@ class LaunchSplitButton:
         if running == self._running:
             return
         self._running = running
-        self.btn_launch.config(text="Show" if running else "Start")
+        self.btn_launch.config(text=t("common.show") if running else t("common.start"))
         self.refresh()
 
     def _has_saved_state(self) -> bool:
@@ -78,11 +79,11 @@ class LaunchSplitButton:
 
     def menu_entries(self) -> List[MenuEntry]:
         enabled = str(self.btn_launch.cget("state")) != "disabled"
-        entries = [("Show" if self._running else "Start",
+        entries = [(t("common.show") if self._running else t("common.start"),
                     lambda: self._on_launch(None), enabled)]
         if self._has_saved_state():
-            entries.append(("Warm boot", lambda: self._on_launch("warm"), enabled))
-            entries.append(("Cold boot", lambda: self._on_launch("cold"), enabled))
+            entries.append((t("launcher.launch_button.warm_boot"), lambda: self._on_launch("warm"), enabled))
+            entries.append((t("launcher.launch_button.cold_boot"), lambda: self._on_launch("cold"), enabled))
         return entries
 
     def refresh(self) -> None:

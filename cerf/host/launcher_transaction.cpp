@@ -6,6 +6,7 @@
 #include "../core/device_config.h"
 #include "../core/log.h"
 #include "../core/string_utils.h"
+#include "ui_language.h"
 
 #include <cstdio>
 #include <fstream>
@@ -144,6 +145,7 @@ bool LauncherTransaction::Run(HWND owner, const char* scaffolding,
     if (ok) {
         nlohmann::json request;
         request[scaffolding]["query"] = query;
+        request[scaffolding]["query"]["language"] = emu_.Get<UiLanguage>().Language();
 
         const std::string device = emu_.Get<DeviceConfig>().device_name;
         char file[64];

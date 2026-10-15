@@ -1,4 +1,5 @@
 from __future__ import annotations
+from i18n import t
 
 import tkinter as tk
 from tkinter import ttk
@@ -7,7 +8,7 @@ from typing import List, Set
 from host_key import (DEFAULT_HOST_KEY, MAX_HOST_KEY_LEN, VK_ESCAPE,
                       combo_label, read_host_key, vk_from_tk_event)
 
-PROMPT = "Press the new host key..."
+PROMPT = 'launcher.host_key_block.press_the_new_host_key'
 
 
 class HostKeyBlock:
@@ -23,7 +24,7 @@ class HostKeyBlock:
         self._button = ttk.Button(row, width=30, text=combo_label(self._vks),
                                   command=self._begin_capture)
         self._button.pack(side="left")
-        ttk.Button(row, text="Reset", command=self._reset).pack(
+        ttk.Button(row, text=t("common.reset"), command=self._reset).pack(
             side="left", padx=(6, 0))
 
         self._button.bind("<KeyPress>", self._on_key_press)
@@ -40,7 +41,7 @@ class HostKeyBlock:
         self._capturing = True
         self._pending = []
         self._held = set()
-        self._button.configure(text=PROMPT)
+        self._button.configure(text=t(PROMPT))
         self._button.focus_set()
 
     def _end_capture(self, commit: bool) -> None:

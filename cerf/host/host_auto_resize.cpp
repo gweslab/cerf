@@ -1,5 +1,6 @@
 #define NOMINMAX
 #include <windows.h>
+#include "ui_language.h"
 
 #include "host_auto_resize.h"
 
@@ -50,10 +51,10 @@ void HostAutoResize::OnUserResizeEnd(uint32_t canvas_w, uint32_t canvas_h) {
 
 std::wstring HostAutoResize::Tooltip() const {
     if (!emu_.Get<GuestAdditionsUiPolicy>().LiveResizeAvailable())
-        return L"Guest Additions - click for tools";
+        return emu_.Get<UiLanguage>().Text("guest_additions.guest_additions_click_for_tools");
     return Enabled()
-        ? L"Guest Additions - auto-resize ON (click to disable, right-click for tools)"
-        : L"Guest Additions - auto-resize OFF (click to enable, right-click for tools)";
+        ? emu_.Get<UiLanguage>().Text("guest_additions.guest_additions_auto_resize_on_click_to_disable_right")
+        : emu_.Get<UiLanguage>().Text("guest_additions.guest_additions_auto_resize_off_click_to_enable_right");
 }
 
 bool HostAutoResize::TryPrimaryAction() {
@@ -66,19 +67,19 @@ std::vector<WidgetMenuItem> HostAutoResize::BuildMenu() {
     std::vector<WidgetMenuItem> items;
 
     WidgetMenuItem header;
-    header.label   = L"CERF Guest Additions";
+    header.label   = emu_.Get<UiLanguage>().Text("guest_additions.cerf_guest_additions");
     header.enabled = false;
     items.push_back(std::move(header));
 
     items.push_back(WidgetMenuItem{});   /* separator */
 
     WidgetMenuItem taskmgr;
-    taskmgr.label    = L"Task manager…";
+    taskmgr.label    = emu_.Get<UiLanguage>().Text("guest_additions.task_manager");
     taskmgr.on_click = [this] { emu_.Get<TaskManagerWindow>().Show(); };
     items.push_back(std::move(taskmgr));
 
     WidgetMenuItem chres;
-    chres.label    = L"Resolution / Customizations…";
+    chres.label    = emu_.Get<UiLanguage>().Text("guest_additions.resolution_customizations");
     chres.on_click = [this] {
         emu_.Get<LiveCustomizationsTransaction>().Open(
             emu_.Get<HostWindow>().Hwnd(), false);
@@ -87,7 +88,7 @@ std::vector<WidgetMenuItem> HostAutoResize::BuildMenu() {
 
     if (emu_.Get<GuestAdditionsUiPolicy>().LiveResizeAvailable()) {
         WidgetMenuItem resize;
-        resize.label    = L"Resize guest to window";
+        resize.label    = emu_.Get<UiLanguage>().Text("guest_additions.resize_guest_to_window");
         resize.checked  = Enabled();
         resize.on_click = [this] { Toggle(); };
         items.push_back(std::move(resize));
@@ -106,4 +107,8 @@ bool HostAutoResize::PollDirty() {
     if (on == last_drawn_on_) return false;
     last_drawn_on_ = on;
     return true;
+}
+
+std::wstring HostAutoResize::MenuLabel() const {
+    return emu_.Get<UiLanguage>().Text("common.guest_additions");
 }

@@ -1,4 +1,5 @@
 from __future__ import annotations
+from i18n import t
 
 import queue
 import threading
@@ -70,8 +71,8 @@ class UpgradeWindow(tk.Toplevel):
 
         def prompt() -> None:
             answer["retry"] = show_dialog(self, title, message,
-                                          ("Retry", "Cancel"),
-                                          default="Cancel") == "Retry"
+                                          ("Retry", t("common.cancel")),
+                                          default=t("common.cancel")) == "Retry"
             answered.set()
 
         self._queue.put(("call", prompt))

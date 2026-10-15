@@ -1,6 +1,7 @@
 #define NOMINMAX
 
 #include "external_display_window.h"
+#include "ui_language.h"
 
 #include <vector>
 
@@ -78,21 +79,21 @@ void ExternalDisplayWindow::SetTitle(std::wstring title) {
 HMENU ExternalDisplayWindow::BuildMenu() {
     HMENU bar  = CreateMenu();
     HMENU view = CreatePopupMenu();
-    AppendMenuW(view, MF_STRING, kIdVpOriginal, L"Original view");
-    AppendMenuW(view, MF_STRING, kIdVpAspect,   L"Resize + match aspect ratio");
-    AppendMenuW(view, MF_STRING, kIdVpStretch,  L"Stretch");
-    AppendMenuW(view, MF_STRING, kIdVpInteger2, L"Integer scale 2x");
-    AppendMenuW(view, MF_STRING, kIdVpInteger3, L"Integer scale 3x");
-    AppendMenuW(view, MF_STRING, kIdVpInteger5, L"Integer scale 5x");
-    AppendMenuW(view, MF_STRING, kIdAliasing,   L"Apply aliasing");
+    AppendMenuW(view, MF_STRING, kIdVpOriginal, emu_.Get<UiLanguage>().Text("menu.original_view"));
+    AppendMenuW(view, MF_STRING, kIdVpAspect,   emu_.Get<UiLanguage>().Text("menu.resize_match_aspect_ratio"));
+    AppendMenuW(view, MF_STRING, kIdVpStretch,  emu_.Get<UiLanguage>().Text("menu.stretch"));
+    AppendMenuW(view, MF_STRING, kIdVpInteger2, emu_.Get<UiLanguage>().Text("menu.integer_scale_2x"));
+    AppendMenuW(view, MF_STRING, kIdVpInteger3, emu_.Get<UiLanguage>().Text("menu.integer_scale_3x"));
+    AppendMenuW(view, MF_STRING, kIdVpInteger5, emu_.Get<UiLanguage>().Text("menu.integer_scale_5x"));
+    AppendMenuW(view, MF_STRING, kIdAliasing,   emu_.Get<UiLanguage>().Text("menu.apply_aliasing"));
     AppendMenuW(view, MF_SEPARATOR, 0, nullptr);
     AppendMenuW(view, MF_STRING, kIdFullscreen,
-                (L"Full screen\t" +
+                (emu_.Get<UiLanguage>().Text("menu.full_screen") +
                  emu_.Get<HostKeyBinding>().LabelWith(L"F")).c_str());
     AppendMenuW(view, MF_SEPARATOR, 0, nullptr);
-    AppendMenuW(view, MF_STRING, kIdSaveShot,   L"Save screenshot");
-    AppendMenuW(view, MF_STRING, kIdCopyShot,   L"Copy screenshot");
-    AppendMenuW(bar, MF_POPUP, (UINT_PTR)view, L"View");
+    AppendMenuW(view, MF_STRING, kIdSaveShot,   emu_.Get<UiLanguage>().Text("menu.save_screenshot"));
+    AppendMenuW(view, MF_STRING, kIdCopyShot,   emu_.Get<UiLanguage>().Text("menu.copy_screenshot"));
+    AppendMenuW(bar, MF_POPUP, (UINT_PTR)view, emu_.Get<UiLanguage>().Text("menu.view"));
     return bar;
 }
 
@@ -323,7 +324,7 @@ LRESULT ExternalDisplayWindow::WndProc(HWND hwnd, UINT msg,
                DestroyWindow - teardown happens via kDestroyMsg from Close(). */
             std::wstring caption;
             { std::lock_guard<std::mutex> lk(title_mutex_); caption = title_; }
-            if (MessageBoxW(hwnd, L"Eject VGA card?", caption.c_str(),
+            if (MessageBoxW(hwnd, emu_.Get<UiLanguage>().Text("display.eject_vga_card"), caption.c_str(),
                             MB_YESNO | MB_ICONQUESTION) == IDYES && on_eject_)
                 emu_.Get<HostWindow>().RunOnUiThread(on_eject_);
             return 0;

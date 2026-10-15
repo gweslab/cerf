@@ -1,5 +1,6 @@
 #define NOMINMAX
 #include <windows.h>
+#include "ui_language.h"
 
 #include "../core/cerf_emulator.h"
 #include "../core/device_config.h"
@@ -30,18 +31,19 @@ public:
     void OnReady() override { emu_.Get<HostWidgetRegistry>().Register(this); }
 
     std::wstring WidgetName() const override { return L"Shared folder"; }
+    std::wstring MenuLabel() const override { return emu_.Get<UiLanguage>().Text("common.shared_folder"); }
     WidgetGroup  Group() const override { return WidgetGroup::Storage; }
     std::wstring Tooltip() const override {
         auto& cfg = emu_.Get<FolderShareConfig>();
         if (!cfg.Enabled())
-            return L"Shared folder: off - click to configure";
-        return L"Shared folder: " + cfg.HostRoot();
+            return emu_.Get<UiLanguage>().Text("share.shared_folder_off_click_to_configure");
+        return emu_.Get<UiLanguage>().Text("share.shared_folder") + cfg.HostRoot();
     }
     bool MenuIsOneAction() const override { return true; }
     std::vector<WidgetMenuItem> BuildMenu() override {
         std::vector<WidgetMenuItem> items;
         WidgetMenuItem configure;
-        configure.label    = L"Configure shared folder…";
+        configure.label    = emu_.Get<UiLanguage>().Text("share.configure_shared_folder");
         configure.on_click = [this] { Configure(); };
         items.push_back(std::move(configure));
         return items;

@@ -1,4 +1,5 @@
 from __future__ import annotations
+from i18n import t
 
 import os
 import shutil
@@ -20,8 +21,8 @@ from upgrade_process import (UNINSTALL_DIR_PREFIX, UNINSTALL_FLAG,
 import ui_theme as theme
 
 
-DONE_HEADING = "CE Runtime Foundation has been uninstalled"
-PARTIAL_HEADING = "CE Runtime Foundation was only partly removed"
+DONE_HEADING = 'launcher.uninstall_cli.ce_runtime_foundation_has_been_uninstalled'
+PARTIAL_HEADING = 'launcher.uninstall_cli.ce_runtime_foundation_was_only_partly_removed'
 
 
 def _root() -> tk.Tk:
@@ -63,8 +64,7 @@ def run_uninstall(argv: List[str]) -> int:
         except (OSError, UpgradeError) as exc:
             root = _root()
             show_dialog(root, "Uninstall",
-                        "The uninstaller cannot start from the temporary "
-                        "folder:\n{}".format(exc))
+                        t('launcher.uninstall_cli.the_uninstaller_cannot_start_from_the_temporary', exc=exc))
             root.destroy()
             return 1
         return 0
@@ -82,8 +82,8 @@ def run_uninstall(argv: List[str]) -> int:
     delete_user_data = confirm.delete_user_data
 
     def ask_retry(title: str, message: str) -> bool:
-        return show_dialog(root, title, message, ("Retry", "Cancel"),
-                           default="Cancel") == "Retry"
+        return show_dialog(root, title, message, ("Retry", t("common.cancel")),
+                           default=t("common.cancel")) == "Retry"
 
     try:
         if wait_pid is not None:
@@ -97,16 +97,16 @@ def run_uninstall(argv: List[str]) -> int:
         return 1
 
     progress = UninstallProgress(root)
-    progress.log("Removing {}".format(install_dir))
+    progress.log(t('launcher.uninstall_cli.removing_install_dir', install_dir=install_dir))
     left = remove_installation(install_dir, delete_user_data, progress.log,
                                ask_retry)
     left += remove_shell_integration(progress.log, ask_retry)
     if left:
         progress.log("")
-        progress.log("Left behind: {}".format(", ".join(left)))
-        progress.finish(PARTIAL_HEADING)
+        progress.log(t('launcher.uninstall_cli.left_behind_value', value=", ".join(left)))
+        progress.finish(t(PARTIAL_HEADING))
     else:
-        progress.finish(DONE_HEADING)
+        progress.finish(t(DONE_HEADING))
     root.mainloop()
     root.destroy()
     return 0

@@ -1,4 +1,5 @@
 from __future__ import annotations
+from i18n import t
 
 import tkinter as tk
 from tkinter import ttk
@@ -16,7 +17,7 @@ CANCEL = "cancel"
 
 def show_release_available(parent: tk.Misc, release: AvailableUpdate) -> str:
     dlg = tk.Toplevel(parent)
-    dlg.title("Update available - CE Runtime Foundation")
+    dlg.title(t("launcher.upgrade_dialog.update_available_ce_runtime_foundation"))
     dlg.configure(bg=theme.BG)
     if parent.winfo_viewable():
         dlg.transient(parent)
@@ -27,16 +28,15 @@ def show_release_available(parent: tk.Misc, release: AvailableUpdate) -> str:
     body.pack(fill="both", expand=True)
 
     ttk.Label(body, wraplength=520, justify="left",
-              text=f"CE Runtime Foundation {release.tag} is available. "
-                   f"Would you like to upgrade?").pack(anchor="w")
+              text=t('launcher.upgrade_dialog.ce_runtime_foundation_tag_is_available_would', tag=release.tag)).pack(anchor="w")
 
     warning = ttk.Frame(body)
     warning.pack(anchor="w", pady=(8, 0))
-    ttk.Label(warning, text="Your saved states will be broken - ",
+    ttk.Label(warning, text=t("launcher.upgrade_dialog.your_saved_states_will_be_broken"),
               foreground=theme.WARN_FG).pack(side="left")
-    link_label(warning, "Learn more",
+    link_label(warning, t("launcher.launch_options_bpp.learn_more"),
                HIBERNATION_WARNING_URL).pack(side="left")
-    ttk.Label(body, text="Last version changelog:").pack(anchor="w",
+    ttk.Label(body, text=t("launcher.upgrade_dialog.last_version_changelog")).pack(anchor="w",
                                                          pady=(12, 4))
 
     changelog = ttk.Frame(body)
@@ -61,7 +61,7 @@ def show_release_available(parent: tk.Misc, release: AvailableUpdate) -> str:
     upgrade = pack_actions(btns, [
         ("Upgrade", lambda: pick(UPGRADE)),
         ("Open in browser", lambda: pick(BROWSER)),
-        ("Cancel", lambda: pick(CANCEL))])[0]
+        (t("common.cancel"), lambda: pick(CANCEL))])[0]
     upgrade.focus_set()
 
     dlg.bind("<Return>", lambda _e: pick(UPGRADE))

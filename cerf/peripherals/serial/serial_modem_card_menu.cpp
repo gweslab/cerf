@@ -2,6 +2,7 @@
 
 #include "../../core/cerf_emulator.h"
 #include "../../host/host_link_opener.h"
+#include "../../host/ui_language.h"
 
 #include <utility>
 
@@ -18,14 +19,14 @@ std::vector<WidgetMenuItem> SerialModemCardMenu::BuildInsertMenu(
     std::vector<WidgetMenuItem> items;
 
     WidgetMenuItem insert;
-    insert.label    = L"Insert";
+    insert.label    = emu_.Get<UiLanguage>().Text("pcmcia.insert");
     insert.on_click = std::move(on_insert);
     items.push_back(std::move(insert));
 
     items.push_back({});
 
     WidgetMenuItem tutorial;
-    tutorial.label    = L"Getting online tutorial";
+    tutorial.label    = emu_.Get<UiLanguage>().Text("pcmcia.getting_online_help");
     tutorial.on_click = [this] {
         emu_.Get<HostLinkOpener>().Open(nullptr, kGettingOnlineUrl);
     };

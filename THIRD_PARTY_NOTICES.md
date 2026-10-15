@@ -16,13 +16,15 @@ are too long to inline are in `licenses/`.
 | [GNU libiconv](https://www.gnu.org/software/libiconv/) | 1.18 | LGPL-2.1-or-later | (c) Free Software Foundation |
 | [GNU gettext (libintl)](https://www.gnu.org/software/gettext/) | 0.22.5 | LGPL-2.1-or-later | (c) Free Software Foundation |
 | [Sun Valley ttk theme (sv-ttk)](https://github.com/rdbende/Sun-Valley-ttk-theme) | 2.5.5 | MIT | (c) rdbende |
+| [yaml-cpp](https://github.com/jbeder/yaml-cpp) | 0.9.0 | MIT | (c) 2008-2015 Jesse Beder |
+| [PyYAML](https://github.com/yaml/pyyaml) | 6.0.1 | MIT | (c) 2017-2021 Ingy döt Net; (c) 2006-2016 Kirill Simonov |
 
 GLib, PCRE2, libiconv and libintl are pulled in transitively by libslirp and form its
 static link closure.
 
 ---
 
-### MIT (nlohmann-json, YY-Thunks, sv-ttk)
+### MIT (nlohmann-json, YY-Thunks, sv-ttk, yaml-cpp, PyYAML)
 
 > Permission is hereby granted, free of charge, to any person obtaining a copy of this
 > software and associated documentation files (the "Software"), to deal in the Software

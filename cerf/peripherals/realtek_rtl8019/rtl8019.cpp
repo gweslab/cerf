@@ -7,6 +7,7 @@
 #include "../../core/fatal.h"
 #include "../../core/log.h"
 #include "../../core/string_utils.h"
+#include "../../host/ui_language.h"
 #include "../../net/ipv4_packet.h"
 #include "../../net/mac_address.h"
 #include "../../net/network_backend.h"
@@ -373,10 +374,13 @@ void Rtl8019::WriteIo16(uint32_t card_io, uint16_t value) {
     nic_.IoWrite16Locked(offset, value);
 }
 
+std::wstring Rtl8019::MenuLabel() const {
+    return emu_.Get<UiLanguage>().Text("pcmcia.ne2000");
+}
+
 std::wstring Rtl8019::TooltipDetail() const {
-    wchar_t buf[64];
-    swprintf_s(buf, L"Ethernet  %hs", cerf::inet::FormatMac(guest_mac_.data()).s);
-    return buf;
+    return emu_.Get<UiLanguage>().Format("pcmcia.ethernet_address",
+        {{"mac", cerf::inet::FormatMac(guest_mac_.data()).s}});
 }
 
 std::vector<WidgetMenuItem> Rtl8019::BuildCardMenu() {

@@ -1,4 +1,6 @@
 from __future__ import annotations
+from i18n import t, data_text
+from database_text import record_key
 
 from typing import List, Optional, Tuple
 
@@ -12,11 +14,16 @@ SUPPORT_NO_SUPPORT = "no_support"
 RUNNING_LEVELS = (SUPPORT_BOOTABLE_FULL, SUPPORT_BOOTABLE_PARTIAL)
 
 SUPPORT_LABELS = {
-    SUPPORT_BOOTABLE_FULL: "Bootable; Full support",
-    SUPPORT_BOOTABLE_PARTIAL: "Bootable; Partial support",
-    SUPPORT_UNKNOWN_PARTIAL: "Unknown; Partial support",
-    SUPPORT_NO_SUPPORT: "Unbootable; No support",
+    SUPPORT_BOOTABLE_FULL: "board.support.bootable_full",
+    SUPPORT_BOOTABLE_PARTIAL: "board.support.bootable_partial",
+    SUPPORT_UNKNOWN_PARTIAL: "board.support.unknown_partial",
+    SUPPORT_NO_SUPPORT: "board.support.no_support",
 }
+
+
+def support_label(level: str) -> str:
+    key = SUPPORT_LABELS.get(level)
+    return t(key) if key else ""
 
 WARN = "warn"
 DANGER = "danger"
@@ -26,7 +33,6 @@ _WARNING_SEVERITIES = {
     SUPPORT_UNKNOWN_PARTIAL: WARN,
     SUPPORT_NO_SUPPORT: DANGER,
 }
-_UNKNOWN_WARNING = (DANGER, "CERF does not know this board.")
 
 
 def board_sort_key(board_name: object) -> tuple[int, str]:
@@ -56,10 +62,10 @@ def board_support_warning(board_id: str) -> Optional[Tuple[str, str]]:
     if not board_id:
         return None
     if board(board_id) is None:
-        return _UNKNOWN_WARNING
+        return (DANGER, t("board.support.unknown_board"))
     level = board_support_level(board_id) or ""
     severity = _WARNING_SEVERITIES.get(level)
-    return (severity, SUPPORT_LABELS[level]) if severity else None
+    return (severity, support_label(level)) if severity else None
 
 
 def board_extra_notes(board_id: str) -> List[str]:
@@ -69,7 +75,19 @@ def board_extra_notes(board_id: str) -> List[str]:
     notes = entry.get("notes")
     if not isinstance(notes, list):
         return []
-    return [n for n in notes if isinstance(n, str) and n.strip()]
+    family = family_of(board_id) or {}
+    inherited = family.get("notes", [])
+    inherited = inherited if isinstance(inherited, list) else []
+    result = []
+    for index, note in enumerate(notes):
+        if not isinstance(note, str) or not note.strip():
+            continue
+        if index < len(inherited):
+            key = record_key("board_families", family) + ".notes." + str(index)
+        else:
+            key = record_key("boards", entry) + ".notes." + str(index - len(inherited))
+        result.append(data_text(key, note))
+    return result
 
 
 def board_soc_cpu(board_id: str) -> Optional[str]:

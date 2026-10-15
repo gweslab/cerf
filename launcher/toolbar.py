@@ -1,4 +1,5 @@
 from __future__ import annotations
+from i18n import t
 
 import tkinter as tk
 from pathlib import Path
@@ -10,7 +11,7 @@ from toolbar_overflow import OverflowBar
 import ui_theme as theme
 
 
-FEEDBACK_TEXT = "Feedback"
+FEEDBACK_TEXT = 'launcher.feedback_window.feedback'
 
 
 class Toolbar:
@@ -30,22 +31,22 @@ class Toolbar:
         self._bar = OverflowBar(parent)
         self.frame = self._bar.frame
 
-        self.btn_new = self._button("New", "new_device", on_new)
-        self.btn_properties = self._button("Properties", "wrench",
+        self.btn_new = self._button(t("common.new"), "new_device", on_new)
+        self.btn_properties = self._button(t("common.properties"), "wrench",
                                            on_properties, state="disabled")
-        self.btn_remove = self._button("Remove", "delete_device",
+        self.btn_remove = self._button(t("common.remove"), "delete_device",
                                        on_remove_selected, state="disabled")
-        self.btn_discard = self._button("Discard", "discard_state",
+        self.btn_discard = self._button(t("common.discard"), "discard_state",
                                         on_discard_selected, state="disabled")
         self.start = LaunchSplitButton(self._bar.frame, devices_dir, on_launch,
                                        icon=self._icon("start_device"),
                                        on_resize=self._bar.refresh)
         self._bar.add(self.start.frame, entries=self.start.menu_entries)
-        self.btn_settings = self._button("Settings", "settings", on_settings,
+        self.btn_settings = self._button(t("common.settings"), "settings", on_settings,
                                          side="right")
-        self.btn_feedback = self._button(FEEDBACK_TEXT, "feedback",
+        self.btn_feedback = self._button(t(FEEDBACK_TEXT), "feedback",
                                          on_feedback, side="right")
-        self.btn_about = self._button("About", "help", on_about, side="right")
+        self.btn_about = self._button(t("common.about"), "help", on_about, side="right")
         self._bar.finish()
         self._rule = tk.Frame(parent, height=1, bd=0, bg=theme.SEPARATOR)
 

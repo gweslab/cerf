@@ -1,4 +1,5 @@
 from __future__ import annotations
+from i18n import t
 
 import tkinter as tk
 from typing import Tuple
@@ -12,15 +13,15 @@ PAGE_DISPLAY = "display"
 
 class DisplayPage:
     key = PAGE_DISPLAY
-    title = "Display"
+    title = "properties.display"
 
     def __init__(self, parent: tk.Misc, window: tk.Misc) -> None:
         page = SettingsColumn(parent)
         self.frame = page.frame
         group = page.group()
-        self.resolution = ResolutionBlock(group.row("Display resolution"),
+        self.resolution = ResolutionBlock(group.row(t("launcher.properties_page_display.display_resolution")),
                                           window)
-        self.bpp = BppOptionBlock(group.row("Color depth",
+        self.bpp = BppOptionBlock(group.row(t("common.color_depth"),
                                             bpp_description(window)))
 
     def set_auto_size(self, size: Tuple[int, int]) -> None:

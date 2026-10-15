@@ -2,6 +2,7 @@
 
 #include "hp_palmtop_vga_card.h"
 #include "../../core/cerf_emulator.h"
+#include "../../host/ui_language.h"
 
 #include <memory>
 
@@ -18,7 +19,7 @@ std::vector<WidgetMenuItem> HpPalmtopVgaCardMenu::BuildInsertMenu(
         items.push_back(std::move(it));
     };
     WidgetMenuItem insert;
-    insert.label    = L"Insert";
+    insert.label    = emu_.Get<UiLanguage>().Text("pcmcia.insert");
     insert.on_click = [this, inserter] {
         inserter(std::make_unique<HpPalmtopVgaCard>(emu_));
     };
@@ -26,9 +27,9 @@ std::vector<WidgetMenuItem> HpPalmtopVgaCardMenu::BuildInsertMenu(
 
     items.push_back({});   /* separator */
 
-    note(L"External VGA monitor output, in its own window.");
-    note(L"Works on the HP Jornada series.");
-    note(L"Verified on the HP Jornada 720.");
+    note(emu_.Get<UiLanguage>().Text("pcmcia.hp_vga.external_output"));
+    note(emu_.Get<UiLanguage>().Text("pcmcia.hp_vga.jornada_support"));
+    note(emu_.Get<UiLanguage>().Text("pcmcia.hp_vga.verified_720"));
 
     return items;
 }

@@ -9,6 +9,7 @@ bundled/devices/*
 
 bundled/launcher.exe
 bundled/launcher/
+bundled/langs/
 
 # ce_apps build artifacts: .obj caches and the SDK linker's import .exp/.lib
 # stay alongside each per-app build.ps1; the staged binaries themselves live

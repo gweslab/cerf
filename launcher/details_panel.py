@@ -1,4 +1,5 @@
 from __future__ import annotations
+from i18n import t, data_text
 
 import tkinter as tk
 import webbrowser
@@ -31,7 +32,7 @@ class DetailsPanel:
         self._addon_buttons: List[ttk.Button] = []
         self._addons_enabled = True
 
-        self.meta_block = SideBlock(inner, "Description", row=0)
+        self.meta_block = SideBlock(inner, t("common.description"), row=0)
         meta = self.meta_block.body
         meta.columnconfigure(0, weight=0)
         meta.columnconfigure(1, weight=1)
@@ -40,23 +41,23 @@ class DetailsPanel:
                                     justify="left")
         self.desc_label.grid(row=0, column=0, columnspan=2, sticky="w")
 
-        self.source_caption = ttk.Label(meta, text="Source:")
+        self.source_caption = ttk.Label(meta, text=t("common.source"))
         self.source_caption.grid(row=1, column=0, sticky="w", padx=(0, 8))
         self.source_value = ttk.Label(meta, wraplength=220, justify="left")
         self.source_value.grid(row=1, column=1, sticky="w")
         self._source_url: Optional[str] = None
         self.source_value.bind("<Button-1>", self._on_source_click)
 
-        self.features_block = SideBlock(inner, "Features", row=1)
+        self.features_block = SideBlock(inner, t("common.features"), row=1)
         self.features_icons = ttk.Frame(self.features_block.body)
         self.features_icons.pack(anchor="w")
 
-        self.notes_block = SideBlock(inner, "⚠ Notes", row=2, warn=True)
+        self.notes_block = SideBlock(inner, t("launcher.details_panel.notes"), row=2, warn=True)
         self.notes_label = ttk.Label(self.notes_block.body, text="",
                                      wraplength=260, justify="left")
         self.notes_label.grid(row=0, column=0, sticky="w")
 
-        self.addons_block = SideBlock(inner, "Add-ons", row=3)
+        self.addons_block = SideBlock(inner, t("launcher.details_panel.add_ons"), row=3)
         self.addons_body = ttk.Frame(self.addons_block.body)
         self.addons_body.grid(row=0, column=0, sticky="ew")
         self.addons_body.columnconfigure(0, weight=1)
@@ -115,13 +116,13 @@ class DetailsPanel:
             ttk.Label(row, text=ps.remote.name, wraplength=170,
                       justify="left").grid(row=0, column=0, sticky="w")
             if ps.has_update or not ps.installed:
-                btn = ttk.Button(row, text="Update" if ps.has_update else "Get",
+                btn = ttk.Button(row, text=t("common.update") if ps.has_update else t("common.get"),
                                  width=7,
                                  command=lambda p=ps: self._package_action(device, p, "install"))
                 btn.grid(row=0, column=1, sticky="e", padx=(4, 0))
                 self._addon_buttons.append(btn)
             elif ps.installed:
-                btn = ttk.Button(row, text="Delete", width=7, style="Danger.TButton",
+                btn = ttk.Button(row, text=t("common.delete"), width=7, style="Danger.TButton",
                                  command=lambda p=ps: self._package_action(device, p, "delete"))
                 btn.grid(row=0, column=1, sticky="e", padx=(4, 0))
                 self._addon_buttons.append(btn)
@@ -170,6 +171,7 @@ class DetailsPanel:
 
     def _update_description(self, device: DeviceBundle) -> None:
         description = device.meta.description.strip()
+        description = data_text(device.meta.description_key, description)
         if description:
             self.desc_label.config(text=description)
             self.desc_label.grid()
@@ -177,7 +179,9 @@ class DetailsPanel:
             self.desc_label.grid_remove()
 
     def _update_notes(self, device: DeviceBundle) -> None:
-        notes: List[str] = list(device.meta.notes)
+        notes: List[str] = [data_text(device.meta.note_keys[index], note)
+                            if index < len(device.meta.note_keys) else note
+                            for index, note in enumerate(device.meta.notes)]
         notes += board_extra_notes(device.meta.board_id)
         if notes:
             self.notes_label.config(text="\n".join(f"• {n}" for n in notes))
@@ -200,7 +204,8 @@ class DetailsPanel:
             lbl = ttk.Label(self.features_icons, image=icon)
             lbl.image = icon
             lbl.pack(side="left", padx=(0, 8))
-            tip = label if supported else f"{label} (unsupported)"
+            label = data_text("database.device_features." + key + ".name", label)
+            tip = label if supported else t("board.feature_unsupported", feature=label)
             bind_tooltip(lbl, tip)
             shown += 1
         self.features_block.adopt_children()

@@ -1,4 +1,5 @@
 from __future__ import annotations
+from i18n import t
 
 import queue
 import threading
@@ -13,13 +14,12 @@ from screen_geometry import fit_geometry
 import ui_theme as theme
 
 
-TITLE = "Feedback"
+TITLE = 'launcher.feedback_window.feedback'
 FEEDBACK_URL = "https://cerf.cx/feedback"
-CREATE_TEXT = "Create issue"
-HEADER_TEXT = ("The list of issues tracked by the developers. Be patient - some tickets might take "
-               "some time until taken into the work.")
-LOADING_TEXT = "Loading issues…"
-EMPTY_TEXT = "No open issues."
+CREATE_TEXT = 'launcher.feedback_window.create_issue'
+HEADER_TEXT = ('launcher.feedback_window.the_list_of_issues_tracked_by_the')
+LOADING_TEXT = 'launcher.feedback_window.loading_issues'
+EMPTY_TEXT = 'launcher.feedback_window.no_open_issues'
 BODY_PAD = 12
 
 
@@ -29,7 +29,7 @@ class FeedbackWindow:
 
         dlg = tk.Toplevel(parent)
         self._dlg = dlg
-        dlg.title(TITLE)
+        dlg.title(t(TITLE))
         dlg.configure(bg=theme.BG)
         if parent.winfo_viewable():
             dlg.transient(parent)
@@ -39,7 +39,7 @@ class FeedbackWindow:
         body.rowconfigure(1, weight=1)
         body.columnconfigure(0, weight=1)
 
-        self._header = ttk.Label(body, text=HEADER_TEXT, wraplength=640,
+        self._header = ttk.Label(body, text=t(HEADER_TEXT), wraplength=640,
                                  justify="left")
         self._header.grid(row=0, column=0, columnspan=2, sticky="w",
                           pady=(0, 10))
@@ -47,8 +47,8 @@ class FeedbackWindow:
 
         tree = ttk.Treeview(body, columns=("reactions",), show="tree headings",
                             selectmode="none", cursor="hand2")
-        tree.heading("#0", text="Issue", anchor="w")
-        tree.heading("reactions", text="Reactions", anchor="e")
+        tree.heading("#0", text=t("launcher.feedback_window.issue"), anchor="w")
+        tree.heading("reactions", text=t("launcher.feedback_window.reactions"), anchor="e")
         tree.column("#0", width=300, minwidth=200, anchor="w", stretch=True)
         tree.column("reactions", width=90, minwidth=70, anchor="e",
                     stretch=False)
@@ -67,10 +67,10 @@ class FeedbackWindow:
         actions = ttk.Frame(footer)
         actions.grid(row=0, column=0, sticky="e")
         pack_actions(actions, [
-            (CREATE_TEXT, lambda: webbrowser.open(FEEDBACK_URL)),
-            ("Close", dlg.destroy)])
+            (t(CREATE_TEXT), lambda: webbrowser.open(FEEDBACK_URL)),
+            (t("common.close"), dlg.destroy)])
 
-        self._note(LOADING_TEXT)
+        self._note(t(LOADING_TEXT))
         dlg.update_idletasks()
         theme.apply_titlebar(dlg)
         try:
@@ -102,7 +102,7 @@ class FeedbackWindow:
                 self._dlg.after(50, poll)
                 return
             if exc is not None:
-                self._note("Could not reach GitHub.\n{}".format(exc))
+                self._note(t('launcher.feedback_window.could_not_reach_github_exc', exc=exc))
             else:
                 self._fill(issues or [])
 
@@ -122,7 +122,7 @@ class FeedbackWindow:
         self._tree.delete(*self._tree.get_children())
         self._issues.clear()
         if not issues:
-            self._note(EMPTY_TEXT)
+            self._note(t(EMPTY_TEXT))
             return
         for issue in issues:
             iid = str(issue.number)

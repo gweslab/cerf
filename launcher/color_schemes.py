@@ -1,4 +1,5 @@
 from __future__ import annotations
+from i18n import t
 
 COLOR_SCHEMES = [
     ("",              "Default"),
@@ -20,4 +21,6 @@ _KEY_TO_LABEL = {k: d for (k, d) in COLOR_SCHEMES}
 
 
 def color_scheme_label(key: str) -> str:
+    if key in ("", "ce2_grayscale", "wm6_green", "wm6_guava"):
+        return t("colors." + (key or "default"))
     return _KEY_TO_LABEL.get(key, key)

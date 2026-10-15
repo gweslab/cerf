@@ -25,6 +25,7 @@ public:
     virtual ~PcmciaCard() = default;
 
     virtual std::wstring DisplayName() const = 0;
+    virtual std::wstring MenuLabel() const { return DisplayName(); }
 
     /* Stable hibernation type tag: the slot writes it so a saved card's
        register state is applied only when the same card type is present. */

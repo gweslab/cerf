@@ -17,6 +17,7 @@ public:
     ~CompactFlashCard() override;
 
     std::wstring DisplayName() const override;
+    std::wstring MenuLabel() const override;
     std::wstring TooltipDetail() const override;
     const wchar_t* IconResource() const override { return L"ICON_PCMCIA_CF"; }
 
@@ -47,6 +48,7 @@ public:
     bool ImageOk() const { return file_ != nullptr; }
 
 private:
+    std::wstring ImageName() const;
     /* ATAPI.H register offsets within the I/O window. kRegDevCtl is the
        device-control / alternate-status register. */
     enum : uint32_t {

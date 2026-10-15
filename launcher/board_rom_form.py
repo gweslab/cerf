@@ -1,4 +1,5 @@
 from __future__ import annotations
+from i18n import t
 
 import tkinter as tk
 from pathlib import Path
@@ -73,15 +74,15 @@ class BoardRomForm:
         self.frame = column.frame
         ident = column.group()
 
-        row = ident.row("Name", [
-            plain("How the device reads in the launcher tree.")])
+        row = ident.row(t("common.name"), [
+            plain(t("launcher.board_rom_form.how_the_device_reads_in_the_launcher_tree"))])
         self.var_name = tk.StringVar()
         self.var_name.trace_add("write", lambda *_: self._on_change())
         self.name_entry = ttk.Entry(row.frame, textvariable=self.var_name,
                                     width=1)
         row.control(self.name_entry)
 
-        row = ident.row("Board", [plain("The type of device to emulate.")])
+        row = ident.row(t("common.board"), [plain(t("launcher.board_rom_form.the_type_of_device_to_emulate"))])
         self.board_button = ttk.Button(
             row.frame, style=PICKER_STYLE, compound="text", width=1,
             image=glyph_images.chevron(row.frame, scaled(row.frame, _CHEVRON_DIP),
@@ -93,8 +94,8 @@ class BoardRomForm:
                                 padx=(scaled(row.frame, CONTROL_GAP_DIP), 0),
                                 pady=(scaled(row.frame, _GAP_DIP), 0))
 
-        self._rom = _FileCard(column, "ROM")
-        self._storage = _FileCard(column, "Storage")
+        self._rom = _FileCard(column, t("common.rom"))
+        self._storage = _FileCard(column, t("launcher.board_rom_form.storage"))
         self._show_board()
 
     def select_first_board(self) -> None:
@@ -126,7 +127,7 @@ class BoardRomForm:
 
     def problem(self) -> Optional[str]:
         if not self.board_id():
-            return "Pick a board."
+            return t("board.pick_required")
         values = self.files()
         for ftype in self._types:
             reason = file_problem(ftype, values, self._base_dir)
@@ -145,7 +146,7 @@ class BoardRomForm:
     def _show_board(self) -> None:
         self.board_button.config(
             text=board_display_name(self._board_id) or self._board_id
-            or "Pick a board")
+            or t("launcher.board_picker.pick_a_board"))
         if apply_support_warning(self.board_warning, self._board_id):
             self.board_warning.grid()
         else:
@@ -195,7 +196,7 @@ class BoardRomForm:
         block.columnconfigure(0, weight=1)
         entry = ttk.Entry(block, textvariable=var, width=1)
         entry.grid(row=0, column=0, sticky="ew")
-        browse = ttk.Button(block, text="Browse…",
+        browse = ttk.Button(block, text=t("common.browse"),
                             command=lambda t=ftype: self._browse(t))
         browse.grid(row=0, column=1, padx=(gap, 0))
         card.add(label)
@@ -230,14 +231,14 @@ class BoardRomForm:
         if ftype.formats:
             types.append((ftype.name,
                           " ".join("*." + f for f in ftype.formats)))
-        types.append(("All files", "*.*"))
+        types.append((t("launcher.board_rom_form.all_files"), "*.*"))
         options = {"parent": self._window, "filetypes": types}
         if current is not None and current.parent.is_dir():
             options["initialdir"] = str(current.parent)
         elif self._base_dir is not None and self._base_dir.is_dir():
             options["initialdir"] = str(self._base_dir)
         if ftype.is_storage:
-            options["title"] = "Pick or name the {} image".format(ftype.name)
+            options["title"] = t('launcher.board_rom_form.pick_or_name_the_name_image', name=ftype.name)
             options["initialfile"] = (current.name if current is not None
                                       else ftype.default_value())
             options["confirmoverwrite"] = False
@@ -245,7 +246,7 @@ class BoardRomForm:
                 options["defaultextension"] = "." + ftype.formats[0]
             path = filedialog.asksaveasfilename(**options)
         else:
-            options["title"] = "Pick the {}".format(ftype.name)
+            options["title"] = t('launcher.board_rom_form.pick_the_name', name=ftype.name)
             path = filedialog.askopenfilename(**options)
         if not path:
             return

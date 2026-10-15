@@ -1,4 +1,5 @@
 from __future__ import annotations
+from i18n import t
 
 import tkinter as tk
 from typing import Callable, Optional
@@ -13,8 +14,8 @@ _PRESETS = [DPI_BASE * percent // 100 for percent in DPI_SCALE_PERCENTS]
 
 def dpi_label(dpi: Optional[int]) -> str:
     if dpi is None:
-        return "Default"
-    return "{}% - {} DPI".format(int(round(dpi * 100.0 / DPI_BASE)), dpi)
+        return t("common.default")
+    return t('launcher.launch_options_dpi.value_dpi_dpi', value=int(round(dpi * 100.0 / DPI_BASE)), dpi=dpi)
 
 
 def model_dpi(model: dict) -> Optional[int]:

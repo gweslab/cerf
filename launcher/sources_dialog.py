@@ -1,4 +1,5 @@
 from __future__ import annotations
+from i18n import t
 
 import queue
 import threading
@@ -29,7 +30,7 @@ class SourcesDialog:
 
         dlg = tk.Toplevel(parent)
         self._dlg = dlg
-        dlg.title("Bundle repositories")
+        dlg.title(t("launcher.sources_dialog.bundle_repositories"))
         if parent.winfo_viewable():
             dlg.transient(parent)
         body = ttk.Frame(dlg, padding=8)
@@ -39,9 +40,9 @@ class SourcesDialog:
 
         tree = ttk.Treeview(body, columns=("url", "status"),
                             show="tree headings", selectmode="browse")
-        tree.heading("#0", text="On")
-        tree.heading("url", text="Repository URL")
-        tree.heading("status", text="Status")
+        tree.heading("#0", text=t("launcher.config_preview.on"))
+        tree.heading("url", text=t("launcher.sources_dialog.repository_url"))
+        tree.heading("status", text=t("launcher.config_preview.status"))
         tree.column("#0", width=44, minwidth=44, anchor="center", stretch=False)
         tree.column("url", width=520, minwidth=180, anchor="w", stretch=True)
         tree.column("status", width=90, minwidth=70, anchor="w", stretch=False)
@@ -55,15 +56,15 @@ class SourcesDialog:
 
         edit = ttk.Frame(body)
         edit.grid(row=1, column=0, columnspan=2, sticky="ew", pady=(6, 0))
-        self.btn_add = ttk.Button(edit, text="Add…", command=self._add)
+        self.btn_add = ttk.Button(edit, text=t("launcher.sources_dialog.add"), command=self._add)
         self.btn_add.pack(side="left")
-        self.btn_del = ttk.Button(edit, text="Delete", command=self._delete,
+        self.btn_del = ttk.Button(edit, text=t("common.delete"), command=self._delete,
                                   state="disabled")
         self.btn_del.pack(side="left", padx=(6, 0))
 
         actions = ttk.Frame(body)
         actions.grid(row=2, column=0, columnspan=2, sticky="e", pady=(10, 0))
-        pack_actions(actions, [("OK", self._ok), ("Cancel", dlg.destroy)])
+        pack_actions(actions, [(t("common.ok"), self._ok), (t("common.cancel"), dlg.destroy)])
 
         for r in self._repos:
             self._probe(r.url)
@@ -125,16 +126,16 @@ class SourcesDialog:
         return "break"
 
     def _add(self) -> None:
-        url = ask_text(self._dlg, "Add bundle repository",
+        url = ask_text(self._dlg, t("launcher.sources_dialog.add_bundle_repository"),
                        "Bundle repository URL:")
         if not url:
             return
         if not (url.startswith("http://") or url.startswith("https://")):
-            show_info(self._dlg, "Invalid URL",
+            show_info(self._dlg, t("launcher.sources_dialog.invalid_url"),
                       "Enter a full http:// or https:// repository URL.")
             return
         if any(r.url == url for r in self._repos):
-            show_info(self._dlg, "Already added",
+            show_info(self._dlg, t("launcher.sources_dialog.already_added"),
                       "That repository URL is already in the list.")
             return
         self._repos.append(BundleRepository(url=url, enabled=True))

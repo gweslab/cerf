@@ -1,10 +1,11 @@
 from __future__ import annotations
+from i18n import t
 
 import tkinter as tk
 from tkinter import ttk
 from typing import Callable, List, Optional, Sequence
 
-CUSTOM_LABEL = "Custom..."
+CUSTOM_LABEL = "common.custom_choice"
 LIST_ROWS = 12
 
 LabelOf = Callable[[object], str]
@@ -30,7 +31,7 @@ class ChoiceCombo:
         self._label_of = label_of
         labels = [label_of(v) for v in self._values]
         if self._ask_custom is not None:
-            labels.append(CUSTOM_LABEL)
+            labels.append(t(CUSTOM_LABEL))
         self.widget.config(values=labels)
         self._show()
 

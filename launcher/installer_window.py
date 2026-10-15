@@ -1,4 +1,5 @@
 from __future__ import annotations
+from i18n import t
 
 import os
 import queue
@@ -12,7 +13,7 @@ from branded_dialog import SETUP_ICON_STEM, BrandedDialog, scaled
 from branding import PRODUCT_NAME
 from install_options import InstallOptions
 from installer_download import stage_release
-from installer_target import CHANGE_DIRECTORY_WARNING, default_install_dir
+from installer_target import default_install_dir
 from sv_elements import SPLIT_DROP_STYLE, SPLIT_MAIN_STYLE
 from ui_dialogs import ask_yesno, show_error
 from upgrade_process import (UPGRADE_DIR_NAME, WAIT_FOR_PID_PREFIX,
@@ -22,19 +23,14 @@ import ui_theme as theme
 
 SETUP_ICO_NAME = "cerf_setup.ico"
 
-TITLE = PRODUCT_NAME + " Setup"
-HEADING = "Would you like to download and install " + PRODUCT_NAME + "?"
 
-DESKTOP_LABEL = "Create desktop icon"
-START_MENU_LABEL = "Create Start menu entry"
-LAUNCH_LABEL = "Launch after installation"
+DESKTOP_LABEL = 'launcher.installer_window.create_desktop_icon'
+START_MENU_LABEL = 'launcher.installer_window.create_start_menu_entry'
+LAUNCH_LABEL = 'launcher.installer_window.launch_after_installation'
 
-UNSTABLE_LABEL = "Install unstable version"
+UNSTABLE_LABEL = 'launcher.installer_window.install_unstable_version'
 UNSTABLE_WARNING = (
-    "You picked an unstable build to install. This build might break on new "
-    "updates or clobber your installation directory. If you want to continue "
-    "receiving unstable channel updates, pick that channel in Settings "
-    "later.\n\nWould you like to continue?")
+    'launcher.installer_window.you_picked_an_unstable_build_to_install')
 
 
 class InstallerWindow:
@@ -44,7 +40,8 @@ class InstallerWindow:
         self._install_dir = default_install_dir()
         self._running = False
 
-        self._chrome = BrandedDialog(root, TITLE, HEADING,
+        self._chrome = BrandedDialog(root, t("installer.title", product=PRODUCT_NAME),
+                                     t("installer.heading", product=PRODUCT_NAME),
                                      icon_stem=SETUP_ICON_STEM)
         body = self._chrome.body
         gap = scaled(root, 10)
@@ -57,16 +54,16 @@ class InstallerWindow:
 
         self._options = ttk.Frame(body)
         self._options.pack(anchor="w", fill="x", pady=(gap, 0))
-        self._desktop = self._check(DESKTOP_LABEL)
-        self._start_menu = self._check(START_MENU_LABEL)
-        self._launch = self._check(LAUNCH_LABEL)
+        self._desktop = self._check(t(DESKTOP_LABEL))
+        self._start_menu = self._check(t(START_MENU_LABEL))
+        self._launch = self._check(t(LAUNCH_LABEL))
 
         self._log: Optional[tk.Text] = None
         self._progress: Optional[ttk.Progressbar] = None
 
         self._change = self._chrome.add_left_button("Change Directory",
                                                     self._pick_directory)
-        self._cancel = self._chrome.add_button("Cancel", self._on_cancel)
+        self._cancel = self._chrome.add_button(t("common.cancel"), self._on_cancel)
         self._more = ttk.Button(self._chrome.buttons, text="▾", width=2,
                                 style=SPLIT_DROP_STYLE,
                                 command=self._show_more)
@@ -76,7 +73,7 @@ class InstallerWindow:
                                   foreground=theme.FG,
                                   activebackground=theme.BG_HOVER,
                                   activeforeground=theme.FG)
-        self._more_menu.add_command(label=UNSTABLE_LABEL,
+        self._more_menu.add_command(label=t(UNSTABLE_LABEL),
                                     command=self._start_unstable)
         self._install = self._chrome.add_button("Install", self._start,
                                                 style=SPLIT_MAIN_STYLE,
@@ -101,8 +98,8 @@ class InstallerWindow:
                               launch_after=bool(self._launch.get()))
 
     def _pick_directory(self) -> None:
-        if not ask_yesno(self._root, "Change directory",
-                         CHANGE_DIRECTORY_WARNING):
+        if not ask_yesno(self._root, t("launcher.installer_window.change_directory"),
+                         t("launcher.installer_target.are_you_sure_you_want_to_change")):
             return
         picked = filedialog.askdirectory(parent=self._root,
                                          title="Install " + PRODUCT_NAME + " to",
@@ -129,7 +126,7 @@ class InstallerWindow:
     def _start_unstable(self) -> None:
         if self._running:
             return
-        if ask_yesno(self._root, UNSTABLE_LABEL, UNSTABLE_WARNING):
+        if ask_yesno(self._root, t(UNSTABLE_LABEL), t(UNSTABLE_WARNING)):
             self._start(unstable=True)
 
     def _start(self, unstable: bool = False) -> None:
@@ -223,7 +220,6 @@ class InstallerWindow:
         if self._progress is not None:
             self._progress.stop()
         if error is not None:
-            show_error(self._root, TITLE,
-                       "{}\n\n{} was not installed.".format(error,
-                                                            PRODUCT_NAME))
+            show_error(self._root, t("installer.title", product=PRODUCT_NAME),
+                       t('launcher.installer_window.error_product_name_was_not_installed', error=error, product_name=PRODUCT_NAME))
         self._root.quit()

@@ -65,6 +65,8 @@ class DeviceMeta:
     notes: List[str] = field(default_factory=list)
     source: Optional[DeviceSource] = None
     forbid_guest_additions: bool = False
+    description_key: str = ""
+    note_keys: List[str] = field(default_factory=list)
 
     @property
     def os_version(self) -> str:
@@ -257,6 +259,13 @@ def parse_cerf_json_object(obj) -> tuple[DeviceMeta, Optional[int], Optional[int
         meta.device_name = _str_or_empty(m.get("device_name"))
         meta.description = _str_or_empty(m.get("description"))
         meta.notes = _str_list(m.get("notes"))
+        meta.description_key = _str_or_empty(m.get("description_key"))
+        keys = m.get("note_keys")
+        notes = m.get("notes")
+        if isinstance(keys, list) and isinstance(notes, list):
+            meta.note_keys = [_str_or_empty(keys[index]) if index < len(keys) else ""
+                              for index, note in enumerate(notes)
+                              if isinstance(note, str) and note.strip()]
         src_block = m.get("source")
         if isinstance(src_block, dict):
             src_name = _str_or_empty(src_block.get("name"))

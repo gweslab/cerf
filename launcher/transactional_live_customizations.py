@@ -1,4 +1,5 @@
 from __future__ import annotations
+from i18n import t
 
 import tkinter as tk
 from tkinter import ttk
@@ -12,12 +13,11 @@ from screen_geometry import fit_geometry
 from ui_dialogs import show_error
 import ui_theme as theme
 
-RESET_NOTE = ("Some properties you changed require a soft reset to take "
-              "effect. Would you like to perform it?")
+RESET_NOTE = ('launcher.transactional_live_customizations.some_properties_you_changed_require_a_soft')
 
-_RESET_CHOICES = (("none", "Do not reset"),
-                  ("soft", "Soft reset"),
-                  ("hard", "Hard reset"))
+_RESET_CHOICES = (("none", "shutdown.no_reset"),
+                  ("soft", "menu.soft_reset"),
+                  ("hard", "shutdown.hard_reset"))
 
 
 class _ResetConfirmDialog:
@@ -27,7 +27,7 @@ class _ResetConfirmDialog:
 
         dlg = tk.Toplevel(parent)
         dlg.withdraw()
-        dlg.title("Reset device")
+        dlg.title(t("launcher.transactional_live_customizations.reset_device"))
         dlg.configure(bg=theme.BG)
         dlg.resizable(False, False)
         dlg.transient(parent)
@@ -35,18 +35,18 @@ class _ResetConfirmDialog:
 
         body = ttk.Frame(dlg, padding=14)
         body.pack(fill="both", expand=True)
-        ttk.Label(body, text=RESET_NOTE, wraplength=380,
+        ttk.Label(body, text=t(RESET_NOTE), wraplength=380,
                   justify="left").grid(row=0, column=0, sticky="w",
                                        pady=(0, 6))
         self.var_reset = tk.StringVar(value="soft")
         for i, (value, label) in enumerate(_RESET_CHOICES):
-            ttk.Radiobutton(body, text=label, value=value,
+            ttk.Radiobutton(body, text=t(label), value=value,
                             variable=self.var_reset).grid(row=1 + i, column=0,
                                                           sticky="w")
         buttons = ttk.Frame(body)
         buttons.grid(row=4, column=0, sticky="e", pady=(14, 0))
-        pack_actions(buttons, [("OK", self._on_ok),
-                               ("Cancel", dlg.destroy)])[0].focus_set()
+        pack_actions(buttons, [(t("common.ok"), self._on_ok),
+                               (t("common.cancel"), dlg.destroy)])[0].focus_set()
         dlg.bind("<Escape>", lambda _e: dlg.destroy())
 
     def run(self) -> Optional[str]:
@@ -98,8 +98,8 @@ def run_live_customizations(ctx, query: dict) -> Optional[dict]:
         try:
             model.save_live()
         except OSError as exc:
-            show_error(dlg, "Guest Additions",
-                       "Could not save:\n{}".format(exc))
+            show_error(dlg, t("common.guest_additions"),
+                       t('launcher.launcher_properties.could_not_save_exc', exc=exc))
             return False
         answer["reboot"] = None if choice == "none" else choice
         return True

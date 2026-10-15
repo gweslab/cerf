@@ -41,6 +41,7 @@ private:
     void ShowRowMenu(int item, POINT screen_pt);
     void SetStatus(const std::wstring& text, COLORREF clr);
     void UpdateTitle(const CerfVirtTaskManager::Snapshot& snap);
+    const wchar_t* ActionName(uint32_t code) const;
 
     HWND                hwnd_       = nullptr;
     HWND                tabs_       = nullptr;

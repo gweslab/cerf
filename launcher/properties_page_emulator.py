@@ -1,4 +1,5 @@
 from __future__ import annotations
+from i18n import t
 
 import tkinter as tk
 
@@ -8,12 +9,12 @@ from rich_text import plain
 from settings_card import SettingsColumn, switch
 
 PAGE_EMULATOR = "emulator"
-THROTTLE_WARNING = "Changing this setting will render emulation broken. Expect crashes or wrong behaviour."
+THROTTLE_WARNING = 'launcher.properties_page_emulator.changing_this_setting_will_render_emulation_broken'
 
 
 class EmulatorSettingsPage:
     key = PAGE_EMULATOR
-    title = "Emulator Settings"
+    title = "properties.emulator"
 
     def __init__(self, parent: tk.Misc) -> None:
         self.var_full_screen = tk.BooleanVar(value=False)
@@ -23,19 +24,18 @@ class EmulatorSettingsPage:
         page = SettingsColumn(parent)
         self.frame = page.frame
         speed = page.group()
-        speed.note(THROTTLE_WARNING)
+        speed.note(t(THROTTLE_WARNING))
         self.throttle = MultiplierOptionBlock(
-            speed.row("Throttle multiplier", [
-                plain("Set how fast the guest runs: 2 is half speed, and 0 "
-                      "is as fast as the host allows.")]),
+            speed.row(t("launcher.properties_page_emulator.throttle_multiplier"), [
+                plain(t("launcher.properties_page_emulator.set_how_fast_the_guest_runs_2_is_half"))]),
             THROTTLE_KEY, THROTTLE_PRESETS)
         group = page.group()
         self._switches = []
         for title, description, var in (
-                ("Borderless full screen", None, self.var_full_screen),
-                ("Detach internet connection", None, self.var_detach_net),
-                ("Verbose logs",
-                 [plain("Resets when the launcher restarts.")],
+                (t("launcher.config_preview.borderless_full_screen"), None, self.var_full_screen),
+                (t("launcher.properties_page_emulator.detach_internet_connection"), None, self.var_detach_net),
+                (t("launcher.config_preview.verbose_logs"),
+                 [plain(t("launcher.properties_page_emulator.resets_when_the_launcher_restarts"))],
                  self.var_verbose)):
             row = group.row(title, description)
             check = switch(row.frame, var)

@@ -1,4 +1,5 @@
 from __future__ import annotations
+from i18n import t
 
 import tkinter as tk
 from tkinter import ttk
@@ -23,8 +24,8 @@ import ui_theme as theme
 
 _OSNOTE_PREFIX = "osnote::"
 
-_SORT_DOWNLOADS = "By downloads"
-_SORT_REGULAR = "Regular"
+_SORT_DOWNLOADS = 'launcher.download_window.by_downloads'
+_SORT_REGULAR = 'launcher.download_window.regular'
 
 ReloadFn = Callable[
     [Callable[[List[DeviceBundle], list, Optional[dict]], None]], None]
@@ -51,7 +52,7 @@ class DownloadWindow:
 
         dlg = tk.Toplevel(parent)
         self._dlg = dlg
-        dlg.title("Download ROMs")
+        dlg.title(t("launcher.download_window.download_roms"))
         if parent.winfo_viewable():
             dlg.transient(parent)
         body = ttk.Frame(dlg, padding=8)
@@ -62,27 +63,27 @@ class DownloadWindow:
         filt = ttk.Frame(body)
         filt.grid(row=0, column=0, columnspan=2, sticky="ew", pady=(0, 6))
         self.var_hide_unsupported = tk.BooleanVar(value=True)
-        pack_toggle(filt, "Hide unsupported", self.var_hide_unsupported,
+        pack_toggle(filt, t("launcher.board_picker.hide_unsupported"), self.var_hide_unsupported,
                     self._refill)
-        ttk.Label(filt, text="Sort:").pack(side="left", padx=(0, 4))
+        ttk.Label(filt, text=t("launcher.download_window.sort")).pack(side="left", padx=(0, 4))
         self.var_sort = tk.StringVar(
-            value=_SORT_DOWNLOADS if self._places is not None else _SORT_REGULAR)
+            value=t(_SORT_DOWNLOADS) if self._places is not None else t(_SORT_REGULAR))
         self.sort_combo = ttk.Combobox(
             filt, textvariable=self.var_sort, state="readonly", width=14,
-            values=(_SORT_DOWNLOADS, _SORT_REGULAR))
+            values=(t(_SORT_DOWNLOADS), t(_SORT_REGULAR)))
         self.sort_combo.pack(side="left")
         self.sort_combo.bind("<<ComboboxSelected>>", lambda *_: self._refill())
         self._sync_sort_availability()
-        self.btn_sources = ttk.Button(filt, text="Sources…",
+        self.btn_sources = ttk.Button(filt, text=t("launcher.download_window.sources"),
                                       command=self._open_sources)
         self.btn_sources.pack(side="right", padx=(8, 0))
         self.var_search = tk.StringVar(value="")
         pack_search(filt, self.var_search, self._refill)
 
         tree, vsb = grouped_tree(
-            body, ("#0", "☐  Device / OS", 640, 320, "w", True),
+            body, ("#0", t("launcher.download_window.device_os"), 640, 320, "w", True),
             [("soc", "SoC", 150, 100, "w", True),
-             ("size", "Size", 90, 70, "e", False)],
+             ("size", t("launcher.download_window.size"), 90, 70, "e", False)],
             selectmode="none", row=1)
         tree.tag_configure("osnote", foreground=theme.FG_DIM)
         tree.bind("<Button-1>", self._on_click)
@@ -91,16 +92,16 @@ class DownloadWindow:
 
         self.no_sources = ttk.Frame(body)
         self.no_sources.grid(row=1, column=0, columnspan=2)
-        ttk.Label(self.no_sources, text="No bundle repositories available.\n",
+        ttk.Label(self.no_sources, text=t("launcher.download_window.no_bundle_repositories_available"),
                   justify="center").pack()
-        link_label(self.no_sources, "See how to find a bundle repository",
+        link_label(self.no_sources, t("launcher.download_window.see_how_to_find_a_bundle_repository"),
                    BUNDLE_REPOSITORIES_URL).pack()
         self._sync_sources_state()
 
         footer = ttk.Frame(body)
         footer.grid(row=2, column=0, columnspan=2, sticky="ew", pady=(8, 0))
         footer.columnconfigure(1, weight=1)
-        ttk.Button(footer, text=COPYRIGHT_BUTTON_LABEL,
+        ttk.Button(footer, text=t(COPYRIGHT_BUTTON_LABEL),
                    command=self._open_copyright_removal).grid(
             row=0, column=0, sticky="w")
         self.summary = ttk.Label(footer, text="")
@@ -108,7 +109,7 @@ class DownloadWindow:
         actions = ttk.Frame(footer)
         actions.grid(row=0, column=2)
         self.btn_download = pack_actions(actions, [
-            ("Download", self._confirm), ("Cancel", dlg.destroy)])[0]
+            (t("common.download"), self._confirm), (t("common.cancel"), dlg.destroy)])[0]
 
         self._refill()
         dlg.update_idletasks()
@@ -160,13 +161,13 @@ class DownloadWindow:
 
     def _sync_sort_availability(self) -> None:
         if self._places is None:
-            self.var_sort.set(_SORT_REGULAR)
+            self.sort_combo.current(1)
             self.sort_combo.configure(state="disabled")
         else:
             self.sort_combo.configure(state="readonly")
 
     def _sort_mode(self) -> str:
-        if self._places is not None and self.var_sort.get() == _SORT_DOWNLOADS:
+        if self._places is not None and self.sort_combo.current() == 0:
             return "downloads"
         return "regular"
 
@@ -290,7 +291,7 @@ class DownloadWindow:
         total = sum(self._sizes.get(n, 0) for n in self._checked)
         n = len(self._checked)
         self.summary.config(
-            text=f"{n} selected · {format_size(total)}" if n else "Nothing selected")
+            text=t('launcher.download_window.n_selected_value', n=n, value=format_size(total)) if n else t("launcher.download_window.nothing_selected"))
         self.btn_download.config(state=("normal" if n else "disabled"))
 
     def _confirm(self) -> None:

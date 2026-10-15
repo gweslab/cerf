@@ -1,6 +1,7 @@
 """Modal dialogs and tooltips: the generic dark-themed dialog plus every
 canned launcher dialog (ROM license, guest-additions help)."""
 from __future__ import annotations
+from i18n import t
 
 import os
 import tkinter as tk
@@ -32,7 +33,7 @@ def open_device_directory(parent: tk.Misc, path: Path) -> None:
     try:
         os.startfile(str(path))
     except OSError as exc:
-        show_error(parent, "Open device directory", str(exc))
+        show_error(parent, t("launcher.launcher_app.open_device_directory"), str(exc))
 
 
 def _run_extra(dlg: tk.Toplevel, handler: Callable[[tk.Misc], None]) -> None:
@@ -42,10 +43,12 @@ def _run_extra(dlg: tk.Toplevel, handler: Callable[[tk.Misc], None]) -> None:
 
 
 def show_dialog(parent: tk.Misc, title: str, message: str,
-                buttons: tuple[str, ...] = ("OK",),
+                buttons: Optional[tuple[str, ...]] = None,
                 default: Optional[str] = None,
                 extra: Optional[Tuple[str, Callable[[tk.Misc], None]]] = None
                 ) -> str:
+    if buttons is None:
+        buttons = (t("common.ok"),)
     dlg = tk.Toplevel(parent)
     dlg.title(title)
     dlg.configure(bg=theme.BG)
@@ -119,7 +122,7 @@ def ask_text(parent: tk.Misc, title: str, prompt: str,
 
     btns = ttk.Frame(body)
     btns.pack(anchor="e", pady=(14, 0))
-    pack_actions(btns, [("OK", accept), ("Cancel", dlg.destroy)])
+    pack_actions(btns, [(t("common.ok"), accept), (t("common.cancel"), dlg.destroy)])
     dlg.bind("<Return>", lambda _e: accept())
     dlg.bind("<Escape>", lambda _e: dlg.destroy())
 
@@ -148,26 +151,17 @@ def show_error(parent: tk.Misc, title: str, message: str) -> None:
 def ask_yesno(parent: tk.Misc, title: str, message: str,
               extra: Optional[Tuple[str, Callable[[tk.Misc], None]]] = None
               ) -> bool:
-    return show_dialog(parent, title, message, ("Yes", "No"), default="No",
-                       extra=extra) == "Yes"
+    return show_dialog(parent, title, message, (t("common.yes"), t("common.no")), default=t("common.no"),
+                       extra=extra) == t("common.yes")
 
 
 def confirm_rom_license(parent: tk.Misc, display_name: str,
                         abuse_contacts_fn: ContactsFn) -> bool:
     return ask_yesno(
         parent,
-        "Download confirmation",
-        "ROM bundles and add-on packages distributed by this launcher are "
-        "abandonware/released publicly by their respective OEMs. They remain "
-        "the property of those OEMs and are governed by whatever terms "
-        "the OEM applied when releasing them.\n\n"
-        f"By pressing Yes you take full personal responsibility for "
-        f"downloading {display_name} and accept whatever license, "
-        f"terms, or restrictions the OEM applied. The CERF project "
-        f"gives no warranty, grants no license, and accepts no "
-        f"liability for the contents.\n\n"
-        f"Download {display_name}?",
-        extra=(COPYRIGHT_BUTTON_LABEL,
+        t("launcher.ui_dialogs.download_confirmation"),
+        t('launcher.ui_dialogs.rom_bundles_and_add_on_packages_distributed', display_name=display_name, display_name2=display_name),
+        extra=(t(COPYRIGHT_BUTTON_LABEL),
                lambda dlg: show_copyright_removal(dlg, abuse_contacts_fn())),
     )
 
@@ -175,15 +169,8 @@ def confirm_rom_license(parent: tk.Misc, display_name: str,
 def show_bpp_help(parent: tk.Misc) -> None:
     show_info(
         parent,
-        "Color depth",
-        "Some values can break the guest. Keep the default value unless you "
-        "have a reason to change it.\n\n"
-        "• Auto - the depth that is known to work on this device.\n"
-        "• 8bpp - for Windows CE 2.0.\n"
-        "• 16bpp - works best for Windows CE 2.11 and 3.0.\n"
-        "• 24bpp - works for every Windows CE version.\n"
-        "• 32bpp - Windows CE 2.11 and later. It often breaks the rendering "
-        "of guest apps."
+        t("common.color_depth"),
+        t("properties.color_depth_help")
     )
 
 
@@ -213,7 +200,7 @@ def show_sources_thanks(parent: tk.Misc, sources) -> None:
         return
 
     dlg = tk.Toplevel(parent)
-    dlg.title("ROM preservation")
+    dlg.title(t("launcher.ui_dialogs.rom_preservation"))
     dlg.configure(bg=theme.BG)
     if parent.winfo_viewable():
         dlg.transient(parent)
@@ -228,9 +215,9 @@ def show_sources_thanks(parent: tk.Misc, sources) -> None:
                   text=source_credit(source)).pack(anchor="w")
         ask = ttk.Frame(body)
         ask.pack(anchor="w", pady=(6, 0))
-        ttk.Label(ask, text="Would you like to ").pack(side="left")
+        ttk.Label(ask, text=t("launcher.ui_dialogs.would_you_like_to")).pack(side="left")
         link_label(ask, "pay them a visit", source.website).pack(side="left")
-        ttk.Label(ask, text=" or ").pack(side="left")
+        ttk.Label(ask, text=t("launcher.ui_dialogs.or")).pack(side="left")
         link_label(ask, "support them", source.donate).pack(side="left")
         ttk.Label(ask, text="?").pack(side="left")
         if source.origin:
@@ -238,7 +225,7 @@ def show_sources_thanks(parent: tk.Misc, sources) -> None:
 
     btns = ttk.Frame(body)
     btns.pack(anchor="e", pady=(14, 0))
-    pack_actions(btns, [("OK", dlg.destroy)])[0].focus_set()
+    pack_actions(btns, [(t("common.ok"), dlg.destroy)])[0].focus_set()
     dlg.bind("<Return>", lambda _e: dlg.destroy())
     dlg.bind("<Escape>", lambda _e: dlg.destroy())
 

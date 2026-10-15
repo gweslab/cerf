@@ -24,6 +24,7 @@ public:
     void OnReady() override { emu_.Get<KeyboardRouter>().Register(this); }
 
     std::wstring SourceName() const override { return L"Nino buttons"; }
+    const char* SourceLabelKey() const override { return "input.nino_buttons"; }
 
     /* A press drives the button's pin high, a release low; keybddr.dll (SYSINTR 8)
        scans the resulting edge into a VK. A general purpose I/O pin (bit 8 set)

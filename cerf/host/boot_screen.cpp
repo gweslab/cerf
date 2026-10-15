@@ -1,6 +1,7 @@
 #define NOMINMAX
 
 #include "boot_screen.h"
+#include "ui_language.h"
 
 #include "../boards/board_context.h"
 #include "../core/cerf_emulator.h"
@@ -10,6 +11,8 @@
 #include "host_fonts.h"
 #include "host_gdiplus.h"
 #include "hw_screen.h"
+
+#include "../core/string_utils.h"
 
 #include <algorithm>
 #include <cmath>
@@ -150,12 +153,12 @@ void BootScreen::EnsureFonts() {
 }
 
 std::wstring BootScreen::CurrentLabelText() const {
-    if (fb_latched_) return L"LCD is rendering.";
+    if (fb_latched_) return emu_.Get<UiLanguage>().Text("boot.lcd_is_rendering");
     if (label_mode_ == LabelMode::Restarting) {
         const wchar_t* over = restart_label_.load(std::memory_order_acquire);
-        return over ? over : L"Rebooting...";
+        return over ? over : emu_.Get<UiLanguage>().Text("boot.rebooting");
     }
-    return L"Booting " + short_name_ + L"...";
+    return emu_.Get<UiLanguage>().Format("boot.device", {{"device", WideToUtf8(short_name_)}});
 }
 
 RECT BootScreen::LogoRect(uint32_t width, uint32_t height,

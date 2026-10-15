@@ -1,4 +1,5 @@
 from __future__ import annotations
+from i18n import t
 
 import ctypes
 import json
@@ -16,6 +17,7 @@ from transactional_about import run_about
 from transactional_live_customizations import run_live_customizations
 from transactional_settings import run_settings
 from ui_dialogs import show_error
+from i18n import set_language
 import ui_theme as theme
 
 TRANSACTIONAL_COMMAND = "transactional"
@@ -87,6 +89,14 @@ def run_transactional(argv: List[str]) -> int:
     if not isinstance(request, dict) or not request:
         return 2
 
+    for block in request.values():
+        query = block.get("query") if isinstance(block, dict) else None
+        if isinstance(query, dict) and isinstance(query.get("language"), str):
+            try:
+                set_language(query["language"])
+            except ValueError:
+                return 2
+            break
     root = _make_root()
     ctx = TransactionalContext(root, device_dir, owner_hwnd)
     answered = False
@@ -97,10 +107,8 @@ def run_transactional(argv: List[str]) -> int:
                 continue
             scaffolding = _SCAFFOLDINGS.get(key)
             if scaffolding is None:
-                show_error(root, "Unsupported request",
-                           "This CERF build asked the launcher for "
-                           "\"{}\", which this launcher does not "
-                           "provide.".format(key))
+                show_error(root, t("launcher.transactional.unsupported_request"),
+                           t('launcher.transactional.this_cerf_build_asked_the_launcher_for', key=key))
                 continue
             query = block.get("query")
             response = scaffolding(ctx, query if isinstance(query, dict) else {})

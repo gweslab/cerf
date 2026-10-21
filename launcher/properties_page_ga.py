@@ -95,6 +95,14 @@ class GuestAdditionsPage:
         row.control(self.color_scheme.widget)
         self.color_scheme.configure(COLOR_SCHEME_KEYS, color_scheme_label)
 
+        body.section("Tweaks")
+        row = body.group().row("Allow untrusted apps", [
+            plain("Lets you run untrusted apps on WM. Breaks cold boot - "
+                  "apply only after boot!")])
+        self.var_untrusted = tk.BooleanVar(value=False)
+        self.untrusted = switch(row.frame, self.var_untrusted)
+        row.control(self.untrusted, wide=False)
+
     def lock_toggle(self) -> None:
         self._toggle_locked = True
         self.check.config(state="disabled")
@@ -114,6 +122,7 @@ class GuestAdditionsPage:
         self.font_size.load(model)
         self.cleartype.set(model_cleartype(model))
         self.color_scheme.set(model.get("color_scheme", ""))
+        self.var_untrusted.set(bool(model.get("allow_untrusted_apps", False)))
         self._sync_preset()
         self._refresh_body()
 
@@ -130,6 +139,7 @@ class GuestAdditionsPage:
         else:
             model["cleartype"] = cleartype
         model["color_scheme"] = self.color_scheme.get()
+        model["allow_untrusted_apps"] = self.var_untrusted.get()
 
     def validate(self) -> bool:
         if not self.var_enabled.get():
@@ -145,6 +155,7 @@ class GuestAdditionsPage:
             block.set_enabled(enabled)
         for combo in (self.preset, self.cleartype, self.color_scheme):
             combo.set_enabled(enabled)
+        self.untrusted.config(state="normal" if enabled else "disabled")
 
     def _refresh_body(self) -> None:
         if self.var_enabled.get():

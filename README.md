@@ -368,6 +368,8 @@ python run_claude.py
         <p><b>💿 Emulator</b><br/>
           🆕 Added x64 hosts support<br/>
           🆕 Added Linux support</p>
+        <p><b>✨ Guest Additions</b><br/>
+          ✅ Moved &quot;untrusted apps hack&quot; for WM into optional switch since it broke WM6</p>
       </td>
     </tr>
     <tr>

@@ -120,6 +120,7 @@ device can declare here.**
 | `guest_additions.override_color_scheme` | string | The system color scheme that the guest driver applies. The same as `--ga-color-scheme`. |
 | `guest_additions.override_font_size` | integer | The system font height, in logical units. The same as `--ga-font-size`. |
 | `guest_additions.override_cleartype` | boolean | `true` turns ClearType on in the guest when the shell is up, and `false` turns it off. When the key is absent, the ROM's own setting stays. |
+| `guest_additions.allow_untrusted_apps` | boolean | `true` lets Windows Mobile run untrusted apps. The guest driver applies it when the shell is up. It breaks a cold boot. Turn it on only after the device boots. `false` or absent changes nothing. |
 | `guest_additions.share_folder` | string | A host folder that CERF mounts into the guest. The same as `--ga-share-folder`. |
 | `guest_additions.shared_folder_mount_point` | string | The name of the guest root folder that shows the shared folder. |
 | `guest_additions.autorun` | array of strings | Guest paths. When the shell is up, the guest driver starts each path, in order. `--ga-autorun=PATH` replaces the array. |

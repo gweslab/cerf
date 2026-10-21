@@ -4,6 +4,9 @@
     new: |
       Added x64 hosts support
       Added Linux support
+  guest_additions:
+    fixed: |
+      Moved "untrusted apps hack" for WM into optional switch since it broke WM6
 - version: v7.0
   date: 14 Oct 2026
   devices:

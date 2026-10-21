@@ -1,3 +1,3 @@
 #pragma once
 
-extern "C" void CerfAllowUnsignedApps(void);
+extern "C" void CerfAllowUnsignedAppsTick(void);

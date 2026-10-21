@@ -201,6 +201,9 @@ def _extract_persist_fields(obj) -> dict:
         ct = ga.get("override_cleartype")
         if isinstance(ct, bool):
             out["cleartype"] = ct
+        aua = ga.get("allow_untrusted_apps")
+        if isinstance(aua, bool):
+            out["allow_untrusted_apps"] = aua
         sf = ga.get("share_folder")
         if isinstance(sf, str) and sf:
             out["share_folder"] = sf
@@ -265,8 +268,8 @@ def write_persist_overrides(device_dir: Path, fields: dict) -> None:
         ga_prev = obj.get("guest_additions")
         ga_obj: dict = dict(ga_prev) if isinstance(ga_prev, dict) else {}
         for key in ("enabled", "override_color_scheme", "override_font_size",
-                    "override_cleartype", "share_folder",
-                    "shared_folder_mount_point"):
+                    "override_cleartype", "allow_untrusted_apps",
+                    "share_folder", "shared_folder_mount_point"):
             ga_obj.pop(key, None)
         if "guest_additions" in fields:
             ga_obj["enabled"] = fields["guest_additions"]
@@ -276,6 +279,8 @@ def write_persist_overrides(device_dir: Path, fields: dict) -> None:
             ga_obj["override_font_size"] = fs
         if "cleartype" in fields:
             ga_obj["override_cleartype"] = fields["cleartype"]
+        if fields.get("allow_untrusted_apps"):
+            ga_obj["allow_untrusted_apps"] = True
         if fields.get("share_folder"):
             ga_obj["share_folder"] = fields["share_folder"]
         if fields.get("mount_point"):

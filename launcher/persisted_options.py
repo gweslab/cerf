@@ -13,8 +13,8 @@ from launch_options_presets import (DEFAULT_SCREEN_WIDTH,
 
 PERSIST_KEYS = ("network_enabled", "guest_additions", "color_scheme",
                 "full_screen", "width", "height", "dpi", "font_size",
-                "cleartype", "bpp", "share_folder", "mount_point",
-                "cpu_config") + MULTIPLIER_KEYS
+                "cleartype", "allow_untrusted_apps", "bpp", "share_folder",
+                "mount_point", "cpu_config") + MULTIPLIER_KEYS
 
 EXPLICIT_KEYS = ("width", "height", "bpp")
 
@@ -34,6 +34,7 @@ def resolve_baseline(base: dict) -> dict:
     b["guest_additions"] = base.get("guest_additions", False)
     b["color_scheme"] = base.get("color_scheme", "")
     b["full_screen"] = base.get("full_screen", False)
+    b["allow_untrusted_apps"] = base.get("allow_untrusted_apps", False)
     b["mount_point"] = base.get("mount_point", ga_shared_folder_mount_point())
     for key in MULTIPLIER_KEYS:
         b[key] = base.get(key, DEFAULT_MULTIPLIER)

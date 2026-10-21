@@ -22,6 +22,8 @@
 - **No font-glyph icon rendering** - draw host widget / status-bar icons with GDI primitives (`FillRect`, `Polygon`, `Rectangle`, `Arc`), never as text glyphs from a symbol font (`Segoe MDL2 Assets`, `Segoe UI Symbol`, `Wingdings`, emoji). Symbol fonts are not present on every supported host (pre-Win10 Windows, Wine), and a missing face never fails - GDI silently substitutes a font without those codepoints, and the icon renders as a `.notdef` box.
 - **`HostWidget` is the UI seam - once it is wired to emulated hardware, every button and clickable element it presents has fully modeled logic.** No deferrals, no hidden deferrals: a half-wired widget produces broken buttons nobody can locate later. A button is never deleted to hide unfinished logic, and a button never routes to `CerfFatalExit`.
 - **A host widget uses both mouse buttons** - the right click opens the menu of the widget, or runs its one action. The left click runs a primary shortcut action, or does the same as the right click. The two buttons therefore do the same thing, or they do different things.
+- **The user directs the website, the UI and the icons** - An agent writes no website text, decides no UI layout or interaction, and creates no icon unless the user's current message directs that exact change.
+- **A change the website needs is asked, never made** - Work can change something that a website page documents about CERF, for example a configuration key or a download step. At the end of that work, the agent tells the user which page needs which change. The agent edits the page only when the user then directs it.
 
 ## JIT, MMU, CPU, Peripherals, Boards Code Changes Rules
 

@@ -42,7 +42,7 @@ One file next to `cerf.exe`, shared by every device instance on the installation
 | `discord_rich_presence` | boolean | Publish the device that you run to Discord. Read by both the launcher and `cerf.exe`. |
 | `host_key` | integer, or array of integers | The host key: one virtual-key code, or up to eight of them that you press together. Absent, the host key is Right Ctrl (`163`). |
 | `default_scale` | integer | The scale of the guest screen when the emulator starts: `0` (Dynamic), `1` (Original view), `2`, `3`, or `5`. Dynamic picks `2` on a primary display at 150% scaling or more, unless the board has a high-DPI screen, and `1` otherwise. Absent: `0`. |
-| `host_branch` | string | A platform of this build: `win32-x86`, `linux-qt-amd64`, `macos-qt-arm64`. Reserved: `windows-amd64`, `windows-arm64`, `linux-qt-arm64`, `android-arm64`. Absent: `win32-x86`. |
+| `host_branch` | string | A platform of this build: `win32-x86`, `linux-amd64`, `macos-arm64`. Reserved: `windows-amd64`, `windows-arm64`, `linux-arm64`, `android-arm64`. Absent: `win32-x86`. |
 
 `last_save_state_mode` is the one key that CERF writes back. When you tick **Remember choice** in
 the shutdown dialog, CERF stores your answer here. When you upgrade CERF, the installer merges the

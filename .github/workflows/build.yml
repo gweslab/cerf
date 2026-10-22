@@ -167,7 +167,7 @@ jobs:
     runs-on: ubuntu-latest
     container: ubuntu:26.04
     env:
-      PLATFORM: linux-qt-amd64
+      PLATFORM: linux-amd64
 
     steps:
       - name: Install the build dependencies
@@ -223,7 +223,7 @@ jobs:
     needs: build
     runs-on: macos-latest
     env:
-      PLATFORM: macos-qt-arm64
+      PLATFORM: macos-arm64
 
     steps:
       - uses: actions/checkout@v4
@@ -307,27 +307,27 @@ jobs:
         if: ${{ needs.build-linux.result == 'success' }}
         uses: actions/download-artifact@v4
         with:
-          name: CERF-${{ steps.version.outputs.version }}-${{ steps.version.outputs.sha }}-Release-linux-qt-amd64
+          name: CERF-${{ steps.version.outputs.version }}-${{ steps.version.outputs.sha }}-Release-linux-amd64
           path: ci/linux
 
       - name: Publish the Linux build to the R2 beta channel
         if: ${{ needs.build-linux.result == 'success' }}
         run: |
-          name="CERF-${{ steps.version.outputs.version }}-${{ steps.version.outputs.sha }}-Release-linux-qt-amd64"
-          python tools/publish_r2_build.py --zip="ci/linux/$name.zip" --host-branch=linux-qt-amd64
+          name="CERF-${{ steps.version.outputs.version }}-${{ steps.version.outputs.sha }}-Release-linux-amd64"
+          python tools/publish_r2_build.py --zip="ci/linux/$name.zip" --host-branch=linux-amd64
 
       - name: Fetch the macOS build
         if: ${{ needs.build-macos.result == 'success' }}
         uses: actions/download-artifact@v4
         with:
-          name: CERF-${{ steps.version.outputs.version }}-${{ steps.version.outputs.sha }}-Release-macos-qt-arm64
+          name: CERF-${{ steps.version.outputs.version }}-${{ steps.version.outputs.sha }}-Release-macos-arm64
           path: ci/macos
 
       - name: Publish the macOS build to the R2 beta channel
         if: ${{ needs.build-macos.result == 'success' }}
         run: |
-          name="CERF-${{ steps.version.outputs.version }}-${{ steps.version.outputs.sha }}-Release-macos-qt-arm64"
-          python tools/publish_r2_build.py --zip="ci/macos/$name.zip" --host-branch=macos-qt-arm64
+          name="CERF-${{ steps.version.outputs.version }}-${{ steps.version.outputs.sha }}-Release-macos-arm64"
+          python tools/publish_r2_build.py --zip="ci/macos/$name.zip" --host-branch=macos-arm64
 
   announce:
     needs: [build, build-linux, build-macos]

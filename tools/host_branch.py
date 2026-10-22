@@ -10,8 +10,8 @@ from typing import Dict, List, Optional
 KEY = "host_branch"
 HOST_KEY_KEY = "host_key"
 WIN32_X86 = "win32-x86"
-LINUX_QT_AMD64 = "linux-qt-amd64"
-MACOS_QT_ARM64 = "macos-qt-arm64"
+LINUX_AMD64 = "linux-amd64"
+MACOS_ARM64 = "macos-arm64"
 
 VK_RMENU = 0xA5
 
@@ -34,12 +34,12 @@ _BRANCHES = {
         name=WIN32_X86, label="Windows", platform_dir="Win32",
         frontend="cerf.exe", launcher="launcher/launcher.exe", forwarder="launcher.exe",
         builds_ce_apps=True, packed_artifact=False),
-    LINUX_QT_AMD64: HostBranch(
-        name=LINUX_QT_AMD64, label="Linux", platform_dir=LINUX_QT_AMD64,
+    LINUX_AMD64: HostBranch(
+        name=LINUX_AMD64, label="Linux", platform_dir=LINUX_AMD64,
         frontend="cerf-qt", launcher="launcher/launcher", forwarder="launcher.sh",
         builds_ce_apps=True, packed_artifact=True),
-    MACOS_QT_ARM64: HostBranch(
-        name=MACOS_QT_ARM64, label="macOS", platform_dir=MACOS_QT_ARM64,
+    MACOS_ARM64: HostBranch(
+        name=MACOS_ARM64, label="macOS", platform_dir=MACOS_ARM64,
         frontend="CE Runtime Foundation.app/Contents/MacOS/CE Runtime Foundation",
         launcher="CE Runtime Foundation Launcher.app/Contents/MacOS/launcher", forwarder=None,
         builds_ce_apps=False, packed_artifact=True,
@@ -82,9 +82,9 @@ def current() -> HostBranch:
     if sys.platform == "win32":
         return _BRANCHES[WIN32_X86]
     if sys.platform.startswith("linux") and machine in ("x86_64", "amd64"):
-        return _BRANCHES[LINUX_QT_AMD64]
+        return _BRANCHES[LINUX_AMD64]
     if sys.platform == "darwin" and machine == "arm64":
-        return _BRANCHES[MACOS_QT_ARM64]
+        return _BRANCHES[MACOS_ARM64]
     raise UnsupportedHost("no CERF host branch for {} on {}".format(sys.platform, machine))
 
 

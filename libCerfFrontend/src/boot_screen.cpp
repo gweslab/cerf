@@ -1,6 +1,7 @@
 #include <cerffrontend/boot_screen.h>
 
 #include <cerffrontend/boot_bar.h>
+#include <cerffrontend/dpi_scale.h>
 #include <cerffrontend/surface_factory.h>
 
 #include <cerfcore/boards/board_context.h>
@@ -39,24 +40,29 @@ constexpr uint32_t kGlowCenterB     = 0x28;
 constexpr int kLabelFontPx    = 18;
 constexpr int kHwLineFontPx   = 12;
 constexpr int kMargin         = 8;
-constexpr int kBootBarPx      = 16;
 constexpr int kHwLineHeightPx = kHwLineFontPx + 4;
-
-constexpr Font kLabelFont{FontFace::kUi, kLabelFontPx, true};
-constexpr Font kHwLineFont{FontFace::kMono, kHwLineFontPx, true};
+constexpr int kLabelBottomPx  = 8;
+constexpr int kHwLineGapPx    = 4;
+constexpr int kHwHitSlackPx   = 2;
 
 }
+
+int BootScreen::S(int px) const { return ScaleForDpi(px, dpi_); }
 
 void BootScreen::OnReady() {
     short_name_ = emu_.Get<cerfcore::BoardContext>().ShortBoardName();
     emu_.Get<cerfcore::GuestPowerNotifier>().RegisterRebootListener([this] { Restart(); });
 }
 
-void BootScreen::RenderInto(uint32_t* dib_bgra32, uint32_t width, uint32_t height) {
+void BootScreen::RenderInto(uint32_t* dib_bgra32, uint32_t width, uint32_t height, int dpi) {
     Advance(emu_.Get<cerfcore::EmulationPause>().AnimationTickMs());
 
     if (!bg_ || bg_->Width() != static_cast<int>(width) || bg_->Height() != static_cast<int>(height)) {
         bg_       = emu_.Get<SurfaceFactory>().Create(static_cast<int>(width), static_cast<int>(height));
+        bg_valid_ = false;
+    }
+    if (dpi != dpi_) {
+        dpi_      = dpi;
         bg_valid_ = false;
     }
 
@@ -76,7 +82,7 @@ void BootScreen::RenderInto(uint32_t* dib_bgra32, uint32_t width, uint32_t heigh
     }
 
     std::memcpy(dib_bgra32, bg_->Bits(), static_cast<size_t>(width) * height * 4u);
-    emu_.Get<BootBar>().RenderInto(dib_bgra32, width, height);
+    emu_.Get<BootBar>().RenderInto(dib_bgra32, width, height, dpi_);
 }
 
 uint64_t BootScreen::BgSignature(uint32_t width, uint32_t height) {
@@ -110,12 +116,14 @@ Rect BootScreen::LogoRect(Painter& p, uint32_t width, uint32_t height, float lab
         if (!p.ImageSize(PainterImage::kCerfLogo, dst_w, dst_h)) return Rect{};
     } else {
         const uint32_t md = std::min(width, height);
-        dst_w = dst_h = static_cast<int>(std::clamp(md / 3u, kCerfLogoMinPx, kCerfLogoMaxPx));
+        dst_w = dst_h = static_cast<int>(std::clamp(
+            md / 3u, static_cast<uint32_t>(S(static_cast<int>(kCerfLogoMinPx))),
+            static_cast<uint32_t>(S(static_cast<int>(kCerfLogoMaxPx)))));
     }
 
     label_progress   = std::clamp(label_progress, 0.0f, 1.0f);
     const float gap  = static_cast<float>(dst_h) * kLabelGapFrac;
-    const float rise = (gap + static_cast<float>(kLabelFontPx)) * 0.5f * label_progress;
+    const float rise = (gap + static_cast<float>(S(kLabelFontPx))) * 0.5f * label_progress;
 
     const int left = static_cast<int>(width) / 2 - dst_w / 2;
     const int top  = static_cast<int>(static_cast<float>(height) * 0.5f - rise) - dst_h / 2;
@@ -230,11 +238,13 @@ void BootScreen::DrawLogoFrame(Painter& p, uint32_t width, uint32_t height, floa
     if (!show_label || text_opacity <= 0.0f) return;
 
     const uint8_t v       = static_cast<uint8_t>(255.0f * text_opacity);
-    const int     max_y   = static_cast<int>(height) - kLabelFontPx - 8;
+    const int     font_px = S(kLabelFontPx);
+    const int     max_y   = static_cast<int>(height) - font_px - S(kLabelBottomPx);
     const int     label_y = std::min(lr.bottom + static_cast<int>(static_cast<float>(lr.Height()) * kLabelGapFrac),
                                      max_y);
-    p.DrawTextBox({0, label_y, static_cast<int>(width), label_y + kLabelFontPx * 2}, label,
-                  kLabelFont, Rgb{v, v, v}, text::kCenter | text::kTop | text::kSingleLine);
+    p.DrawTextBox({0, label_y, static_cast<int>(width), label_y + font_px * 2}, label,
+                  Font{FontFace::kUi, font_px, true}, Rgb{v, v, v},
+                  text::kCenter | text::kTop | text::kSingleLine);
 }
 
 void BootScreen::DrawAnimation(Painter& p, uint32_t width, uint32_t height) {
@@ -259,11 +269,13 @@ void BootScreen::DrawHwStatusLine(Painter& p, uint32_t width, uint32_t height) {
 
     const float   op     = phase_ == Phase::CerfFadeIn ? cur_op_ : 1.0f;
     const uint8_t dv     = static_cast<uint8_t>(150.0f * op);
-    const int     bottom = static_cast<int>(height) - kBootBarPx - 4;
-    const Rect r{kMargin, bottom - kHwLineHeightPx, static_cast<int>(width) - kMargin, bottom};
-    p.DrawTextBox(r, last, kHwLineFont, Rgb{dv, dv, dv},
+    const int     bar_h  = BootBar::Height(dpi_);
+    const int     bottom = static_cast<int>(height) - bar_h - S(kHwLineGapPx);
+    const Rect r{S(kMargin), bottom - S(kHwLineHeightPx), static_cast<int>(width) - S(kMargin), bottom};
+    p.DrawTextBox(r, last, Font{FontFace::kMono, S(kHwLineFontPx), true}, Rgb{dv, dv, dv},
                   text::kCenter | text::kVCenter | text::kSingleLine | text::kEndEllipsis);
-    hw_line_rect_ = Rect{0, r.top - 2, static_cast<int>(width), static_cast<int>(height) - kBootBarPx};
+    hw_line_rect_ = Rect{0, r.top - S(kHwHitSlackPx), static_cast<int>(width),
+                         static_cast<int>(height) - bar_h};
 }
 
 bool BootScreen::HitTestHwLine(int x, int y) const {

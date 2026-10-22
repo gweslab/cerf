@@ -6,6 +6,7 @@
 #include "qt_theme.h"
 
 #include <cerfcore/core/cerf_emulator.h>
+#include <cerffrontend/dpi_scale.h>
 #include <cerffrontend/link_opener.h>
 #include <cerffrontend/shutdown_dialog_layout.h>
 #include <cerffrontend/shutdown_prompt.h>
@@ -29,8 +30,7 @@ namespace {
 using cerffrontend::ShutdownPrompt;
 using cerffrontend::ShutdownPromptAction;
 using Layout = cerffrontend::ShutdownDialogLayout;
-
-constexpr int kLogicalDpi = 96;
+using cerffrontend::kDefaultDpi;
 
 QRect ToQRect(const cerffrontend::Rect& r) { return QRect(r.left, r.top, r.right - r.left, r.bottom - r.top); }
 
@@ -51,11 +51,11 @@ public:
     ShutdownDialogWidget(cerfcore::CerfEmulator& emu, QWidget* owner, cerfcore::ShutdownTrigger trigger)
         : QDialog(owner),
           emu_(emu),
-          layout_(kLogicalDpi, Layout::kBandH, Layout::kBandW,
-                  Layout::ClientHeight(kLogicalDpi, Layout::kBandH)) {
+          layout_(kDefaultDpi, Layout::kBandH, Layout::kBandW,
+                  Layout::ClientHeight(kDefaultDpi, Layout::kBandH)) {
         auto& prompt = emu_.Get<ShutdownPrompt>();
         setWindowTitle(QString::fromUtf8(prompt.Title()));
-        setFixedSize(Layout::kBandW, Layout::ClientHeight(kLogicalDpi, Layout::kBandH));
+        setFixedSize(Layout::kBandW, Layout::ClientHeight(kDefaultDpi, Layout::kBandH));
 
         MakeLabel(QString::fromUtf8(prompt.Intro(trigger)), layout_.Intro());
         MakeLabel(QString::fromUtf8(prompt.Question()), layout_.Question());

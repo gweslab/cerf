@@ -14,9 +14,11 @@
 #include <cerffrontend/shutdown_teardown.h>
 #include "shutdown_dialog.h"
 #include <cerffrontend/guest_auto_resize.h>
+#include <cerffrontend/startup_scale.h>
 #include <cerfcore/host/frame_renderer.h>
 #include "host_canvas.h"
 #include "host_dark_mode.h"
+#include "host_dpi.h"
 #include "host_focus_policy.h"
 #include "host_input_capture.h"
 #include "host_menu.h"
@@ -243,6 +245,13 @@ void HostWindow::UiThreadMain() {
     emu_.Get<HostStatusBar>().CreateOn(hwnd_, sb);
     emu_.Get<HostDarkMode>().ApplyToWindow(canvas.Hwnd());
     emu_.Get<HostInputCapture>().AttachUiThread(hwnd_);
+
+    const int scale = emu_.Get<cerffrontend::StartupScale>().Factor(
+        static_cast<int>(emu_.Get<HostDpi>().ForPrimaryMonitor()));
+    if (scale > 1) {
+        canvas.SetIntegerScale(scale);
+        FitWindowToSurface(canvas.ContentWidth(), canvas.ContentHeight());
+    }
 
     emu_.Get<HostFocusPolicy>().Show(hwnd_);
     UpdateWindow(hwnd_);

@@ -10,12 +10,18 @@ import ui_theme as theme
 _WM_SETTINGCHANGE = 0x001A
 _GWLP_WNDPROC = -4
 _APPEARANCE_POLL_MS = 250
+_TK_APPEARANCE_CHANGED = "<<AppearanceChanged>>"
 
 
 class ThemeFollowMixin:
     def _install_theme_listener(self) -> None:
         self._old_wndproc = None
         self._appearance = None
+        self._appearance_binding = None
+        if sys.platform == "darwin":
+            self._appearance_binding = self.bind(
+                _TK_APPEARANCE_CHANGED, lambda _event: self._maybe_retheme(), add="+")
+            return
         if sys.platform != "win32":
             self._appearance = AppearanceMonitor()
             self._appearance.start()
@@ -49,6 +55,9 @@ class ThemeFollowMixin:
                 self._old_wndproc = None
             except (OSError, AttributeError):
                 pass
+        binding, self._appearance_binding = getattr(self, "_appearance_binding", None), None
+        if binding is not None:
+            self.unbind(_TK_APPEARANCE_CHANGED, binding)
         appearance, self._appearance = self._appearance, None
         if appearance is not None:
             appearance.stop()
@@ -68,5 +77,5 @@ class ThemeFollowMixin:
         self.after(_APPEARANCE_POLL_MS, self._poll_appearance)
 
     def _maybe_retheme(self) -> None:
-        if theme.refresh_palette():
+        if theme.refresh_palette(self):
             self._retheme()

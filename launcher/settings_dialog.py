@@ -5,30 +5,34 @@ from tkinter import ttk
 from typing import Callable, Optional
 
 from app_settings import (CHANNEL_DISABLED, CHANNEL_STABLE, CHANNEL_UNSTABLE,
-                          read_discord_rich_presence, read_update_channel,
+                          read_default_scale, read_discord_rich_presence,
+                          read_update_channel, write_default_scale,
                           write_discord_rich_presence, write_update_channel)
+from branded_dialog import scaled
+from choice_combo import ChoiceCombo
 from dialog_buttons import pack_actions
+from display_scale import scale_choices, scale_label
 from host_key import write_host_key
 from host_key_block import HostKeyBlock
+from rich_text import plain
 from screen_geometry import fit_geometry
+from settings_card import SettingsColumn, control_hint, switch
 from ui_dialogs import show_info
 import ui_theme as theme
 
-CHANNEL_LABELS = (
-    ("Disable updates", CHANNEL_DISABLED),
-    ("Stable releases", CHANNEL_STABLE),
-    ("Unstable releases", CHANNEL_UNSTABLE),
-)
+PAGE_PAD_DIP = 14
+
+CHANNEL_LABELS = {
+    CHANNEL_DISABLED: "Disable updates",
+    CHANNEL_STABLE: "Stable releases",
+    CHANNEL_UNSTABLE: "Unstable releases",
+}
 
 CHANNEL_HINTS = {
-    CHANNEL_DISABLED:
-        "You won't receive new emulator update notifications.",
-    CHANNEL_STABLE:
-        "You will be notified when a new release arrives and you will "
-        "receive a prompt to upgrade.",
-    CHANNEL_UNSTABLE:
-       "You will be notified when a new unstable release. Be careful - "
-        "an experimental build might damage your installation or devices.",
+    CHANNEL_DISABLED: "No update notifications.",
+    CHANNEL_STABLE: "Offers each new release.",
+    CHANNEL_UNSTABLE: "Offers experimental builds. They can damage your "
+                      "installation or devices.",
 }
 
 
@@ -41,6 +45,7 @@ class SettingsDialog:
         self._channel_before = read_update_channel()
 
         dlg = tk.Toplevel(parent)
+        dlg.withdraw()
         self._dlg = dlg
         dlg.title("Settings")
         dlg.configure(bg=theme.BG)
@@ -48,43 +53,55 @@ class SettingsDialog:
             dlg.transient(parent)
         dlg.resizable(False, False)
 
-        body = ttk.Frame(dlg, padding=16)
-        body.pack(fill="both", expand=True)
-
-        actions = ttk.Frame(body)
-        actions.pack(side="bottom", anchor="e", pady=(18, 0))
+        footer = ttk.Frame(dlg, padding=(12, 10))
+        footer.pack(fill="x", side="bottom")
+        tk.Frame(dlg, height=1, bg=theme.SEPARATOR).pack(fill="x", side="bottom")
+        actions = ttk.Frame(footer)
+        actions.pack(side="right")
         pack_actions(actions, [("OK", self._ok), ("Cancel", dlg.destroy)])
 
-        ttk.Label(body, text="Host key").pack(anchor="w", pady=(0, 2))
-        self._host_key = HostKeyBlock(body)
+        main = ttk.Frame(dlg, style="Page.TFrame", padding=scaled(dlg, PAGE_PAD_DIP))
+        main.pack(fill="both", expand=True)
+        page = SettingsColumn(main)
+        page.frame.pack(fill="both", expand=True)
+        group = page.group()
 
+        host_key = group.row("Host key", [
+            plain("Reassign a key you use to defocus keyboard/mouse from guest")])
+        self._host_key = HostKeyBlock(host_key.frame)
+        host_key.control(self._host_key.frame)
+
+        channel = group.row("Update channel", [
+            plain("Choose which updates the launcher offers.")])
+        channel_box = ttk.Frame(channel.frame)
+        channel_box.columnconfigure(0, weight=1)
+        self._channel = ChoiceCombo(channel_box, on_change=self._sync_hint)
+        self._channel.widget.grid(row=0, column=0, sticky="ew")
+        self._channel.set(self._channel_before)
+        self._channel.configure(list(CHANNEL_LABELS), CHANNEL_LABELS.__getitem__)
+        self._hint = control_hint(channel_box, max(CHANNEL_HINTS.values(), key=len))
+        self._hint.grid(row=1, column=0, sticky="ew", pady=(4, 0))
+        channel.control(channel_box)
+
+        scale = group.row("Default scale")
+        self._scale = ChoiceCombo(scale.frame)
+        self._scale.set(read_default_scale())
+        self._scale.configure(scale_choices(), scale_label)
+        scale.control(self._scale.widget)
+
+        drp = group.row("Discord Rich Presence", [
+            plain("Shows the device and OS version in your Discord profile.")])
         self.var_drp = tk.BooleanVar(value=read_discord_rich_presence())
-        ttk.Checkbutton(body, text="Discord Rich Presence",
-                        variable=self.var_drp).pack(anchor="w", pady=(16, 0))
-        ttk.Label(body, style="Hint.TLabel", wraplength=380, justify="left",
-                  text="Shows the current device and OS version in your "
-                       "Discord profile as an activity.").pack(
-            anchor="w", pady=(2, 0))
+        drp.control(switch(drp.frame, self.var_drp), wide=False)
 
-        ttk.Label(body, text="Update channel").pack(anchor="w", pady=(16, 2))
-        self._labels = [label for label, _ in CHANNEL_LABELS]
-        self.var_channel = tk.StringVar(value=self._label_for(self._channel_before))
-        combo = ttk.Combobox(body, state="readonly", width=30,
-                             values=self._labels, textvariable=self.var_channel)
-        combo.pack(anchor="w")
-        combo.bind("<<ComboboxSelected>>", lambda _e: self._sync_hint())
-
-        self._hint = ttk.Label(body, style="Hint.TLabel", wraplength=380,
-                               justify="left", text="")
-        self._hint.pack(anchor="w", fill="x", pady=(4, 0))
-
-        self._hint.configure(text=max(CHANNEL_HINTS.values(), key=len))
+        dlg.bind("<Escape>", lambda _e: dlg.destroy())
         dlg.update_idletasks()
+        width = dlg.winfo_reqwidth()
         height = dlg.winfo_reqheight()
         self._sync_hint()
 
         theme.apply_titlebar(dlg)
-        fit_geometry(dlg, 440, height, parent=parent)
+        fit_geometry(dlg, width, height, parent=parent)
         if owner_hwnd:
             theme.set_owner_window(dlg, owner_hwnd)
         dlg.deiconify()
@@ -95,26 +112,14 @@ class SettingsDialog:
     def wait(self) -> None:
         self._parent.wait_window(self._dlg)
 
-    def _label_for(self, channel: str) -> str:
-        for label, value in CHANNEL_LABELS:
-            if value == channel:
-                return label
-        return CHANNEL_LABELS[1][0]
-
-    def _selected_channel(self) -> str:
-        picked = self.var_channel.get()
-        for label, value in CHANNEL_LABELS:
-            if label == picked:
-                return value
-        return CHANNEL_STABLE
-
     def _sync_hint(self) -> None:
-        self._hint.configure(text=CHANNEL_HINTS[self._selected_channel()])
+        self._hint.configure(text=CHANNEL_HINTS[self._channel.get()])
 
     def _ok(self) -> None:
         write_discord_rich_presence(self.var_drp.get())
         write_host_key(self._host_key.value())
-        channel = self._selected_channel()
+        write_default_scale(self._scale.get())
+        channel = self._channel.get()
         write_update_channel(channel)
         self._dlg.destroy()
         show_info(self._parent, "Settings saved",

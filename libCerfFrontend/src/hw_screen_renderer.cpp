@@ -23,9 +23,9 @@ constexpr Rgb kLogText{205, 205, 205};
 constexpr Rgb kErrorText{255, 110, 110};
 constexpr Rgb kWarnText{235, 210, 90};
 
-constexpr int      kFontHeightSmall      = 13;
-constexpr int      kFontHeightRegular    = 15;
-constexpr uint32_t kSmallTierThresholdPx = 480;
+constexpr int kFontHeightSmall      = 13;
+constexpr int kFontHeightRegular    = 15;
+constexpr int kSmallTierThresholdPx = 480;
 
 bool ContainsCI(std::string_view hay, std::string_view needle) {
     if (needle.empty() || needle.size() > hay.size()) return false;
@@ -51,12 +51,16 @@ Rgb ClassifyLineColor(std::string_view line) {
 
 }
 
-void HwScreenRenderer::RenderInto(uint32_t* dib_bgra32, uint32_t width, uint32_t height) {
+void HwScreenRenderer::RenderInto(uint32_t* dib_bgra32, uint32_t width, uint32_t height, int dpi) {
     std::vector<std::string> snapshot;
     const uint64_t           gen = emu_.Get<cerfcore::HwScreen>().Snapshot(snapshot);
 
     if (!bg_ || bg_->Width() != static_cast<int>(width) || bg_->Height() != static_cast<int>(height)) {
         bg_       = emu_.Get<SurfaceFactory>().Create(static_cast<int>(width), static_cast<int>(height));
+        bg_valid_ = false;
+    }
+    if (dpi != dpi_) {
+        dpi_      = dpi;
         bg_valid_ = false;
     }
 
@@ -71,19 +75,22 @@ void HwScreenRenderer::RenderInto(uint32_t* dib_bgra32, uint32_t width, uint32_t
     }
 
     std::memcpy(dib_bgra32, bg_->Bits(), static_cast<size_t>(width) * height * 4u);
-    emu_.Get<BootBar>().RenderInto(dib_bgra32, width, height);
+    emu_.Get<BootBar>().RenderInto(dib_bgra32, width, height, dpi_);
 }
 
 void HwScreenRenderer::DrawLog(Painter& p, uint32_t width, uint32_t height,
                                const std::vector<std::string>& snapshot) {
-    const bool small_tier = width < kSmallTierThresholdPx || height < kSmallTierThresholdPx;
-    const Font font{FontFace::kMono, small_tier ? kFontHeightSmall : kFontHeightRegular, true};
+    const uint32_t threshold  = static_cast<uint32_t>(ScaleForDpi(kSmallTierThresholdPx, dpi_));
+    const bool     small_tier = width < threshold || height < threshold;
+    const Font font{FontFace::kMono,
+                    ScaleForDpi(small_tier ? kFontHeightSmall : kFontHeightRegular, dpi_), true};
 
     const FontMetrics fm = p.Metrics(font);
     if (fm.line_height <= 0 || fm.avg_char_width <= 0) return;
 
-    const int avail_h    = static_cast<int>(height) - 2 * kEdgeMarginPx;
-    const int avail_w    = static_cast<int>(width) - 2 * kEdgeMarginPx;
+    const int edge       = ScaleForDpi(kEdgeMarginPx, dpi_);
+    const int avail_h    = static_cast<int>(height) - 2 * edge;
+    const int avail_w    = static_cast<int>(width) - 2 * edge;
     const int max_lines  = avail_h > 0 ? avail_h / fm.line_height : 0;
     const int chars_wide = avail_w > 0 ? avail_w / fm.avg_char_width : 0;
     if (max_lines <= 0 || chars_wide <= 0) return;
@@ -113,9 +120,9 @@ void HwScreenRenderer::DrawLog(Painter& p, uint32_t width, uint32_t height,
 
     const int total = static_cast<int>(wrapped.size());
     const int start = total > max_lines ? total - max_lines : 0;
-    int       y     = kEdgeMarginPx;
+    int       y     = edge;
     for (int i = start; i < total; ++i) {
-        p.DrawTextAt(kEdgeMarginPx, y, wrapped[static_cast<size_t>(i)].text, font,
+        p.DrawTextAt(edge, y, wrapped[static_cast<size_t>(i)].text, font,
                      wrapped[static_cast<size_t>(i)].color);
         y += fm.line_height;
     }

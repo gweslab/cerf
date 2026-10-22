@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cerffrontend/dpi_scale.h>
 #include <cerffrontend/painter.h>
 
 #include <cerfcore/core/service.h>
@@ -17,7 +18,7 @@ public:
 
     void OnReady() override;
 
-    void RenderInto(uint32_t* dib_bgra32, uint32_t width, uint32_t height);
+    void RenderInto(uint32_t* dib_bgra32, uint32_t width, uint32_t height, int dpi);
     void DrawWatermark(Painter& p, uint32_t width, uint32_t height);
 
     bool Finished() const { return phase_ == Phase::Finished; }
@@ -32,6 +33,7 @@ private:
     enum class Phase { CerfFadeIn, CerfHold, TextFadeIn, TextHold, Finished };
     enum class LabelMode { Starting, Restarting };
 
+    int         S(int px) const;
     void        Advance(uint64_t now_ms);
     uint64_t    BgSignature(uint32_t width, uint32_t height);
     std::string CurrentLabelText() const;
@@ -50,6 +52,7 @@ private:
     std::unique_ptr<OffscreenSurface> bg_;
     uint64_t                          bg_sig_   = ~0ull;
     bool                              bg_valid_ = false;
+    int                               dpi_      = kDefaultDpi;
     Rect                              hw_line_rect_;
 
     Phase     phase_       = Phase::CerfFadeIn;

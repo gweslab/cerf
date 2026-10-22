@@ -8,7 +8,7 @@ import subprocess
 import sys
 import time
 from datetime import datetime
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import List, Optional
 
 ROOT = Path(__file__).resolve().parent
@@ -190,7 +190,7 @@ def main(argv: List[str]) -> int:
     emergency = timeout + 10
 
     exe_dir = host_branch.output_dir(ROOT, "Release", branch)
-    exe = exe_dir / frontend
+    exe = exe_dir.joinpath(*PurePosixPath(frontend).parts)
     note = " (converted from '{}')".format(log_raw) if str(log_file) != log_raw else ""
     say("{}, timeout {} s, emergency kill {} s, log {}{}".format(device, timeout, emergency,
                                                                 log_file, note))

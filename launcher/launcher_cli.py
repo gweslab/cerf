@@ -7,7 +7,7 @@ import threading
 from pathlib import Path
 from typing import List, Optional, Tuple
 
-from app_paths import FRONTEND_NAME, LAUNCHER_DIR_NAME, resolve_cerf_exe
+from app_paths import FRONTEND_NAME, install_root, resolve_cerf_exe
 from child_process import spawn_detached
 from bundles import BundleError, package_category_label
 from device_source_text import source_credit
@@ -50,8 +50,8 @@ def _print_source_notice(device: DeviceBundle) -> None:
 def _run_in_cerf(bundle: str) -> None:
     cerf = resolve_cerf_exe()
     if cerf is None:
-        print(f"ERROR: {FRONTEND_NAME} not found next to the {LAUNCHER_DIR_NAME} folder; "
-              "cannot run-in-cerf.", file=sys.stderr)
+        print(f"ERROR: {FRONTEND_NAME} not found in {install_root()}; cannot run-in-cerf.",
+              file=sys.stderr)
         return
     try:
         spawn_detached([str(cerf), f"--device={bundle}"], cerf.parent)

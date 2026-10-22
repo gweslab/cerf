@@ -36,3 +36,13 @@ inline constexpr HostKeyName kHostKeyNames[] = {
     {0xC0, "`"}, {0xDB, "["}, {0xDC, "\\"}, {0xDD, "]"}, {0xDE, "'"},
     {0xE2, "102nd Key"},
 };
+
+/* macOS SDK HIToolbox Events.h kVK_Return, kVK_Delete, kVK_ForwardDelete, kVK_Control,
+   kVK_Option, kVK_Command and their Right variants, at the VK_* that kMacKeyToVk gives. */
+inline constexpr HostKeyName kHostKeyNamesMacos[] = {
+    {0x08, "Delete"},       {0x0D, "Return"},        {0x11, "Control"},
+    {0x12, "Option"},       {0x2E, "Forward Delete"},
+    {0x5B, "Left Command"}, {0x5C, "Right Command"},
+    {0xA2, "Left Control"}, {0xA3, "Right Control"},
+    {0xA4, "Left Option"},  {0xA5, "Right Option"},
+};

@@ -1,9 +1,10 @@
 #include "discord_ipc_transport.h"
 
+#include <cerfcore/platform/host_descriptor.h>
+
 #include <cerrno>
 #include <cstdio>
 #include <cstdlib>
-#include <fcntl.h>
 #include <poll.h>
 #include <sys/socket.h>
 #include <sys/un.h>
@@ -23,14 +24,6 @@ const char* RuntimeDir() {
     for (const char* var : {"XDG_RUNTIME_DIR", "TMPDIR", "TMP", "TEMP"})
         if (const char* v = std::getenv(var)) return v;
     return "/tmp";
-}
-
-bool PrepareFd(int fd) {
-    const int fd_flags = fcntl(fd, F_GETFD);
-    const int fl_flags = fcntl(fd, F_GETFL);
-    if (fd_flags < 0 || fl_flags < 0) return false;
-    return fcntl(fd, F_SETFD, fd_flags | FD_CLOEXEC) == 0 &&
-           fcntl(fd, F_SETFL, fl_flags | O_NONBLOCK) == 0;
 }
 
 }
@@ -56,7 +49,8 @@ struct DiscordIpcTransport::Impl {
 DiscordIpcTransport::DiscordIpcTransport() : impl_(std::make_unique<Impl>()) {
     int fds[2] = { -1, -1 };
     if (pipe(fds) != 0) return;
-    if (!PrepareFd(fds[0]) || !PrepareFd(fds[1])) {
+    if (!cerfcore::host_platform::SetCloseOnExecNonBlocking(fds[0]) ||
+        !cerfcore::host_platform::SetCloseOnExecNonBlocking(fds[1])) {
         close(fds[0]);
         close(fds[1]);
         return;
@@ -85,7 +79,8 @@ bool DiscordIpcTransport::Connect(std::string& endpoint) {
         const int on = 1;
         setsockopt(s, SOL_SOCKET, SO_NOSIGPIPE, &on, sizeof(on));
 #endif
-        if (connect(s, reinterpret_cast<const sockaddr*>(&addr), sizeof(addr)) == 0 && PrepareFd(s)) {
+        if (connect(s, reinterpret_cast<const sockaddr*>(&addr), sizeof(addr)) == 0 &&
+            cerfcore::host_platform::SetCloseOnExecNonBlocking(s)) {
             impl_->sock = s;
             endpoint    = addr.sun_path;
             return true;

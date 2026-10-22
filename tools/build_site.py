@@ -23,12 +23,12 @@ CONTENT   = os.path.join(SITE, 'content')
 OUT       = os.path.join(ROOT, 'build', 'site')
 ICONS_SRC = os.path.join(ROOT, 'launcher', 'assets', 'icons')
 
-ICONS_SVG = os.path.join(ROOT, 'cerf-win32', 'assets', 'icons_sources')
+ICONS_SVG = os.path.join(ROOT, 'assets', 'icons_sources')
 
 IMAGES = [
-    (os.path.join('cerf-win32', 'assets', 'cerf.ico'),         'cerf.ico'),
-    (os.path.join('cerf-win32', 'assets', 'icons_sources', 'cerf.svg'), 'cerf.svg'),
-    (os.path.join('cerf-win32', 'assets', 'icons_sources', 'cerf-light.svg'), 'cerf-light.svg'),
+    (os.path.join('assets', 'cerf.ico'),         'cerf.ico'),
+    (os.path.join('assets', 'icons_sources', 'cerf.svg'), 'cerf.svg'),
+    (os.path.join('assets', 'icons_sources', 'cerf-light.svg'), 'cerf-light.svg'),
 ]
 
 

@@ -16,8 +16,8 @@ from ci_release import Artifact, latest_release
 from source_diffstat import diffstat
 
 ROOT = Path(__file__).resolve().parent.parent
-FONT_DIR = ROOT / "cerf-win32" / "assets" / "fonts"
-LOGO_PATH = ROOT / "cerf-win32" / "assets" / "cerf_1024.png"
+FONT_DIR = ROOT / "assets" / "fonts"
+LOGO_PATH = ROOT / "assets" / "cerf_1024.png"
 
 SCALE = 2
 WIDTH = 1200

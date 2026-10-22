@@ -16,7 +16,10 @@ class QtMenuBuilder : public cerfcore::Service {
 public:
     using cerfcore::Service::Service;
 
+    using MenuSource = std::function<std::vector<cerffrontend::MenuItem>()>;
+
     void Populate(QMenu* menu, const std::vector<cerffrontend::MenuItem>& items);
+    void Bind(QMenu* menu, MenuSource source);
     void RunContextMenu(const std::vector<cerffrontend::MenuItem>& items, const QPoint& global);
 
 private:

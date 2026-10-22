@@ -53,7 +53,7 @@ from board_info import running_boards
 
 def _boards_table():
     table = compile_readme.build_supported_devices()
-    return (table.replace('cerf-win32/assets/icons_sources', '/assets/icons')
+    return (table.replace('assets/icons_sources', '/assets/icons')
                  .replace('launcher/assets/icons', '/assets/icons'))
 
 

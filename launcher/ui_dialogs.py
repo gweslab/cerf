@@ -2,8 +2,6 @@
 canned launcher dialog (ROM license, guest-additions help)."""
 from __future__ import annotations
 
-import os
-import sys
 import tkinter as tk
 import webbrowser
 from pathlib import Path
@@ -12,7 +10,7 @@ from typing import Callable, Dict, Optional, Tuple
 
 from copyright_removal_dialog import (BUTTON_LABEL as COPYRIGHT_BUTTON_LABEL,
                                       ContactsFn, show_copyright_removal)
-from child_process import spawn_detached
+from desktop_shell import open_path
 from device_source_text import source_credit
 from device_state import DeviceSource
 from dialog_buttons import pack_actions
@@ -32,10 +30,7 @@ PATREON_URL = "https://www.patreon.com/dz3n"
 
 def open_device_directory(parent: tk.Misc, path: Path) -> None:
     try:
-        if sys.platform == "win32":
-            os.startfile(str(path))
-        else:
-            spawn_detached(["xdg-open", str(path)], path)
+        open_path(path)
     except OSError as exc:
         show_error(parent, "Open device directory", str(exc))
 

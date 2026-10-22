@@ -3,6 +3,8 @@
 #include <cerfcore/core/cerf_emulator.h>
 #include <cerfcore/core/cerf_paths.h>
 
+#include "qt_launcher_path.h"
+
 #include <QEventLoop>
 #include <QProcess>
 #include <QStringList>
@@ -15,7 +17,7 @@ public:
     using cerffrontend::LauncherProcess::LauncherProcess;
 
     std::string ExecutablePath() const override {
-        return cerfcore::GetCerfDir() + "launcher/launcher";
+        return cerfcore::GetCerfDir() + LauncherPathInInstallation();
     }
 
     bool RunAndWait(uint64_t owner, const std::vector<std::string>& args, uint32_t& exit_code,

@@ -102,6 +102,23 @@ def build(type: str, target: str, sources: Sequence[str] = ("main.c",), entry: s
           wce_version: str = "300", rc: str = "", coredll_def: str = "",
           coredll_def_local: Sequence[str] = (), crt_libs: Sequence[str] = (),
           out_subdir: str = "") -> None:
+    config = os.environ.get("CE_APPS_CONFIG") or "Release"
+    mode = os.environ.get("CE_APPS_MODE") or "dev"
+    dev_mode_flag = "0" if mode == "production" else "1"
+    arch_sub = out_subdir or (mips_isa if arch == "mips" else arch)
+    branch = host_branch.current()
+    out_dir = host_branch.output_dir(REPO_ROOT, config, branch) / "ce_apps" / arch_sub
+    out_dir.mkdir(parents=True, exist_ok=True)
+    staged = out_dir / target
+
+    prebuilt = os.environ.get("CE_APPS_FROM")
+    if prebuilt:
+        _copy_prebuilt(Path(prebuilt) / arch_sub / target, staged)
+        return
+    if not branch.builds_ce_apps:
+        raise CeBuildError("ce_apps/ cannot be built on {}: the eMbedded Visual C++ 4.0 tools are "
+                           "x86 Windows programs. Pass --ce-apps-from=<the ce_apps directory of "
+                           "a Windows or Linux build>.".format(branch.name))
     if not BIN.is_dir():
         raise CeBuildError(
             "CE toolchain not found at {}\n\nBuilding ce_apps/ needs eMbedded Visual C++ 4.0. "
@@ -127,15 +144,6 @@ def build(type: str, target: str, sources: Sequence[str] = ("main.c",), entry: s
     inc_dirs += [sdk_inc, CORE_INCLUDE]
 
     env = _tool_env()
-
-    config = os.environ.get("CE_APPS_CONFIG") or "Release"
-    mode = os.environ.get("CE_APPS_MODE") or "dev"
-    dev_mode_flag = "0" if mode == "production" else "1"
-    arch_sub = out_subdir or (mips_isa if arch == "mips" else arch)
-    out_dir = (host_branch.output_dir(REPO_ROOT, config, host_branch.current()) / "ce_apps"
-               / arch_sub)
-    out_dir.mkdir(parents=True, exist_ok=True)
-    staged = out_dir / target
 
     if not entry:
         entry = "WinMain" if type == "exe" else "DllEntryPoint"
@@ -234,6 +242,16 @@ def build(type: str, target: str, sources: Sequence[str] = ("main.c",), entry: s
     if _run([link] + argv, env) != 0:
         raise CeBuildError("Link failed: {}".format(target))
     print("[CE]      {} bytes".format(staged.stat().st_size), flush=True)
+
+
+def _copy_prebuilt(source: Path, staged: Path) -> None:
+    if not source.is_file():
+        raise CeBuildError("{} is missing from the copied CE apps".format(source))
+    if staged.is_file() and staged.read_bytes() == source.read_bytes():
+        print("[CE] {} up-to-date".format(staged.name), flush=True)
+        return
+    shutil.copy2(str(source), str(staged))
+    print("[CE] copy {} -> {}".format(source, staged), flush=True)
 
 
 def run_app(app_dir: Path, variants: Sequence[dict]) -> int:

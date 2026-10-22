@@ -9,12 +9,44 @@ from typing import Callable, Optional
 from sv_elements import PAGE_SCROLLBAR_STYLE, THIN_SCROLLBAR_STYLE
 import ui_theme as theme
 
+WHEEL_NOTCH_DELTA = 120
+
 
 def fit_scrollregion(canvas: tk.Canvas, pad_bottom: int = 0) -> None:
     box = canvas.bbox("all")
     width = box[2] if box else 0
     height = max(box[3] + pad_bottom if box else 0, canvas.winfo_height())
     canvas.configure(scrollregion=(0, 0, width, height))
+
+
+def _scroll_pixels(canvas: tk.Canvas, delta_y: int) -> None:
+    region = canvas.cget("scrollregion").split()
+    total = float(region[3]) - float(region[1]) if len(region) == 4 else 0.0
+    if total <= 0.0:
+        return
+    top = canvas.yview()[0] * total
+    canvas.yview_moveto((top - delta_y) / total)
+
+
+def _touchpad_delta_y(packed: int) -> int:
+    low = packed & 0xFFFF
+    return low - 0x10000 if low >= 0x8000 else low
+
+
+def bind_wheel_scroll(widget: tk.Misc, canvas: tk.Canvas) -> None:
+    def units(count: int) -> str:
+        canvas.yview_scroll(count, "units")
+        return "break"
+
+    def pixels(packed: int) -> str:
+        _scroll_pixels(canvas, _touchpad_delta_y(packed))
+        return "break"
+
+    widget.bind("<MouseWheel>", lambda e: units(int(-e.delta / WHEEL_NOTCH_DELTA)))
+    widget.bind("<Button-4>", lambda _e: units(-1))
+    widget.bind("<Button-5>", lambda _e: units(1))
+    if float(widget.tk.call("info", "patchlevel").rsplit(".", 1)[0]) >= 9.0:
+        widget.bind("<TouchpadScroll>", lambda e: pixels(e.delta))
 
 
 class ScrollColumn:
@@ -79,11 +111,7 @@ class ScrollColumn:
         self._canvas.grid(row=row, column=column, **kwargs)
         self.scrollbar.grid(row=row, column=column + 1, sticky="ns")
 
-    def _on_wheel(self, event: object) -> str:
-        self._canvas.yview_scroll(int(-event.delta / 120), "units")
-        return "break"
-
     def bind_wheel(self, widget: tk.Misc) -> None:
-        widget.bind("<MouseWheel>", self._on_wheel)
+        bind_wheel_scroll(widget, self._canvas)
         for child in widget.winfo_children():
             self.bind_wheel(child)

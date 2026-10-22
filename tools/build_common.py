@@ -1,25 +1,40 @@
 from __future__ import annotations
 
 import os
+import shutil
 import subprocess
 import sys
 import time
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Callable, Dict, List, Optional
 
 import host_processes
 from host_branch import WIN32_X86, HostBranch
 
 WINDOWS_BLOCKERS = ("cerf", "MSBuild", "cl", "link")
-LINUX_BLOCKERS = ("cerf-qt",)
 WAIT_BUDGET_SECONDS = 30 * 60
 NESTED_PINS = (("libCerfEngine", "libservicelocator"), ("libCerfCore", "libCerfEngine"))
 LAUNCHER_STAMP = ".launcher_timestamps"
-LAUNCHER_EXTRA_INPUTS = ("cerf-win32/assets/cerf.ico", "cerf-win32/assets/cerf_error.ico",
-                         "cerf-win32/assets/cerf_setup.ico",
+LAUNCHER_EXTRA_INPUTS = ("assets/cerf.ico", "assets/cerf_error.ico",
+                         "assets/cerf_setup.ico",
                          "libCerfFrontend/include/cerffrontend/version.h",
-                         "cerf-qt/qt_evdev_vk.h", "cerf-qt/host_key_names.h",
-                         "tools/host_branch.py")
+                         "libCerfFrontend/include/cerffrontend/integer_scales.h",
+                         "cerf-qt/qt_evdev_vk.h", "cerf-qt/qt_mac_key_vk.h",
+                         "cerf-qt/host_key_names.h", "tools/host_branch.py",
+                         "tools/host_processes.py", "tools/macos_icns.py",
+                         "assets/cerf_1024.png")
+LAUNCHER_THEME_DIR = "external/sun_valley_theme"
+NOTICE_FILES = ("LICENSE", "THIRD_PARTY_NOTICES.txt")
+LICENSES_DIR = "licenses"
+
+
+def ship_notices(root: Path, out: Path) -> None:
+    for name in NOTICE_FILES:
+        shutil.copy2(str(root / name), str(out / name))
+    target = out / LICENSES_DIR
+    if target.exists():
+        shutil.rmtree(str(target))
+    shutil.copytree(str(root / LICENSES_DIR), str(target))
 
 
 class BuildReport:
@@ -40,7 +55,7 @@ def _blocking(branch: HostBranch) -> Dict[int, str]:
     if branch.name == WIN32_X86:
         wanted = {n.lower() for n in WINDOWS_BLOCKERS}
     else:
-        wanted = {n.lower() for n in LINUX_BLOCKERS}
+        wanted = {PurePosixPath(branch.frontend).name.lower()}
     me = os.getpid()
     return {pid: name for pid, name in host_processes.list_processes().items()
             if name.lower() in wanted and pid != me}
@@ -110,7 +125,8 @@ def launcher_signature(root: Path) -> str:
             continue
         inputs.append(path)
     inputs += [root / rel for rel in LAUNCHER_EXTRA_INPUTS if (root / rel).is_file()]
-    inputs += sorted((root / "cerf-win32" / "assets").glob("about_band_*.png"))
+    inputs += sorted((root / "assets").glob("about_band_*.png"))
+    inputs += sorted(p for p in (root / LAUNCHER_THEME_DIR).rglob("*") if p.is_file())
     return "\n".join(sorted("{}|{}".format(p, p.stat().st_mtime_ns) for p in inputs))
 
 
@@ -118,7 +134,7 @@ def launcher_outputs(root: Path, branch: HostBranch) -> List[Path]:
     if branch.name == WIN32_X86:
         return [root / "bundled" / "launcher.exe", root / "bundled" / "launcher" / "launcher.exe",
                 root / "launcher" / "dist" / "cerf_installer.exe"]
-    return [root / "bundled" / "launcher" / "launcher"]
+    return [root.joinpath("bundled", *PurePosixPath(branch.launcher).parts)]
 
 
 def build_launcher(root: Path, branch: HostBranch, config: str, rebuild: bool,
@@ -143,10 +159,13 @@ def build_launcher(root: Path, branch: HostBranch, config: str, rebuild: bool,
 
 
 def build_ce_apps(root: Path, config: str, mode: str, heartbeat: Callable[[], None],
-                  report: BuildReport) -> None:
+                  report: BuildReport, ce_apps_from: Optional[str] = None) -> None:
     env = dict(os.environ)
     env["CE_APPS_CONFIG"] = config
     env["CE_APPS_MODE"] = mode
+    env.pop("CE_APPS_FROM", None)
+    if ce_apps_from:
+        env["CE_APPS_FROM"] = os.path.abspath(ce_apps_from)
     for app in sorted(p for p in (root / "ce_apps").iterdir() if p.is_dir()):
         script = app / "build.py"
         if not script.is_file():

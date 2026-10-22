@@ -21,7 +21,7 @@ Put each core library at the repository root. Put third-party code in
   path of the consumer. When a library must report a condition, it calls an
   interface that its consumer implements.
 - Each library has a CMake target, its own tests and its own CI.
-- A library lists the third-party components that it links and the projects that the authors studied for its code in its own `THIRD_PARTY_NOTICES.md`. The root `THIRD_PARTY_NOTICES.md` repeats every entry of every library, because the CERF binaries contain the libraries.
+- A library lists the third-party components that it links and the projects that the authors studied for its code in its own `THIRD_PARTY_NOTICES.md`. The root `THIRD_PARTY_NOTICES.txt` repeats every entry of every library, because the CERF binaries contain the libraries.
 - `.gitmodules` records the public HTTPS URL of each library, so a clone needs
   no SSH key.
 - The project rules apply inside a library as they apply in the rest of this

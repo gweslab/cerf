@@ -1,19 +1,19 @@
 #!/usr/bin/env python3
 """Generate every icon asset CERF ships, from one set of SVG sources.
 
-  sources : cerf-win32/assets/icons_sources/*.svg   (authored 16x16, vector-scalable)
+  sources : assets/icons_sources/*.svg   (authored 16x16, vector-scalable)
   targets :
-    ico       cerf-win32/assets/<name>.ico               16/20/24/32/48/64/256, 32-bit alpha
-    ce_ico    cerf-win32/assets/<stem>_ce.ico            16/32, 32bpp BMP frames
-    ce2_ico   cerf-win32/assets/<stem>_ce2.ico           16/32, 4bpp system-palette frames
+    ico       assets/<name>.ico               16/20/24/32/48/64/256, 32-bit alpha
+    ce_ico    assets/<stem>_ce.ico            16/32, 32bpp BMP frames
+    ce2_ico   assets/<stem>_ce2.ico           16/32, 4bpp system-palette frames
               (from the flat *_vga.svg sources, not the gradient ones)
     launcher  launcher/assets/icons/<stem>.png     32x32 RGBA
     wizard    launcher/assets/icons/<stem>.png     64x64 RGBA (New-device wizard pivots)
     toolbar   launcher/assets/icons/<stem>.png     48x48 RGBA (main-window toolbar buttons)
     dialog    launcher/assets/icons/<stem>_<px>.png  branded-dialog icons, per DPI scale
     badges    launcher/assets/icons/badge_<key>.png  CPU-arch badges (no SVG source)
-    band      cerf-win32/assets/about_band_<pct>.png     branded-dialog band, per DPI scale
-    logo      cerf-win32/assets/cerf_1024.png            app mark, cerf.exe
+    band      assets/about_band_<pct>.png     branded-dialog band, per DPI scale
+    logo      assets/<stem>_1024.png          large app marks (LOGO_STEMS)
 
 Each .ico carries every size as its own resvg-rendered frame (vector rendered
 natively at each pixel size, not one bitmap downscaled), so small sizes stay
@@ -56,8 +56,8 @@ DIALOG_STEMS = ("cerf_error", "cerf", "cerf_setup")
 LAUNCHER_ONLY_STEMS = WIZARD_STEMS + TOOLBAR_STEMS
 
 REPO = Path(__file__).resolve().parent.parent
-SRC_DIR = REPO / "cerf-win32" / "assets" / "icons_sources"
-ICO_DIR = REPO / "cerf-win32" / "assets"
+SRC_DIR = REPO / "assets" / "icons_sources"
+ICO_DIR = REPO / "assets"
 LAUNCHER_DIR = REPO / "launcher" / "assets" / "icons"
 
 CE_ICO_STEMS = ("cerf",)
@@ -72,7 +72,7 @@ CE2_ICO_DITHER = False
 BAND_STEM = "about_band"
 BAND_SCALES = (100, 125, 150, 200, 300)
 
-LOGO_STEM = "cerf"
+LOGO_STEMS = ("cerf", "cerf_running")
 LOGO_PX = 1024
 
 TARGETS = ("ico", "ce_ico", "ce2_ico", "launcher", "wizard", "toolbar",
@@ -267,19 +267,17 @@ def build_band(names):
 
 
 def build_logo(names):
-    """One large square PNG of the app mark.
-
-    Stays a raster: Tk's PhotoImage reads PNG but not SVG, and the launcher's
-    two shipped builds have no runtime SVG rasterizer."""
-    if names and LOGO_STEM not in {Path(n).stem for n in names}:
-        return
-    svg = SRC_DIR / f"{LOGO_STEM}.svg"
-    if not svg.exists():
-        sys.exit(f"source not found: {svg}")
-    ICO_DIR.mkdir(parents=True, exist_ok=True)
-    out = ICO_DIR / f"{LOGO_STEM}_{LOGO_PX}.png"
-    write_if_changed(out, render_png(svg, LOGO_PX))
-    print(f"{svg.name} -> {out.relative_to(REPO)}  ({LOGO_PX}x{LOGO_PX})")
+    wanted = {Path(n).stem for n in names}
+    for stem in LOGO_STEMS:
+        if names and stem not in wanted:
+            continue
+        svg = SRC_DIR / f"{stem}.svg"
+        if not svg.exists():
+            sys.exit(f"source not found: {svg}")
+        ICO_DIR.mkdir(parents=True, exist_ok=True)
+        out = ICO_DIR / f"{stem}_{LOGO_PX}.png"
+        write_if_changed(out, render_png(svg, LOGO_PX))
+        print(f"{svg.name} -> {out.relative_to(REPO)}  ({LOGO_PX}x{LOGO_PX})")
 
 
 def build_launcher_pngs(names):

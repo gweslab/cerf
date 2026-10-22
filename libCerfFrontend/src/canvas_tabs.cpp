@@ -46,15 +46,15 @@ bool CanvasTabs::OnPresentTick(bool has_frame) {
     return true;
 }
 
-bool CanvasTabs::RenderAlt(uint32_t* bits, int width, int height) {
+bool CanvasTabs::RenderAlt(uint32_t* bits, int width, int height, int dpi) {
     if (tab_ == Tab::Framebuffer) return false;
     if (tab_ == Tab::Boot) {
         emu_.Get<BootScreen>().RenderInto(bits, static_cast<uint32_t>(width),
-                                          static_cast<uint32_t>(height));
+                                          static_cast<uint32_t>(height), dpi);
         return true;
     }
     emu_.Get<HwScreenRenderer>().RenderInto(bits, static_cast<uint32_t>(width),
-                                            static_cast<uint32_t>(height));
+                                            static_cast<uint32_t>(height), dpi);
     return true;
 }
 

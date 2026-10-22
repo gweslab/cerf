@@ -17,14 +17,14 @@ class HostKeyBlock:
         self._held: Set[int] = set()
         self._capturing = False
 
-        row = ttk.Frame(parent)
-        row.pack(anchor="w", fill="x")
+        self.frame = ttk.Frame(parent)
+        self.frame.columnconfigure(0, weight=1)
 
-        self._button = ttk.Button(row, width=30, text=combo_label(self._vks),
+        self._button = ttk.Button(self.frame, width=1, text=combo_label(self._vks),
                                   command=self._begin_capture)
-        self._button.pack(side="left")
-        ttk.Button(row, text="Reset", command=self._reset).pack(
-            side="left", padx=(6, 0))
+        self._button.grid(row=0, column=0, sticky="ew")
+        ttk.Button(self.frame, text="Reset", command=self._reset).grid(
+            row=0, column=1, padx=(6, 0))
 
         self._button.bind("<KeyPress>", self._on_key_press)
         self._button.bind("<KeyRelease>", self._on_key_release)

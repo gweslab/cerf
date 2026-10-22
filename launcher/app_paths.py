@@ -5,13 +5,17 @@ from __future__ import annotations
 import os
 import re
 import sys
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import List, Optional, Tuple
 
+import host_branch
+
+_BRANCH = host_branch.current()
+_FRONTEND_PARTS = PurePosixPath(_BRANCH.frontend).parts
+_LAUNCHER_PARTS = PurePosixPath(_BRANCH.launcher).parts
 
 LAUNCHER_DIR_NAME = "launcher"
-FRONTEND_NAME = "cerf.exe" if sys.platform == "win32" else "cerf-qt"
-LAUNCHER_NAME = "launcher.exe" if sys.platform == "win32" else "launcher"
+FRONTEND_NAME = _FRONTEND_PARTS[-1]
 
 _HERE = Path(os.path.abspath(__file__)).parent
 
@@ -24,8 +28,23 @@ def exe_dir() -> Path:
 
 def install_root() -> Path:
     if getattr(sys, "frozen", False):
-        return exe_dir().parent
+        return Path(os.path.abspath(sys.executable)).parents[len(_LAUNCHER_PARTS) - 1]
     return exe_dir()
+
+
+def launcher_executable_in(root: Path) -> Path:
+    return root.joinpath(*_LAUNCHER_PARTS)
+
+
+def frontend_executable_in(root: Path) -> Path:
+    return root.joinpath(*_FRONTEND_PARTS)
+
+
+NOTICES_NAME = "THIRD_PARTY_NOTICES.txt"
+
+
+def notices_candidates() -> List[Path]:
+    return [install_root() / NOTICES_NAME, _HERE.parent / NOTICES_NAME]
 
 
 def resolve_devices_dir() -> Path:
@@ -33,7 +52,7 @@ def resolve_devices_dir() -> Path:
 
 
 def resolve_cerf_exe() -> Optional[Path]:
-    candidate = install_root() / FRONTEND_NAME
+    candidate = frontend_executable_in(install_root())
     if candidate.is_file():
         return candidate
     return None
@@ -48,7 +67,7 @@ def resolve_icon(name: str = "cerf.ico") -> Optional[Path]:
     candidate = exe_dir() / name
     if candidate.is_file():
         return candidate
-    repo_candidate = exe_dir() / ".." / "cerf-win32" / "assets" / name
+    repo_candidate = exe_dir() / ".." / "assets" / name
     if repo_candidate.is_file():
         return Path(os.path.abspath(str(repo_candidate)))
     return None
@@ -74,15 +93,26 @@ def resolve_asset(name: str) -> Optional[Path]:
         candidates.append(Path(meipass) / "assets" / name)
     candidates.append(exe_dir() / "assets" / name)
     candidates.append(_HERE / "assets" / name)
-    candidates.append(_HERE.parent / "cerf-win32" / "assets" / name)
+    candidates.append(_HERE.parent / "assets" / name)
     for path in candidates:
         if path.is_file():
             return path
     return None
 
 
+SUN_VALLEY_DIR_NAME = "sun_valley_theme"
+
+
+def resolve_sun_valley_script() -> Path:
+    meipass = getattr(sys, "_MEIPASS", None)
+    base = Path(meipass) if meipass else _HERE.parent / "external"
+    return base / SUN_VALLEY_DIR_NAME / "sv.tcl"
+
+
 VERSION_HEADER = ("version.h", ("libCerfFrontend", "include", "cerffrontend"))
+INTEGER_SCALES_HEADER = ("integer_scales.h", ("libCerfFrontend", "include", "cerffrontend"))
 EVDEV_VK_HEADER = ("qt_evdev_vk.h", ("cerf-qt",))
+MAC_KEY_VK_HEADER = ("qt_mac_key_vk.h", ("cerf-qt",))
 HOST_KEY_NAMES_HEADER = ("host_key_names.h", ("cerf-qt",))
 
 
@@ -98,6 +128,13 @@ def resolve_source_header(header: Tuple[str, Tuple[str, ...]]) -> Optional[Path]
         if path.is_file():
             return path
     return None
+
+
+def read_source_header(header: Tuple[str, Tuple[str, ...]]) -> str:
+    path = resolve_source_header(header)
+    if path is None:
+        raise FileNotFoundError("{} is missing from this installation".format(header[0]))
+    return path.read_text(encoding="utf-8")
 
 
 def _version_header_text() -> str:

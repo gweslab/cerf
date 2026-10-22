@@ -661,7 +661,7 @@ IDA / static analysis only - see `agent_docs/debugging.md` § IDA discipline.
 
 The `CopyBundledFiles` MSBuild target mirrors `bundled/**/*` into
 `build/<config>/Win32/**` at build time. The `cerf-qt-bundled` CMake target
-does the same into `build/<config>/linux-qt-amd64/**`. Each copy is
+does the same into the folder that holds the cerf-qt frontend. Each copy is
 incremental and never deletes destination files that are absent from the
 source set.
 
@@ -679,4 +679,5 @@ directory of the host. This tree hosts the `cerf_guest`
 guest-additions display driver next to sample binaries. It is the home
 for any CERF-built CE binary.
 
-On Linux the build runs the same toolchain through Wine.
+On Linux the build runs the same toolchain through Wine. macOS cannot run it, so a macOS
+build copies the CE apps of a Windows or Linux build (`build.py --ce-apps-from`).

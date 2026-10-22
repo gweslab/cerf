@@ -6,10 +6,15 @@ import stat
 import subprocess
 import sys
 import urllib.request
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 
 HERE = Path(os.path.abspath(__file__)).parent
 REPO = HERE.parent
+sys.path.insert(0, str(REPO / "tools"))
+import homebrew_packages
+import host_branch
+from macos_icns import IcnsError, make_icns
+
 BUNDLED = REPO / "bundled"
 CACHE = REPO / "references" / "python"
 NAME = "launcher"
@@ -19,17 +24,17 @@ PY37_VERSION = "3.7.9"
 PY37_SHA256 = "769bb7c74ad1df6d7d74071cc16a984ff6182e4016e11b8949b93db487977220"
 PY37_URL = "https://www.python.org/ftp/python/{0}/python-{0}.exe".format(PY37_VERSION)
 WINDOWS_PYINSTALLER = "5.13.2"
-LINUX_PYINSTALLER = "6.22.3"
-SV_TTK = "2.5.5"
+POSIX_PYINSTALLER = "6.22.3"
 
-LINUX_FORWARDER = ('#!/bin/sh\n'
+POSIX_FORWARDER = ('#!/bin/sh\n'
                    'here=$(dirname "$(readlink -f "$0")")\n'
-                   'if [ ! -x "$here/launcher/launcher" ]; then\n'
-                   '    echo "launcher/launcher could not be started. Re-download CERF from '
+                   'if [ ! -x "$here/{0}" ]; then\n'
+                   '    echo "{0} could not be started. Re-download CERF from '
                    'https://cerf.cx/download" >&2\n'
                    '    exit 1\n'
                    'fi\n'
-                   'exec "$here/launcher/launcher" "$@"\n')
+                   'exec "$here/{0}" "$@"\n')
+ICON_SOURCE = REPO / "assets" / "cerf_1024.png"
 
 
 class LauncherBuildError(Exception):
@@ -89,16 +94,44 @@ def ucrt_redist_dir():
     return None
 
 
-def linux_python():
-    venv = CACHE / "launcher-venv-linux"
+def posix_base_python():
+    if sys.platform != "darwin":
+        return Path(sys.executable)
+    brew = shutil.which("brew")
+    if brew is None:
+        raise LauncherBuildError("brew not found on PATH. Install Homebrew, then brew install {}."
+                                 .format(homebrew_packages.TK_FORMULA))
+    prefix = subprocess.run([brew, "--prefix", homebrew_packages.PYTHON_FORMULA],
+                            capture_output=True, text=True, check=False).stdout.strip()
+    python = Path(prefix) / "bin" / homebrew_packages.PYTHON_NAME
+    if not prefix or not python.is_file():
+        raise LauncherBuildError("{} is not installed. Run brew install {}."
+                                 .format(homebrew_packages.PYTHON_FORMULA,
+                                         homebrew_packages.TK_FORMULA))
+    return python
+
+
+def base_prefix(python):
+    result = subprocess.run([str(python), "-c", "import sys; print(sys.base_prefix)"],
+                            capture_output=True, text=True, check=False)
+    return result.stdout.strip() if result.returncode == 0 else None
+
+
+def posix_python():
+    base = posix_base_python()
+    venv = CACHE / ("launcher-venv-macos" if sys.platform == "darwin" else "launcher-venv-linux")
     python = venv / "bin" / "python"
+    if python.is_file() and base_prefix(python) != base_prefix(base):
+        say("Recreating {} for {} ...".format(venv, base))
+        shutil.rmtree(str(venv))
     if not python.is_file():
         say("Creating the launcher build environment in {} ...".format(venv))
-        if run([sys.executable, "-m", "venv", venv]) != 0 or not python.is_file():
-            raise LauncherBuildError("python3 -m venv {} failed.".format(venv))
+        if run([base, "-m", "venv", venv]) != 0 or not python.is_file():
+            raise LauncherBuildError("{} -m venv {} failed.".format(base, venv))
     if run([python, "-c", "import tkinter; tkinter.Tcl()"], stderr=subprocess.DEVNULL) != 0:
-        raise LauncherBuildError("{} has no working tkinter. Install the Tk bindings of the "
-                                 "system Python (python3-tk).".format(sys.executable))
+        raise LauncherBuildError("{} has no working tkinter. Install the Tk bindings of this "
+                                 "Python (python3-tk, or {} on Homebrew)."
+                                 .format(base, homebrew_packages.TK_FORMULA))
     return python
 
 
@@ -132,7 +165,7 @@ def install_onedir(built):
     if not built.is_dir():
         raise LauncherBuildError("Expected {} not produced.".format(built))
     BUNDLED.mkdir(parents=True, exist_ok=True)
-    target = BUNDLED / NAME
+    target = BUNDLED / built.name
     if target.exists():
         shutil.rmtree(str(target))
     shutil.copytree(str(built), str(target), symlinks=True)
@@ -151,7 +184,7 @@ def windows_stub(python, out_dir):
     if vcvars is None or not vcvars.is_file():
         raise LauncherBuildError("vcvars32.bat not found under {}.".format(vs[0] if vs else "?"))
     out_dir.mkdir(parents=True, exist_ok=True)
-    assets = REPO / "cerf-win32" / "assets"
+    assets = REPO / "assets"
     rc, res = out_dir / "launcher_stub.rc", out_dir / "launcher_stub.res"
     obj, out = out_dir / "launcher_stub.obj", out_dir / "launcher.exe"
     src = HERE / "stub" / "launcher_stub.c"
@@ -184,7 +217,6 @@ def build_windows(config):
     env["CERF_LAUNCHER_UCRT"] = str(ucrt)
     env["CERF_LAUNCHER_NAME"] = NAME
     ensure_package(python, "PyInstaller", "pyinstaller", WINDOWS_PYINSTALLER)
-    ensure_package(python, "sv_ttk", "sv-ttk", SV_TTK)
     clean()
     say("Building {}.exe ({})...".format(NAME, config))
     pyinstaller(python, "launcher.spec", env)
@@ -204,20 +236,39 @@ def build_windows(config):
     say("Size: {} bytes".format(installer.stat().st_size))
 
 
-def build_linux(config):
-    python = linux_python()
+def build_posix(config):
+    launcher = PurePosixPath(host_branch.current().launcher)
+    if launcher.name != NAME:
+        raise LauncherBuildError("{} names no {} executable.".format(launcher, NAME))
+    python = posix_python()
     env = dict(os.environ)
     env["CERF_LAUNCHER_NAME"] = NAME
-    ensure_package(python, "PyInstaller", "pyinstaller", LINUX_PYINSTALLER)
-    ensure_package(python, "sv_ttk", "sv-ttk", SV_TTK)
+    ensure_package(python, "PyInstaller", "pyinstaller", POSIX_PYINSTALLER)
     clean()
-    say("Building {} ({})...".format(NAME, config))
+    if sys.platform == "darwin":
+        icns = HERE / "build" / "cerf.icns"
+        try:
+            make_icns(ICON_SOURCE, icns)
+        except IcnsError as exc:
+            raise LauncherBuildError(str(exc)) from exc
+        env["CERF_LAUNCHER_APP"] = launcher.parts[0]
+        env["CERF_LAUNCHER_ICNS"] = str(icns)
+    say("Building {} ({})...".format(launcher, config))
     pyinstaller(python, "launcher.spec", env)
-    if not (HERE / "dist" / NAME / NAME).is_file():
-        raise LauncherBuildError("Expected dist/{0}/{0} not produced.".format(NAME))
-    install_onedir(HERE / "dist" / NAME)
-    forwarder = BUNDLED / (NAME + ".sh")
-    forwarder.write_text(LINUX_FORWARDER, encoding="utf-8")
+    if not HERE.joinpath("dist", *launcher.parts).is_file():
+        raise LauncherBuildError("Expected dist/{} not produced.".format(launcher))
+    install_onedir(HERE / "dist" / launcher.parts[0])
+    if launcher.parts[0] != NAME and (BUNDLED / NAME).is_dir():
+        shutil.rmtree(str(BUNDLED / NAME))
+    forwarder_name = host_branch.current().forwarder
+    if forwarder_name is None:
+        stale = BUNDLED / (NAME + ".sh")
+        if stale.is_file():
+            stale.unlink()
+        say("OK: {}".format(BUNDLED / launcher.parts[0]))
+        return
+    forwarder = BUNDLED / forwarder_name
+    forwarder.write_text(POSIX_FORWARDER.format(launcher), encoding="utf-8")
     forwarder.chmod(forwarder.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
     say("OK: {} (forwarder)".format(forwarder))
 
@@ -236,8 +287,8 @@ def main(argv):
     try:
         if sys.platform == "win32":
             build_windows(args.config)
-        elif sys.platform.startswith("linux"):
-            build_linux(args.config)
+        elif sys.platform.startswith("linux") or sys.platform == "darwin":
+            build_posix(args.config)
         else:
             raise LauncherBuildError("no launcher build for {}".format(sys.platform))
     except (LauncherBuildError, OSError) as exc:

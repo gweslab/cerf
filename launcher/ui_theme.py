@@ -9,9 +9,8 @@ from pathlib import Path
 from tkinter import ttk
 from typing import Dict, Optional
 
-import sv_ttk
-
 import sv_elements
+from app_paths import resolve_sun_valley_script
 from freedesktop_services import COLOR_SCHEME_PREFER_DARK, portal_color_scheme
 from sv_sprite_stretch import source_sun_valley
 from device_state import (
@@ -22,9 +21,13 @@ from device_state import (
 )
 
 
-def system_uses_dark() -> bool:
+def system_uses_dark(root: Optional[tk.Misc] = None) -> bool:
     """HKCU Personalize AppsUseLightTheme: 1 = light, 0 = dark; absent or
     unreadable -> light."""
+    if sys.platform == "darwin":
+        if root is None:
+            return False
+        return bool(root.tk.getboolean(root.tk.call("winfo", "isdark", str(root))))
     if sys.platform != "win32":
         return portal_color_scheme() == COLOR_SCHEME_PREFER_DARK
     try:
@@ -106,7 +109,7 @@ def _build_state_tint() -> dict:
 STATE_TINT = _build_state_tint()
 
 
-def refresh_palette() -> bool:
+def refresh_palette(root: Optional[tk.Misc] = None) -> bool:
     """Re-read the OS theme; if it changed since last time, swap the live
     palette (every module reads colours as ui_theme.<NAME>) and return True so
     the caller re-runs apply_theme + per-widget retheme(). No change -> False."""
@@ -116,7 +119,7 @@ def refresh_palette() -> bool:
     global UPDATE_LINK, LINK_FG, GROUP_BG, PREVIEW_STOPPED, DANGER_FG, WARN_FG
     global CARD_RUNNING_BG, CARD_UPDATE_BG, CARD_RUNNING_SEL, CARD_UPDATE_SEL
     global PAGE_BG, CARD_BORDER, CARD_HOVER
-    dark = system_uses_dark()
+    dark = system_uses_dark(root)
     if dark == IS_DARK:
         return False
     IS_DARK = dark
@@ -235,11 +238,13 @@ def apply_titlebar(window: tk.Misc) -> None:
 
 def _use_sun_valley(root: tk.Tk) -> None:
     if "sun-valley-dark" not in root.tk.call("ttk::style", "theme", "names"):
-        source_sun_valley(root, Path(sv_ttk.__file__).parent / "sv.tcl")
+        source_sun_valley(root, resolve_sun_valley_script())
     root.tk.call("set_theme", "dark" if IS_DARK else "light")
 
 
 def apply_theme(root: tk.Tk) -> None:
+    if sys.platform == "darwin":
+        refresh_palette(root)
     _use_sun_valley(root)
     style = ttk.Style(root)
     sv_elements.create(root, style, PAGE_BG)

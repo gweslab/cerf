@@ -11,12 +11,13 @@ if str(THIS_DIR) not in sys.path:
 import exe_version
 from branding import PRODUCT_NAME
 from tcl_data_filter import drop_unused_tcl_data
-from PyInstaller.utils.hooks import collect_data_files
 
-ASSETS       = REPO_ROOT / "cerf-win32" / "assets"
+ASSETS       = REPO_ROOT / "assets"
 ICON_PATH    = str(ASSETS / "cerf.ico")
 UNINSTALL_ICON_PATH = str(ASSETS / "cerf_error.ico")
 VERSION_PATH = str(REPO_ROOT / "libCerfFrontend" / "include" / "cerffrontend" / "version.h")
+INTEGER_SCALES_PATH = str(REPO_ROOT / "libCerfFrontend" / "include" / "cerffrontend" /
+                          "integer_scales.h")
 
 NAME = os.environ.get("CERF_LAUNCHER_NAME", "launcher")
 
@@ -28,7 +29,8 @@ BAND_FILES = [(p, "assets") for p in
               sorted(glob.glob(str(ASSETS / "about_band_*.png")))]
 
 HOST_KEY_TABLES = [] if sys.platform == "win32" else [
-    (str(REPO_ROOT / "cerf-qt" / "qt_evdev_vk.h"), "."),
+    (str(REPO_ROOT / "cerf-qt" / ("qt_mac_key_vk.h" if sys.platform == "darwin"
+                                  else "qt_evdev_vk.h")), "."),
     (str(REPO_ROOT / "cerf-qt" / "host_key_names.h"), "."),
 ]
 
@@ -38,10 +40,11 @@ a = Analysis(
     [str(THIS_DIR / "launcher.py")],
     pathex=[str(THIS_DIR), str(REPO_ROOT / "tools")],
     binaries=UCRT_BINARIES,
-    datas=[(ICON_PATH, "."), (VERSION_PATH, "."),
+    datas=[(ICON_PATH, "."), (VERSION_PATH, "."), (INTEGER_SCALES_PATH, "."),
            (str(THIS_DIR / "assets" / "icons"), "assets/icons"),
            (str(THIS_DIR / "assets" / "contributors_generated.txt"),
-            "assets")] + BAND_FILES + HOST_KEY_TABLES + collect_data_files("sv_ttk"),
+            "assets"),
+           (str(REPO_ROOT / "external" / "sun_valley_theme"), "sun_valley_theme")] + BAND_FILES + HOST_KEY_TABLES,
     hiddenimports=[],
     hookspath=[],
     runtime_hooks=[],
@@ -84,3 +87,14 @@ coll = COLLECT(
     upx=False,
     name=NAME,
 )
+
+if sys.platform == "darwin":
+    BUNDLE_VERSION = ".".join(str(n) for n in exe_version.version_tuple(VERSION_PATH)[:3])
+    app = BUNDLE(
+        coll,
+        name=os.environ["CERF_LAUNCHER_APP"],
+        icon=os.environ["CERF_LAUNCHER_ICNS"],
+        bundle_identifier="cx.cerf.launcher",
+        version=BUNDLE_VERSION,
+        info_plist={"CFBundleVersion": BUNDLE_VERSION},
+    )

@@ -160,6 +160,10 @@ jobs:
           python tools/publish_r2_object.py --file="launcher/dist/cerf_installer.exe"
 
   build-linux:
+    if: >-
+      ${{ !contains(github.event.head_commit.message, '[skip build]') &&
+          (github.event_name != 'pull_request' ||
+           github.event.pull_request.head.repo.full_name == github.repository) }}
     runs-on: ubuntu-latest
     container: ubuntu:26.04
     env:
@@ -205,8 +209,51 @@ jobs:
         id: pack
         run: |
           name="CERF-${{ steps.version.outputs.version }}-${{ steps.version.outputs.sha }}-Release-$PLATFORM"
-          python3 -c "import shutil, sys; shutil.make_archive(sys.argv[1], 'zip', sys.argv[2])" \
-            "ci/dist/$name" "build/Release/$PLATFORM"
+          python3 tools/pack_release.py "ci/dist/$name.zip" "build/Release/$PLATFORM"
+          echo "name=$name" >> "$GITHUB_OUTPUT"
+          echo "zip=ci/dist/$name.zip" >> "$GITHUB_OUTPUT"
+
+      - name: Upload Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.pack.outputs.name }}
+          path: ${{ steps.pack.outputs.zip }}
+
+  build-macos:
+    needs: build
+    runs-on: macos-latest
+    env:
+      PLATFORM: macos-qt-arm64
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: false
+
+      - name: Fetch core libraries
+        run: git submodule update --init libservicelocator libCerfEngine libCerfCore
+
+      - name: Install the build dependencies
+        run: brew install cmake ninja pkgconf qtbase qtsvg libslirp nlohmann-json python@3.14 python-tk@3.14
+
+      - name: Stamp version.h with CI build info
+        id: version
+        run: python3 tools/stamp_version.py --run=${{ github.run_number }} --sha=${{ github.sha }}
+
+      - name: Fetch the CE apps of the Windows build
+        uses: actions/download-artifact@v4
+        with:
+          name: CERF-${{ steps.version.outputs.version }}-${{ steps.version.outputs.sha }}-Release-Win32
+          path: ci/win32
+
+      - name: Build
+        run: python3 build.py --config Release --mode production --ce-apps-from=ci/win32/ce_apps
+
+      - name: Pack the build
+        id: pack
+        run: |
+          name="CERF-${{ steps.version.outputs.version }}-${{ steps.version.outputs.sha }}-Release-$PLATFORM"
+          python3 tools/pack_release.py "ci/dist/$name.zip" "build/Release/$PLATFORM"
           echo "name=$name" >> "$GITHUB_OUTPUT"
           echo "zip=ci/dist/$name.zip" >> "$GITHUB_OUTPUT"
 
@@ -217,7 +264,7 @@ jobs:
           path: ${{ steps.pack.outputs.zip }}
 
   publish:
-    needs: [build, build-linux]
+    needs: [build, build-linux, build-macos]
     if: ${{ always() && github.event_name == 'push' }}
     runs-on: ubuntu-latest
     env:
@@ -269,8 +316,21 @@ jobs:
           name="CERF-${{ steps.version.outputs.version }}-${{ steps.version.outputs.sha }}-Release-linux-qt-amd64"
           python tools/publish_r2_build.py --zip="ci/linux/$name.zip" --host-branch=linux-qt-amd64
 
+      - name: Fetch the macOS build
+        if: ${{ needs.build-macos.result == 'success' }}
+        uses: actions/download-artifact@v4
+        with:
+          name: CERF-${{ steps.version.outputs.version }}-${{ steps.version.outputs.sha }}-Release-macos-qt-arm64
+          path: ci/macos
+
+      - name: Publish the macOS build to the R2 beta channel
+        if: ${{ needs.build-macos.result == 'success' }}
+        run: |
+          name="CERF-${{ steps.version.outputs.version }}-${{ steps.version.outputs.sha }}-Release-macos-qt-arm64"
+          python tools/publish_r2_build.py --zip="ci/macos/$name.zip" --host-branch=macos-qt-arm64
+
   announce:
-    needs: [build, build-linux]
+    needs: [build, build-linux, build-macos]
     if: >-
       ${{ github.event_name == 'push' &&
           !contains(github.event.head_commit.message, '[release cerf]') }}
@@ -299,7 +359,7 @@ jobs:
           ${{ contains(github.event.head_commit.message, '[rc]') && '--rc' || '' }}
 
   release:
-    needs: [build, build-linux]
+    needs: [build, build-linux, build-macos]
     if: github.event_name == 'push' && contains(github.event.head_commit.message, '[release cerf]')
     runs-on: ubuntu-latest
 

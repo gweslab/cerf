@@ -1,5 +1,6 @@
 #include <cerffrontend/guest_auto_resize.h>
 
+#include <cerffrontend/frontend_window.h>
 #include <cerffrontend/guest_additions_ui_policy.h>
 
 #include <cerfcore/core/cerf_emulator.h>
@@ -29,12 +30,21 @@ void GuestAutoResize::SetEnabled(bool on) {
 }
 
 void GuestAutoResize::OnUserResizeEnd(uint32_t canvas_w, uint32_t canvas_h) {
-    if (!Enabled() || canvas_w == 0 || canvas_h == 0) return;
-    if (canvas_w == last_w_ && canvas_h == last_h_) return;
-    last_w_ = canvas_w;
-    last_h_ = canvas_h;
-    emu_.Get<cerfcore::CerfVirtResize>().RequestResize(canvas_w, canvas_h);
-    emu_.Get<cerfcore::UserConfigWriter>().WriteConfigurableScreenSize(canvas_w, canvas_h);
+    if (!Enabled()) return;
+    const auto& window = emu_.Get<FrontendWindow>();
+    uint32_t    w      = canvas_w;
+    uint32_t    h      = canvas_h;
+    if (window.Mode() == ViewportMode::Integer) {
+        const uint32_t factor = static_cast<uint32_t>(window.IntegerFactor());
+        w /= factor;
+        h /= factor;
+    }
+    if (w == 0 || h == 0) return;
+    if (w == last_w_ && h == last_h_) return;
+    last_w_ = w;
+    last_h_ = h;
+    emu_.Get<cerfcore::CerfVirtResize>().RequestResize(w, h);
+    emu_.Get<cerfcore::UserConfigWriter>().WriteConfigurableScreenSize(w, h);
 }
 
 }

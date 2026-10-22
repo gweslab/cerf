@@ -172,6 +172,12 @@ def check_windows_toolchain(c: Checks) -> None:
 
 
 def check_ce_toolchain(c: Checks) -> None:
+    import host_branch
+    branch = host_branch.current()
+    if not branch.builds_ce_apps:
+        c.report("WARN", "ce-toolchain", "{} cannot build ce_apps/ -- build.py --ce-apps-from=<the "
+                 "ce_apps directory of a Windows or Linux build> copies them".format(branch.name))
+        return
     root = ROOT / "third_party" / "wince"
     if not root.is_dir():
         c.report("WARN", "ce-toolchain", "absent -- optional; needed only to build ce_apps/ (see "
@@ -210,6 +216,23 @@ def check_linux_toolchain(c: Checks) -> None:
              "present" if tk.returncode == 0 else "absent -- the launcher build needs python3-tk")
 
 
+def check_macos_toolchain(c: Checks) -> None:
+    import homebrew_packages
+    for tool in ("cmake", "ninja", "clang++", "brew"):
+        path = shutil.which(tool)
+        c.report("OK" if path else "FAIL", tool, path or "absent from PATH")
+    brew = shutil.which("brew")
+    if brew is None:
+        return
+    for formula in homebrew_packages.ALL_FORMULAE:
+        found = subprocess.run([brew, "list", "--versions", formula], capture_output=True,
+                               text=True, check=False)
+        if found.returncode == 0 and found.stdout.strip():
+            c.report("OK", "brew " + formula, found.stdout.strip())
+        else:
+            c.report("FAIL", "brew " + formula, "absent -- brew install {}".format(formula))
+
+
 def run_checks(c: Checks) -> None:
     if not check_git_repo(c):
         return
@@ -220,10 +243,11 @@ def run_checks(c: Checks) -> None:
     check_claude_hooks(c)
     if sys.platform == "win32":
         check_windows_toolchain(c)
-        check_ce_toolchain(c)
+    elif sys.platform == "darwin":
+        check_macos_toolchain(c)
     else:
         check_linux_toolchain(c)
-        check_ce_toolchain(c)
+    check_ce_toolchain(c)
 
 
 def main(argv: List[str]) -> int:

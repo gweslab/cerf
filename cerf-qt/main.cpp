@@ -3,6 +3,7 @@
 #include <cerfcore/core/log.h>
 #include <cerfcore/execution/jit_runner.h>
 #include "crash_report.h"
+#include "qt_app_defaults.h"
 
 #include <QApplication>
 #include <QMetaObject>
@@ -11,6 +12,7 @@
 
 int main(int argc, char* argv[]) {
     cerfcore::Log::SetCrashPresenter(&QtCrashReport::Present);
+    ApplyPlatformAppDefaults();
     QApplication app(argc, argv);
     cerfcore::CerfConfig cfg;
     if (const std::optional<int> exit_code =

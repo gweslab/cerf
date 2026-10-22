@@ -49,10 +49,10 @@ public:
                                         cerffrontend::kDefaultPresentIntervalMs);
         setCentralWidget(canvas_);
         QMenu* view = menuBar()->addMenu(QStringLiteral("View"));
-        QObject::connect(view, &QMenu::aboutToShow, view, [this, view] {
+        emu_.Get<QtMenuBuilder>().Bind(view, [this] {
             std::vector<cerffrontend::MenuItem> items;
             emu_.Get<cerffrontend::ViewportMenu>().Append(items, *this);
-            emu_.Get<QtMenuBuilder>().Populate(view, items);
+            return items;
         });
     }
 
@@ -147,10 +147,12 @@ private:
         QtHostKey key;
         auto&     keys = emu_.Get<QtKeyInput>();
         if (!keys.Translate(event, key)) return;
-        keys.Note(key, key_up);
-        if (!key_up && key.vk == cerffrontend::kVkF &&
-            emu_.Get<cerffrontend::HostKeyBinding>().AllMembersDownNow())
-            ToggleFullscreen();
+        keys.ForEachTransition(key, key_up, [&](bool up) {
+            keys.Note(key, up);
+            if (!up && key.vk == cerffrontend::kVkF &&
+                emu_.Get<cerffrontend::HostKeyBinding>().AllMembersDownNow())
+                ToggleFullscreen();
+        });
     }
 
     cerfcore::CerfEmulator& emu_;

@@ -2,8 +2,9 @@
   date: TBA
   emulator:
     new: |
-      Added x64 hosts support
-      Added Linux support
+      Support for Linux (x86-64)
+      Support for macOS (ARM64)
+      Startup screen scale configuration and dynamic mode for retina screen
   guest_additions:
     fixed: |
       Moved "untrusted apps hack" for WM into optional switch since it broke WM6

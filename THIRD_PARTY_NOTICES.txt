@@ -1,0 +1,267 @@
+THIRD-PARTY NOTICES
+===================
+
+
+BUNDLED / LINKED
+----------------
+
+nlohmann-json 3.12.0 - https://github.com/nlohmann/json
+    License:   MIT
+    Copyright: (c) 2013-2025 Niels Lohmann
+
+YY-Thunks 1.2.1 - https://github.com/Chuyu-Team/YY-Thunks
+    License:   MIT
+    Copyright: (c) 2018 Chuyu-Team
+
+libslirp 4.9.1 - https://gitlab.freedesktop.org/slirp/libslirp
+    License:   BSD-3-Clause
+    Copyright: (c) 1995-1996 Danny Gasparovski and the libslirp contributors
+
+GLib 2.88.0 - https://gitlab.gnome.org/GNOME/glib
+    License:   LGPL-2.1-or-later
+    Copyright: (c) The GLib authors
+    Text:      licenses/LGPL-2.1.txt
+
+PCRE2 10.47 - https://github.com/PCRE2Project/pcre2
+    License:   BSD-3-Clause
+    Copyright: (c) 1997-2007 University of Cambridge; (c) 2007-2024 Philip Hazel;
+               JIT written by Zoltan Herczeg
+    Text:      licenses/PCRE2.txt
+
+GNU libiconv 1.18 - https://www.gnu.org/software/libiconv/
+    License:   LGPL-2.1-or-later
+    Copyright: (c) Free Software Foundation
+    Text:      licenses/LGPL-2.1.txt
+
+GNU gettext (libintl) 0.22.5 - https://www.gnu.org/software/gettext/
+    License:   LGPL-2.1-or-later
+    Copyright: (c) Free Software Foundation
+    Text:      licenses/LGPL-2.1.txt
+
+Sun Valley ttk theme (sv-ttk) 2.5.5 - https://github.com/rdbende/Sun-Valley-ttk-theme
+    License:   MIT
+    Copyright: (c) rdbende
+
+alsa-lib 1.2.15.3 - https://www.alsa-project.org/
+    License:   LGPL-2.1-or-later
+    Copyright: (c) 1998 Jaroslav Kysela; (c) 2000 Abramo Bagnara
+    Text:      licenses/LGPL-2.1.txt
+
+Qt 6 - https://www.qt.io/
+    License:   LGPL-3.0-only
+    Copyright: (c) The Qt Company Ltd.
+    Text:      licenses/LGPL-3.0.txt, licenses/GPL-3.0.txt
+
+
+RUNTIME LIBRARIES IN THE RELEASE PACKAGES
+-----------------------------------------
+
+Python - https://www.python.org/
+    License:   PSF-2.0
+    Text:      licenses/Python.txt, licenses/Python-Windows.txt
+
+PyInstaller bootloader - https://pyinstaller.org/
+    License:   GPL-2.0-or-later with the PyInstaller bootloader exception
+
+Microsoft Visual C++ runtime and Universal CRT
+    License:   Microsoft Distributable Code
+    Text:      licenses/Python-Windows.txt
+
+Tcl/Tk - https://www.tcl-lang.org/
+    License:   Tcl/Tk license
+    Text:      licenses/Tcl-Tk.txt
+
+OpenSSL - https://www.openssl.org/
+    License:   Apache-2.0, OpenSSL and SSLeay
+    Text:      licenses/OpenSSL.txt, licenses/Python-Windows.txt
+
+libffi - https://sourceware.org/libffi/
+    License:   MIT
+    Text:      licenses/libffi.txt
+
+Expat - https://libexpat.github.io/
+    License:   MIT
+    Text:      licenses/expat.txt
+
+bzip2 - https://sourceware.org/bzip2/
+    License:   bzip2 license
+    Text:      licenses/bzip2.txt
+
+XZ Utils (liblzma) - https://tukaani.org/xz/
+    License:   0BSD
+    Text:      licenses/xz.txt
+
+zlib - https://zlib.net/
+    License:   Zlib
+    Text:      licenses/zlib.txt
+
+mpdecimal - https://www.bytereef.org/mpdecimal/
+    License:   BSD-2-Clause
+    Text:      licenses/mpdecimal.txt
+
+Zstandard - https://facebook.github.io/zstd/
+    License:   BSD-3-Clause
+    Text:      licenses/zstd.txt
+
+LibTomMath - https://www.libtom.net/
+    License:   The LibTom license (public domain)
+    Text:      licenses/libtommath.txt
+
+Brotli - https://github.com/google/brotli
+    License:   MIT
+    Text:      licenses/brotli.txt
+
+FreeType - https://freetype.org/
+    License:   FreeType License
+    Text:      licenses/FreeType.txt
+
+libpng - http://www.libpng.org/pub/png/libpng.html
+    License:   PNG Reference Library License version 2
+    Text:      licenses/libpng.txt
+
+Fontconfig - https://www.freedesktop.org/wiki/Software/fontconfig/
+    License:   MIT-style
+    Text:      licenses/fontconfig.txt
+
+X.Org libX11, libXau, libXdmcp, libXext, libXft, libXrender, libXss - https://www.x.org/
+    License:   MIT-style
+    Text:      licenses/libX11.txt, licenses/libXau.txt, licenses/libXdmcp.txt,
+               licenses/libXext.txt, licenses/libXft.txt, licenses/libXrender.txt,
+               licenses/libXss.txt
+
+HarfBuzz - https://harfbuzz.github.io/
+    License:   Old MIT
+    Text:      licenses/HarfBuzz.txt
+
+Graphite2 - https://github.com/silnrsi/graphite
+    License:   LGPL-2.1-or-later
+    Text:      licenses/graphite2.txt, licenses/LGPL-2.1.txt
+
+ICU - https://icu.unicode.org/
+    License:   Unicode License v3
+    Text:      licenses/ICU.txt
+
+D-Bus - https://www.freedesktop.org/wiki/Software/dbus/
+    License:   AFL-2.1
+    Text:      licenses/dbus.txt, licenses/AFL-2.1.txt
+
+double-conversion - https://github.com/google/double-conversion
+    License:   BSD-3-Clause
+    Text:      licenses/double-conversion.txt
+
+libjpeg-turbo - https://libjpeg-turbo.org/
+    License:   IJG License, Modified BSD License
+    Text:      licenses/libjpeg-turbo.txt
+
+libb2 - https://github.com/BLAKE2/libb2
+    License:   CC0-1.0
+    Text:      licenses/libb2.txt
+
+MD4C - https://github.com/mity/md4c
+    License:   MIT
+    Text:      licenses/md4c.txt
+
+This software is based in part on the work of the Independent JPEG Group.
+
+
+EMBEDDED FONTS
+--------------
+
+IBM Plex Sans Regular, IBM Plex Sans Bold, IBM Plex Mono Bold - https://github.com/IBM/plex
+    License:   SIL Open Font License 1.1
+    Copyright: (c) 2017 IBM Corp.
+    Text:      licenses/OFL-1.1.txt
+
+
+MIT (nlohmann-json, YY-Thunks, sv-ttk)
+--------------------------------------
+
+    Permission is hereby granted, free of charge, to any person obtaining a copy of this
+    software and associated documentation files (the "Software"), to deal in the Software
+    without restriction, including without limitation the rights to use, copy, modify, merge,
+    publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons
+    to whom the Software is furnished to do so, subject to the following conditions:
+
+    The above copyright notice and this permission notice shall be included in all copies or
+    substantial portions of the Software.
+
+    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED,
+    INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR
+    PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE
+    FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
+    OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+    DEALINGS IN THE SOFTWARE.
+
+
+BSD-3-CLAUSE (libslirp)
+-----------------------
+
+Copyright (c) 1995, 1996 Danny Gasparovski. All rights reserved.
+
+    Redistribution and use in source and binary forms, with or without modification, are
+    permitted provided that the following conditions are met:
+    1. Redistributions of source code must retain the above copyright notice, this list of
+       conditions and the following disclaimer.
+    2. Redistributions in binary form must reproduce the above copyright notice, this list of
+       conditions and the following disclaimer in the documentation and/or other materials
+       provided with the distribution.
+    3. Neither the name of the copyright holder nor the names of its contributors may be used
+       to endorse or promote products derived from this software without specific prior written
+       permission.
+
+    THIS SOFTWARE IS PROVIDED ``AS IS'' AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT
+    NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
+    PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL DANNY GASPAROVSKI OR CONTRIBUTORS BE LIABLE FOR
+    ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
+    BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+    PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER
+    IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY
+    WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+
+DEVELOPMENT ENVIRONMENT
+-----------------------
+
+SimpleEnglish - https://github.com/AminBlg/SimpleEnglish - MIT, (c) 2026 AminBlg
+
+
+STUDIED REFERENCES
+------------------
+
+QEMU - https://www.qemu.org/
+the Linux kernel - https://www.kernel.org/
+Ganbold Tsagaankhuu's FreeBSD Qualcomm port - https://github.com/tsgan/qualcomm
+Little Kernel - https://android.googlesource.com/kernel/lk
+NetBSD - https://www.netbsd.org/
+Dolphin - https://dolphin-emu.org/
+MAME - https://www.mamedev.org/
+OpenOCD - https://openocd.org/
+dosfstools - https://github.com/dosfstools/dosfstools
+Dynamic Rate Control for Retro Game Emulators - Hans-Kristian Arntzen -
+    https://docs.libretro.com/guides/ratecontrol.pdf
+Polynomial Interpolators for High-Quality Resampling of Oversampled Audio - Olli Niemitalo -
+    http://yehar.com/blog/wp-content/uploads/2009/08/deip.pdf
+qemu-neo1973 - Openmoko - https://github.com/jvesely/qemu-neo1973
+libqmi - https://gitlab.freedesktop.org/mobile-broadband/libqmi
+Rockbox - https://www.rockbox.org/
+Das U-Boot - https://github.com/u-boot/u-boot
+handhelds.org bootldr - https://ftp.gwdg.de/pub/linux/handhelds/feeds/bootldr/
+pySerial - https://github.com/pyserial/pyserial
+Wine - https://www.winehq.org/
+XNU - https://github.com/apple-oss-distributions/xnu
+CMake - https://cmake.org/
+LuaJIT - https://luajit.org/
+dynarmic - https://github.com/azahar-emu/dynarmic
+FEX - https://github.com/FEX-Emu/FEX
+Box64 - https://github.com/ptitSeb/box64
+discord-rpc - https://github.com/discord/discord-rpc
+
+
+TRADEMARKS
+----------
+
+Windows and Windows CE are trademarks of Microsoft Corporation. CE Runtime Foundation is an
+independent project, not affiliated with, endorsed by, or sponsored by Microsoft.
+
+ASD-STE100 is a registered trademark of ASD. The SimpleEnglish skill is unofficial, and ASD
+and STEMG do not endorse it.

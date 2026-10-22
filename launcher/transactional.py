@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import List
 
 from app_paths import resolve_devices_dir
+from macos_menubar import install_macos_menubar
 from window_icon import apply_window_icon
 from device_state import write_cerf_json
 from screen_geometry import screen_work_area
@@ -52,6 +53,7 @@ def _return_foreground(owner_hwnd: int) -> None:
 
 def _make_root() -> tk.Tk:
     root = tk.Tk()
+    install_macos_menubar(root)
     theme.apply_theme(root)
     TextContextMenu(root)
     root.withdraw()

@@ -1,21 +1,11 @@
 #include <cerffrontend/shutdown_dialog_layout.h>
 
+#include <cerffrontend/dpi_scale.h>
 #include <cerffrontend/shutdown_prompt.h>
 
 #include <cstdio>
 
 namespace cerffrontend {
-
-namespace {
-
-constexpr int kDefaultDpi = 96;
-
-int ScaleForDpi(int v, int dpi) {
-    const int64_t twice = 2 * static_cast<int64_t>(v) * dpi;
-    return static_cast<int>((twice + kDefaultDpi) / (2 * kDefaultDpi));
-}
-
-}
 
 int ShutdownDialogLayout::ClientHeight(int dpi, int band_h) {
     return band_h + ScaleForDpi(kContentH, dpi);

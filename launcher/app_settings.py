@@ -3,9 +3,11 @@ from __future__ import annotations
 import json
 
 from bundle_repositories import config_path, load_config
+from display_scale import SCALE_DYNAMIC, scale_choices
 
 DISCORD_RICH_PRESENCE_KEY = "discord_rich_presence"
 UPDATE_CHANNEL_KEY = "update_channel"
+DEFAULT_SCALE_KEY = "default_scale"
 
 CHANNEL_DISABLED = "disabled"
 CHANNEL_STABLE = "stable"
@@ -45,3 +47,15 @@ def read_update_channel() -> str:
 def write_update_channel(channel: str) -> None:
     write_key(UPDATE_CHANNEL_KEY,
               channel if channel in CHANNELS else CHANNEL_DEFAULT)
+
+
+def read_default_scale() -> int:
+    value = load_config(config_path()).get(DEFAULT_SCALE_KEY)
+    if isinstance(value, bool) or value not in scale_choices():
+        return SCALE_DYNAMIC
+    return value
+
+
+def write_default_scale(value: int) -> None:
+    write_key(DEFAULT_SCALE_KEY,
+              value if value in scale_choices() else SCALE_DYNAMIC)

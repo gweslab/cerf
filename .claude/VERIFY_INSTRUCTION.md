@@ -306,7 +306,7 @@ When the claim fails, quote both sides: the target, with the file and the declar
 
 ## License audit - a ported MODEL is not ported CODE
 
-CERF studies open-source projects freely: QEMU's block cache, a Linux driver's register map, a NetBSD driver's init sequence. Most of this emulator is grounded that way, and `THIRD_PARTY_NOTICES.md` declares the studied references. What is forbidden is the other project's source pasted into CERF. It carries that project's license into an MIT repo, and no verdict of yours undoes a licensing breach once it ships.
+CERF studies open-source projects freely: QEMU's block cache, a Linux driver's register map, a NetBSD driver's init sequence. Most of this emulator is grounded that way, and `THIRD_PARTY_NOTICES.txt` declares the studied references. What is forbidden is the other project's source pasted into CERF. It carries that project's license into an MIT repo, and no verdict of yours undoes a licensing breach once it ships.
 
 Two Microsoft trees sit outside that freedom and may not even be CITED in a shipped file: the Device Emulator source, and Platform Builder / Windows CE Shared Source, including every BSP, `PUBLIC`, `PRIVATE` and `OAK` subtree under it. Their licences reach information DERIVED FROM the source rather than only its expression, so an independently written implementation still does not detach CERF from the restriction. A shipped comment naming one of them is a finding on its own, separate from any copying question - see `agent_docs/rules.md` § Reference Licence Hygiene. Report it, and note that deleting the comment is not the remedy: the fact must be re-grounded on a permitted source.
 

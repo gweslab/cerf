@@ -22,8 +22,7 @@ from changelog_card import artifact_card
 from ci_release import (GITHUB_API, GITHUB_UPLOADS, REPO, Artifact, CiError,
                         changelog_markdown, github, latest_artifact,
                         load_credentials, post_discord, request, run_artifact)
-
-PACKED_PLATFORMS = (host_branch.by_name(host_branch.LINUX_QT_AMD64).platform_dir,)
+from host_branch import HostBranch
 
 DISCORD_CHANNEL_ID = "1517249750796206191"
 RELEASE_WATCHERS_ROLE_ID = "1553511779789971606"
@@ -70,6 +69,14 @@ def packed_asset(token: str, artifact: Artifact) -> Path:
         destination = Path("tmp") / expected
         destination.write_bytes(outer.read(expected))
     return destination
+
+
+def release_asset(token: str, branch: HostBranch, artifact: Artifact) -> Path:
+    if branch.packed_artifact:
+        return packed_asset(token, artifact)
+    archive = Path("tmp") / f"{artifact.name}.zip"
+    download_artifact(token, artifact, archive)
+    return archive
 
 
 def create_release(token: str, artifact: Artifact, body: str) -> dict:
@@ -126,14 +133,11 @@ def main(argv: List[str]) -> int:
     card = artifact_card(token, artifact, "release")
     print(f"  announcement card rendered ({len(card) // 1024} KB)")
 
-    archive = Path("tmp") / f"{artifact.name}.zip"
-    print(f"\nDownloading {artifact.name} ...")
-    download_artifact(token, artifact, archive)
-    archives = [archive]
-    for platform in PACKED_PLATFORMS:
-        packed = run_artifact(token, artifact.run_id, platform)
-        print(f"Downloading {packed.name} ...")
-        archives.append(packed_asset(token, packed))
+    archives = []
+    for branch in host_branch.all_branches():
+        build = run_artifact(token, artifact.run_id, branch.platform_dir)
+        print(f"\nDownloading {build.name} ...")
+        archives.append(release_asset(token, branch, build))
     for path in archives:
         print(f"  {path} ({path.stat().st_size / 1024 / 1024:.1f} MB)")
     confirm(f"Publish tag {artifact.tag} at {artifact.sha[:7]} with these assets?",

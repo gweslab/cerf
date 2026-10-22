@@ -10,6 +10,7 @@ bundled/devices/*
 bundled/launcher.exe
 bundled/launcher.sh
 bundled/launcher/
+bundled/*.app/
 
 ce_apps/**/*.obj
 ce_apps/**/*.exp
@@ -310,6 +311,5 @@ third_party/
 .build_lock
 .cerf_lock*
 
-# Site assets synced from launcher/ and cerf-win32/ by tools/build_site.py
 docs/website/content/assets/icons/
 docs/website/content/assets/img/

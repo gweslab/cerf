@@ -3,6 +3,7 @@ from __future__ import annotations
 import datetime
 
 PRODUCT_NAME = "CE Runtime Foundation"
+LAUNCHER_PRODUCT_NAME = PRODUCT_NAME + " Launcher"
 AUTHOR = "Yaroslav Kibysh"
 AUTHOR_URL = "https://yaroslavkibysh.com"
 FIRST_YEAR = 2019

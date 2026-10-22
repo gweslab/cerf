@@ -6,11 +6,12 @@ from tkinter import font as tkfont
 from tkinter import ttk
 from typing import List
 
-from app_paths import resolve_asset, resolve_version_parts
+from app_paths import notices_candidates, resolve_asset, resolve_version_parts
 from branded_dialog import BrandedDialog, scaled
 from branding import AUTHOR, AUTHOR_URL, PRODUCT_NAME, copyright_years
+from desktop_shell import open_path
 from rich_text import RichText, link, plain
-from ui_dialogs import DISCORD_URL, PATREON_URL, WEBSITE_URL
+from ui_dialogs import DISCORD_URL, PATREON_URL, WEBSITE_URL, show_error
 import ui_theme as theme
 
 
@@ -136,6 +137,7 @@ class AboutWindow:
                         link(AUTHOR, lambda: webbrowser.open(AUTHOR_URL))]
                  ).pack(anchor="w", fill="x", pady=(gap, 0))
 
+        chrome.add_left_button("Licenses", self._open_licenses)
         chrome.add_button("OK", self._close, default=True)
         self._dlg.bind("<Escape>", lambda _e: self._close())
         self._dlg.protocol("WM_DELETE_WINDOW", self._close)
@@ -147,6 +149,17 @@ class AboutWindow:
         self._dlg.lift()
         self._dlg.focus_force()
         self._dlg.grab_set()
+
+    def _open_licenses(self) -> None:
+        candidates = notices_candidates()
+        notices = next((path for path in candidates if path.is_file()), None)
+        if notices is None:
+            show_error(self._dlg, "Licenses", "{} is missing.".format(candidates[0]))
+            return
+        try:
+            open_path(notices)
+        except OSError as exc:
+            show_error(self._dlg, "Licenses", str(exc))
 
     def _close(self) -> None:
         self._dlg.destroy()

@@ -9,6 +9,8 @@ from tkinter import ttk
 from typing import Callable, List, Optional, Tuple
 
 from app_paths import resolve_icons_dir, resolve_version
+from branding import LAUNCHER_PRODUCT_NAME
+from macos_menubar import install_macos_menubar
 from window_icon import apply_window_icon
 from device_card_list import DeviceCardList
 from device_state import (DeviceBundle, SAVED_STATE_SCREENSHOT_FILENAME,
@@ -54,7 +56,8 @@ class LauncherApp(OperationsMixin, RefreshMixin, SpawnMixin, PropertiesMixin,
         self.cerf_exe = cerf_exe
         self.update_check = UpdateCheck(self)
         version = resolve_version()
-        self.title(f"CE Runtime Foundation Launcher {version}" if version else "CE Runtime Foundation Launcher")
+        self.title(f"{LAUNCHER_PRODUCT_NAME} {version}" if version else LAUNCHER_PRODUCT_NAME)
+        install_macos_menubar(self, on_about=self._open_about, on_preferences=self._open_settings)
 
         try:
             dpi = float(self.winfo_fpixels("1i"))

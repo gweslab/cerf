@@ -28,6 +28,12 @@ def control_width(widget: tk.Misc) -> int:
     return scaled(widget, CONTROL_DIP)
 
 
+def control_hint(parent: tk.Misc, text: str) -> ttk.Label:
+    width = control_width(parent) - scaled(parent, CONTROL_GAP_DIP)
+    return ttk.Label(parent, text=text, style="Hint.TLabel", justify="left",
+                     wraplength=width)
+
+
 def path_width(widget: tk.Misc) -> int:
     return scaled(widget, PATH_DIP)
 

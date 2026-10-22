@@ -1,4 +1,5 @@
 {
   "device": "",
-  "bundle_repositories": []
+  "bundle_repositories": [],
+  "default_scale": 0
 }

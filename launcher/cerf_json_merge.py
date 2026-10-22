@@ -20,12 +20,6 @@ def merge_preserving_old(old, new):
             else:
                 merged[key] = value
         return merged
-    if isinstance(old, list) and isinstance(new, list):
-        merged = list(old)
-        for item in new:
-            if item not in merged:
-                merged.append(item)
-        return merged
     return old
 
 

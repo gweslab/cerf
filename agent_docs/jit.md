@@ -1,8 +1,8 @@
-# JIT - guest ISA → host x86 block translator
+# JIT - guest ISA → host block translator
 
-The JIT translates guest code to native host x86 at the first
+The JIT translates guest code to native host code at the first
 execution of each block, and caches the translation. CERF implements
-two guest ISAs: ARM (ARM-mode + Thumb) and MIPS (MIPS IV, 64-bit). A
+the ARM (ARM-mode + Thumb) and MIPS (MIPS IV, 64-bit) guest ISAs. A
 board runs exactly one of them, chosen by `BoardContext::GetCpuArch()`.
 
 ## Where the parts live
@@ -16,13 +16,15 @@ board runs exactly one of them, chosen by `BoardContext::GetCpuArch()`.
 | `libCerfEngine/src/jit_code_arena.{h,cpp}` | the executable-memory allocator |
 | `libCerfEngine/include/cerfengine/isa_block_space.h`, `jit_block_index.h` | the translation index and jump cache |
 | `libCerfEngine/src/x86_emit*.h` | host x86 encoding helpers, from Intel SDM Vol. 2 |
-| `libCerfEngine/src/host_fp_env.h` | the file that selects the host code for floating-point exception flags |
+| `libCerfEngine/src/a64_emit*.h` | AArch64 encoding helpers for the host, from ARM DDI 0487 |
+| `libCerfEngine/src/host_fp_env.h` | the host layer that runs a guest floating-point operation and reads its exception flags |
 | `libCerfEngine/src/arm/`, `libCerfEngine/src/mips/` | the two engines |
 | `libCerfEngine/include/cerfengine/arm/arm_insn_kind.h`, `include/cerfengine/mips/mips_insn_kind.h` | the instruction kinds that the decoders produce |
 | `libCerfEngine/src/cerfir/` | CerfIR, the guest-neutral block IR |
 | `libCerfEngine/src/cerfir/cerfir_guest_model.h` | the guest data that a lowering reads |
 | `libCerfEngine/src/cerfir/cerfir_host_lowering.h` | the file that selects the host lowering |
 | `libCerfEngine/src/cerfir/x86/` | the x86-32 and x86-64 lowering of CerfIR |
+| `libCerfEngine/src/cerfir/a64/` | the AArch64 lowering of CerfIR |
 | `libCerfEngine/src/arm/cerfir/`, `libCerfEngine/src/mips/cerfir/` | the ARM and MIPS frontends of CerfIR |
 | `libCerfCore/src/cpu/arm/`, `libCerfCore/src/cpu/mips/`, `libCerfCore/src/cpu/<core>/` | the page-walk, coprocessor, TLB and exception models that CERF gives the engine, for each ISA and for each core |
 
@@ -61,13 +63,12 @@ the fix is not in the JIT.
 
 ## Errors
 
-`Engine::Start` returns a setup error to its caller. Two builds execute
-guest code: an MSVC x86-32 build, and a Linux x86-64 build that uses the
-System V calling convention. In every other build, `Start` refuses. A
-consumer that names engine classes links only on an x86-32 or x86-64
-build, because only that build compiles the whole engine.
+`Engine::Start` returns a setup error to its caller. In a build with no
+execution backend for its host, `Start` refuses. A consumer that names
+engine classes links only on a host that has a lowering. Only a build
+for such a host compiles the whole engine.
 
-The lowering has no Windows x64 calling convention. On a Win64 build it
+The x86 lowering has no Windows x64 calling convention. On a Win64 build it
 refuses every call to a host function, so a block that makes such a call
 does not lower there.
 
@@ -169,13 +170,41 @@ raises a guest Undefined-Instruction exception.
 ## Pinned-register dispatcher
 
 Every translated block runs with the guest CPU-state pointer pinned in
-`ESI` on x86-32 and in `RBX` on x86-64. ARM additionally pins the
-MMU-state pointer in `EBX` on x86-32 and in `RBP` on x86-64. Lowered
-code addresses state fields off the pinned register and never
-recomputes the base.
+one host register. ARM additionally pins the MMU-state pointer in a
+second one. Each lowering names the two registers. Lowered code
+addresses state fields off the pinned register and never recomputes the
+base.
 
 **The assignment is invariant across the whole lowering and every JIT
-helper.** Changing it requires an edit at every emit site.
+helper.** A change to it requires an edit at every emit site.
+
+## Pinned guest slots
+
+A guest model can name a run of 32-bit state slots as pinned. The
+AArch64 lowering keeps those slots in host registers while guest code
+runs.
+
+**Memory and the pinned registers agree at every block boundary.** A
+dispatcher must enter a block through the entry stub of the lowering,
+because the stub loads the pinned registers.
+
+**A call to a C++ function sees guest state in memory.** The function
+can read and write any guest slot. The block continues with the values
+that the function left. A memory tail gives its slow entry the same
+view.
+
+**A TLB miss helper sees guest state in memory, but the block keeps its
+pinned registers.** A miss helper can read a pinned slot. It must not
+write one.
+
+**A helper that unwinds to the dispatcher in the middle of a block
+leaves memory older than the pinned registers.** A guest that delivers
+exceptions through such an unwind must not pin slots.
+
+**The lowering tracks the state of each pinned register at compile time,
+across labels and condition guards.** A write to a pinned slot inside a
+branch that the lowering does not track breaks that state. A byte access
+to a pinned slot has no pinned form. Both are compile faults.
 
 ## Invariants that span files
 
@@ -221,6 +250,27 @@ None of these is visible from any single file.
 - **On x86-64, blocks run with RSP aligned to 16 bytes.** Every call
   from emitted code to a host function must keep that alignment. Code
   that a block enters by `CALL` starts 8 bytes away from that alignment.
+- **On AArch64, the upper 32 bits of a register that holds a guest
+  value are unspecified.** A 64-bit read of such a register first
+  extends the value, or reads a register that a 32-bit write just set.
+  A 32-bit write clears the upper 32 bits.
+- **On AArch64, a conditional branch has a short range.** `B.cond` and
+  `CBZ` reach 1 MB, and `TBZ` reaches 32 KB. When the target is out of
+  range, the label fixup raises an emit fault.
+- **On macOS, every write to the arena runs inside a code-write
+  scope.** The arena is a `MAP_JIT` region, and a code-write scope opens
+  it for writes on one thread. While the scope is open, that thread can
+  write the region and cannot execute it. Every byte that a write
+  changes must also reach the instruction cache before the code runs.
+  The block records live in the arena too, so a change to a record is a
+  write to the arena.
+- **A guest floating-point operation whose exception flags matter runs
+  inside the host floating-point layer.** A compiler can move ordinary
+  arithmetic across the instructions that clear and read the host
+  flags. A C runtime can also compute a square root outside the unit
+  that sets those flags. The guest flags then depend on the host
+  compiler. The layer clears the flags, runs the operation and reads the
+  flags as one unit.
 - **A flush never reclaims a permanent arena allocation.** The
   soft-TLB miss routines are permanent, because emitted blocks call
   them at a fixed address. If a flush reclaims those bytes, every such

@@ -6,7 +6,7 @@ from pathlib import Path
 from PIL import Image
 
 REPO = Path(__file__).resolve().parent.parent
-PNG  = REPO / "cerf-win32" / "assets" / "uart_boot_bar.png"
+PNG  = REPO / "assets" / "uart_boot_bar.png"
 OUT  = REPO / "libCerfFrontend" / "include" / "cerffrontend" / "uart_boot_bar_data.h"
 
 

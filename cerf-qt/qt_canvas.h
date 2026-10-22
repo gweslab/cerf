@@ -1,5 +1,6 @@
 #pragma once
 
+#include "qt_key_input.h"
 #include "qt_presenter_canvas.h"
 
 #include <cerffrontend/canvas_input.h>
@@ -38,6 +39,7 @@ private:
     void ApplyCursor(int x, int y);
     void RouteMouse(QMouseEvent* event, cerffrontend::CanvasMouse::Kind kind);
     void RouteKey(QKeyEvent* event, bool key_up);
+    void DeliverKey(QKeyEvent* event, const QtHostKey& key, bool key_up);
 
     bool grabbing_       = false;
     bool pointer_hidden_ = false;

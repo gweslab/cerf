@@ -3,30 +3,32 @@ from __future__ import annotations
 
 import os
 import sys
-from typing import List
+from typing import List, Tuple
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import host_branch
 from changelog_card import artifact_card
+from host_branch import HostBranch
 from ci_release import (Artifact, CiError, load_credentials, post_discord,
                         run_artifact)
 
 QA_CHANNEL_ID = "1537263681228771349"
 QA_ROLE_ID = "1537262210118852708"
-LINUX_PLATFORM = host_branch.by_name(host_branch.LINUX_QT_AMD64).platform_dir
 
 
-def message(artifact: Artifact, linux: Artifact, release_candidate: bool) -> str:
-    title = f"**v{artifact.series} build {artifact.run_number}**"
+def message(builds: List[Tuple[HostBranch, Artifact]], release_candidate: bool) -> str:
+    run = builds[0][1]
+    title = f"**v{run.series} build {run.run_number}**"
     if release_candidate:
         headline = f"{title} [release candidate] available <@&{QA_ROLE_ID}>"
     else:
         headline = f"{title} [unstable] available"
+    downloads = " · ".join(f"[{branch.label}]({build.download_url})"
+                           for branch, build in builds)
     return (f"{headline}\n"
-            f"Download: [Windows]({artifact.download_url}) · "
-            f"[Linux]({linux.download_url}) (needs a GitHub account) · "
-            f"[CI build]({artifact.run_url}) · "
-            f"[`{artifact.sha[:7]}`]({artifact.commit_url})")
+            f"Download: {downloads} · "
+            f"[CI build]({run.run_url}) · "
+            f"[`{run.sha[:7]}`]({run.commit_url})")
 
 
 def main(argv: List[str]) -> int:
@@ -37,22 +39,23 @@ def main(argv: List[str]) -> int:
     release_candidate = "--rc" in argv
 
     token, secret = load_credentials()
-    artifact = run_artifact(token, int(run_id))
-    linux = run_artifact(token, int(run_id), LINUX_PLATFORM)
-    print(f"\nArtifact        : {artifact.name}")
-    print(f"  version / tag : {artifact.version} -> {artifact.tag}")
-    print(f"  branch / sha  : {artifact.branch} / {artifact.sha[:7]}")
-    print(f"  download      : {artifact.download_url}")
-    print(f"  linux         : {linux.download_url}")
+    builds = [(branch, run_artifact(token, int(run_id), branch.platform_dir))
+              for branch in host_branch.all_branches()]
+    run = builds[0][1]
+    print(f"\nRun             : {run.run_url}")
+    print(f"  version / tag : {run.version} -> {run.tag}")
+    print(f"  branch / sha  : {run.branch} / {run.sha[:7]}")
+    for branch, build in builds:
+        print(f"  {branch.label.lower():<14}: {build.download_url}")
 
     kind = "candidate" if release_candidate else "unstable"
-    card = artifact_card(token, artifact, kind)
-    content = message(artifact, linux, release_candidate)
+    card = artifact_card(token, run, kind)
+    content = message(builds, release_candidate)
     print(f"\n{content}\n  card: {len(card) // 1024} KB\n")
     post_discord(secret, QA_CHANNEL_ID, content,
                  ping_role=QA_ROLE_ID if release_candidate else None,
                  image=card)
-    print(f"Announced {artifact.name} in channel {QA_CHANNEL_ID}.")
+    print(f"Announced run {run_id} in channel {QA_CHANNEL_ID}.")
     return 0
 
 

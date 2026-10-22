@@ -17,7 +17,7 @@ from device_state import DeviceBundle, format_size, running_status, \
     saved_state_info
 from rounded_style import CARD_MARGIN_X
 from sv_elements import PAGE_SCROLLBAR_STYLE
-from ui_scroll import fit_scrollregion
+from ui_scroll import bind_wheel_scroll, fit_scrollregion
 import ui_theme as theme
 
 HOVER_BLEND = 0.5
@@ -93,7 +93,7 @@ class DeviceCardList:
         canvas.configure(yscrollcommand=vsb.set)
         self._canvas = canvas
         canvas.bind("<Configure>", self._on_canvas_config)
-        canvas.bind("<MouseWheel>", self._on_wheel)
+        bind_wheel_scroll(canvas, canvas)
         canvas.bind("<Button-1>", self._on_click)
         canvas.bind("<Double-1>", self._on_double)
         canvas.bind("<Button-3>", self._on_right)
@@ -336,7 +336,3 @@ class DeviceCardList:
             self._layout()
         else:
             fit_scrollregion(self._canvas, HEADER_PAD_TOP)
-
-    def _on_wheel(self, e: tk.Event) -> str:
-        self._canvas.yview_scroll(int(-e.delta / 120), "units")
-        return "break"

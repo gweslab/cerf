@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import subprocess
-import sys
 import tkinter as tk
 from pathlib import Path
 from tkinter import font as tkfont
@@ -10,8 +8,8 @@ from typing import Optional
 
 from app_paths import install_root
 from branded_dialog import load_dialog_icon
+from desktop_shell import show_item
 from feedback_window import FeedbackWindow
-from freedesktop_services import show_item
 from rich_text import RichText, bold, link, plain
 from screen_geometry import fit_geometry
 import ui_theme as theme
@@ -45,10 +43,7 @@ def _size_label(path: Optional[Path]) -> str:
 
 def _locate(path: Path) -> None:
     try:
-        if sys.platform == "win32":
-            subprocess.Popen('explorer /select,"{}"'.format(path))
-        else:
-            show_item(path)
+        show_item(path)
     except OSError:
         pass
 

@@ -151,16 +151,8 @@
     </ResourceCompile>
   </ItemGroup>
   <ItemGroup>
-    <None Include="assets\cerf.ico" />
-    <None Include="assets\uart_boot_bar.png" />
-    <None Include="assets\oem\logo_compaq.png" />
-    <None Include="assets\oem\logo_hp.png" />
-    <None Include="assets\oem\logo_microsoft.png" />
-    <None Include="assets\oem\logo_nec.png" />
-    <None Include="assets\oem\logo_psc.png" />
-    <None Include="assets\oem\logo_siemens.png" />
-    <None Include="assets\oem\logo_ti.png" />
-    <None Include="assets\oem\logo_zune.png" />
+    <None Include="..\assets\cerf.ico" />
+    <None Include="..\assets\uart_boot_bar.png" />
   </ItemGroup>
   <!-- Bundled device files — copied to devices/ next to cerf.exe.
        OverwriteReadOnlyFiles: source bundles once contained ROM-extracted

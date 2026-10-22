@@ -19,7 +19,7 @@ public:
     void RearmAutoSwitch();
     bool OnPresentTick(bool has_frame);
 
-    bool RenderAlt(uint32_t* bits, int width, int height);
+    bool RenderAlt(uint32_t* bits, int width, int height, int dpi);
     bool ShouldDesaturate();
 
 private:

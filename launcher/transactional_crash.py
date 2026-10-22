@@ -6,6 +6,7 @@ from typing import List, Optional
 
 from window_icon import apply_window_icon
 from crash_window import CrashWindow
+from macos_menubar import install_macos_menubar
 from text_context_menu import TextContextMenu
 import ui_theme as theme
 
@@ -19,6 +20,7 @@ def run_transactional_crash(argv: List[str]) -> int:
         log_path = Path(argv[0])
 
     root = tk.Tk()
+    install_macos_menubar(root)
     theme.apply_theme(root)
     TextContextMenu(root)
     root.withdraw()

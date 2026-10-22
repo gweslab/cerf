@@ -4,11 +4,12 @@ import ctypes
 import sys
 from typing import List, Sequence
 
+import host_branch
 from app_settings import remove_key, write_key
 from bundle_repositories import config_path, load_config
-from linux_key_tables import key_names, vk_from_x_keycode
+from qt_key_tables import key_names, vk_from_tk_aqua_keycode, vk_from_x_keycode
 
-HOST_KEY_KEY = "host_key"
+HOST_KEY_KEY = host_branch.HOST_KEY_KEY
 
 VK_CANCEL = 0x03
 VK_ESCAPE = 0x1B
@@ -34,7 +35,9 @@ VK_RCONTROL = 0xA3
 VK_LMENU = 0xA4
 VK_RMENU = 0xA5
 
-DEFAULT_HOST_KEY = (VK_RCONTROL,)
+ABSENT_HOST_KEY = (VK_RCONTROL,)
+_BRANCH_DEFAULT = host_branch.current().cerf_json_defaults.get(HOST_KEY_KEY)
+DEFAULT_HOST_KEY = tuple(_BRANCH_DEFAULT) if _BRANCH_DEFAULT else ABSENT_HOST_KEY
 MAX_HOST_KEY_LEN = 8
 
 UNREACHABLE_VKS = frozenset((0x01, 0x02, 0x04, 0x05, 0x06, 0x10, 0x11, 0x12))
@@ -83,13 +86,17 @@ def vk_label(vk: int) -> str:
 
 def combo_label(vks: Sequence[int]) -> str:
     return "+".join(vk_label(vk) for vk in vks) if vks else combo_label(
-        DEFAULT_HOST_KEY)
+        ABSENT_HOST_KEY)
 
 
 def vk_from_tk_event(event) -> int:
     if sys.platform != "win32":
         code = getattr(event, "keycode", 0)
-        return vk_from_x_keycode(code) if isinstance(code, int) else 0
+        if not isinstance(code, int):
+            return 0
+        if sys.platform == "darwin":
+            return vk_from_tk_aqua_keycode(code)
+        return vk_from_x_keycode(code)
     vk = _KEYSYM_VK.get(getattr(event, "keysym", ""))
     if vk:
         return vk
@@ -99,11 +106,11 @@ def vk_from_tk_event(event) -> int:
 
 def normalize(raw) -> List[int]:
     if isinstance(raw, bool):
-        return list(DEFAULT_HOST_KEY)
+        return list(ABSENT_HOST_KEY)
     if isinstance(raw, int):
         raw = [raw]
     if not isinstance(raw, (list, tuple)):
-        return list(DEFAULT_HOST_KEY)
+        return list(ABSENT_HOST_KEY)
     out: List[int] = []
     for item in raw:
         if isinstance(item, bool) or not isinstance(item, int):
@@ -115,7 +122,7 @@ def normalize(raw) -> List[int]:
         out.append(item)
         if len(out) == MAX_HOST_KEY_LEN:
             break
-    return out or list(DEFAULT_HOST_KEY)
+    return out or list(ABSENT_HOST_KEY)
 
 
 def read_host_key() -> List[int]:
@@ -124,7 +131,7 @@ def read_host_key() -> List[int]:
 
 def write_host_key(vks: Sequence[int]) -> None:
     normalized = normalize(list(vks))
-    if normalized == list(DEFAULT_HOST_KEY):
+    if _BRANCH_DEFAULT is None and normalized == list(ABSENT_HOST_KEY):
         remove_key(HOST_KEY_KEY)
     else:
         write_key(HOST_KEY_KEY, normalized)

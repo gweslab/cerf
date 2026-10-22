@@ -1,5 +1,7 @@
 #include <cerffrontend/notification_overlay.h>
 
+#include <cerffrontend/dpi_scale.h>
+
 #include <cerfcore/core/cerf_emulator.h>
 
 #include <algorithm>
@@ -41,13 +43,6 @@ constexpr Palette kWarning = {{242, 201, 76}, {191, 149, 30}, {30, 30, 30}};
 constexpr Palette kError   = {{204, 60, 60}, {150, 35, 35}, {255, 255, 255}};
 constexpr Palette kMore    = {{64, 64, 64}, {40, 40, 40}, {230, 230, 230}};
 
-int MulDivRound(int value, int numerator, int denominator) {
-    const long long product = static_cast<long long>(value) * numerator;
-    const long long half    = denominator / 2;
-    return static_cast<int>(product >= 0 ? (product + half) / denominator
-                                         : (product - half) / denominator);
-}
-
 }
 
 void NotificationOverlay::Render(Painter& p, int width, int height, int dpi) {
@@ -80,7 +75,7 @@ void NotificationOverlay::Relayout(Painter& p, int width, int height, int dpi) {
     dpi_ = dpi;
     if (cards_.empty() || width <= 0 || height <= 0) return;
 
-    auto       px      = [dpi](int v) { return MulDivRound(v, dpi, 96); };
+    auto       px      = [dpi](int v) { return ScaleForDpi(v, dpi); };
     const bool compact = width < px(kRegularMinW) || height < px(kRegularMinH);
     const int  margin  = px(compact ? kCompactMargin : kMargin);
     const int  card_w  = std::min(px(compact ? kCompactMaxW : kCardW), width - 2 * margin);

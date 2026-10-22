@@ -11,9 +11,8 @@ if str(THIS_DIR) not in sys.path:
 import exe_version
 from branding import PRODUCT_NAME
 from tcl_data_filter import drop_unused_tcl_data
-from PyInstaller.utils.hooks import collect_data_files
 
-ASSETS       = REPO_ROOT / "cerf-win32" / "assets"
+ASSETS       = REPO_ROOT / "assets"
 ICON_PATH    = str(ASSETS / "cerf_setup.ico")
 VERSION_PATH = str(REPO_ROOT / "libCerfFrontend" / "include" / "cerffrontend" / "version.h")
 
@@ -34,8 +33,8 @@ a = Analysis(
     [str(THIS_DIR / "cerf_installer.py")],
     pathex=[str(THIS_DIR), str(REPO_ROOT / "tools")],
     binaries=UCRT_BINARIES,
-    datas=[(ICON_PATH, "."), (VERSION_PATH, ".")] + BAND_FILES + DIALOG_ICONS
-          + collect_data_files("sv_ttk"),
+    datas=[(ICON_PATH, "."), (VERSION_PATH, "."),
+           (str(REPO_ROOT / "external" / "sun_valley_theme"), "sun_valley_theme")] + BAND_FILES + DIALOG_ICONS,
     hiddenimports=[],
     hookspath=[],
     runtime_hooks=[],

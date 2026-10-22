@@ -10,7 +10,7 @@ OUTPUT    = os.path.join(ROOT, 'README.md')
 CHANGELOG_LINK = 'https://cerf.cx/changelog/'
 CHANGELOG_RECENT = 2
 ICONS_DIR = 'launcher/assets/icons'          # CPU-arch badge PNGs
-SVG_DIR   = 'cerf-win32/assets/icons_sources'
+SVG_DIR   = 'assets/icons_sources'
 FUNDING = os.path.join(ROOT, '.github', 'FUNDING.yml')
 
 # FUNDING.yml platform key -> shields.io badge (label, hex, logo, logo color)
@@ -23,6 +23,7 @@ FUNDING_BADGES = [
 ]
 FUNDING_MESSAGE = 'support'
 
+sys.path.insert(0, os.path.join(ROOT, 'tools'))
 sys.path.insert(0, os.path.join(ROOT, 'launcher'))
 from board_database import (FEATURE_SPECS, family_of, soc_family_of, soc_of,
                             sort_text)
@@ -33,7 +34,6 @@ UNMODELED_MARK = '*'
 UNMODELED_LEGEND = (f'``{UNMODELED_MARK}`` Supported, but CERF does not model this '
                     'board\'s differences.')
 
-sys.path.insert(0, os.path.join(ROOT, 'tools'))
 import changelog
 
 

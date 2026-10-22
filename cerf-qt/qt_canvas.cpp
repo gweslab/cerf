@@ -6,6 +6,7 @@
 #include "qt_painter.h"
 
 #include <cerffrontend/canvas_tabs.h>
+#include <cerffrontend/dpi_scale.h>
 #include <cerffrontend/host_virtual_keys.h>
 #include <cerffrontend/input_capture.h>
 #include <cerffrontend/notification_overlay.h>
@@ -20,8 +21,6 @@
 #include <QWheelEvent>
 
 namespace {
-
-constexpr int kLogicalDpi = 96;
 
 uint32_t Held(Qt::MouseButtons buttons) {
     uint32_t held = 0;
@@ -61,7 +60,8 @@ void QtCanvas::OnPresentTick() {
 }
 
 bool QtCanvas::RenderAlt(uint32_t* bits, int w, int h) {
-    return emu_.Get<cerffrontend::CanvasTabs>().RenderAlt(bits, w, h);
+    return emu_.Get<cerffrontend::CanvasTabs>().RenderAlt(bits, w, h,
+                                                          DeviceExtent(cerffrontend::kDefaultDpi, Dpr()));
 }
 
 bool QtCanvas::ShouldDesaturate() {
@@ -72,7 +72,7 @@ void QtCanvas::RenderOverlay(QImage& present, int w, int h) {
     QPainter  p(&present);
     QtPainter painter(emu_, p);
     emu_.Get<cerffrontend::NotificationOverlay>().Render(painter, w, h,
-                                                         DeviceExtent(kLogicalDpi, Dpr()));
+                                                         DeviceExtent(cerffrontend::kDefaultDpi, Dpr()));
 }
 
 void QtCanvas::ClientSize(int& width, int& height) const {
@@ -177,6 +177,11 @@ void QtCanvas::RouteKey(QKeyEvent* event, bool key_up) {
     QtHostKey key;
     auto&     keys = emu_.Get<QtKeyInput>();
     if (!keys.Translate(event, key)) return;
+    keys.ForEachTransition(key, key_up, [&](bool up) { DeliverKey(event, key, up); });
+}
+
+void QtCanvas::DeliverKey(QKeyEvent* event, const QtHostKey& key, bool key_up) {
+    auto& keys = emu_.Get<QtKeyInput>();
     keys.Note(key, key_up);
     if (emu_.Get<cerffrontend::InputCapture>().OnHostKey(key.sided_vk, key_up)) return;
     const bool system_key = key.vk == cerffrontend::kVkF10 || key.vk == cerffrontend::kVkMenu ||

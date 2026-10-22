@@ -11,6 +11,7 @@
 #include "win32_painter.h"
 #include <cerfcore/host/refresh_rate_service.h>
 #include <cerffrontend/canvas_tabs.h>
+#include <cerffrontend/dpi_scale.h>
 #include <cerffrontend/notification_overlay.h>
 
 #include <algorithm>
@@ -47,7 +48,7 @@ void HostCanvas::OnPresentTick() {
 }
 
 bool HostCanvas::RenderAltContent(HDC, uint32_t* bits, int w, int h) {
-    return emu_.Get<cerffrontend::CanvasTabs>().RenderAlt(bits, w, h);
+    return emu_.Get<cerffrontend::CanvasTabs>().RenderAlt(bits, w, h, cerffrontend::kDefaultDpi);
 }
 
 bool HostCanvas::ShouldDesaturatePresent() {

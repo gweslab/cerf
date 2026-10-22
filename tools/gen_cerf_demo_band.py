@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Bake cerf-win32/assets/icons_sources/about_band.svg into ce_apps/cerf_demo/band_data.h.
+"""Bake assets/icons_sources/about_band.svg into ce_apps/cerf_demo/band_data.h.
 
 Usage: python tools/gen_cerf_demo_band.py [about_band.svg]
 
@@ -18,7 +18,7 @@ import resvg_py
 from PIL import Image
 
 REPO = Path(__file__).resolve().parent.parent
-DEFAULT_SVG = REPO / "cerf-win32" / "assets" / "icons_sources" / "about_band.svg"
+DEFAULT_SVG = REPO / "assets" / "icons_sources" / "about_band.svg"
 OUT = REPO / "ce_apps" / "cerf_demo" / "band_data.h"
 
 

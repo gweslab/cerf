@@ -11,11 +11,13 @@
 #include "qt_theme.h"
 
 #include <cerffrontend/canvas_tabs.h>
+#include <cerffrontend/dpi_scale.h>
 #include <cerffrontend/guest_auto_resize.h>
 #include <cerffrontend/host_menu_model.h>
 #include <cerffrontend/input_capture.h>
 #include <cerffrontend/shutdown_prompt.h>
 #include <cerffrontend/shutdown_teardown.h>
+#include <cerffrontend/startup_scale.h>
 #include <cerffrontend/status_bar.h>
 #include <cerffrontend/window_title.h>
 
@@ -28,6 +30,7 @@
 #include <cerfcore/platform/host_process.h>
 
 #include <QApplication>
+#include <QGuiApplication>
 #include <QIcon>
 #include <QMenu>
 #include <QMenuBar>
@@ -53,7 +56,7 @@ void QtMainWindow::OnReady() {
 
     QIcon app_icon;
     for (int px : {16, 20, 24, 32, 48, 64, 256})
-        app_icon.addPixmap(QPixmap::fromImage(emu_.Get<QtPaintResources>().SvgImage("cerf", px, px)));
+        app_icon.addPixmap(QPixmap::fromImage(emu_.Get<QtPaintResources>().SvgImage("cerf_running", px, px)));
     QApplication::setWindowIcon(app_icon);
     window_ = new QtHostWindow(*this);
     window_->setWindowTitle(QString::fromStdString(emu_.Get<cerffrontend::WindowTitle>().Compose()));
@@ -80,10 +83,15 @@ void QtMainWindow::OnReady() {
     QObject::connect(resize_debounce_.get(), &QTimer::timeout, [this] { FireAutoResize(); });
     canvas_->SetResizeListener([this] { OnCanvasResized(); });
 
+    const int scale = emu_.Get<cerffrontend::StartupScale>().Factor(
+        qRound(cerffrontend::kDefaultDpi * QGuiApplication::primaryScreen()->devicePixelRatio()));
+    if (scale > 1) canvas_->SetIntegerScale(scale);
+
     emu_.Get<QtFocusPolicy>().Show(window_);
     native_handle_.store(static_cast<uint64_t>(window_->winId()), std::memory_order_release);
     AdoptResolutionToWindowMonitor();
-    FitWindowToSurface(initial_surface_w_, initial_surface_h_);
+    FitWindowToSurface(static_cast<uint32_t>(canvas_->ContentWidth()),
+                       static_cast<uint32_t>(canvas_->ContentHeight()));
     emu_.Get<QtFocusPolicy>().Focus(canvas_);
 }
 
@@ -101,9 +109,8 @@ void QtMainWindow::BuildMenus() {
     auto& model = emu_.Get<cerffrontend::HostMenuModel>();
     for (int i = 0; i < cerffrontend::HostMenuModel::kMenuCount; ++i) {
         QMenu* menu = window_->menuBar()->addMenu(QString::fromUtf8(model.Title(i)));
-        QObject::connect(menu, &QMenu::aboutToShow, menu, [this, menu, i] {
-            emu_.Get<QtMenuBuilder>().Populate(menu,
-                                               emu_.Get<cerffrontend::HostMenuModel>().Build(i));
+        emu_.Get<QtMenuBuilder>().Bind(menu, [this, i] {
+            return emu_.Get<cerffrontend::HostMenuModel>().Build(i);
         });
     }
 }

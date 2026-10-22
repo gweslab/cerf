@@ -24,13 +24,9 @@ protected:
     bool event(QEvent* event) override;
 
 private:
-    void  Tick();
-    void  ApplyDeviceHeight();
-    int   DeviceWidth() const;
-    int   DeviceHeight() const;
-    QRect BoxToLogical(int left, int top, int width, int height) const;
-    void  SecondaryAction(cerfcore::HostWidget* w, const QPoint& pos);
-    int   EntryAt(const QPoint& device_pos) const;
+    void Tick();
+    void SecondaryAction(cerfcore::HostWidget* w, const QPoint& pos);
+    int  EntryAt(const QPoint& pos) const;
 
     cerfcore::CerfEmulator& emu_;
     QTimer                  tick_;

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
+import os
 import sys
-from pathlib import Path
 
 from app_paths import FRONTEND_NAME
 from device_state import RunningStatus
@@ -31,20 +31,22 @@ if sys.platform == "win32":
 else:
     import socket
 
-    def _is_frontend(pid: int) -> bool:
-        try:
-            comm = Path("/proc/{}/comm".format(pid)).read_text(encoding="utf-8").strip()
-        except OSError:
-            return False
-        return comm == FRONTEND_NAME
+    from host_processes import process_name
+
+    def _show_address(pid: int):
+        if sys.platform == "darwin":
+            directory = os.environ.get("TMPDIR") or "/tmp/"
+            if not directory.endswith("/"):
+                directory += "/"
+            return "{}cerf-show-{}".format(directory, pid)
+        return b"\0" + "cerf-show/{}".format(pid).encode("ascii")
 
     def show_running_window(status: RunningStatus) -> bool:
-        if not status.pid or not _is_frontend(status.pid):
+        if not status.pid or process_name(status.pid) != FRONTEND_NAME:
             return False
-        address = b"\0" + "cerf-show/{}".format(status.pid).encode("ascii")
         try:
             with socket.socket(socket.AF_UNIX, socket.SOCK_DGRAM) as s:
-                s.sendto(b"show", address)
+                s.sendto(b"show", _show_address(status.pid))
         except OSError:
             return False
         return True

@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import List, Optional
 
 from about_window import AboutWindow
-from app_paths import FRONTEND_NAME, LAUNCHER_DIR_NAME
+from app_paths import FRONTEND_NAME, install_root
 from child_process import spawn_detached
 from device_state import DeviceBundle
 from running_state import show_running_window
@@ -18,7 +18,7 @@ class SpawnMixin:
             return
         if self.cerf_exe is None:
             show_error(self, "Cannot launch",
-                       f"{FRONTEND_NAME} not found next to the {LAUNCHER_DIR_NAME} folder.")
+                       f"{FRONTEND_NAME} not found in {install_root()}.")
             return
         if not d.is_installed:
             return

@@ -46,5 +46,5 @@ On a board whose stock input is a **relative mouse** rather than a touch panel, 
 pointer to the window while that source is active - a relative device has no absolute position to
 map a free cursor onto.
 
-**Tap the host key to release the pointer.** Tap it again to give the input back to the guest. The
-host key is Right Ctrl, and **Settings** in the launcher gives it to another key.
+**Tap your configured host key (default: Right Ctrl/Right Option) to release the pointer.** Tap it
+again to give the input back to the guest. **Settings** in the launcher gives it to another key.

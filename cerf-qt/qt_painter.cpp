@@ -229,7 +229,7 @@ cerffrontend::FontMetrics QtPainter::Metrics(const cerffrontend::Font& font) {
 }
 
 void QtPainter::DrawIcon(const cerffrontend::Rect& box, std::string_view stem, int px) {
-    const QImage& icon = emu_.Get<QtPaintResources>().Icon(stem, px);
+    const QImage& icon = emu_.Get<QtPaintResources>().Icon(stem, px, p_.device()->devicePixelRatioF());
     p_.drawImage(QPoint(box.left + (box.Width() - px) / 2, box.top + (box.Height() - px) / 2), icon);
 }
 

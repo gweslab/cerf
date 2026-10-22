@@ -1,4 +1,5 @@
 #include "qt_menu_builder.h"
+#include "qt_menu_item_text.h"
 
 #include <cerfcore/core/cerf_emulator.h>
 
@@ -6,6 +7,7 @@
 #include <QActionGroup>
 #include <QMenu>
 #include <QPoint>
+#include <QTimer>
 
 REGISTER_SERVICE(QtMenuBuilder);
 
@@ -17,7 +19,7 @@ void QtMenuBuilder::Append(QMenu* menu, const std::vector<cerffrontend::MenuItem
             menu->addSeparator();
             continue;
         }
-        const QString label = QString::fromStdString(it.label);
+        const QString label = MenuItemText(it.label);
         if (!it.submenu.empty()) {
             QMenu* sub = menu->addMenu(label);
             sub->setEnabled(it.enabled);
@@ -44,6 +46,12 @@ void QtMenuBuilder::Populate(QMenu* menu, const std::vector<cerffrontend::MenuIt
     Append(menu, items, callbacks);
     for (auto& [action, callback] : callbacks)
         QObject::connect(action, &QAction::triggered, menu, [cb = callback] { cb(); });
+}
+
+void QtMenuBuilder::Bind(QMenu* menu, MenuSource source) {
+    auto refill = [this, menu, source = std::move(source)] { Populate(menu, source()); };
+    QObject::connect(menu, &QMenu::aboutToShow, menu, refill);
+    QTimer::singleShot(0, menu, refill);
 }
 
 void QtMenuBuilder::RunContextMenu(const std::vector<cerffrontend::MenuItem>& items,

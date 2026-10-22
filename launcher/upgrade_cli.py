@@ -12,6 +12,7 @@ from app_paths import FRONTEND_NAME, install_root
 from window_icon import apply_window_icon
 from branding import PRODUCT_NAME
 from install_options import InstallOptions, parse_options
+from macos_menubar import install_macos_menubar
 from text_context_menu import TextContextMenu
 from ui_dialogs import show_dialog, show_error
 from upgrade_install import install_upgrade
@@ -42,6 +43,7 @@ def parse_stage(argv: List[str]) -> Tuple[str, Optional[int]]:
 def _hidden_root() -> tk.Tk:
     root = tk.Tk()
     root.withdraw()
+    install_macos_menubar(root)
     theme.apply_theme(root)
     TextContextMenu(root)
     apply_window_icon(root)

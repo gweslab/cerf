@@ -1,4 +1,5 @@
 #include <cerffrontend/frontend_config.h>
+#include <cerffrontend/integer_scales.h>
 
 #include <cerfcore/core/cerf_emulator.h>
 #include <cerfcore/core/cerf_paths.h>
@@ -63,6 +64,21 @@ std::vector<uint8_t> ReadHostKey(const json& root, const std::string& path) {
     return vks;
 }
 
+int ReadDefaultScale(const json& root, const std::string& path) {
+    const char* k = "default_scale";
+    if (!root.contains(k)) return FrontendConfig::kDynamicScale;
+    const auto& v = root[k];
+    if (v.is_number_integer()) {
+        const int n = v.get<int>();
+        if (n == FrontendConfig::kDynamicScale || n == 1) return n;
+        for (const int scale : kIntegerScales)
+            if (n == scale) return n;
+    }
+    std::string allowed = "0, 1";
+    for (const int scale : kIntegerScales) allowed += ", " + std::to_string(scale);
+    cerfcore::CfgFatal(path, "'default_scale' must be one of " + allowed);
+}
+
 }
 
 void FrontendConfig::OnReady() {
@@ -85,7 +101,8 @@ void FrontendConfig::OnReady() {
             cerfcore::CfgFatal(path_, "'discord_rich_presence' must be a boolean");
         discord_rich_presence_ = j["discord_rich_presence"].get<bool>();
     }
-    host_key_vks_ = ReadHostKey(j, path_);
+    host_key_vks_  = ReadHostKey(j, path_);
+    default_scale_ = ReadDefaultScale(j, path_);
 }
 
 void FrontendConfig::SaveLastSaveStateMode(bool save_state) {

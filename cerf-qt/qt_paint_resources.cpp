@@ -12,6 +12,8 @@
 #include <QStringList>
 #include <QSvgRenderer>
 
+#include <cmath>
+
 REGISTER_SERVICE(QtPaintResources);
 
 QString QtPaintResources::LoadFamily(const char* resource) {
@@ -64,23 +66,28 @@ const QImage& QtPaintResources::Logo() {
     return logo_;
 }
 
-const QImage& QtPaintResources::Icon(std::string_view stem, int px) { return SvgImage(stem, px, px); }
+const QImage& QtPaintResources::Icon(std::string_view stem, int px, qreal dpr) {
+    return SvgImage(stem, px, px, dpr);
+}
 
-const QImage& QtPaintResources::SvgImage(std::string_view stem, int width, int height) {
-    auto key = std::make_tuple(std::string(stem), width, height);
+const QImage& QtPaintResources::SvgImage(std::string_view stem, int width, int height, qreal dpr) {
+    auto key = std::make_tuple(std::string(stem), width, height, dpr);
     auto it  = svgs_.find(key);
     if (it != svgs_.end()) return it->second;
 
     const QString path =
         QStringLiteral(":/icons_sources/%1.svg").arg(QString::fromUtf8(stem.data(), stem.size()));
     QSvgRenderer renderer(path);
-    if (!renderer.isValid() || width <= 0 || height <= 0)
+    const int    device_w = static_cast<int>(std::lround(width * dpr));
+    const int    device_h = static_cast<int>(std::lround(height * dpr));
+    if (!renderer.isValid() || device_w <= 0 || device_h <= 0)
         emu_.Get<cerfcore::Fatal>().Die("QtPaintResources: SVG '%s' at %dx%d not renderable",
-                                        std::get<0>(key).c_str(), width, height);
-    QImage image(width, height, QImage::Format_ARGB32_Premultiplied);
+                                        std::get<0>(key).c_str(), device_w, device_h);
+    QImage image(device_w, device_h, QImage::Format_ARGB32_Premultiplied);
     image.fill(Qt::transparent);
     QPainter painter(&image);
-    renderer.render(&painter, QRectF(0, 0, width, height));
+    renderer.render(&painter, QRectF(0, 0, device_w, device_h));
     painter.end();
+    image.setDevicePixelRatio(dpr);
     return svgs_.emplace(std::move(key), std::move(image)).first->second;
 }

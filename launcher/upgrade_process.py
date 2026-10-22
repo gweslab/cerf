@@ -6,10 +6,11 @@ import time
 from pathlib import Path
 from typing import Callable, List, Optional
 
-from app_paths import FRONTEND_NAME, LAUNCHER_DIR_NAME, LAUNCHER_NAME
+import host_branch
+from app_paths import FRONTEND_NAME, frontend_executable_in, launcher_executable_in
 from child_process import spawn_detached
 
-ROOT_LAUNCHER_NAME = "launcher.exe" if sys.platform == "win32" else "launcher.sh"
+ROOT_LAUNCHER_NAME = host_branch.current().forwarder
 UPGRADE_DIR_NAME = "upgrade"
 UPGRADE_ZIP_NAME = "upgrade.zip"
 GLOBAL_CONFIG_NAME = "cerf.json"
@@ -90,8 +91,8 @@ if sys.platform == "win32":
                 if entry.szExeFile.lower() == FRONTEND_NAME:
                     pid = int(entry.th32ProcessID)
                     image = _image_path(pid)
-                    if image is None or _same_directory(os.path.dirname(image),
-                                                        install_dir):
+                    if image is None or _same_directory(
+                            os.path.dirname(image), frontend_executable_in(install_dir).parent):
                         pids.append(pid)
                 if not kernel32.Process32NextW(snapshot, ctypes.byref(entry)):
                     return pids
@@ -108,32 +109,21 @@ if sys.platform == "win32":
         finally:
             kernel32.CloseHandle(handle)
 else:
+    from host_processes import executable_path, is_alive, list_processes
+
     def running_cerf_pids(install_dir: Path) -> List[int]:
         pids: List[int] = []
-        for entry in Path("/proc").iterdir():
-            if not entry.name.isdigit():
+        for pid, name in list_processes().items():
+            if name != FRONTEND_NAME:
                 continue
-            try:
-                comm = (entry / "comm").read_text(encoding="utf-8").strip()
-            except OSError:
-                continue
-            if comm != FRONTEND_NAME:
-                continue
-            try:
-                image = os.readlink(str(entry / "exe"))
-            except OSError:
-                image = None
-            if image is None or _same_directory(os.path.dirname(image), install_dir):
-                pids.append(int(entry.name))
+            image = executable_path(pid)
+            if image is None or _same_directory(os.path.dirname(image),
+                                                frontend_executable_in(install_dir).parent):
+                pids.append(pid)
         return pids
 
     def _pid_alive(pid: int) -> bool:
-        try:
-            stat = Path("/proc/{}/stat".format(pid)).read_text(encoding="utf-8")
-        except OSError:
-            return False
-        state = stat[stat.rfind(")") + 2:].split(" ", 1)[0]
-        return state not in ("Z", "X")
+        return is_alive(pid)
 
 
 def wait_for_cerf_exit(ask_retry: Callable[[str, str], bool],
@@ -160,8 +150,10 @@ def wait_for_pid_exit(pid: int, timeout: float = PID_WAIT_TIMEOUT) -> None:
 
 
 def launcher_exe_in(directory: Path) -> Path:
-    candidate = directory / LAUNCHER_DIR_NAME / LAUNCHER_NAME
-    return candidate if candidate.is_file() else directory / ROOT_LAUNCHER_NAME
+    candidate = launcher_executable_in(directory)
+    if candidate.is_file() or ROOT_LAUNCHER_NAME is None:
+        return candidate
+    return directory / ROOT_LAUNCHER_NAME
 
 
 def spawn_stage(exe: Path, args: List[str], cwd: Path) -> None:

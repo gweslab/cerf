@@ -22,6 +22,8 @@ def parse_args(argv):
     parser.add_argument("--mode", "-Mode", choices=("dev", "production"), default="dev")
     parser.add_argument("--force-kill", "-ForceKill", action="store_true")
     parser.add_argument("--rebuild", "-Rebuild", action="store_true")
+    parser.add_argument("--ce-apps-from", metavar="DIR",
+                        help="copy ce_apps from the ce_apps directory of another build")
     args = parser.parse_args(argv)
     if args.config.lower() in ("d", "debug"):
         args.config = "Debug"
@@ -35,8 +37,8 @@ def host_build(branch, args, heartbeat):
         import build_windows
         return build_windows, build_windows.WindowsBuild(ROOT, args.config, args.mode,
                                                          args.rebuild, heartbeat)
-    import build_linux
-    return build_linux, build_linux.LinuxBuild(ROOT, args.config, args.mode, args.rebuild,
+    import build_posix
+    return build_posix, build_posix.PosixBuild(ROOT, args.config, args.mode, args.rebuild,
                                                heartbeat, branch)
 
 
@@ -78,11 +80,12 @@ def run(args, branch, lock) -> int:
     if frontend_ok:
         host_branch.stamp(out / "cerf.json", branch)
         print("[BUILD] {} stamped into {}".format(branch.name, out / "cerf.json"), flush=True)
+        build_common.ship_notices(ROOT, out)
         report.ok()
     else:
         report.fail(branch.frontend)
 
-    build_common.build_ce_apps(ROOT, args.config, args.mode, heartbeat, report)
+    build_common.build_ce_apps(ROOT, args.config, args.mode, heartbeat, report, args.ce_apps_from)
 
     print("============================================================")
     if report.failed:

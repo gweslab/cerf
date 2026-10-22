@@ -9,12 +9,13 @@ exchange data through files only.
 The frontend sits in the install root: `cerf.exe` on Windows, `cerf-qt` on Linux. The
 launcher sits in the `launcher\` directory below it. PyInstaller builds the launcher in
 one-directory mode, so `launcher\launcher.exe` sits next to the Python runtime DLLs. On
-Linux the launcher is `launcher/launcher`.
+Linux the launcher is `launcher/launcher`. On macOS both programs are application bundles
+in the install root. `tools/host_branch.py` holds the path of each executable on each host.
 
 The root `launcher.exe` is a forwarder. It starts `launcher\launcher.exe` with the
 arguments that it received, and exits at once. On Linux the forwarder is the shell script
-`launcher.sh`, which replaces itself with `launcher/launcher` through `exec`. These start
-the forwarder:
+`launcher.sh`, which replaces itself with `launcher/launcher` through `exec`. macOS has no
+forwarder, because the user opens the launcher bundle itself. These start the forwarder:
 
 - users who unzip a build
 - shortcuts from earlier installations
@@ -216,10 +217,16 @@ The Properties sheet of a running device opens with every control disabled.
 The launcher brings a running device to the front instead. On Windows it uses the window
 handle. On Linux it sends a datagram to the abstract Unix socket `cerf-show/<pid>`.
 `cerf-qt` binds that socket at start, and raises its window when a datagram arrives.
+macOS has no abstract socket names, so there the socket is the file `cerf-show-<pid>` in
+`$TMPDIR`.
 
 On Linux the launcher starts each child process with the `LD_LIBRARY_PATH` that it
 received. The PyInstaller bootloader changes that variable to load the bundled
 libraries. A child program must not load them.
+
+On Linux and macOS the launcher also removes the `_PYI_` variables of the PyInstaller
+bootloader from the environment of each child process. A launcher child process that
+inherits them skips its own library setup and fails to start.
 
 ## Board data
 
@@ -229,9 +236,9 @@ launcher lists and a board CERF boots can never disagree.
 
 ## Installing and uninstalling
 
-Installing and uninstalling exist on Windows only. Linux has its own install conventions,
-so a Linux user extracts the release archive. On Linux the launcher refuses `--install`
-and `--uninstall`.
+Installing and uninstalling exist on Windows only. Linux and macOS have their own install
+conventions, so a user there extracts the release archive. On those hosts the launcher
+refuses `--install` and `--uninstall`.
 
 `cerf_installer.exe` is what a user downloads from the website. It is a second
 PyInstaller build of the same `launcher/` tree. It belongs to no installation,
@@ -277,15 +284,18 @@ update into `<install root>/upgrade/`. The staged
 `upgrade\launcher\launcher.exe --upgrade` then copies the update over the
 installation, after the old process exits. It never overwrites the global
 `cerf.json`. `cerf_json_merge.py` merges that file, so user keys survive.
-The launcher refuses an update while a CERF frontend runs: `cerf.exe` on Windows, `cerf-qt`
-on Linux.
+The launcher refuses an update while the frontend of the installation runs.
+
+On macOS the upgrade replaces each application bundle whole. The release archive keeps the
+symbolic links of the bundles.
 
 ## CPython 3.7 - a hard limit
 
 The Windows launcher ships on CPython 3.7.9 (x86). It is the newest interpreter that
-loads on Windows Vista, the supported floor. The Linux launcher ships on the Python 3 of the
-build host, from the same source. Every `launcher/*.py` file must run on 3.7.
-`tools/host_branch.py` must also run on 3.7, because the launcher imports it.
+loads on Windows Vista, the supported floor. Every host builds the launcher from the same
+source, so every `launcher/*.py` file must run on 3.7.
+Every module under `tools/` that the launcher imports must also run on 3.7. The rules of
+this section apply to it too.
 
 Use nothing newer: no walrus `:=`, no `Path.unlink(missing_ok=)`, no
 `str.removeprefix` or `removesuffix`, no `math.isqrt`, no `dict | dict`. A 3.8+

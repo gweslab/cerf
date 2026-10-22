@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 import shutil
+import stat
 import sys
 import threading
 import urllib.request
@@ -71,25 +72,54 @@ def verify_download(path: Path, label: str,
             )
 
 
+def _inside(path: str, root: Path) -> bool:
+    try:
+        Path(os.path.abspath(path)).relative_to(root)
+    except ValueError:
+        return False
+    return True
+
+
+def _is_symlink(member: zipfile.ZipInfo) -> bool:
+    return (member.create_system == _ZIP_HOST_UNIX
+            and stat.S_ISLNK(member.external_attr >> 16))
+
+
 def safe_extract(zip_path: Path, destination: Path) -> None:
     destination_absolute = Path(os.path.abspath(str(destination)))
     with zipfile.ZipFile(zip_path) as archive:
-        for member in archive.infolist():
-            member_absolute = Path(os.path.abspath(
-                str(destination / member.filename)))
-            try:
-                member_absolute.relative_to(destination_absolute)
-            except ValueError as exc:
-                raise BundleError(
-                    f"unsafe path in archive: {member.filename}"
-                ) from exc
-        archive.extractall(destination)
-        if sys.platform != "win32":
-            _restore_unix_modes(archive, destination)
+        members = archive.infolist()
+        for member in members:
+            if not _inside(str(destination / member.filename), destination_absolute):
+                raise BundleError(f"unsafe path in archive: {member.filename}")
+        if sys.platform == "win32":
+            archive.extractall(destination)
+            return
+        links = [m for m in members if _is_symlink(m)]
+        targets = {}
+        for link in links:
+            target = archive.read(link).decode("utf-8")
+            place = os.path.dirname(str(destination / link.filename.rstrip("/")))
+            if os.path.isabs(target) or not _inside(os.path.join(place, target),
+                                                    destination_absolute):
+                raise BundleError(f"unsafe link in archive: {link.filename} -> {target}")
+            targets[link.filename] = target
+        files = [m for m in members if not _is_symlink(m)]
+        archive.extractall(destination, members=files)
+        _restore_unix_modes(files, destination)
+        paths = [str(destination / link.filename.rstrip("/")) for link in links]
+        for link, path in zip(links, paths):
+            os.symlink(targets[link.filename], path)
+        real_root = Path(os.path.realpath(str(destination)))
+        escaping = [p for p in paths if not _inside(os.path.realpath(p), real_root)]
+        if escaping:
+            for path in paths:
+                os.unlink(path)
+            raise BundleError(f"link in archive leaves the destination: {escaping[0]}")
 
 
-def _restore_unix_modes(archive: zipfile.ZipFile, destination: Path) -> None:
-    for member in archive.infolist():
+def _restore_unix_modes(members, destination: Path) -> None:
+    for member in members:
         if member.create_system != _ZIP_HOST_UNIX:
             continue
         mode = (member.external_attr >> 16) & 0o777

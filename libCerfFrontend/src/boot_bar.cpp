@@ -5,30 +5,38 @@
 #include <cerfcore/core/cerf_emulator.h>
 #include <cerfcore/lcd/lcd_pixel_expand.h>
 #include <cerfcore/host/emulation_pause.h>
+#include <cerffrontend/dpi_scale.h>
 #include <cerffrontend/uart_boot_bar_data.h>
 
 namespace cerffrontend {
 
 REGISTER_SERVICE(BootBar);
 
+int BootBar::Factor(int dpi) { return IntegerFactorForDpi(dpi); }
+
+int BootBar::Height(int dpi) { return static_cast<int>(kUartBootBarHeight) * Factor(dpi); }
+
 void BootBar::RenderInto(uint32_t* dib_bgra32,
-                         uint32_t width, uint32_t height) {
-    if (height < kUartBootBarHeight || width == 0) return;
+                         uint32_t width, uint32_t height, int dpi) {
+    const uint32_t factor = static_cast<uint32_t>(Factor(dpi));
+    const uint32_t bar_h  = kUartBootBarHeight * factor;
+    const uint32_t bar_w  = kUartBootBarWidth * factor;
+    if (height < bar_h || width == 0) return;
 
     const uint64_t cycle_ms = 4000;
     const uint32_t phase_ms =
         (uint32_t)(emu_.Get<cerfcore::EmulationPause>().AnimationTickMs() % cycle_ms);
     const int      x_origin = (int)(((uint64_t)phase_ms * width) / cycle_ms);
-    const int      y_origin = (int)height - (int)kUartBootBarHeight;
+    const int      y_origin = (int)height - (int)bar_h;
 
-    for (uint32_t py = 0; py < kUartBootBarHeight; ++py) {
+    for (uint32_t py = 0; py < bar_h; ++py) {
         const int dst_y = y_origin + (int)py;
         if (dst_y < 0 || dst_y >= (int)height) continue;
-        const uint32_t* src_row = &kUartBootBarPixels[py * kUartBootBarWidth];
+        const uint32_t* src_row = &kUartBootBarPixels[(py / factor) * kUartBootBarWidth];
         uint32_t*       dst_row = dib_bgra32 + (size_t)dst_y * width;
-        for (uint32_t px = 0; px < kUartBootBarWidth; ++px) {
+        for (uint32_t px = 0; px < bar_w; ++px) {
             const int dst_x = (x_origin + (int)px) % (int)width;
-            const uint32_t s  = src_row[px];
+            const uint32_t s  = src_row[px / factor];
             const uint32_t sa = (s >> 24) & 0xFFu;
             if (sa == 0) continue;
             const uint32_t sr = (s >> 16) & 0xFFu;

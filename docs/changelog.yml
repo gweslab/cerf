@@ -5,6 +5,8 @@
       Support for Linux (x86-64)
       Support for macOS (ARM64)
       Startup screen scale configuration and dynamic mode for retina screen
+    fixed: |
+      Serial connection regression on some MIPS boards
   guest_additions:
     fixed: |
       Moved "untrusted apps hack" for WM into optional switch since it broke WM6

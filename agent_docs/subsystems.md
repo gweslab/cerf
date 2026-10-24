@@ -20,6 +20,12 @@ headers. When the core needs an action or an answer from the frontend, it
 declares a seam service, for example `UserAlert` or `DeviceSelection`. A seam
 is required unless the core resolves it with `TryGet<T>()`.
 
+The core receives host input as events with their real timing and order. Some
+host platforms, input devices or UI toolkits do not report the full timing. For
+example, a key can arrive with no press time. The frontend of that platform
+corrects the event before the core receives it. A correction for one input
+source never goes into a core path that every host and every source shares.
+
 ## CerfEmulator
 
 The composition root. One C++ class, owned by `main.cpp`, owns every service.

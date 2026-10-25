@@ -78,6 +78,6 @@ If your reading of the request is incorrect, the user sees that line and stops y
 
 ## Hard stops
 
-- **Never run git unless the user asked.** `/commit` is that ask. It covers this one commit and the library commits of the same change. Do not `git push`, which needs separate approval.
+- **Never run git unless the user asked.** `/commit` is that ask. It covers this one commit, the library commits of the same change, and the root commit that records their pointers. Do not `git push`, which needs separate approval.
 - **Never force past `.gitignore`** with `git add -f`. The ignore is a STOP signal.
 - **Stage only what this session changed.** Other agents and the user work in this tree at the same time, so `git status` often lists edits that are not yours. If you did not make a change, leave it unstaged and say it is there.

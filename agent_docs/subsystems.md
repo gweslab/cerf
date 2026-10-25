@@ -65,6 +65,11 @@ state are forbidden.
 - **Slot resolution runs on the boot thread only.** If a second thread must
   resolve a slot before boot ends, CERF halts. After boot, no slot is left to
   resolve, and any thread can call `Get<>`.
+- **A thread that `OnReady` starts gets its services from `OnReady`.** `Get<>`
+  runs `OnReady` on the thread that asks first, also while the boot sweep runs
+  on the boot thread. A thread that asks for a service that is not ready yet
+  runs its setup beside the boot sweep. Two setups that touch the same state
+  then race. Resolve every service that the thread uses before you start it.
 - **The locator is the `libservicelocator` submodule.**
 
 - `libCerfCore/include/cerfcore/core/cerf_emulator.h`, `libCerfCore/include/cerfcore/core/service.h`,

@@ -14,7 +14,7 @@ jobs:
       - name: Install the checkout tools
         run: |
           apt-get update
-          DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends ca-certificates git python3
+          DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends ca-certificates curl git python3
 
       - uses: actions/checkout@v4
         with:

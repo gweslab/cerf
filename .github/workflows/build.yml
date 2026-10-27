@@ -45,7 +45,7 @@ jobs:
 
   publish:
     needs: [build, build-linux, build-macos, build-android]
-    if: ${{ always() && github.event_name == 'push' }}
+    if: ${{ github.event_name == 'push' }}
     runs-on: ubuntu-latest
     env:
       R2_ACCOUNT_ID:        ${{ secrets.R2_ACCOUNT_ID }}
@@ -56,6 +56,9 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+
+      - name: Fetch libCerfCore
+        run: git submodule update --init libCerfCore
 
       - uses: actions/setup-python@v5
         with:
@@ -69,54 +72,48 @@ jobs:
         run: python tools/stamp_version.py --run=${{ github.run_number }} --sha=${{ github.sha }}
 
       - name: Fetch the Windows build
-        if: ${{ needs.build.result == 'success' }}
         uses: actions/download-artifact@v4
         with:
           name: ${{ steps.version.outputs.artifact-win32-x86 }}
           path: ci/win32
 
       - name: Publish the Windows build to the R2 beta channel
-        if: ${{ needs.build.result == 'success' }}
         run: |
           name="${{ steps.version.outputs.artifact-win32-x86 }}"
           python tools/pack_release.py "ci/dist/$name.zip" ci/win32
           python tools/publish_r2_build.py --zip="ci/dist/$name.zip" --host-branch=win32-x86
 
       - name: Fetch the Linux build
-        if: ${{ needs.build-linux.result == 'success' }}
         uses: actions/download-artifact@v4
         with:
           name: ${{ steps.version.outputs.artifact-linux-amd64 }}
           path: ci/linux
 
       - name: Publish the Linux build to the R2 beta channel
-        if: ${{ needs.build-linux.result == 'success' }}
         run: |
           name="${{ steps.version.outputs.artifact-linux-amd64 }}"
           python tools/publish_r2_build.py --zip="ci/linux/$name.zip" --host-branch=linux-amd64
 
       - name: Fetch the macOS build
-        if: ${{ needs.build-macos.result == 'success' }}
         uses: actions/download-artifact@v4
         with:
           name: ${{ steps.version.outputs.artifact-macos-arm64 }}
           path: ci/macos
 
       - name: Publish the macOS build to the R2 beta channel
-        if: ${{ needs.build-macos.result == 'success' }}
         run: |
           name="${{ steps.version.outputs.artifact-macos-arm64 }}"
           python tools/publish_r2_build.py --zip="ci/macos/$name.zip" --host-branch=macos-arm64
 
       - name: Fetch the Android build
-        if: ${{ needs.build-android.result == 'success' && needs.build-android.outputs.signed == 'true' }}
+        if: ${{ needs.build-android.outputs.signed == 'true' }}
         uses: actions/download-artifact@v4
         with:
           name: ${{ steps.version.outputs.artifact-android-arm64 }}
           path: ci/android
 
       - name: Publish the Android build to the R2 beta channel
-        if: ${{ needs.build-android.result == 'success' && needs.build-android.outputs.signed == 'true' }}
+        if: ${{ needs.build-android.outputs.signed == 'true' }}
         run: |
           name="${{ steps.version.outputs.artifact-android-arm64 }}"
           python tools/pack_release.py "ci/dist/$name.zip" ci/android
@@ -124,7 +121,7 @@ jobs:
 
       - name: Publish the Android release APK to R2
         if: >-
-          ${{ needs.build-android.result == 'success' && needs.build-android.outputs.signed == 'true' &&
+          ${{ needs.build-android.outputs.signed == 'true' &&
               contains(github.event.head_commit.message, '[release cerf]') }}
         env:
           R2_PREFIX: cerf_android
@@ -145,6 +142,9 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+
+      - name: Fetch libCerfCore
+        run: git submodule update --init libCerfCore
 
       - uses: actions/setup-python@v5
         with:
@@ -176,6 +176,9 @@ jobs:
           exit 1
 
       - uses: actions/checkout@v4
+
+      - name: Fetch libCerfCore
+        run: git submodule update --init libCerfCore
 
       - uses: actions/setup-python@v5
         with:

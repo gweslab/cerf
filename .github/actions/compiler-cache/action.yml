@@ -1,0 +1,51 @@
+name: Compiler cache
+description: Restore the ccache folder before the build, then keep only the entries the build used and save it.
+
+inputs:
+  stage:
+    description: restore before the build, save after it.
+    required: true
+  host-branch:
+    description: The host branch that the build compiles.
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Restore the compiler cache
+      if: inputs.stage == 'restore'
+      id: restore
+      uses: actions/cache/restore@v4
+      with:
+        path: ci/ccache
+        key: ccache-${{ inputs.host-branch }}-${{ github.sha }}
+        restore-keys: ccache-${{ inputs.host-branch }}-
+
+    - name: Point ccache at the restored cache
+      if: inputs.stage == 'restore'
+      shell: bash
+      run: |
+        export CCACHE_DIR="$GITHUB_WORKSPACE/ci/ccache"
+        ccache --zero-stats
+        echo "CCACHE_DIR=$CCACHE_DIR" >> "$GITHUB_ENV"
+        echo "CERF_CCACHE_HIT=${{ steps.restore.outputs.cache-hit }}" >> "$GITHUB_ENV"
+        echo "CERF_CCACHE_STARTED=$(date +%s)" >> "$GITHUB_ENV"
+
+    - name: Keep only the entries the build used
+      if: inputs.stage == 'save'
+      id: trim
+      shell: bash
+      run: |
+        ccache --show-stats
+        used=$(ccache --print-stats | awk -F'\t' '$1 == "direct_cache_hit" || $1 == "preprocessed_cache_hit" || $1 == "cache_miss" { n += $2 } END { print n + 0 }')
+        echo "used=$used" >> "$GITHUB_OUTPUT"
+        if [ "$used" -gt 0 ]; then
+          ccache --evict-older-than "$(( $(date +%s) - CERF_CCACHE_STARTED + 1 ))s"
+        fi
+
+    - name: Save the compiler cache
+      if: inputs.stage == 'save' && steps.trim.outputs.used != '0' && env.CERF_CCACHE_HIT != 'true'
+      uses: actions/cache/save@v4
+      with:
+        path: ci/ccache
+        key: ccache-${{ inputs.host-branch }}-${{ github.sha }}

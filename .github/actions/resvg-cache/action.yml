@@ -1,0 +1,42 @@
+name: resvg cache
+description: Restore or save the resvg library that tools/resvg_library.py builds for one host branch.
+
+inputs:
+  stage:
+    description: restore before the build, save after it.
+    required: true
+  host-branch:
+    description: The host branch whose resvg library the build links.
+    required: true
+  python:
+    description: The Python command of the runner.
+    required: false
+    default: python3
+
+runs:
+  using: composite
+  steps:
+    - name: Name the resvg library
+      id: resvg
+      shell: bash
+      run: ${{ inputs.python }} tools/resvg_library.py --cache-outputs "${{ inputs.host-branch }}" >> "$GITHUB_OUTPUT"
+
+    - name: Restore the resvg library
+      if: inputs.stage == 'restore'
+      id: restore
+      uses: actions/cache/restore@v4
+      with:
+        path: ${{ steps.resvg.outputs.path }}
+        key: resvg-${{ inputs.host-branch }}-${{ steps.resvg.outputs.key }}
+
+    - name: Record the resvg cache hit
+      if: inputs.stage == 'restore'
+      shell: bash
+      run: echo "CERF_RESVG_HIT=${{ steps.restore.outputs.cache-hit }}" >> "$GITHUB_ENV"
+
+    - name: Save the resvg library
+      if: inputs.stage == 'save' && env.CERF_RESVG_HIT != 'true' && hashFiles(steps.resvg.outputs.stamp) != ''
+      uses: actions/cache/save@v4
+      with:
+        path: ${{ steps.resvg.outputs.path }}
+        key: resvg-${{ inputs.host-branch }}-${{ steps.resvg.outputs.key }}

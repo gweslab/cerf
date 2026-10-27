@@ -6,19 +6,25 @@ on:
   pull_request:
     branches: ["main"]
 
-concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
-
 permissions:
   contents: read
 
 jobs:
-  build:
+  qt-windows:
     if: >-
       ${{ !contains(github.event.head_commit.message, '[skip build]') &&
           (github.event_name != 'pull_request' ||
            github.event.pull_request.head.repo.full_name == github.repository) }}
+    concurrency:
+      group: ${{ github.workflow }}-qt-windows
+      cancel-in-progress: false
+    uses: ./.github/workflows/qt-windows.yml
+
+  build:
+    needs: qt-windows
+    concurrency:
+      group: ${{ github.workflow }}-${{ github.ref }}-windows
+      cancel-in-progress: true
     uses: ./.github/workflows/build-windows.yml
     secrets: inherit
 
@@ -27,11 +33,17 @@ jobs:
       ${{ !contains(github.event.head_commit.message, '[skip build]') &&
           (github.event_name != 'pull_request' ||
            github.event.pull_request.head.repo.full_name == github.repository) }}
+    concurrency:
+      group: ${{ github.workflow }}-${{ github.ref }}-linux
+      cancel-in-progress: true
     uses: ./.github/workflows/build-linux.yml
     secrets: inherit
 
   build-macos:
     needs: build
+    concurrency:
+      group: ${{ github.workflow }}-${{ github.ref }}-macos
+      cancel-in-progress: true
     uses: ./.github/workflows/build-macos.yml
     secrets: inherit
 
@@ -40,12 +52,18 @@ jobs:
       ${{ !contains(github.event.head_commit.message, '[skip build]') &&
           (github.event_name != 'pull_request' ||
            github.event.pull_request.head.repo.full_name == github.repository) }}
+    concurrency:
+      group: ${{ github.workflow }}-${{ github.ref }}-android
+      cancel-in-progress: true
     uses: ./.github/workflows/build-android.yml
     secrets: inherit
 
   publish:
     needs: [build, build-linux, build-macos, build-android]
     if: ${{ github.event_name == 'push' }}
+    concurrency:
+      group: ${{ github.workflow }}-${{ github.ref }}-publish
+      cancel-in-progress: true
     runs-on: ubuntu-latest
     env:
       R2_ACCOUNT_ID:        ${{ secrets.R2_ACCOUNT_ID }}
@@ -135,6 +153,9 @@ jobs:
     if: >-
       ${{ github.event_name == 'push' &&
           !contains(github.event.head_commit.message, '[release cerf]') }}
+    concurrency:
+      group: ${{ github.workflow }}-${{ github.ref }}-announce
+      cancel-in-progress: true
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -166,6 +187,9 @@ jobs:
   release:
     needs: [build, build-linux, build-macos, build-android]
     if: github.event_name == 'push' && contains(github.event.head_commit.message, '[release cerf]')
+    concurrency:
+      group: ${{ github.workflow }}-${{ github.ref }}-release
+      cancel-in-progress: true
     runs-on: ubuntu-latest
 
     steps:

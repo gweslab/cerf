@@ -1,10 +1,7 @@
 name: vcpkg dependencies on Windows
-description: Restore, install and save the vcpkg manifest dependencies of one triplet.
+description: Restore the vcpkg caches, install the manifest dependencies of one host branch and save the caches.
 
 inputs:
-  triplet:
-    description: The vcpkg triplet of the host branch, for the cache keys.
-    required: true
   host-branch:
     description: The host branch whose triplet tools/vcpkg_install.py installs.
     required: true
@@ -12,14 +9,11 @@ inputs:
 runs:
   using: composite
   steps:
-    - name: Restore vcpkg deps
-      id: cache-deps
-      uses: actions/cache/restore@v4
+    - uses: ./.github/actions/vcpkg-cache
       with:
-        path: vcpkg_installed
-        key: vcpkg_${{ runner.os }}_${{ inputs.triplet }}_${{ hashFiles('vcpkg.json', 'vcpkg-configuration.json', 'libCerfCore/vcpkg-ports/**') }}
-        restore-keys: |
-          vcpkg_${{ runner.os }}_${{ inputs.triplet }}_
+        stage: restore
+        host-branch: ${{ inputs.host-branch }}
+        python: python
 
     - name: Restore vcpkg source downloads
       id: cache-downloads
@@ -53,9 +47,8 @@ runs:
         path: C:\vcpkg\downloads
         key: vcpkg-downloads-${{ runner.os }}-${{ hashFiles('vcpkg.json', 'vcpkg-configuration.json') }}
 
-    - name: Save vcpkg deps
-      if: steps.cache-deps.outputs.cache-hit != 'true'
-      uses: actions/cache/save@v4
+    - uses: ./.github/actions/vcpkg-cache
       with:
-        path: vcpkg_installed
-        key: vcpkg_${{ runner.os }}_${{ inputs.triplet }}_${{ hashFiles('vcpkg.json', 'vcpkg-configuration.json', 'libCerfCore/vcpkg-ports/**') }}
+        stage: save
+        host-branch: ${{ inputs.host-branch }}
+        python: python

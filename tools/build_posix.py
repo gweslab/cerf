@@ -30,7 +30,6 @@ BUILD_TOOLS = ("cmake", "ninja", COMPILER)
 class PosixBuild(FrontendBuild):
     compiler = COMPILER
     cmake: Optional[str] = None
-    ccache: Optional[str] = None
     prefix_path: Optional[str] = None
 
     def discover(self) -> None:
@@ -39,12 +38,12 @@ class PosixBuild(FrontendBuild):
             raise BuildAbort("{} not found on PATH. Install CMake, Ninja, a C++ "
                              "compiler and the Qt 6 development packages.".format(", ".join(missing)))
         self.cmake = shutil.which("cmake")
-        self.ccache = shutil.which("ccache")
         if sys.platform == "darwin":
             self.prefix_path = _homebrew_prefix()
+        ccache = self.compiler_cache()
         print("[BUILD] cmake {}, ninja {}, {} {}{}{}".format(
             self.cmake, shutil.which("ninja"), self.compiler, shutil.which(self.compiler),
-            ", ccache {}".format(self.ccache) if self.ccache else "",
+            ", ccache {}".format(ccache) if ccache else "",
             ", prefix {}".format(self.prefix_path) if self.prefix_path else ""), flush=True)
 
     def build(self) -> bool:
@@ -55,11 +54,10 @@ class PosixBuild(FrontendBuild):
         configure = [self.cmake, "-S", self.root, "-B", cmake_dir, "-G", "Ninja",
                      "-DCMAKE_BUILD_TYPE=" + self.config, "-DCMAKE_CXX_COMPILER=" + self.compiler,
                      "-DCMAKE_RUNTIME_OUTPUT_DIRECTORY={}".format(out),
-                     "-DCMAKE_EXPORT_COMPILE_COMMANDS=ON"] + self.cmake_options() + resvg
+                     "-DCMAKE_EXPORT_COMPILE_COMMANDS=ON"] + \
+            self.cmake_options() + self.compiler_cache_options() + resvg
         if self.prefix_path:
             configure.append("-DCMAKE_PREFIX_PATH=" + self.prefix_path)
-        if self.ccache:
-            configure.append("-DCMAKE_CXX_COMPILER_LAUNCHER=" + self.ccache)
         self.configure(cmake_dir, configure)
         if not self.compile([self.cmake, "--build", cmake_dir, "--parallel"]):
             return False

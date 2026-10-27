@@ -38,6 +38,13 @@ class FrontendBuild:
                 "-DCERFCORE_DEVICE_TRACES=" + (self.dev if self.device_traces else "OFF"),
                 "-DPython3_EXECUTABLE={}".format(sys.executable)]
 
+    def compiler_cache(self) -> Optional[str]:
+        return shutil.which("ccache")
+
+    def compiler_cache_options(self) -> List[str]:
+        ccache = self.compiler_cache()
+        return [] if ccache is None else ["-DCMAKE_CXX_COMPILER_LAUNCHER=" + ccache]
+
     def resvg_options(self, env: Dict[str, str]) -> List[str]:
         try:
             return resvg_library.cmake_options(self.root, self.branch.name, env, self.heartbeat)

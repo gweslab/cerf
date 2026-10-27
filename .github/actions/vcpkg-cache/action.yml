@@ -1,0 +1,47 @@
+name: vcpkg binary cache
+description: Restore the newest vcpkg binary cache before the install, then trim it to the installed packages and save it when they changed.
+
+inputs:
+  stage:
+    description: restore before the vcpkg install, save after it.
+    required: true
+  host-branch:
+    description: The host branch whose triplet tools/vcpkg_install.py installs.
+    required: true
+  python:
+    description: The Python command of the runner.
+    required: false
+    default: python3
+
+runs:
+  using: composite
+  steps:
+    - name: Restore the vcpkg binary cache
+      if: inputs.stage == 'restore'
+      id: restore
+      uses: actions/cache/restore@v4
+      with:
+        path: ci/vcpkg-archives
+        key: vcpkg-archives-${{ inputs.host-branch }}
+        restore-keys: vcpkg-archives-${{ inputs.host-branch }}-
+
+    - name: Point vcpkg at the binary cache
+      if: inputs.stage == 'restore'
+      shell: bash
+      run: |
+        mkdir -p ci/vcpkg-archives
+        echo "VCPKG_DEFAULT_BINARY_CACHE=$GITHUB_WORKSPACE/ci/vcpkg-archives" >> "$GITHUB_ENV"
+        echo "CERF_VCPKG_ARCHIVES_KEY=${{ steps.restore.outputs.cache-matched-key }}" >> "$GITHUB_ENV"
+
+    - name: Trim the binary cache to the installed packages
+      if: inputs.stage == 'save'
+      id: trim
+      shell: bash
+      run: ${{ inputs.python }} tools/vcpkg_install.py --trim-archives "${{ inputs.host-branch }}" >> "$GITHUB_OUTPUT"
+
+    - name: Save the vcpkg binary cache
+      if: inputs.stage == 'save' && env.CERF_VCPKG_ARCHIVES_KEY != format('vcpkg-archives-{0}-{1}', inputs.host-branch, steps.trim.outputs.key)
+      uses: actions/cache/save@v4
+      with:
+        path: ci/vcpkg-archives
+        key: vcpkg-archives-${{ inputs.host-branch }}-${{ steps.trim.outputs.key }}

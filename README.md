@@ -46,7 +46,7 @@ Install modern Visual Studio with the C++ desktop development workload.
 Install the build packages. These are the Ubuntu 26.04 names:
 
 ```
-sudo apt install git cmake ninja-build g++ pkg-config wine ccache qt6-base-dev qt6-svg-dev qt6-declarative-dev qt6-declarative-dev-tools qml6-module-qtquick qml6-module-qtquick-controls qml6-module-qtquick-templates qml6-module-qtquick-layouts qml6-module-qtquick-window qml6-module-qtqml-workerscript qml6-module-qtquick-dialogs qml6-module-qtquick-effects qml6-module-qtqml qml6-module-qtqml-models libslirp-dev libzip-dev nlohmann-json3-dev libasound2-dev libxcb1-dev libxcb-randr0-dev libwayland-dev
+sudo apt install git cmake ninja-build g++ pkg-config ccache wine qt6-base-dev qt6-svg-dev qt6-declarative-dev qt6-declarative-dev-tools qml6-module-qtquick qml6-module-qtquick-controls qml6-module-qtquick-templates qml6-module-qtquick-layouts qml6-module-qtquick-window qml6-module-qtqml-workerscript qml6-module-qtquick-dialogs qml6-module-qtquick-effects qml6-module-qtqml qml6-module-qtqml-models libslirp-dev libzip-dev nlohmann-json3-dev libasound2-dev libxcb1-dev libxcb-randr0-dev libwayland-dev
 ```
 
 ### macOS
@@ -54,7 +54,7 @@ sudo apt install git cmake ninja-build g++ pkg-config wine ccache qt6-base-dev q
 Install the Xcode Command Line Tools (`xcode-select --install`) and [Homebrew](https://brew.sh). Then install the build packages:
 
 ```
-brew install cmake ninja pkgconf qtbase qtsvg qtdeclarative libslirp libzip nlohmann-json
+brew install cmake ninja pkgconf ccache qtbase qtsvg qtdeclarative libslirp libzip nlohmann-json
 ```
 
 ### All hosts

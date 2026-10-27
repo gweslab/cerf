@@ -11,6 +11,10 @@ from typing import List, Optional, Tuple
 MIN_TOOLS_VERSION = (14, 30)
 
 
+class ToolchainError(Exception):
+    pass
+
+
 @dataclass
 class VsToolchain:
     vswhere: Path
@@ -78,3 +82,24 @@ def find() -> VsToolchain:
 
 def min_tools_version_text() -> str:
     return "{}.{}".format(*MIN_TOOLS_VERSION)
+
+
+def require(product: str) -> VsToolchain:
+    tc = find()
+    if not tc.vswhere.is_file():
+        raise ToolchainError("vswhere.exe not found at {}. Install Visual Studio "
+                             "with the C++ desktop workload.".format(tc.vswhere))
+    if not tc.tools_version:
+        raise ToolchainError(
+            "No usable MSVC toolset. Installed: {}.\n"
+            "[BUILD] Requires >= {} (for /std:c++20) and not 14.51.*, which\n"
+            "[BUILD] miscompiles bit-mask dispatch loops on x86 /O2 /Oy- and would silently\n"
+            "[BUILD] produce a broken {}.".format("; ".join(tc.installed), min_tools_version_text(), product))
+    root = tc.instance["installationPath"]
+    if tc.msbuild is None or not tc.msbuild.is_file():
+        raise ToolchainError("MSBuild.exe not found in {}. Ensure Visual Studio's "
+                             "C++ desktop workload is installed.".format(root))
+    if not tc.cmake.is_file():
+        raise ToolchainError("CMake not found at {}. Install the 'C++ CMake tools "
+                             "for Windows' component of Visual Studio.".format(tc.cmake))
+    return tc

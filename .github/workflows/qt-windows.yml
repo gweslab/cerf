@@ -1,0 +1,38 @@
+name: qt-windows
+
+on:
+  workflow_call:
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: false
+
+      - name: Name the Qt build
+        id: qt
+        shell: pwsh
+        run: python tools/qt_windows.py --cache-outputs >> $env:GITHUB_OUTPUT
+
+      - name: Look up the Qt build
+        id: cache-qt
+        uses: actions/cache/restore@v4
+        with:
+          path: ${{ steps.qt.outputs.path }}
+          key: qt-win7-x86-${{ steps.qt.outputs.key }}
+          lookup-only: true
+
+      - name: Build Qt
+        if: steps.cache-qt.outputs.cache-hit != 'true'
+        shell: pwsh
+        run: python tools/qt_windows.py --ensure
+
+      - name: Save the Qt build
+        if: steps.cache-qt.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: ${{ steps.qt.outputs.path }}
+          key: qt-win7-x86-${{ steps.qt.outputs.key }}

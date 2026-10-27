@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import shutil
 import subprocess
+import sys
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable, Dict, List
@@ -9,7 +10,7 @@ from typing import Callable, Dict, List
 import rust_toolchain
 import tar_archives
 from host_branch import ANDROID_AMD64, ANDROID_ARM64, LINUX_AMD64, MACOS_ARM64, WIN32_X86
-from json_files import read_json_or_none, write_json
+from json_files import json_digest, read_json_or_none, write_json
 from tool_log import tagged
 from tool_process import failure_text
 from verified_download import fetch_verified
@@ -88,8 +89,23 @@ def _library_name(triple: str) -> str:
     return "resvg.lib" if triple.endswith("-msvc") else "libresvg.a"
 
 
+def _wanted_stamp(target: RustTarget) -> dict:
+    return {"version": RESVG_VERSION, "toolchain": target.toolchain, "build_std": target.build_std}
+
+
+def prefix_dir(root: Path, target: RustTarget) -> Path:
+    return root / RESVG_DIR / RESVG_VERSION / target.triple
+
+
 def build(root: Path, branch_name: str, env: Dict[str, str], heartbeat: Callable[[], None]) -> Path:
     target = TARGETS[branch_name]
+    base = root / RESVG_DIR / RESVG_VERSION
+    source = base / "src"
+    prefix = prefix_dir(root, target)
+    stamp = prefix / STAMP_NAME
+    wanted = _wanted_stamp(target)
+    if read_json_or_none(stamp) == wanted:
+        return prefix
     rust = rust_toolchain.RustToolchain(root, heartbeat)
     try:
         if target.build_std:
@@ -98,13 +114,6 @@ def build(root: Path, branch_name: str, env: Dict[str, str], heartbeat: Callable
             rust.ensure(target.toolchain, [target.triple], [])
     except rust_toolchain.RustError as exc:
         raise ResvgError(str(exc))
-    base = root / RESVG_DIR / RESVG_VERSION
-    source = base / "src"
-    prefix = base / target.triple
-    stamp = prefix / STAMP_NAME
-    wanted = {"version": RESVG_VERSION, "toolchain": target.toolchain, "build_std": target.build_std}
-    if read_json_or_none(stamp) == wanted:
-        return prefix
     _unpack(_fetch(root / RESVG_DIR / "downloads"), source)
     heartbeat()
     target_dir = base / "target"
@@ -144,3 +153,16 @@ def build(root: Path, branch_name: str, env: Dict[str, str], heartbeat: Callable
 
 def cmake_options(root: Path, branch_name: str, env: Dict[str, str], heartbeat: Callable[[], None]) -> List[str]:
     return ["-DCERFQT_RESVG_PREFIX={}".format(build(root, branch_name, env, heartbeat).as_posix())]
+
+
+def cache_outputs(branch_name: str) -> List[str]:
+    target = TARGETS[branch_name]
+    prefix = prefix_dir(Path("."), target)
+    return ["path={}".format(prefix.as_posix()), "stamp={}".format((prefix / STAMP_NAME).as_posix()),
+            "key={}".format(json_digest(_wanted_stamp(target)))]
+
+
+if __name__ == "__main__":
+    if len(sys.argv) != 3 or sys.argv[1] != "--cache-outputs" or sys.argv[2] not in TARGETS:
+        raise SystemExit("usage: resvg_library.py --cache-outputs <{}>".format("|".join(TARGETS)))
+    print("\n".join(cache_outputs(sys.argv[2])))

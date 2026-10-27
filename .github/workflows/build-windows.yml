@@ -26,21 +26,20 @@ jobs:
         run: python tools/qt_windows.py --cache-outputs >> $env:GITHUB_OUTPUT
 
       - name: Restore the Qt build
-        id: cache-qt
         uses: actions/cache/restore@v4
         with:
           path: ${{ steps.qt.outputs.path }}
-          key: qt-${{ runner.os }}-${{ hashFiles('tools/qt_windows.py', 'tools/qt_common.py') }}
-
-      - name: Name the vcpkg triplet
-        id: vcpkg
-        shell: pwsh
-        run: python tools/vcpkg_install.py --outputs ${{ env.HOST_BRANCH }} >> $env:GITHUB_OUTPUT
+          key: qt-win7-x86-${{ steps.qt.outputs.key }}
 
       - uses: ./.github/actions/vcpkg-windows
         with:
-          triplet: ${{ steps.vcpkg.outputs.triplet }}
           host-branch: ${{ env.HOST_BRANCH }}
+
+      - uses: ./.github/actions/resvg-cache
+        with:
+          stage: restore
+          host-branch: ${{ env.HOST_BRANCH }}
+          python: python
 
       - name: Stamp version.h with CI build info
         id: version
@@ -56,12 +55,12 @@ jobs:
         shell: pwsh
         run: python build.py --config Release --mode production
 
-      - name: Save the Qt build
-        if: always() && steps.cache-qt.outputs.cache-hit != 'true' && hashFiles(steps.qt.outputs.stamp) != ''
-        uses: actions/cache/save@v4
+      - uses: ./.github/actions/resvg-cache
+        if: ${{ !cancelled() }}
         with:
-          path: ${{ steps.qt.outputs.path }}
-          key: qt-${{ runner.os }}-${{ hashFiles('tools/qt_windows.py', 'tools/qt_common.py') }}
+          stage: save
+          host-branch: ${{ env.HOST_BRANCH }}
+          python: python
 
       - uses: ./.github/actions/ship-pdb
         with:

@@ -30,8 +30,30 @@ jobs:
           name: ${{ steps.version.outputs.artifact-win32-x86 }}
           path: ci/win32
 
+      - uses: ./.github/actions/compiler-cache
+        with:
+          stage: restore
+          host-branch: ${{ env.HOST_BRANCH }}
+
+      - uses: ./.github/actions/resvg-cache
+        with:
+          stage: restore
+          host-branch: ${{ env.HOST_BRANCH }}
+
       - name: Build
         run: python3 build.py --config Release --mode production --ce-apps-from=ci/win32/ce_apps
+
+      - uses: ./.github/actions/resvg-cache
+        if: ${{ !cancelled() }}
+        with:
+          stage: save
+          host-branch: ${{ env.HOST_BRANCH }}
+
+      - uses: ./.github/actions/compiler-cache
+        if: ${{ !cancelled() }}
+        with:
+          stage: save
+          host-branch: ${{ env.HOST_BRANCH }}
 
       - name: Pack the build
         id: pack

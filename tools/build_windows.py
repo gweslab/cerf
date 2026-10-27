@@ -34,25 +34,10 @@ class _MsvcBuild(FrontendBuild):
     toolchain = None
 
     def discover(self) -> None:
-        tc = vs_toolchain.find()
-        if not tc.vswhere.is_file():
-            raise BuildAbort("vswhere.exe not found at {}. Install Visual Studio "
-                             "with the C++ desktop workload.".format(tc.vswhere))
-        if not tc.tools_version:
-            raise BuildAbort(
-                "No usable MSVC toolset. Installed: {}.\n"
-                "[BUILD] Requires >= {} (for /std:c++20) and not 14.51.*, which\n"
-                "[BUILD] miscompiles bit-mask dispatch loops on x86 /O2 /Oy- and would silently\n"
-                "[BUILD] produce a broken {}.".format("; ".join(tc.installed),
-                                                      vs_toolchain.min_tools_version_text(),
-                                                      self.branch.frontend))
-        root = tc.instance["installationPath"]
-        if tc.msbuild is None or not tc.msbuild.is_file():
-            raise BuildAbort("MSBuild.exe not found in {}. Ensure Visual Studio's "
-                             "C++ desktop workload is installed.".format(root))
-        if not tc.cmake.is_file():
-            raise BuildAbort("CMake not found at {}. Install the 'C++ CMake tools "
-                             "for Windows' component of Visual Studio.".format(tc.cmake))
+        try:
+            tc = vs_toolchain.require(self.branch.frontend)
+        except vs_toolchain.ToolchainError as exc:
+            raise BuildAbort(exc)
         print("[BUILD] {}, MSVC toolset {} ({}) (installed: {})".format(
             tc.instance.get("displayName", "?"), tc.tools_version, tc.platform_toolset,
             "; ".join(tc.installed)), flush=True)

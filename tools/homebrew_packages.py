@@ -2,7 +2,7 @@ import sys
 
 from tool_process import exit_code
 
-BUILD_FORMULAE = ("cmake", "ninja", "pkgconf", "qtbase", "qtsvg", "qtdeclarative", "libslirp",
+BUILD_FORMULAE = ("cmake", "ninja", "pkgconf", "ccache", "qtbase", "qtsvg", "qtdeclarative", "libslirp",
                   "libzip", "nlohmann-json")
 
 

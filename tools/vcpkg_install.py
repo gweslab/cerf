@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Callable, Dict, List
 
 from host_branch import ANDROID_AMD64, ANDROID_ARM64, WIN32_X86
+from json_files import json_digest
 from tool_process import run_or_raise
 
 TRIPLETS = {WIN32_X86: "x86-windows-static-md", ANDROID_ARM64: "arm64-android", ANDROID_AMD64: "x64-android"}
@@ -72,9 +73,31 @@ def install(repo: Path, vcpkg_root: Path, triplet: str, env: Dict[str, str],
     return installed_prefix(repo, triplet)
 
 
+def installed_abis(repo: Path, triplet: str) -> List[str]:
+    database = installed_root(repo, triplet) / "vcpkg"
+    entries: Dict[tuple, Dict[str, str]] = {}
+    for path in [database / "status"] + sorted((database / "updates").glob("*")):
+        for block in path.read_text(encoding="utf-8").split("\n\n"):
+            fields = dict(line.split(": ", 1) for line in block.splitlines() if ": " in line)
+            if "Package" in fields:
+                entries[(fields["Package"], fields.get("Architecture"), fields.get("Feature"))] = fields
+    return sorted(fields["Abi"] for fields in entries.values()
+                  if fields.get("Status") == "install ok installed" and "Abi" in fields)
+
+
+def trim_archives(archives: Path, abis: List[str]) -> None:
+    keep = set(abis)
+    for archive in archives.glob("*/*.zip"):
+        if archive.stem not in keep:
+            archive.unlink()
+
+
 def main(argv: List[str]) -> int:
-    if len(argv) == 3 and argv[1] == "--outputs":
-        print("triplet={}".format(TRIPLETS[argv[2]]))
+    if len(argv) == 3 and argv[1] == "--trim-archives":
+        repo = Path(__file__).resolve().parent.parent
+        abis = installed_abis(repo, TRIPLETS[argv[2]])
+        trim_archives(Path(os.environ["VCPKG_DEFAULT_BINARY_CACHE"]), abis)
+        print("key={}".format(json_digest(abis)))
         return 0
     if len(argv) == 3 and argv[1] == "--install":
         try:
@@ -84,7 +107,7 @@ def main(argv: List[str]) -> int:
             print("[VCPKG] FAILED! {}".format(exc), flush=True)
             return 1
         return 0
-    sys.stderr.write("usage: vcpkg_install.py --outputs <host branch> | --install <host branch>\n")
+    sys.stderr.write("usage: vcpkg_install.py --install <host branch> | --trim-archives <host branch>\n")
     return 2
 
 

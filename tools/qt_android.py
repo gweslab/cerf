@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Callable, List, Tuple
 
 from host_branch import ANDROID_AMD64, ANDROID_ARM64
-from json_files import read_json_or_none, write_json
+from json_files import json_digest, read_json_or_none, write_json
 from qt_common import QT_DIR, STAMP_NAME, say
 from tool_process import run_or_raise
 from verified_download import fetch_verified
@@ -128,13 +128,18 @@ def _fetch(folder: str, archives: Tuple[Archive, ...], downloads: Path) -> List[
             for package, name, sha256 in archives]
 
 
-def _install(prefix: Path, folder: str, archives: Tuple[Archive, ...], cmake: Path, downloads: Path,
-             heartbeat: Callable[[], None]) -> Path:
-    stamp = prefix / STAMP_NAME
+def _wanted_stamp(archives: Tuple[Archive, ...]) -> dict:
     wanted = {"version": PACKAGE_VERSION, "archives": {name: sha256 for _, name, sha256 in archives}}
     destinations = {name: ARCHIVE_DESTINATIONS[name] for _, name, _ in archives if name in ARCHIVE_DESTINATIONS}
     if destinations:
         wanted["destinations"] = destinations
+    return wanted
+
+
+def _install(prefix: Path, folder: str, archives: Tuple[Archive, ...], cmake: Path, downloads: Path,
+             heartbeat: Callable[[], None]) -> Path:
+    stamp = prefix / STAMP_NAME
+    wanted = _wanted_stamp(archives)
     if read_json_or_none(stamp) == wanted:
         return prefix
     paths = _fetch(folder, archives, downloads)
@@ -173,7 +178,17 @@ def ensure(root: Path, branch_name: str, cmake: Path, heartbeat: Callable[[], No
     return target, host
 
 
+def cache_outputs(branch_name: str) -> List[str]:
+    _, target_archives = TARGETS[branch_name]
+    _, _, host_archives = HOSTS[sys.platform]
+    key = json_digest([_wanted_stamp(target_archives), _wanted_stamp(host_archives)])
+    target, host = prefix_dirs(Path("."), branch_name)
+    return ["key={}".format(key), "target-stamp={}".format((target / STAMP_NAME).as_posix()),
+            "host-stamp={}".format((host / STAMP_NAME).as_posix()),
+            "paths<<CERF_QT_PATHS", target.as_posix(), host.as_posix(), "CERF_QT_PATHS"]
+
+
 if __name__ == "__main__":
-    if len(sys.argv) != 3 or sys.argv[1] != "--cache-paths" or sys.argv[2] not in TARGETS or not host_supported():
-        raise SystemExit("usage: qt_android.py --cache-paths <{}> (on {})".format("|".join(TARGETS), "|".join(HOSTS)))
-    print("\n".join(path.as_posix() for path in prefix_dirs(Path("."), sys.argv[2])))
+    if len(sys.argv) != 3 or sys.argv[1] != "--cache-outputs" or sys.argv[2] not in TARGETS or not host_supported():
+        raise SystemExit("usage: qt_android.py --cache-outputs <{}> (on {})".format("|".join(TARGETS), "|".join(HOSTS)))
+    print("\n".join(cache_outputs(sys.argv[2])))

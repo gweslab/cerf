@@ -38,8 +38,30 @@ jobs:
         with:
           url: ${{ secrets.CE_TOOLCHAIN_URL }}
 
+      - uses: ./.github/actions/compiler-cache
+        with:
+          stage: restore
+          host-branch: ${{ env.HOST_BRANCH }}
+
+      - uses: ./.github/actions/resvg-cache
+        with:
+          stage: restore
+          host-branch: ${{ env.HOST_BRANCH }}
+
       - name: Build
         run: python3 build.py --config Release --mode production
+
+      - uses: ./.github/actions/resvg-cache
+        if: ${{ !cancelled() }}
+        with:
+          stage: save
+          host-branch: ${{ env.HOST_BRANCH }}
+
+      - uses: ./.github/actions/compiler-cache
+        if: ${{ !cancelled() }}
+        with:
+          stage: save
+          host-branch: ${{ env.HOST_BRANCH }}
 
       - name: Pack the build
         id: pack

@@ -2,9 +2,9 @@ import sys
 
 from tool_process import exit_code
 
-BUILD_TOOLS = ("cmake", "ninja-build", "g++", "pkg-config", "wine")
+BUILD_TOOLS = ("cmake", "ninja-build", "g++", "pkg-config", "ccache", "wine")
 BUILD_PACKAGES = ("git",) + BUILD_TOOLS + (
-    "ccache", "qt6-base-dev", "qt6-svg-dev", "qt6-declarative-dev", "qt6-declarative-dev-tools",
+    "qt6-base-dev", "qt6-svg-dev", "qt6-declarative-dev", "qt6-declarative-dev-tools",
     "qml6-module-qtquick", "qml6-module-qtquick-controls", "qml6-module-qtquick-templates",
     "qml6-module-qtquick-layouts", "qml6-module-qtquick-window", "qml6-module-qtqml-workerscript",
     "qml6-module-qtquick-dialogs", "qml6-module-qtquick-effects", "qml6-module-qtqml", "qml6-module-qtqml-models",

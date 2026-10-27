@@ -10,10 +10,11 @@ from pathlib import Path
 from typing import Callable, Dict, List
 
 import tar_archives
-from json_files import read_json_or_none, write_json
+import vs_toolchain
+from json_files import json_digest, read_json_or_none, write_json
 from qt_common import QT_DIR, STAMP_NAME, say
 from tool_process import exit_code, output_or_raise, prepend_path, run_or_raise
-from verified_download import Say, fetch_verified, partial_path
+from verified_download import DownloadError, Say, fetch_verified, partial_path
 
 QT_VERSION = "6.8.4"
 QT_MODULES = (
@@ -110,7 +111,7 @@ def _vcvars_environment(toolchain) -> Dict[str, str]:
     for line in listing.decode("utf-16-le", errors="replace").splitlines():
         key, sep, value = line.partition("=")
         if sep and key:
-            env[key] = value
+            env[key.upper()] = value
     return prepend_path(env, toolchain.cmake.parent, toolchain.ninja.parent)
 
 
@@ -175,11 +176,24 @@ def ensure(root: Path, toolchain, heartbeat: Callable[[], None]) -> Path:
 
 
 def cache_outputs() -> List[str]:
-    prefix = prefix_dir(Path("."))
-    return ["path={}".format(prefix.as_posix()), "stamp={}".format((prefix / STAMP_NAME).as_posix())]
+    return ["path={}".format(prefix_dir(Path(".")).as_posix()), "key={}".format(json_digest(_wanted_stamp()))]
+
+
+def main(argv: List[str]) -> int:
+    if argv == ["--cache-outputs"]:
+        print("\n".join(cache_outputs()))
+        return 0
+    if argv == ["--ensure"]:
+        try:
+            toolchain = vs_toolchain.require("Qt {}".format(QT_VERSION))
+            ensure(Path(__file__).resolve().parent.parent, toolchain, lambda: None)
+        except (vs_toolchain.ToolchainError, QtBuildError, DownloadError, OSError) as exc:
+            say("FAILED! {}".format(exc))
+            return 1
+        return 0
+    sys.stderr.write("usage: qt_windows.py --cache-outputs | --ensure\n")
+    return 2
 
 
 if __name__ == "__main__":
-    if sys.argv[1:] != ["--cache-outputs"]:
-        raise SystemExit("usage: qt_windows.py --cache-outputs")
-    print("\n".join(cache_outputs()))
+    sys.exit(main(sys.argv[1:]))

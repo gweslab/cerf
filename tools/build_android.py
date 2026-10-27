@@ -136,7 +136,8 @@ class AndroidBuild(FrontendBuild):
             "-DCERFQT_ANDROID_TARGET_SDK={}".format(android_sdk.TARGET_SDK),
             "-DCERFQT_ANDROID_EXTRA_LIBS={}".format(";".join(path.as_posix() for path in openssl)),
             "-DCERFQT_HOST_BRANCH=" + self.branch.name,
-            "-DQT_ANDROID_SIGN_APK=" + ("ON" if signed else "OFF")] + self.cmake_options() + resvg, env)
+            "-DQT_ANDROID_SIGN_APK=" + ("ON" if signed else "OFF")] + self.cmake_options() +
+            self.compiler_cache_options() + resvg, env)
         if not self.compile([self.cmake, "--build", build_dir, "--target", "apk"], env):
             return False
         kind = self.config.lower()

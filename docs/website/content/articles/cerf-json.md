@@ -7,15 +7,16 @@ There are **three layers**, read in this order:
 
 | # | File | Where | Written by |
 | --- | --- | --- | --- |
-| 1 | `cerf.json` | next to `cerf.exe` | ships with CERF. The launcher and CERF both edit it |
+| 1 | `cerf.json` | next to `cerf.exe` | ships with CERF. The emulator edits it |
 | 2 | `cerf.json` | `devices/<name>/` | ships with the ROM bundle. The remote repository owns it |
-| 3 | `cerf-user.json` | `devices/<name>/` | the launcher, on your behalf - optional |
+| 3 | `cerf-user.json` | `devices/<name>/` | the emulator, on your behalf - optional |
 
 CERF applies each layer on top of the previous one, key by key. CERF applies the command line last,
 so a flag always wins over a file. Every field is optional.
 
-CERF ignores unknown keys. If a file is unreadable or malformed, CERF names the file and the key,
-then exits.
+CERF ignores unknown keys. If a `cerf.json` is unreadable or malformed, CERF names the file, then
+exits. For a wrong value in a device `cerf.json`, it also names the key. A broken `cerf-user.json` is
+not read, and the next write replaces it.
 
 ## Layer 1 - the global `cerf.json`
 
@@ -36,16 +37,17 @@ One file next to `cerf.exe`, shared by every device instance on the installation
 | Key | Type | Meaning |
 | --- | --- | --- |
 | `device` | string | The device directory to boot when the command line has no `--device=`. When this key and `--device=` are both empty, CERF exits with an error. |
-| `bundle_repositories` | array of `{ url, enabled }` | The [ROM bundle repositories](bundle-repositories.md) that the launcher installs and updates from. Launcher only - `cerf.exe` does not read it. |
+| `bundle_repositories` | array of `{ url, enabled }` | The [ROM bundle repositories](bundle-repositories.md) that ROMs are installed and updated from. |
 | `last_save_state_mode` | boolean | The default state of **Save the state** in the shutdown dialog. |
-| `update_channel` | string | Which CERF builds the launcher offers you: `disabled`, `stable`, or `unstable`. Launcher only - `cerf.exe` does not read it. |
-| `discord_rich_presence` | boolean | Publish the device that you run to Discord. Read by both the launcher and `cerf.exe`. |
+| `update_channel` | string | Which new builds you are offered: `disabled`, `stable`, or `unstable`. |
+| `discord_rich_presence` | boolean | Publish the device that you run to Discord. |
 | `host_key` | integer, or array of integers | The host key: one virtual-key code, or up to eight of them that you press together. Absent, the host key is Right Ctrl (`163`). |
 | `default_scale` | integer | The scale of the guest screen when the emulator starts: `0` (Dynamic), `1` (Original view), `2`, `3`, or `5`. Dynamic picks `2` on a primary display at 150% scaling or more, unless the board has a high-DPI screen, and `1` otherwise. Absent: `0`. |
-| `host_branch` | string | A platform of this build: `win32-x86`, `linux-amd64`, `macos-arm64`. Reserved: `windows-amd64`, `windows-arm64`, `linux-arm64`, `android-arm64`. Absent: `win32-x86`. |
+| `host_branch` | string | A platform of this build: `win32-x86`, `linux-amd64`, `macos-arm64`, `android-arm64`, `android-amd64`. Reserved: `windows-amd64`, `windows-arm64`, `linux-arm64`. Absent: `win32-x86`. |
 
-`last_save_state_mode` is the one key that CERF writes back. When you tick **Remember choice** in
-the shutdown dialog, CERF stores your answer here. When you upgrade CERF, the installer merges the
+CERF writes the keys that you change in **Settings** and on the **Sources** page. When you tick
+**Remember this choice** in the shutdown dialog, CERF stores your answer in `last_save_state_mode`.
+When you upgrade CERF, the installer merges the
 new file into your existing one. It keeps every value that you already have, so your own edits
 survive.
 
@@ -127,17 +129,15 @@ device can declare here.**
 | `guest_additions.shared_folder_mount_point` | string | The name of the guest root folder that shows the shared folder. |
 | `guest_additions.autorun` | array of strings | Guest paths. When the shell is up, the guest driver starts each path, in order. `--ga-autorun=PATH` replaces the array. |
 | `full_screen` | boolean | Enter borderless full screen at startup. |
+| `double_tap_helper` | boolean | In stylus mode on Android, the emulator detects double taps and sends the second tap exactly at the position of the first, so the taps do not drift apart. Default `true`. |
 | `throttle_multiplier` | number | Scales the wall time that CERF gives each guest second. `2` runs the guest at half speed. `0` removes the limit, and the guest runs as fast as the host allows. Default `1`. |
 | `cpu_rate_multiplier` | number | Multiplies the guest CPU clock rate. The guest's timers keep their rates, so the guest does more work in each second. Default `1`. |
 | `adopt_guest_additions_resolution_for_host_screen` | boolean | Size the Guest Additions display to the host monitor instead of the configured resolution. |
 | `additional_packages.compact_flash_cards` | array of `{ file, name, insert_on_launch }` | CF card images that ship with the ROM. Each one appears in the card insert menu. When `insert_on_launch` is `true`, CERF inserts that card automatically at boot. |
 | `meta` | object | Who the device is: `name`, `device_name`, and `os` (`name`, `ver_major`, `ver_minor`). |
 
-`meta` is descriptive, not operational. CERF displays it, and the launcher lists it. CERF takes
-nothing about the boot from it: the board comes from `board.id`, and CERF reads everything else out
-of the ROM. The launcher understands a few more `meta` fields than `cerf.exe` does (a description,
-notes, the OS language and build, and the origin of the dump). This text is for the catalog and
-changes nothing at runtime.
+`meta` is descriptive, not operational. CERF displays it. CERF takes nothing about the boot from
+it: the board comes from `board.id`, and CERF reads everything else out of the ROM.
 
 ## Layer 3 - `cerf-user.json`
 
@@ -145,9 +145,9 @@ This file has the same format and the same keys, in the same device directory. C
 after `cerf.json`, so anything in it wins. The file is optional, and a device that you never
 configured does not have one.
 
-The launcher keeps a device from a bundle repository up to date. When the catalog metadata changes,
-the launcher **rewrites that device's `cerf.json` wholesale**, and anything that you put in that
-file is lost. The launcher therefore writes your choices here instead:
+The emulator keeps a device from a bundle repository up to date. When the catalog metadata changes,
+it **rewrites that device's `cerf.json` wholesale**, and anything that you put in that file is lost.
+Your choices are therefore written here instead:
 
 ```json
 {
@@ -164,11 +164,11 @@ file is lost. The launcher therefore writes your choices here instead:
 ```
 
 - **`launcher`** - the repository that this device directory came from, and its name there. This
-  block is the update link: the launcher uses it to know that a newer bundle applies to this
+  block is the update link: it tells the emulator that a newer bundle applies to this
   directory. A device that you created from your own dump has no such block, and it has no
   layer 2 file either. Its board and ROM live here.
 - **`meta.name`** - your display-name override.
-- **Everything that you set in the device's *Properties***. The launcher stores only the values
+- **Everything that you set in the device's *Properties***. CERF stores only the values
   that you changed away from the device's own default.
 - **`cpu_config`** - your CPU values, from the *CPU Configuration* page. Each key is a parameter
   `id` from `cpu_config_params` in `db.json`. Its value replaces the default of the board's SoC.
@@ -180,9 +180,9 @@ your configuration is still there afterwards.
 !!! note "A file you picked stays picked after upgrades"
 
     `cerf-user.json` goes through the same loader as `cerf.json`, so any key from layer 2 is legal
-    in it. When you pick another ROM or storage file in *Properties*, the launcher writes that key
-    here. A bundle upgrade does not replace that choice. When you pick the default file again, the
-    launcher removes your choice.
+    in it. When you pick another ROM or storage file in *Properties*, that key is written here.
+    A bundle upgrade does not replace that choice. When you pick the default file again, your
+    choice is removed.
 
 ## Order of application
 

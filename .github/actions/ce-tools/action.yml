@@ -1,0 +1,20 @@
+name: CE build tools
+description: Fetch the eMbedded Visual C++ toolchain from the private mirror into third_party/wince.
+
+inputs:
+  url:
+    description: The address of the toolchain archive.
+    required: true
+  python:
+    description: The Python command of the runner.
+    required: false
+    default: python3
+
+runs:
+  using: composite
+  steps:
+    - name: Fetch CE build tools
+      shell: bash
+      env:
+        CE_TOOLCHAIN_URL: ${{ inputs.url }}
+      run: ${{ inputs.python }} "$GITHUB_ACTION_PATH/fetch_ce_tools.py"

@@ -43,15 +43,3 @@ the root commit.
 ## Push
 
 Do not push the root before its libraries.
-
-## Forks
-
-Only the author pushes to the upstream repositories. Every other contributor
-works from forks:
-
-1. Fork the CERF repository and every core library repository.
-2. Point `origin` of the root and of each library at your fork. `.gitmodules`
-   keeps the upstream URLs.
-3. Open a pull request in each changed repository. The library pull requests
-   merge first. The root pull request then points at the merged library
-   commits.

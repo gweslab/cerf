@@ -1,5 +1,8 @@
 #include <cerfcore/host/host_displays.h>
 
+#include "qt_screen_pixels.h"
+#include "qt_ui_thread_calls.h"
+
 #include <cerfcore/core/cerf_emulator.h>
 #include <cerfcore/core/log.h>
 
@@ -17,14 +20,15 @@ public:
     using cerfcore::HostDisplays::HostDisplays;
 
     void OnReady() override {
-        for (QScreen* screen : QGuiApplication::screens()) Watch(screen);
-        QObject::connect(qGuiApp, &QGuiApplication::screenAdded, &context_, [this](QScreen* screen) {
-            Watch(screen);
-            Recompute(nullptr);
+        emu_.Get<QtUiThreadCalls>().Run([this] {
+            for (QScreen* screen : QGuiApplication::screens()) Watch(screen);
+            QObject::connect(qGuiApp, &QGuiApplication::screenAdded, &context_, [this](QScreen* screen) {
+                Watch(screen);
+                RequestRecompute();
+            });
+            QObject::connect(qGuiApp, &QGuiApplication::screenRemoved, &context_, [this] { RequestRecompute(); });
+            Recompute();
         });
-        QObject::connect(qGuiApp, &QGuiApplication::screenRemoved, &context_,
-                         [this](QScreen* screen) { Recompute(screen); });
-        Recompute(nullptr);
     }
 
     void LargestDisplaySize(uint32_t& width, uint32_t& height) override {
@@ -37,19 +41,30 @@ public:
 
 private:
     void Watch(QScreen* screen) {
-        QObject::connect(screen, &QScreen::geometryChanged, &context_, [this] { Recompute(nullptr); });
-        QObject::connect(screen, &QScreen::refreshRateChanged, &context_, [this] { Recompute(nullptr); });
+        QObject::connect(screen, &QScreen::geometryChanged, &context_, [this] { RequestRecompute(); });
+        QObject::connect(screen, &QScreen::refreshRateChanged, &context_, [this] { RequestRecompute(); });
     }
 
-    void Recompute(const QScreen* leaving) {
+    void RequestRecompute() {
+        if (recompute_pending_) return;
+        recompute_pending_ = true;
+        QMetaObject::invokeMethod(
+            &context_,
+            [this] {
+                recompute_pending_ = false;
+                Recompute();
+            },
+            Qt::QueuedConnection);
+    }
+
+    void Recompute() {
         uint32_t width   = 0;
         uint32_t height  = 0;
         int      refresh = 0;
         for (const QScreen* screen : QGuiApplication::screens()) {
-            if (screen == leaving) continue;
-            const qreal    ratio = screen->devicePixelRatio();
-            const uint32_t w = static_cast<uint32_t>(std::lround(screen->size().width() * ratio));
-            const uint32_t h = static_cast<uint32_t>(std::lround(screen->size().height() * ratio));
+            const QSize    pixels = ScreenPixels(*screen);
+            const uint32_t w      = static_cast<uint32_t>(pixels.width());
+            const uint32_t h      = static_cast<uint32_t>(pixels.height());
             if (static_cast<uint64_t>(w) * h > static_cast<uint64_t>(width) * height) {
                 width  = w;
                 height = h;
@@ -63,6 +78,7 @@ private:
     }
 
     QObject               context_;
+    bool                  recompute_pending_ = false;
     std::atomic<uint64_t> size_{0};
     std::atomic<int>      refresh_{0};
 };

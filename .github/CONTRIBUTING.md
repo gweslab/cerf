@@ -1,7 +1,26 @@
 # Contributing to CE Runtime Foundation
 
 > [!IMPORTANT]
-> This document is quite raw. Not finished yet. Expect this content to change.
+> This document is not finished yet - expect this content to change.
+
+Thank you for your interest! Any features you add will be attributed to you in the changelog and in the About window!
+
+## Working from a fork
+
+Only the author can push to the CERF repositories. To send a change, work in your own forks on GitHub.
+
+1. Fork `gweslab/cerf`, `gweslab/libCerfCore` and `gweslab/libCerfEngine`. If you change the service locator, also fork `dz333n/libservicelocator`.
+2. Clone your fork of `cerf`. Then do the steps in [Building](../README.md#building). `tools/dev_setup.py` initializes the submodules.
+3. Point each library at your fork:
+
+   ```
+   git -C libCerfCore remote set-url origin https://github.com/<you>/libCerfCore.git
+   git -C libCerfEngine remote set-url origin https://github.com/<you>/libCerfEngine.git
+   ```
+
+4. Push each changed library to your fork before you push the `cerf` commit that points at it.
+5. Open a pull request in each changed repository.
+6. When the author merges the library pull requests, update your `cerf` pull request to point at the merged library commits.
 
 ## Low-quality contributions are **forbidden**
 

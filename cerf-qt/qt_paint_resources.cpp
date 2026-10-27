@@ -1,32 +1,31 @@
 #include "qt_paint_resources.h"
 
+#include "qt_device_pixels.h"
+#include "qt_resource_paths.h"
+#include "resource_paths_text.h"
+#include "svg_document.h"
+
 #include <cerfcore/core/cerf_emulator.h>
-#include <cerfcore/core/fatal.h>
 #include <cerfcore/core/log.h>
 
-#include <QApplication>
 #include <QFontDatabase>
 #include <QFontInfo>
-#include <QPainter>
-#include <QRectF>
+#include <QGuiApplication>
+#include <QSize>
 #include <QStringList>
-#include <QSvgRenderer>
-
-#include <cmath>
 
 REGISTER_SERVICE(QtPaintResources);
 
-QString QtPaintResources::LoadFamily(const char* resource) {
-    const int id = QFontDatabase::addApplicationFont(QString::fromLatin1(resource));
+QString QtPaintResources::LoadFamily(const char* file_name) {
+    const int id = QFontDatabase::addApplicationFont(FontResource(file_name));
     if (id < 0) return {};
-    const QStringList families = QFontDatabase::applicationFontFamilies(id);
-    return families.isEmpty() ? QString() : families.front();
+    return QFontDatabase::applicationFontFamilies(id).front();
 }
 
 void QtPaintResources::OnReady() {
-    const QString sans      = LoadFamily(":/fonts/IBMPlexSans-Regular.ttf");
-    const QString sans_bold = LoadFamily(":/fonts/IBMPlexSans-Bold.ttf");
-    const QString mono      = LoadFamily(":/fonts/IBMPlexMono-Bold.ttf");
+    const QString sans      = LoadFamily(CERF_FONT_SANS);
+    const QString sans_bold = LoadFamily(CERF_FONT_SANS_BOLD);
+    const QString mono      = LoadFamily(CERF_FONT_MONO_BOLD);
 
     ui_family_ = !sans.isEmpty() && !sans_bold.isEmpty()
                      ? sans
@@ -43,7 +42,7 @@ void QtPaintResources::OnReady() {
 
 QFont QtPaintResources::Font(const cerffrontend::Font& font) const {
     if (font.face == cerffrontend::FontFace::kSystem) {
-        QFont f = QApplication::font();
+        QFont f = QGuiApplication::font();
         if (font.px != 0) f.setPixelSize(QFontInfo(f).pixelSize() + font.px);
         f.setBold(font.bold);
         return f;
@@ -57,15 +56,6 @@ QFont QtPaintResources::Font(const cerffrontend::Font& font) const {
     return f;
 }
 
-const QImage& QtPaintResources::Logo() {
-    if (logo_.isNull()) {
-        logo_ = QImage(QStringLiteral(":/cerf_1024.png"));
-        if (logo_.isNull())
-            emu_.Get<cerfcore::Fatal>().Die("QtPaintResources: the CERF logo resource is absent");
-    }
-    return logo_;
-}
-
 const QImage& QtPaintResources::Icon(std::string_view stem, int px, qreal dpr) {
     return SvgImage(stem, px, px, dpr);
 }
@@ -75,19 +65,8 @@ const QImage& QtPaintResources::SvgImage(std::string_view stem, int width, int h
     auto it  = svgs_.find(key);
     if (it != svgs_.end()) return it->second;
 
-    const QString path =
-        QStringLiteral(":/icons_sources/%1.svg").arg(QString::fromUtf8(stem.data(), stem.size()));
-    QSvgRenderer renderer(path);
-    const int    device_w = static_cast<int>(std::lround(width * dpr));
-    const int    device_h = static_cast<int>(std::lround(height * dpr));
-    if (!renderer.isValid() || device_w <= 0 || device_h <= 0)
-        emu_.Get<cerfcore::Fatal>().Die("QtPaintResources: SVG '%s' at %dx%d not renderable",
-                                        std::get<0>(key).c_str(), device_w, device_h);
-    QImage image(device_w, device_h, QImage::Format_ARGB32_Premultiplied);
-    image.fill(Qt::transparent);
-    QPainter painter(&image);
-    renderer.render(&painter, QRectF(0, 0, device_w, device_h));
-    painter.end();
+    const SvgDocument document(AssetIconResource(QString::fromUtf8(stem.data(), stem.size())));
+    QImage image = document.Render(QSize(DeviceExtent(width, dpr), DeviceExtent(height, dpr)));
     image.setDevicePixelRatio(dpr);
     return svgs_.emplace(std::move(key), std::move(image)).first->second;
 }

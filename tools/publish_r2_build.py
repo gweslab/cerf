@@ -4,7 +4,6 @@ from __future__ import annotations
 import hashlib
 import json
 import os
-import re
 import sys
 from pathlib import Path
 from typing import List, Set
@@ -12,42 +11,25 @@ from typing import List, Set
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import host_branch
 from ci_release import CiError, changelog_markdown
+from header_defines import int_define, str_define
 
-VERSION_PATH = Path("libCerfFrontend/include/cerffrontend/version.h")
-LATEST_NAME = "latest.json"
+VERSION_PATH = Path("cerf-qt/version.h")
 LATEST_SCHEMA = 1
-BRANCHES_KEY = "host_branches"
-
-
-def _int_define(text: str, name: str) -> int:
-    match = re.search(r"#define\s+" + name + r"\s+(\d+)", text)
-    if match is None:
-        raise CiError(f"{VERSION_PATH} has no {name}")
-    return int(match.group(1))
-
-
-def _str_define(text: str, name: str) -> str:
-    match = re.search(r'#define\s+' + name + r'\s+"([^"]*)"', text)
-    if match is None:
-        raise CiError(f"{VERSION_PATH} has no {name}")
-    return match.group(1)
+BRANCHES_KEY = host_branch.BRANCHES_KEY
 
 
 def version_fields() -> dict:
     if not VERSION_PATH.is_file():
         raise CiError(f"{VERSION_PATH} not found - run from the repo root")
-    text = VERSION_PATH.read_text(encoding="utf-8", errors="ignore")
-    build = _int_define(text, "CERF_VERSION_BUILD")
+    build = int_define(VERSION_PATH, "CERF_VERSION_BUILD")
     if build == 0:
         raise CiError("CERF_VERSION_BUILD is 0 - version.h was never stamped")
-    return {
-        "ver_major": _int_define(text, "CERF_VERSION_MAJOR"),
-        "ver_minor": _int_define(text, "CERF_VERSION_MINOR"),
-        "ver_patch": _int_define(text, "CERF_VERSION_PATCH"),
-        "ver_build": build,
-        "commit_hash": _str_define(text, "CERF_VERSION_SHA"),
-        "build_date": _str_define(text, "CERF_VERSION_DATE"),
-    }
+    numbers = [int_define(VERSION_PATH, name)
+               for name in ("CERF_VERSION_MAJOR", "CERF_VERSION_MINOR", "CERF_VERSION_PATCH")] + [build]
+    fields = dict(zip(host_branch.ENTRY_VERSION_KEYS, numbers))
+    fields["commit_hash"] = str_define(VERSION_PATH, "CERF_VERSION_SHA")
+    fields["build_date"] = str_define(VERSION_PATH, "CERF_VERSION_DATE")
+    return fields
 
 
 def env(name: str) -> str:
@@ -108,7 +90,7 @@ def merge_latest(previous: dict, branch: str, entry: dict) -> dict:
     branches = previous.get(BRANCHES_KEY)
     branches = dict(branches) if isinstance(branches, dict) else {}
     branches[branch] = entry
-    root = entry if branch == host_branch.WIN32_X86 else \
+    root = entry if branch == host_branch.ROOT_ENTRY else \
         {k: v for k, v in previous.items() if k != BRANCHES_KEY}
     latest = dict(root)
     latest["version"] = LATEST_SCHEMA
@@ -118,8 +100,9 @@ def merge_latest(previous: dict, branch: str, entry: dict) -> dict:
 
 def referenced_objects(latest: dict, prefix: str) -> Set[str]:
     entries = [latest] + list(latest[BRANCHES_KEY].values())
-    return {f"{prefix}/{e['object_name']}" for e in entries
-            if isinstance(e, dict) and isinstance(e.get("object_name"), str)}
+    name_key = host_branch.ENTRY_OBJECT_NAME_KEY
+    return {f"{prefix}/{e[name_key]}" for e in entries
+            if isinstance(e, dict) and isinstance(e.get(name_key), str)}
 
 
 def argument(argv: List[str], name: str) -> str:
@@ -146,17 +129,18 @@ def main(argv: List[str]) -> int:
     payload = archive.read_bytes()
     entry = {"version": LATEST_SCHEMA}
     entry.update(version_fields())
-    entry["object_name"] = archive.name
-    entry["object_size"] = len(payload)
-    entry["object_sha256"] = hashlib.sha256(payload).hexdigest()
+    entry[host_branch.ENTRY_OBJECT_NAME_KEY] = archive.name
+    entry[host_branch.ENTRY_OBJECT_SIZE_KEY] = len(payload)
+    entry[host_branch.ENTRY_OBJECT_SHA256_KEY] = hashlib.sha256(payload).hexdigest()
 
-    tag = f"{entry['ver_major']}.{entry['ver_minor']}"
-    entry["changelog"] = changelog_markdown(
+    major_key, minor_key, _, build_key = host_branch.ENTRY_VERSION_KEYS
+    tag = f"{entry[major_key]}.{entry[minor_key]}"
+    entry[host_branch.ENTRY_CHANGELOG_KEY] = changelog_markdown(
         tag, f"Nothing recorded in the {tag} changelog yet.")
 
     client = make_client()
     object_key = f"{prefix}/{archive.name}"
-    latest_key = f"{prefix}/{LATEST_NAME}"
+    latest_key = f"{prefix}/{host_branch.LATEST_NAME}"
 
     print(f"Uploading {object_key} ({len(payload) / 1024 / 1024:.1f} MB) ...")
     client.put_object(Bucket=bucket, Key=object_key, Body=payload,
@@ -174,7 +158,7 @@ def main(argv: List[str]) -> int:
         print(f"  removing stale {key}")
         client.delete_object(Bucket=bucket, Key=key)
 
-    print(f"Published {branch} build {entry['ver_build']} as {archive.name} "
+    print(f"Published {branch} build {entry[build_key]} as {archive.name} "
           f"({len(stale)} stale object(s) removed)")
     return 0
 

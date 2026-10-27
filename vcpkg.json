@@ -3,6 +3,10 @@
   "version-string": "0.0.1",
   "dependencies": [
     "nlohmann-json",
-    "libslirp"
+    "libslirp",
+    {
+      "name": "libzip",
+      "default-features": false
+    }
   ]
 }

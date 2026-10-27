@@ -1,6 +1,6 @@
 #pragma once
 
-#include <cerffrontend/painter.h>
+#include "painter.h"
 
 #include <cerfcore/core/cerf_emulator.h>
 
@@ -39,12 +39,12 @@ public:
                     cerffrontend::Rgb color) override;
     int  TextHeight(std::string_view utf8, const cerffrontend::Font& font, int width,
                     uint32_t flags) override;
+    int  TextWidth(std::string_view utf8, const cerffrontend::Font& font) override;
     cerffrontend::FontMetrics Metrics(const cerffrontend::Font& font) override;
 
     void DrawIcon(const cerffrontend::Rect& box, std::string_view stem, int px) override;
     void DrawImage(const cerffrontend::Rect& dst, cerffrontend::PainterImage image,
                    float opacity) override;
-    bool ImageSize(cerffrontend::PainterImage image, int& w, int& h) override;
 
 private:
     QStringList Lines(const QString& text, int width, uint32_t flags);

@@ -13,6 +13,7 @@ GROUPS = [
     ('devices',         'Devices',         '📱'),
     ('emulator',        'Emulator',        '💿'),
     ('launcher',        'Launcher',        '🚀'),
+    ('cerfman',         'Devices Manager', '🗂️'),
     ('ce_apps',         'CE Apps',         '💾'),
     ('guest_additions', 'Guest Additions', '✨'),
     ('website',         'Website',         '🌐'),
@@ -89,13 +90,16 @@ def render_rows(entries):
     return '\n'.join(lines)
 
 
+MARKDOWN_HARD_BREAK = '  '
+
+
 def render_markdown(groups):
     lines = []
     for group in groups:
         lines.append(f'## {group["emoji"]} {group["heading"]}')
         for subcat in group['subcats']:
             prefix = f'{subcat["emoji"]} ' if subcat['emoji'] else ''
-            lines += [prefix + line for line in subcat['lines']]
+            lines += [prefix + line + MARKDOWN_HARD_BREAK for line in subcat['lines']]
     return '\n'.join(lines)
 
 

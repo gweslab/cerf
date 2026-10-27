@@ -1,0 +1,48 @@
+name: build-macos
+
+on:
+  workflow_call:
+
+jobs:
+  build:
+    runs-on: macos-latest
+    env:
+      HOST_BRANCH: macos-arm64
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: false
+
+      - name: Fetch core libraries
+        run: git submodule update --init libservicelocator libCerfEngine libCerfCore
+
+      - name: Install the build dependencies
+        run: python3 tools/homebrew_packages.py
+
+      - name: Stamp version.h with CI build info
+        id: version
+        run: python3 tools/stamp_version.py --run=${{ github.run_number }} --sha=${{ github.sha }} --host-branch=${{ env.HOST_BRANCH }}
+
+      - name: Fetch the CE apps of the Windows build
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ steps.version.outputs.artifact-win32-x86 }}
+          path: ci/win32
+
+      - name: Build
+        run: python3 build.py --config Release --mode production --ce-apps-from=ci/win32/ce_apps
+
+      - name: Pack the build
+        id: pack
+        run: |
+          name="${{ steps.version.outputs.artifact }}"
+          python3 tools/pack_release.py "ci/dist/$name.zip" "${{ steps.version.outputs.out }}"
+          echo "name=$name" >> "$GITHUB_OUTPUT"
+          echo "zip=ci/dist/$name.zip" >> "$GITHUB_OUTPUT"
+
+      - name: Upload Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.pack.outputs.name }}
+          path: ${{ steps.pack.outputs.zip }}

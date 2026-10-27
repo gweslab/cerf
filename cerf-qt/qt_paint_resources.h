@@ -1,6 +1,6 @@
 #pragma once
 
-#include <cerffrontend/painter.h>
+#include "painter.h"
 
 #include <cerfcore/core/service.h>
 
@@ -20,15 +20,13 @@ public:
     void OnReady() override;
 
     QFont         Font(const cerffrontend::Font& font) const;
-    const QImage& Logo();
     const QImage& Icon(std::string_view stem, int px, qreal dpr);
-    const QImage& SvgImage(std::string_view stem, int width, int height, qreal dpr = 1.0);
+    const QImage& SvgImage(std::string_view stem, int width, int height, qreal dpr);
 
 private:
-    QString LoadFamily(const char* resource);
+    QString LoadFamily(const char* file_name);
 
     QString                                                    ui_family_;
     QString                                                    mono_family_;
-    QImage                                                     logo_;
     std::map<std::tuple<std::string, int, int, qreal>, QImage> svgs_;
 };

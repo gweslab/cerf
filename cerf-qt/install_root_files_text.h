@@ -1,0 +1,9 @@
+#ifndef CERFQT_INSTALL_ROOT_FILES_TEXT_H
+#define CERFQT_INSTALL_ROOT_FILES_TEXT_H
+
+#define CERF_GLOBAL_CONFIG_NAME "cerf.json"
+#define CERF_LICENSE_NAME       "LICENSE"
+#define CERF_NOTICES_NAME       "THIRD_PARTY_NOTICES.txt"
+#define CERF_LICENSES_DIR_NAME  "licenses"
+
+#endif

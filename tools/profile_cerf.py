@@ -12,9 +12,12 @@ from datetime import datetime
 from pathlib import Path
 from typing import List
 
+import host_branch
+
 ROOT = Path(__file__).resolve().parent.parent
+BRANCH = host_branch.by_name(host_branch.WIN32_X86)
 WPT_DIR = Path(r"C:\Program Files (x86)\Windows Kits\10\Windows Performance Toolkit")
-SOURCE_DIRS = ("libCerfEngine", "libCerfCore", "libCerfFrontend", "cerf-win32")
+SOURCE_DIRS = ("libCerfEngine", "libCerfCore", "cerf-qt")
 
 
 class ProfileError(Exception):
@@ -64,14 +67,14 @@ def profile(args) -> int:
         print("    python tools\\profile_cerf.py " + " ".join(sys.argv[1:]) + "\n")
         return 2
 
-    exe_dir = ROOT / "build" / args.config / "Win32"
-    exe = exe_dir / "cerf.exe"
+    exe_dir = host_branch.output_dir(ROOT, args.config, BRANCH)
+    exe = exe_dir / BRANCH.frontend
     if not exe.is_file():
-        raise ProfileError("cerf.exe not found at {}. Build first: python build.py".format(exe))
+        raise ProfileError("{} not found at {}. Build first: python build.py".format(BRANCH.frontend, exe))
     exe_time = exe.stat().st_mtime
     newer = newer_sources(exe_time)
     if newer:
-        print("\nERROR: cerf.exe is older than source files.")
+        print("\nERROR: {} is older than source files.".format(BRANCH.frontend))
         print("  exe:    {}  ({})".format(exe, datetime.fromtimestamp(exe_time)))
         print("  newer sources (first 5):")
         for path in newer:
@@ -150,7 +153,7 @@ def profile(args) -> int:
     tee([xperf, "-i", etl, "-symbols", "-tle", "-tti", "-a", "profile", "-detail"], profile_txt,
         log, env)
     log_append(log, "=== xperf stack -butterfly {} (cerf only) ===".format(args.min_hits))
-    tee([xperf, "-i", etl, "-symbols", "-tle", "-tti", "-a", "stack", "-process", "cerf.exe",
+    tee([xperf, "-i", etl, "-symbols", "-tle", "-tti", "-a", "stack", "-process", BRANCH.frontend,
          "-butterfly", args.min_hits], butterfly, log, env)
 
     print("\n=== Output ==========================================================")
@@ -161,12 +164,12 @@ def profile(args) -> int:
     print("\n=== Next steps ======================================================")
     print('  GUI drill-down:    wpa.exe "{}"'.format(etl))
     print('  Re-extract top N:  xperf -i "{}" -symbols -a profile -detail'.format(etl))
-    print('  Per-thread stacks: xperf -i "{}" -symbols -a stack -process cerf.exe\n'.format(etl))
+    print('  Per-thread stacks: xperf -i "{}" -symbols -a stack -process {}\n'.format(etl, BRANCH.frontend))
     return 0
 
 
 def main(argv: List[str]) -> int:
-    parser = argparse.ArgumentParser(description="CPU-profile cerf.exe with ETW sampling.")
+    parser = argparse.ArgumentParser(description="CPU-profile {} with ETW sampling.".format(BRANCH.frontend))
     parser.add_argument("--duration-sec", type=int, default=60)
     parser.add_argument("--cerf-args", default="")
     parser.add_argument("--config", default="Release")

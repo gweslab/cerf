@@ -14,7 +14,12 @@ hide:
 Handhelds, PDAs, industrial panels and more. Windows CE 1.0 to Windows Embedded Compact 2013.
 </p>
 
-[:fontawesome-solid-download: Download (Windows, x86)](download.md){ .md-button .md-button--primary }
+[:fontawesome-solid-download: Download for your device](download.md){ .md-button .md-button--primary .cerf-download-generic }
+[:fontawesome-brands-windows: Download for Windows](download.md){ .md-button .md-button--primary .cerf-hidden data-platform="Windows" }
+[:fontawesome-brands-apple: Download for macOS](download.md){ .md-button .md-button--primary .cerf-hidden data-platform="macOS" }
+[:fontawesome-brands-linux: Download for Linux](download.md){ .md-button .md-button--primary .cerf-hidden data-platform="Linux" }
+[:fontawesome-brands-android: Download for Android](download.md){ .md-button .md-button--primary .cerf-hidden data-platform="Android" }
+[:fontawesome-solid-download: Other downloads](download.md){ .md-button .cerf-download-other .cerf-hidden }
 
 {links}
 

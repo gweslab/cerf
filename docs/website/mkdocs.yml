@@ -91,6 +91,8 @@ markdown_extensions:
 
 extra_css:
   - assets/cerf.css
+  - assets/blocks.css
+  - assets/reveal.css
   - assets/rail.css
 
 extra_javascript:
@@ -98,6 +100,7 @@ extra_javascript:
   - assets/slideshow.js
   - assets/scene.js
   - assets/rail.js
+  - assets/download.js
 
 extra:
   analytics:

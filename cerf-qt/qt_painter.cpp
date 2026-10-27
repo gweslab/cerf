@@ -1,6 +1,8 @@
 #include "qt_painter.h"
 
 #include "qt_paint_resources.h"
+#include "qt_rgb_color.h"
+#include "resource_paths_text.h"
 
 #include <QFontMetrics>
 #include <QPainter>
@@ -14,8 +16,6 @@ namespace {
 
 namespace text = cerffrontend::text;
 
-QColor Color(cerffrontend::Rgb c, int alpha = 255) { return QColor(c.r, c.g, c.b, alpha); }
-
 QRect FillArea(const cerffrontend::Rect& r) { return QRect(r.left, r.top, r.Width(), r.Height()); }
 
 QRect OutlineArea(const cerffrontend::Rect& r) {
@@ -23,7 +23,7 @@ QRect OutlineArea(const cerffrontend::Rect& r) {
 }
 
 QPen SolidPen(cerffrontend::Rgb c, int width) {
-    QPen pen(Color(c));
+    QPen pen(ToQColor(c));
     pen.setWidth(width);
     pen.setJoinStyle(Qt::MiterJoin);
     return pen;
@@ -42,22 +42,32 @@ QPainterPath RoundRectPath(qreal x, qreal y, qreal w, qreal h, qreal radius) {
 }
 
 void QtPainter::FillRect(const cerffrontend::Rect& r, cerffrontend::Rgb color) {
-    p_.fillRect(FillArea(r), Color(color));
+    p_.fillRect(FillArea(r), ToQColor(color));
 }
 
 void QtPainter::BlendRect(const cerffrontend::Rect& r, cerffrontend::Rgb color, uint8_t alpha) {
     p_.save();
     p_.setCompositionMode(QPainter::CompositionMode_SourceOver);
-    p_.fillRect(FillArea(r), Color(color, alpha));
+    p_.fillRect(FillArea(r), ToQColor(color, alpha));
     p_.restore();
 }
 
 void QtPainter::Rectangle(const cerffrontend::Rect& r, cerffrontend::Rgb pen, int pen_width,
                           const cerffrontend::Rgb* fill) {
+    if (pen_width == 1) {
+        const QRect area = FillArea(r);
+        if (fill) p_.fillRect(area.adjusted(1, 1, -1, -1), ToQColor(*fill));
+        const QColor edge = ToQColor(pen);
+        p_.fillRect(QRect(area.left(), area.top(), area.width(), 1), edge);
+        p_.fillRect(QRect(area.left(), area.bottom(), area.width(), 1), edge);
+        p_.fillRect(QRect(area.left(), area.top(), 1, area.height()), edge);
+        p_.fillRect(QRect(area.right(), area.top(), 1, area.height()), edge);
+        return;
+    }
     p_.save();
     p_.setRenderHint(QPainter::Antialiasing, false);
     p_.setPen(SolidPen(pen, pen_width));
-    p_.setBrush(fill ? QBrush(Color(*fill)) : Qt::NoBrush);
+    p_.setBrush(fill ? QBrush(ToQColor(*fill)) : Qt::NoBrush);
     p_.drawRect(OutlineArea(r));
     p_.restore();
 }
@@ -67,7 +77,7 @@ void QtPainter::RoundRect(const cerffrontend::Rect& r, int corner_w, int corner_
     p_.save();
     p_.setRenderHint(QPainter::Antialiasing, false);
     p_.setPen(SolidPen(pen, 1));
-    p_.setBrush(Color(fill));
+    p_.setBrush(ToQColor(fill));
     p_.drawRoundedRect(OutlineArea(r), corner_w / 2.0, corner_h / 2.0, Qt::AbsoluteSize);
     p_.restore();
 }
@@ -76,7 +86,7 @@ void QtPainter::Ellipse(const cerffrontend::Rect& r, cerffrontend::Rgb pen, cerf
     p_.save();
     p_.setRenderHint(QPainter::Antialiasing, false);
     p_.setPen(SolidPen(pen, 1));
-    p_.setBrush(Color(fill));
+    p_.setBrush(ToQColor(fill));
     p_.drawEllipse(OutlineArea(r));
     p_.restore();
 }
@@ -101,9 +111,9 @@ void QtPainter::FillCircleAA(int cx, int cy, int radius, cerffrontend::Rgb fill,
     p_.save();
     p_.setRenderHint(QPainter::Antialiasing, true);
     p_.setPen(Qt::NoPen);
-    p_.setBrush(Color(fill));
+    p_.setBrush(ToQColor(fill));
     p_.drawEllipse(QRectF(x, y, d, d));
-    p_.setPen(QPen(Color(rim), 1.0));
+    p_.setPen(QPen(ToQColor(rim), 1.0));
     p_.setBrush(Qt::NoBrush);
     p_.drawEllipse(QRectF(x, y, d, d));
     p_.restore();
@@ -116,9 +126,9 @@ void QtPainter::FillPolygonAA(const cerffrontend::Point* points, int count, cerf
     p_.save();
     p_.setRenderHint(QPainter::Antialiasing, true);
     p_.setPen(Qt::NoPen);
-    p_.setBrush(Color(fill));
+    p_.setBrush(ToQColor(fill));
     p_.drawPolygon(poly);
-    p_.setPen(QPen(Color(rim), 1.0));
+    p_.setPen(QPen(ToQColor(rim), 1.0));
     p_.setBrush(Qt::NoBrush);
     p_.drawPolygon(poly);
     p_.restore();
@@ -130,8 +140,8 @@ void QtPainter::FillRoundRectAA(const cerffrontend::Rect& r, int radius, cerffro
                                             r.Height() - 1.0, radius);
     p_.save();
     p_.setRenderHint(QPainter::Antialiasing, true);
-    p_.fillPath(path, Color(fill));
-    p_.strokePath(path, QPen(Color(rim), 1.0));
+    p_.fillPath(path, ToQColor(fill));
+    p_.strokePath(path, QPen(ToQColor(rim), 1.0));
     p_.restore();
 }
 
@@ -140,7 +150,7 @@ void QtPainter::FillRoundRectAlphaAA(const cerffrontend::Rect& r, int radius, ce
     const QPainterPath path = RoundRectPath(r.left, r.top, r.Width(), r.Height(), radius);
     p_.save();
     p_.setRenderHint(QPainter::Antialiasing, true);
-    p_.fillPath(path, Color(fill, alpha));
+    p_.fillPath(path, ToQColor(fill, alpha));
     p_.restore();
 }
 
@@ -187,7 +197,7 @@ void QtPainter::DrawTextBox(const cerffrontend::Rect& r, std::string_view utf8,
     if ((flags & text::kBottom) && (flags & text::kSingleLine)) y = r.bottom - lh;
 
     p_.setClipRect(FillArea(r), Qt::IntersectClip);
-    p_.setPen(Color(color));
+    p_.setPen(ToQColor(color));
     for (const QString& line : lines) {
         if ((flags & text::kEditControl) && y + lh > r.bottom) break;
         int x = r.left;
@@ -206,7 +216,7 @@ void QtPainter::DrawTextAt(int x, int y, std::string_view utf8, const cerffronte
                            cerffrontend::Rgb color) {
     p_.save();
     p_.setFont(emu_.Get<QtPaintResources>().Font(font));
-    p_.setPen(Color(color));
+    p_.setPen(ToQColor(color));
     p_.drawText(QPoint(x, y + QFontMetrics(p_.font()).ascent()),
                 QString::fromUtf8(utf8.data(), static_cast<int>(utf8.size())));
     p_.restore();
@@ -221,6 +231,11 @@ int QtPainter::TextHeight(std::string_view utf8, const cerffrontend::Font& font,
         Lines(QString::fromUtf8(utf8.data(), static_cast<int>(utf8.size())), width, flags).size());
     p_.restore();
     return lines * fm.height();
+}
+
+int QtPainter::TextWidth(std::string_view utf8, const cerffrontend::Font& font) {
+    const QFontMetrics fm(emu_.Get<QtPaintResources>().Font(font));
+    return fm.horizontalAdvance(QString::fromUtf8(utf8.data(), static_cast<int>(utf8.size())));
 }
 
 cerffrontend::FontMetrics QtPainter::Metrics(const cerffrontend::Font& font) {
@@ -239,22 +254,11 @@ void QtPainter::DrawImage(const cerffrontend::Rect& dst, cerffrontend::PainterIm
     switch (image) {
         case cerffrontend::PainterImage::kCerfLogo:
             p_.save();
-            p_.setRenderHint(QPainter::SmoothPixmapTransform, true);
             p_.setOpacity(opacity);
-            p_.drawImage(FillArea(dst), emu_.Get<QtPaintResources>().Logo());
+            p_.drawImage(QPoint(dst.left, dst.top),
+                         emu_.Get<QtPaintResources>().SvgImage(CERF_LOGO_ASSET, dst.Width(), dst.Height(),
+                                                                p_.device()->devicePixelRatioF()));
             p_.restore();
             return;
     }
-}
-
-bool QtPainter::ImageSize(cerffrontend::PainterImage image, int& w, int& h) {
-    switch (image) {
-        case cerffrontend::PainterImage::kCerfLogo: {
-            const QImage& logo = emu_.Get<QtPaintResources>().Logo();
-            w                  = logo.width();
-            h                  = logo.height();
-            return true;
-        }
-    }
-    return false;
 }

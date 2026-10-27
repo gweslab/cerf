@@ -1,0 +1,7 @@
+#include "asset_icon_files.h"
+
+1 ICON CERF_LOGO_ICON_FILE
+
+#include "../cerf-qt/executable_names_text.h"
+#define CERF_RC_FILE_NAME CERF_LAUNCHER_NAME
+#include "../cerf-qt/version_info.rc"

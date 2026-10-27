@@ -9,7 +9,7 @@ on:
       - "libCerfCore"
       - "compile_readme.py"
       - "tools/build_site.py"
-      - "libCerfFrontend/include/cerffrontend/version.h"
+      - "cerf-qt/version.h"
       - ".github/workflows/site.yml"
   workflow_dispatch:
 

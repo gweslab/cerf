@@ -1,16 +1,13 @@
-import re
 import os
 import sys
 import datetime
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
-VERSION_H = os.path.join(ROOT, 'libCerfFrontend', 'include', 'cerffrontend', 'version.h')
+VERSION_H = os.path.join(ROOT, 'cerf-qt', 'version.h')
 SOURCE    = os.path.join(ROOT, 'README_SOURCE.md')
 OUTPUT    = os.path.join(ROOT, 'README.md')
 CHANGELOG_LINK = 'https://cerf.cx/changelog/'
 CHANGELOG_RECENT = 2
-ICONS_DIR = 'launcher/assets/icons'          # CPU-arch badge PNGs
-SVG_DIR   = 'assets/icons_sources'
 FUNDING = os.path.join(ROOT, '.github', 'FUNDING.yml')
 
 # FUNDING.yml platform key -> shields.io badge (label, hex, logo, logo color)
@@ -24,11 +21,15 @@ FUNDING_BADGES = [
 FUNDING_MESSAGE = 'support'
 
 sys.path.insert(0, os.path.join(ROOT, 'tools'))
-sys.path.insert(0, os.path.join(ROOT, 'launcher'))
-from board_database import (FEATURE_SPECS, family_of, soc_family_of, soc_of,
-                            sort_text)
-from board_info import (SUPPORT_BOOTABLE_PARTIAL, board_sort_key,
-                        running_boards)
+from header_defines import int_define
+from board_database import (FEATURE_SPECS, SUPPORT_BOOTABLE_PARTIAL, board_sort_key,
+                            family_of, running_boards, soc_family_of, soc_of, sort_text)
+from product_facts import ASSET_ICONS_DIR, BADGE_PREFIX
+import android_sdk
+import apt_packages
+import homebrew_packages
+
+SVG_DIR = f'assets/{ASSET_ICONS_DIR}'
 
 UNMODELED_MARK = '*'
 UNMODELED_LEGEND = (f'``{UNMODELED_MARK}`` Supported, but CERF does not model this '
@@ -38,11 +39,9 @@ import changelog
 
 
 def parse_version():
-    with open(VERSION_H, 'r') as f:
-        text = f.read()
-    major = int(re.search(r'#define CERF_VERSION_MAJOR\s+(\d+)', text).group(1))
-    minor = int(re.search(r'#define CERF_VERSION_MINOR\s+(\d+)', text).group(1))
-    patch = int(re.search(r'#define CERF_VERSION_PATCH\s+(\d+)', text).group(1))
+    major = int_define(VERSION_H, 'CERF_VERSION_MAJOR')
+    minor = int_define(VERSION_H, 'CERF_VERSION_MINOR')
+    patch = int_define(VERSION_H, 'CERF_VERSION_PATCH')
     return f'{major}.{minor}' if patch == 0 else f'{major}.{minor}.{patch}'
 
 
@@ -52,8 +51,7 @@ def icon_img(stem, title, size=32):
 
 
 def badge_img(cpu):
-    # CPU-arch badge PNG (tools/make_icons.py); intrinsic size, no scaling.
-    return (f'<img src="{ICONS_DIR}/badge_{cpu.lower()}.png" '
+    return (f'<img src="{SVG_DIR}/{BADGE_PREFIX}{cpu.lower()}.svg" '
             f'align="middle" title="{cpu}" alt="{cpu}"/>')
 
 
@@ -187,6 +185,11 @@ def build_changelog():
     return '\n'.join(lines)
 
 
+def code_list(items):
+    quoted = [f'`{item}`' for item in items]
+    return ', '.join(quoted[:-1]) + ' and ' + quoted[-1]
+
+
 def main():
     with open(SOURCE, 'r', encoding='utf-8') as f:
         content = f.read()
@@ -197,6 +200,9 @@ def main():
     content = content.replace('{supported_devices}', build_supported_devices())
     content = content.replace('{support_badges}', build_support_badges())
     content = content.replace('{cur_year}', str(datetime.date.today().year))
+    content = content.replace('{apt_install}', apt_packages.install_command())
+    content = content.replace('{brew_install}', homebrew_packages.install_command())
+    content = content.replace('{android_sdk_packages}', code_list(android_sdk.packages()))
 
     with open(OUTPUT, 'w', encoding='utf-8', newline='\n') as f:
         f.write(content)

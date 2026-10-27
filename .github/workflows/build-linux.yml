@@ -1,0 +1,56 @@
+name: build-linux
+
+on:
+  workflow_call:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    container: ubuntu:26.04
+    env:
+      HOST_BRANCH: linux-amd64
+
+    steps:
+      - name: Install the checkout tools
+        run: |
+          apt-get update
+          DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends ca-certificates git python3
+
+      - uses: actions/checkout@v4
+        with:
+          submodules: false
+
+      - name: Install the build dependencies
+        env:
+          DEBIAN_FRONTEND: noninteractive
+        run: python3 tools/apt_packages.py linux
+
+      - name: Fetch core libraries
+        run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          git submodule update --init libservicelocator libCerfEngine libCerfCore
+
+      - name: Stamp version.h with CI build info
+        id: version
+        run: python3 tools/stamp_version.py --run=${{ github.run_number }} --sha=${{ github.sha }} --host-branch=${{ env.HOST_BRANCH }}
+
+      - uses: ./.github/actions/ce-tools
+        with:
+          url: ${{ secrets.CE_TOOLCHAIN_URL }}
+
+      - name: Build
+        run: python3 build.py --config Release --mode production
+
+      - name: Pack the build
+        id: pack
+        run: |
+          name="${{ steps.version.outputs.artifact }}"
+          python3 tools/pack_release.py "ci/dist/$name.zip" "${{ steps.version.outputs.out }}"
+          echo "name=$name" >> "$GITHUB_OUTPUT"
+          echo "zip=ci/dist/$name.zip" >> "$GITHUB_OUTPUT"
+
+      - name: Upload Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.pack.outputs.name }}
+          path: ${{ steps.pack.outputs.zip }}

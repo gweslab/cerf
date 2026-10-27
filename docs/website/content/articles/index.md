@@ -26,7 +26,7 @@ and reference for the parts underneath.
   needs.
 - [**The configuration files**](cerf-json.md) - the three layers of `cerf.json`, and what each one
   can set.
-- [**ROM bundle repositories**](bundle-repositories.md) - where the launcher downloads ROMs from,
+- [**ROM bundle repositories**](bundle-repositories.md) - where the emulator downloads ROMs from,
   running your own, and copyright removal.
 - [**Save and restore**](hibernation.md) - how saved state works
 - [**Windows CE ROM containers**](rom-containers.md) - the ROM file formats, how they differ across

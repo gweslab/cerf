@@ -13,7 +13,7 @@ When the user asks to bump the CERF version, follow § Bump mode instead.
 
 ## Bump mode
 
-1. **Read the version from `libCerfFrontend/include/cerffrontend/version.h`**: `CERF_VERSION_MAJOR`, `CERF_VERSION_MINOR`, `CERF_VERSION_PATCH`. The label is `v<major>.<minor>`, or `v<major>.<minor>.<patch>` when the patch is not 0. Do not edit `version.h`.
+1. **Read the version from `cerf-qt/version.h`**: `CERF_VERSION_MAJOR`, `CERF_VERSION_MINOR`, `CERF_VERSION_PATCH`. The label is `v<major>.<minor>`, or `v<major>.<minor>.<patch>` when the patch is not 0. Do not edit `version.h`.
 2. **If the top entry of `docs/changelog.yml` already has that version, change nothing** and tell the user.
 3. **Otherwise insert a new top entry**, exactly in this shape:
 
@@ -35,6 +35,7 @@ Component groups:
 - **`devices`** - a board/device: new board support, per-board fixes (touch, sound, screen), on-board silicon (SoC RTC, suspend, battery, reset), PC cards / PCMCIA (NE2000, CompactFlash, modem), sleeves.
 - **`emulator`** - the CERF core (`cerf.exe`): JIT / MMU / CPU, VFP/NEON, host UI/UX, hibernation/state saving, the serial stack, host-OS compatibility, board detection, crashes, general fixes.
 - **`launcher`** - the launcher tool.
+- **`cerfman`** - the Devices Manager: the device list, downloads, device properties, settings, the installer and self-update.
 - **`ce_apps`** - CERF-built CE binaries and shipped tools (xplorer, romdump, `tools\fileserver.py`, bundled CE apps).
 - **`guest_additions`** - the Guest Additions subsystem: display driver, ROM injection, mouse/keyboard, shared folders, task manager, DPI, resolution.
 - **`website`** - the cerf.cx docs site.

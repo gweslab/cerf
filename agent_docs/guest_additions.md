@@ -324,11 +324,17 @@ keyboard input on every guest OS, with no per-version code and no
 guest-installed driver.
 
 - Host channel: `libCerfCore/src/peripherals/cerf_virt/cerf_virt_keyboard.{h,cpp}` +
-  `cerf_virt_keyboard_regs.h`. Keys are edges (down/up) that must arrive once
-  and in order. The channel is therefore a ring buffer, not the level /
-  last-value-wins registers of the pointer. The host appends one entry per
-  host-key transition and increments the write sequence after the entry store.
-  The guest drains entries by index.
+  `libCerfCore/include/cerfcore/peripherals/cerf_virt/cerf_virt_keyboard_regs.h`.
+  Keys are edges (down/up) that must arrive once and in order. As a result, the
+  channel is a ring buffer. The host appends one entry per host-key transition
+  and increments the write sequence after the entry store. The guest drains
+  entries by index.
+- Pointer channel: `libCerfCore/src/peripherals/cerf_virt/cerf_virt_pointer.{h,cpp}` +
+  `libCerfCore/include/cerfcore/peripherals/cerf_virt/cerf_virt_pointer_regs.h`.
+  It holds each button change until the guest reads the buttons. Between two
+  button changes, it keeps only the last position. The guest pump attaches with
+  one read before its loop starts. That read keeps only the newest state, so
+  input from before the pump runs never reaches the guest.
 - Guest pump: `ce_apps/cerf_guest/cerf_input_pump.cpp`. It carries the keyboard
   and the pointer on one thread. It resolves `keybd_event` through
   `GetProcAddressW` and replays each ring entry. GWES routes each entry to the
@@ -377,7 +383,7 @@ executables. It has three pieces:
   `_regs.h` contract. The host publishes one command at a time through a gen
   bump. The guest answers with response regs plus a kick. LIST rows stream
   guest→host one record at a time through a register window.
-- The host window (`cerf-win32/host/task_manager_window.{h,cpp}`), which
+- The host window (`cerf-qt/desktop/qt_task_manager_window.cpp`), which
   implements the `TaskManagerView` seam. The Guest Additions widget
   (`libCerfCore/src/host/guest_additions_widget.{h,cpp}`, pinned in the terminal
   range of the status bar) opens it.

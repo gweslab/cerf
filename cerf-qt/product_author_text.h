@@ -1,0 +1,6 @@
+#ifndef CERFQT_PRODUCT_AUTHOR_TEXT_H
+#define CERFQT_PRODUCT_AUTHOR_TEXT_H
+
+#define CERF_PRODUCT_AUTHOR "Yaroslav Kibysh"
+
+#endif

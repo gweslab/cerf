@@ -1,0 +1,34 @@
+name: Ship the stripped PDB
+description: Reduce a Windows build folder to what a user runs, with the stripped PDB under the name of the frontend.
+
+inputs:
+  out:
+    description: The build output folder.
+    required: true
+  frontend:
+    description: The file name of the frontend executable.
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Reduce the payload to what a user runs
+      shell: pwsh
+      run: |
+        $out = "${{ inputs.out }}"
+        $stem = [System.IO.Path]::GetFileNameWithoutExtension("${{ inputs.frontend }}")
+        $public = Join-Path $out "$stem.public.pdb"
+        if (-not (Test-Path $public)) {
+          throw "$public is missing; the linker wrote no stripped PDB"
+        }
+        $drop = "$stem.pdb","$stem.exp","$stem.lib"
+        foreach ($name in $drop) {
+          Remove-Item (Join-Path $out $name) -Force -ErrorAction SilentlyContinue
+        }
+        $left = $drop | Where-Object { Test-Path (Join-Path $out $_) }
+        if ($left) { throw "still in the payload: $($left -join ', ')" }
+        $shipped = Join-Path $out "$stem.pdb"
+        Move-Item $public $shipped -Force
+        if (-not (Test-Path $shipped)) { throw "$shipped was not put in place" }
+        Get-ChildItem $out -File | Sort-Object Length -Descending |
+          Select-Object -First 8 Name, Length | Format-Table -AutoSize

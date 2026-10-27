@@ -20,6 +20,7 @@ class VsToolchain:
     installed: List[str] = field(default_factory=list)
     msbuild: Optional[Path] = None
     cmake: Optional[Path] = None
+    ninja: Optional[Path] = None
 
 
 def _version_key(text: str) -> Tuple[int, ...]:
@@ -69,8 +70,9 @@ def find() -> VsToolchain:
     found = _vswhere(vswhere, "-path", root, "-find", r"MSBuild\**\Bin\amd64\MSBuild.exe")
     first = next((line.strip() for line in found.splitlines() if line.strip()), None)
     toolchain.msbuild = Path(first) if first else None
-    toolchain.cmake = (Path(root) / "Common7" / "IDE" / "CommonExtensions" / "Microsoft" / "CMake"
-                       / "CMake" / "bin" / "cmake.exe")
+    cmake_tools = Path(root) / "Common7" / "IDE" / "CommonExtensions" / "Microsoft" / "CMake"
+    toolchain.cmake = cmake_tools / "CMake" / "bin" / "cmake.exe"
+    toolchain.ninja = cmake_tools / "Ninja" / "ninja.exe"
     return toolchain
 
 

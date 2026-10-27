@@ -1,9 +1,14 @@
-BUILD_FORMULAE = ("cmake", "ninja", "pkgconf", "qtbase", "qtsvg", "libslirp", "nlohmann-json")
-PYTHON_FORMULA = "python@3.14"
-PYTHON_NAME = "python3.14"
-TK_FORMULA = "python-tk@3.14"
-ALL_FORMULAE = BUILD_FORMULAE + (PYTHON_FORMULA, TK_FORMULA)
+import sys
+
+from tool_process import exit_code
+
+BUILD_FORMULAE = ("cmake", "ninja", "pkgconf", "qtbase", "qtsvg", "qtdeclarative", "libslirp",
+                  "libzip", "nlohmann-json")
 
 
 def install_command():
-    return "brew install " + " ".join(ALL_FORMULAE)
+    return "brew install " + " ".join(BUILD_FORMULAE)
+
+
+if __name__ == "__main__":
+    sys.exit(exit_code(["brew", "install", *BUILD_FORMULAE]))

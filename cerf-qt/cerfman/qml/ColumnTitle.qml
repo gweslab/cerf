@@ -1,0 +1,3 @@
+StrongLabel {
+    dim: true
+}

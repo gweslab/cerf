@@ -48,8 +48,8 @@ Delete such temporary code when you no longer need it.
 - If you want to insert a PC Card, simply temporary modify the code. We usually auto-insert NE2000
   into one slot if guest OS is CE 4+. For CE <= 3, NE2000 interrupts a welcome wizard with a config dialog
   and combine that with not calibrated touch panel.
-- Emulator generates a screenshot into a device directory `live_state.png` every 10 seconds. Deleted at graceful
-  shutdown - wont be deleted if you are using GNU timeout
+- The emulator writes a screenshot of the guest screen to `live_state.png` in the device directory while it
+  runs. A graceful shutdown deletes it.
 - If you need own files to be accessible inside guest OS, you can boot GA with `--ga-share-folder=...` (spawned as ``\CERF Storage\*``) or
   generate FAT16/FAT32 CF PCCard and insert it the same temp scaffolding (usually visible as ``\Storage Card\*``).
 

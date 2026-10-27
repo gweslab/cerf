@@ -1,0 +1,5 @@
+#include "asset_icon_files.h"
+
+IDI_ICON1 ICON CERF_LOGO_ICON_FILE
+
+#include "version_info.rc"

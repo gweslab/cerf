@@ -37,10 +37,13 @@ def main(argv: List[str]) -> int:
     if not run_id.isdigit():
         raise CiError("--run-id=<id> is required")
     release_candidate = "--rc" in argv
+    without = {host_branch.by_name(name).name
+               for a in argv if a.startswith("--without=")
+               for name in a.partition("=")[2].split(",") if name}
 
     token, secret = load_credentials()
     builds = [(branch, run_artifact(token, int(run_id), branch.platform_dir))
-              for branch in host_branch.all_branches()]
+              for branch in host_branch.ci_branches() if branch.name not in without]
     run = builds[0][1]
     print(f"\nRun             : {run.run_url}")
     print(f"  version / tag : {run.version} -> {run.tag}")

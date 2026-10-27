@@ -10,31 +10,21 @@ from typing import Callable, Dict, List, Optional
 
 import host_processes
 from host_branch import WIN32_X86, HostBranch
+from product_facts import LICENSE_NAME, LICENSES_DIR_NAME, NOTICES_NAME
+from tool_process import exit_code, failure_text
 
-WINDOWS_BLOCKERS = ("cerf", "MSBuild", "cl", "link")
+WINDOWS_TOOL_BLOCKERS = ("MSBuild", "cl", "link")
 WAIT_BUDGET_SECONDS = 30 * 60
 NESTED_PINS = (("libCerfEngine", "libservicelocator"), ("libCerfCore", "libCerfEngine"))
-LAUNCHER_STAMP = ".launcher_timestamps"
-LAUNCHER_EXTRA_INPUTS = ("assets/cerf.ico", "assets/cerf_error.ico",
-                         "assets/cerf_setup.ico",
-                         "libCerfFrontend/include/cerffrontend/version.h",
-                         "libCerfFrontend/include/cerffrontend/integer_scales.h",
-                         "cerf-qt/qt_evdev_vk.h", "cerf-qt/qt_mac_key_vk.h",
-                         "cerf-qt/host_key_names.h", "tools/host_branch.py",
-                         "tools/host_processes.py", "tools/macos_icns.py",
-                         "assets/cerf_1024.png")
-LAUNCHER_THEME_DIR = "external/sun_valley_theme"
-NOTICE_FILES = ("LICENSE", "THIRD_PARTY_NOTICES.txt")
-LICENSES_DIR = "licenses"
 
 
 def ship_notices(root: Path, out: Path) -> None:
-    for name in NOTICE_FILES:
+    for name in (LICENSE_NAME, NOTICES_NAME):
         shutil.copy2(str(root / name), str(out / name))
-    target = out / LICENSES_DIR
+    target = out / LICENSES_DIR_NAME
     if target.exists():
         shutil.rmtree(str(target))
-    shutil.copytree(str(root / LICENSES_DIR), str(target))
+    shutil.copytree(str(root / LICENSES_DIR_NAME), str(target))
 
 
 class BuildReport:
@@ -53,7 +43,7 @@ class BuildReport:
 
 def _blocking(branch: HostBranch) -> Dict[int, str]:
     if branch.name == WIN32_X86:
-        wanted = {n.lower() for n in WINDOWS_BLOCKERS}
+        wanted = {PurePosixPath(branch.frontend).stem.lower()} | {n.lower() for n in WINDOWS_TOOL_BLOCKERS}
     else:
         wanted = {PurePosixPath(branch.frontend).name.lower()}
     me = os.getpid()
@@ -114,55 +104,13 @@ def check_nested_pins(root: Path, production: bool) -> bool:
     return True
 
 
-def launcher_signature(root: Path) -> str:
-    launcher = root / "launcher"
-    inputs: List[Path] = []
-    for path in launcher.rglob("*"):
-        rel = path.relative_to(launcher).parts
-        if not path.is_file() or rel[0] in ("build", "dist") or "__pycache__" in rel:
-            continue
-        if path.suffix == ".pyc" or path.name == LAUNCHER_STAMP:
-            continue
-        inputs.append(path)
-    inputs += [root / rel for rel in LAUNCHER_EXTRA_INPUTS if (root / rel).is_file()]
-    inputs += sorted((root / "assets").glob("about_band_*.png"))
-    inputs += sorted(p for p in (root / LAUNCHER_THEME_DIR).rglob("*") if p.is_file())
-    return "\n".join(sorted("{}|{}".format(p, p.stat().st_mtime_ns) for p in inputs))
-
-
-def launcher_outputs(root: Path, branch: HostBranch) -> List[Path]:
-    if branch.name == WIN32_X86:
-        return [root / "bundled" / "launcher.exe", root / "bundled" / "launcher" / "launcher.exe",
-                root / "launcher" / "dist" / "cerf_installer.exe"]
-    return [root.joinpath("bundled", *PurePosixPath(branch.launcher).parts)]
-
-
-def build_launcher(root: Path, branch: HostBranch, config: str, rebuild: bool,
-                   heartbeat: Callable[[], None], report: BuildReport) -> None:
-    script = root / "launcher" / "build.py"
-    stamp = root / "launcher" / LAUNCHER_STAMP
-    signature = launcher_signature(root)
-    old = stamp.read_text(encoding="utf-8") if stamp.is_file() else ""
-    if not rebuild and old == signature and all(p.is_file() for p in launcher_outputs(root, branch)):
-        print("[LAUNCHER] up to date (no input changes) -- skipping", flush=True)
-        report.ok()
-        return
-    print("[LAUNCHER]", flush=True)
-    code = subprocess.run([sys.executable, str(script), "--config", config], check=False).returncode
-    heartbeat()
-    if code != 0:
-        print("[LAUNCHER] build returned {}".format(code), flush=True)
-        report.fail("launcher")
-        return
-    stamp.write_text(signature, encoding="utf-8")
-    report.ok()
-
-
-def build_ce_apps(root: Path, config: str, mode: str, heartbeat: Callable[[], None],
-                  report: BuildReport, ce_apps_from: Optional[str] = None) -> None:
+def build_ce_apps(root: Path, branch: HostBranch, config: str, mode: str,
+                  heartbeat: Callable[[], None], report: BuildReport,
+                  ce_apps_from: Optional[str] = None) -> None:
     env = dict(os.environ)
     env["CE_APPS_CONFIG"] = config
     env["CE_APPS_MODE"] = mode
+    env["CE_APPS_HOST_BRANCH"] = branch.name
     env.pop("CE_APPS_FROM", None)
     if ce_apps_from:
         env["CE_APPS_FROM"] = os.path.abspath(ce_apps_from)
@@ -172,11 +120,10 @@ def build_ce_apps(root: Path, config: str, mode: str, heartbeat: Callable[[], No
             continue
         heartbeat()
         print("[CE] {}".format(app.name), flush=True)
-        code = subprocess.run([sys.executable, str(script)], cwd=str(app), env=env,
-                              check=False).returncode
+        code = exit_code([sys.executable, script], app, env)
         heartbeat()
         if code != 0:
-            print("[CE] ce_apps/{} build returned {}".format(app.name, code), flush=True)
+            print("[CE] {}".format(failure_text("ce_apps/{} build".format(app.name), code)), flush=True)
             report.fail("ce_apps/" + app.name)
         else:
             report.ok()

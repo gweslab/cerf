@@ -12,8 +12,12 @@ sys.path.insert(0, str(ROOT / "tools"))
 
 import build_common
 import cerf_locks
+import frontend_build
 import host_branch
-from host_branch import WIN32_X86
+from host_branch import ANDROID_AMD64, ANDROID_ARM64, WIN32_X86
+from product_facts import GLOBAL_CONFIG_NAME
+
+ANDROID_BRANCHES = {"arm64": ANDROID_ARM64, "amd64": ANDROID_AMD64}
 
 
 def parse_args(argv):
@@ -22,6 +26,9 @@ def parse_args(argv):
     parser.add_argument("--mode", "-Mode", choices=("dev", "production"), default="dev")
     parser.add_argument("--force-kill", "-ForceKill", action="store_true")
     parser.add_argument("--rebuild", "-Rebuild", action="store_true")
+    parser.add_argument("--android", nargs="?", const="arm64", choices=sorted(ANDROID_BRANCHES),
+                        help="build the Android package ({}) for this ABI (default arm64) instead of "
+                             "the frontend of this host".format(host_branch.by_name(ANDROID_ARM64).frontend))
     parser.add_argument("--ce-apps-from", metavar="DIR",
                         help="copy ce_apps from the ce_apps directory of another build")
     args = parser.parse_args(argv)
@@ -32,14 +39,21 @@ def parse_args(argv):
     return args
 
 
+def build_branch(args):
+    if args.android:
+        return host_branch.by_name(ANDROID_BRANCHES[args.android])
+    return host_branch.current()
+
+
 def host_build(branch, args, heartbeat):
+    if branch.name in ANDROID_BRANCHES.values():
+        import build_android
+        return build_android.AndroidBuild(ROOT, args.config, args.mode, args.rebuild, heartbeat, branch)
     if branch.name == WIN32_X86:
         import build_windows
-        return build_windows, build_windows.WindowsBuild(ROOT, args.config, args.mode,
-                                                         args.rebuild, heartbeat)
+        return build_windows.WindowsBuild(ROOT, args.config, args.mode, args.rebuild, heartbeat, branch)
     import build_posix
-    return build_posix, build_posix.PosixBuild(ROOT, args.config, args.mode, args.rebuild,
-                                               heartbeat, branch)
+    return build_posix.PosixBuild(ROOT, args.config, args.mode, args.rebuild, heartbeat, branch)
 
 
 def run(args, branch, lock) -> int:
@@ -56,36 +70,35 @@ def run(args, branch, lock) -> int:
     print("        Full rebuild might take 60+ minutes")
     print("============================================================", flush=True)
 
-    module, builder = host_build(branch, args, heartbeat)
+    builder = host_build(branch, args, heartbeat)
     dev_flag = "0" if args.mode == "production" else "1"
     try:
         builder.discover()
         print("[BUILD] Mode: {} (CERF_DEV_MODE={})".format(args.mode, dev_flag), flush=True)
         report = build_common.BuildReport()
         heartbeat()
-        build_common.build_launcher(ROOT, branch, args.config, args.rebuild, heartbeat, report)
-        heartbeat()
         if not build_common.check_nested_pins(ROOT, args.mode == "production"):
             return 1
-        if branch.name == WIN32_X86:
-            builder.build_libraries()
-            frontend_ok = builder.build_frontend()
-        else:
-            frontend_ok = builder.build()
-    except module.BuildAbort as exc:
+        build_common.build_ce_apps(ROOT, branch, args.config, args.mode, heartbeat, report,
+                                   args.ce_apps_from)
+        if branch.package_file and report.failed:
+            print("[BUILD] FAILED! {} holds every CE app, and {} of them failed.".format(
+                branch.frontend, report.failed), flush=True)
+            return 1
+        frontend_ok = builder.build()
+    except frontend_build.BuildAbort as exc:
         print(str(exc), flush=True)
         return 1
 
     out = host_branch.output_dir(ROOT, args.config, branch)
     if frontend_ok:
-        host_branch.stamp(out / "cerf.json", branch)
-        print("[BUILD] {} stamped into {}".format(branch.name, out / "cerf.json"), flush=True)
-        build_common.ship_notices(ROOT, out)
+        if not branch.package_file:
+            host_branch.stamp(out / GLOBAL_CONFIG_NAME, branch)
+            print("[BUILD] {} stamped into {}".format(branch.name, out / GLOBAL_CONFIG_NAME), flush=True)
+            build_common.ship_notices(ROOT, out)
         report.ok()
     else:
         report.fail(branch.frontend)
-
-    build_common.build_ce_apps(ROOT, args.config, args.mode, heartbeat, report, args.ce_apps_from)
 
     print("============================================================")
     if report.failed:
@@ -100,7 +113,7 @@ def main(argv) -> int:
     args = parse_args(argv)
     os.chdir(str(ROOT))
     try:
-        branch = host_branch.current()
+        branch = build_branch(args)
     except host_branch.UnsupportedHost as exc:
         print("[BUILD] FAILED! {}".format(exc), flush=True)
         return 1
@@ -111,7 +124,7 @@ def main(argv) -> int:
         gen_clangd.generate(ROOT)
         try:
             build_windows.check_vcpkg_integration()
-        except build_windows.BuildAbort as exc:
+        except frontend_build.BuildAbort as exc:
             print(str(exc), flush=True)
             return 1
 

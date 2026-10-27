@@ -134,7 +134,7 @@ def main(argv: List[str]) -> int:
     print(f"  announcement card rendered ({len(card) // 1024} KB)")
 
     archives = []
-    for branch in host_branch.all_branches():
+    for branch in host_branch.ci_branches():
         build = run_artifact(token, artifact.run_id, branch.platform_dir)
         print(f"\nDownloading {build.name} ...")
         archives.append(release_asset(token, branch, build))

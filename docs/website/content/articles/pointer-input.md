@@ -47,4 +47,4 @@ pointer to the window while that source is active - a relative device has no abs
 map a free cursor onto.
 
 **Tap your configured host key (default: Right Ctrl/Right Option) to release the pointer.** Tap it
-again to give the input back to the guest. **Settings** in the launcher gives it to another key.
+again to give the input back to the guest. **Settings** gives it to another key.

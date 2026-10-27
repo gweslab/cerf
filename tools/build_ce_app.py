@@ -3,12 +3,13 @@ from __future__ import annotations
 import hashlib
 import os
 import shutil
-import subprocess
 import sys
 from pathlib import Path
 from typing import Iterable, List, Optional, Sequence
 
 import host_branch
+from product_facts import CE_APPS_DIR_NAME
+from tool_process import exit_code
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 SDK = REPO_ROOT / "third_party" / "wince"
@@ -44,10 +45,7 @@ def _arch_setup(arch: str, mips_isa: str):
 
 
 def _run(argv: Sequence[str], env: dict) -> int:
-    command = [str(a) for a in argv]
-    if not NATIVE:
-        command.insert(0, "wine")
-    return subprocess.run(command, env=env, check=False).returncode
+    return exit_code(([] if NATIVE else ["wine"]) + list(argv), env=env)
 
 
 def _arg(path) -> str:
@@ -106,8 +104,9 @@ def build(type: str, target: str, sources: Sequence[str] = ("main.c",), entry: s
     mode = os.environ.get("CE_APPS_MODE") or "dev"
     dev_mode_flag = "0" if mode == "production" else "1"
     arch_sub = out_subdir or (mips_isa if arch == "mips" else arch)
-    branch = host_branch.current()
-    out_dir = host_branch.output_dir(REPO_ROOT, config, branch) / "ce_apps" / arch_sub
+    branch_name = os.environ.get("CE_APPS_HOST_BRANCH")
+    branch = host_branch.by_name(branch_name) if branch_name else host_branch.current()
+    out_dir = host_branch.output_dir(REPO_ROOT, config, branch) / CE_APPS_DIR_NAME / arch_sub
     out_dir.mkdir(parents=True, exist_ok=True)
     staged = out_dir / target
 
@@ -115,10 +114,11 @@ def build(type: str, target: str, sources: Sequence[str] = ("main.c",), entry: s
     if prebuilt:
         _copy_prebuilt(Path(prebuilt) / arch_sub / target, staged)
         return
-    if not branch.builds_ce_apps:
+    build_host = host_branch.current()
+    if not build_host.builds_ce_apps:
         raise CeBuildError("ce_apps/ cannot be built on {}: the eMbedded Visual C++ 4.0 tools are "
                            "x86 Windows programs. Pass --ce-apps-from=<the ce_apps directory of "
-                           "a Windows or Linux build>.".format(branch.name))
+                           "a Windows or Linux build>.".format(build_host.name))
     if not BIN.is_dir():
         raise CeBuildError(
             "CE toolchain not found at {}\n\nBuilding ce_apps/ needs eMbedded Visual C++ 4.0. "

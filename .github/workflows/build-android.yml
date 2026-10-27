@@ -1,0 +1,126 @@
+name: build-android
+
+on:
+  workflow_call:
+    outputs:
+      signed:
+        description: true when the APK is signed and uploaded.
+        value: ${{ jobs.build.outputs.signed }}
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    container: ubuntu:26.04
+    outputs:
+      signed: ${{ steps.build.outputs.signed }}
+    env:
+      HOST_BRANCH: android-arm64
+      ANDROID_SDK_ROOT: /opt/android-sdk
+      VCPKG_ROOT: /opt/vcpkg
+      VCPKG_DEFAULT_BINARY_CACHE: /opt/vcpkg-archives
+      JAVA_HOME: /usr/lib/jvm/java-21-openjdk-amd64
+
+    steps:
+      - name: Install the checkout tools
+        run: |
+          apt-get update
+          DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends ca-certificates git python3
+
+      - uses: actions/checkout@v4
+        with:
+          submodules: false
+
+      - name: Install the build dependencies
+        env:
+          DEBIAN_FRONTEND: noninteractive
+        run: python3 tools/apt_packages.py android
+
+      - name: Fetch core libraries
+        run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          git submodule update --init libservicelocator libCerfEngine libCerfCore
+
+      - name: Install the Android SDK packages
+        run: |
+          python3 tools/android_sdk.py --fetch-linux-cmdline-tools /tmp/cmdline-tools.zip
+          mkdir -p "$ANDROID_SDK_ROOT/cmdline-tools"
+          unzip -q /tmp/cmdline-tools.zip -d "$ANDROID_SDK_ROOT/cmdline-tools"
+          mv "$ANDROID_SDK_ROOT/cmdline-tools/cmdline-tools" "$ANDROID_SDK_ROOT/cmdline-tools/latest"
+          sdkmanager="$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager"
+          yes | "$sdkmanager" --sdk_root="$ANDROID_SDK_ROOT" --licenses > /dev/null
+          "$sdkmanager" --sdk_root="$ANDROID_SDK_ROOT" $(python3 tools/android_sdk.py --packages)
+
+      - name: Install vcpkg
+        run: |
+          git clone --quiet https://github.com/microsoft/vcpkg.git "$VCPKG_ROOT"
+          "$VCPKG_ROOT/bootstrap-vcpkg.sh" -disableMetrics
+          mkdir -p "$VCPKG_DEFAULT_BINARY_CACHE"
+
+      - name: Name the vcpkg triplet
+        id: vcpkg
+        run: python3 tools/vcpkg_install.py --outputs "$HOST_BRANCH" >> "$GITHUB_OUTPUT"
+
+      - name: Restore vcpkg deps
+        uses: actions/cache/restore@v4
+        with:
+          path: /opt/vcpkg-archives
+          key: vcpkg-${{ steps.vcpkg.outputs.triplet }}-${{ hashFiles('vcpkg.json', 'vcpkg-configuration.json', 'libCerfCore/vcpkg-ports/**') }}
+
+      - name: Name the Qt download folders
+        id: qt
+        run: |
+          {
+            echo "paths<<QT_PATHS"
+            python3 tools/qt_android.py --cache-paths "$HOST_BRANCH"
+            echo "QT_PATHS"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Restore the Qt download
+        uses: actions/cache/restore@v4
+        with:
+          path: ${{ steps.qt.outputs.paths }}
+          key: qt-android-${{ hashFiles('tools/qt_android.py', 'tools/qt_common.py') }}
+
+      - name: Stamp version.h with CI build info
+        id: version
+        run: python3 tools/stamp_version.py --run=${{ github.run_number }} --sha=${{ github.sha }} --host-branch=${{ env.HOST_BRANCH }}
+
+      - uses: ./.github/actions/ce-tools
+        with:
+          url: ${{ secrets.CE_TOOLCHAIN_URL }}
+
+      - name: Build
+        id: build
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          QT_ANDROID_KEYSTORE_ALIAS: ${{ secrets.ANDROID_KEYSTORE_ALIAS }}
+          QT_ANDROID_KEYSTORE_STORE_PASS: ${{ secrets.ANDROID_KEYSTORE_STORE_PASS }}
+          QT_ANDROID_KEYSTORE_KEY_PASS: ${{ secrets.ANDROID_KEYSTORE_KEY_PASS }}
+        run: |
+          if [ -n "$ANDROID_KEYSTORE_BASE64" ]; then
+            printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/cerf-release.jks"
+            export QT_ANDROID_KEYSTORE_PATH="$RUNNER_TEMP/cerf-release.jks"
+          fi
+          python3 tools/build_android.py --signed-output >> "$GITHUB_OUTPUT"
+          python3 build.py --android --config Release --mode production
+
+      - name: Save vcpkg deps
+        if: ${{ always() }}
+        uses: actions/cache/save@v4
+        with:
+          path: /opt/vcpkg-archives
+          key: vcpkg-${{ steps.vcpkg.outputs.triplet }}-${{ hashFiles('vcpkg.json', 'vcpkg-configuration.json', 'libCerfCore/vcpkg-ports/**') }}
+
+      - name: Save the Qt download
+        if: ${{ always() }}
+        uses: actions/cache/save@v4
+        with:
+          path: ${{ steps.qt.outputs.paths }}
+          key: qt-android-${{ hashFiles('tools/qt_android.py', 'tools/qt_common.py') }}
+
+      - name: Upload Artifacts
+        if: ${{ steps.build.outputs.signed == 'true' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.version.outputs.artifact }}
+          path: ${{ steps.version.outputs.out }}/${{ steps.version.outputs.frontend }}

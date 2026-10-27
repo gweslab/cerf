@@ -1,5 +1,0 @@
-build/
-dist/
-__pycache__/
-*.pyc
-.launcher_timestamps

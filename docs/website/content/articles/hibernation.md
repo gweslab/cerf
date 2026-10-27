@@ -3,7 +3,7 @@
 CERF snapshots a running machine into a single state file: the CPU, the MMU, all of RAM, the flash
 contents, and the registers of every emulated component on the board.
 
-**Save state...** and **Load state...** are in the Actions menu. Closing the window offers to save
+**Save state…** and **Load state…** are in the Actions menu. Closing the window offers to save
 on the way out.
 
 ![The shutdown dialog offering to save the state](/assets/articles/hibernation/save-on-exit.png)

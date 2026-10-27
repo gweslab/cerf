@@ -15,12 +15,15 @@ sys.path.insert(0, str(ROOT / "tools"))
 
 CE_TOOLS = ("clarm.exe", "clthumb.exe", "clmips.exe", "clsh.exe", "link.exe", "lib.exe", "rc.exe")
 CE_ARCHES = ("Armv4", "Armv4i", "Mipsii", "Mipsiv", "Sh3")
-LINUX_TOOLS = ("cmake", "ninja", "g++", "pkg-config", "wine")
 LINUX_PKGCONFIG = (("Qt6Widgets", "Qt 6 Widgets development files"),
+                   ("Qt6Quick", "Qt 6 Quick development files"),
                    ("alsa", "ALSA development files"),
                    ("slirp", "libslirp development files"),
+                   ("libzip", "libzip development files"),
                    ("nlohmann_json", "nlohmann-json development files"),
-                   ("python3-embed", "Python shared library that the launcher build bundles"))
+                   ("xcb", "XCB development files"),
+                   ("xcb-randr", "XCB RandR development files"),
+                   ("wayland-client", "Wayland client development files"))
 
 
 class Checks:
@@ -146,9 +149,9 @@ def check_claude_hooks(c: Checks) -> None:
 
 
 def check_windows_toolchain(c: Checks) -> None:
-    import build_windows
+    import vcpkg_install
     import vs_toolchain
-    if build_windows.vcpkg_props_path().is_file():
+    if vcpkg_install.integration_props().is_file():
         c.report("OK", "vcpkg", "MSBuild integration present")
     else:
         c.report("FAIL", "vcpkg", "run 'vcpkg integrate install' from "
@@ -169,6 +172,13 @@ def check_windows_toolchain(c: Checks) -> None:
     else:
         c.report("FAIL", "cmake", "absent -- install the 'C++ CMake tools for Windows' component "
                  "of {}".format(tc.instance.get("displayName", "Visual Studio")))
+    import qt_windows
+    prefix = qt_windows.prefix_dir(ROOT)
+    if (prefix / qt_windows.STAMP_NAME).is_file():
+        c.report("OK", "qt", str(prefix))
+    else:
+        c.report("WARN", "qt", "absent -- build.py builds Qt {} on its first run".format(
+            qt_windows.QT_VERSION))
 
 
 def check_ce_toolchain(c: Checks) -> None:
@@ -199,7 +209,8 @@ def check_ce_toolchain(c: Checks) -> None:
 
 
 def check_linux_toolchain(c: Checks) -> None:
-    for tool in LINUX_TOOLS:
+    import build_posix
+    for tool in build_posix.BUILD_TOOLS + ("pkg-config", "wine"):
         path = shutil.which(tool)
         c.report("OK" if path else "FAIL", tool, path or "absent from PATH")
     if shutil.which("pkg-config"):
@@ -210,21 +221,18 @@ def check_linux_toolchain(c: Checks) -> None:
                 c.report("OK", module, found.stdout.strip())
             else:
                 c.report("FAIL", module, "absent -- install the {}".format(what))
-    tk = subprocess.run([sys.executable, "-c", "import tkinter; tkinter.Tcl()"],
-                        capture_output=True, check=False)
-    c.report("OK" if tk.returncode == 0 else "FAIL", "tkinter",
-             "present" if tk.returncode == 0 else "absent -- the launcher build needs python3-tk")
 
 
 def check_macos_toolchain(c: Checks) -> None:
+    import build_posix
     import homebrew_packages
-    for tool in ("cmake", "ninja", "clang++", "brew"):
+    for tool in build_posix.BUILD_TOOLS + ("brew",):
         path = shutil.which(tool)
         c.report("OK" if path else "FAIL", tool, path or "absent from PATH")
     brew = shutil.which("brew")
     if brew is None:
         return
-    for formula in homebrew_packages.ALL_FORMULAE:
+    for formula in homebrew_packages.BUILD_FORMULAE:
         found = subprocess.run([brew, "list", "--versions", formula], capture_output=True,
                                text=True, check=False)
         if found.returncode == 0 and found.stdout.strip():

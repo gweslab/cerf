@@ -77,6 +77,6 @@ guest runs the display driver its own ROM shipped.
 !!! warning "Experimental"
 
     Guest Additions modify the ROM as it loads. Some ROMs do not survive it, and some behave
-    oddly. It is off by default, and the launcher lists the boards where it is known to cause
-    trouble. If a device misbehaves, turn it off first. Launcher usually tells if Guest Additions
+    oddly. It is off by default, and the emulator lists the boards where it is known to cause
+    trouble. If a device misbehaves, turn it off first. The emulator usually tells if Guest Additions
     supported or not.

@@ -1,14 +1,19 @@
-#include <cerffrontend/image_exporter.h>
+#include "image_exporter.h"
+
+#include "qt_ui_thread_calls.h"
 
 #include <cerfcore/core/cerf_emulator.h>
 #include <cerfcore/core/log.h>
+#include <cerfcore/platform/host_error.h>
+#include <cerfcore/platform/host_file.h>
 
+#include <QBuffer>
+#include <QByteArray>
 #include <QClipboard>
-#include <QCoreApplication>
 #include <QGuiApplication>
 #include <QImage>
-#include <QMetaObject>
-#include <QThread>
+
+#include <string_view>
 
 namespace {
 
@@ -23,24 +28,25 @@ public:
 
     bool WritePng(const std::vector<uint32_t>& pixels, uint32_t w, uint32_t h,
                   const std::string& path) override {
-        if (pixels.empty() || w == 0 || h == 0) return false;
-        if (Wrap(pixels, w, h).save(QString::fromStdString(path), "PNG")) return true;
-        LOG(Caution, "QtImageExporter: PNG %s not written\n", path.c_str());
+        QByteArray png;
+        QBuffer    buffer(&png);
+        buffer.open(QIODevice::WriteOnly);
+        if (!Wrap(pixels, w, h).save(&buffer, "PNG")) {
+            LOG(Caution, "QtImageExporter: PNG %s not encoded\n", path.c_str());
+            return false;
+        }
+        uint32_t error = 0;
+        if (cerfcore::host_platform::ReplaceHostFileContents(
+                path, std::string_view(png.constData(), static_cast<size_t>(png.size())), false, error))
+            return true;
+        LOG(Caution, "QtImageExporter: PNG %s not written: %s\n", path.c_str(),
+            cerfcore::host_platform::ErrorText(error).c_str());
         return false;
     }
 
-    bool CopyToClipboard(const std::vector<uint32_t>& pixels, uint32_t w, uint32_t h,
-                         uint64_t) override {
-        if (pixels.empty() || w == 0 || h == 0) return false;
-        QImage            copy = Wrap(pixels, w, h).copy();
-        QCoreApplication* app  = QCoreApplication::instance();
-        if (QThread::currentThread() == app->thread()) {
-            QGuiApplication::clipboard()->setImage(copy);
-            return true;
-        }
-        QMetaObject::invokeMethod(app, [&copy] { QGuiApplication::clipboard()->setImage(copy); },
-                                  Qt::BlockingQueuedConnection);
-        return true;
+    bool CopyToClipboard(const std::vector<uint32_t>& pixels, uint32_t w, uint32_t h) override {
+        const QImage copy = Wrap(pixels, w, h).copy();
+        return emu_.Get<QtUiThreadCalls>().Run([copy] { QGuiApplication::clipboard()->setImage(copy); });
     }
 };
 

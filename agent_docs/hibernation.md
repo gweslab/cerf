@@ -10,8 +10,9 @@ A skipped rule does not produce a smaller feature. It produces a broken restore
 different device.
 
 The host-side implementation is in `libCerfCore/src/state/`, and its public
-headers are in `libCerfCore/include/cerfcore/state/`. The Win32 shutdown dialog is
-`cerf-win32/host/shutdown_dialog.cpp`. The JIT pause lives in
+headers are in `libCerfCore/include/cerfcore/state/`. The shutdown dialog is
+`cerf-qt/desktop/qt_shutdown_dialog.cpp` on the desktop and
+`cerf-qt/mobile/qml/EmulatorShutdownDialog.qml` on Android. The JIT pause lives in
 `libCerfCore/include/cerfcore/execution/jit_runner.h`, `libCerfCore/src/execution/jit_runner.cpp`.
 
 ## What it is

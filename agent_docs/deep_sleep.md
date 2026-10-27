@@ -11,8 +11,8 @@ CERF only halts the CPU and drives the wake.
 conflation of the two is the most common mistake in this subsystem.
 
 Host implementation: `libCerfCore/include/cerfcore/host/guest_deep_sleep.h`, `libCerfCore/src/host/guest_deep_sleep.cpp`,
-`libCerfCore/include/cerfcore/host/shutdown_host.h`, `cerf-win32/host/win32_shutdown_host.cpp`,
-`cerf-win32/host/shutdown_dialog.{h,cpp}`. CPU halt/wake: `libCerfEngine/src/arm/arm_jit.cpp`
+`libCerfCore/include/cerfcore/host/shutdown_host.h`, `cerf-qt/desktop/qt_shutdown_host.cpp`,
+`cerf-qt/desktop/qt_shutdown_dialog.{h,cpp}`, `cerf-qt/mobile/mobile_shutdown_host.cpp`. CPU halt/wake: `libCerfEngine/src/arm/arm_jit.cpp`
 (`EnterDeepSleep`, `SetResetPending`, delivery), `libCerfCore/src/execution/jit_runner.cpp` (the
 park), `libCerfEngine/src/arm/arm_cpu.cpp` (`RaiseResetException`). Reset cause + reset
 line: `libCerfCore/include/cerfcore/socs/guest_cpu_reset.h`, `libCerfCore/src/socs/guest_cpu_reset.cpp`.
@@ -241,4 +241,4 @@ wake, no dialog). Consequences:
   `DeliverWake` - not a separate hibernation defect to chase.
 
 - `libCerfCore/include/cerfcore/host/guest_deep_sleep.h`, `libCerfCore/src/host/guest_deep_sleep.cpp`, `libCerfCore/include/cerfcore/socs/guest_cpu_reset.h`, `libCerfCore/src/socs/guest_cpu_reset.cpp`,
-`cerf-win32/host/shutdown_dialog.{h,cpp}`; CPU halt/wake under `libCerfEngine/`.
+`cerf-qt/desktop/qt_shutdown_dialog.{h,cpp}`; CPU halt/wake under `libCerfEngine/`.

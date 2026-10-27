@@ -4,12 +4,17 @@
     new: |
       Support for Linux (x86-64)
       Support for macOS (ARM64)
+      Support for Android (ARM64)
       Startup screen scale configuration and dynamic mode for retina screen
     fixed: |
       Serial connection regression on some MIPS boards
+  launcher:
+    deleted: |
+      Replaced with Devices Manager
   guest_additions:
     fixed: |
       Moved "untrusted apps hack" for WM into optional switch since it broke WM6
+      Fixed miniport driver causing hangs at soft resets
 - version: v7.0
   date: 14 Oct 2026
   devices:

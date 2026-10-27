@@ -1,0 +1,46 @@
+/* Entrance animations, driven by assets/reveal.js.
+   The hidden state lives here, gated on the .cerf-anim class that the head
+   script (overrides/main.html) puts on <html>: it must be in effect at the
+   first paint, or the element renders visible and then animates OUT. No
+   script, no .cerf-anim, no hiding - the page is simply static.
+   The entrance transition applies until the element is .cerf-done, after
+   which the element's own hover transition takes over again. */
+.cerf-anim .cerf-hero:not(.cerf-done),
+.cerf-anim .cerf-pill:not(.cerf-done),
+.cerf-anim .cerf-stats:not(.cerf-done),
+.cerf-anim .md-typeset h2:not(.cerf-done),
+.cerf-anim .cerf-device:not(.cerf-done),
+.cerf-anim .cerf-card:not(.cerf-done),
+.cerf-anim .cerf-banner:not(.cerf-done),
+.cerf-anim .cerf-video:not(.cerf-done) {
+  will-change: transform, opacity;
+  transition: opacity 0.8s ease, transform 0.8s var(--cerf-ease);
+}
+
+.cerf-anim .cerf-hero:not(.cerf-shown),
+.cerf-anim .cerf-pill:not(.cerf-shown),
+.cerf-anim .cerf-stats:not(.cerf-shown),
+.cerf-anim .md-typeset h2:not(.cerf-shown),
+.cerf-anim .cerf-device:not(.cerf-shown),
+.cerf-anim .cerf-card:not(.cerf-shown),
+.cerf-anim .cerf-banner:not(.cerf-shown),
+.cerf-anim .cerf-video:not(.cerf-shown) {
+  opacity: 0;
+}
+
+.cerf-anim .cerf-hero:not(.cerf-shown),
+.cerf-anim .md-typeset h2:not(.cerf-shown),
+.cerf-anim .cerf-banner:not(.cerf-shown),
+.cerf-anim .cerf-video:not(.cerf-shown) {
+  transform: translateY(40px);
+}
+
+.cerf-anim .cerf-pill:not(.cerf-shown) {
+  transform: translateX(-40px);
+}
+
+.cerf-anim .cerf-stats:not(.cerf-shown),
+.cerf-anim .cerf-device:not(.cerf-shown),
+.cerf-anim .cerf-card:not(.cerf-shown) {
+  transform: scale(0.92) translateY(20px);
+}

@@ -16,15 +16,15 @@ internet for some other device will not.
     like the Ford SYNC 2 recovery image. In either case CERF reads and boots the dump exactly the way
     the original hardware was meant to.
 
-## Adding a device ROM via launcher
+## Adding a device ROM through the device list
 
-1. Click **New** on the launcher toolbar.
+1. Click **New** on the toolbar.
 2. Pick **New device** - the option that says *"Create a device from your local ROM"*.
 3. Follow the wizard: choose the board, name the device, and point it at your ROM file.
 
-That is it. The launcher writes the device and it shows up ready to boot.
+That is it. The device shows up ready to boot.
 
-## Adding a device ROM without launcher
+## Adding a device ROM by hand
 
 1. Create a folder under `devices/` (next to `cerf.exe`), e.g. `devices/mydump/`.
 2. Put the ROM image in it, e.g. `mykernel.nb0`.

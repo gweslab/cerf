@@ -2,13 +2,14 @@ from __future__ import annotations
 
 import os
 import re
-import subprocess
 import sys
 from pathlib import Path
 from typing import List, Optional
 
+from tool_process import output_or_raise
+
 FRAMEWORKS_REFERENCE = "@executable_path/../Frameworks/"
-QT_CONF = "[Paths]\nPrefix = .\nPlugins = PlugIns\n"
+QT_CONF = "[Paths]\nPrefix = .\nPlugins = PlugIns\nQmlImports = Resources/qml\n"
 MACH_O_MAGICS = (0xFEEDFACE, 0xCEFAEDFE, 0xFEEDFACF, 0xCFFAEDFE, 0xCAFEBABE, 0xBEBAFECA)
 SYSTEM_PREFIXES = ("/System/", "/usr/lib/")
 
@@ -18,11 +19,7 @@ class DeployError(Exception):
 
 
 def _output(argv: List[object]) -> str:
-    result = subprocess.run([str(a) for a in argv], capture_output=True, text=True, check=False)
-    if result.returncode != 0:
-        raise DeployError("{} returned {}: {}".format(" ".join(str(a) for a in argv),
-                                                      result.returncode, result.stderr.strip()))
-    return result.stdout
+    return output_or_raise(argv, DeployError)
 
 
 def _is_mach_o(path: Path) -> bool:
@@ -96,12 +93,13 @@ def _sign(app: Path, frameworks: Path, binaries: List[Path]) -> None:
     _output(["codesign", "--verify", "--deep", "--strict", app])
 
 
-def deploy(app: Path, homebrew_prefix: str) -> None:
+def deploy(app: Path, homebrew_prefix: str, qml_dir: Path) -> None:
     macdeployqt = Path(homebrew_prefix) / "opt" / "qtbase" / "bin" / "macdeployqt"
     if not macdeployqt.is_file():
         raise DeployError("{} not found. Run brew install qtbase.".format(macdeployqt))
     _output([macdeployqt, app, "-always-overwrite", "-no-codesign",
-             "-libpath={}".format(Path(homebrew_prefix) / "lib")])
+             "-libpath={}".format(Path(homebrew_prefix) / "lib"),
+             "-qmldir={}".format(qml_dir)])
     contents = app / "Contents"
     frameworks = contents / "Frameworks"
     binaries = _mach_o_files(contents)
@@ -113,11 +111,11 @@ def deploy(app: Path, homebrew_prefix: str) -> None:
 
 
 def main(argv: List[str]) -> int:
-    if len(argv) != 2:
-        print("usage: macos_deploy.py <bundle.app> <homebrew prefix>", file=sys.stderr)
+    if len(argv) != 3:
+        print("usage: macos_deploy.py <bundle.app> <homebrew prefix> <qml dir>", file=sys.stderr)
         return 2
     try:
-        deploy(Path(argv[0]), argv[1])
+        deploy(Path(argv[0]), argv[1], Path(argv[2]))
     except (DeployError, OSError) as exc:
         print("macos_deploy: {}".format(exc), file=sys.stderr)
         return 1

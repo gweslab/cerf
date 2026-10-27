@@ -1,0 +1,3 @@
+RowDelegate {
+    verticalPadding: 0
+}

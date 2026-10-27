@@ -6,14 +6,14 @@ subsystems. This page lists what CERF itself owns.
 
 ## Libraries and frontends
 
-CERF splits into libraries and frontends:
+CERF splits into libraries and a frontend:
 
 - **libCerfEngine** (submodule) - the JIT.
 - **libCerfCore** (submodule) - the emulation core and the seams that a
   frontend implements.
-- **libCerfFrontend** (in this repository) - frontend code that uses no UI
-  toolkit. Every frontend shares it.
-- **Frontends** - each frontend is one application in its own `cerf-<name>` directory.
+- **cerf-qt** - the frontend, one Qt application. It has a desktop form and an
+  Android form. The root of `cerf-qt/` holds the code that both forms compile.
+  `desktop/` and `mobile/` hold the code of one form.
 
 The core never includes frontend code. A frontend includes only public core
 headers. When the core needs an action or an answer from the frontend, it
@@ -62,9 +62,21 @@ state are forbidden.
   path. The idiom is `emu_.Get<BoardContext>().GetSocId() == SocId::X`.
 - **`Get<Foo>()` resolves the `Base` slot first when
   `REGISTER_SERVICE_AS(Foo, Base)` registers `Foo`.**
-- **Slot resolution runs on the boot thread only.** If a second thread must
-  resolve a slot before boot ends, CERF halts. After boot, no slot is left to
-  resolve, and any thread can call `Get<>`.
+- **Slot resolution runs on one thread at a time.** If a second thread must
+  resolve a slot before resolution ends, CERF halts. A job that the resolving
+  thread waits for is the one exception. The thread that runs the job borrows
+  the role for the length of the job (`ResolverBorrow`). After resolution, no
+  slot is left to resolve, and any thread can call `Get<>`.
+- **The Android frontend boots the emulator on a boot thread.** Qt binds a
+  `QObject` service to the thread that creates it. As a result, the GUI thread
+  creates the services. A boot thread resolves every slot, runs the readiness
+  sweep and starts the guest. The emulator window opens after the readiness
+  sweep and before the guest starts. A job that a service posts to the window
+  before that time runs after the window opens.
+- **A GUI job can resolve a slot while the boot thread waits for it.**
+  `QtUiThreadCalls` runs every GUI job under a `ResolverBorrow`. While the boot
+  thread runs, the GUI thread calls `Get<>` on the emulator only inside such a
+  job.
 - **A thread that `OnReady` starts gets its services from `OnReady`.** `Get<>`
   runs `OnReady` on the thread that asks first, also while the boot sweep runs
   on the boot thread. A thread that asks for a service that is not ready yet
@@ -306,18 +318,30 @@ absent after every hard reset on that board.
 
 ## Host window & presentation
 
-The Win32 window, its drawable area, and the render/input plumbing that
-connects the host UI to the guest. All are `Service`s. The renderer,
-touch, and keyboard pieces are abstract bases with per-SoC/per-board
-concretes (strategy pattern, selected by `BoardContext`).
+This section covers the emulator window of a frontend, its drawable area, and
+the render and input plumbing that connects the host UI to the guest. All are
+`Service`s. The
+renderer, touch, and keyboard pieces are abstract bases with
+per-SoC/per-board concretes (strategy pattern, selected by `BoardContext`).
 
-- **`HostWindow`** - the top-level window. It owns the dedicated UI thread
-  (window + message pump live there, not the main thread), the menu, and
-  auto-resize-to-guest. The SoC LCD service calls `HostPresentation::PanelEnabled()`
-  on the guest panel-enable edge, and the Win32 frontend forwards it to
-  `OnLcdEnabled()`. The call carries no dimensions. The call tells the
-  host to read the new size from `FrameRenderer::PresentedSize`.
-  - `cerf-win32/host/host_window.{h,cpp}`
+- **`FrontendWindow`** - the emulator window seam of cerf-qt. It
+  switches the canvas tab, follows the guest size, and runs jobs on the UI
+  thread. `Tab` is an alias of the core `CanvasTab` enum,
+  so core configuration can name the startup tab with no dependency on the
+  host layer. Its guest-surface dimensions are atomic, so any thread can read
+  them. The SoC LCD service calls
+  `HostPresentation::PanelEnabled()` on the guest panel-enable edge, and
+  `FrontendHostPresentation` forwards it to `FrontendWindow::OnLcdEnabled()`.
+  The call carries no dimensions. The call tells the frontend to read the
+  new size from `FrameRenderer::PresentedSize`.
+
+  The window of each frontend form is a service of its own type. Code of
+  that form resolves the window by that type. A private subclass of
+  `FrontendWindowAdapter` fills the `FrontendWindow` slot. That subclass
+  forwards each call to the window service.
+  - `cerf-qt/frontend_window.h`, `cerf-qt/frontend_window_adapter.{h,cpp}`;
+    desktop `cerf-qt/desktop/qt_main_window.{h,cpp}`, Android
+    `cerf-qt/mobile/mobile_emulator_window.{h,cpp}`
 
 - **The panel code is the only authority on the guest resolution. Two
   states sit outside it, and one board fact serves both.** The guest signals
@@ -331,22 +355,20 @@ concretes (strategy pattern, selected by `BoardContext`).
   no window resize. A panel that reports a different size wins.
 
   When the user sets no guest-additions resolution override, guest additions
-  take that same board fact. The launcher resolves that order too.
+  take that same board fact. The manager resolves that order too.
 
   **A default that is too large breaks many guests.** A board whose panel the
   user can change therefore declares the size it uses by default. When no single
   size is right for the board, it declares none, and the window opens at the
   CERF default.
 
-- **`HostCanvas`** - the child window for the drawable area. It owns the
-  tabs, the viewport mode and the scrollbars. It also owns the single
-  host-pixel↔guest-surface coordinate transform (`HostToGuest`), so taps land
-  on the rendered image. On the first presented guest frame the canvas
-  switches to the framebuffer tab, unless the user already picked a tab.
-  `Tab` is an alias of the core `CanvasTab` enum, so core configuration can
-  name the startup tab with no dependency on the host layer. The
-  guest-surface dimensions are atomic, so any thread can read them.
-  - `cerf-win32/host/host_canvas.{h,cpp}`
+- **The canvas** - the drawable area of the emulator window. It implements
+  `CanvasInputHost` and owns the one transform from host pixels to
+  guest-surface coordinates (`HostToGuest`). As a result, taps land on the
+  rendered image. On the first presented guest frame, `CanvasTabs` switches
+  to the framebuffer tab, unless the user already picked a tab.
+  - desktop `cerf-qt/desktop/qt_canvas.{h,cpp}`, Android
+    `cerf-qt/mobile/guest_surface.{h,cpp}`
 
 - **`FrameRenderer`** (abstract) - one producer of guest frames.
   `RenderInto(dib_bgra32, w, h)` fills a BGRA32 surface. `PresentedSize(w, h)`
@@ -368,11 +390,11 @@ concretes (strategy pattern, selected by `BoardContext`).
   JIT thread and the UI thread together.
 
   `PresentedSize` is not the only source of the guest-surface size.
-  `HostCanvas::SetGuestSurfaceSize` is the single entry point, and the
+  `FrontendWindow::SetGuestSurfaceSize` is the single entry point, and the
   panel-enable edge is only one of its callers.
-  `HostWindow::SetGuestResolution` calls it for a guest re-mode and for the
-  resolution dialog. `HostAutoResize::OnUserResizeEnd` reaches it through that
-  same path, and is not a separate setter.
+  `FrontendWindow::SetGuestResolution` calls it for a guest re-mode and for
+  the resolution dialog. `GuestAutoResize::OnUserResizeEnd` reaches it
+  through that same path, and is not a separate setter.
   `Hibernation::RestorePresentation` reaches it through
   `HostPresentation::RestoreSurfaceSize` with the size from the state image.
   As a result, a restore installs a surface size that `PresentedSize` never
@@ -391,7 +413,7 @@ concretes (strategy pattern, selected by `BoardContext`).
     framebuffer under `libCerfCore/src/peripherals/cerf_virt/`. It wins only on a
     `--guest-additions` run.
   - **`FrameRenderer`** itself - the presented surface. It has one candidate,
-    **`PresentedFrameRenderer`**, and `HostCanvas` binds it.
+    **`PresentedFrameRenderer`**, and the canvas of each frontend binds it.
 
   **`PresentedFrameRenderer`** is an ordered stack of the two layers above.
   The panel layer renders under the guest-additions layer. A splash that the
@@ -420,8 +442,7 @@ concretes (strategy pattern, selected by `BoardContext`).
   To add a layer, register it on its own role slot. Then put the layer in the
   order of the compositor.
   - `libCerfCore/include/cerfcore/host/frame_renderer.h`, `panel_frame_renderer.h`,
-    `guest_additions_frame_renderer.h`,
-    `libCerfFrontend/src/presented_frame_renderer.cpp`
+    `guest_additions_frame_renderer.h`, `cerf-qt/presented_frame_renderer.cpp`
 
 - **`HwScreen`** - the hardware text console behind the `Tab::Hw` tab. It is
   the bounded text-mode RX/TX line buffer for guest UART / OEM-debug output
@@ -430,8 +451,7 @@ concretes (strategy pattern, selected by `BoardContext`).
   `HwScreenRenderer` draws the scrolled log over the `BootBar` through the
   `Painter` of the frontend.
   - `libCerfCore/include/cerfcore/host/hw_screen.h`, `libCerfCore/src/host/hw_screen.cpp`,
-    `libCerfFrontend/include/cerffrontend/hw_screen_renderer.h`,
-    `libCerfFrontend/src/hw_screen_renderer.cpp`
+    `cerf-qt/hw_screen_renderer.{h,cpp}`
 
 - **`NotificationStack`** is the card stack over every canvas tab, and it takes
   only notices that interrupt the user's workflow, never routine events.
@@ -440,17 +460,16 @@ concretes (strategy pattern, selected by `BoardContext`).
   plus the `BootBar`. The 60 Hz present loop drives it in time, with no
   thread. `Restart` (guest reboot / deep-sleep wake) and
   `OnFramebufferLatched` are its cross-thread control hooks.
-  - `libCerfFrontend/include/cerffrontend/boot_screen.h`, `libCerfFrontend/src/boot_screen.cpp`
+  - `cerf-qt/boot_screen.{h,cpp}`
 
 - **`BootBar`** - the bottom CPU-activity bar shared by the Boot Screen and
   Hardware Screen tabs. It is a strip that scrolls. The host animation clock
   advances it, so it freezes when emulation is paused.
-  - `libCerfFrontend/include/cerffrontend/boot_bar.h`, `libCerfFrontend/src/boot_bar.cpp`
+  - `cerf-qt/boot_bar.{h,cpp}`
 
-- **`TouchInput`** (abstract) - `OnPenDown/Move/Up` + `OnCaptureLost` in
-  guest-surface coordinates. The touch peripheral concrete of the board
-  converts them into guest pen samples. Concretes live under
-  `libCerfCore/src/boards/<family>/`.
+- **`TouchInput`** (abstract) - takes host pen events in guest-surface
+  coordinates. The touch peripheral concrete of the board converts them into
+  guest pen samples. The concretes live under `libCerfCore/src/boards/<family>/`.
   - `libCerfCore/include/cerfcore/host/touch_input.h`
 
 - **Off-screen bezel touch buttons are physical, never framebuffer-drawn.**
@@ -459,10 +478,31 @@ concretes (strategy pattern, selected by `BoardContext`).
   guest does not render them. They are extra areas of the same touch panel,
   in a raw-ADC band past the screen's active range. The board maps its screen
   to a raw sub-range (a per-board seam) and reserves the rest of the range for
-  the buttons. A host menu (the keyboard-widget hotkey section) sends a held
-  synthetic raw pen tap to each button, because no on-screen pixel maps to one.
-  The guest driver resolves the zone-to-key mapping and its own calibration.
-  CERF models only the panel geometry, never the guest's button table.
+  the buttons. Each of these buttons has a button in the status-bar button row
+  (`ButtonRow`, below). That row button sends a held synthetic raw pen tap to
+  its zone, because no on-screen pixel maps to the zone. The guest driver
+  resolves the zone-to-key mapping and its own calibration. CERF models only the
+  panel geometry, never the guest's button table.
+
+- **`ButtonRow`** - the buttons left of the host widgets in the status bar. The
+  row holds the special keys of the active keyboard source, then the
+  `DeviceButtons` groups of the board. A device button is anything that is not
+  on the keyboard: a printed bezel button, or a device key that no host key
+  sends.
+
+  **A special key stays down for as long as the user presses its button.** The
+  desktop sends the key-down at the press and the key-up at the release. The
+  Android strip scrolls, so it sends the key-down when the press becomes a tap.
+  It sends the key-up when the key was down for as long as the finger held the
+  button. A press held for one second latches the key. The key then stays down
+  until the next click on its button.
+
+  A device button runs its whole action on one click.
+
+  **The desktop shows a special key only when the board names it differently
+  from the host key that sends it.** The Android strip shows every special key
+  of the board.
+  - `cerf-qt/button_row.h`, `libCerfCore/include/cerfcore/host/device_buttons.h`
 
 - **`KeyboardInput`** (abstract) - one keyboard source: `OnHostKey(vk, key_up)`
   plus `SourceName` / `SourcePriority` / `SourceReady`. Concretes self-register
@@ -474,6 +514,11 @@ concretes (strategy pattern, selected by `BoardContext`).
 - **`KeyboardRouter`** - the keyboard-source registry and host-key funnel.
   `KeyboardInput` concretes self-register from `OnReady`. The router forwards
   host keys to the single active source.
+
+  **A key belongs to the source that receives its key-down.** That source
+  receives the key-up of the key, also after the active source changes. A
+  key-down of a key that another source holds releases the key on that source
+  first. A key-up of a key that no source holds reaches no source.
 
   **The router selects the highest-priority source that reports
   `SourceReady`.** When no source is ready, the router selects the highest
@@ -493,10 +538,15 @@ concretes (strategy pattern, selected by `BoardContext`).
 - **`PointerRouter` / `PointerWidget`** - the pointer-source registry and
   host-mouse funnel. It mirrors `KeyboardRouter`. Pointing-device sources
   (the touch / mouse of a board, the guest-additions absolute pointer)
-  self-register. The router forwards host mouse messages to the single
-  active source. It selects by the same ready-then-priority rule as
+  self-register. The frontend sends host mouse messages to the single
+  active source. The router selects by the same ready-then-priority rule as
   `KeyboardRouter`, and it carries the same `RearmAutoSelect` /
   `ReevaluateAuto` pair.
+
+  **A pen or a mouse button that is down stays with the source that received
+  the press.** This holds also after the active source changes. A host mouse
+  event that reports the button up releases it on that source.
+
   When more than one is registered, the `PointerWidget` status-bar widget
   switches the active source and keeps the choice across hibernation. Some
   apps (calibrators) read the stock touch/mouse stream directly. On a board
@@ -506,19 +556,17 @@ concretes (strategy pattern, selected by `BoardContext`).
 
 - **`InputCapture`** - the capture toggle, so the guest receives the keys
   that the host shell normally takes. It forwards to `KeyboardInput` and
-  synthesizes Ctrl-Alt-Del. Each frontend feeds it host keys. The Win32
-  `HostInputCapture` takes them from a low-level keyboard hook, and it
-  installs and removes that hook on the UI thread.
-  - `libCerfFrontend/include/cerffrontend/input_capture.h`,
-    `libCerfFrontend/src/input_capture.cpp`, `cerf-win32/host/host_input_capture.{h,cpp}`
+  synthesizes Ctrl-Alt-Del. Each frontend feeds it host keys. On Windows, the
+  desktop frontend takes them from `LowLevelKeyboardHook` and installs that
+  hook on the UI thread.
+  - `cerf-qt/input_capture.{h,cpp}`, `cerf-qt/desktop/qt_input_capture_windows.cpp`
 
 - **`StatusBar`** - the bottom status bar. It lays out and paints the ordered
   widget set of `HostWidgetRegistry` (icons and per-icon tooltips), and it
   sends each mouse click to its widget. The capture/lock indicator is itself
   one such host-owned widget. The window, the tooltips and the timer of the
   bar belong to the frontend.
-  - `libCerfFrontend/include/cerffrontend/status_bar.h`, `libCerfFrontend/src/status_bar.cpp`,
-    `cerf-win32/host/host_status_bar.{h,cpp}`, `cerf-qt/qt_status_bar.{h,cpp}`
+  - `cerf-qt/status_bar.{h,cpp}`, `cerf-qt/desktop/qt_status_bar.{h,cpp}`, `cerf-qt/mobile/mobile_widget_bar.{h,cpp}`
 
 - **`HostWidget` / `HostWidgetRegistry`** - the live configuration surface of
   a peripheral or a board feature. `HostWidget` is an abstract,
@@ -539,7 +587,7 @@ concretes (strategy pattern, selected by `BoardContext`).
   surface (via `FrontendWindow::CaptureGuestSurface`, 1:1). The
   `ImageExporter` seam of the frontend writes the PNG and fills the
   clipboard.
-  - `libCerfFrontend/include/cerffrontend/screenshots.h`, `libCerfFrontend/src/screenshots.cpp`
+  - `cerf-qt/screenshots.{h,cpp}`
 
 ## TraceManager
 
@@ -651,18 +699,15 @@ byte buffer. Do not write a local shift-and-or or a local `Put32`.
   a multi-partition / multi-file bundle, for example a ROM plus a separate
   EEPROM image present together. The `rom` block then names which file boots
   and which file is data, so CERF does not guess. Everything else in the file
-  is a user convenience. The `meta` block is launcher-only metadata (display
+  is a user convenience. The `meta` block is manager-only metadata (display
   name, board, SoC, OS, year). The `board` / `network` / `rom` overrides let a
-  user pre-bake options that the launcher or the CLI otherwise passes each
+  user pre-bake options that the manager or the CLI otherwise passes each
   time (a custom screen resolution on boards that support one or for a
   guest-additions boot, a force-flipped flag). When the file is absent, CERF
   uses `DeviceConfig` defaults plus CLI overrides.
 
-`./launcher` syncs `bundled/devices/`. It downloads the public manifest and
-installs selected bundles.
-
-Git ignores the downloaded bundle directories and the local `manifest.json`.
-Only those are copied to the release directory. Users run `launcher` locally.
+Git ignores the bundle directories and the local `manifest.json` in
+`bundled/devices/`.
 
 For IDA debugging, `tools/extract_bundles.py` decomposes the same `.nb0` /
 `.bin` offline into `references/extracted-roms/<dev>/<rom>/`. The script runs
@@ -670,15 +715,10 @@ For IDA debugging, `tools/extract_bundles.py` decomposes the same `.nb0` /
 PDBs. That tree is gitignored. CERF does not consume it at runtime. It serves
 IDA / static analysis only - see `agent_docs/debugging.md` § IDA discipline.
 
-The `CopyBundledFiles` MSBuild target mirrors `bundled/**/*` into
-`build/<config>/Win32/**` at build time. The `cerf-qt-bundled` CMake target
-does the same into the folder that holds the cerf-qt frontend. Each copy is
+The `cerf-qt-bundled` CMake target mirrors `bundled/**/*` into the folder that
+holds the frontend at build time. The copy is
 incremental and never deletes destination files that are absent from the
 source set.
-
-CERF uses `bundled/devices` locally, because the build syncs it into
-`build\release\win32\devices`. Regular users have the launcher inside the
-build directory and sync the devices folder there.
 
 ## CE Apps - CERF-built CE binaries
 
@@ -692,3 +732,6 @@ for any CERF-built CE binary.
 
 On Linux the build runs the same toolchain through Wine. macOS cannot run it, so a macOS
 build copies the CE apps of a Windows or Linux build (`build.py --ce-apps-from`).
+
+The Android package (`build.py --android`) carries every CE app inside the APK. As a result,
+the CE apps must exist before the frontend builds. A partial set of CE apps must not ship.

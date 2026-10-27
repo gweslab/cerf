@@ -36,8 +36,8 @@ submodule that `.gitmodules` lists. The upstream of the root is
 `gweslab/cerf`. The upstream of a submodule is its URL in `.gitmodules`.
 
 If an origin points at its upstream, write a note of two lines at most: an
-external contributor works from forks, as `agent_docs/submodules.md` § Forks
-describes.
+external contributor works from forks, as `.github/CONTRIBUTING.md` § Working
+from a fork describes.
 
 If every origin points at a fork, write nothing. This step reads the remotes
 and nothing else.

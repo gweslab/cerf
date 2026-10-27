@@ -9,13 +9,14 @@ nlohmann-json 3.12.0 - https://github.com/nlohmann/json
     License:   MIT
     Copyright: (c) 2013-2025 Niels Lohmann
 
-YY-Thunks 1.2.1 - https://github.com/Chuyu-Team/YY-Thunks
-    License:   MIT
-    Copyright: (c) 2018 Chuyu-Team
-
 libslirp 4.9.1 - https://gitlab.freedesktop.org/slirp/libslirp
     License:   BSD-3-Clause
     Copyright: (c) 1995-1996 Danny Gasparovski and the libslirp contributors
+
+libzip 1.11.4 - https://libzip.org/
+    License:   BSD-3-Clause
+    Copyright: (c) 1999-2020 Dieter Baron and Thomas Klausner
+    Text:      licenses/libzip.txt
 
 GLib 2.88.0 - https://gitlab.gnome.org/GNOME/glib
     License:   LGPL-2.1-or-later
@@ -38,54 +39,256 @@ GNU gettext (libintl) 0.22.5 - https://www.gnu.org/software/gettext/
     Copyright: (c) Free Software Foundation
     Text:      licenses/LGPL-2.1.txt
 
-Sun Valley ttk theme (sv-ttk) 2.5.5 - https://github.com/rdbende/Sun-Valley-ttk-theme
-    License:   MIT
-    Copyright: (c) rdbende
+Material Symbols - https://github.com/google/material-design-icons
+    License:   Apache-2.0
+    Copyright: (c) Google LLC
+    Text:      licenses/Apache-2.0.txt
 
 alsa-lib 1.2.15.3 - https://www.alsa-project.org/
     License:   LGPL-2.1-or-later
     Copyright: (c) 1998 Jaroslav Kysela; (c) 2000 Abramo Bagnara
     Text:      licenses/LGPL-2.1.txt
 
+libxcb 1.17.0 (libxcb, libxcb-randr) - https://xcb.freedesktop.org/
+    License:   MIT
+    Copyright: (c) 2001-2006 Bart Massey, Jamey Sharp, and Josh Triplett
+
+Wayland 1.24.0 (libwayland-client) - https://wayland.freedesktop.org/
+    License:   MIT
+    Copyright: (c) 2008-2012 Kristian Høgsberg; (c) 2010-2012 Intel Corporation;
+               (c) 2011 Benjamin Franzke; (c) 2012 Collabora, Ltd.
+
+wayland-protocols 1.45 (xdg-output-unstable-v1) - https://gitlab.freedesktop.org/wayland/wayland-protocols
+    License:   MIT
+    Copyright: (c) 2017 Red Hat Inc.
+
 Qt 6 - https://www.qt.io/
     License:   LGPL-3.0-only
     Copyright: (c) The Qt Company Ltd.
     Text:      licenses/LGPL-3.0.txt, licenses/GPL-3.0.txt
 
+qt6windows7 - https://github.com/crystalidea/qt6windows7
+    License:   LGPL-3.0-only
+    Text:      licenses/LGPL-3.0.txt
+
+resvg 0.48.1 (resvg, usvg, resvg-capi) - https://github.com/linebender/resvg
+    License:   MIT
+    Copyright: 2017 the Resvg Authors
+
+Rust standard library - https://www.rust-lang.org/
+    License:   MIT
+    Copyright: (c) The Rust Project Developers
+
+adler2 2.0.1 - https://github.com/oyvindln/adler2
+    License:   MIT
+    Copyright: (C) Jonas Schievink
+
+arrayref 0.3.9 - https://github.com/droundy/arrayref
+    License:   BSD-2-Clause
+    Copyright: (c) 2015 David Roundy
+    Text:      licenses/arrayref.txt
+
+arrayvec 0.7.8 - https://github.com/bluss/arrayvec
+    License:   MIT
+    Copyright: (c) Ulrik Sverdrup "bluss" 2015-2023
+
+base64 0.23.0 - https://github.com/marshallpierce/rust-base64
+    License:   MIT
+    Copyright: (c) 2025 Alice Maz, Marshall Pierce
+
+bitflags 2.13.1 - https://github.com/bitflags/bitflags
+    License:   MIT
+    Copyright: (c) 2014 The Rust Project Developers
+
+bytemuck 1.25.2 - https://github.com/Lokathor/bytemuck
+    License:   MIT
+    Copyright: (c) 2019 Daniel "Lokathor" Gee
+
+byteorder-lite 0.1.0 - https://github.com/image-rs/byteorder-lite
+    License:   MIT
+    Copyright: (c) 2015 Andrew Gallant
+
+cfg-if 1.0.4 - https://github.com/rust-lang/cfg-if
+    License:   MIT
+    Copyright: (c) 2014 Alex Crichton
+
+color_quant 1.1.0 - https://github.com/image-rs/color_quant
+    License:   MIT
+    Copyright: (c) 2016 PistonDevelopers
+
+crc32fast 1.5.0 - https://github.com/srijs/rust-crc32fast
+    License:   MIT
+    Copyright: (c) 2018 Sam Rijs, Alex Crichton and contributors
+
+data-url 0.3.2 - https://github.com/servo/rust-url
+    License:   MIT
+    Copyright: (c) 2013-2025 The rust-url developers
+
+fdeflate 0.3.7 - https://github.com/image-rs/fdeflate
+    License:   MIT
+    Copyright: The image-rs Developers
+
+flate2 1.1.9 - https://github.com/rust-lang/flate2-rs
+    License:   MIT
+    Copyright: (c) 2014-2026 Alex Crichton
+
+float-cmp 0.9.0 - https://github.com/mikedilger/float-cmp
+    License:   MIT
+    Copyright: (c) 2014-2020 Optimal Computing (NZ) Ltd
+
+font-types 0.12.1, read-fonts 0.41.0, skrifa 0.44.0 - https://github.com/googlefonts/fontations
+    License:   MIT
+    Copyright: (c) 2019 Fontations Developers
+
+fontconfig-parser 0.5.8 - https://github.com/Riey/fontconfig-parser
+    License:   MIT
+    Copyright: (c) 2021 Riey
+
+fontdb 0.24.0 - https://github.com/RazrFalcon/fontdb
+    License:   MIT
+    Copyright: (c) 2020 Yevhenii Reizner
+
+gif 0.14.2 - https://github.com/image-rs/image-gif
+    License:   MIT
+    Copyright: (c) 2015 nwin
+
+harfrust 0.12.0 - https://github.com/harfbuzz/harfrust
+    License:   MIT
+    Copyright: (c) 2020 Yevhenii Reizner; (c) HarfBuzz developers
+
+image-webp 0.2.4 - https://github.com/image-rs/image-webp
+    License:   MIT
+
+imagesize 0.15.0 - https://github.com/Roughsketch/imagesize
+    License:   MIT
+    Copyright: (c) 2017 Maiddog
+
+kurbo 0.13.1, polycool 0.4.0 - https://github.com/linebender/kurbo
+    License:   MIT
+    Copyright: (c) 2018 Raph Levien
+
+libc 0.2.189 - https://github.com/rust-lang/libc
+    License:   MIT
+    Copyright: (c) The Rust Project Developers
+
+log 0.4.33 - https://github.com/rust-lang/log
+    License:   MIT
+    Copyright: (c) 2014 The Rust Project Developers
+
+memchr 2.8.3 - https://github.com/BurntSushi/memchr
+    License:   MIT
+    Copyright: (c) 2015 Andrew Gallant
+
+memmap2 0.9.11 - https://github.com/RazrFalcon/memmap2-rs
+    License:   MIT
+    Copyright: (c) 2015 Dan Burkert; (c) 2020 Yevhenii Reizner
+
+miniz_oxide 0.8.9 - https://github.com/Frommi/miniz_oxide
+    License:   MIT
+    Copyright: (c) 2017, 2020 Frommi; (c) 2017-2024 oyvindln;
+               2010-2014 Rich Geldreich and Tenacious Software LLC;
+               2013-2014 RAD Game Tools and Valve Software
+
+once_cell 1.21.4 - https://github.com/matklad/once_cell
+    License:   MIT
+    Copyright: Aleksey Kladov
+
+pico-args 0.5.0 - https://github.com/RazrFalcon/pico-args
+    License:   MIT
+    Copyright: (c) 2019 Yevhenii Reizner
+
+png 0.18.1 - https://github.com/image-rs/image-png
+    License:   MIT
+    Copyright: (c) 2015 nwin
+
+quick-error 2.0.1 - https://github.com/tailhook/quick-error
+    License:   MIT
+    Copyright: (c) 2015 The quick-error Developers
+
+rgb 0.8.53 - https://github.com/kornelski/rust-rgb
+    License:   MIT
+    Copyright: (c) 2019 Kornel
+
+roxmltree 0.20.0, roxmltree 0.21.1 - https://github.com/RazrFalcon/roxmltree
+    License:   MIT
+    Copyright: (c) 2018 Yevhenii Reizner
+
+simd-adler32 0.3.10 - https://github.com/mcountryman/simd-adler32
+    License:   MIT
+    Copyright: (c) 2021 Marvin Countryman
+
+simplecss 0.2.2 - https://github.com/linebender/simplecss
+    License:   MIT
+    Copyright: (c) 2018 Reizner Evgeniy
+
+siphasher 1.0.3 - https://github.com/jedisct1/rust-siphash
+    License:   MIT
+    Copyright: 2012-2016 The Rust Project Developers; 2016-2026 Frank Denis
+
+slotmap 1.1.1 - https://github.com/orlp/slotmap
+    License:   Zlib
+    Copyright: (c) 2021 Orson Peters
+    Text:      licenses/slotmap.txt
+
+smallvec 1.15.2 - https://github.com/servo/rust-smallvec
+    License:   MIT
+    Copyright: (c) 2018 The Servo Project Developers
+
+strict-num 0.1.1 - https://github.com/RazrFalcon/strict-num
+    License:   MIT
+    Copyright: (c) 2022 Yevhenii Reizner
+
+svgtypes 0.16.1 - https://github.com/linebender/svgtypes
+    License:   MIT
+    Copyright: (c) 2018 Yevhenii Reizner
+
+tiny-skia 0.12.0, tiny-skia-path 0.12.0 - https://github.com/linebender/tiny-skia
+    License:   BSD-3-Clause
+    Copyright: (c) 2011 Google Inc.; (c) 2020 Yevhenii Reizner
+    Text:      licenses/tiny-skia.txt
+
+tinyvec 1.12.0 - https://github.com/Lokathor/tinyvec
+    License:   MIT
+    Copyright: (c) 2019 Daniel "Lokathor" Gee
+
+tinyvec_macros 0.1.1 - https://github.com/Soveu/tinyvec_macros
+    License:   MIT
+    Copyright: (c) 2020 Tomasz "Soveu" Marx
+
+unicode-bidi 0.3.18 - https://github.com/servo/unicode-bidi
+    License:   MIT
+    Copyright: (c) 2015 The Rust Project Developers
+
+unicode-script 0.5.8 - https://github.com/unicode-rs/unicode-script
+    License:   MIT
+    Copyright: (c) 2019 Manish Goregaokar; 2021 The Unicode-rs Developers
+
+unicode-vo 0.1.0 - https://github.com/RazrFalcon/unicode-vo
+    License:   MIT
+    Copyright: (c) 2018 Reizner Evgeniy
+
+weezl 0.1.12 - https://github.com/image-rs/weezl
+    License:   MIT
+    Copyright: (c) HeroicKatora 2020
+
+xmlwriter 0.1.0 - https://github.com/RazrFalcon/xmlwriter
+    License:   MIT
+    Copyright: (c) 2019 Reizner Evgeniy
+
+zune-core 0.5.1, zune-jpeg 0.5.15 - https://github.com/etemesi254/zune-image
+    License:   MIT
+    Copyright: (c) zune-image developers
+
 
 RUNTIME LIBRARIES IN THE RELEASE PACKAGES
 -----------------------------------------
 
-Python - https://www.python.org/
-    License:   PSF-2.0
-    Text:      licenses/Python.txt, licenses/Python-Windows.txt
-
-PyInstaller bootloader - https://pyinstaller.org/
-    License:   GPL-2.0-or-later with the PyInstaller bootloader exception
-
 Microsoft Visual C++ runtime and Universal CRT
     License:   Microsoft Distributable Code
-    Text:      licenses/Python-Windows.txt
-
-Tcl/Tk - https://www.tcl-lang.org/
-    License:   Tcl/Tk license
-    Text:      licenses/Tcl-Tk.txt
 
 OpenSSL - https://www.openssl.org/
     License:   Apache-2.0, OpenSSL and SSLeay
-    Text:      licenses/OpenSSL.txt, licenses/Python-Windows.txt
-
-libffi - https://sourceware.org/libffi/
-    License:   MIT
-    Text:      licenses/libffi.txt
-
-Expat - https://libexpat.github.io/
-    License:   MIT
-    Text:      licenses/expat.txt
-
-bzip2 - https://sourceware.org/bzip2/
-    License:   bzip2 license
-    Text:      licenses/bzip2.txt
+    Text:      licenses/OpenSSL.txt
 
 XZ Utils (liblzma) - https://tukaani.org/xz/
     License:   0BSD
@@ -95,17 +298,9 @@ zlib - https://zlib.net/
     License:   Zlib
     Text:      licenses/zlib.txt
 
-mpdecimal - https://www.bytereef.org/mpdecimal/
-    License:   BSD-2-Clause
-    Text:      licenses/mpdecimal.txt
-
 Zstandard - https://facebook.github.io/zstd/
     License:   BSD-3-Clause
     Text:      licenses/zstd.txt
-
-LibTomMath - https://www.libtom.net/
-    License:   The LibTom license (public domain)
-    Text:      licenses/libtommath.txt
 
 Brotli - https://github.com/google/brotli
     License:   MIT
@@ -118,16 +313,6 @@ FreeType - https://freetype.org/
 libpng - http://www.libpng.org/pub/png/libpng.html
     License:   PNG Reference Library License version 2
     Text:      licenses/libpng.txt
-
-Fontconfig - https://www.freedesktop.org/wiki/Software/fontconfig/
-    License:   MIT-style
-    Text:      licenses/fontconfig.txt
-
-X.Org libX11, libXau, libXdmcp, libXext, libXft, libXrender, libXss - https://www.x.org/
-    License:   MIT-style
-    Text:      licenses/libX11.txt, licenses/libXau.txt, licenses/libXdmcp.txt,
-               licenses/libXext.txt, licenses/libXft.txt, licenses/libXrender.txt,
-               licenses/libXss.txt
 
 HarfBuzz - https://harfbuzz.github.io/
     License:   Old MIT
@@ -173,8 +358,8 @@ IBM Plex Sans Regular, IBM Plex Sans Bold, IBM Plex Mono Bold - https://github.c
     Text:      licenses/OFL-1.1.txt
 
 
-MIT (nlohmann-json, YY-Thunks, sv-ttk)
---------------------------------------
+MIT (nlohmann-json, resvg, the Rust standard library, the MIT Rust crates)
+--------------------------------------------------------------------------
 
     Permission is hereby granted, free of charge, to any person obtaining a copy of this
     software and associated documentation files (the "Software"), to deal in the Software
@@ -249,12 +434,14 @@ handhelds.org bootldr - https://ftp.gwdg.de/pub/linux/handhelds/feeds/bootldr/
 pySerial - https://github.com/pyserial/pyserial
 Wine - https://www.winehq.org/
 XNU - https://github.com/apple-oss-distributions/xnu
+Android Open Source Project - https://source.android.com/
 CMake - https://cmake.org/
 LuaJIT - https://luajit.org/
 dynarmic - https://github.com/azahar-emu/dynarmic
 FEX - https://github.com/FEX-Emu/FEX
 Box64 - https://github.com/ptitSeb/box64
 discord-rpc - https://github.com/discord/discord-rpc
+Qt - https://www.qt.io/
 
 
 TRADEMARKS

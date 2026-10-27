@@ -1,0 +1,6 @@
+#ifndef CERFMAN_BOARD_ORDER_TEXT_H
+#define CERFMAN_BOARD_ORDER_TEXT_H
+
+#define CERF_LAST_BOARD_TIER_PREFIX "device emulator"
+
+#endif

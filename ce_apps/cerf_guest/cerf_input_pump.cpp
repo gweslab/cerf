@@ -7,18 +7,8 @@
 #include "cerf_input_pump.h"
 
 #include "cerfcore/peripherals/cerf_virt/cerf_virt_addr_map.h"
-
-#define CERF_PTR_X            0x00u
-#define CERF_PTR_Y            0x04u
-#define CERF_PTR_BUTTONS      0x08u
-#define CERF_PTR_WHEEL        0x0Cu
-#define CERF_PTR_SEQ          0x10u
-
-#define CERF_KB_WRITE_SEQ     0x00u
-#define CERF_KB_RING_BASE     0x10u
-#define CERF_KB_RING_COUNT    256u
-#define CERF_KB_VK_MASK       0x00FFu
-#define CERF_KB_KEYUP_BIT     0x0100u
+#include "cerfcore/peripherals/cerf_virt/cerf_virt_keyboard_regs.h"
+#include "cerfcore/peripherals/cerf_virt/cerf_virt_pointer_regs.h"
 
 #define CERF_INPUT_POLL_MS    10u
 #define CERF_INPUT_CE_PRIO    145
@@ -34,7 +24,12 @@ static void CerfInputBoost(void) {
     else     SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_HIGHEST);
 }
 
+static void CerfSendButton(PFN_mouse_event me, ULONG btn, ULONG changed, ULONG bit, DWORD down, DWORD up) {
+    if (changed & bit) me((btn & bit) ? down : up, 0, 0, 0, 0);
+}
+
 static DWORD WINAPI CerfInputPumpThread(LPVOID) {
+    using namespace cerfcore::CerfVirt;
     PFN_mouse_event me = (PFN_mouse_event)CerfCoredllProc(L"mouse_event");
     PFN_keybd_event ke = (PFN_keybd_event)CerfCoredllProc(L"keybd_event");
     volatile ULONG* ptr = NULL;
@@ -49,13 +44,11 @@ static DWORD WINAPI CerfInputPumpThread(LPVOID) {
     CERF_LOG_X("cerf_guest: inputpump keybd_event", (DWORD)ke);
 
     if (me) {
-        ptr = (volatile ULONG*)CerfMapRegsPage(g_CerfVirtBase + cerfcore::CerfVirt::kPointerOffset,
-                                               cerfcore::CerfVirt::kPointerSize);
+        ptr = (volatile ULONG*)CerfMapRegsPage(g_CerfVirtBase + kPointerOffset, kPointerSize);
         if (!ptr) me = NULL;
     }
     if (ke) {
-        kb = (volatile ULONG*)CerfMapRegsPage(g_CerfVirtBase + cerfcore::CerfVirt::kKeyboardOffset,
-                                              cerfcore::CerfVirt::kKeyboardSize);
+        kb = (volatile ULONG*)CerfMapRegsPage(g_CerfVirtBase + kKeyboardOffset, kKeyboardSize);
         if (!kb) ke = NULL;
     }
     if (!me && !ke) {
@@ -70,28 +63,28 @@ static DWORD WINAPI CerfInputPumpThread(LPVOID) {
     }
 
     if (me) {
-        last_seq   = ptr[CERF_PTR_SEQ / 4];
-        last_wheel = (LONG)ptr[CERF_PTR_WHEEL / 4];
+        last_seq   = ptr[kPtrAttach / 4];
+        last_wheel = (LONG)ptr[kPtrWheelAccum / 4];
     }
-    if (ke) consumed = kb[CERF_KB_WRITE_SEQ / 4];
+    if (ke) consumed = kb[kKbWriteSeq / 4];
 
     for (;;) {
         if (me) {
-            ULONG seq = ptr[CERF_PTR_SEQ / 4];
+            ULONG seq = ptr[kPtrSeq / 4];
             if (seq != last_seq) {
-                DWORD nx    = ptr[CERF_PTR_X / 4];
-                DWORD ny    = ptr[CERF_PTR_Y / 4];
-                ULONG btn   = ptr[CERF_PTR_BUTTONS / 4];
-                LONG  wheel = (LONG)ptr[CERF_PTR_WHEEL / 4];
+                DWORD nx    = ptr[kPtrX / 4];
+                DWORD ny    = ptr[kPtrY / 4];
+                ULONG btn   = ptr[kPtrButtons / 4];
+                LONG  wheel = (LONG)ptr[kPtrWheelAccum / 4];
                 ULONG changed;
                 last_seq = seq;
 
                 me(MOUSEEVENTF_ABSOLUTE | MOUSEEVENTF_MOVE, nx, ny, 0, 0);
 
                 changed = btn ^ last_btn;
-                if (changed & 1u) me((btn & 1u) ? MOUSEEVENTF_LEFTDOWN   : MOUSEEVENTF_LEFTUP,   0, 0, 0, 0);
-                if (changed & 2u) me((btn & 2u) ? MOUSEEVENTF_RIGHTDOWN  : MOUSEEVENTF_RIGHTUP,  0, 0, 0, 0);
-                if (changed & 4u) me((btn & 4u) ? MOUSEEVENTF_MIDDLEDOWN : MOUSEEVENTF_MIDDLEUP, 0, 0, 0, 0);
+                CerfSendButton(me, btn, changed, kPtrButtonLeft, MOUSEEVENTF_LEFTDOWN, MOUSEEVENTF_LEFTUP);
+                CerfSendButton(me, btn, changed, kPtrButtonRight, MOUSEEVENTF_RIGHTDOWN, MOUSEEVENTF_RIGHTUP);
+                CerfSendButton(me, btn, changed, kPtrButtonMiddle, MOUSEEVENTF_MIDDLEDOWN, MOUSEEVENTF_MIDDLEUP);
                 last_btn = btn;
 
                 if (wheel != last_wheel) {
@@ -102,17 +95,17 @@ static DWORD WINAPI CerfInputPumpThread(LPVOID) {
         }
 
         if (ke) {
-            ULONG wseq = kb[CERF_KB_WRITE_SEQ / 4];
+            ULONG wseq = kb[kKbWriteSeq / 4];
             while (consumed != wseq) {
                 ULONG idx, entry;
                 BYTE  vk;
                 DWORD flags;
-                if ((ULONG)(wseq - consumed) > CERF_KB_RING_COUNT)
-                    consumed = wseq - CERF_KB_RING_COUNT;
-                idx   = consumed % CERF_KB_RING_COUNT;
-                entry = kb[(CERF_KB_RING_BASE / 4) + idx];
-                vk    = (BYTE)(entry & CERF_KB_VK_MASK);
-                flags = (entry & CERF_KB_KEYUP_BIT) ? KEYEVENTF_KEYUP : 0u;
+                if ((ULONG)(wseq - consumed) > kKbRingCount)
+                    consumed = wseq - kKbRingCount;
+                idx   = consumed % kKbRingCount;
+                entry = kb[(kKbRingBase / 4) + idx];
+                vk    = (BYTE)(entry & kKbEntryVkMask);
+                flags = (entry & kKbEntryKeyUpBit) ? KEYEVENTF_KEYUP : 0u;
                 ke(vk, 0, flags, 0);
                 CERF_LOG_X("cerf_guest: inputpump key inject", entry);
                 consumed++;

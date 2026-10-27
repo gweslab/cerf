@@ -39,14 +39,14 @@ CERF builds on Windows, Linux and macOS with the same `build.py` script.
 Install modern Visual Studio with the C++ desktop development workload.
 
 > [!NOTE]
-> **The first build on a new machine takes more than one hour.** vcpkg compiles the dependencies from source before CERF links. This occurs one time on each machine. Later builds use the cached `vcpkg_installed/` tree and are complete in a few minutes. Do not stop the first build.
+> **The first build on a new machine takes more than one hour.** vcpkg compiles the dependencies from source, and `build.py` builds Qt into `third_party/qt/`. This occurs one time on each machine. Later builds use the cached trees and are complete in a few minutes. Do not stop the first build.
 
 ### Linux
 
 Install the build packages. These are the Ubuntu 26.04 names:
 
 ```
-sudo apt install git cmake ninja-build g++ ccache pkg-config qt6-base-dev qt6-svg-dev libslirp-dev nlohmann-json3-dev libasound2-dev python3-venv python3-tk libpython3-dev wine
+{apt_install}
 ```
 
 ### macOS
@@ -54,7 +54,7 @@ sudo apt install git cmake ninja-build g++ ccache pkg-config qt6-base-dev qt6-sv
 Install the Xcode Command Line Tools (`xcode-select --install`) and [Homebrew](https://brew.sh). Then install the build packages:
 
 ```
-brew install cmake ninja pkgconf qtbase qtsvg libslirp nlohmann-json python@3.14 python-tk@3.14
+{brew_install}
 ```
 
 ### All hosts
@@ -84,9 +84,23 @@ python3 build.py
 The build script will:
 
 - wait for a parallel build (Claude Code-special feature for parallel agents work)
-- build the launcher (and will install CPython into a repo directory, if needed)
+- install a pinned Rust toolchain into `third_party/rust` and build the resvg SVG renderer
 - build the emulator itself (and will pick appropriate SDK/toolchain from your installations)
 - build all the bundled Windows CE apps (at `ce_apps/`)
+
+### Android
+
+`python build.py --android` builds `build/<Config>/android-arm64/cerf.apk` on any host.
+
+`python build.py --android=amd64` builds `build/<Config>/android-amd64/cerf.apk` for an x86_64 Android emulator. Install these first:
+
+- the Android SDK with {android_sdk_packages}, and set `ANDROID_SDK_ROOT` to it
+- a JDK 17 or newer, and set `JAVA_HOME` to it
+- on Linux, a vcpkg checkout, and set `VCPKG_ROOT` to it
+
+The build downloads Qt 6.12 for Android and for the host into `third_party/qt/`.
+
+To sign the package, set `QT_ANDROID_KEYSTORE_PATH`, `QT_ANDROID_KEYSTORE_ALIAS`, `QT_ANDROID_KEYSTORE_STORE_PASS` and `QT_ANDROID_KEYSTORE_KEY_PASS`.
 
 ### Building the CE-side binaries (optional)
 

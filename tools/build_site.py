@@ -5,7 +5,7 @@
     python tools/build_site.py --serve --port 8123  the same, on another port
 
 The board table, changelog and version are pulled in by docs/website/hooks/render.py
-from the same sources the launcher and README.md use, so the site cannot drift from
+from the same sources README.md uses, so the site cannot drift from
 them. This script only syncs the shared image assets - which live outside the site
 tree - into the docs dir, where MkDocs can see them.
 """
@@ -17,18 +17,18 @@ import shutil
 import subprocess
 import sys
 
+from product_facts import ASSET_ICONS_DIR, LOGO_ASSET
+
 ROOT      = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SITE      = os.path.join(ROOT, 'docs', 'website')
 CONTENT   = os.path.join(SITE, 'content')
 OUT       = os.path.join(ROOT, 'build', 'site')
-ICONS_SRC = os.path.join(ROOT, 'launcher', 'assets', 'icons')
-
-ICONS_SVG = os.path.join(ROOT, 'assets', 'icons_sources')
+ICONS_SVG = os.path.join(ROOT, 'assets', ASSET_ICONS_DIR)
 
 IMAGES = [
-    (os.path.join('assets', 'cerf.ico'),         'cerf.ico'),
-    (os.path.join('assets', 'icons_sources', 'cerf.svg'), 'cerf.svg'),
-    (os.path.join('assets', 'icons_sources', 'cerf-light.svg'), 'cerf-light.svg'),
+    (os.path.join('assets', LOGO_ASSET + '.ico'), LOGO_ASSET + '.ico'),
+    (os.path.join('assets', ASSET_ICONS_DIR, LOGO_ASSET + '.svg'), LOGO_ASSET + '.svg'),
+    (os.path.join('assets', ASSET_ICONS_DIR, 'cerf-light.svg'), 'cerf-light.svg'),
 ]
 
 
@@ -36,7 +36,7 @@ def sync_assets():
     icons = os.path.join(CONTENT, 'assets', 'icons')
     if os.path.isdir(icons):
         shutil.rmtree(icons)
-    shutil.copytree(ICONS_SRC, icons, ignore=shutil.ignore_patterns('*.md'))
+    os.makedirs(icons)
     for svg in glob.glob(os.path.join(ICONS_SVG, '*.svg')):
         shutil.copy2(svg, os.path.join(icons, os.path.basename(svg)))
 

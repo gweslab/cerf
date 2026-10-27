@@ -1,22 +1,13 @@
 #pragma once
 
+#include <QImage>
 #include <QPoint>
 #include <QPointF>
+#include <QSize>
 
-#include <cmath>
-
-inline int DeviceExtent(qreal logical, qreal dpr) {
-    return static_cast<int>(std::lround(logical * dpr));
-}
-
-inline int LogicalExtentCovering(int device, qreal dpr) {
-    return static_cast<int>(std::ceil(device / dpr));
-}
-
-inline QPoint DevicePoint(const QPointF& logical, qreal dpr) {
-    return QPoint(DeviceExtent(logical.x(), dpr), DeviceExtent(logical.y(), dpr));
-}
-
-inline QPoint LogicalPoint(int x, int y, qreal dpr) {
-    return QPoint(static_cast<int>(std::lround(x / dpr)), static_cast<int>(std::lround(y / dpr)));
-}
+int    DeviceExtent(qreal logical, qreal dpr);
+QSize  DeviceCanvasSize(qreal logical_w, qreal logical_h, qreal dpr);
+int    LogicalExtentCovering(int device, qreal dpr);
+QPoint DevicePoint(const QPointF& logical, qreal dpr);
+QPoint LogicalPoint(int x, int y, qreal dpr);
+void   FitDeviceImage(QImage& image, qreal logical_w, qreal logical_h, qreal ratio, QImage::Format format);

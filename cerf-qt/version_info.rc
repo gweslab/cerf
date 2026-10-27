@@ -1,0 +1,38 @@
+#include <winver.h>
+#include <cerfcore/core/product_name_text.h>
+#include "executable_names_text.h"
+#include "product_author_text.h"
+#include "version.h"
+
+#ifndef CERF_RC_DESCRIPTION
+#define CERF_RC_DESCRIPTION CERF_PRODUCT_NAME
+#endif
+#ifndef CERF_RC_FILE_NAME
+#define CERF_RC_FILE_NAME CERF_FRONTEND_NAME
+#endif
+
+VS_VERSION_INFO VERSIONINFO
+ FILEVERSION    CERF_VERSION_MAJOR,CERF_VERSION_MINOR,CERF_VERSION_PATCH,CERF_VERSION_BUILD_WORD
+ PRODUCTVERSION CERF_VERSION_MAJOR,CERF_VERSION_MINOR,CERF_VERSION_PATCH,CERF_VERSION_BUILD_WORD
+ FILEOS         VOS_NT_WINDOWS32
+ FILETYPE       VFT_APP
+BEGIN
+    BLOCK "StringFileInfo"
+    BEGIN
+        BLOCK "040904E4"
+        BEGIN
+            VALUE "CompanyName",      CERF_PRODUCT_AUTHOR
+            VALUE "FileDescription",  CERF_RC_DESCRIPTION
+            VALUE "FileVersion",      CERF_VERSION_DISPLAY_STR
+            VALUE "InternalName",     CERF_RC_FILE_NAME
+            VALUE "LegalCopyright",   "Copyright © " CERF_PRODUCT_AUTHOR
+            VALUE "OriginalFilename", CERF_RC_FILE_NAME ".exe"
+            VALUE "ProductName",      CERF_PRODUCT_NAME
+            VALUE "ProductVersion",   CERF_VERSION_DISPLAY_STR
+        END
+    END
+    BLOCK "VarFileInfo"
+    BEGIN
+        VALUE "Translation", 0x0409, 0x04E4
+    END
+END

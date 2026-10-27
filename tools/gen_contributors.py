@@ -5,10 +5,11 @@ import re
 import subprocess
 import sys
 
+from product_facts import CONTRIBUTORS_FILE
+
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-MANUAL_LIST = os.path.join(REPO_ROOT, "launcher", "assets", "contributors.txt")
-GENERATED_LIST = os.path.join(REPO_ROOT, "launcher", "assets",
-                              "contributors_generated.txt")
+MANUAL_LIST = os.path.join(REPO_ROOT, "assets", "contributors.txt")
+GENERATED_LIST = os.path.join(REPO_ROOT, "assets", CONTRIBUTORS_FILE)
 
 OWNER_NAMES = {"yaroslav kibysh"}
 AI_COAUTHOR_DOMAINS = {"anthropic.com"}
@@ -148,10 +149,10 @@ def merge(*groups):
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Merge launcher/assets/contributors.txt with the GitHub "
+        description="Merge assets/contributors.txt with the GitHub "
                     "logins of every git author and Co-Authored-By trailer, "
-                    "then write launcher/assets/contributors_generated.txt, "
-                    "which the launcher ships and its About box reads. Needs "
+                    f"then write assets/{CONTRIBUTORS_FILE}, "
+                    "which the About window reads. Needs "
                     "an authenticated gh.")
     parser.add_argument("--check", action="store_true",
                         help="exit 1 when the generated list is stale "

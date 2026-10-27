@@ -260,10 +260,10 @@ None of these is visible from any single file.
 - **On macOS, every write to the arena runs inside a code-write
   scope.** The arena is a `MAP_JIT` region, and a code-write scope opens
   it for writes on one thread. While the scope is open, that thread can
-  write the region and cannot execute it. Every byte that a write
-  changes must also reach the instruction cache before the code runs.
-  The block records live in the arena too, so a change to a record is a
-  write to the arena.
+  write the region and cannot execute it. The block records live in the
+  arena too, so a change to a record is a write to the arena.
+- **On every AArch64 host, every byte that a write to the arena changes
+  must reach the instruction cache before the code runs.**
 - **A guest floating-point operation whose exception flags matter runs
   inside the host floating-point layer.** A compiler can move ordinary
   arithmetic across the instructions that clear and read the host

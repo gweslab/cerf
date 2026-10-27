@@ -17,8 +17,10 @@ from pathlib import Path
 import resvg_py
 from PIL import Image
 
+from product_facts import ABOUT_BAND_ASSET, ASSET_ICONS_DIR
+
 REPO = Path(__file__).resolve().parent.parent
-DEFAULT_SVG = REPO / "assets" / "icons_sources" / "about_band.svg"
+DEFAULT_SVG = REPO / "assets" / ASSET_ICONS_DIR / (ABOUT_BAND_ASSET + ".svg")
 OUT = REPO / "ce_apps" / "cerf_demo" / "band_data.h"
 
 

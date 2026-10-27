@@ -13,11 +13,12 @@ from PIL import Image, ImageDraw, ImageFont
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import changelog
 from ci_release import Artifact, latest_release
+from product_facts import FONT_SANS, FONT_SANS_BOLD, FONTS_DIR, LOGO_PNG, PRODUCT_NAME
 from source_diffstat import diffstat
 
 ROOT = Path(__file__).resolve().parent.parent
-FONT_DIR = ROOT / "assets" / "fonts"
-LOGO_PATH = ROOT / "assets" / "cerf_1024.png"
+FONT_DIR = ROOT / "assets" / FONTS_DIR
+LOGO_PATH = ROOT / "assets" / LOGO_PNG
 
 SCALE = 2
 WIDTH = 1200
@@ -130,7 +131,7 @@ class _Painter:
     def font(self, size: int, bold: bool = False) -> ImageFont.FreeTypeFont:
         key = (size, bold)
         if key not in self.fonts:
-            name = "IBMPlexSans-Bold.ttf" if bold else "IBMPlexSans-Regular.ttf"
+            name = FONT_SANS_BOLD if bold else FONT_SANS
             self.fonts[key] = ImageFont.truetype(str(FONT_DIR / name), size * SCALE)
         return self.fonts[key]
 
@@ -246,7 +247,7 @@ class _Card:
         x = PAD + LOGO + 22
         title_base = PAD + 38
         sub_base = PAD + 72
-        paint.text(x, title_base, "CE Runtime Foundation", TITLE_SIZE, HEADING,
+        paint.text(x, title_base, PRODUCT_NAME, TITLE_SIZE, HEADING,
                    bold=True)
         x += paint.text(x, sub_base, f"v{info.series} build {info.build}",
                         SUB_SIZE, TEXT) + 14

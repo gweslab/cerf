@@ -14,7 +14,7 @@ A clear and concise description of what the bug is.
 **Emulator configuration (please complete the following information):**
  - Device: [e.g. Jornada 720]
  - OS: [e.g. Windows CE 3.0]
- - ROM name: [e.g. current name from launcher/devices directory if it's from bundle repository or say custom if it's your own]
+ - ROM name: [e.g. current name from the devices directory if it's from bundle repository or say custom if it's your own]
  - Did you use Guest Additions: [yes/no]
  - CERF Version: [e.g. 7.0 build 600]
  - Host OS: [e.g. Windows 11 build 26200]

@@ -19,252 +19,32 @@ jobs:
       ${{ !contains(github.event.head_commit.message, '[skip build]') &&
           (github.event_name != 'pull_request' ||
            github.event.pull_request.head.repo.full_name == github.repository) }}
-    runs-on: windows-latest
-
-    strategy:
-      matrix:
-        configuration: [Release]
-        # configuration: [Release, Debug]
-        platform: [Win32]
-
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          submodules: false
-
-      - name: Fetch core libraries
-        run: git submodule update --init libservicelocator libCerfEngine libCerfCore
-
-      - name: Add MSBuild to PATH
-        uses: microsoft/setup-msbuild@v2
-
-      - name: Restore vcpkg deps
-        id: cache-deps
-        uses: actions/cache/restore@v4
-        with:
-          path: vcpkg_installed
-          key: vcpkg-${{ runner.os }}-x86-windows-static-${{ hashFiles('vcpkg.json', 'vcpkg-configuration.json') }}
-          restore-keys: |
-            vcpkg-${{ runner.os }}-x86-windows-static-
-
-      - name: Restore vcpkg source downloads
-        id: cache-downloads
-        uses: actions/cache/restore@v4
-        with:
-          path: C:\vcpkg\downloads
-          key: vcpkg-downloads-${{ runner.os }}-${{ hashFiles('vcpkg.json', 'vcpkg-configuration.json') }}
-          restore-keys: |
-            vcpkg-downloads-${{ runner.os }}-
-
-      - name: Activate vcpkg MSBuild integration
-        shell: pwsh
-        run: |
-          & "$env:VCPKG_INSTALLATION_ROOT\vcpkg.exe" integrate install
-
-      - name: Install vcpkg dependencies
-        id: vcpkg
-        shell: pwsh
-        run: |
-          $vcpkg = "$env:VCPKG_INSTALLATION_ROOT\vcpkg.exe"
-          $opts = @(
-            'install', '--x-wait-for-lock',
-            '--triplet', 'x86-windows-static',
-            "--vcpkg-root=$env:VCPKG_INSTALLATION_ROOT",
-            "--x-manifest-root=$PWD",
-            "--x-install-root=$PWD\vcpkg_installed\x86-windows-static"
-          )
-          for ($i = 1; $i -le 3; $i++) {
-            & $vcpkg @opts
-            if ($LASTEXITCODE -eq 0) { exit 0 }
-            Write-Host "vcpkg install attempt $i failed with exit $LASTEXITCODE"
-            Start-Sleep -Seconds 30
-          }
-          exit 1
-
-      - name: Stamp version.h with CI build info
-        id: version
-        shell: pwsh
-        run: python tools/stamp_version.py --run=${{ github.run_number }} --sha=${{ github.sha }}
-
-      - name: Fetch CE build tools (private R2 mirror)
-        shell: pwsh
-        run: |
-          curl.exe -fsSL "${{ secrets.CE_TOOLCHAIN_URL }}" -o "$env:RUNNER_TEMP\ce-tools.zip"
-          Expand-Archive -Path "$env:RUNNER_TEMP\ce-tools.zip" -DestinationPath "$env:RUNNER_TEMP\ce-tools" -Force
-          $sdk = Get-ChildItem "$env:RUNNER_TEMP\ce-tools" -Recurse -Directory -Filter STANDARDSDK -ErrorAction SilentlyContinue | Select-Object -First 1
-          if (-not $sdk) { throw "CE toolchain zip has no STANDARDSDK folder" }
-          New-Item -ItemType Directory -Force third_party | Out-Null
-          if (Test-Path third_party\wince) { Remove-Item third_party\wince -Recurse -Force }
-          Move-Item $sdk.Parent.FullName third_party\wince
-          Write-Host "CE toolchain ready at third_party/wince"
-
-      - name: Save vcpkg source downloads
-        if: always() && steps.cache-downloads.outputs.cache-hit != 'true'
-        uses: actions/cache/save@v4
-        with:
-          path: C:\vcpkg\downloads
-          key: vcpkg-downloads-${{ runner.os }}-${{ hashFiles('vcpkg.json', 'vcpkg-configuration.json') }}
-
-      - name: Save vcpkg deps
-        if: always() && steps.vcpkg.outcome == 'success' && steps.cache-deps.outputs.cache-hit != 'true'
-        uses: actions/cache/save@v4
-        with:
-          path: vcpkg_installed
-          key: vcpkg-${{ runner.os }}-x86-windows-static-${{ hashFiles('vcpkg.json', 'vcpkg-configuration.json') }}
-
-      - name: Build
-        shell: pwsh
-        run: python build.py --config ${{matrix.configuration}} --mode production
-
-      - name: Reduce the payload to what a user runs
-        shell: pwsh
-        run: |
-          $out = "build/${{matrix.configuration}}/${{matrix.platform}}"
-          $public = Join-Path $out "cerf.public.pdb"
-          if (-not (Test-Path $public)) {
-            throw "$public is missing; StripPrivateSymbols did not run"
-          }
-          $drop = "cerf.pdb","cerf.exp","cerf.lib"
-          foreach ($name in $drop) {
-            Remove-Item (Join-Path $out $name) -Force -ErrorAction SilentlyContinue
-          }
-          $left = $drop | Where-Object { Test-Path (Join-Path $out $_) }
-          if ($left) { throw "still in the payload: $($left -join ', ')" }
-          $shipped = Join-Path $out "cerf.pdb"
-          Move-Item $public $shipped -Force
-          if (-not (Test-Path $shipped)) { throw "$shipped was not put in place" }
-          Get-ChildItem $out -File | Sort-Object Length -Descending |
-            Select-Object -First 8 Name, Length | Format-Table -AutoSize
-
-      - name: Upload Artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: CERF-${{ steps.version.outputs.version }}-${{ steps.version.outputs.sha }}-${{matrix.configuration}}-${{matrix.platform}}
-          path: ./build/${{matrix.configuration}}/${{matrix.platform}}/
-
-      - name: Publish the installer to R2
-        if: >-
-          ${{ github.event_name == 'push' &&
-              matrix.configuration == 'Release' && matrix.platform == 'Win32' &&
-              (contains(github.event.head_commit.message, '[release cerf]') ||
-               contains(github.event.head_commit.message, '[release installer]')) }}
-        shell: pwsh
-        env:
-          R2_ACCOUNT_ID:        ${{ secrets.R2_ACCOUNT_ID }}
-          R2_BUCKET:            cerf
-          R2_ACCESS_KEY_ID:     ${{ secrets.R2_ACCESS_KEY_ID }}
-          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
-          R2_PREFIX: cerf_installer
-        run: |
-          python -m pip install --quiet --disable-pip-version-check boto3 pyyaml
-          python tools/publish_r2_object.py --file="launcher/dist/cerf_installer.exe"
+    uses: ./.github/workflows/build-windows.yml
+    secrets: inherit
 
   build-linux:
     if: >-
       ${{ !contains(github.event.head_commit.message, '[skip build]') &&
           (github.event_name != 'pull_request' ||
            github.event.pull_request.head.repo.full_name == github.repository) }}
-    runs-on: ubuntu-latest
-    container: ubuntu:26.04
-    env:
-      PLATFORM: linux-amd64
-
-    steps:
-      - name: Install the build dependencies
-        run: |
-          apt-get update
-          DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
-            ca-certificates curl git cmake ninja-build g++ ccache pkg-config \
-            qt6-base-dev qt6-svg-dev libslirp-dev nlohmann-json3-dev libasound2-dev \
-            python3 python3-venv python3-tk libpython3-dev wine
-
-      - uses: actions/checkout@v4
-        with:
-          submodules: false
-
-      - name: Fetch core libraries
-        run: |
-          git config --global --add safe.directory "$GITHUB_WORKSPACE"
-          git submodule update --init libservicelocator libCerfEngine libCerfCore
-
-      - name: Stamp version.h with CI build info
-        id: version
-        run: python3 tools/stamp_version.py --run=${{ github.run_number }} --sha=${{ github.sha }}
-
-      - name: Fetch CE build tools (private R2 mirror)
-        run: |
-          curl -fsSL "${{ secrets.CE_TOOLCHAIN_URL }}" -o "$RUNNER_TEMP/ce-tools.zip"
-          python3 -c "import sys, zipfile; zipfile.ZipFile(sys.argv[1]).extractall(sys.argv[2])" \
-            "$RUNNER_TEMP/ce-tools.zip" "$RUNNER_TEMP/ce-tools"
-          sdk=$(find "$RUNNER_TEMP/ce-tools" -type d -name STANDARDSDK -print -quit)
-          if [ -z "$sdk" ]; then echo "CE toolchain zip has no STANDARDSDK folder"; exit 1; fi
-          mkdir -p third_party
-          rm -rf third_party/wince
-          mv "$(dirname "$sdk")" third_party/wince
-
-      - name: Build
-        run: python3 build.py --config Release --mode production
-
-      - name: Pack the build
-        id: pack
-        run: |
-          name="CERF-${{ steps.version.outputs.version }}-${{ steps.version.outputs.sha }}-Release-$PLATFORM"
-          python3 tools/pack_release.py "ci/dist/$name.zip" "build/Release/$PLATFORM"
-          echo "name=$name" >> "$GITHUB_OUTPUT"
-          echo "zip=ci/dist/$name.zip" >> "$GITHUB_OUTPUT"
-
-      - name: Upload Artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: ${{ steps.pack.outputs.name }}
-          path: ${{ steps.pack.outputs.zip }}
+    uses: ./.github/workflows/build-linux.yml
+    secrets: inherit
 
   build-macos:
     needs: build
-    runs-on: macos-latest
-    env:
-      PLATFORM: macos-arm64
+    uses: ./.github/workflows/build-macos.yml
+    secrets: inherit
 
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          submodules: false
-
-      - name: Fetch core libraries
-        run: git submodule update --init libservicelocator libCerfEngine libCerfCore
-
-      - name: Install the build dependencies
-        run: brew install cmake ninja pkgconf qtbase qtsvg libslirp nlohmann-json python@3.14 python-tk@3.14
-
-      - name: Stamp version.h with CI build info
-        id: version
-        run: python3 tools/stamp_version.py --run=${{ github.run_number }} --sha=${{ github.sha }}
-
-      - name: Fetch the CE apps of the Windows build
-        uses: actions/download-artifact@v4
-        with:
-          name: CERF-${{ steps.version.outputs.version }}-${{ steps.version.outputs.sha }}-Release-Win32
-          path: ci/win32
-
-      - name: Build
-        run: python3 build.py --config Release --mode production --ce-apps-from=ci/win32/ce_apps
-
-      - name: Pack the build
-        id: pack
-        run: |
-          name="CERF-${{ steps.version.outputs.version }}-${{ steps.version.outputs.sha }}-Release-$PLATFORM"
-          python3 tools/pack_release.py "ci/dist/$name.zip" "build/Release/$PLATFORM"
-          echo "name=$name" >> "$GITHUB_OUTPUT"
-          echo "zip=ci/dist/$name.zip" >> "$GITHUB_OUTPUT"
-
-      - name: Upload Artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: ${{ steps.pack.outputs.name }}
-          path: ${{ steps.pack.outputs.zip }}
+  build-android:
+    if: >-
+      ${{ !contains(github.event.head_commit.message, '[skip build]') &&
+          (github.event_name != 'pull_request' ||
+           github.event.pull_request.head.repo.full_name == github.repository) }}
+    uses: ./.github/workflows/build-android.yml
+    secrets: inherit
 
   publish:
-    needs: [build, build-linux, build-macos]
+    needs: [build, build-linux, build-macos, build-android]
     if: ${{ always() && github.event_name == 'push' }}
     runs-on: ubuntu-latest
     env:
@@ -292,45 +72,69 @@ jobs:
         if: ${{ needs.build.result == 'success' }}
         uses: actions/download-artifact@v4
         with:
-          name: CERF-${{ steps.version.outputs.version }}-${{ steps.version.outputs.sha }}-Release-Win32
+          name: ${{ steps.version.outputs.artifact-win32-x86 }}
           path: ci/win32
 
       - name: Publish the Windows build to the R2 beta channel
         if: ${{ needs.build.result == 'success' }}
         run: |
-          name="CERF-${{ steps.version.outputs.version }}-${{ steps.version.outputs.sha }}-Release-Win32"
-          python -c "import shutil, sys; shutil.make_archive(sys.argv[1], 'zip', sys.argv[2])" \
-            "ci/dist/$name" ci/win32
+          name="${{ steps.version.outputs.artifact-win32-x86 }}"
+          python tools/pack_release.py "ci/dist/$name.zip" ci/win32
           python tools/publish_r2_build.py --zip="ci/dist/$name.zip" --host-branch=win32-x86
 
       - name: Fetch the Linux build
         if: ${{ needs.build-linux.result == 'success' }}
         uses: actions/download-artifact@v4
         with:
-          name: CERF-${{ steps.version.outputs.version }}-${{ steps.version.outputs.sha }}-Release-linux-amd64
+          name: ${{ steps.version.outputs.artifact-linux-amd64 }}
           path: ci/linux
 
       - name: Publish the Linux build to the R2 beta channel
         if: ${{ needs.build-linux.result == 'success' }}
         run: |
-          name="CERF-${{ steps.version.outputs.version }}-${{ steps.version.outputs.sha }}-Release-linux-amd64"
+          name="${{ steps.version.outputs.artifact-linux-amd64 }}"
           python tools/publish_r2_build.py --zip="ci/linux/$name.zip" --host-branch=linux-amd64
 
       - name: Fetch the macOS build
         if: ${{ needs.build-macos.result == 'success' }}
         uses: actions/download-artifact@v4
         with:
-          name: CERF-${{ steps.version.outputs.version }}-${{ steps.version.outputs.sha }}-Release-macos-arm64
+          name: ${{ steps.version.outputs.artifact-macos-arm64 }}
           path: ci/macos
 
       - name: Publish the macOS build to the R2 beta channel
         if: ${{ needs.build-macos.result == 'success' }}
         run: |
-          name="CERF-${{ steps.version.outputs.version }}-${{ steps.version.outputs.sha }}-Release-macos-arm64"
+          name="${{ steps.version.outputs.artifact-macos-arm64 }}"
           python tools/publish_r2_build.py --zip="ci/macos/$name.zip" --host-branch=macos-arm64
 
+      - name: Fetch the Android build
+        if: ${{ needs.build-android.result == 'success' && needs.build-android.outputs.signed == 'true' }}
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ steps.version.outputs.artifact-android-arm64 }}
+          path: ci/android
+
+      - name: Publish the Android build to the R2 beta channel
+        if: ${{ needs.build-android.result == 'success' && needs.build-android.outputs.signed == 'true' }}
+        run: |
+          name="${{ steps.version.outputs.artifact-android-arm64 }}"
+          python tools/pack_release.py "ci/dist/$name.zip" ci/android
+          python tools/publish_r2_build.py --zip="ci/dist/$name.zip" --host-branch=android-arm64
+
+      - name: Publish the Android release APK to R2
+        if: >-
+          ${{ needs.build-android.result == 'success' && needs.build-android.outputs.signed == 'true' &&
+              contains(github.event.head_commit.message, '[release cerf]') }}
+        env:
+          R2_PREFIX: cerf_android
+        run: |
+          mkdir -p ci/dist
+          cp "ci/android/${{ steps.version.outputs.frontend-android-arm64 }}" ci/dist/cerf_latest.apk
+          python tools/publish_r2_object.py --file=ci/dist/cerf_latest.apk --content-type=application/vnd.android.package-archive
+
   announce:
-    needs: [build, build-linux, build-macos]
+    needs: [build, build-linux, build-macos, build-android, publish]
     if: >-
       ${{ github.event_name == 'push' &&
           !contains(github.event.head_commit.message, '[release cerf]') }}
@@ -357,13 +161,20 @@ jobs:
           python tools/announce_build.py
           --run-id=${{ github.run_id }}
           ${{ contains(github.event.head_commit.message, '[rc]') && '--rc' || '' }}
+          ${{ needs.build-android.outputs.signed != 'true' && '--without=android-arm64' || '' }}
 
   release:
-    needs: [build, build-linux, build-macos]
+    needs: [build, build-linux, build-macos, build-android]
     if: github.event_name == 'push' && contains(github.event.head_commit.message, '[release cerf]')
     runs-on: ubuntu-latest
 
     steps:
+      - name: Refuse a release without a signed Android build
+        if: ${{ needs.build-android.outputs.signed != 'true' }}
+        run: |
+          echo "The Android signing secrets are not all set; a release needs the signed APK."
+          exit 1
+
       - uses: actions/checkout@v4
 
       - uses: actions/setup-python@v5

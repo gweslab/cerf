@@ -23,7 +23,8 @@ DISCORD_API = "https://discord.com/api/v10"
 DISCORD_MESSAGE_LIMIT = 2000
 DISCORD_SUPPRESS_EMBEDS = 1 << 2
 
-ARTIFACT_NAME = re.compile(r"^CERF-(\d+)\.(\d+)\.(\d+)-([0-9a-f]+)-Release-([A-Za-z0-9-]+)$")
+ARTIFACT_NAME = re.compile(r"^CERF-(\d+)\.(\d+)\.(\d+)-([0-9a-f]+)-" + re.escape(host_branch.RELEASE_PREFIX)
+                           + r"([A-Za-z0-9-]+)$")
 WIN32_PLATFORM = host_branch.by_name(host_branch.WIN32_X86).platform_dir
 CHANGELOG_PATH = Path("docs/changelog.yml")
 ENV_PATH = Path(".env")
@@ -66,7 +67,7 @@ class Artifact:
 
     @property
     def download_url(self) -> str:
-        return f"{self.run_url}/artifacts/{self.id}"
+        return f"{host_branch.CI_BASE_URL}/{self.name}.zip"
 
 
 def load_env() -> dict:
@@ -172,7 +173,7 @@ def latest_artifact(token: str, sha: Optional[str] = None,
             continue
         return _with_run_number(token, artifact)
     where = f" built from {sha[:7]}" if sha else ""
-    raise CiError(f"no unexpired Release-{platform} artifact{where} found")
+    raise CiError(f"no unexpired {host_branch.RELEASE_PREFIX}{platform} artifact{where} found")
 
 
 def run_artifact(token: str, run_id: int, platform: str = WIN32_PLATFORM,
@@ -187,7 +188,7 @@ def run_artifact(token: str, run_id: int, platform: str = WIN32_PLATFORM,
         if attempt + 1 < attempts:
             print(f"  artifact of run {run_id} not listed yet, retrying in {delay}s")
             time.sleep(delay)
-    raise CiError(f"run {run_id} published no Release-{platform} artifact")
+    raise CiError(f"run {run_id} published no {host_branch.RELEASE_PREFIX}{platform} artifact")
 
 
 def changelog_markdown(tag: str, fallback: Optional[str] = None) -> str:

@@ -4,65 +4,55 @@ import json
 import os
 import re
 import shutil
-import subprocess
-from datetime import datetime
 from pathlib import Path
-from typing import Callable, List
+from typing import Dict, List
 
+import build_report
+import qt_windows
+import vcpkg_install
+import verified_download
 import vs_toolchain
+import windows_deploy
+from frontend_build import BuildAbort, FrontendBuild
+from host_branch import output_dir
+from tool_process import output_or_raise, prepend_path
 
-VCPKG_TRIPLET = "x86-windows-static"
 GENERATOR_KEYS = ("CMAKE_GENERATOR", "CMAKE_GENERATOR_PLATFORM", "CMAKE_GENERATOR_TOOLSET",
                   "CMAKE_GENERATOR_INSTANCE")
 
 
-class BuildAbort(Exception):
-    pass
-
-
-def vcpkg_props_path() -> Path:
-    return Path(os.environ.get("LOCALAPPDATA", "")) / "vcpkg" / "vcpkg.user.props"
-
-
 def check_vcpkg_integration() -> None:
-    if not vcpkg_props_path().is_file():
+    if not vcpkg_install.integration_props().is_file():
         raise BuildAbort(
-            "[BUILD] FAILED! vcpkg MSBuild integration missing. Run 'vcpkg integrate install' "
+            "vcpkg MSBuild integration missing. Run 'vcpkg integrate install' "
             "from the vcpkg that ships with Visual Studio (path is "
             "'<VS install>\\VC\\vcpkg\\vcpkg.exe' inside the VS install -- comes with the C++ "
             "desktop workload).")
 
 
-def _run(argv: List[str], env: dict = None) -> int:
-    return subprocess.run([str(a) for a in argv], env=env, check=False).returncode
-
-
-class WindowsBuild:
-    def __init__(self, root: Path, config: str, mode: str, rebuild: bool,
-                 heartbeat: Callable[[], None]) -> None:
-        self.root = root
-        self.config = config
-        self.mode = mode
-        self.rebuild = rebuild
-        self.heartbeat = heartbeat
-        self.toolchain = None
+class _MsvcBuild(FrontendBuild):
+    toolchain = None
 
     def discover(self) -> None:
         tc = vs_toolchain.find()
         if not tc.vswhere.is_file():
-            raise BuildAbort("[BUILD] FAILED! vswhere.exe not found at {}. Install Visual Studio "
+            raise BuildAbort("vswhere.exe not found at {}. Install Visual Studio "
                              "with the C++ desktop workload.".format(tc.vswhere))
         if not tc.tools_version:
             raise BuildAbort(
-                "[BUILD] FAILED! No usable MSVC toolset. Installed: {}.\n"
+                "No usable MSVC toolset. Installed: {}.\n"
                 "[BUILD] Requires >= {} (for /std:c++20) and not 14.51.*, which\n"
                 "[BUILD] miscompiles bit-mask dispatch loops on x86 /O2 /Oy- and would silently\n"
-                "[BUILD] produce a broken cerf.exe.".format("; ".join(tc.installed),
-                                                            vs_toolchain.min_tools_version_text()))
+                "[BUILD] produce a broken {}.".format("; ".join(tc.installed),
+                                                      vs_toolchain.min_tools_version_text(),
+                                                      self.branch.frontend))
         root = tc.instance["installationPath"]
         if tc.msbuild is None or not tc.msbuild.is_file():
-            raise BuildAbort("[BUILD] FAILED! MSBuild.exe not found in {}. Ensure Visual Studio's "
+            raise BuildAbort("MSBuild.exe not found in {}. Ensure Visual Studio's "
                              "C++ desktop workload is installed.".format(root))
+        if not tc.cmake.is_file():
+            raise BuildAbort("CMake not found at {}. Install the 'C++ CMake tools "
+                             "for Windows' component of Visual Studio.".format(tc.cmake))
         print("[BUILD] {}, MSVC toolset {} ({}) (installed: {})".format(
             tc.instance.get("displayName", "?"), tc.tools_version, tc.platform_toolset,
             "; ".join(tc.installed)), flush=True)
@@ -70,64 +60,36 @@ class WindowsBuild:
 
     def _generator(self) -> str:
         cmake = self.toolchain.cmake
-        if not cmake.is_file():
-            raise BuildAbort("[BUILD] FAILED! CMake not found at {}. Install the 'C++ CMake tools "
-                             "for Windows' component of Visual Studio.".format(cmake))
         major = self.toolchain.instance["installationVersion"].split(".")[0]
-        caps = subprocess.run([str(cmake), "-E", "capabilities"], capture_output=True, text=True,
-                              check=False).stdout
+        caps = output_or_raise([cmake, "-E", "capabilities"], BuildAbort)
         names = [g.get("name", "") for g in json.loads(caps).get("generators", [])]
         pattern = re.compile(r"^Visual Studio {} \d{{4}}$".format(major))
         match = next((n for n in names if pattern.match(n)), None)
         if match is None:
-            raise BuildAbort("[BUILD] FAILED! {} has no generator for Visual Studio {}."
+            raise BuildAbort("{} has no generator for Visual Studio {}."
                              .format(cmake, major))
         return match
 
     def _vcpkg(self) -> Path:
-        props = vcpkg_props_path().read_text(encoding="utf-8-sig", errors="replace")
-        match = re.search(r'Project="([^"]+)\\scripts\\buildsystems\\msbuild\\vcpkg\.props"', props)
-        if match is None:
-            raise BuildAbort("[BUILD] FAILED! vcpkg.user.props names no vcpkg root. Run 'vcpkg "
-                             "integrate install' again.")
-        vcpkg_root = Path(match.group(1))
-        installed = self.root / "vcpkg_installed" / VCPKG_TRIPLET
-        stamp = installed / ".msbuildstamp-{}.stamp".format(VCPKG_TRIPLET)
-        inputs = [self.root / "vcpkg.json", self.root / "vcpkg-configuration.json"]
-        current = stamp.is_file() and \
-            not any(p.stat().st_mtime > stamp.stat().st_mtime for p in inputs)
-        if not current:
-            print("[VCPKG] Installing the manifest dependencies ({})".format(VCPKG_TRIPLET),
-                  flush=True)
-            env = dict(os.environ)
-            env["PATH"] = str(self.toolchain.cmake.parent) + os.pathsep + env.get("PATH", "")
-            code = _run([vcpkg_root / "vcpkg.exe", "install", "--x-wait-for-lock", "--triplet",
-                         VCPKG_TRIPLET, "--vcpkg-root", vcpkg_root,
-                         "--x-manifest-root={}".format(self.root),
-                         "--x-install-root={}".format(installed)], env)
-            self.heartbeat()
-            if code != 0:
-                raise BuildAbort("[BUILD] vcpkg install FAILED (exit={})".format(code))
-            stamp.parent.mkdir(parents=True, exist_ok=True)
-            stamp.touch()
-        return installed
+        env = prepend_path(dict(os.environ), self.toolchain.cmake.parent)
+        try:
+            return vcpkg_install.install(self.root, vcpkg_install.vcpkg_root(self.branch.name),
+                                         vcpkg_install.TRIPLETS[self.branch.name], env, self.heartbeat)
+        except (vcpkg_install.VcpkgError, OSError) as exc:
+            raise BuildAbort(exc)
 
-    def build_libraries(self) -> None:
+    def _configure(self, build_dir: Path, options: List[str]) -> None:
         generator = self._generator()
-        installed = self._vcpkg()
         tc = self.toolchain
-        libs_out = self.root / "build" / "cerflibs"
-        dev = "OFF" if self.mode == "production" else "ON"
-        if self.rebuild and libs_out.exists():
-            shutil.rmtree(libs_out)
-        wanted = {
+        self.clear_for_rebuild(build_dir)
+        wanted: Dict[str, str] = {
             "CMAKE_GENERATOR": generator,
             "CMAKE_GENERATOR_PLATFORM": "Win32",
             "CMAKE_GENERATOR_TOOLSET": "{},version={}".format(tc.platform_toolset,
                                                               tc.tools_version),
             "CMAKE_GENERATOR_INSTANCE": tc.instance["installationPath"],
         }
-        cache = libs_out / "CMakeCache.txt"
+        cache = build_dir / "CMakeCache.txt"
         if cache.is_file():
             cached = {}
             for line in cache.read_text(encoding="utf-8", errors="replace").splitlines():
@@ -137,47 +99,43 @@ class WindowsBuild:
                     cached[m.group(1)] = m.group(2)
             changed = [k for k in GENERATOR_KEYS if cached.get(k) != wanted[k]]
             if changed:
-                print("[LIBS] {} changed; configuring {} from scratch".format(", ".join(changed),
-                                                                              libs_out), flush=True)
-                shutil.rmtree(libs_out)
+                print("[CMAKE] {} changed; configuring {} from scratch".format(
+                    ", ".join(changed), build_dir), flush=True)
+                shutil.rmtree(build_dir)
+        self.configure(build_dir, [tc.cmake, "-S", self.root, "-B", build_dir, "-G", generator, "-A", "Win32",
+                                   "-T", wanted["CMAKE_GENERATOR_TOOLSET"],
+                                   "-DCMAKE_GENERATOR_INSTANCE={}".format(wanted["CMAKE_GENERATOR_INSTANCE"]),
+                                   "-DCMAKE_MSVC_DEBUG_INFORMATION_FORMAT=Embedded"]
+                       + self.cmake_options() + options)
 
-        print("[LIBS] libCerfEngine, libCerfCore, libCerfFrontend ({})".format(self.config),
-              flush=True)
-        code = _run([tc.cmake, "-S", self.root, "-B", libs_out, "-G", generator, "-A", "Win32",
-                     "-T", wanted["CMAKE_GENERATOR_TOOLSET"],
-                     "-DCMAKE_GENERATOR_INSTANCE={}".format(wanted["CMAKE_GENERATOR_INSTANCE"]),
-                     "-DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded$<$<CONFIG:Debug>:Debug>",
-                     "-DCMAKE_MSVC_DEBUG_INFORMATION_FORMAT=Embedded",
-                     "-DCMAKE_PREFIX_PATH={}".format(installed / VCPKG_TRIPLET),
-                     "-DCERFCORE_DEV_MODE=" + dev, "-DCERFCORE_DEVICE_TRACES=" + dev])
-        if code == 0:
-            code = _run([tc.cmake, "--build", libs_out, "--config", self.config, "--parallel",
-                         "--", "/v:minimal", "/nologo", "/nodeReuse:false"])
-        self.heartbeat()
-        if code != 0:
-            raise BuildAbort("[BUILD] CERF libraries FAILED (exit={})".format(code))
 
-    def build_frontend(self) -> bool:
-        tc = self.toolchain
-        target = "/t:Rebuild" if self.rebuild else "/t:Build"
-        if self.rebuild:
-            print("[BUILD] Clean rebuild requested (/t:Rebuild)", flush=True)
-        dev_flag = "0" if self.mode == "production" else "1"
-        code = _run([tc.msbuild, "cerf.sln", "/p:Configuration=" + self.config,
-                     "/p:Platform=Win32", target, "/m", "/v:minimal",
-                     "/p:CerfExtraDefines=CERF_DEV_MODE=" + dev_flag, "/p:CerfMode=" + self.mode,
-                     "/p:VCToolsVersion=" + tc.tools_version])
+class WindowsBuild(_MsvcBuild):
+    def build(self) -> bool:
+        installed = self._vcpkg()
+        try:
+            qt_prefix = qt_windows.ensure(self.root, self.toolchain, self.heartbeat)
+        except (qt_windows.QtBuildError, verified_download.DownloadError, OSError) as exc:
+            raise BuildAbort("Qt: {}".format(exc))
+        resvg = self.resvg_options(dict(os.environ))
+        out_dirs =["-DCMAKE_RUNTIME_OUTPUT_DIRECTORY_{}={}".format(
+            config.upper(), output_dir(self.root, config, self.branch))
+            for config in ("Release", "Debug")]
+        build_dir = self.build_dir(None)
+        self._configure(build_dir, [
+            "-DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreadedDLL",
+            "-DCMAKE_MAP_IMPORTED_CONFIG_DEBUG=Release",
+            "-DCMAKE_PREFIX_PATH={};{}".format(qt_prefix, installed)] + resvg + out_dirs)
+        if not self.compile([self.toolchain.cmake, "--build", build_dir, "--config", self.config,
+                             "--parallel", "--", "/v:minimal", "/nologo", "/nodeReuse:false"]):
+            return False
+        exe = output_dir(self.root, self.config, self.branch) / self.branch.frontend
+        if not build_report.built_file_present(exe.name, exe, "binary"):
+            return False
+        build_report.built_file(exe.name, exe.resolve())
+        try:
+            windows_deploy.deploy(self.root, exe, qt_prefix, self.toolchain)
+        except (windows_deploy.DeployError, OSError) as exc:
+            build_report.deploy_failed(exc)
+            return False
         self.heartbeat()
-        exe = self.root / "build" / self.config / "Win32" / "cerf.exe"
-        if code != 0:
-            print("[BUILD] cerf.exe FAILED (msbuild exit={})".format(code), flush=True)
-            return False
-        if not exe.is_file():
-            print("[BUILD] cerf.exe FAILED (msbuild reported success but binary not found at {})"
-                  .format(exe), flush=True)
-            return False
-        stat = exe.stat()
-        print("[BUILD] cerf.exe OK: {}".format(exe.resolve()), flush=True)
-        print("[BUILD] Size: {} bytes".format(stat.st_size), flush=True)
-        print("[BUILD] Time: {}".format(datetime.fromtimestamp(stat.st_mtime)), flush=True)
         return True

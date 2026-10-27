@@ -1,7 +1,8 @@
 # Running CERF from the command line
 
-The launcher is the normal way to start CERF: it downloads the ROM bundle and boots it. Everything
-below is for running `cerf.exe` directly.
+The device list is the normal way to start a device: the emulator downloads the ROM bundle and
+boots it.
+Everything below is for running `cerf.exe` directly.
 
 ## Commands
 

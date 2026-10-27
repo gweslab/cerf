@@ -7,11 +7,6 @@ ce_apps/**/*.res
 bundled/devices/manifest.json
 bundled/devices/*
 
-bundled/launcher.exe
-bundled/launcher.sh
-bundled/launcher/
-bundled/*.app/
-
 ce_apps/**/*.obj
 ce_apps/**/*.exp
 ce_apps/**/*.lib

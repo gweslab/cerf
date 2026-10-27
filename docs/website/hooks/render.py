@@ -1,6 +1,6 @@
 """MkDocs hook: fills the placeholders whose content lives outside the site.
 
-{version}         libCerfFrontend/include/cerffrontend/version.h
+{version}         cerf-qt/version.h
 {boards_table}    libCerfCore/db.json (via compile_readme.py)
 {changelog_table} docs/changelog.yml (via changelog.py)
 {stats}           board / SoC / CPU counts, from libCerfCore/db.json
@@ -47,14 +47,12 @@ sys.path.insert(0, ROOT)
 sys.path.insert(0, os.path.join(ROOT, 'tools'))
 import changelog
 import compile_readme
-from board_database import soc_family_of
-from board_info import running_boards
+from board_database import running_boards, soc_family_of
 
 
 def _boards_table():
     table = compile_readme.build_supported_devices()
-    return (table.replace('assets/icons_sources', '/assets/icons')
-                 .replace('launcher/assets/icons', '/assets/icons'))
+    return table.replace(compile_readme.SVG_DIR, '/assets/icons')
 
 
 def _changelog_table():

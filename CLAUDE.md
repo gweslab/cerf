@@ -53,10 +53,10 @@ The following pages are authoritative project knowledge; their full contents are
 - **[agent_docs/hibernation.md](agent_docs/hibernation.md)** - machine-state save/restore.
 - **[agent_docs/deep_sleep.md](agent_docs/deep_sleep.md)** - guest suspend/resume.
 - **[agent_docs/guest_additions.md](agent_docs/guest_additions.md)** - Guest Additions.
-- **[agent_docs/launcher.md](agent_docs/launcher.md)** - launcher, config files, transactional mode.
+- **[agent_docs/cerfman.md](agent_docs/cerfman.md)** - cerfman (the device manager), config files, installer, self-update.
 - **[agent_docs/database.md](agent_docs/database.md)** - the shared board / SoC / OS database.
 - **[agent_docs/leds.md](agent_docs/leds.md)** - LEDs and LED buttons.
-- **[agent_docs/submodules.md](agent_docs/submodules.md)** - the core library submodules, their commit and push order, and forks.
+- **[agent_docs/submodules.md](agent_docs/submodules.md)** - the core library submodules and their commit and push order.
 
 ## Build
 
@@ -64,11 +64,11 @@ The following pages are authoritative project knowledge; their full contents are
 python build.py
 ```
 
-Output: `build/Release/Win32/cerf.exe`. Pre-commit hook rejects .cpp/.h files over 500 lines (see `.githooks/pre-commit`). The libraries build with CMake globs, and `cerf-win32/cerf.vcxproj` uses a `**\*.cpp` glob. New .cpp files are therefore in the build automatically. You do not edit a project file by hand.
+Output: `build/Release/Win32/cerf.exe`. Pre-commit hook rejects .cpp/.h files over 500 lines (see `.githooks/pre-commit`). The libraries and the cerf-qt frontend build with CMake globs. New .cpp files are therefore in the build automatically. You do not edit a project file by hand.
 
 - Build might take 5-10 minutes to complete on an already-set-up machine.
 - `build.py` waits until no run holds a `.cerf_lock.N` slot, and holds `.build_lock` until the build ends. Each script refreshes its own lock while it works, so a lock expires only after its owner process dies.
-- **First build on a fresh machine takes 1+ hour** because vcpkg compiles dependencies from source before cerf links. `build.py` runs the vcpkg manifest install before it builds the libraries, so you need no separate vcpkg command. Cached in `vcpkg_installed/` after; later builds are fast again. Do not cancel the first build assuming it's hung.
+- **First build on a fresh machine takes 1+ hour** because vcpkg compiles dependencies from source and `build.py` builds Qt into `third_party/qt/` before cerf links. `build.py` runs both steps itself, so you need no separate vcpkg or Qt command. Cached in `vcpkg_installed/` and `third_party/qt/` after; later builds are fast again. Do not cancel the first build assuming it's hung.
 - Prerequisite (once per machine): `vcpkg integrate install` from the VS-bundled vcpkg at `<VS install>\VC\vcpkg\vcpkg.exe`. `build.py` fails fast with a clear error if this is missing.
 - You can run it as a background task with GNU timeout in command itself in case if either you have parallel work to do or user insisted on this.
 

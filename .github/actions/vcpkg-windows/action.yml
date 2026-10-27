@@ -1,0 +1,61 @@
+name: vcpkg dependencies on Windows
+description: Restore, install and save the vcpkg manifest dependencies of one triplet.
+
+inputs:
+  triplet:
+    description: The vcpkg triplet of the host branch, for the cache keys.
+    required: true
+  host-branch:
+    description: The host branch whose triplet tools/vcpkg_install.py installs.
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Restore vcpkg deps
+      id: cache-deps
+      uses: actions/cache/restore@v4
+      with:
+        path: vcpkg_installed
+        key: vcpkg_${{ runner.os }}_${{ inputs.triplet }}_${{ hashFiles('vcpkg.json', 'vcpkg-configuration.json', 'libCerfCore/vcpkg-ports/**') }}
+        restore-keys: |
+          vcpkg_${{ runner.os }}_${{ inputs.triplet }}_
+
+    - name: Restore vcpkg source downloads
+      id: cache-downloads
+      uses: actions/cache/restore@v4
+      with:
+        path: C:\vcpkg\downloads
+        key: vcpkg-downloads-${{ runner.os }}-${{ hashFiles('vcpkg.json', 'vcpkg-configuration.json') }}
+        restore-keys: |
+          vcpkg-downloads-${{ runner.os }}-
+
+    - name: Activate vcpkg MSBuild integration
+      shell: pwsh
+      run: |
+        & "$env:VCPKG_INSTALLATION_ROOT\vcpkg.exe" integrate install
+
+    - name: Install vcpkg dependencies
+      shell: pwsh
+      run: |
+        for ($i = 1; $i -le 3; $i++) {
+          python tools/vcpkg_install.py --install ${{ inputs.host-branch }}
+          if ($LASTEXITCODE -eq 0) { exit 0 }
+          Write-Host "vcpkg install attempt $i failed with exit $LASTEXITCODE"
+          Start-Sleep -Seconds 30
+        }
+        exit 1
+
+    - name: Save vcpkg source downloads
+      if: always() && steps.cache-downloads.outputs.cache-hit != 'true'
+      uses: actions/cache/save@v4
+      with:
+        path: C:\vcpkg\downloads
+        key: vcpkg-downloads-${{ runner.os }}-${{ hashFiles('vcpkg.json', 'vcpkg-configuration.json') }}
+
+    - name: Save vcpkg deps
+      if: steps.cache-deps.outputs.cache-hit != 'true'
+      uses: actions/cache/save@v4
+      with:
+        path: vcpkg_installed
+        key: vcpkg_${{ runner.os }}_${{ inputs.triplet }}_${{ hashFiles('vcpkg.json', 'vcpkg-configuration.json', 'libCerfCore/vcpkg-ports/**') }}

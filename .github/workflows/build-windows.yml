@@ -1,0 +1,75 @@
+name: build-windows
+
+on:
+  workflow_call:
+
+jobs:
+  build:
+    runs-on: windows-latest
+    env:
+      HOST_BRANCH: win32-x86
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: false
+
+      - name: Fetch core libraries
+        run: git submodule update --init libservicelocator libCerfEngine libCerfCore
+
+      - name: Add MSBuild to PATH
+        uses: microsoft/setup-msbuild@v2
+
+      - name: Name the Qt build folder
+        id: qt
+        shell: pwsh
+        run: python tools/qt_windows.py --cache-outputs >> $env:GITHUB_OUTPUT
+
+      - name: Restore the Qt build
+        id: cache-qt
+        uses: actions/cache/restore@v4
+        with:
+          path: ${{ steps.qt.outputs.path }}
+          key: qt-${{ runner.os }}-${{ hashFiles('tools/qt_windows.py', 'tools/qt_common.py') }}
+
+      - name: Name the vcpkg triplet
+        id: vcpkg
+        shell: pwsh
+        run: python tools/vcpkg_install.py --outputs ${{ env.HOST_BRANCH }} >> $env:GITHUB_OUTPUT
+
+      - uses: ./.github/actions/vcpkg-windows
+        with:
+          triplet: ${{ steps.vcpkg.outputs.triplet }}
+          host-branch: ${{ env.HOST_BRANCH }}
+
+      - name: Stamp version.h with CI build info
+        id: version
+        shell: pwsh
+        run: python tools/stamp_version.py --run=${{ github.run_number }} --sha=${{ github.sha }} --host-branch=${{ env.HOST_BRANCH }}
+
+      - uses: ./.github/actions/ce-tools
+        with:
+          url: ${{ secrets.CE_TOOLCHAIN_URL }}
+          python: python
+
+      - name: Build
+        shell: pwsh
+        run: python build.py --config Release --mode production
+
+      - name: Save the Qt build
+        if: always() && steps.cache-qt.outputs.cache-hit != 'true' && hashFiles(steps.qt.outputs.stamp) != ''
+        uses: actions/cache/save@v4
+        with:
+          path: ${{ steps.qt.outputs.path }}
+          key: qt-${{ runner.os }}-${{ hashFiles('tools/qt_windows.py', 'tools/qt_common.py') }}
+
+      - uses: ./.github/actions/ship-pdb
+        with:
+          out: ${{ steps.version.outputs.out }}
+          frontend: ${{ steps.version.outputs.frontend }}
+
+      - name: Upload Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.version.outputs.artifact }}
+          path: ${{ steps.version.outputs.out }}/

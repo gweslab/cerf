@@ -2,6 +2,7 @@
 #include <winioctl.h>
 #include <pm.h>
 
+#include "cerf_coredll_proc.h"
 #include "cerf_debug_log.h"
 #include "cerf_power.h"
 #include "main.h"
@@ -30,9 +31,8 @@ extern "C" void CerfAdvertiseDisplayPower(void) {
     wchar_t name[MAX_PATH];
     wsprintfW(name, L"\\Windows\\%s", leaf);
 
-    HMODULE h = LoadLibraryW(L"coredll.dll");
     PFN_AdvertiseInterface adv =
-        h ? (PFN_AdvertiseInterface)GetProcAddressW(h, L"AdvertiseInterface") : NULL;
+        (PFN_AdvertiseInterface)CerfCoredllProc(L"AdvertiseInterface");
     if (!adv) {
         CERF_LOG("cerf_guest: no Power Manager (CE3) - display power advertise skipped");
         return;

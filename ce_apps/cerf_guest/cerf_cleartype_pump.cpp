@@ -1,6 +1,7 @@
 #include <windows.h>
 
 #include "cerf_cleartype_pump.h"
+#include "cerf_coredll_proc.h"
 #include "cerf_regs_map.h"
 #include "cerf_shell_watch.h"
 
@@ -34,10 +35,8 @@ static CerfCtState s_ct;
 static CerfCtState* Ct(void) { return &s_ct; }
 
 static BOOL CerfCtResolve(CerfCtState* c) {
-    HMODULE h = LoadLibraryW(L"coredll.dll");
-    if (!h) return FALSE;
-    c->spi = (PFN_SystemParametersInfoW)GetProcAddressW(h, L"SystemParametersInfoW");
-    c->invalidate = (PFN_InvalidateRect)GetProcAddressW(h, L"InvalidateRect");
+    c->spi = (PFN_SystemParametersInfoW)CerfCoredllProc(L"SystemParametersInfoW");
+    c->invalidate = (PFN_InvalidateRect)CerfCoredllProc(L"InvalidateRect");
     return c->spi != NULL && c->invalidate != NULL;
 }
 

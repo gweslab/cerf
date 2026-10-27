@@ -1,4 +1,5 @@
 #include <windows.h>
+#include "cerf_coredll_proc.h"
 #include "cerf_regs_map.h"
 #include "cerf_gwes_ready.h"
 #include "cerf_resize_pump.h"
@@ -54,11 +55,9 @@ static BOOL CerfMapRszRegs(CerfRszState* z) {
 }
 
 static BOOL CerfRszResolve(CerfRszState* z) {
-    HMODULE h = LoadLibraryW(L"coredll.dll");
-    z->cds = h ? (PFN_ChangeDisplaySettingsExW)GetProcAddressW(h, L"ChangeDisplaySettingsExW")
-               : NULL;
-    if (!z->cds && h)
-        z->cds = (PFN_ChangeDisplaySettingsExW)GetProcAddressW(h, L"ChangeDisplaySettingsEx");
+    z->cds = (PFN_ChangeDisplaySettingsExW)CerfCoredllProc(L"ChangeDisplaySettingsExW");
+    if (!z->cds)
+        z->cds = (PFN_ChangeDisplaySettingsExW)CerfCoredllProc(L"ChangeDisplaySettingsEx");
     CERF_LOG_X("cerf_guest: rszpump CDS proc", (DWORD)z->cds);
     return z->cds != NULL;
 }

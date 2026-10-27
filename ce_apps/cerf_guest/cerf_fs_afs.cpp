@@ -1,3 +1,4 @@
+#include "cerf_coredll_proc.h"
 #include "cerf_fs_driver.h"
 #include "cerf_regs_map.h"
 
@@ -24,11 +25,9 @@ BOOL DeregisterAFSName(int index);
 typedef BOOL (*PFN_RegisterAFS)(int, HANDLE, DWORD, DWORD, DWORD);
 
 static BOOL CerfRegisterAFS(int iAFS, HANDLE hApi, DWORD ctx) {
-    HMODULE core = LoadLibraryW(L"coredll.dll");
     PFN_RegisterAFS ex;
     PFN_RegisterAFS reg;
-    if (!core) return FALSE;
-    ex = (PFN_RegisterAFS)GetProcAddressW(core, L"RegisterAFSEx");
+    ex = (PFN_RegisterAFS)CerfCoredllProc(L"RegisterAFSEx");
     if (ex) {
         if (ex(iAFS, hApi, ctx, AFS_VERSION, 0)) return TRUE;
         if (ex(iAFS, hApi, ctx, AFS_VERSION_LEGACY, 0)) {
@@ -37,7 +36,7 @@ static BOOL CerfRegisterAFS(int iAFS, HANDLE hApi, DWORD ctx) {
         }
         return FALSE;
     }
-    reg = (PFN_RegisterAFS)GetProcAddressW(core, L"RegisterAFS");
+    reg = (PFN_RegisterAFS)CerfCoredllProc(L"RegisterAFS");
     if (reg) {
         if (reg(iAFS, hApi, ctx, AFS_VERSION, 0)) return TRUE;
         if (reg(iAFS, hApi, ctx, AFS_VERSION_LEGACY, 0)) {
@@ -231,7 +230,6 @@ static const ULONGLONG g_findSig64[CERF_FIND_METHODS] = {
     FNSIG2(DW, PTR),
 };
 
-typedef HANDLE (*PFN_CreateAPISet)(char*, USHORT, const PFNVOID*, const ULONGLONG*);
 typedef BOOL   (*PFN_RegisterDirectMethods)(HANDLE, const PFNVOID*);
 
 static BOOL CerfCreateApiSets(void) {
@@ -239,9 +237,7 @@ static BOOL CerfCreateApiSets(void) {
     OSVERSIONINFO ovi;
     BOOL wide;
     BOOL ffcn;
-    HMODULE core = LoadLibraryW(L"coredll.dll");
-    PFN_CreateAPISet pCreateAPISet =
-        core ? (PFN_CreateAPISet)GetProcAddressW(core, L"CreateAPISet") : NULL;
+    PFN_CreateAPISet pCreateAPISet = (PFN_CreateAPISet)CerfCoredllProc(L"CreateAPISet");
     if (!pCreateAPISet) {
         CERF_LOG("cerf_guest: foldershare CreateAPISet unresolved");
         return FALSE;
@@ -253,10 +249,10 @@ static BOOL CerfCreateApiSets(void) {
 
     /* smartbook_g138_ce4_2 coredll.dll 0x3F7C460 AFS_FindFirstChangeNotificationW:
        traps AFS method 17 (0xF0010044), the highest AFS stub in that coredll. */
-    ffcn = !wide && GetProcAddressW(core, L"AFS_FindFirstChangeNotificationW") != NULL;
+    ffcn = !wide && CerfCoredllProc(L"AFS_FindFirstChangeNotificationW") != NULL;
     af->afsCount = ffcn ? CERF_AFS_FFCN_METHODS : CERF_AFS_BASE_METHODS;
     CERF_LOG_X("cerf_guest: foldershare AFS method count", af->afsCount);
-    af->seekTakesOffset = GetProcAddressW(core, L"ReadFileWithSeek") != NULL;
+    af->seekTakesOffset = CerfCoredllProc(L"ReadFileWithSeek") != NULL;
     CERF_LOG_X("cerf_guest: foldershare seek read takes offset", af->seekTakesOffset);
 
     if (wide) {
@@ -283,7 +279,7 @@ static BOOL CerfCreateApiSets(void) {
 
     if (ovi.dwMajorVersion >= 6) {
         PFN_RegisterDirectMethods pRDM =
-            (PFN_RegisterDirectMethods)GetProcAddressW(core, L"RegisterDirectMethods");
+            (PFN_RegisterDirectMethods)CerfCoredllProc(L"RegisterDirectMethods");
         if (pRDM) {
             CERF_LOG_X("cerf_guest: RegisterAPISet HT_AFSVOLUME ok",
                        RegisterAPISet(af->hAFSAPI, HT_AFSVOLUME | REGISTER_APISET_TYPE));

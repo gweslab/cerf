@@ -13,6 +13,7 @@ extern "C" {
 
 BOOL CerfNdisInstall(void);
 BOOL CerfMpRegistered(void);
+BOOL CerfMpAdapterBound(void);
 BOOL CerfMpNicChannelPresent(void);
 
 const UCHAR* CerfMpMac(void);

@@ -1,3 +1,4 @@
+#include "cerf_coredll_proc.h"
 #include "cerf_fs_driver.h"
 
 #include <windows.h>
@@ -15,7 +16,6 @@ typedef struct CerfWatch {
 } CerfWatch;
 
 typedef BOOL   (*PFN_SetEventData)(HANDLE, DWORD);
-typedef HANDLE (*PFN_CreateAPISet)(char*, USHORT, const PFNVOID*, const ULONGLONG*);
 
 typedef struct {
     HANDLE           hApi;
@@ -47,15 +47,12 @@ static const DWORD g_notifySig32[3] = { 0x000, 0x000, 0x004 };
 
 void CerfFsNotifyInit(void) {
     CerfNotifyState* ns = Ntf();
-    HMODULE core;
     PFN_CreateAPISet pCreateAPISet;
     if (ns->ready) return;
-    core = LoadLibraryW(L"coredll.dll");
-    if (!core) return;
-    ns->pSetEventData = (PFN_SetEventData)GetProcAddressW(core, L"SetEventData");
+    ns->pSetEventData = (PFN_SetEventData)CerfCoredllProc(L"SetEventData");
     if (!ns->pSetEventData) { CERF_LOG("cerf_guest: notify SetEventData absent"); return; }
-    pCreateAPISet = (PFN_CreateAPISet)GetProcAddressW(core, L"CreateAPISet");
-    if (!pCreateAPISet) return;
+    pCreateAPISet = (PFN_CreateAPISet)CerfCoredllProc(L"CreateAPISet");
+    if (!pCreateAPISet) { CERF_LOG("cerf_guest: notify CreateAPISet unresolved"); return; }
 
     ns->hApi = pCreateAPISet("CFSN", 3, g_notifyMethods, (const ULONGLONG*)g_notifySig32);
     if (!ns->hApi) { CERF_LOG("cerf_guest: notify CreateAPISet FAILED"); return; }

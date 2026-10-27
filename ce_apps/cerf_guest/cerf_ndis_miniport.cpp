@@ -36,6 +36,16 @@ extern "C" BOOL CerfMpRegistered(void) {
     return mp && mp->wrapper != 0;
 }
 
+extern "C" BOOL CerfMpAdapterBound(void) {
+    CerfMpSlot* mp = CerfMpSelf();
+    BOOL        bound;
+    if (!mp->life_cs_ready) return FALSE;
+    EnterCriticalSection(&mp->life_cs);
+    bound = mp->adapter != 0;
+    LeaveCriticalSection(&mp->life_cs);
+    return bound;
+}
+
 extern "C" const UCHAR* CerfMpMac(void) { return CerfMpSelf()->mac; }
 extern "C" ULONG CerfMpFilterGet(void) { return CerfMpSelf()->filter; }
 extern "C" void  CerfMpFilterSet(ULONG v) { CerfMpSelf()->filter = v; }

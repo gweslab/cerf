@@ -1,5 +1,6 @@
 #include <windows.h>
 
+#include "cerf_coredll_proc.h"
 #include "cerf_regs_map.h"
 #include "cerf_debug_log.h"
 #include "cerf_gwes_ready.h"
@@ -26,19 +27,16 @@ typedef VOID (WINAPI *PFN_mouse_event)(DWORD, DWORD, DWORD, DWORD, DWORD);
 typedef VOID (WINAPI *PFN_keybd_event)(BYTE, BYTE, DWORD, DWORD);
 typedef BOOL (WINAPI *PFN_CeSetThreadPriority)(HANDLE, int);
 
-static void CerfInputBoost(HMODULE core) {
-    PFN_CeSetThreadPriority csp = core
-        ? (PFN_CeSetThreadPriority)GetProcAddressW(core, L"CeSetThreadPriority") : NULL;
+static void CerfInputBoost(void) {
+    PFN_CeSetThreadPriority csp =
+        (PFN_CeSetThreadPriority)CerfCoredllProc(L"CeSetThreadPriority");
     if (csp) csp(GetCurrentThread(), CERF_INPUT_CE_PRIO);
     else     SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_HIGHEST);
 }
 
 static DWORD WINAPI CerfInputPumpThread(LPVOID) {
-    HMODULE core = LoadLibraryW(L"coredll.dll");
-    PFN_mouse_event me = core
-        ? (PFN_mouse_event)GetProcAddressW(core, L"mouse_event") : NULL;
-    PFN_keybd_event ke = core
-        ? (PFN_keybd_event)GetProcAddressW(core, L"keybd_event") : NULL;
+    PFN_mouse_event me = (PFN_mouse_event)CerfCoredllProc(L"mouse_event");
+    PFN_keybd_event ke = (PFN_keybd_event)CerfCoredllProc(L"keybd_event");
     volatile ULONG* ptr = NULL;
     volatile ULONG* kb  = NULL;
     ULONG last_seq  = 0;
@@ -46,7 +44,7 @@ static DWORD WINAPI CerfInputPumpThread(LPVOID) {
     LONG  last_wheel = 0;
     ULONG consumed  = 0;
 
-    CerfInputBoost(core);
+    CerfInputBoost();
     CERF_LOG_X("cerf_guest: inputpump mouse_event", (DWORD)me);
     CERF_LOG_X("cerf_guest: inputpump keybd_event", (DWORD)ke);
 

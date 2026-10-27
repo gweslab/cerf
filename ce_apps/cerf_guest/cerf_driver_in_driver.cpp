@@ -1,5 +1,6 @@
 #include <windows.h>
 
+#include "cerf_coredll_proc.h"
 #include "cerf_driver_in_driver.h"
 #include "cerf_fs_driver.h"
 #include "cerf_ndis_miniport.h"
@@ -46,30 +47,21 @@ static DWORD WINAPI CerfDidWorker(LPVOID unused) {
 
     if (!CerfWriteDidKey(dll_name)) return 0;
 
-    HMODULE core = LoadLibraryW(L"coredll.dll");
-    if (!core) {
-        CERF_LOG("cerf_guest: driver-in-driver ABORT - no coredll");
-        return 0;
-    }
-
-    PFN_ActivateDeviceEx adex =
-        (PFN_ActivateDeviceEx)GetProcAddressW(core, L"ActivateDeviceEx");
+    PFN_ActivateDeviceEx adex = (PFN_ActivateDeviceEx)CerfCoredllProc(L"ActivateDeviceEx");
     if (adex) {
         HANDLE h = adex(kDidKeyPath, NULL, 0, NULL);
         CERF_LOG_X("cerf_guest: driver-in-driver ActivateDeviceEx handle", (DWORD)h);
         return 0;
     }
 
-    PFN_ActivateDevice ad =
-        (PFN_ActivateDevice)GetProcAddressW(core, L"ActivateDevice");
+    PFN_ActivateDevice ad = (PFN_ActivateDevice)CerfCoredllProc(L"ActivateDevice");
     if (ad) {
         HANDLE h = ad(kDidKeyPath, 0);
         CERF_LOG_X("cerf_guest: driver-in-driver ActivateDevice handle", (DWORD)h);
         return 0;
     }
 
-    PFN_RegisterDevice rd =
-        (PFN_RegisterDevice)GetProcAddressW(core, L"RegisterDevice");
+    PFN_RegisterDevice rd = (PFN_RegisterDevice)CerfCoredllProc(L"RegisterDevice");
     if (rd) {
         HANDLE h = rd(kDidPrefix, 1, dll_name, 0);
         CERF_LOG_X("cerf_guest: driver-in-driver RegisterDevice handle", (DWORD)h);

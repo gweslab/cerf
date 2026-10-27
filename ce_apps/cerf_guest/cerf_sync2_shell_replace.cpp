@@ -1,5 +1,6 @@
 #include <windows.h>
 
+#include "cerf_coredll_proc.h"
 #include "cerf_debug_log.h"
 #include "cerf_init_table.h"
 #include "cerf_registry_customizations.h"
@@ -13,7 +14,6 @@
 #define CERF_S2_SLOT_TAKEN   0x2
 
 typedef DWORD (WINAPI *PFN_GetFileAttributesW)(LPCWSTR);
-typedef LONG  (WINAPI *PFN_RegDeleteValueW)(HKEY, LPCWSTR);
 typedef int   (WINAPI *PFN_MessageBoxW)(HWND, LPCWSTR, LPCWSTR, UINT);
 
 static const WCHAR* const kSync2Files[] = {
@@ -41,10 +41,8 @@ typedef struct {
 } CerfSync2Api;
 
 static BOOL CerfSync2Resolve(CerfSync2Api* api) {
-    HMODULE core = LoadLibraryW(L"coredll.dll");
-    if (!core) return FALSE;
-    api->gfa = (PFN_GetFileAttributesW)GetProcAddressW(core, L"GetFileAttributesW");
-    api->del = (PFN_RegDeleteValueW)GetProcAddressW(core, L"RegDeleteValueW");
+    api->gfa = (PFN_GetFileAttributesW)CerfCoredllProc(L"GetFileAttributesW");
+    api->del = (PFN_RegDeleteValueW)CerfCoredllProc(L"RegDeleteValueW");
     return api->gfa && api->del;
 }
 
@@ -137,9 +135,7 @@ static BOOL CerfSync2TakeNotice(const CerfSync2Api* api) {
 }
 
 static DWORD WINAPI CerfSync2NoticeThread(LPVOID) {
-    HMODULE core = LoadLibraryW(L"coredll.dll");
-    PFN_MessageBoxW mb = core
-        ? (PFN_MessageBoxW)GetProcAddressW(core, L"MessageBoxW") : NULL;
+    PFN_MessageBoxW mb = (PFN_MessageBoxW)CerfCoredllProc(L"MessageBoxW");
     if (!mb) return 0;
     mb(NULL,
        L"Guest Additions removed the Ford SYNC 2 shell from startup. This NAND "

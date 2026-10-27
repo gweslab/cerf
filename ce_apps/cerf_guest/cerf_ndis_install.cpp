@@ -1,3 +1,4 @@
+#include "cerf_coredll_proc.h"
 #include "cerf_ndis.h"
 #include "cerf_ndis_miniport.h"
 #include "cerf_debug_log.h"
@@ -38,13 +39,45 @@ static BOOL CerfNdisWriteCardKeys(void) {
     return TRUE;
 }
 
-static BOOL CerfNdisWriteKey(const wchar_t* path, const wchar_t* image) {
+typedef struct {
+    const wchar_t* name;
+    const char*    fail_log;
+} CerfNdisStaleValue;
+
+static const CerfNdisStaleValue kDriverStaleValues[] = {
+    { L"NoDeviceCreate", "ndis: stale CERFMP NoDeviceCreate delete failed rc" },
+};
+
+static const CerfNdisStaleValue kAdapterStaleValues[] = {
+    { L"Group",          "ndis: stale CERFMP1 Group delete failed rc" },
+    { L"ImagePath",      "ndis: stale CERFMP1 ImagePath delete failed rc" },
+    { L"NoDeviceCreate", "ndis: stale CERFMP1 NoDeviceCreate delete failed rc" },
+};
+
+#define CERF_NDIS_COUNT(a) ((int)(sizeof(a) / sizeof((a)[0])))
+
+static void CerfNdisDeleteValues(HKEY key, const CerfNdisStaleValue* values, int count) {
+    PFN_RegDeleteValueW del = (PFN_RegDeleteValueW)CerfCoredllProc(L"RegDeleteValueW");
+    int i;
+    if (!del) {
+        CERF_LOG("ndis: RegDeleteValueW unresolved - stale registry values kept");
+        return;
+    }
+    for (i = 0; i < count; ++i) {
+        LONG rc;
+        if (RegQueryValueExW(key, values[i].name, NULL, NULL, NULL, NULL) != ERROR_SUCCESS)
+            continue;
+        rc = del(key, values[i].name);
+        if (rc != ERROR_SUCCESS) CERF_LOG_X(values[i].fail_log, (ULONG)rc);
+    }
+}
+
+static BOOL CerfNdisWriteDriverKey(const wchar_t* image) {
     HKEY  key = 0;
     DWORD disp = 0;
-    DWORD one = 1;
     LONG  rc;
 
-    rc = RegCreateKeyExW(HKEY_LOCAL_MACHINE, path, 0, NULL,
+    rc = RegCreateKeyExW(HKEY_LOCAL_MACHINE, kDriverKey, 0, NULL,
                          REG_OPTION_NON_VOLATILE, KEY_ALL_ACCESS, NULL,
                          &key, &disp);
     if (rc != ERROR_SUCCESS) return FALSE;
@@ -53,10 +86,23 @@ static BOOL CerfNdisWriteKey(const wchar_t* path, const wchar_t* image) {
                    sizeof(kGroupNdis));
     RegSetValueExW(key, L"ImagePath", 0, REG_SZ, (const BYTE*)image,
                    (DWORD)((wcslen(image) + 1) * sizeof(wchar_t)));
-    RegSetValueExW(key, L"NoDeviceCreate", 0, REG_DWORD,
-                   (const BYTE*)&one, sizeof(one));
     RegSetValueExW(key, L"DisplayName", 0, REG_SZ,
                    (const BYTE*)kDisplayName, sizeof(kDisplayName));
+    CerfNdisDeleteValues(key, kDriverStaleValues, CERF_NDIS_COUNT(kDriverStaleValues));
+    RegCloseKey(key);
+    return TRUE;
+}
+
+static BOOL CerfNdisWriteAdapterKey(void) {
+    HKEY  key = 0;
+    DWORD disp = 0;
+
+    if (RegCreateKeyExW(HKEY_LOCAL_MACHINE, kAdapterKey, 0, NULL,
+                        REG_OPTION_NON_VOLATILE, KEY_ALL_ACCESS, NULL,
+                        &key, &disp) != ERROR_SUCCESS) return FALSE;
+    RegSetValueExW(key, L"DisplayName", 0, REG_SZ,
+                   (const BYTE*)kDisplayName, sizeof(kDisplayName));
+    CerfNdisDeleteValues(key, kAdapterStaleValues, CERF_NDIS_COUNT(kAdapterStaleValues));
     RegCloseKey(key);
     return TRUE;
 }
@@ -67,7 +113,6 @@ BOOL CerfNdisInstall(void) {
     HKEY  key = 0;
     DWORD disp = 0;
     DWORD zero = 0;
-    NDIS_HANDLE out = 0;
 
     if (!api) return FALSE;
 
@@ -82,8 +127,8 @@ BOOL CerfNdisInstall(void) {
         return FALSE;
     }
 
-    if (!CerfNdisWriteKey(kDriverKey, image)) return FALSE;
-    if (!CerfNdisWriteKey(kAdapterKey, image)) return FALSE;
+    if (!CerfNdisWriteDriverKey(image)) return FALSE;
+    if (!CerfNdisWriteAdapterKey()) return FALSE;
 
     if (RegCreateKeyExW(HKEY_LOCAL_MACHINE, kLinkageKey, 0, NULL,
                         REG_OPTION_NON_VOLATILE, KEY_ALL_ACCESS, NULL,
@@ -114,8 +159,12 @@ BOOL CerfNdisInstall(void) {
     }
 
     if (api->RegisterAdapter) {
-        NDIS_STATUS st = api->RegisterAdapter(&out, (void*)L"CERFMP",
-                                              (void*)kAdapterName);
+        NDIS_STATUS st = CERF_NDIS_STATUS_FAILURE;
+        if (CerfMpAdapterBound()) {
+            CERF_LOG("ndis: adapter already bound by NDIS at boot");
+            return TRUE;
+        }
+        api->RegisterAdapter(&st, (void*)L"CERFMP", (void*)kAdapterName);
         CERF_LOG_X("ndis: NdisRegisterAdapter status", (ULONG)st);
         return st == CERF_NDIS_STATUS_SUCCESS;
     }

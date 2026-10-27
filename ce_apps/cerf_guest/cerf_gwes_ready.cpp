@@ -1,5 +1,6 @@
 #include <windows.h>
 
+#include "cerf_coredll_proc.h"
 #include "cerf_gwes_ready.h"
 #include "main.h"
 
@@ -14,10 +15,7 @@ typedef BOOL (WINAPI *PFN_IsAPIReady)(DWORD);
 static PFN_IsAPIReady s_pIsAPIReady = NULL;
 
 static PFN_IsAPIReady CerfIsApiReadyProc(void) {
-    HMODULE core;
-    if (s_pIsAPIReady) return s_pIsAPIReady;
-    core = LoadLibraryW(L"coredll.dll");
-    if (core) s_pIsAPIReady = (PFN_IsAPIReady)GetProcAddressW(core, L"IsAPIReady");
+    if (!s_pIsAPIReady) s_pIsAPIReady = (PFN_IsAPIReady)CerfCoredllProc(L"IsAPIReady");
     return s_pIsAPIReady;
 }
 

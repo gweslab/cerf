@@ -31,7 +31,7 @@ typedef void        (*PFN_EthFilterDprIndicateReceive)(void*, NDIS_HANDLE, char*
                                                        UINT, void*, UINT, UINT);
 typedef void        (*PFN_EthFilterDprIndicateReceiveComplete)(void*);
 typedef void        (*PFN_NdisQueryBuffer)(void*, void**, UINT*);
-typedef NDIS_STATUS (*PFN_NdisRegisterAdapter)(NDIS_HANDLE*, void*, void*);
+typedef ULONG       (*PFN_NdisRegisterAdapter)(NDIS_STATUS*, void*, void*);
 typedef DWORD       (*PFN_NDS_Init)(const wchar_t*);
 typedef void        (*PFN_NdisAllocatePacketPool)(NDIS_STATUS*, void**, UINT, UINT);
 typedef void        (*PFN_NdisAllocatePacket)(NDIS_STATUS*, void**, void*);

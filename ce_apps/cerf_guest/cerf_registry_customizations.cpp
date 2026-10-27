@@ -1,5 +1,6 @@
 #include <windows.h>
 
+#include "cerf_coredll_proc.h"
 #include "cerf_debug_log.h"
 #include "cerf_registry_customizations.h"
 #include "cerf_regs_map.h"
@@ -68,9 +69,7 @@ static BOOL CerfApplySystemFont(void) {
 }
 
 extern "C" void CerfFlushRegistry(void) {
-    HMODULE core = LoadLibraryW(L"coredll.dll");
-    PFN_RegFlushKey flush = core
-        ? (PFN_RegFlushKey)GetProcAddressW(core, L"RegFlushKey") : NULL;
+    PFN_RegFlushKey flush = (PFN_RegFlushKey)CerfCoredllProc(L"RegFlushKey");
     if (!flush) {
         CERF_LOG("cerf_guest: no RegFlushKey - registry is the object store");
         return;

@@ -89,7 +89,7 @@ void StepDumpOnMessage(AppState* st, UINT msg, WPARAM wp, LPARAM lp) {
         if (st->thread) { CloseHandle(st->thread); st->thread = NULL; }
         st->running = 0;
         SetWindowText(GetDlgItem(st->hwnd, ID_NAV), L"Exit");  /* Stop -> Exit */
-        InvalidateRect(st->hwnd, NULL, FALSE);
+        InvalidateRect(st->panel, NULL, FALSE);
         if (st->ok)
             MessageBoxW(st->hwnd,
                         L"Dump complete. Read the log; press Exit when you are done.",

@@ -28,9 +28,9 @@ def message(builds: List[Tuple[HostBranch, Artifact]], release_candidate: bool) 
     return (f"{headline}\n"
             f"Download: {downloads} · "
             f"[CI build]({run.run_url}) · "
-            f"[`{run.sha[:7]}`]({run.commit_url})\n"
-            "ℹ️ Receive this build in your local installation: "
-            "Emulator Settings -> Update Channel -> Unstable Releases")
+            f"[`{run.sha[:7]}`]({run.commit_url})\n\n"
+            "Receive this build in your local installation:\n"
+            "Emulator Settings → Update Channel → Unstable Releases")
 
 
 def main(argv: List[str]) -> int:

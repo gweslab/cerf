@@ -30,7 +30,7 @@ PATCH_URL = "https://github.com/crystalidea/qt6windows7/archive/{}.zip".format(P
 PATCH_TREE = "e3bc950c394f42a73eb493d82b0004bbe9e89b6c0623d5e70e1eb7a655b7da7d"
 PATCH_MODULE = "qtbase"
 CONFIGURE = ("-release", "-opensource", "-confirm-license", "-opengl", "desktop", "-no-openssl",
-             "-nomake", "tests", "-nomake", "examples")
+             "-no-feature-sql", "-nomake", "tests", "-nomake", "examples")
 
 class QtBuildError(Exception):
     pass

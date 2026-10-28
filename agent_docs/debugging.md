@@ -446,10 +446,8 @@ Investigation:
 
 ## Crash shape #4 - kernel debug serial says something useful
 
-The OAL writes diagnostic strings to a UART, or - when the OEM nulls
-the debug path - to a sink hooked by a `libCerfCore/src/tracing/<bundle>/nkdbg/`
-file. CERF routes all such guest debug text through `KernelDebugSink`
-to the `Nkdbg` channel. Search `cerf.log` for `[NKDBG]` to
+The OAL writes diagnostic strings to a UART. CERF routes the TX of that
+UART through `KernelDebugSink` to the `Nkdbg` channel. Search `cerf.log` for `[NKDBG]` to
 find the kernel's own boot trace, which often names the function that
 crashed shortly before the fault.
 
@@ -575,9 +573,7 @@ at a given VA, so the match is unambiguous where a name lookup is not.
    `libCerfCore/src/tracing/wm5_smdk2410_devemu/`). If it does not exist, create it.
 2. Add a `bundle.h` that declares
    `constexpr uint32_t k<Bundle>Crc32 = 0x<actual>;`. Put it in the
-   bundle directory, where git ignores it. If this bundle ships a
-   production kernel-debug hook, put it in `<bundle>/nkdbg/` instead.
-   That is the only committed CRC header. To get the CRC,
+   bundle directory, where git ignores it. To get the CRC,
    either run `python -c "import zlib; print(hex(zlib.crc32(open('path-to-rom.bin','rb').read())))"`
    (concatenate every loaded partition in load order if there is more
    than one), or just boot CERF once and read the `[TRACE] bundle
@@ -606,12 +602,9 @@ at a given VA, so the match is unambiguous where a name lookup is not.
    trace file. `build.py --mode production` excludes the entire
    `libCerfCore/src/tracing/<bundle>/` subtree from the build.
 
-Per-device trace files are gitignored - personal debugging
-scaffolding, not committed source. Git tracks only each
-`libCerfCore/src/tracing/<bundle>/nkdbg/` directory - its hooks and its `bundle.h`
-CRC header. The rest, every other CRC header included, stays on your
-disk. It persists across your local sessions, and never enters the
-repo. Verify your existing hooks before
+Git ignores per-device trace files. They are personal debugging
+scaffolding, not committed source, and they stay on your disk across your
+local sessions. Verify your existing hooks before
 you re-derive a path. The bundle CRC32 gates them (silent no-op on any
 other bundle), and production builds exclude them, so they cost nothing
 at runtime.

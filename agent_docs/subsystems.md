@@ -615,19 +615,8 @@ Each file is a small `Service` whose `OnReady` calls
 closure runs if and only if the CRC32 of the live bundle matches. On a
 mismatch the file silently does nothing at runtime. A header in that
 directory declares the constant that every trace file in it uses
-(`constexpr uint32_t k<Bundle>Crc32 = ...;`). The location of the header
-decides whether git keeps it:
-
-- **`<bundle>/nkdbg/bundle.h` is the only committed CRC header.** Two
-  conditions admit a bundle to this form. The bundle ships a production
-  kernel-debug hook under `nkdbg/`, and its ROM is a permanent board
-  image.
-- **Every other CRC header in `<bundle>/` is gitignored**, with the rest
-  of the personal trace scaffolding. The convention names it `bundle.h`.
-  A bundle with no `nkdbg/` hook has only this form, so its CRC stays out
-  of the repo. A temporary or work-in-progress ROM is always this form.
-  When one directory holds both headers, the ignored header includes
-  `nkdbg/bundle.h` and does not restate the constant.
+(`constexpr uint32_t k<Bundle>Crc32 = ...;`). The convention names it
+`bundle.h`.
 
 `TraceManager::OnReady` computes the bundle CRC32 over the
 concatenated `RomParserService::Loaded()[i].raw` bytes in load order. On
@@ -635,9 +624,8 @@ the first boot of a new bundle, the log line `[TRACE] bundle CRC32 = 0xXXXX`
 gives you the value to paste into that header.
 
 `build.py --mode production` builds libCerfCore with
-`CERFCORE_DEVICE_TRACES` off. The build then excludes the per-device trace files
-and keeps `src/tracing/*/nkdbg/*.cpp`, so the kernel-debug hooks stay in
-production builds. The framework (`libCerfCore/src/tracing/trace_manager.{h,cpp}`)
+`CERFCORE_DEVICE_TRACES` off. The build then excludes every per-device trace
+file. The framework (`libCerfCore/src/tracing/trace_manager.{h,cpp}`)
 stays compiled.
 
 **CRC32 / bundle gating is diagnostics-only - never runtime behavior.**
@@ -652,21 +640,13 @@ a class of ROMs uses a ROM-content fingerprint that generalizes, the way
 `BoardContext` does. CRC/bundle gating stays in diagnostics, where its
 single-image, dev-only nature is exactly correct.
 
-The one production-built CRC-gated exception is the kernel-debug (`nkdbg/`)
-hooks. They are OBSERVATION-ONLY: they read guest debug text and emit it to
-the log and HwScreen, and they never alter emulation or board behavior. They
-also fail benignly: a CRC mismatch installs no hook, which costs only absent
-debug output, never a device that misbehaves. Anything that changes how the
-guest runs stays out of CRC gates.
-
 - `libCerfCore/src/tracing/<bundle>/`
 
 ## Kernel debug output
 
 `KernelDebugSink` (`libCerfCore/src/tracing/kernel_debug_sink.{h,cpp}`) is the single
-funnel for guest OS debug text. Every producer routes finished lines to it:
-the TX of a live SoC/board UART or serial peripheral, and a hook on a nulled
-OEM debug sink (`libCerfCore/src/tracing/<bundle>/nkdbg/`). It emits each line to the
+funnel for guest OS debug text. A live SoC/board UART or serial peripheral
+routes the finished lines of its TX to it. It emits each line to the
 `Nkdbg` log channel (`[NKDBG]`) and to the `HwScreen` debug console.
 
 - `EmitLine(line, source, to_screen)` - the output primitive. `source` is an

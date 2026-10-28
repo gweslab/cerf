@@ -20,7 +20,7 @@ jobs:
       cancel-in-progress: false
     uses: ./.github/workflows/qt-windows.yml
 
-  build:
+  build-windows:
     needs: qt-windows
     concurrency:
       group: ${{ github.workflow }}-${{ github.ref }}-windows
@@ -40,7 +40,7 @@ jobs:
     secrets: inherit
 
   build-macos:
-    needs: build
+    needs: build-windows
     concurrency:
       group: ${{ github.workflow }}-${{ github.ref }}-macos
       cancel-in-progress: true
@@ -59,7 +59,8 @@ jobs:
     secrets: inherit
 
   publish:
-    needs: [build, build-linux, build-macos, build-android]
+    name: publish beta binaries
+    needs: [build-windows, build-linux, build-macos, build-android]
     if: ${{ github.event_name == 'push' }}
     concurrency:
       group: ${{ github.workflow }}-${{ github.ref }}-publish
@@ -149,7 +150,7 @@ jobs:
           python tools/publish_r2_object.py --file=ci/dist/cerf_latest.apk --content-type=application/vnd.android.package-archive
 
   announce:
-    needs: [build, build-linux, build-macos, build-android, publish]
+    needs: [build-windows, build-linux, build-macos, build-android, publish]
     if: >-
       ${{ github.event_name == 'push' &&
           !contains(github.event.head_commit.message, '[release cerf]') }}
@@ -185,7 +186,8 @@ jobs:
           ${{ needs.build-android.outputs.signed != 'true' && '--without=android-arm64' || '' }}
 
   release:
-    needs: [build, build-linux, build-macos, build-android]
+    name: publish release binaries
+    needs: [build-windows, build-linux, build-macos, build-android]
     if: github.event_name == 'push' && contains(github.event.head_commit.message, '[release cerf]')
     concurrency:
       group: ${{ github.workflow }}-${{ github.ref }}-release

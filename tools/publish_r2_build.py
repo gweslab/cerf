@@ -87,8 +87,9 @@ def read_latest(client, bucket: str, key: str) -> dict:
 
 
 def merge_latest(previous: dict, branch: str, entry: dict) -> dict:
+    published = {b.name for b in host_branch.ci_branches()}
     branches = previous.get(BRANCHES_KEY)
-    branches = dict(branches) if isinstance(branches, dict) else {}
+    branches = {k: v for k, v in branches.items() if k in published} if isinstance(branches, dict) else {}
     branches[branch] = entry
     root = entry if branch == host_branch.ROOT_ENTRY else \
         {k: v for k, v in previous.items() if k != BRANCHES_KEY}

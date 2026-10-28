@@ -29,7 +29,7 @@ public:
         if (!QProcess::startDetached(executable, args, QString::fromStdString(cerfcore::GetCerfDir())))
             return FlowError(QStringLiteral("Launch failed"),
                              QStringLiteral("%1 could not be started.").arg(QDir::toNativeSeparators(executable)));
-        return StartedReply(name);
+        return Started(name);
     }
 };
 

@@ -9,6 +9,7 @@
 #include "flow_reply.h"
 #include "local_manifest_store.h"
 #include "manager_operations.h"
+#include "starting_devices.h"
 
 #include <cerfcore/core/cerf_config.h>
 #include <cerfcore/core/cerf_emulator.h>
@@ -30,7 +31,8 @@ void DeviceActions::SetVerboseLogs(bool verbose) {
 }
 
 bool DeviceActions::Running(const QString& name) const {
-    return ReadRunningStatus(LocalManifestStore::DevicePath(name)).has_value();
+    return ReadRunningStatus(LocalManifestStore::DevicePath(name)).has_value() ||
+           emu_.Get<StartingDevices>().Pending(name);
 }
 
 bool DeviceActions::HasSavedState(const QString& name) const {
@@ -42,6 +44,7 @@ QString DeviceActions::WarmBoot() const { return QString::fromLatin1(cerfcore::k
 QString DeviceActions::ColdBoot() const { return QString::fromLatin1(cerfcore::kBootCold); }
 
 QVariantMap DeviceActions::Launch(const QString& name, const QString& boot, bool confirmed) {
+    if (emu_.Get<StartingDevices>().Pending(name)) return {};
     QStringList args{QString::fromLatin1(cerffrontend::kArgDevice) + name};
     if (VerboseLogs())
         args.append(QString::fromLatin1(cerffrontend::kArgLog) + QString::fromLatin1(cerfcore::Log::kAllCategories));
@@ -56,10 +59,9 @@ QVariantMap DeviceActions::RunningError(const QString& name) const {
 }
 
 QVariantMap DeviceActions::DiscardSavedState(const QString& name) {
-    const QString  path  = LocalManifestStore::DevicePath(name);
-    const RunState state = ReadRunState(path);
-    if (state.kind == RunStateKind::kRunning) return RunningError(name);
-    if (state.kind != RunStateKind::kSaved) return {};
+    if (Running(name)) return RunningError(name);
+    const QString path = LocalManifestStore::DevicePath(name);
+    if (!ReadSavedState(path)) return {};
     for (const char* file : {cerfcore::kDefaultStateFile, cerfcore::kSavedStateScreenshotFile}) {
         QString error;
         if (!RemoveEntry(PathOf(QDir(path).filePath(QString::fromLatin1(file))), error))

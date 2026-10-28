@@ -11,6 +11,7 @@
 #include "device_texts.h"
 #include "local_manifest_store.h"
 #include "manager_operations.h"
+#include "starting_devices.h"
 #include "text_compare.h"
 
 #include <cerfcore/core/cerf_emulator.h>
@@ -83,11 +84,14 @@ QVariantMap DeviceCards::Rows(const QString& query) const {
         if (MatchesQuery(texts.SearchFields(device), query)) shown.push_back(std::move(device));
     }
 
+    auto&        starting_devices = emu_.Get<StartingDevices>();
     QVariantList out;
     for (const DeviceBundle& device : shown) {
-        const QString  path       = LocalManifestStore::DevicePath(device.name);
-        const RunState state      = ReadRunState(path);
-        const QString  arch       = boards.ArchName(device.meta.board_id).toLower();
+        const QString  path     = LocalManifestStore::DevicePath(device.name);
+        const RunState state    = ReadRunState(path);
+        const bool     starting = state.kind != RunStateKind::kRunning && starting_devices.Pending(device.name);
+        const bool     running  = starting || state.kind == RunStateKind::kRunning;
+        const QString  arch     = boards.ArchName(device.meta.board_id).toLower();
         out.append(QVariantMap{
             {QStringLiteral("key"), device.name},
             {QStringLiteral("name"), device.name},
@@ -98,12 +102,11 @@ QVariantMap DeviceCards::Rows(const QString& query) const {
             {QStringLiteral("detail"), texts.PanelDetail(device)},
             {QStringLiteral("badge"), arch.isEmpty() ? QString() : BadgeUrl(arch)},
             {QStringLiteral("badgeSize"), arch.isEmpty() ? QSize(0, 0) : BadgeSize(arch)},
-            {QStringLiteral("status"), CardStatus(state)},
-            {QStringLiteral("state"), RunStateName(state.kind)},
-            {QStringLiteral("launchLabel"),
-             state.kind == RunStateKind::kRunning ? QStringLiteral("Show") : QStringLiteral("Run")},
-            {QStringLiteral("saved"), state.kind == RunStateKind::kSaved},
-            {QStringLiteral("removable"), state.kind != RunStateKind::kRunning},
+            {QStringLiteral("status"), starting ? QStringLiteral("Started") : CardStatus(state)},
+            {QStringLiteral("state"), RunStateName(running ? RunStateKind::kRunning : state.kind)},
+            {QStringLiteral("launchLabel"), running ? QStringLiteral("Show") : QStringLiteral("Run")},
+            {QStringLiteral("saved"), !running && state.kind == RunStateKind::kSaved},
+            {QStringLiteral("removable"), !running},
             {QStringLiteral("preview"), PreviewUrl(path, state)},
             {QStringLiteral("updatable"), device.Updatable()},
         });

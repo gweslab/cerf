@@ -39,7 +39,7 @@ public:
             qApp->requestPermission(microphone, &context_, [this, name](const QPermission&) { Boot(name); });
         else
             Boot(name);
-        return StartedReply(name);
+        return Started(name);
     }
 
 private:

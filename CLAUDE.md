@@ -56,7 +56,7 @@ The following pages are authoritative project knowledge; their full contents are
 - **[agent_docs/cerfman.md](agent_docs/cerfman.md)** - cerfman (the device manager), config files, installer, self-update.
 - **[agent_docs/database.md](agent_docs/database.md)** - the shared board / SoC / OS database.
 - **[agent_docs/leds.md](agent_docs/leds.md)** - LEDs and LED buttons.
-- **[agent_docs/submodules.md](agent_docs/submodules.md)** - the core library submodules and their commit and push order.
+- **[agent_docs/submodules.md](agent_docs/submodules.md)** - the core library submodules.
 
 ## Build
 

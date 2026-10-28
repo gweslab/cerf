@@ -12,7 +12,7 @@ Fewer words is better. A one-line title is the target, not a minimum.
 ## Procedure
 
 1. Run `git status`, then `git diff` (staged and unstaged). Read what actually changed.
-2. If `git status` lists a core library submodule as changed, commit in the order of `agent_docs/submodules.md` § Commits.
+2. If `git status` lists a core library submodule as changed, follow § Submodules.
 3. Stage only the paths this work touched.
 4. Commit with a message written under the rules below.
 
@@ -21,6 +21,7 @@ Fewer words is better. A one-line title is the target, not a minimum.
 - **Describe the diff, not the discussion.** The message covers what the change does to the project. It never covers the conversation that produced it.
 - **A body is banned. Write the one-line title, then stop.** If you judge a body "substantive", "justified", or "short enough", that judgment IS the slop. Delete it. Ship the title.
 - **Use the imperative, with a lowercase scope prefix that matches recent commits** (`jornada820: keyboard`, `host: compose window title from cerf.json device meta`). Read `git log` first.
+- **Title a commit that only bumps a submodule pointer `<submodule>: bump submodule`, and nothing more.** `<submodule>` is the name of the submodule whose pointer moves, for example `libCerfCore: bump submodule`. A commit that also changes other files takes a title that describes its whole change.
 - **End with the `Co-Authored-By:` trailer for the model that runs this session.** Claude Code supplies it.
 
 ## Example
@@ -53,6 +54,15 @@ Each of these describes the session instead of the diff:
 
 The test for a line: a developer at a fresh clone, who never saw this session, understands it. If a line makes sense only to someone who watched the conversation, delete it.
 
+## Submodules
+
+A change to a core library gets a commit in that library and a commit in each repository that holds the library. A library commit is not complete without the commit that records its pointer.
+
+1. Commit inside each changed library first, in the repository of that library, with this skill.
+2. Commit the repository that holds the library last. Stage the path of each changed library together with the changes of that repository. The staged library paths record the new library commits. If the other changes stay uncommitted, stage only the library paths.
+
+Push a library before the repository that holds its pointer. Push the root last. Before you push a repository, make sure that the remote of each library holds the commit that the pointer names. A pointer to a commit that is only local breaks every CI checkout.
+
 ## GitHub issues
 
 An issue reference is diff metadata, so it is welcome. When the commit fully resolves the issue, put `Fixes #123` on its own line above the trailer. When the commit is related but does not resolve it, use `Refs #123`. Reference an issue only when the diff corresponds to it. The issue thread is still conversation, so do not summarize it into the body.
@@ -77,6 +87,6 @@ If your reading of the request is incorrect, the user sees that line and stops y
 
 ## Hard stops
 
-- **Never run git unless the user asked.** `/commit` is that ask. It covers this one commit, the library commits of the same change, and the root commit that records their pointers. Do not `git push`, which needs separate approval.
+- **Never run git unless the user asked.** `/commit` is that ask. It covers this one commit, the library commits of the same change, and the commits that record their pointers. Do not `git push`, which needs separate approval.
 - **Never force past `.gitignore`** with `git add -f`. The ignore is a STOP signal.
 - **Stage only what this session changed.** Other agents and the user work in this tree at the same time, so `git status` often lists edits that are not yours. If you did not make a change, leave it unstaged and say it is there.

@@ -26,20 +26,3 @@ Put each core library at the repository root. Put third-party code in
   no SSH key.
 - The project rules apply inside a library as they apply in the rest of this
   repository.
-
-## Commits
-
-A feature that changes a library gets one commit in each changed library and
-one commit in the root repository. A library commit is not complete without
-the root commit.
-
-1. Commit inside each changed library first, in the repository of that
-   library. Follow `/commit` there.
-2. Commit the root repository last. Stage the path of each changed library
-   together with the changes of the root. The staged library paths record the
-   new library commits (the pointer bump). If the other root changes stay
-   uncommitted, stage only the library paths.
-
-## Push
-
-Do not push the root before its libraries.

@@ -135,9 +135,12 @@ OperationResult BundleInstaller::RunInstall(const RemoteBundle& bundle, std::opt
     const std::optional<QString> target = LocalManifestStore::SafeDevicePath(name, error);
     if (!target) return OperationResult::kFailed;
 
-    QTemporaryDir temp(QDir(LocalManifestStore::DevicesDir()).filePath(QStringLiteral(".sync_XXXXXX")));
+    const QString devices = LocalManifestStore::DevicesDir();
+    if (!MakeDirectory(devices, error)) return OperationResult::kFailed;
+    QTemporaryDir temp(QDir(devices).filePath(QStringLiteral(".sync_XXXXXX")));
     if (!temp.isValid()) {
-        error = temp.errorString();
+        error = QStringLiteral("cannot create a temporary folder in %1 (%2)")
+                    .arg(QDir::toNativeSeparators(devices), temp.errorString());
         return OperationResult::kFailed;
     }
     QString               prepared;
@@ -232,9 +235,11 @@ OperationResult BundleInstaller::RunInstallPackage(const QString& name, const Re
     error = PackageTargetProblem(name);
     if (!error.isEmpty()) return OperationResult::kFailed;
     const QString label = QStringLiteral("%1: %2").arg(name, package.name);
-    QTemporaryDir temp(QDir(LocalManifestStore::DevicesDir()).filePath(QStringLiteral(".pkg_XXXXXX")));
+    const QString devices = LocalManifestStore::DevicesDir();
+    QTemporaryDir temp(QDir(devices).filePath(QStringLiteral(".pkg_XXXXXX")));
     if (!temp.isValid()) {
-        error = temp.errorString();
+        error = QStringLiteral("cannot create a temporary folder in %1 (%2)")
+                    .arg(QDir::toNativeSeparators(devices), temp.errorString());
         return OperationResult::kFailed;
     }
     QString               prepared;

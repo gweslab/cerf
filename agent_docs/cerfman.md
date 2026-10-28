@@ -40,6 +40,9 @@ folder that holds the global `cerf.json`.
 `docs/website/content/articles/cerf-json.md` is the schema. It owns what each of these
 files can contain.
 
+When `bundled/cerf.local.json` exists, a dev build puts its top-level keys into the
+global `cerf.json` that it builds. A key in that file replaces the key of the same name.
+
 The manager writes a device setting only when it differs from the `cerf.json` value. It
 deletes the file when the file becomes empty. The screen size and the color depth have
 no such baseline: "Auto" is their absence, and the manager writes any other value.

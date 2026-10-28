@@ -14,6 +14,7 @@ import build_common
 import cerf_locks
 import frontend_build
 import host_branch
+import local_config
 from host_branch import ANDROID_AMD64, ANDROID_ARM64, WIN32_X86
 from product_facts import GLOBAL_CONFIG_NAME
 
@@ -95,6 +96,14 @@ def run(args, branch, lock) -> int:
         if not branch.package_file:
             host_branch.stamp(out / GLOBAL_CONFIG_NAME, branch)
             print("[BUILD] {} stamped into {}".format(branch.name, out / GLOBAL_CONFIG_NAME), flush=True)
+            overlay = local_config.overlay_for(ROOT, args.mode)
+            if overlay is not None:
+                try:
+                    local_config.merge(out / GLOBAL_CONFIG_NAME, overlay)
+                except local_config.LocalConfigError as exc:
+                    print("[BUILD] FAILED! {}".format(exc), flush=True)
+                    return 1
+                print("[BUILD] {} merged into {}".format(overlay, out / GLOBAL_CONFIG_NAME), flush=True)
             build_common.ship_notices(ROOT, out)
         report.ok()
     else:

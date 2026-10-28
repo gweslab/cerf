@@ -2,7 +2,8 @@ cmake_policy(SET CMP0009 NEW)
 file(GLOB_RECURSE cerfqt_bundled LIST_DIRECTORIES false RELATIVE "${CERFQT_BUNDLED_DIR}"
      "${CERFQT_BUNDLED_DIR}/*")
 foreach(cerfqt_file IN LISTS cerfqt_bundled)
-    if(cerfqt_file MATCHES "(^|/)\\.git(/|$)|(^|/)\\.gitkeep$|\\.(i64|id0|id1|id2|nam|til|cmd)$")
+    if(cerfqt_file MATCHES "(^|/)\\.git(/|$)|(^|/)\\.gitkeep$|\\.(i64|id0|id1|id2|nam|til|cmd)$"
+       OR cerfqt_file STREQUAL CERFQT_LOCAL_CONFIG_NAME)
         continue()
     endif()
     set(cerfqt_src "${CERFQT_BUNDLED_DIR}/${cerfqt_file}")

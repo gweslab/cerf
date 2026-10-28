@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Callable, Dict, List, Optional
 
 import build_report
+import local_config
 import resvg_library
 import verified_download
 from host_branch import HostBranch
@@ -36,6 +37,7 @@ class FrontendBuild:
     def cmake_options(self) -> List[str]:
         return ["-DCERF_BUILD_QT=ON", "-DCERFCORE_DEV_MODE=" + self.dev,
                 "-DCERFCORE_DEVICE_TRACES=" + (self.dev if self.device_traces else "OFF"),
+                "-DCERFQT_LOCAL_CONFIG_NAME=" + local_config.NAME,
                 "-DPython3_EXECUTABLE={}".format(sys.executable)]
 
     def compiler_cache(self) -> Optional[str]:

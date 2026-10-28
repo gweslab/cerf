@@ -211,6 +211,14 @@ if(ANDROID)
     if(NOT cerfqt_stamp_rc EQUAL 0)
         message(FATAL_ERROR "tools/host_branch.py --stamp failed (${cerfqt_stamp_rc})")
     endif()
+    if(CERFQT_GLOBAL_CONFIG_OVERLAY)
+        execute_process(COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/../tools/local_config.py"
+                                --merge "${cerfqt_global_config}" "${CERFQT_GLOBAL_CONFIG_OVERLAY}"
+                        RESULT_VARIABLE cerfqt_merge_rc)
+        if(NOT cerfqt_merge_rc EQUAL 0)
+            message(FATAL_ERROR "tools/local_config.py --merge failed (${cerfqt_merge_rc})")
+        endif()
+    endif()
     configure_file("${cerfqt_db_json}" "${cerfqt_install_dir}/${cerfqt_db_json_name}" COPYONLY)
     qt_add_resources(cerf-qt "cerfqt_install"
         PREFIX "${cerfqt_install_prefix}"
@@ -242,6 +250,7 @@ else()
     add_custom_target(cerf-qt-bundled ALL
         COMMAND "${CMAKE_COMMAND}"
                 "-DCERFQT_BUNDLED_DIR=${CMAKE_CURRENT_SOURCE_DIR}/../bundled"
+                "-DCERFQT_LOCAL_CONFIG_NAME=${CERFQT_LOCAL_CONFIG_NAME}"
                 "-DCERFQT_DB_JSON=${cerfqt_db_json}"
                 "-DCERFQT_DB_JSON_NAME=${cerfqt_db_json_name}"
                 "-DCERFQT_OUTPUT_DIR=${cerfqt_output_dir}"

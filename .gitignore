@@ -7,6 +7,8 @@ ce_apps/**/*.res
 bundled/devices/manifest.json
 bundled/devices/*
 
+bundled/cerf.local.json
+
 ce_apps/**/*.obj
 ce_apps/**/*.exp
 ce_apps/**/*.lib

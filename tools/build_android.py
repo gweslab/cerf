@@ -9,6 +9,7 @@ from typing import Dict, Optional, Tuple
 import android_openssl
 import android_sdk
 import build_report
+import local_config
 import qt_android
 import vcpkg_install
 import verified_download
@@ -120,6 +121,7 @@ class AndroidBuild(FrontendBuild):
         build_dir = self.build_dir(self.config)
         self.clear_for_rebuild(build_dir)
         signed = signing_configured()
+        overlay = local_config.overlay_for(self.root, self.mode)
         self.configure(build_dir, [
             self.cmake, "-S", self.root, "-B", build_dir, "-G", "Ninja",
             "-DCMAKE_MAKE_PROGRAM={}".format(self.ninja),
@@ -137,6 +139,7 @@ class AndroidBuild(FrontendBuild):
             "-DCERFQT_ANDROID_TARGET_SDK={}".format(android_sdk.TARGET_SDK),
             "-DCERFQT_ANDROID_EXTRA_LIBS={}".format(";".join(path.as_posix() for path in openssl)),
             "-DCERFQT_HOST_BRANCH=" + self.branch.name,
+            "-DCERFQT_GLOBAL_CONFIG_OVERLAY={}".format(overlay.as_posix() if overlay else ""),
             "-DQT_ANDROID_SIGN_APK=" + ("ON" if signed else "OFF")] + self.cmake_options() +
             self.compiler_cache_options() + resvg, env)
         if not self.compile([self.cmake, "--build", build_dir, "--target", "apk"], env):

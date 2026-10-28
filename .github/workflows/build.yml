@@ -40,7 +40,7 @@ jobs:
     secrets: inherit
 
   build-macos:
-    needs: build-windows
+    needs: build-linux
     concurrency:
       group: ${{ github.workflow }}-${{ github.ref }}-macos
       cancel-in-progress: true

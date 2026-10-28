@@ -24,11 +24,14 @@ jobs:
         id: version
         run: python3 tools/stamp_version.py --run=${{ github.run_number }} --sha=${{ github.sha }} --host-branch=${{ env.HOST_BRANCH }}
 
-      - name: Fetch the CE apps of the Windows build
+      - name: Fetch the Linux build
         uses: actions/download-artifact@v4
         with:
-          name: ${{ steps.version.outputs.artifact-win32-x86 }}
-          path: ci/win32
+          name: ${{ steps.version.outputs.artifact-linux-amd64 }}
+          path: ci/linux
+
+      - name: Unpack the CE apps of the Linux build
+        run: unzip -q "ci/linux/${{ steps.version.outputs.artifact-linux-amd64 }}.zip" "ce_apps/*" -d ci/linux
 
       - uses: ./.github/actions/compiler-cache
         with:
@@ -41,7 +44,7 @@ jobs:
           host-branch: ${{ env.HOST_BRANCH }}
 
       - name: Build
-        run: python3 build.py --config Release --mode production --ce-apps-from=ci/win32/ce_apps
+        run: python3 build.py --config Release --mode production --ce-apps-from=ci/linux/ce_apps
 
       - uses: ./.github/actions/resvg-cache
         if: ${{ !cancelled() }}

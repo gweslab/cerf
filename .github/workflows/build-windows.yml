@@ -51,9 +51,24 @@ jobs:
           url: ${{ secrets.CE_TOOLCHAIN_URL }}
           python: python
 
+      - name: Install ccache
+        shell: bash
+        run: python tools/ccache_windows.py --install "$GITHUB_PATH"
+
+      - uses: ./.github/actions/compiler-cache
+        with:
+          stage: restore
+          host-branch: ${{ env.HOST_BRANCH }}
+
       - name: Build
         shell: pwsh
         run: python build.py --config Release --mode production
+
+      - uses: ./.github/actions/compiler-cache
+        if: ${{ !cancelled() }}
+        with:
+          stage: save
+          host-branch: ${{ env.HOST_BRANCH }}
 
       - uses: ./.github/actions/resvg-cache
         if: ${{ !cancelled() }}

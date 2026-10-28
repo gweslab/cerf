@@ -91,7 +91,16 @@ class _MsvcBuild(FrontendBuild):
                                    "-T", wanted["CMAKE_GENERATOR_TOOLSET"],
                                    "-DCMAKE_GENERATOR_INSTANCE={}".format(wanted["CMAKE_GENERATOR_INSTANCE"]),
                                    "-DCMAKE_MSVC_DEBUG_INFORMATION_FORMAT=Embedded"]
-                       + self.cmake_options() + options)
+                       + self.cmake_options() + self._compiler_cache_globals(build_dir) + options)
+
+    def _compiler_cache_globals(self, build_dir: Path) -> List[str]:
+        ccache = self.compiler_cache()
+        if ccache is None:
+            return ["-DCMAKE_VS_GLOBALS="]
+        tool_dir = build_dir / "ccache"
+        tool_dir.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(ccache, str(tool_dir / "cl.exe"))
+        return ["-DCMAKE_VS_GLOBALS=CLToolExe=cl.exe;CLToolPath={};UseMultiToolTask=true".format(tool_dir)]
 
 
 class WindowsBuild(_MsvcBuild):

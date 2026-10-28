@@ -103,6 +103,7 @@ class AndroidBuild(FrontendBuild):
         env["ANDROID_NDK_HOME"] = str(self.ndk)
         env["ANDROID_SDK_ROOT"] = str(self.sdk)
         env["JAVA_HOME"] = str(self.java_home)
+        env["CCACHE_COMPILERCHECK"] = "string:ndk-" + android_sdk.NDK_VERSION
         return env
 
     def build(self) -> bool:

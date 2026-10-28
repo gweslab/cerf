@@ -31,6 +31,7 @@ QtObject {
     readonly property color tapBubbleRing: "#ffffff"
 
     readonly property color cardHover: dark ? "#2c2c2c" : "#f5f5f5"
+    readonly property color backdrop: dark ? "#99000000" : "#99303030"
 
     readonly property color previewBackdrop: "#1f2329"
     readonly property real previewBlurOpacity: 0.55

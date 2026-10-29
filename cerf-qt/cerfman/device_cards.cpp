@@ -1,8 +1,6 @@
 #include "device_cards.h"
 
 #include "../device_status_files.h"
-#include "../qt_resource_paths.h"
-#include "../svg_document.h"
 #include "board_catalog.h"
 #include "bundle_catalog.h"
 #include "device_inventory.h"
@@ -70,7 +68,6 @@ QString PreviewUrl(const QString& device_path, const RunState& state) {
 
 QVariantMap DeviceCards::Rows(const QString& query) const {
     auto&                     texts   = emu_.Get<DeviceTexts>();
-    auto&                     boards  = emu_.Get<BoardCatalog>();
     std::vector<DeviceBundle> devices = emu_.Get<DeviceInventory>().List();
     texts.SortForCards(devices);
 
@@ -85,13 +82,13 @@ QVariantMap DeviceCards::Rows(const QString& query) const {
     }
 
     auto&        starting_devices = emu_.Get<StartingDevices>();
+    auto&        boards           = emu_.Get<BoardCatalog>();
     QVariantList out;
     for (const DeviceBundle& device : shown) {
         const QString  path     = LocalManifestStore::DevicePath(device.name);
         const RunState state    = ReadRunState(path);
         const bool     starting = state.kind != RunStateKind::kRunning && starting_devices.Pending(device.name);
         const bool     running  = starting || state.kind == RunStateKind::kRunning;
-        const QString  arch     = boards.ArchName(device.meta.board_id).toLower();
         out.append(QVariantMap{
             {QStringLiteral("key"), device.name},
             {QStringLiteral("name"), device.name},
@@ -100,8 +97,7 @@ QVariantMap DeviceCards::Rows(const QString& query) const {
             {QStringLiteral("title"), texts.CardTitle(device)},
             {QStringLiteral("subtitle"), texts.CardSubtitle(device)},
             {QStringLiteral("detail"), texts.PanelDetail(device)},
-            {QStringLiteral("badge"), arch.isEmpty() ? QString() : BadgeUrl(arch)},
-            {QStringLiteral("badgeSize"), arch.isEmpty() ? QSize(0, 0) : BadgeSize(arch)},
+            {QStringLiteral("arch"), boards.ArchName(device.meta.board_id)},
             {QStringLiteral("status"), starting ? QStringLiteral("Started") : CardStatus(state)},
             {QStringLiteral("state"), RunStateName(running ? RunStateKind::kRunning : state.kind)},
             {QStringLiteral("launchLabel"), running ? QStringLiteral("Show") : QStringLiteral("Run")},
@@ -115,12 +111,6 @@ QVariantMap DeviceCards::Rows(const QString& query) const {
     return QVariantMap{{QStringLiteral("rows"), out},
                        {QStringLiteral("installed"), installed},
                        {QStringLiteral("bundleUpdates"), hide_updates ? 0 : updates}};
-}
-
-QSize DeviceCards::BadgeSize(const QString& arch) const {
-    const auto [it, added] = badge_sizes_.try_emplace(arch);
-    if (added) it->second = SvgDocument(AssetIconResource(BadgeStem(arch))).DefaultSize().toSize();
-    return it->second;
 }
 
 QString DeviceCards::UpdateRomsLabel(int count) const {

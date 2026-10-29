@@ -81,7 +81,9 @@ public:
     bool HasMouseCapture() const override { return grabbing_; }
     void FocusCanvas() override;
     void SetPointerHidden(bool hidden) override;
-    void WarpPointerTo(int x, int y) override;
+    bool WarpPointerTo(int x, int y) override;
+    bool LockPointer() override;
+    void UnlockPointer() override;
     void ClientSize(int& width, int& height) const override;
     bool HostToGuest(int x, int y, int& sx, int& sy) const override;
     void ClampGuest(int& sx, int& sy) const override;
@@ -162,5 +164,6 @@ private:
     bool                               grabbing_         = false;
     bool                               from_touch_       = true;
     bool                               pressed_          = false;
+    bool                               touching_         = false;
     MouseRoute                         mouse_route_      = MouseRoute::kNone;
 };

@@ -123,7 +123,13 @@ QtObject {
     function offerUpgrade(host) {
         const offer = CerfUpdates.Offer()
         if (!offer.upgradable) {
-            inform(offer.title, offer.message, host)
+            const close = qsTr("Close")
+            const download = qsTr("Download")
+            Dialogs.question(target(host), {"title": offer.title, "message": offer.message},
+                             [download, close], choice => {
+                if (choice === download)
+                    DesktopShell.OpenLink(offer.downloadUrl)
+            })
             return
         }
         const dialog = offerDialog.createObject(target(host), {"offer": offer})

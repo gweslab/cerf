@@ -102,7 +102,7 @@ WizardPage {
                     onClicked: page.setRepo(row.index, {"enabled": !row.modelData.enabled})
                 }
                 FoldedCell {
-                    narrow: page.narrow
+                    folded: page.narrow
                     text: row.modelData.url
                     wrapMode: Text.WrapAnywhere
                     caption: row.modelData.status

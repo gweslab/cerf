@@ -1,4 +1,5 @@
 #include "frontend_config.h"
+#include "cerfman/json_file.h"
 #include "install_root_files.h"
 #include "integer_scales.h"
 
@@ -39,35 +40,39 @@ std::vector<uint8_t> ReadHostKey(const json& j) {
 
 void FrontendConfig::OnReady() {
     path_ = cerfcore::GetCerfDir() + kGlobalConfigFileName;
-    const json j = emu_.Get<cerfcore::ConfigReader>().ReadLoggedJsonFile<json>(path_);
-    Parse(j.is_null() ? json::object() : j);
+    emu_.Get<cerfcore::ConfigReader>().ReadLoggedJsonFile<json>(path_);
 }
 
-void FrontendConfig::Parse(const json& j) {
-    host_branch_           = j.value(kHostBranchKey, std::string(host_branch_table::kKeyless));
-    device_                = j.value(kDeviceKey, std::string());
-    last_save_state_mode_  = j.value(kLastSaveStateModeKey, false);
-    discord_rich_presence_ = j.value(kDiscordRichPresenceKey, false);
-    host_key_vks_          = ReadHostKey(j);
-    default_scale_         = j.value(kDefaultScaleKey, kDynamicScale);
-    update_channel_        = j.value(kUpdateChannelKey, std::string(kUpdateChannelStable));
+json FrontendConfig::Current() const { return LoadJsonObject(QString::fromStdString(path_)); }
+
+std::string FrontendConfig::HostBranch() const {
+    return Current().value(kHostBranchKey, std::string(host_branch_table::kKeyless));
+}
+
+std::string FrontendConfig::Device() const { return Current().value(kDeviceKey, std::string()); }
+
+bool FrontendConfig::DiscordRichPresence() const { return Current().value(kDiscordRichPresenceKey, false); }
+
+std::vector<uint8_t> FrontendConfig::HostKeyVks() const { return ReadHostKey(Current()); }
+
+int FrontendConfig::DefaultScale() const { return Current().value(kDefaultScaleKey, kDynamicScale); }
+
+std::string FrontendConfig::UpdateChannel() const {
+    return Current().value(kUpdateChannelKey, std::string(kUpdateChannelStable));
+}
+
+bool FrontendConfig::LastSaveStateMode() const { return Current().value(kLastSaveStateModeKey, false); }
+
+bool FrontendConfig::TutorialFinished() const {
+    const json config = Current();
+    const auto flag   = config.find(kTutorialFinishedKey);
+    return flag != config.end() && *flag == true;
 }
 
 bool FrontendConfig::Write(const std::function<void(json&)>& mutate, std::string& error) {
-    json       written;
-    const bool ok = cerfcore::CfgUpdateJsonFile(
-        path_,
-        [&](json& j) {
-            mutate(j);
-            written = j;
-        },
-        cerfcore::CfgEmptyObject::kWrite, error);
-    if (!ok) {
-        LOG(Cfg, "FrontendConfig: %s\n", error.c_str());
-        return false;
-    }
-    Parse(written);
-    return true;
+    const bool ok = cerfcore::CfgUpdateJsonFile(path_, mutate, cerfcore::CfgEmptyObject::kWrite, error);
+    if (!ok) LOG(Cfg, "FrontendConfig: %s\n", error.c_str());
+    return ok;
 }
 
 void FrontendConfig::SaveLastSaveStateMode(bool save_state) {

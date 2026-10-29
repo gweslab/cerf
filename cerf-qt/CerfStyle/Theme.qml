@@ -43,8 +43,12 @@ QtObject {
     readonly property color previewText: "#ffffff"
     readonly property color previewTextDim: "#b3ffffff"
     readonly property color previewDisc: "#73000000"
-    readonly property color previewChip: "#99000000"
     readonly property color previewHover: "#59ffffff"
+    readonly property real chipSaturation: 0.55
+    readonly property real chipLightness: 0.3
+    readonly property real chipAlpha: 0.9
+    readonly property color success: "#3fb950"
+    readonly property color successMark: "#ffffff"
 
     function luminance(color) {
         const channel = c => c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4)
@@ -54,6 +58,13 @@ QtObject {
     function readableOn(background) {
         const l = luminance(background)
         return (l + 0.05) / 0.05 >= 1.05 / (l + 0.05) ? "#000000" : "#ffffff"
+    }
+
+    function chipColor(text) {
+        let hash = 0
+        for (let i = 0; i < text.length; ++i)
+            hash = (hash * 31 + text.charCodeAt(i)) >>> 0
+        return Qt.hsla((hash % 360) / 360, chipSaturation, chipLightness, chipAlpha)
     }
 
     function rowColumns(width, columns) {
@@ -66,6 +77,8 @@ QtObject {
     readonly property int barTitleSize: 18
     readonly property int headlineSize: 21
     readonly property int displaySize: 22
+    readonly property int stampSize: 34
+    readonly property int stampLetterSpacing: 4
 
     readonly property int spaceXXS: 2
     readonly property int spaceXS: 4

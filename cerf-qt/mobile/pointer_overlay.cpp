@@ -8,8 +8,6 @@
 namespace {
 
 constexpr qreal kArrowSize = 28.0;
-constexpr qreal kArrowHotX = 240.0 / 960.0;
-constexpr qreal kArrowHotY = 80.0 / 960.0;
 
 }
 
@@ -38,6 +36,6 @@ void PointerOverlay::PaintGuest(QPainter& painter, const QImage& image, QPoint h
 
 void PointerOverlay::PaintArrow(QPainter& painter, QPointF device_at, qreal dpr) {
     const QImage& arrow  = Arrow(dpr);
-    const QPointF origin = device_at - QPointF(arrow.width() * kArrowHotX, arrow.height() * kArrowHotY);
+    const QPointF origin = device_at - QPointF(arrow.width() * kCursorIconHotX, arrow.height() * kCursorIconHotY);
     painter.drawImage(QRectF(origin / dpr, QSizeF(arrow.size()) / dpr), arrow);
 }

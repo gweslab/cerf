@@ -15,6 +15,7 @@ public:
 
     void OpenAbout(const std::string& device_line);
     void OpenSettings();
+    void OpenTutorial();
     bool EditLiveCustomizations(bool force_reboot, std::optional<int> ce_major, cerffrontend::GuestReset& reset);
 
 private:

@@ -24,6 +24,7 @@ public:
     static constexpr char kUpdateChannelKey[]       = "update_channel";
     static constexpr char kDiscordRichPresenceKey[] = "discord_rich_presence";
     static constexpr char kLastSaveStateModeKey[]   = "last_save_state_mode";
+    static constexpr char kTutorialFinishedKey[]    = "tutorial_finished";
     static constexpr int    kDynamicScale            = 0;
     static constexpr int    kOriginalScale           = 1;
     static constexpr size_t kMaxHostKeyLength        = 8;
@@ -37,29 +38,24 @@ public:
     void OnReady() override;
 
     const std::string& Path() const { return path_; }
-    const std::string& HostBranch() const { return host_branch_; }
-    const std::string& Device() const { return device_; }
-    bool DiscordRichPresence() const { return discord_rich_presence_; }
-    const std::vector<uint8_t>& HostKeyVks() const { return host_key_vks_; }
-    int DefaultScale() const { return default_scale_; }
-    const std::string& UpdateChannel() const { return update_channel_; }
+    std::string HostBranch() const;
+    std::string Device() const;
+    bool DiscordRichPresence() const;
+    std::vector<uint8_t> HostKeyVks() const;
+    int DefaultScale() const;
+    std::string UpdateChannel() const;
 
-    bool LastSaveStateMode() const { return last_save_state_mode_; }
+    bool LastSaveStateMode() const;
     void SaveLastSaveStateMode(bool save_state);
+
+    bool TutorialFinished() const;
 
     bool Write(const std::function<void(nlohmann::ordered_json&)>& mutate, std::string& error);
 
 private:
-    void Parse(const nlohmann::ordered_json& j);
+    nlohmann::ordered_json Current() const;
 
-    std::string          path_;
-    std::string          host_branch_ = host_branch_table::kKeyless;
-    std::string          device_;
-    bool                 last_save_state_mode_  = false;
-    bool                 discord_rich_presence_ = false;
-    std::vector<uint8_t> host_key_vks_;
-    int                  default_scale_  = kDynamicScale;
-    std::string          update_channel_ = kUpdateChannelStable;
+    std::string path_;
 };
 
 }

@@ -25,6 +25,7 @@ Page {
         id: top
         visible: page.mobile || page.searchable
         mobile: page.mobile
+        stacked: page.narrow
         searchable: page.searchable
         title: page.title
         actionName: page.actionName

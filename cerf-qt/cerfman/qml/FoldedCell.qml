@@ -6,8 +6,8 @@ ColumnLayout {
     id: cell
     property alias text: main.text
     property alias wrapMode: main.wrapMode
-    property alias caption: folded.text
-    property bool narrow: false
+    property alias caption: captionLabel.text
+    property bool folded: false
 
     Layout.fillWidth: true
     spacing: 0
@@ -18,8 +18,9 @@ ColumnLayout {
         wrapMode: Text.Wrap
     }
     CaptionLabel {
-        id: folded
+        id: captionLabel
         Layout.fillWidth: true
-        visible: cell.narrow
+        visible: cell.folded && text !== ""
+        wrapMode: Text.Wrap
     }
 }

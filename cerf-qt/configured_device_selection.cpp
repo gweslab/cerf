@@ -20,8 +20,9 @@ public:
         const char* cli = emu_.Config().device_override;
         if (cli && cli[0]) return cli;
 
-        auto& config = emu_.Get<FrontendConfig>();
-        if (!config.Device().empty()) return config.Device();
+        auto&             config = emu_.Get<FrontendConfig>();
+        const std::string device = config.Device();
+        if (!device.empty()) return device;
 
 #if !CERF_DEV_MODE
         emu_.Get<cerfcore::UserAlert>().Show(

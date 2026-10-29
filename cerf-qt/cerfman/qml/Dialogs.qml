@@ -8,6 +8,9 @@ QtObject {
     readonly property Component settingsWindow: Component {
         SettingsWindow {}
     }
+    readonly property Component tutorialWindow: Component {
+        TutorialWindow {}
+    }
 
     function show(host, props, done) {
         const dialog = flowDialog.createObject(host, props)
@@ -51,5 +54,12 @@ QtObject {
         if (initialPage !== undefined)
             props.initialPage = initialPage
         settingsWindow.createObject(parentWindow, props).show()
+    }
+
+    function openTutorial(parentWindow, done) {
+        const window = tutorialWindow.createObject(parentWindow, {"transientParent": parentWindow})
+        if (done)
+            window.finished.connect(done)
+        window.show()
     }
 }

@@ -10,6 +10,8 @@ ToolBar {
     property bool actionVisible: false
     property bool actionEnabled: true
     property string actionName: ""
+    property bool searchable: false
+    readonly property alias searchText: search.text
     signal back()
     signal action()
 
@@ -26,9 +28,17 @@ ToolBar {
         TitleLabel {
             Layout.fillWidth: true
             Layout.leftMargin: bar.backVisible ? 0 : Theme.spaceXXXL
+            visible: !bar.searchable
             level: TitleLabel.Bar
             text: bar.title
             elide: Text.ElideRight
+        }
+        SearchBox {
+            id: search
+            Layout.fillWidth: true
+            Layout.leftMargin: bar.backVisible ? 0 : Theme.spaceXL
+            Layout.rightMargin: bar.actionVisible ? 0 : Theme.spaceXL
+            visible: bar.searchable
         }
         ToolButton {
             visible: bar.actionVisible

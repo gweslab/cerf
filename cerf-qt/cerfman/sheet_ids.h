@@ -31,6 +31,7 @@ class SheetIds : public QObject {
     Q_PROPERTY(QString cpuConfigPage READ CpuConfigPage CONSTANT)
     Q_PROPERTY(QString emulatorPage READ EmulatorPage CONSTANT)
     Q_PROPERTY(QString settingsEmulatorPage READ SettingsEmulatorPage CONSTANT)
+    Q_PROPERTY(QString settingsTutorialPage READ SettingsTutorialPage CONSTANT)
     Q_PROPERTY(QString settingsFeedbackPage READ SettingsFeedbackPage CONSTANT)
     Q_PROPERTY(QString settingsAboutPage READ SettingsAboutPage CONSTANT)
 
@@ -60,6 +61,7 @@ public:
     QString CpuConfigPage() const;
     QString EmulatorPage() const;
     QString SettingsEmulatorPage() const;
+    QString SettingsTutorialPage() const;
     QString SettingsFeedbackPage() const;
     QString SettingsAboutPage() const;
 };

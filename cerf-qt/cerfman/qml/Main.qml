@@ -22,7 +22,7 @@ ApplicationWindow {
     minimumWidth: Theme.windowMinimumWidth
     minimumHeight: Theme.windowMinimumHeight
     visible: true
-    title: qsTr("%1 %2").arg(ProductLinks.productName).arg(AboutModel.version)
+    title: qsTr("%1 Device Manager %2").arg(ProductLinks.productName).arg(AboutModel.displayVersion)
 
     function reload() {
         const reply = DeviceCards.Rows(home.query)
@@ -104,12 +104,33 @@ ApplicationWindow {
             item.closed.connect(() => stack.pop())
     }
 
-    function launch(name, boot, confirmed) {
+    function openTutorial(done) {
+        if (!touchPlatform) {
+            Dialogs.openTutorial(window, done)
+            return
+        }
+        const page = stack.push(tutorialPage)
+        page.finished.connect(() => {
+            stack.pop()
+            done()
+        })
+    }
+
+    function launch(name, boot) {
+        if (TutorialState.finished || DeviceActions.Running(name)) {
+            startDevice(name, boot, false)
+            return
+        }
+        if (!ManagerOperations.RefuseWhileBusy())
+            openTutorial(() => startDevice(name, boot, false))
+    }
+
+    function startDevice(name, boot, confirmed) {
         if (ManagerOperations.RefuseWhileBusy())
             return
-        const reply = DeviceActions.Launch(name, boot, confirmed === true)
+        const reply = DeviceActions.Launch(name, boot, confirmed)
         if (reply.confirm !== undefined) {
-            flows.ask(reply.confirm.title, reply.confirm.message, () => launch(name, boot, true))
+            flows.ask(reply.confirm.title, reply.confirm.message, () => startDevice(name, boot, true))
             return
         }
         if (flows.failed(reply))
@@ -381,6 +402,11 @@ ApplicationWindow {
     Component {
         id: newDeviceWindow
         NewDeviceWindow {}
+    }
+
+    Component {
+        id: tutorialPage
+        TutorialView {}
     }
 
     Component {

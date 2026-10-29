@@ -40,6 +40,7 @@ public:
     QString                          FamilyName(const QString& board_id) const;
     QString                          SocLabel(const QString& board_id) const;
     QStringList                      Notes(const QString& board_id) const;
+    QVariantMap                      GroupHardware(const QStringList& board_ids) const;
     bool                             ConfigurableScreen(const QString& board_id) const;
     int                              GaColorDepth(const QString& board_id) const;
     int                              DeviceYear(const QString& board_id) const;
@@ -50,7 +51,7 @@ public:
     Q_INVOKABLE QString      BoardLabel(const QString& board_id, const QString& empty_text) const;
     Q_INVOKABLE QVariantMap  SupportWarning(const QString& board_id) const;
     Q_INVOKABLE QString      FirstRunningBoard() const;
-    Q_INVOKABLE QVariantList GroupedBoards(bool hide_unknown, bool hide_unsupported,
+    Q_INVOKABLE QVariantList GroupedBoards(bool show_unsupported, bool show_unknown,
                                            const QString& query) const;
 
 private:

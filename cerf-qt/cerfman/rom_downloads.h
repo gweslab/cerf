@@ -20,7 +20,7 @@ class RomDownloads : public QObject, public cerfcore::Service {
     QML_ELEMENT
     QML_SINGLETON
     Q_PROPERTY(QString repositoriesUrl READ RepositoriesUrl CONSTANT)
-    Q_PROPERTY(QString copyrightRemovalTitle READ CopyrightRemovalTitle CONSTANT)
+    Q_PROPERTY(QString contactsTitle READ ContactsTitle CONSTANT)
 
 public:
     explicit RomDownloads(cerfcore::CerfEmulator& emu) : cerfcore::Service(emu) {}
@@ -29,11 +29,11 @@ public:
     }
 
     QString RepositoriesUrl() const;
-    QString CopyrightRemovalTitle() const;
+    QString ContactsTitle() const;
 
-    Q_INVOKABLE QVariantMap  Catalog(bool hide_unsupported, const QString& query, bool by_downloads) const;
+    Q_INVOKABLE QVariantMap  Catalog(bool show_unsupported, const QString& query, bool by_downloads) const;
     Q_INVOKABLE QString      Summary(const QStringList& keys) const;
-    Q_INVOKABLE QString      CopyrightText() const;
+    Q_INVOKABLE QString      ContactsText() const;
     Q_INVOKABLE QVariantMap  Plan(const QStringList& keys) const;
     Q_INVOKABLE void         Start(const QStringList& keys);
 

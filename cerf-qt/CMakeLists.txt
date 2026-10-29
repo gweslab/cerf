@@ -99,18 +99,20 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
     target_link_libraries(cerf-qt PRIVATE Qt6::DBus PkgConfig::cerfqt_screen)
     enable_language(C)
     find_program(cerfqt_wayland_scanner wayland-scanner REQUIRED)
-    set(cerfqt_xdg_output_xml "${CMAKE_CURRENT_SOURCE_DIR}/../external/wayland_protocols/xdg-output-unstable-v1.xml")
     set(cerfqt_wayland_dir "${CMAKE_CURRENT_BINARY_DIR}/wayland")
-    set(cerfqt_xdg_output_header "${cerfqt_wayland_dir}/xdg-output-unstable-v1-client-protocol.h")
-    set(cerfqt_xdg_output_code "${cerfqt_wayland_dir}/xdg-output-unstable-v1-protocol.c")
     file(MAKE_DIRECTORY "${cerfqt_wayland_dir}")
-    add_custom_command(
-        OUTPUT "${cerfqt_xdg_output_header}" "${cerfqt_xdg_output_code}"
-        COMMAND "${cerfqt_wayland_scanner}" client-header "${cerfqt_xdg_output_xml}" "${cerfqt_xdg_output_header}"
-        COMMAND "${cerfqt_wayland_scanner}" private-code "${cerfqt_xdg_output_xml}" "${cerfqt_xdg_output_code}"
-        DEPENDS "${cerfqt_xdg_output_xml}"
-        VERBATIM)
-    target_sources(cerf-qt PRIVATE "${cerfqt_xdg_output_header}" "${cerfqt_xdg_output_code}")
+    foreach(cerfqt_protocol IN ITEMS xdg-output-unstable-v1 relative-pointer-unstable-v1 pointer-constraints-unstable-v1)
+        set(cerfqt_protocol_xml "${CMAKE_CURRENT_SOURCE_DIR}/../external/wayland_protocols/${cerfqt_protocol}.xml")
+        set(cerfqt_protocol_header "${cerfqt_wayland_dir}/${cerfqt_protocol}-client-protocol.h")
+        set(cerfqt_protocol_code "${cerfqt_wayland_dir}/${cerfqt_protocol}-protocol.c")
+        add_custom_command(
+            OUTPUT "${cerfqt_protocol_header}" "${cerfqt_protocol_code}"
+            COMMAND "${cerfqt_wayland_scanner}" client-header "${cerfqt_protocol_xml}" "${cerfqt_protocol_header}"
+            COMMAND "${cerfqt_wayland_scanner}" private-code "${cerfqt_protocol_xml}" "${cerfqt_protocol_code}"
+            DEPENDS "${cerfqt_protocol_xml}"
+            VERBATIM)
+        target_sources(cerf-qt PRIVATE "${cerfqt_protocol_header}" "${cerfqt_protocol_code}")
+    endforeach()
     target_include_directories(cerf-qt PRIVATE "${cerfqt_wayland_dir}")
     set_target_properties(cerf-qt cerfqt_style PROPERTIES QT_QMLCACHEGEN_ARGUMENTS "--only-bytecode")
     foreach(cerfqt_target IN ITEMS cerf-qt cerfqt_style cerfqt_styleplugin)

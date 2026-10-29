@@ -13,9 +13,7 @@ WizardPage {
     readonly property string repositoriesUrl: RomDownloads.repositoriesUrl
     readonly property int checkedCount: Object.keys(checked).length
     readonly property string summary: RomDownloads.Summary(Object.keys(checked))
-    readonly property int socWidth: 150
     readonly property int sizeWidth: 90
-    readonly property int noteIconSize: 16
     signal started()
     signal sources()
 
@@ -28,37 +26,46 @@ WizardPage {
     onAction: page.start()
     onSearchTextChanged: page.refill()
     filters: [
-        HideUnsupportedSwitch {
-            id: hideUnsupported
-            onToggled: page.refill()
-        },
-        Row {
-            spacing: Theme.spaceXS
+        GridLayout {
+            id: controls
+            Layout.fillWidth: true
+            columns: page.narrow ? 2 : 3
+            columnSpacing: Theme.spaceM
+            rowSpacing: Theme.spaceM
 
-            Label {
-                anchors.verticalCenter: parent.verticalCenter
-                text: qsTr("Sort:")
+            UnsupportedSwitch {
+                id: unsupported
+                Layout.row: 0
+                Layout.column: 0
+                Layout.fillWidth: page.narrow
+                onToggled: page.refill()
             }
             ComboBox {
                 id: sort
                 readonly property int byDownloads: 0
-                readonly property int regular: 1
+                readonly property int byName: 1
+                Layout.row: page.narrow ? 1 : 0
+                Layout.column: page.narrow ? 0 : 1
+                Layout.columnSpan: page.narrow ? 2 : 1
+                Layout.fillWidth: page.narrow
                 implicitContentWidthPolicy: ComboBox.WidestText
                 enabled: page.sortable
-                model: [qsTr("By downloads"), qsTr("Regular")]
+                model: [qsTr("Sort by downloads count"), qsTr("Sort by name")]
                 onActivated: page.refill()
             }
-        },
-        Button {
-            text: qsTr("Sources…")
-            enabled: !BundleCatalog.loading
-            onClicked: page.sources()
+            Button {
+                Layout.row: 0
+                Layout.column: page.narrow ? 1 : 2
+                text: qsTr("Sources…")
+                enabled: !BundleCatalog.loading
+                onClicked: page.sources()
+            }
         }
     ]
     footerLeading: [
         Button {
-            text: RomDownloads.copyrightRemovalTitle
-            onClicked: page.flows.inform(RomDownloads.copyrightRemovalTitle, RomDownloads.CopyrightText(), page)
+            text: RomDownloads.contactsTitle
+            onClicked: page.flows.inform(RomDownloads.contactsTitle, RomDownloads.ContactsText(), page)
         },
         Label {
             text: page.summary
@@ -95,19 +102,18 @@ WizardPage {
     }
 
     function refill() {
-        const c = RomDownloads.Catalog(hideUnsupported.checked, page.searchText,
+        const c = RomDownloads.Catalog(unsupported.checked, page.searchText,
                                        sort.currentIndex === sort.byDownloads)
         available = !c.noSources
         sortable = c.sortable
         if (!c.sortable)
-            sort.currentIndex = sort.regular
+            sort.currentIndex = sort.byName
         const flat = []
         c.groups.forEach(g => {
-            flat.push({"kind": "group", "text": g.label,
+            flat.push({"kind": "group", "text": g.label, "soc": g.soc, "arches": g.arches,
                        "members": g.rows.map(r => r.key)})
             g.rows.forEach(r => {
-                flat.push({"kind": "device", "key": r.key, "text": r.os, "soc": r.soc,
-                           "size": r.size, "detail": r.detail, "notes": r.notes})
+                flat.push({"kind": "device", "key": r.key, "text": r.os, "size": r.size, "notes": r.notes})
             })
         })
         rows = flat
@@ -135,7 +141,7 @@ WizardPage {
         LinkLabel {
             Layout.alignment: Qt.AlignHCenter
             wrapMode: Text.NoWrap
-            text: HtmlText.Link(page.repositoriesUrl, qsTr("See how to find a bundle repository"))
+            text: HtmlText.Link(page.repositoriesUrl, qsTr("What are bundle repositories?"))
         }
     }
 
@@ -147,10 +153,6 @@ WizardPage {
             ColumnTitle {
                 Layout.fillWidth: true
                 text: qsTr("Device / OS")
-            },
-            ColumnTitle {
-                Layout.preferredWidth: page.socWidth
-                text: qsTr("SoC")
             },
             ColumnTitle {
                 Layout.preferredWidth: page.sizeWidth
@@ -178,10 +180,11 @@ WizardPage {
                             checkState: page.groupState(page.checked, slot.modelData.members)
                             onClicked: page.toggleGroup(slot.modelData.members)
                         }
-                        StrongLabel {
-                            Layout.fillWidth: true
+                        GroupHeading {
+                            narrow: page.narrow
                             text: slot.modelData.text
-                            wrapMode: Text.Wrap
+                            caption: slot.modelData.soc
+                            arches: slot.modelData.arches
                         }
                     }
                 }
@@ -190,63 +193,21 @@ WizardPage {
                     id: deviceRow
                     TableRow {
                         leftPadding: Theme.nestedIndent
-                        columns: 4
                         onClicked: page.toggle(slot.modelData.key)
 
                         RowCheckBox {
-                            Layout.row: 0
-                            Layout.column: 0
                             checked: page.checked[slot.modelData.key] === true
                             onClicked: page.toggle(slot.modelData.key)
                         }
                         FoldedCell {
-                            Layout.row: 0
-                            Layout.column: 1
-                            narrow: page.narrow
+                            folded: true
                             text: slot.modelData.text
-                            caption: slot.modelData.detail
+                            caption: slot.modelData.notes
                         }
                         SecondaryLabel {
-                            Layout.row: 0
-                            Layout.column: 2
-                            Layout.preferredWidth: page.socWidth
-                            visible: !page.narrow
-                            text: slot.modelData.soc
-                        }
-                        SecondaryLabel {
-                            Layout.row: 0
-                            Layout.column: 3
-                            Layout.preferredWidth: page.sizeWidth
-                            visible: !page.narrow
+                            Layout.preferredWidth: page.narrow ? -1 : page.sizeWidth
                             text: slot.modelData.size
                             horizontalAlignment: Text.AlignRight
-                        }
-                        Repeater {
-                            model: slot.modelData.notes
-
-                            RowLayout {
-                                id: noteLine
-                                required property int index
-                                required property string modelData
-                                Layout.row: index + 1
-                                Layout.column: 1
-                                Layout.columnSpan: 3
-                                Layout.fillWidth: true
-                                Layout.bottomMargin: Theme.spaceS
-                                spacing: Theme.spaceXS
-
-                                SymbolIcon {
-                                    Layout.alignment: Qt.AlignTop
-                                    name: "subdirectory_arrow_right"
-                                    size: page.noteIconSize
-                                    color: Theme.dim
-                                }
-                                SecondaryLabel {
-                                    Layout.fillWidth: true
-                                    text: noteLine.modelData
-                                    wrapMode: Text.Wrap
-                                }
-                            }
                         }
                     }
                 }

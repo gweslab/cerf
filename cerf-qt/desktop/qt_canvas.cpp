@@ -27,6 +27,7 @@ QtCanvas::QtCanvas(cerfcore::CerfEmulator& emu, QWidget* parent, uint32_t surf_w
     : QtPresenterCanvas(emu, parent, surf_w, surf_h,
                         static_cast<int>(emu.Get<cerfcore::RefreshRateService>().FrameIntervalMs())) {
     SetPresentHooks(std::make_unique<QtEmulatorPresent>(*this));
+    pointer_lock_ = MakeQtPointerLock(*this);
     resize_debounce_.setSingleShot(true);
     resize_debounce_.setInterval(kResizeDebounceMs);
     QObject::connect(&resize_debounce_, &QTimer::timeout, this,
@@ -50,14 +51,7 @@ void QtCanvas::FireAutoResize(cerfcore::CerfEmulator& emu) {
 
 cerfcore::FrameSource& QtCanvas::Source(cerfcore::CerfEmulator& emu) { return emu.Get<cerfcore::FrameRenderer>(); }
 
-void QtCanvas::ClientSize(int& width, int& height) const {
-    int w = 0, h = 0;
-    VisibleSize(w, h);
-    const qreal  dpr     = Dpr();
-    const QPoint landing = DevicePoint(QPointF(LogicalPoint(w / 2, h / 2, dpr)), dpr);
-    width                = landing.x() * 2;
-    height               = landing.y() * 2;
-}
+void QtCanvas::ClientSize(int& width, int& height) const { VisibleSize(width, height); }
 
 void QtCanvas::SetMouseCapture(bool on) {
     if (on) {
@@ -82,8 +76,32 @@ void QtCanvas::SetPointerHidden(bool hidden) {
     setCursor(hidden ? Qt::BlankCursor : Qt::ArrowCursor);
 }
 
-void QtCanvas::WarpPointerTo(int x, int y) {
-    QCursor::setPos(mapToGlobal(LogicalPoint(x, y, Dpr())));
+bool QtCanvas::WarpPointerTo(int x, int y) {
+    if (!pointer_lock_->CanWarp()) return false;
+    const QPoint target = mapToGlobal(LogicalPoint(x, y, Dpr()));
+    if (QCursor::pos() == target) return false;
+    QCursor::setPos(target);
+    return true;
+}
+
+bool QtCanvas::LockPointer() {
+    relative_rest_x_ = 0;
+    relative_rest_y_ = 0;
+    return pointer_lock_->Lock(*this);
+}
+
+void QtCanvas::UnlockPointer() { pointer_lock_->Unlock(); }
+
+void QtCanvas::OnRelativeMotion(double dx, double dy) {
+    const qreal dpr = Dpr();
+    relative_rest_x_ += dx * dpr;
+    relative_rest_y_ += dy * dpr;
+    const int ix = static_cast<int>(relative_rest_x_);
+    const int iy = static_cast<int>(relative_rest_y_);
+    relative_rest_x_ -= ix;
+    relative_rest_y_ -= iy;
+    if (ix == 0 && iy == 0) return;
+    gate_.Run([ix, iy](cerfcore::CerfEmulator& emu) { emu.Get<cerffrontend::CanvasInput>().OnRelativeMotion(ix, iy); });
 }
 
 void QtCanvas::ApplyCursor(cerfcore::CerfEmulator& emu, int x, int y) {
@@ -135,6 +153,10 @@ void QtCanvas::mouseMoveEvent(QMouseEvent* event) {
         ApplyCursor(emu, pos.x(), pos.y());
         RouteMouse(emu, event, cerffrontend::CanvasMouse::Kind::kMove);
     });
+}
+
+void QtCanvas::leaveEvent(QEvent*) {
+    gate_.Run([](cerfcore::CerfEmulator& emu) { emu.Get<cerffrontend::CanvasInput>().OnPointerLeave(); });
 }
 
 void QtCanvas::wheelEvent(QWheelEvent* event) {

@@ -27,6 +27,7 @@ REGISTER_SERVICE(CanvasInput);
 namespace {
 
 constexpr uint32_t kLockHintHoldMs = 4500;
+constexpr int      kRecenterParts  = 4;
 
 using Kind = CanvasMouse::Kind;
 using Tab  = cerfcore::CanvasTab;
@@ -61,9 +62,14 @@ void CanvasInput::EnsureLocked() {
     h.FocusCanvas();
     h.SetMouseCapture(true);
     h.SetPointerHidden(true);
-    int w = 0, ht = 0;
+    native_lock_ = h.LockPointer();
+}
+
+void CanvasInput::RecenterLockedPointer() {
+    CanvasInputHost& h = Host();
+    int              w = 0, ht = 0;
     h.ClientSize(w, ht);
-    h.WarpPointerTo(w / 2, ht / 2);
+    if (h.WarpPointerTo(w / 2, ht / 2)) relative_anchored_ = false;
 }
 
 void CanvasInput::Unlock() {
@@ -74,6 +80,10 @@ void CanvasInput::Unlock() {
     if (!mouse_locked_active_) return;
     mouse_locked_active_ = false;
     CanvasInputHost& h   = Host();
+    if (native_lock_) {
+        native_lock_ = false;
+        h.UnlockPointer();
+    }
     if (h.HasMouseCapture()) h.SetMouseCapture(false);
     h.SetPointerHidden(false);
 }
@@ -173,14 +183,19 @@ bool CanvasInput::RouteLocked(const CanvasMouse& m) {
     const uint32_t mask = RelativeMask(m.held);
 
     if (m.kind == Kind::kMove) {
+        if (native_lock_) return true;
+        const int dx = m.x - relative_last_x_;
+        const int dy = m.y - relative_last_y_;
+        if (relative_anchored_ && (dx != 0 || dy != 0)) {
+            rm->OnRelativeMove(dx, dy, mask);
+            relative_buttons_ = mask;
+        }
+        AnchorAt(m);
         int w = 0, h = 0;
         Host().ClientSize(w, h);
-        const int dx = m.x - w / 2;
-        const int dy = m.y - h / 2;
-        if (dx == 0 && dy == 0) return true;
-        rm->OnRelativeMove(dx, dy, mask);
-        relative_buttons_ = mask;
-        Host().WarpPointerTo(w / 2, h / 2);
+        if (m.x < w / kRecenterParts || m.x > w - w / kRecenterParts || m.y < h / kRecenterParts ||
+            m.y > h - h / kRecenterParts)
+            RecenterLockedPointer();
         return true;
     }
     rm->OnRelativeMove(0, 0, mask);
@@ -278,6 +293,20 @@ bool CanvasInput::OnCaptureLost() {
     return OnMouse(m);
 }
 
+void CanvasInput::OnPointerLeave() { relative_anchored_ = false; }
+
+void CanvasInput::AnchorAt(const CanvasMouse& m) {
+    relative_last_x_   = m.x;
+    relative_last_y_   = m.y;
+    relative_anchored_ = true;
+}
+
+void CanvasInput::OnRelativeMotion(int dx, int dy) {
+    RefreshLock();
+    if (!mouse_locked_active_) return;
+    emu_.Get<cerfcore::RelativeMouseInput>().OnRelativeMove(dx, dy, relative_buttons_);
+}
+
 bool CanvasInput::OnMouse(const CanvasMouse& m) {
     const Tab  tab         = emu_.Get<CanvasTabs>().Current();
     const bool framebuffer = tab == Tab::Framebuffer;
@@ -285,6 +314,7 @@ bool CanvasInput::OnMouse(const CanvasMouse& m) {
     if (auto* a = emu_.Get<cerfcore::PointerRouter>().Active()) kind = a->Kind();
     const bool locked = Locked(framebuffer);
 
+    if (!locked && (m.kind == Kind::kMove || m.kind == Kind::kDown || m.kind == Kind::kUp)) AnchorAt(m);
     ReleaseLostButtons(m);
     if (!locked && RouteNotification(m)) return true;
 

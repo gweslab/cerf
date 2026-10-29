@@ -3,7 +3,6 @@
 #define CERF_SYMBOL_ICONS_PREFIX "/icons"
 #define CERF_INSTALL_RESOURCE_PREFIX "/install"
 #define CERF_ASSET_ICONS_DIR "icons_sources"
-#define CERF_BADGE_PREFIX "badge_"
 #define CERF_FONTS_DIR "fonts"
 #define CERF_FONT_SANS "IBMPlexSans-Regular.ttf"
 #define CERF_FONT_SANS_BOLD "IBMPlexSans-Bold.ttf"

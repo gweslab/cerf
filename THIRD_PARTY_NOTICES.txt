@@ -58,9 +58,10 @@ Wayland 1.24.0 (libwayland-client) - https://wayland.freedesktop.org/
     Copyright: (c) 2008-2012 Kristian Høgsberg; (c) 2010-2012 Intel Corporation;
                (c) 2011 Benjamin Franzke; (c) 2012 Collabora, Ltd.
 
-wayland-protocols 1.45 (xdg-output-unstable-v1) - https://gitlab.freedesktop.org/wayland/wayland-protocols
+wayland-protocols 1.45 (xdg-output-unstable-v1, relative-pointer-unstable-v1,
+pointer-constraints-unstable-v1) - https://gitlab.freedesktop.org/wayland/wayland-protocols
     License:   MIT
-    Copyright: (c) 2017 Red Hat Inc.
+    Copyright: (c) 2017 Red Hat Inc.; (c) 2014 Jonas Ådahl; (c) 2015 Red Hat Inc.
 
 Qt 6 - https://www.qt.io/
     License:   LGPL-3.0-only

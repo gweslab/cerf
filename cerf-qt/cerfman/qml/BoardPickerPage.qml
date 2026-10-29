@@ -8,7 +8,6 @@ WizardPage {
     property string current: ""
     property string selected: current
     property var rows: []
-    readonly property int socWidth: 180
     readonly property int supportWidth: 160
     signal picked(string boardId)
 
@@ -19,23 +18,28 @@ WizardPage {
     onAction: page.picked(page.selected)
     onSearchTextChanged: page.refill()
     filters: [
-        Switch {
-            id: hideUnknown
-            text: qsTr("Hide unknown support")
-            onToggled: page.refill()
-        },
-        HideUnsupportedSwitch {
-            id: hideUnsupported
-            onToggled: page.refill()
+        Flow {
+            Layout.fillWidth: true
+            spacing: Theme.spaceM
+
+            UnsupportedSwitch {
+                id: unsupported
+                onToggled: page.refill()
+            }
+            Switch {
+                id: unknown
+                text: qsTr("Unknown support")
+                checked: true
+                onToggled: page.refill()
+            }
         }
     ]
 
     function refill() {
         const flat = []
-        BoardCatalog.GroupedBoards(hideUnknown.checked, hideUnsupported.checked, page.searchText).forEach(g => {
-            flat.push({"header": g.family, "id": "", "name": "", "soc": "", "support": ""})
-            g.boards.forEach(b => flat.push({"header": "", "id": b.id, "name": b.name,
-                                             "soc": b.soc, "support": b.support}))
+        BoardCatalog.GroupedBoards(unsupported.checked, unknown.checked, page.searchText).forEach(g => {
+            flat.push({"header": g.family, "soc": g.soc, "arches": g.arches})
+            g.boards.forEach(b => flat.push({"header": "", "id": b.id, "name": b.name, "support": b.support}))
         })
         rows = flat
     }
@@ -54,18 +58,22 @@ WizardPage {
 
             Component {
                 id: familyRow
-                StrongLabel {
-                    text: slot.modelData.header
+                GroupHeading {
                     leftPadding: Theme.spaceL
+                    rightPadding: Theme.spaceL
                     topPadding: Theme.spaceL
                     bottomPadding: Theme.spaceXS
+                    narrow: page.narrow
+                    text: slot.modelData.header
+                    caption: slot.modelData.soc
+                    arches: slot.modelData.arches
                 }
             }
 
             Component {
                 id: boardRow
                 RowDelegate {
-                    columns: Theme.rowColumns(width, 3)
+                    columns: Theme.rowColumns(width, 2)
                     highlighted: slot.modelData.id === page.selected
                     onClicked: page.selected = slot.modelData.id
                     onDoubleClicked: page.picked(slot.modelData.id)
@@ -74,10 +82,6 @@ WizardPage {
                         Layout.fillWidth: true
                         text: slot.modelData.name
                         wrapMode: Text.Wrap
-                    }
-                    CaptionLabel {
-                        Layout.preferredWidth: page.socWidth
-                        text: slot.modelData.soc
                     }
                     CaptionLabel {
                         Layout.preferredWidth: page.supportWidth

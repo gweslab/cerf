@@ -30,6 +30,8 @@ inline constexpr char kDiscordUrl[]       = "https://discord.gg/QREE9Y2v2d";
 inline constexpr char kPatreonUrl[]       = "https://www.patreon.com/dz3n";
 
 inline constexpr auto kDownloadUrl           = JoinLink(kWebsiteUrl, "/download/");
+inline constexpr auto kAndroidDownloadUrl    = JoinLink(kWebsiteUrl, "/download?system=android");
+inline constexpr auto kDonateUrl             = JoinLink(kWebsiteUrl, "/donate");
 inline constexpr auto kArticlesUrl           = JoinLink(kWebsiteUrl, "/articles/");
 inline constexpr auto kGuestAdditionsUrl     = JoinLink(kArticlesUrl.text, "guest-additions/");
 inline constexpr auto kBundleRepositoriesUrl = JoinLink(kArticlesUrl.text, "bundle-repositories/");

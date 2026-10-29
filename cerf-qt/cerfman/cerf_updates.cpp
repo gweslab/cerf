@@ -90,6 +90,7 @@ QVariantMap CerfUpdates::Offer() const {
         {QStringLiteral("tag"), release_->tag},
         {QStringLiteral("body"), release_->body},
         {QStringLiteral("htmlUrl"), release_->html_url},
+        {QStringLiteral("downloadUrl"), QString::fromUtf8(ManualDownloadUrl())},
         {QStringLiteral("warningUrl"), QString::fromUtf8(cerffrontend::kHibernationWarningUrl.text)}};
 }
 

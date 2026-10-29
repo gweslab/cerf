@@ -18,14 +18,17 @@ SheetView {
 
     title: qsTr("Settings")
     pages: [{"key": SheetIds.settingsEmulatorPage, "title": qsTr("Emulator Settings")},
+            {"key": SheetIds.settingsTutorialPage, "title": qsTr("Tutorial")},
             {"key": SheetIds.settingsFeedbackPage, "title": FeedbackModel.title},
             {"key": SheetIds.settingsAboutPage, "title": qsTr("About")}]
     pageKeys: pages.map(page => page.key)
+    launchKeys: view.mobile ? [] : [SheetIds.settingsTutorialPage]
     actionVisible: current === SheetIds.settingsEmulatorPage && (split || !menuShown)
     actionName: qsTr("OK")
 
     onAction: accept()
     onLeave: closed()
+    onLaunched: Dialogs.openTutorial(view.Window.window)
 
     Component.onCompleted: {
         current = initialPage
@@ -43,6 +46,17 @@ SheetView {
 
     GlobalSettingsPage {
         id: settings
+    }
+    Loader {
+        active: view.mobile
+        sourceComponent: TutorialView {
+            onFinished: {
+                if (view.split)
+                    view.show(SheetIds.settingsEmulatorPage)
+                else
+                    view.goBack()
+            }
+        }
     }
     FeedbackContent {
         compact: view.mobile

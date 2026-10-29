@@ -1,6 +1,7 @@
 #include "qt_screen_pixels.h"
 
 #include "qt_unscaled_screen_pixels.h"
+#include "desktop/wayland_registry_scan.h"
 #include "xdg-output-unstable-v1-client-protocol.h"
 
 #include <cerfcore/core/log.h>
@@ -235,26 +236,17 @@ void OnGlobal(void* data, wl_registry* registry, uint32_t global, const char* in
     globals->outputs.push_back(std::move(entry));
 }
 
-void OnGlobalRemove(void*, wl_registry*, uint32_t) {}
-
-const wl_registry_listener kRegistryListener = {OnGlobal, OnGlobalRemove};
-
 QSize WaylandPixels(const QScreen& screen, wl_display* display) {
-    wl_event_queue* queue   = wl_display_create_queue(display);
-    auto*           wrapper = static_cast<wl_display*>(wl_proxy_create_wrapper(display));
-    wl_proxy_set_queue(reinterpret_cast<wl_proxy*>(wrapper), queue);
-    wl_registry* registry = wl_display_get_registry(wrapper);
-    wl_proxy_wrapper_destroy(wrapper);
-    WaylandGlobals globals;
-    wl_registry_add_listener(registry, &kRegistryListener, &globals);
-    bool read = wl_display_roundtrip_queue(display, queue) >= 0;
+    WaylandGlobals      globals;
+    WaylandRegistryScan scan(display, &OnGlobal, &globals);
+    bool                read = scan.Roundtrip();
     if (read && globals.xdg_manager != nullptr) {
         for (const auto& entry : globals.outputs) {
             entry->xdg_output = zxdg_output_manager_v1_get_xdg_output(globals.xdg_manager, entry->output);
             zxdg_output_v1_add_listener(entry->xdg_output, &kXdgOutputListener, entry.get());
         }
     }
-    read = read && wl_display_roundtrip_queue(display, queue) >= 0;
+    read = read && scan.Roundtrip();
     QSize found;
     for (const auto& entry : globals.outputs) {
         if (WaylandOutputName(*entry) != screen.name()) continue;
@@ -266,8 +258,6 @@ QSize WaylandPixels(const QScreen& screen, wl_display* display) {
         else                                                   wl_output_destroy(entry->output);
     }
     if (globals.xdg_manager != nullptr) zxdg_output_manager_v1_destroy(globals.xdg_manager);
-    wl_registry_destroy(registry);
-    wl_event_queue_destroy(queue);
     if (!read) return NoPixels(screen, "the Wayland roundtrip failed");
     if (!found.isValid()) return NoPixels(screen, "no Wayland output carries its name and a current mode");
     return found;

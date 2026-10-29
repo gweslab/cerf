@@ -144,6 +144,8 @@ std::vector<MenuItem> HostMenuModel::View() {
 
 std::vector<MenuItem> HostMenuModel::Help() {
     std::vector<MenuItem> items;
+    items.push_back(
+        MenuItem::Action("Tutorial", [this] { emu_.Get<QtManagerWindowOpener>().OpenTutorial(); }));
     items.push_back(MenuItem::Action("Articles (opens in browser)",
                                      [this] { emu_.Get<LinkOpener>().Open(kArticlesUrl.text); }));
     items.push_back(MenuItem{});

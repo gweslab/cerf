@@ -14,6 +14,7 @@ Page {
     property bool rootBack: true
     property bool actionVisible: false
     property string actionName: ""
+    property var launchKeys: []
     readonly property int menuWidth: 200
     readonly property string currentTitle: {
         const page = pages.find(p => p.key === current)
@@ -22,6 +23,14 @@ Page {
     default property alias pageItems: stack.data
     signal action()
     signal leave()
+    signal launched(string key)
+
+    function pick(key) {
+        if (launchKeys.indexOf(key) >= 0)
+            launched(key)
+        else
+            show(key)
+    }
 
     function show(key) {
         current = key
@@ -70,7 +79,7 @@ Page {
                 width: ListView.view.width
                 text: modelData.title
                 highlighted: sheet.split && modelData.key === sheet.current
-                onClicked: sheet.show(modelData.key)
+                onClicked: sheet.pick(modelData.key)
             }
         }
         Divider {

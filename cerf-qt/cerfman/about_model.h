@@ -13,6 +13,7 @@ class AboutModel : public QObject, public cerfcore::Service {
     QML_ELEMENT
     QML_SINGLETON
     Q_PROPERTY(QString version READ Version CONSTANT)
+    Q_PROPERTY(QString displayVersion READ DisplayVersion CONSTANT)
     Q_PROPERTY(QString versionLabel READ VersionLabel CONSTANT)
     Q_PROPERTY(QString build READ Build CONSTANT)
     Q_PROPERTY(QString linksHtml READ LinksHtml CONSTANT)
@@ -32,6 +33,7 @@ public:
     }
 
     QString      Version() const;
+    QString      DisplayVersion() const;
     QString      VersionLabel() const;
     QString      Build() const;
     QString      LinksHtml() const;

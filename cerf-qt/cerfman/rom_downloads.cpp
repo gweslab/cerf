@@ -59,14 +59,14 @@ std::vector<DeviceBundle> RomDownloads::Candidates() const {
     return out;
 }
 
-QVariantMap RomDownloads::Catalog(bool hide_unsupported, const QString& query, bool by_downloads) const {
+QVariantMap RomDownloads::Catalog(bool show_unsupported, const QString& query, bool by_downloads) const {
     auto&                         texts  = emu_.Get<DeviceTexts>();
     auto&                         boards = emu_.Get<BoardCatalog>();
     const std::optional<DownloadPlaces>& places = emu_.Get<BundleCatalog>().Places();
 
     std::vector<DeviceBundle> visible;
     for (DeviceBundle& device : Candidates()) {
-        if (hide_unsupported && !boards.Runs(device.meta.board_id)) continue;
+        if (!show_unsupported && !boards.Runs(device.meta.board_id)) continue;
         if (!MatchesQuery(texts.SearchFields(device), query)) continue;
         visible.push_back(std::move(device));
     }
@@ -89,29 +89,33 @@ QVariantMap RomDownloads::Catalog(bool hide_unsupported, const QString& query, b
                          [&](const DeviceBundle& a, const DeviceBundle& b) { return key(a) < key(b); });
     }
 
-    std::vector<std::pair<QString, QVariantList>> grouped;
-    QMap<QString, size_t>                         group_index;
+    struct Group {
+        QString      label;
+        QStringList  board_ids;
+        QVariantList rows;
+    };
+    std::vector<Group>    grouped;
+    QMap<QString, size_t> group_index;
     for (const DeviceBundle& device : visible) {
         const QString name = texts.GroupName(device);
         if (!group_index.contains(name)) {
             group_index.insert(name, grouped.size());
-            grouped.emplace_back(texts.DeviceLabel(device), QVariantList());
+            grouped.push_back({texts.DeviceLabel(device), {}, {}});
         }
-        const QString soc  = boards.SocLabel(device.meta.board_id);
-        const QString size = FormatSize(device.remote->archive_size);
-        QStringList   detail{soc, size};
-        detail.removeAll(QString());
-        grouped[group_index.value(name)].second.append(
-            QVariantMap{{QStringLiteral("key"), device.key},
-                        {QStringLiteral("os"), texts.OsLabel(device)},
-                        {QStringLiteral("soc"), soc},
-                        {QStringLiteral("size"), size},
-                        {QStringLiteral("detail"), detail.join(QStringLiteral(" · "))},
-                        {QStringLiteral("notes"), device.meta.os_notes}});
+        Group& group = grouped[group_index.value(name)];
+        group.board_ids.append(device.meta.board_id);
+        group.rows.append(QVariantMap{{QStringLiteral("key"), device.key},
+                                      {QStringLiteral("os"), texts.OsLabel(device)},
+                                      {QStringLiteral("size"), FormatSize(device.remote->archive_size)},
+                                      {QStringLiteral("notes"), texts.OsNotes(device)}});
     }
     QVariantList groups;
-    for (const auto& [label, rows] : grouped)
-        groups.append(QVariantMap{{QStringLiteral("label"), label}, {QStringLiteral("rows"), rows}});
+    for (const Group& group : grouped) {
+        QVariantMap entry = boards.GroupHardware(group.board_ids);
+        entry.insert(QStringLiteral("label"), group.label);
+        entry.insert(QStringLiteral("rows"), group.rows);
+        groups.append(entry);
+    }
     bool any_enabled = false;
     for (const BundleRepository& repo : emu_.Get<BundleRepositories>().Read()) any_enabled = any_enabled || repo.enabled;
     return QVariantMap{{QStringLiteral("groups"), groups},
@@ -130,21 +134,21 @@ QString RomDownloads::Summary(const QStringList& keys) const {
     return QStringLiteral("%1 selected · %2").arg(QString::number(keys.size()), size);
 }
 
-QString RomDownloads::CopyrightRemovalTitle() const { return QStringLiteral("Copyright removal"); }
+QString RomDownloads::ContactsTitle() const { return QStringLiteral("Contacts"); }
 
-QString RomDownloads::CopyrightText() const {
+QString RomDownloads::ContactsText() const {
     const std::vector<BundleCatalog::AbuseContact> contacts = emu_.Get<BundleCatalog>().AbuseContacts();
     if (contacts.empty())
-        return QStringLiteral("The ROM bundle providers you added to your launcher have provided the following emails "
-                              "to contact them:\n\nNo bundle repositories are configured.");
+        return QStringLiteral("The ROM bundle providers you added have provided the following emails to contact "
+                              "them:\n\nNo bundle repositories are configured.");
     QStringList lines;
     bool        missing = false;
     for (const auto& [url, email] : contacts) {
         lines.append(QStringLiteral("%1  %2").arg(url, email.value_or(QStringLiteral("-"))));
         missing = missing || !email;
     }
-    QString text = QStringLiteral("The ROM bundle providers you added to your launcher have provided the following "
-                                  "emails to contact them:\n\n%1")
+    QString text = QStringLiteral("The ROM bundle providers you added have provided the following emails to contact "
+                                  "them:\n\n%1")
                        .arg(lines.join(QLatin1Char('\n')));
     if (missing) text += QStringLiteral("\n\n- marks a repository that publishes no removal contact.");
     return text;

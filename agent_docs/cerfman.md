@@ -1,7 +1,6 @@
 # cerfman - the device manager, configuration and installation
 
-cerfman is the internal name of the CE Runtime Foundation Virtual Machine
-Manager. It is C++ and Qt Quick code in `cerf-qt/cerfman/`. It is part of the frontend
+cerfman is the internal name of the CE Runtime Foundation Device Manager. It is C++ and Qt Quick code in `cerf-qt/cerfman/`. It is part of the frontend
 executable: `cerf.exe` on Windows, `cerf` on Linux, and the `CE Runtime Foundation.app`
 bundle on macOS. `tools/host_branch.py` holds the path of that executable on each host.
 

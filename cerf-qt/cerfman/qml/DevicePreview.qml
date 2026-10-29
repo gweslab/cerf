@@ -157,30 +157,15 @@ Item {
         spacing: Theme.spaceM
         opacity: preview.textOpacity
 
-        PreviewLabel {
-            visible: text !== ""
+        ColorChip {
             text: preview.row !== null ? preview.row.board : ""
-            color: Theme.previewText
-            leftPadding: Theme.spaceS
-            rightPadding: Theme.spaceS
-            topPadding: Theme.spaceXXS
-            bottomPadding: Theme.spaceXXS
-            background: Rectangle {
-                radius: height / 2
-                color: Theme.previewChip
-            }
         }
         Item {
             Layout.fillWidth: true
         }
-        Image {
-            readonly property size badgeSize: preview.row !== null ? preview.row.badgeSize : Qt.size(0, 0)
-            Layout.minimumWidth: badgeSize.width
-            Layout.preferredWidth: badgeSize.width
-            Layout.preferredHeight: badgeSize.height
-            visible: source.toString() !== ""
-            source: preview.row !== null ? preview.row.badge : ""
-            sourceSize: badgeSize
+        ColorChip {
+            Layout.minimumWidth: implicitWidth
+            text: preview.row !== null ? preview.row.arch : ""
         }
     }
 

@@ -21,6 +21,7 @@ public:
     QString    DeviceLabel(const DeviceBundle& device) const;
     QString    OsLabel(const DeviceBundle& device) const;
     QString    OsTitle(const DeviceBundle& device) const;
+    QString    OsNotes(const DeviceBundle& device) const;
     QString    CardTitle(const DeviceBundle& device) const;
     QString    CardSubtitle(const DeviceBundle& device) const;
     QString    PanelDetail(const DeviceBundle& device) const;

@@ -176,25 +176,25 @@ python run_claude.py
   </thead>
   <tbody>
     <tr>
-      <td align="center"><img src="assets/icons_sources/badge_arm.svg" align="middle" title="ARM" alt="ARM"/><br/><b>ARM ARM720T</b><br/><sub>ARM720T</sub></td>
+      <td align="center"><b>ARM ARM720T</b><br/><sub>ARM720T</sub></td>
       <td><b>Microsoft Hardware Reference Platform</b></td>
       <td><img src="assets/icons_sources/board.svg" width="16" height="16" title="PDA" alt="PDA"/> <b>Microsoft Hardware Reference Platform</b> <code>odo</code></td>
       <td><img src="assets/icons_sources/stylus.svg" width="32" height="32" title="Touch" alt="Touch"/> <img src="assets/icons_sources/keyboard.svg" width="32" height="32" title="Keyboard" alt="Keyboard"/> <img src="assets/icons_sources/ga_autoresize.svg" width="32" height="32" title="Guest Additions" alt="Guest Additions"/> <img src="assets/icons_sources/speaker_active.svg" width="32" height="32" title="Sound" alt="Sound"/></td>
     </tr>
     <tr>
-      <td align="center"><img src="assets/icons_sources/badge_arm.svg" align="middle" title="ARM" alt="ARM"/><br/><b>Freescale i.MX31L</b><br/><sub>ARM1136</sub></td>
+      <td align="center"><b>Freescale i.MX31L</b><br/><sub>ARM1136</sub></td>
       <td><b>Toshiba Gigabeat S</b></td>
       <td><img src="assets/icons_sources/board.svg" width="16" height="16" title="PDA" alt="PDA"/> <b>Microsoft Zune 30</b> <code>zune_30</code></td>
       <td><img src="assets/icons_sources/keyboard.svg" width="32" height="32" title="Keyboard" alt="Keyboard"/> <img src="assets/icons_sources/ga_autoresize.svg" width="32" height="32" title="Guest Additions" alt="Guest Additions"/> <img src="assets/icons_sources/speaker_active.svg" width="32" height="32" title="Sound" alt="Sound"/></td>
     </tr>
     <tr>
-      <td align="center"><img src="assets/icons_sources/badge_arm.svg" align="middle" title="ARM" alt="ARM"/><br/><b>Freescale i.MX51</b><br/><sub>Cortex-A8</sub></td>
+      <td align="center"><b>Freescale i.MX51</b><br/><sub>Cortex-A8</sub></td>
       <td><b>Ford SYNC Gen 2</b></td>
       <td><img src="assets/icons_sources/board.svg" width="16" height="16" title="PDA" alt="PDA"/> <b>Ford MyFord Touch</b> <code>ford_sync_2</code></td>
       <td><img src="assets/icons_sources/stylus.svg" width="32" height="32" title="Touch" alt="Touch"/> <img src="assets/icons_sources/ga_autoresize.svg" width="32" height="32" title="Guest Additions" alt="Guest Additions"/></td>
     </tr>
     <tr>
-      <td rowspan="4" align="center"><img src="assets/icons_sources/badge_arm.svg" align="middle" title="ARM" alt="ARM"/><br/><b>Intel IOP13xx</b><br/><sub>XScale</sub></td>
+      <td rowspan="4" align="center"><b>Intel IOP13xx</b><br/><sub>XScale</sub></td>
       <td rowspan="4"><b>Siemens SIMATIC MP 377</b></td>
       <td><img src="assets/icons_sources/board.svg" width="16" height="16" title="PDA" alt="PDA"/> <b>Siemens SIMATIC MP 377 12" Key</b> <code>*</code> <code>siemens_mp377_12_key</code></td>
       <td><img src="assets/icons_sources/stylus.svg" width="32" height="32" title="Touch" alt="Touch"/> <img src="assets/icons_sources/ga_autoresize.svg" width="32" height="32" title="Guest Additions" alt="Guest Additions"/> <img src="assets/icons_sources/speaker_active.svg" width="32" height="32" title="Sound" alt="Sound"/> <img src="assets/icons_sources/internet.svg" width="32" height="32" title="Network" alt="Network"/></td>
@@ -212,13 +212,13 @@ python run_claude.py
       <td><img src="assets/icons_sources/stylus.svg" width="32" height="32" title="Touch" alt="Touch"/> <img src="assets/icons_sources/ga_autoresize.svg" width="32" height="32" title="Guest Additions" alt="Guest Additions"/> <img src="assets/icons_sources/speaker_active.svg" width="32" height="32" title="Sound" alt="Sound"/> <img src="assets/icons_sources/internet.svg" width="32" height="32" title="Network" alt="Network"/></td>
     </tr>
     <tr>
-      <td align="center"><img src="assets/icons_sources/badge_arm.svg" align="middle" title="ARM" alt="ARM"/><br/><b>Intel SA-1100</b><br/><sub>StrongARM</sub></td>
+      <td align="center"><b>Intel SA-1100</b><br/><sub>StrongARM</sub></td>
       <td><b>HP Jornada 820</b></td>
       <td><img src="assets/icons_sources/board.svg" width="16" height="16" title="PDA" alt="PDA"/> <b>HP Jornada 820</b> <code>jornada_820</code></td>
       <td><img src="assets/icons_sources/cursor.svg" width="32" height="32" title="Mouse" alt="Mouse"/> <img src="assets/icons_sources/keyboard.svg" width="32" height="32" title="Keyboard" alt="Keyboard"/> <img src="assets/icons_sources/suspend.svg" width="32" height="32" title="Suspend / Resume" alt="Suspend / Resume"/> <img src="assets/icons_sources/ga_autoresize.svg" width="32" height="32" title="Guest Additions" alt="Guest Additions"/> <img src="assets/icons_sources/speaker_active.svg" width="32" height="32" title="Sound" alt="Sound"/> <img src="assets/icons_sources/pcmcia_enabled.svg" width="32" height="32" title="PCMCIA" alt="PCMCIA"/> <img src="assets/icons_sources/internet.svg" width="32" height="32" title="Network" alt="Network"/> <img src="assets/icons_sources/battery.svg" width="32" height="32" title="Battery" alt="Battery"/></td>
     </tr>
     <tr>
-      <td rowspan="6" align="center"><img src="assets/icons_sources/badge_arm.svg" align="middle" title="ARM" alt="ARM"/><br/><b>Intel SA-1110</b><br/><sub>StrongARM</sub></td>
+      <td rowspan="6" align="center"><b>Intel SA-1110</b><br/><sub>StrongARM</sub></td>
       <td rowspan="3"><b>Compaq iPAQ H3000</b></td>
       <td><img src="assets/icons_sources/board.svg" width="16" height="16" title="PDA" alt="PDA"/> <b>Compaq iPAQ H3100 Series</b> <code>ipaq_h31xx</code></td>
       <td><img src="assets/icons_sources/stylus.svg" width="32" height="32" title="Touch" alt="Touch"/> <img src="assets/icons_sources/suspend.svg" width="32" height="32" title="Suspend / Resume" alt="Suspend / Resume"/> <img src="assets/icons_sources/ga_autoresize.svg" width="32" height="32" title="Guest Additions" alt="Guest Additions"/> <img src="assets/icons_sources/speaker_active.svg" width="32" height="32" title="Sound" alt="Sound"/> <img src="assets/icons_sources/microphone.svg" width="32" height="32" title="Microphone" alt="Microphone"/> <img src="assets/icons_sources/pcmcia_enabled.svg" width="32" height="32" title="PCMCIA" alt="PCMCIA"/> <img src="assets/icons_sources/internet.svg" width="32" height="32" title="Network" alt="Network"/></td>
@@ -247,7 +247,7 @@ python run_claude.py
       <td><img src="assets/icons_sources/stylus.svg" width="32" height="32" title="Touch" alt="Touch"/> <img src="assets/icons_sources/ga_autoresize.svg" width="32" height="32" title="Guest Additions" alt="Guest Additions"/> <img src="assets/icons_sources/speaker_active.svg" width="32" height="32" title="Sound" alt="Sound"/> <img src="assets/icons_sources/pcmcia_enabled.svg" width="32" height="32" title="PCMCIA" alt="PCMCIA"/> <img src="assets/icons_sources/internet.svg" width="32" height="32" title="Network" alt="Network"/> <img src="assets/icons_sources/battery.svg" width="32" height="32" title="Battery" alt="Battery"/></td>
     </tr>
     <tr>
-      <td rowspan="2" align="center"><img src="assets/icons_sources/badge_arm.svg" align="middle" title="ARM" alt="ARM"/><br/><b>Intel XScale PXA255</b><br/><sub>XScale</sub></td>
+      <td rowspan="2" align="center"><b>Intel XScale PXA255</b><br/><sub>XScale</sub></td>
       <td><b>Askey PC3xx</b></td>
       <td><img src="assets/icons_sources/board.svg" width="16" height="16" title="PDA" alt="PDA"/> <b>PSC/Datalogic Falcon 4220</b> <code>falcon_4220</code></td>
       <td><img src="assets/icons_sources/stylus.svg" width="32" height="32" title="Touch" alt="Touch"/> <img src="assets/icons_sources/suspend.svg" width="32" height="32" title="Suspend / Resume" alt="Suspend / Resume"/> <img src="assets/icons_sources/ga_autoresize.svg" width="32" height="32" title="Guest Additions" alt="Guest Additions"/> <img src="assets/icons_sources/speaker_active.svg" width="32" height="32" title="Sound" alt="Sound"/> <img src="assets/icons_sources/pcmcia_enabled.svg" width="32" height="32" title="PCMCIA" alt="PCMCIA"/> <img src="assets/icons_sources/internet.svg" width="32" height="32" title="Network" alt="Network"/> <img src="assets/icons_sources/battery.svg" width="32" height="32" title="Battery" alt="Battery"/></td>
@@ -258,7 +258,7 @@ python run_claude.py
       <td><img src="assets/icons_sources/stylus.svg" width="32" height="32" title="Touch" alt="Touch"/> <img src="assets/icons_sources/keyboard.svg" width="32" height="32" title="Keyboard" alt="Keyboard"/> <img src="assets/icons_sources/suspend.svg" width="32" height="32" title="Suspend / Resume" alt="Suspend / Resume"/> <img src="assets/icons_sources/ga_autoresize.svg" width="32" height="32" title="Guest Additions" alt="Guest Additions"/> <img src="assets/icons_sources/speaker_active.svg" width="32" height="32" title="Sound" alt="Sound"/> <img src="assets/icons_sources/pcmcia_enabled.svg" width="32" height="32" title="PCMCIA" alt="PCMCIA"/> <img src="assets/icons_sources/internet.svg" width="32" height="32" title="Network" alt="Network"/></td>
     </tr>
     <tr>
-      <td rowspan="3" align="center"><img src="assets/icons_sources/badge_arm.svg" align="middle" title="ARM" alt="ARM"/><br/><b>Intel XScale PXA270</b><br/><sub>XScale</sub></td>
+      <td rowspan="3" align="center"><b>Intel XScale PXA270</b><br/><sub>XScale</sub></td>
       <td rowspan="3"><b>Symbol Hamptons</b></td>
       <td><img src="assets/icons_sources/board.svg" width="16" height="16" title="PDA" alt="PDA"/> <b>Symbol MK500 (A035QN02 panel)</b> <code>symbol_mk500_a035qn02</code></td>
       <td><img src="assets/icons_sources/stylus.svg" width="32" height="32" title="Touch" alt="Touch"/> <img src="assets/icons_sources/ga_autoresize.svg" width="32" height="32" title="Guest Additions" alt="Guest Additions"/> <img src="assets/icons_sources/speaker_active.svg" width="32" height="32" title="Sound" alt="Sound"/></td>
@@ -272,7 +272,7 @@ python run_claude.py
       <td><img src="assets/icons_sources/stylus.svg" width="32" height="32" title="Touch" alt="Touch"/> <img src="assets/icons_sources/ga_autoresize.svg" width="32" height="32" title="Guest Additions" alt="Guest Additions"/> <img src="assets/icons_sources/speaker_active.svg" width="32" height="32" title="Sound" alt="Sound"/></td>
     </tr>
     <tr>
-      <td rowspan="5" align="center"><img src="assets/icons_sources/badge_arm.svg" align="middle" title="ARM" alt="ARM"/><br/><b>Samsung S3C2410</b><br/><sub>ARM920T</sub></td>
+      <td rowspan="5" align="center"><b>Samsung S3C2410</b><br/><sub>ARM920T</sub></td>
       <td rowspan="4"><b>Samsung SMDK2410</b></td>
       <td><img src="assets/icons_sources/board.svg" width="16" height="16" title="PDA" alt="PDA"/> <b>Device Emulator (QVGA)</b> <code>devemu</code></td>
       <td><img src="assets/icons_sources/stylus.svg" width="32" height="32" title="Touch" alt="Touch"/> <img src="assets/icons_sources/keyboard.svg" width="32" height="32" title="Keyboard" alt="Keyboard"/> <img src="assets/icons_sources/suspend.svg" width="32" height="32" title="Suspend / Resume" alt="Suspend / Resume"/> <img src="assets/icons_sources/ga_autoresize.svg" width="32" height="32" title="Guest Additions" alt="Guest Additions"/> <img src="assets/icons_sources/speaker_active.svg" width="32" height="32" title="Sound" alt="Sound"/> <img src="assets/icons_sources/pcmcia_enabled.svg" width="32" height="32" title="PCMCIA" alt="PCMCIA"/> <img src="assets/icons_sources/internet.svg" width="32" height="32" title="Network" alt="Network"/> <img src="assets/icons_sources/battery.svg" width="32" height="32" title="Battery" alt="Battery"/></td>
@@ -295,7 +295,7 @@ python run_claude.py
       <td><img src="assets/icons_sources/stylus.svg" width="32" height="32" title="Touch" alt="Touch"/> <img src="assets/icons_sources/ga_autoresize.svg" width="32" height="32" title="Guest Additions" alt="Guest Additions"/></td>
     </tr>
     <tr>
-      <td rowspan="2" align="center"><img src="assets/icons_sources/badge_arm.svg" align="middle" title="ARM" alt="ARM"/><br/><b>TI OMAP 3530</b><br/><sub>Cortex-A8</sub></td>
+      <td rowspan="2" align="center"><b>TI OMAP 3530</b><br/><sub>Cortex-A8</sub></td>
       <td rowspan="2"><b>TI OMAP35x EVM</b></td>
       <td><img src="assets/icons_sources/board.svg" width="16" height="16" title="PDA" alt="PDA"/> <b>TI OMAP35x EVM (Gen1 main board)</b> <code>omap_3530_evm</code></td>
       <td><img src="assets/icons_sources/stylus.svg" width="32" height="32" title="Touch" alt="Touch"/> <img src="assets/icons_sources/ga_autoresize.svg" width="32" height="32" title="Guest Additions" alt="Guest Additions"/> <img src="assets/icons_sources/speaker_active.svg" width="32" height="32" title="Sound" alt="Sound"/></td>
@@ -305,19 +305,19 @@ python run_claude.py
       <td><img src="assets/icons_sources/stylus.svg" width="32" height="32" title="Touch" alt="Touch"/> <img src="assets/icons_sources/ga_autoresize.svg" width="32" height="32" title="Guest Additions" alt="Guest Additions"/> <img src="assets/icons_sources/speaker_active.svg" width="32" height="32" title="Sound" alt="Sound"/></td>
     </tr>
     <tr>
-      <td align="center"><img src="assets/icons_sources/badge_mips.svg" align="middle" title="MIPS" alt="MIPS"/><br/><b>NEC VR4102</b><br/><sub>MIPS III</sub></td>
+      <td align="center"><b>NEC VR4102</b><br/><sub>MIPS III</sub></td>
       <td><b>NEC MobilePro 700</b></td>
       <td><img src="assets/icons_sources/board.svg" width="16" height="16" title="PDA" alt="PDA"/> <b>NEC MobilePro 700</b> <code>nec_mobilepro_700</code></td>
       <td><img src="assets/icons_sources/stylus.svg" width="32" height="32" title="Touch" alt="Touch"/> <img src="assets/icons_sources/keyboard.svg" width="32" height="32" title="Keyboard" alt="Keyboard"/> <img src="assets/icons_sources/suspend.svg" width="32" height="32" title="Suspend / Resume" alt="Suspend / Resume"/> <img src="assets/icons_sources/ga_autoresize.svg" width="32" height="32" title="Guest Additions" alt="Guest Additions"/> <img src="assets/icons_sources/pcmcia_enabled.svg" width="32" height="32" title="PCMCIA" alt="PCMCIA"/> <img src="assets/icons_sources/internet.svg" width="32" height="32" title="Network" alt="Network"/> <img src="assets/icons_sources/serial_com.svg" width="32" height="32" title="Serial Port" alt="Serial Port"/></td>
     </tr>
     <tr>
-      <td align="center"><img src="assets/icons_sources/badge_mips.svg" align="middle" title="MIPS" alt="MIPS"/><br/><b>NEC VR4111</b><br/><sub>MIPS III</sub></td>
+      <td align="center"><b>NEC VR4111</b><br/><sub>MIPS III</sub></td>
       <td><b>Casio Tomcat</b></td>
       <td><img src="assets/icons_sources/board.svg" width="16" height="16" title="PDA" alt="PDA"/> <b>Casio Cassiopeia E-55</b> <code>casio_cassiopeia_e55</code></td>
       <td><img src="assets/icons_sources/stylus.svg" width="32" height="32" title="Touch" alt="Touch"/> <img src="assets/icons_sources/keyboard.svg" width="32" height="32" title="Keyboard" alt="Keyboard"/> <img src="assets/icons_sources/ga_autoresize.svg" width="32" height="32" title="Guest Additions" alt="Guest Additions"/> <img src="assets/icons_sources/pcmcia_enabled.svg" width="32" height="32" title="PCMCIA" alt="PCMCIA"/> <img src="assets/icons_sources/internet.svg" width="32" height="32" title="Network" alt="Network"/> <img src="assets/icons_sources/serial_com.svg" width="32" height="32" title="Serial Port" alt="Serial Port"/></td>
     </tr>
     <tr>
-      <td rowspan="3" align="center"><img src="assets/icons_sources/badge_mips.svg" align="middle" title="MIPS" alt="MIPS"/><br/><b>NEC VR4121</b><br/><sub>MIPS III</sub></td>
+      <td rowspan="3" align="center"><b>NEC VR4121</b><br/><sub>MIPS III</sub></td>
       <td rowspan="3"><b>Casio PocketPostPet</b></td>
       <td><img src="assets/icons_sources/board.svg" width="16" height="16" title="PDA" alt="PDA"/> <b>Casio Message-Cam</b> <code>casio_message_cam</code></td>
       <td><img src="assets/icons_sources/stylus.svg" width="32" height="32" title="Touch" alt="Touch"/> <img src="assets/icons_sources/keyboard.svg" width="32" height="32" title="Keyboard" alt="Keyboard"/> <img src="assets/icons_sources/ga_autoresize.svg" width="32" height="32" title="Guest Additions" alt="Guest Additions"/></td>
@@ -331,7 +331,7 @@ python run_claude.py
       <td><img src="assets/icons_sources/stylus.svg" width="32" height="32" title="Touch" alt="Touch"/> <img src="assets/icons_sources/keyboard.svg" width="32" height="32" title="Keyboard" alt="Keyboard"/> <img src="assets/icons_sources/ga_autoresize.svg" width="32" height="32" title="Guest Additions" alt="Guest Additions"/></td>
     </tr>
     <tr>
-      <td rowspan="2" align="center"><img src="assets/icons_sources/badge_mips.svg" align="middle" title="MIPS" alt="MIPS"/><br/><b>NEC VR4122</b><br/><sub>MIPS III</sub></td>
+      <td rowspan="2" align="center"><b>NEC VR4122</b><br/><sub>MIPS III</sub></td>
       <td rowspan="2"><b>Casio JX670</b></td>
       <td><img src="assets/icons_sources/board.svg" width="16" height="16" title="PDA" alt="PDA"/> <b>Casio Cassiopeia E-700</b> <code>casio_cassiopeia_e700</code></td>
       <td><img src="assets/icons_sources/stylus.svg" width="32" height="32" title="Touch" alt="Touch"/> <img src="assets/icons_sources/ga_autoresize.svg" width="32" height="32" title="Guest Additions" alt="Guest Additions"/> <img src="assets/icons_sources/speaker_active.svg" width="32" height="32" title="Sound" alt="Sound"/></td>
@@ -341,13 +341,13 @@ python run_claude.py
       <td><img src="assets/icons_sources/stylus.svg" width="32" height="32" title="Touch" alt="Touch"/> <img src="assets/icons_sources/ga_autoresize.svg" width="32" height="32" title="Guest Additions" alt="Guest Additions"/> <img src="assets/icons_sources/speaker_active.svg" width="32" height="32" title="Sound" alt="Sound"/></td>
     </tr>
     <tr>
-      <td align="center"><img src="assets/icons_sources/badge_mips.svg" align="middle" title="MIPS" alt="MIPS"/><br/><b>NEC VR5500</b><br/><sub>MIPS IV</sub></td>
+      <td align="center"><b>NEC VR5500</b><br/><sub>MIPS IV</sub></td>
       <td><b>NEC Solution Gear 2-Vr5500</b></td>
       <td><img src="assets/icons_sources/board.svg" width="16" height="16" title="PDA" alt="PDA"/> <b>NEC Rockhopper SG2_VR5500</b> <code>nec_rockhopper</code></td>
       <td><img src="assets/icons_sources/cursor.svg" width="32" height="32" title="Mouse" alt="Mouse"/> <img src="assets/icons_sources/keyboard.svg" width="32" height="32" title="Keyboard" alt="Keyboard"/> <img src="assets/icons_sources/ga_autoresize.svg" width="32" height="32" title="Guest Additions" alt="Guest Additions"/> <img src="assets/icons_sources/pcmcia_enabled.svg" width="32" height="32" title="PCMCIA" alt="PCMCIA"/> <img src="assets/icons_sources/internet.svg" width="32" height="32" title="Network" alt="Network"/></td>
     </tr>
     <tr>
-      <td rowspan="6" align="center"><img src="assets/icons_sources/badge_mips.svg" align="middle" title="MIPS" alt="MIPS"/><br/><b>Philips PR31500</b><br/><sub>MIPS I</sub></td>
+      <td rowspan="6" align="center"><b>Philips PR31500</b><br/><sub>MIPS I</sub></td>
       <td rowspan="6"><b>Philips Velo 1</b></td>
       <td><img src="assets/icons_sources/board.svg" width="16" height="16" title="PDA" alt="PDA"/> <b>Philips Velo 1</b> <code>philips_velo_1</code></td>
       <td><img src="assets/icons_sources/stylus.svg" width="32" height="32" title="Touch" alt="Touch"/> <img src="assets/icons_sources/keyboard.svg" width="32" height="32" title="Keyboard" alt="Keyboard"/> <img src="assets/icons_sources/suspend.svg" width="32" height="32" title="Suspend / Resume" alt="Suspend / Resume"/> <img src="assets/icons_sources/speaker_active.svg" width="32" height="32" title="Sound" alt="Sound"/> <img src="assets/icons_sources/pcmcia_enabled.svg" width="32" height="32" title="PCMCIA" alt="PCMCIA"/> <img src="assets/icons_sources/internet.svg" width="32" height="32" title="Network" alt="Network"/> <img src="assets/icons_sources/battery.svg" width="32" height="32" title="Battery" alt="Battery"/> <img src="assets/icons_sources/serial_com.svg" width="32" height="32" title="Serial Port" alt="Serial Port"/></td>
@@ -373,7 +373,7 @@ python run_claude.py
       <td><img src="assets/icons_sources/stylus.svg" width="32" height="32" title="Touch" alt="Touch"/> <img src="assets/icons_sources/keyboard.svg" width="32" height="32" title="Keyboard" alt="Keyboard"/> <img src="assets/icons_sources/suspend.svg" width="32" height="32" title="Suspend / Resume" alt="Suspend / Resume"/> <img src="assets/icons_sources/speaker_active.svg" width="32" height="32" title="Sound" alt="Sound"/> <img src="assets/icons_sources/pcmcia_enabled.svg" width="32" height="32" title="PCMCIA" alt="PCMCIA"/> <img src="assets/icons_sources/internet.svg" width="32" height="32" title="Network" alt="Network"/> <img src="assets/icons_sources/battery.svg" width="32" height="32" title="Battery" alt="Battery"/> <img src="assets/icons_sources/serial_com.svg" width="32" height="32" title="Serial Port" alt="Serial Port"/></td>
     </tr>
     <tr>
-      <td rowspan="2" align="center"><img src="assets/icons_sources/badge_mips.svg" align="middle" title="MIPS" alt="MIPS"/><br/><b>Philips PR31700</b><br/><sub>MIPS I</sub></td>
+      <td rowspan="2" align="center"><b>Philips PR31700</b><br/><sub>MIPS I</sub></td>
       <td><b>Philips Nino</b></td>
       <td><img src="assets/icons_sources/board.svg" width="16" height="16" title="PDA" alt="PDA"/> <b>Philips Nino 300</b> <code>philips_nino_300</code></td>
       <td><img src="assets/icons_sources/stylus.svg" width="32" height="32" title="Touch" alt="Touch"/> <img src="assets/icons_sources/keyboard.svg" width="32" height="32" title="Keyboard" alt="Keyboard"/> <img src="assets/icons_sources/suspend.svg" width="32" height="32" title="Suspend / Resume" alt="Suspend / Resume"/> <img src="assets/icons_sources/ga_autoresize.svg" width="32" height="32" title="Guest Additions" alt="Guest Additions"/> <img src="assets/icons_sources/speaker_active.svg" width="32" height="32" title="Sound" alt="Sound"/> <img src="assets/icons_sources/pcmcia_enabled.svg" width="32" height="32" title="PCMCIA" alt="PCMCIA"/> <img src="assets/icons_sources/battery.svg" width="32" height="32" title="Battery" alt="Battery"/> <img src="assets/icons_sources/serial_com.svg" width="32" height="32" title="Serial Port" alt="Serial Port"/></td>

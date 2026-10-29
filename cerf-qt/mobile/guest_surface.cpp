@@ -234,7 +234,11 @@ void GuestSurface::FocusCanvas() { forceActiveFocus(Qt::MouseFocusReason); }
 
 void GuestSurface::SetPointerHidden(bool hidden) { setCursor(hidden ? Qt::BlankCursor : Qt::ArrowCursor); }
 
-void GuestSurface::WarpPointerTo(int, int) {}
+bool GuestSurface::WarpPointerTo(int, int) { return false; }
+
+bool GuestSurface::LockPointer() { return false; }
+
+void GuestSurface::UnlockPointer() {}
 
 void GuestSurface::ClientSize(int& width_out, int& height_out) const {
     const qreal dpr = Dpr();
@@ -312,7 +316,8 @@ void GuestSurface::mouseReleaseEvent(QMouseEvent* event) {
 void GuestSurface::hoverEnterEvent(QHoverEvent*) { relative_mouse_.Forget(); }
 
 void GuestSurface::hoverMoveEvent(QHoverEvent* event) {
-    if (gate_.Attached() && ActiveKind() == cerfcore::PointerKind::Relative) relative_mouse_.Move(event->position());
+    if (gate_.Attached() && !touching_ && ActiveKind() == cerfcore::PointerKind::Relative)
+        relative_mouse_.Move(event->position());
 }
 
 void GuestSurface::hoverLeaveEvent(QHoverEvent*) { relative_mouse_.Forget(); }
@@ -327,6 +332,7 @@ void GuestSurface::mouseUngrabEvent() {
 
 void GuestSurface::touchEvent(QTouchEvent* event) {
     if (!gate_.Attached()) return;
+    touching_ = event->type() != QEvent::TouchEnd && event->type() != QEvent::TouchCancel;
     if (event->type() == QEvent::TouchCancel) {
         gestures_.Cancel();
         event->accept();
@@ -336,6 +342,7 @@ void GuestSurface::touchEvent(QTouchEvent* event) {
 }
 
 void GuestSurface::touchUngrabEvent() {
+    touching_ = false;
     if (gate_.Attached()) gestures_.Cancel();
 }
 

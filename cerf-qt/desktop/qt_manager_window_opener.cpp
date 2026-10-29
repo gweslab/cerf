@@ -18,6 +18,7 @@ REGISTER_SERVICE(QtManagerWindowOpener);
 namespace {
 
 constexpr char kSettingsWindow[] = "SettingsWindow";
+constexpr char kTutorialWindow[] = "TutorialWindow";
 
 }
 
@@ -30,6 +31,10 @@ void QtManagerWindowOpener::OpenAbout(const std::string& device_line) {
 
 void QtManagerWindowOpener::OpenSettings() {
     emu_.Get<ManagerEngine>().Open(QString::fromLatin1(kSettingsWindow), Placement());
+}
+
+void QtManagerWindowOpener::OpenTutorial() {
+    emu_.Get<ManagerEngine>().Open(QString::fromLatin1(kTutorialWindow), Placement());
 }
 
 bool QtManagerWindowOpener::EditLiveCustomizations(bool force_reboot, std::optional<int> ce_major,

@@ -162,13 +162,25 @@ QString BoardCatalog::FirstRunningBoard() const {
         std::find_if(boards.begin(), boards.end(), [](const DbBoard& board) { return board.runs; })->id);
 }
 
-QVariantList BoardCatalog::GroupedBoards(bool hide_unknown, bool hide_unsupported,
+QVariantMap BoardCatalog::GroupHardware(const QStringList& board_ids) const {
+    QStringList socs;
+    QStringList arches;
+    for (const QString& board_id : board_ids) {
+        const QString soc  = SocLabel(board_id);
+        const QString arch = ArchName(board_id);
+        if (!soc.isEmpty() && !socs.contains(soc)) socs.append(soc);
+        if (!arch.isEmpty() && !arches.contains(arch)) arches.append(arch);
+    }
+    return QVariantMap{{QStringLiteral("soc"), socs.join(QStringLiteral(" / "))}, {QStringLiteral("arches"), arches}};
+}
+
+QVariantList BoardCatalog::GroupedBoards(bool show_unsupported, bool show_unknown,
                                          const QString& query) const {
     auto& db = emu_.Get<BoardDatabase>();
     std::map<std::string, std::vector<const DbBoard*>> members;
     for (const auto& board : db.Boards()) {
-        if (hide_unknown && board.support_level == SupportLevel::UnknownPartial) continue;
-        if (hide_unsupported && board.support_level == SupportLevel::NoSupport) continue;
+        if (!show_unknown && board.support_level == SupportLevel::UnknownPartial) continue;
+        if (!show_unsupported && board.support_level == SupportLevel::NoSupport) continue;
         const QString id = QString::fromStdString(board.id);
         const QStringList fields{QString::fromStdString(board.name), id, FamilyName(id), SocLabel(id),
                                  LevelLabel(board.support_level)};
@@ -188,15 +200,18 @@ QVariantList BoardCatalog::GroupedBoards(bool hide_unknown, bool hide_unsupporte
             return BoardSortKey(QString::fromStdString(a->name)) < BoardSortKey(QString::fromStdString(b->name));
         });
         QVariantList rows;
+        QStringList  ids;
         for (const DbBoard* board : boards) {
             const QString id = QString::fromStdString(board->id);
+            ids.append(id);
             rows.append(QVariantMap{{QStringLiteral("id"), id},
                                     {QStringLiteral("name"), QString::fromStdString(board->name)},
-                                    {QStringLiteral("soc"), SocLabel(id)},
                                     {QStringLiteral("support"), LevelLabel(board->support_level)}});
         }
-        out.append(QVariantMap{{QStringLiteral("family"), QString::fromStdString(family->name)},
-                               {QStringLiteral("boards"), rows}});
+        QVariantMap group = GroupHardware(ids);
+        group.insert(QStringLiteral("family"), QString::fromStdString(family->name));
+        group.insert(QStringLiteral("boards"), rows);
+        out.append(group);
     }
     return out;
 }

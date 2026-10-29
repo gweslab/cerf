@@ -19,6 +19,11 @@ bool OsNameHasVersion(const QString& name, int major, int minor) {
     return cerfcore::OsNameHasVersion(name.toStdString(), major, minor);
 }
 
+QString JoinParts(QStringList parts) {
+    parts.removeAll(QString());
+    return parts.join(QStringLiteral("  ·  "));
+}
+
 }
 
 int DeviceTexts::DeviceYear(const DeviceBundle& device) const {
@@ -56,10 +61,10 @@ QString DeviceTexts::OsLabel(const DeviceBundle& device) const {
 QString DeviceTexts::OsTitle(const DeviceBundle& device) const {
     const QString edition_name = device.meta.os_name.trimmed();
     const QString edition      = edition_name.isEmpty() ? DeviceLabel(device) : edition_name;
-    QStringList   parts{edition, device.meta.os_language.trimmed()};
-    parts.removeAll(QString());
-    return parts.join(QStringLiteral("  ·  "));
+    return JoinParts({edition, device.meta.os_language.trimmed()});
 }
+
+QString DeviceTexts::OsNotes(const DeviceBundle& device) const { return JoinParts(device.meta.os_notes); }
 
 QString DeviceTexts::OsCeVersion(const DeviceBundle& device) const {
     const DeviceMeta& meta = device.meta;
@@ -72,19 +77,13 @@ QString DeviceTexts::CardTitle(const DeviceBundle& device) const {
 }
 
 QString DeviceTexts::CardSubtitle(const DeviceBundle& device) const {
-    QStringList parts;
-    if (device.meta.name.isEmpty()) parts.append(device.meta.os_notes);
-    parts.append(OsCeVersion(device));
-    parts.removeAll(QString());
-    return parts.join(QStringLiteral("  ·  "));
+    return JoinParts({device.meta.name.isEmpty() ? OsNotes(device) : QString(), OsCeVersion(device)});
 }
 
 QString DeviceTexts::PanelDetail(const DeviceBundle& device) const {
-    const int   year = device.meta.os_year;
-    QStringList parts{year ? QString::number(year) : QString(), emu_.Get<BoardCatalog>().SocLabel(device.meta.board_id),
-                      FormatSize(device.remote ? device.remote->unpacked_size : device.rom_size)};
-    parts.removeAll(QString());
-    return parts.join(QStringLiteral("  ·  "));
+    const int year = device.meta.os_year;
+    return JoinParts({year ? QString::number(year) : QString(), emu_.Get<BoardCatalog>().SocLabel(device.meta.board_id),
+                      FormatSize(device.remote ? device.remote->unpacked_size : device.rom_size)});
 }
 
 QStringList DeviceTexts::SearchFields(const DeviceBundle& device) const {

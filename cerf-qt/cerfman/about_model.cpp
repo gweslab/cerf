@@ -23,6 +23,8 @@ REGISTER_SERVICE(AboutModel);
 
 QString AboutModel::Version() const { return QStringLiteral(CERF_VERSION_STR); }
 
+QString AboutModel::DisplayVersion() const { return QString::fromUtf8(CERF_VERSION_DISPLAY_STR); }
+
 QString AboutModel::VersionLabel() const { return QStringLiteral(CERF_VERSION_LABEL); }
 
 QString AboutModel::Build() const { return QString::fromUtf8(CERF_VERSION_BUILD_STR); }

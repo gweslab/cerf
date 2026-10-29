@@ -6,10 +6,11 @@
 
 #include <QCloseEvent>
 #include <QResizeEvent>
+#include <QWindow>
 
 void QtHostWindow::ResizeTo(const QSize& size) {
-    expected_ = size;
     resize(size);
+    expected_ = windowHandle()->geometry().size();
 }
 
 void QtHostWindow::closeEvent(QCloseEvent* event) {

@@ -44,8 +44,4 @@ QString FontResource(const char* file_name) {
 
 QString ContributorsResource() { return QStringLiteral(":/" CERF_CONTRIBUTORS_FILE); }
 
-QString BadgeStem(const QString& key) { return QStringLiteral(CERF_BADGE_PREFIX) + key; }
-
-QString BadgeUrl(const QString& key) { return AssetImageUrl(BadgeStem(key)); }
-
 QString InstallResourceRoot() { return QStringLiteral(":" CERF_INSTALL_RESOURCE_PREFIX); }

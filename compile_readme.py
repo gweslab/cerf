@@ -24,7 +24,7 @@ sys.path.insert(0, os.path.join(ROOT, 'tools'))
 from header_defines import int_define
 from board_database import (FEATURE_SPECS, SUPPORT_BOOTABLE_PARTIAL, board_sort_key,
                             family_of, running_boards, soc_family_of, soc_of, sort_text)
-from product_facts import ASSET_ICONS_DIR, BADGE_PREFIX
+from product_facts import ASSET_ICONS_DIR
 import android_sdk
 import apt_packages
 import homebrew_packages
@@ -48,11 +48,6 @@ def parse_version():
 def icon_img(stem, title, size=32):
     return (f'<img src="{SVG_DIR}/{stem}.svg" width="{size}" height="{size}" '
             f'title="{title}" alt="{title}"/>')
-
-
-def badge_img(cpu):
-    return (f'<img src="{SVG_DIR}/{BADGE_PREFIX}{cpu.lower()}.svg" '
-            f'align="middle" title="{cpu}" alt="{cpu}"/>')
 
 
 def features_cell(board):
@@ -107,7 +102,7 @@ def build_supported_devices():
         '  <tbody>',
     ]
     unmodeled = False
-    for arch, socs in _grouped_boards():
+    for _arch, socs in _grouped_boards():
         for soc, families in socs:
             soc_rows = sum(len(boards) for _family, boards in families)
             first_in_soc = True
@@ -117,8 +112,7 @@ def build_supported_devices():
                     if first_in_soc:
                         soc_family = soc_family_of(board['id'])
                         lines.append(f'      <td{_rowspan(soc_rows)} align="center">'
-                                     f'{badge_img(arch)}'
-                                     f'<br/><b>{soc["name"]}</b>'
+                                     f'<b>{soc["name"]}</b>'
                                      f'<br/><sub>{soc_family["name"]}</sub></td>')
                         first_in_soc = False
                     if index == 0:

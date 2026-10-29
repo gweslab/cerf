@@ -1,9 +1,14 @@
 import QtQuick
 import QtQuick.Controls
+import QtQuick.Layouts
 import CerfStyle
 
 Pane {
-    default property alias content: flow.data
+    id: bar
+    property bool searchVisible: false
+    property bool stacked: false
+    readonly property alias searchText: search.text
+    default property alias content: filters.data
 
     padding: Theme.spaceM
 
@@ -11,10 +16,23 @@ Pane {
         color: Theme.barBg
     }
 
-    Flow {
-        id: flow
+    GridLayout {
         anchors.left: parent.left
         anchors.right: parent.right
-        spacing: Theme.spaceM
+        columns: bar.stacked ? 1 : 2
+        columnSpacing: Theme.spaceM
+        rowSpacing: Theme.spaceM
+
+        ColumnLayout {
+            id: filters
+            Layout.fillWidth: true
+            spacing: Theme.spaceM
+        }
+        SearchBox {
+            id: search
+            Layout.fillWidth: bar.stacked
+            Layout.preferredWidth: Theme.searchWidth
+            visible: bar.searchVisible
+        }
     }
 }

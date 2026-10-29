@@ -1,12 +1,12 @@
 #pragma once
 
+#include "../cursor_icon.h"
+
 #include <QImage>
 #include <QPoint>
 #include <QPointF>
 
 class QPainter;
-
-inline constexpr char kCursorIconName[] = "arrow_selector_tool";
 
 class PointerOverlay {
 public:

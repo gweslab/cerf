@@ -5,12 +5,9 @@
 #include <cerfcore/core/service.h>
 
 #include <QObject>
-#include <QSize>
 #include <QString>
 #include <QVariantMap>
 #include <QtQml/qqmlregistration.h>
-
-#include <map>
 
 class DeviceCards : public QObject, public cerfcore::Service {
     Q_OBJECT
@@ -31,9 +28,4 @@ public:
     Q_INVOKABLE QVariantMap Rows(const QString& query) const;
     Q_INVOKABLE QVariantMap Details(const QString& name) const;
     Q_INVOKABLE QString     UpdateRomsLabel(int count) const;
-
-private:
-    QSize BadgeSize(const QString& arch) const;
-
-    mutable std::map<QString, QSize> badge_sizes_;
 };

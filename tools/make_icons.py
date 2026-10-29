@@ -6,8 +6,7 @@ from pathlib import Path
 
 from ico_format import (WIN16_PALETTE, build_ico, dib_frame,
                         dib_frame_indexed)
-from product_facts import (ASSET_ICONS_DIR, BADGE_PREFIX, ERROR_ASSET, FONT_SANS_BOLD, FONTS_DIR, LOGO_ASSET,
-                           LOGO_PNG, LOGO_PX)
+from product_facts import ASSET_ICONS_DIR, ERROR_ASSET, LOGO_ASSET, LOGO_PNG, LOGO_PX
 
 DEFAULT_SIZES = [16, 20, 24, 32, 48, 64, 256]
 
@@ -29,7 +28,7 @@ ANDROID_RES_DIR = REPO / "cerf-qt" / "mobile" / "android" / "res"
 ANDROID_ICON_STEM = LOGO_ASSET
 ANDROID_ICON_DENSITIES = (("mdpi", 48), ("hdpi", 72), ("xhdpi", 96), ("xxhdpi", 144), ("xxxhdpi", 192))
 
-TARGETS = ("ico", "ce_ico", "ce2_ico", "badges", "logo", "android")
+TARGETS = ("ico", "ce_ico", "ce2_ico", "logo", "android")
 
 
 def render_image(svg_path, size):
@@ -157,70 +156,6 @@ def build_android_icon(names):
         print(f"{svg.name} -> {out.relative_to(REPO)}  ({px}x{px})")
 
 
-BADGES = [
-    ("arm", "ARM", "#0e7c9d"),
-    ("mips", "MIPS", "#c0392b"),
-]
-
-BADGE_FONT = REPO / "assets" / FONTS_DIR / FONT_SANS_BOLD
-FONT_PX = 11
-PAD_X = 5
-PAD_Y = 3
-RADIUS = 2
-GAP_X = 4
-TEXT_FILL = "#ffffff"
-
-
-def svg_number(value):
-    return f"{value:.2f}".rstrip("0").rstrip(".")
-
-
-def draw_label(font, text, pen, dx, dy):
-    from fontTools.pens.transformPen import TransformPen
-    glyphs = font.getGlyphSet()
-    cmap = font.getBestCmap()
-    scale = FONT_PX / font["head"].unitsPerEm
-    x = 0.0
-    for ch in text:
-        glyph = glyphs[cmap[ord(ch)]]
-        glyph.draw(TransformPen(pen, (scale, 0, 0, -scale, dx + x, dy)))
-        x += glyph.width * scale
-
-
-def label_bounds(font, text):
-    from fontTools.pens.boundsPen import BoundsPen
-    pen = BoundsPen(font.getGlyphSet())
-    draw_label(font, text, pen, 0.0, 0.0)
-    return pen.bounds
-
-
-def badge_svg(font, label, fill, box_w, box_h):
-    from fontTools.pens.svgPathPen import SVGPathPen
-    x_min, y_min, x_max, y_max = label_bounds(font, label)
-    pen = SVGPathPen(font.getGlyphSet(), ntos=svg_number)
-    draw_label(font, label, pen, (box_w - x_min - x_max) / 2, (box_h - y_min - y_max) / 2)
-    width = box_w + GAP_X
-    return (f'<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{box_h}" '
-            f'viewBox="0 0 {width} {box_h}">'
-            f'<rect width="{box_w}" height="{box_h}" rx="{RADIUS}" fill="{fill}"/>'
-            f'<path d="{pen.getCommands()}" fill="{TEXT_FILL}"/></svg>\n')
-
-
-def build_badges():
-    from fontTools.ttLib import TTFont
-    font = TTFont(BADGE_FONT)
-    widest = 0.0
-    for _key, label, _fill in BADGES:
-        x_min, _y_min, x_max, _y_max = label_bounds(font, label)
-        widest = max(widest, x_max - x_min)
-    box_w = round(widest) + 2 * PAD_X
-    box_h = FONT_PX + 2 * PAD_Y
-    for key, label, fill in BADGES:
-        out = SRC_DIR / f"{BADGE_PREFIX}{key}.svg"
-        write_if_changed(out, badge_svg(font, label, fill, box_w, box_h).encode("utf-8"))
-        print(f"{label:5s} -> {out.relative_to(REPO)}  ({box_w + GAP_X}x{box_h})")
-
-
 def main():
     ap = argparse.ArgumentParser(description="SVG -> CERF icon assets")
     ap.add_argument("names", nargs="*",
@@ -232,12 +167,11 @@ def main():
     args = ap.parse_args()
 
     try:
-        import fontTools  # noqa: F401
         import resvg_py  # noqa: F401
         from PIL import Image  # noqa: F401
     except ImportError as e:
         sys.exit(f"missing dependency ({e.name}). Run: "
-                 f"python -m pip install resvg-py pillow fonttools")
+                 f"python -m pip install resvg-py pillow")
 
     sizes = [int(x) for x in args.sizes.split(",") if x.strip()]
 
@@ -252,8 +186,6 @@ def main():
         build_logo(args.names)
     if "android" in args.targets:
         build_android_icon(args.names)
-    if "badges" in args.targets and not args.names:
-        build_badges()
 
 
 if __name__ == "__main__":

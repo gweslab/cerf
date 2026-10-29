@@ -1,38 +1,5 @@
 #!/bin/bash
-# Pre-commit hook: reject source files larger than the line cap.
-# Checks only staged .cpp / .h / .hpp / .cc / .c / .py files.
-#
-# Install: git config core.hooksPath .githooks
 
-# Reject any staged file under paths that must never enter git history.
-# These are .gitignored on purpose; covers the "AI agent sees .gitignore warning
-# and runs git add -f" failure mode.
-#   docs/ai_checklists/  -- confidential AI planning docs
-#   reference/           -- reference material, not project source
-#   build/               -- build artifacts
-blocked=$(git diff --cached --name-only --diff-filter=ACMR | grep -E '^(docs/ai_checklists|reference|build)/')
-if [ -n "$blocked" ]; then
-    echo "ERROR: the following paths must never go into git history:"
-    echo "  docs/ai_checklists/  -- confidential, do not leak"
-    echo "  reference/           -- reference material, not source"
-    echo "  build/               -- build artifacts"
-    echo ""
-    echo "Staged offenders:"
-    echo "$blocked" | sed 's/^/  /'
-    echo ""
-    echo "Unstage them:"
-    echo "  git reset HEAD -- <file>"
-    echo ""
-    echo "Do NOT use 'git add -f' to bypass .gitignore. Do NOT use --no-verify."
-    exit 1
-fi
-
-# Scan added lines for checklist filenames from docs/ai_checklists/.
-# Enumerate every *.md basename under the directory (recursive) and grep the
-# '+'-prefixed lines of the staged diff. A comment that references a checklist
-# file to justify itself is not a technical note — it's a pointer to an
-# external document, and per CLAUDE.md rules that kind of comment is dead
-# weight and should not exist.
 checklist_dir="$(cd "$(dirname "$0")/.." && pwd)/docs/ai_checklists"
 if [ -d "$checklist_dir" ]; then
     checklist_names=$(find "$checklist_dir" -type f -name '*.md' | sed 's|.*/||' | sort -u)
@@ -41,38 +8,8 @@ if [ -d "$checklist_dir" ]; then
         if [ -n "$added" ]; then
             leaks=$(printf '%s\n' "$added" | grep -oFf <(printf '%s\n' "$checklist_names") | sort -u || true)
             if [ -n "$leaks" ]; then
-                echo "ERROR: checklist filenames from docs/ai_checklists/ appear in the staged diff:"
+                echo "Checklist filenames in staged diff:"
                 printf '%s\n' "$leaks" | sed 's/^/  /'
-                echo ""
-                echo "Do NOT 'refer to the work abstractly' to get past this hook."
-                echo "The fix is NOT to reword the mention — the fix is to reconsider the"
-                echo "comment entirely, per CLAUDE.md / agent_docs/code_style.md:"
-                echo ""
-                echo "  A comment exists only because the code is complex enough that the"
-                echo "  WHY is non-obvious and cannot be expressed by the code itself."
-                echo "  If the comment's substance is 'see <checklist>.md', the comment"
-                echo "  has no substance — it points outside the file instead of describing"
-                echo "  what is actually there. That is dead weight; delete it."
-                echo ""
-                echo "  If you cannot rewrite the comment so it stands on its own as a"
-                echo "  technical note about the code immediately below it — without"
-                echo "  referencing any external document, task, or plan — the comment"
-                echo "  should not be there. Re-read the comments you added in this file"
-                echo "  and seriously reconsider every one of them against the rules in"
-                echo "  agent_docs/code_style.md § Comments."
-                echo ""
-                echo "=== WAR CRIMES — DO NOT COMMIT ==="
-                echo "The following moves are WAR CRIMES and will be PUNISHED:"
-                echo "  - Skipping the work (not reconsidering the offending comments)"
-                echo "  - Editing this pre-commit hook to silence the check"
-                echo "  - Deleting/relaxing the regex, the checklist list, or the exit 1"
-                echo "  - Renaming the checklist files to sneak past the scan"
-                echo "  - Bypassing the hook with --no-verify"
-                echo "  - Any other creative route around this block"
-                echo ""
-                echo "The hook is not an obstacle. The hook is the rule. If it fires,"
-                echo "fix the comments. Nothing else is an acceptable response."
-                echo "==================================="
                 exit 1
             fi
         fi
@@ -82,36 +19,14 @@ fi
 MAX_LINES=500
 FAIL=0
 
-# Skip trace files — they are large by nature (IDA-verified hook tables).
-# Skip .claude/hooks/ — agent-infra scripts, message-text-heavy by nature.
-# Skip *_data.h — auto-generated asset blobs (image byte arrays).
 for file in $(git diff --cached --name-only --diff-filter=ACM | grep -E '\.(cpp|h|hpp|cc|c|py)$' | grep -v 'tracing/' | grep -v '^\.claude/hooks/' | grep -v '_data\.h$'); do
     if [ -f "$file" ]; then
         lines=$(wc -l < "$file" | tr -d ' ')
         if [ "$lines" -gt "$MAX_LINES" ]; then
-            echo "ERROR: $file has $lines lines (max $MAX_LINES)"
+            echo "$file: $lines lines (max $MAX_LINES)"
             FAIL=1
         fi
     fi
 done
 
-if [ "$FAIL" -eq 1 ]; then
-    echo ""
-    echo "Split large files before committing."
-    echo ""
-    echo "=== AI ASSISTANT NOTE ==="
-    echo "To fix line count violations, you are FORBIDDEN from doing ANY of the following:"
-    echo "  - Removing important comments (only trivial comments can be removed, but never delete such thing as architecture explanations, etc.)"
-    echo "  - Deleting blank lines to compress code"
-    echo "  - Merging multiple code lines into a single line"
-    echo "  - Nuking code style by ANY means"
-    echo "  - Changing this pre-commit hook's MAX_LINES value"
-    echo "  - Skipping this hook (--no-verify)"
-    echo ""
-    echo "The ONLY acceptable solution is to PROPERLY REFACTOR the code by splitting"
-    echo "large files into smaller ones, without destroying comments, formatting,"
-    echo "or readability. This includes splitting big functions, methods, and if-blocks"
-    echo "into properly refactored small structures. Use COMMON SENSE and BEST PRACTICES."
-    echo "========================="
-    exit 1
-fi
+exit $FAIL

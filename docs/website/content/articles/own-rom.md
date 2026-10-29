@@ -1,3 +1,5 @@
+--8<-- "ai-summary.md"
+
 # Running your own ROM
 
 CERF emulates a *whole device* - the SoC, the board, the memory map and every peripheral the ROM's
@@ -7,14 +9,6 @@ so a matching SoC is not enough.
 
 In practice: a dump boots if its board is on the [supported list](/devices.md). A ROM found on the
 internet for some other device will not.
-
-!!! note "Use the original dump - CERF runs it as the hardware does"
-
-    You do not have to unpack or convert the ROM first. CERF runs the original ROM container the
-    device shipped with. Most of the time that is an XIP or IMGFS container (see
-    [Windows CE ROM containers](rom-containers.md)); sometimes it is something larger and proprietary,
-    like the Ford SYNC 2 recovery image. In either case CERF reads and boots the dump exactly the way
-    the original hardware was meant to.
 
 ## Adding a device ROM through the device list
 

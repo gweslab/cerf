@@ -1,110 +1,62 @@
 # cerf.json - the configuration files
 
-JSON files in the CERF directory describe a device instance. Everything in them lands in one place:
-the configuration that CERF builds for that instance at startup.
+There are **three layers** of JSON configuration files:
 
-There are **three layers**, read in this order:
-
-| # | File | Where | Written by |
+| # | File | Where | Meaning |
 | --- | --- | --- | --- |
-| 1 | `cerf.json` | next to `cerf.exe` | ships with CERF. The emulator edits it |
-| 2 | `cerf.json` | `devices/<name>/` | ships with the ROM bundle. The remote repository owns it |
-| 3 | `cerf-user.json` | `devices/<name>/` | the emulator, on your behalf - optional |
+| 1 | `cerf.json` | next to `cerf.exe` | packed in the release |
+| 2 | `cerf.json` | `devices/<name>/` | a configuration of your device |
+| 3 | `cerf-user.json` | `devices/<name>/` | same, but stores only overrides by user |
 
 CERF applies each layer on top of the previous one, key by key. CERF applies the command line last,
-so a flag always wins over a file. Every field is optional.
+so a flag always wins over a file.
 
-CERF ignores unknown keys. If a `cerf.json` is unreadable or malformed, CERF names the file, then
-exits. For a wrong value in a device `cerf.json`, it also names the key. A broken `cerf-user.json` is
-not read, and the next write replaces it.
+```
+global cerf.json  ->  devices/<name>/cerf.json  ->  devices/<name>/cerf-user.json  ->  command line
+```
+
+Later wins. Below is an unfinished description of schema. Some values are absent from here.
 
 ## Layer 1 - the global `cerf.json`
 
-One file next to `cerf.exe`, shared by every device instance on the installation.
-
-```json
-{
-  "device": "jornada720",
-  "bundle_repositories": [
-    { "url": "https://example.com/bundles", "enabled": true }
-  ],
-  "last_save_state_mode": false,
-  "discord_rich_presence": false,
-  "host_key": [162, 164]
-}
-```
-
-| Key | Type | Meaning |
+| Key | Type | Meaning/values |
 | --- | --- | --- |
-| `device` | string | The device directory to boot when the command line has no `--device=`. When this key and `--device=` are both empty, CERF exits with an error. |
-| `bundle_repositories` | array of `{ url, enabled }` | The [ROM bundle repositories](bundle-repositories.md) that ROMs are installed and updated from. |
-| `last_save_state_mode` | boolean | The default state of **Save the state** in the shutdown dialog. |
-| `update_channel` | string | Which new builds you are offered: `disabled`, `stable`, or `unstable`. |
-| `discord_rich_presence` | boolean | Publish the device that you run to Discord. |
-| `host_key` | integer, or array of integers | The host key: one virtual-key code, or up to eight of them that you press together. Absent, the host key is Right Ctrl (`163`). |
-| `default_scale` | integer | The scale of the guest screen when the emulator starts: `0` (Dynamic), `1` (Original view), `2`, `3`, or `5`. Dynamic picks `2` on a primary display at 150% scaling or more, unless the board has a high-DPI screen, and `1` otherwise. Absent: `0`. |
-| `host_branch` | string | A platform of this build: `win32-x86`, `linux-amd64`, `macos-arm64`, `android-arm64`, `android-amd64`. Reserved: `windows-amd64`, `windows-arm64`, `linux-arm64`. Absent: `win32-x86`. |
-
-CERF writes the keys that you change in **Settings** and on the **Sources** page. When you tick
-**Remember this choice** in the shutdown dialog, CERF stores your answer in `last_save_state_mode`.
-When you upgrade CERF, the installer merges the
-new file into your existing one. It keeps every value that you already have, so your own edits
-survive.
+| `device` | string | The device directory to boot when the command line has no `--device=` |
+| `bundle_repositories` | array of `{ url, enabled }` | The [ROM bundle repositories](bundle-repositories.md) |
+| `last_save_state_mode` | boolean | **Save the state** checkmark state in shutdown window |
+| `update_channel` | string | `disabled`, `stable`, or `unstable`. |
+| `discord_rich_presence` | boolean | - |
+| `tutorial_finished` | boolean | - |
+| `host_key` | integer, or array of integers | One VK or max 8 VKs. Absent: Right Ctrl (`163`). |
+| `default_scale` | integer | Integer scaling at start. `0` (Dynamic), `1` (Original view), `2`, `3`, or `5`. Absent: `0`. |
+| `host_branch` | string | `win32-x86`, `linux-amd64`, `macos-arm64`, `android-arm64`, `android-amd64`. Reserved: `windows-amd64`, `windows-arm64`, `linux-arm64`. Absent: `win32-x86`. |
 
 ## Layer 2 - the device `cerf.json`
 
-This file lives inside the device directory next to the ROM. It comes with a ROM bundle and
-describes the device as shipped. Nothing that you change goes into it.
-
-!!! note "Global vs scoped parameters"
-
-    Configurable screen width, height, bpp, DPI live inside the global block rather than in
-    guest additions block, because some boards supports it too. Good example is Device Emulator board -
-    you are using same knobs to tweak either stock behaviour, or the one that Guest Additions driver
-    overrides.
-
-```json
-{
-  "meta": {
-    "device_name": "HP Jornada 720",
-    "os": { "name": "Handheld PC 2000", "ver_major": 3, "ver_minor": 0 }
-  },
-  "board": { "id": "jornada_720" },
-  "rom": {
-    "primary": "jornada720.bin",
-    "eeprom": "jorn720_eeprom.bin"
-  }
-}
-```
-
-Two keys carry the whole boot. `board.id` selects the board that CERF emulates. `rom.primary` names
-the file that boots. Everything else is optional.
-
 ### `board`
 
-| Key | Type | Meaning |
+| Key | Type | Meaning/values |
 | --- | --- | --- |
-| `id` | string | The board that CERF emulates. `cerf.exe --help` lists every id. |
-| `configurable_screen_width` | integer | The screen width on a board whose resolution is not fixed, and for the Guest Additions display. |
-| `configurable_screen_height` | integer | As above, the height. |
-| `configurable_screen_dpi` | integer | The display DPI that CERF reports to the guest. Guest Additions only. |
-| `configurable_screen_bpp` | integer | The display colour depth in bits per pixel. Absent, CERF picks the depth. |
+| `id` | string | the board ID cerf emulates from `db.json` |
+| `configurable_screen_width` | integer | device models a panel with dynamic resolution - width |
+| `configurable_screen_height` | integer | as above |
+| `configurable_screen_dpi` | integer | as above |
+| `configurable_screen_bpp` | integer | as above |
 
 ### `rom`
 
-| Key | Type | Meaning |
-| --- | --- | --- |
-| `primary` | string | The file that boots. A filename inside the device directory, or an absolute path. |
-| `extensions` | array of strings | Extra ROM partitions that CERF loads after the primary one. |
-| `recovery` | string | An alternative image. CERF boots it only with `--recovery`. |
-| `eeprom` | string | A serial configuration EEPROM image, for a board that has one. |
-| `lumia800_user_area_erase` | string | The erase package for the user area. It is in the same firmware package as `primary`. |
+Devices define their own keys since sources may vary accross devices. Here are some generic but not all:
 
-The boards are different in the `rom` block. Most devices need one line - `primary`.
-Some need more, because the hardware has more. **The board implementation decides which keys a
-device can declare here.**
+| Key | Type | Meaning/values |
+| --- | --- | --- |
+| `primary` | string | a generic ROM path if a device support it. Most of devices share this key |
+| `recovery` | string | alternative to `primary` but boots with `--recovery` (FIXME: wait, i thought i removed it) |
+| `eeprom` | string | Used for devices which have one EEPROM dump |
+| `lumia800_user_area_erase` | string | Lumia 800 specific firmware package file |
 
 ### `storage`
+
+Identical conception as above but for writable persistant user storage.
 
 | Key | Type | Meaning |
 | --- | --- | --- |
@@ -112,84 +64,39 @@ device can declare here.**
 | `hdd` | string | A hard disk image, relative to the device directory. Absent, `hdd.img`. |
 | `emmc` | string | An eMMC image, relative to the device directory. Absent, `emmc.img`. |
 
-### The rest
+### Network
 
 | Key | Type | Meaning |
 | --- | --- | --- |
-| `network.enabled` | boolean | The network backend. The same as `--disable-network` inverted. |
-| `network.mac` | string | The guest MAC, `XX:XX:XX:XX:XX:XX`. |
+| `network.enabled` | boolean | The same as `--disable-network` inverted. |
+| `network.mac` | string | The guest MAC, `XX:XX:XX:XX:XX:XX`. (FIXME: there can be one MAC per a network device and CERF lets you to use several at once. Do we increment the MAC or something? I forgot) |
 | `network.mtu` | integer | 64 to 1500. |
-| `network.forward_tcp`, `network.forward_udp` | string | Host-to-guest port forwards. |
-| `guest_additions.enabled` | boolean | Boot with Guest Additions. The same as `--guest-additions`. |
-| `guest_additions.override_color_scheme` | string | The system color scheme that the guest driver applies. The same as `--ga-color-scheme`. |
-| `guest_additions.override_font_size` | integer | The system font height, in logical units. The same as `--ga-font-size`. |
-| `guest_additions.override_cleartype` | boolean | `true` turns ClearType on in the guest when the shell is up, and `false` turns it off. When the key is absent, the ROM's own setting stays. |
-| `guest_additions.allow_untrusted_apps` | boolean | `true` lets Windows Mobile run untrusted apps. The guest driver applies it when the shell is up. It breaks a cold boot. Turn it on only after the device boots. `false` or absent changes nothing. |
-| `guest_additions.share_folder` | string | A host folder that CERF mounts into the guest. The same as `--ga-share-folder`. |
-| `guest_additions.shared_folder_mount_point` | string | The name of the guest root folder that shows the shared folder. |
-| `guest_additions.autorun` | array of strings | Guest paths. When the shell is up, the guest driver starts each path, in order. `--ga-autorun=PATH` replaces the array. |
-| `full_screen` | boolean | Enter borderless full screen at startup. |
-| `double_tap_helper` | boolean | In stylus mode on Android, the emulator detects double taps and sends the second tap exactly at the position of the first, so the taps do not drift apart. Default `true`. |
-| `throttle_multiplier` | number | Scales the wall time that CERF gives each guest second. `2` runs the guest at half speed. `0` removes the limit, and the guest runs as fast as the host allows. Default `1`. |
-| `cpu_rate_multiplier` | number | Multiplies the guest CPU clock rate. The guest's timers keep their rates, so the guest does more work in each second. Default `1`. |
-| `adopt_guest_additions_resolution_for_host_screen` | boolean | Size the Guest Additions display to the host monitor instead of the configured resolution. |
-| `additional_packages.compact_flash_cards` | array of `{ file, name, insert_on_launch }` | CF card images that ship with the ROM. Each one appears in the card insert menu. When `insert_on_launch` is `true`, CERF inserts that card automatically at boot. |
-| `meta` | object | Who the device is: `name`, `device_name`, and `os` (`name`, `ver_major`, `ver_minor`). |
+| `network.forward_tcp`, `network.forward_udp` | string | Host-to-guest port forwards. I don't know if it still works, nobody tested it since CERF v1 |
 
-`meta` is descriptive, not operational. CERF displays it. CERF takes nothing about the boot from
-it: the board comes from `board.id`, and CERF reads everything else out of the ROM.
+# Guest Additions
+
+| Key | Type | Meaning |
+| --- | --- | --- |
+| `guest_additions.enabled` | boolean | The same as `--guest-additions`. |
+| `guest_additions.override_color_scheme` | string | The same as `--ga-color-scheme`. |
+| `guest_additions.override_font_size` | integer | same as `--ga-font-size`. |
+| `guest_additions.override_cleartype` | boolean | - |
+| `guest_additions.allow_untrusted_apps` | boolean | - |
+| `guest_additions.share_folder` | string | The same as `--ga-share-folder`. |
+| `guest_additions.shared_folder_mount_point` | string | - |
+| `guest_additions.autorun` | array of strings | Guest paths. When the shell is up, the guest driver starts each path, in order. `--ga-autorun=PATH` replaces the array. (FIXME: should we add this to UI?) |
+
+# Rest
+
+| Key | Type | Meaning |
+| --- | --- | --- |
+| `full_screen` | boolean | - |
+| `double_tap_helper` | boolean | A double tap at single coordinate helper for Android |
+| `throttle_multiplier` | number | - |
+| `cpu_rate_multiplier` | number | - |
+| `additional_packages.compact_flash_cards` | array of `{ file, name, insert_on_launch }` | CF cards from a ROM bundle that are displayed in UI and might be auto-attached at launch |
+| `meta` | object | Who the device is: `name`, `device_name`, and `os` (`name`, `ver_major`, `ver_minor`). Pure metadata. |
 
 ## Layer 3 - `cerf-user.json`
 
-This file has the same format and the same keys, in the same device directory. CERF applies it
-after `cerf.json`, so anything in it wins. The file is optional, and a device that you never
-configured does not have one.
-
-The emulator keeps a device from a bundle repository up to date. When the catalog metadata changes,
-it **rewrites that device's `cerf.json` wholesale**, and anything that you put in that file is lost.
-Your choices are therefore written here instead:
-
-```json
-{
-  "launcher": {
-    "repository_url": "https://example.com/bundles",
-    "name_on_repository": "devemu_ce5"
-  },
-  "meta": { "name": "My CE 5 box" },
-  "guest_additions": { "enabled": true },
-  "board": { "configurable_screen_width": 800, "configurable_screen_height": 600 },
-  "network": { "enabled": false },
-  "full_screen": false
-}
-```
-
-- **`launcher`** - the repository that this device directory came from, and its name there. This
-  block is the update link: it tells the emulator that a newer bundle applies to this
-  directory. A device that you created from your own dump has no such block, and it has no
-  layer 2 file either. Its board and ROM live here.
-- **`meta.name`** - your display-name override.
-- **Everything that you set in the device's *Properties***. CERF stores only the values
-  that you changed away from the device's own default.
-- **`cpu_config`** - your CPU values, from the *CPU Configuration* page. Each key is a parameter
-  `id` from `cpu_config_params` in `db.json`. Its value replaces the default of the board's SoC.
-  A hex value is a string such as `"0x6901B118"`. CERF reads this key from this file only.
-
-A ROM upgrade replaces the ROM and rewrites `cerf.json`. It does not touch `cerf-user.json`, so
-your configuration is still there afterwards.
-
-!!! note "A file you picked stays picked after upgrades"
-
-    `cerf-user.json` goes through the same loader as `cerf.json`, so any key from layer 2 is legal
-    in it. When you pick another ROM or storage file in *Properties*, that key is written here.
-    A bundle upgrade does not replace that choice. When you pick the default file again, your
-    choice is removed.
-
-## Order of application
-
-```
-global cerf.json  ->  devices/<name>/cerf.json  ->  devices/<name>/cerf-user.json  ->  command line
-```
-
-Later wins.
-
-[Running your own ROM](own-rom.md) shows the two-key `cerf-user.json` that boots a dump.
+Identical to `cerf.json`. Conception is that `cerf.json` is a ROM bundle's one that changes only on ROM bundle updates, and `cerf-user.json` is where you dump all your personal overrides. Second is applied over first. Your data is never lost on ROM bundle updates.

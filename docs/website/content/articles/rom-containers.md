@@ -1,5 +1,7 @@
 # Windows CE ROM containers
 
+--8<-- "ai-summary.md"
+
 A reference for the file formats Windows CE ROMs actually ship in, how they differ across CE
 versions, and how to extract them. This is the layer *below* "the ROM" - what wraps the bootable
 image, not the CE binaries inside it. It is written down almost nowhere else; this page is grounded

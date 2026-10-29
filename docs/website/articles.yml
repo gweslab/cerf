@@ -1,8 +1,8 @@
 articles:
-  - title: Running CERF from the command line
-    text: The CLI, the log channels, and the files a bug report needs.
-    image: command-line/cerf-help.png
-    link: articles/command-line.md
+  - title: ROM/bundle repositories
+    text: Where to download ROMs?
+    image: bundle-repositories/image.png
+    link: articles/bundle-repositories.md
 
   - title: Getting the guest online
     text: Put a network card in the slot and browse the web from Windows CE.

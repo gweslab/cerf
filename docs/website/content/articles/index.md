@@ -22,8 +22,6 @@ and reference for the parts underneath.
 
 ## Advanced users and developers
 
-- [**Running CERF from the command line**](command-line.md) - the CLI, and the logs a bug report
-  needs.
 - [**The configuration files**](cerf-json.md) - the three layers of `cerf.json`, and what each one
   can set.
 - [**ROM bundle repositories**](bundle-repositories.md) - where the emulator downloads ROMs from,

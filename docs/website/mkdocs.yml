@@ -88,6 +88,9 @@ markdown_extensions:
   - pymdownx.keys
   - pymdownx.tabbed:
       alternate_style: true
+  - pymdownx.snippets:
+      base_path: !relative $config_dir/snippets
+      check_paths: true
 
 extra_css:
   - assets/cerf.css

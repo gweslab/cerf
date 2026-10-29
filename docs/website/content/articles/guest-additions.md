@@ -41,6 +41,8 @@ Explorer.
 
 ## How the driver gets in
 
+--8<-- "ai-summary.md"
+
 A Windows CE ROM ships with the display driver its device will use.
 [Windows CE ROM containers](rom-containers.md) covers the forms those images come in.
 

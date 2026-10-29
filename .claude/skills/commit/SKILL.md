@@ -20,7 +20,14 @@ Fewer words is better. A one-line title is the target, not a minimum.
 
 - **Describe the diff, not the discussion.** The message covers what the change does to the project. It never covers the conversation that produced it.
 - **A body is banned. Write the one-line title, then stop.** If you judge a body "substantive", "justified", or "short enough", that judgment IS the slop. Delete it. Ship the title.
-- **Use the imperative, with a lowercase scope prefix that matches recent commits** (`jornada820: keyboard`, `host: compose window title from cerf.json device meta`). Read `git log` first.
+- **The title is `<scope>: <change>`.** `<change>` is in the imperative. `<scope>` is one of these values:
+  - `tools`, `ce_apps`, `ci`, `frontend`, `cerfman`, `claude`, `assets`, `installers`, `uninstaller`, `website`, `ga`, `db`, `chore`
+  - `libCerfCore`, `libCerfEngine`, `libservicelocator`
+  - the short name of a SoC, for example `s3c2410` or `vr4121`
+  - the short name of a board, for example `jornada820`
+  - the name of a CPU architecture, for example `arm` or `mips`
+
+  When no one scope covers the change, join the scopes with `, `, for example `sa1111, jornada720: ...`.
 - **Title a commit that only bumps a submodule pointer `<submodule>: bump submodule`, and nothing more.** `<submodule>` is the name of the submodule whose pointer moves, for example `libCerfCore: bump submodule`. A commit that also changes other files takes a title that describes its whole change.
 - **End with the `Co-Authored-By:` trailer for the model that runs this session.** Claude Code supplies it.
 

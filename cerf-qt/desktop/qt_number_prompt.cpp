@@ -4,6 +4,7 @@
 #include "qt_main_window.h"
 
 #include <cerfcore/core/cerf_emulator.h>
+#include <cerfcore/core/instance_gate.h>
 
 #include <QDialog>
 #include <QLabel>
@@ -36,8 +37,8 @@ public:
         ok->setDefault(true);
         auto* cancel = new QPushButton(QStringLiteral("Cancel"), &dialog);
         cancel->setGeometry(du.Rect(152, 50, 50, 14));
-        QObject::connect(ok, &QPushButton::clicked, &dialog, &QDialog::accept);
-        QObject::connect(cancel, &QPushButton::clicked, &dialog, &QDialog::reject);
+        QObject::connect(ok, &QPushButton::clicked, &dialog, gate_.Bind([&dialog] { dialog.accept(); }));
+        QObject::connect(cancel, &QPushButton::clicked, &dialog, gate_.Bind([&dialog] { dialog.reject(); }));
         edit->setFocus();
 
         if (dialog.exec() != QDialog::Accepted) return 0;
@@ -46,6 +47,9 @@ public:
         if (!parsed || value < minimum || value > 0xFFFFFFFFull) return minimum;
         return static_cast<uint32_t>(value);
     }
+
+private:
+    const cerfcore::InstanceGate gate_{emu_};
 };
 
 }

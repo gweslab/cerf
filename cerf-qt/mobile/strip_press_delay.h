@@ -4,14 +4,14 @@
 #include <QTimer>
 
 #include <deque>
-#include <functional>
+
+class StripPressReceiver;
 
 class StripPressDelay {
 public:
     enum class Step { kPress, kRelease, kCancel };
-    using Sink = std::function<void(Step step, int index)>;
 
-    explicit StripPressDelay(Sink sink);
+    explicit StripPressDelay(StripPressReceiver& receiver);
 
     void Begin(int index);
     void End(int index);
@@ -32,14 +32,22 @@ private:
     void DeliverAll();
     void Arm();
 
-    Sink               sink_;
-    QElapsedTimer      clock_;
-    QTimer             tap_timer_;
-    QTimer             due_timer_;
-    std::deque<Queued> queue_;
-    qint64             free_at_ms_   = 0;
-    qint64             down_ms_      = 0;
-    qint64             press_due_ms_ = 0;
-    int                current_      = -1;
-    bool               decided_      = false;
+    StripPressReceiver& receiver_;
+    QElapsedTimer       clock_;
+    QTimer              tap_timer_;
+    QTimer              due_timer_;
+    std::deque<Queued>  queue_;
+    qint64              free_at_ms_   = 0;
+    qint64              down_ms_      = 0;
+    qint64              press_due_ms_ = 0;
+    int                 current_      = -1;
+    bool                decided_      = false;
+};
+
+class StripPressReceiver {
+public:
+    virtual void OnStripStep(StripPressDelay::Step step, int index) = 0;
+
+protected:
+    ~StripPressReceiver() = default;
 };

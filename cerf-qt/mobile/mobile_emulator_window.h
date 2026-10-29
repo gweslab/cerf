@@ -42,8 +42,11 @@ public:
     void        ShowHint(const QString& text, uint32_t hold_ms, int bottom_gap);
     QQuickItem* CreateExternalDisplay();
     void        CloseDialogs();
+    void        SetWedgedHandler(std::function<void()> fn) { wedged_handler_ = std::move(fn); }
+    void        OnTeardownWedged() override;
 
 private:
+    void     CloseWindow();
     void     MakeWindow();
     QObject* CreateDialog(const QString& type_name, const QVariantMap& properties);
     void     AdoptResolutionToScreen();
@@ -52,6 +55,8 @@ private:
     QPointer<GuestSurface>       surface_;
     QPointer<EmulatorController> controller_;
     QPointer<MobileWidgetBar>    widget_bar_;
+    std::function<void()>        wedged_handler_;
 
-    bool fullscreen_ = true;
+    bool input_attached_ = false;
+    bool fullscreen_     = true;
 };

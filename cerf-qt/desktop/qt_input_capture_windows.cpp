@@ -6,6 +6,7 @@
 #include "qt_main_window.h"
 
 #include <cerfcore/core/cerf_emulator.h>
+#include <cerfcore/core/instance_gate.h>
 
 #include <windows.h>
 
@@ -22,7 +23,9 @@ public:
                 if (!IsCaptured()) return false;
                 if (GetForegroundWindow() != reinterpret_cast<HWND>(window.NativeHandle()))
                     return false;
-                return OnHostKey(vk, key_up);
+                bool eaten = false;
+                gate_.Run([&](cerfcore::CerfEmulator&) { eaten = OnHostKey(vk, key_up); });
+                return eaten;
             });
         });
     }
@@ -30,6 +33,7 @@ public:
     void OnShutdown() override { hook_.Remove(); }
 
 private:
+    const cerfcore::InstanceGate       gate_{emu_};
     cerffrontend::LowLevelKeyboardHook hook_;
 };
 

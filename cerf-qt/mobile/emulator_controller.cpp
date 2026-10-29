@@ -28,43 +28,42 @@ QString ArrowSymbol(const cerffrontend::RowButton& b) {
 }
 
 void EmulatorController::OpenGearMenu(qreal x, qreal y) {
-    if (!emu_) return;
-    emu_->Get<MobileMenuPresenter>().Show(emu_->Get<MobileEmulatorWindow>().GearMenu(), QPointF(x, y));
+    gate_.Run([x, y](cerfcore::CerfEmulator& emu) {
+        emu.Get<MobileMenuPresenter>().Show(emu.Get<MobileEmulatorWindow>().GearMenu(), QPointF(x, y));
+    });
 }
 
 void EmulatorController::OpenPointerMenu(qreal x, qreal y) {
-    if (!emu_) return;
-    emu_->Get<MobileMenuPresenter>().Show(emu_->Get<MobileEmulatorWindow>().PointerMenu(), QPointF(x, y));
+    gate_.Run([x, y](cerfcore::CerfEmulator& emu) {
+        emu.Get<MobileMenuPresenter>().Show(emu.Get<MobileEmulatorWindow>().PointerMenu(), QPointF(x, y));
+    });
 }
 
 void EmulatorController::MenuPicked(int id) {
     QMetaObject::invokeMethod(
-        this,
-        [this, id] {
-            if (emu_) emu_->Get<MobileMenuPresenter>().Pick(id);
-        },
+        this, [this, id] { gate_.Run([id](cerfcore::CerfEmulator& emu) { emu.Get<MobileMenuPresenter>().Pick(id); }); },
         Qt::QueuedConnection);
 }
 
 void EmulatorController::RequestClose() {
-    if (!emu_) return;
-    emu_->Get<MobileEmulatorWindow>().CloseRequested();
+    gate_.Run([](cerfcore::CerfEmulator& emu) { emu.Get<MobileEmulatorWindow>().CloseRequested(); });
 }
 
 QVariantList EmulatorController::RowButtons() {
-    if (!emu_) return {};
-    const std::vector<cerffrontend::RowButton> buttons = emu_->Get<cerffrontend::ButtonRow>().Buttons();
-    QVariantList                               out;
-    for (size_t i = 0; i < buttons.size(); ++i) {
-        const cerffrontend::RowButton& b = buttons[i];
-        QVariantMap                    entry;
-        entry["index"]      = static_cast<int>(i);
-        entry["label"]      = QString::fromStdString(b.label);
-        entry["symbol"]     = ArrowSymbol(b);
-        entry["held"]       = b.held;
-        entry["groupStart"] = b.group_start;
-        out.append(entry);
-    }
+    QVariantList out;
+    gate_.Run([&out](cerfcore::CerfEmulator& emu) {
+        const std::vector<cerffrontend::RowButton> buttons = emu.Get<cerffrontend::ButtonRow>().Buttons();
+        for (size_t i = 0; i < buttons.size(); ++i) {
+            const cerffrontend::RowButton& b = buttons[i];
+            QVariantMap                    entry;
+            entry["index"]      = static_cast<int>(i);
+            entry["label"]      = QString::fromStdString(b.label);
+            entry["symbol"]     = ArrowSymbol(b);
+            entry["held"]       = b.held;
+            entry["groupStart"] = b.group_start;
+            out.append(entry);
+        }
+    });
     return out;
 }
 
@@ -77,19 +76,23 @@ void EmulatorController::ReleaseRowButton(int index) { row_press_.End(index); }
 void EmulatorController::CancelRowButton(int index) { row_press_.Cancel(index); }
 
 bool EmulatorController::HoldRowButton(int index) {
-    if (!emu_) return false;
+    if (!gate_.Attached()) return false;
     row_press_.HandOver(index);
-    if (!emu_->Get<cerffrontend::ButtonRow>().HoldAt(static_cast<size_t>(index))) return false;
-    PerformLongPressHaptic(*emu_->Get<MobileEmulatorWindow>().Window());
-    return true;
+    bool held = false;
+    gate_.Run([index, &held](cerfcore::CerfEmulator& emu) {
+        held = emu.Get<cerffrontend::ButtonRow>().HoldAt(static_cast<size_t>(index));
+        if (held) PerformLongPressHaptic(*emu.Get<MobileEmulatorWindow>().Window());
+    });
+    return held;
 }
 
-void EmulatorController::RowStep(StripPressDelay::Step step, int index) {
-    if (!emu_) return;
-    auto& row = emu_->Get<cerffrontend::ButtonRow>();
-    switch (step) {
-        case StripPressDelay::Step::kPress:   row.PressAt(static_cast<size_t>(index)); return;
-        case StripPressDelay::Step::kRelease: row.ReleaseAt(static_cast<size_t>(index)); return;
-        case StripPressDelay::Step::kCancel:  row.CancelPress(); return;
-    }
+void EmulatorController::OnStripStep(StripPressDelay::Step step, int index) {
+    gate_.Run([step, index](cerfcore::CerfEmulator& emu) {
+        auto& row = emu.Get<cerffrontend::ButtonRow>();
+        switch (step) {
+            case StripPressDelay::Step::kPress:   row.PressAt(static_cast<size_t>(index)); return;
+            case StripPressDelay::Step::kRelease: row.ReleaseAt(static_cast<size_t>(index)); return;
+            case StripPressDelay::Step::kCancel:  row.CancelPress(); return;
+        }
+    });
 }

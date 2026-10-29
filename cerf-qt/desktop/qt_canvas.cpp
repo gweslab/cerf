@@ -6,25 +6,49 @@
 #include "../qt_key_input.h"
 #include "qt_guest_cursor.h"
 
+#include <cerfcore/core/cerf_emulator.h>
 #include <cerfcore/host/frame_renderer.h>
+#include <cerfcore/host/guest_resize_policy.h>
 #include <cerfcore/host/refresh_rate_service.h>
 
 #include <QCursor>
 #include <QKeyEvent>
 #include <QMouseEvent>
+#include <QResizeEvent>
 #include <QWheelEvent>
 
-QtCanvas::QtCanvas(cerfcore::CerfEmulator& emu, QWidget* parent, uint32_t surf_w, uint32_t surf_h)
-    : QtPresenterCanvas(emu, parent, emu.Get<cerfcore::FrameRenderer>(), surf_w, surf_h,
-                        static_cast<int>(emu.Get<cerfcore::RefreshRateService>().FrameIntervalMs()),
-                        std::make_unique<QtEmulatorPresent>(
-                            emu, [this] { return Dpr(); }, [this] { SetFramebufferActive(true); })) {
-    emu_.Get<cerffrontend::CanvasInput>().Attach(this);
+namespace {
+
+constexpr int kResizeDebounceMs = 200;
+
 }
 
-QtCanvas::~QtCanvas() {
-    emu_.Get<cerffrontend::CanvasInput>().Attach(nullptr);
+QtCanvas::QtCanvas(cerfcore::CerfEmulator& emu, QWidget* parent, uint32_t surf_w, uint32_t surf_h)
+    : QtPresenterCanvas(emu, parent, surf_w, surf_h,
+                        static_cast<int>(emu.Get<cerfcore::RefreshRateService>().FrameIntervalMs())) {
+    SetPresentHooks(std::make_unique<QtEmulatorPresent>(*this));
+    resize_debounce_.setSingleShot(true);
+    resize_debounce_.setInterval(kResizeDebounceMs);
+    QObject::connect(&resize_debounce_, &QTimer::timeout, this,
+                     [this] { gate_.Run([this](cerfcore::CerfEmulator& gate_emu) { FireAutoResize(gate_emu); }); });
 }
+
+void QtCanvas::resizeEvent(QResizeEvent* event) {
+    QtPresenterCanvas::resizeEvent(event);
+    gate_.Run([this](cerfcore::CerfEmulator& emu) {
+        auto* policy = emu.TryGet<cerfcore::GuestResizePolicy>();
+        if (policy && policy->Enabled() && !window()->isMinimized()) resize_debounce_.start();
+    });
+}
+
+void QtCanvas::FireAutoResize(cerfcore::CerfEmulator& emu) {
+    const qreal dpr = Dpr();
+    if (auto* policy = emu.TryGet<cerfcore::GuestResizePolicy>())
+        policy->OnUserResizeEnd(static_cast<uint32_t>(DeviceExtent(width(), dpr)),
+                                static_cast<uint32_t>(DeviceExtent(height(), dpr)));
+}
+
+cerfcore::FrameSource& QtCanvas::Source(cerfcore::CerfEmulator& emu) { return emu.Get<cerfcore::FrameRenderer>(); }
 
 void QtCanvas::ClientSize(int& width, int& height) const {
     int w = 0, h = 0;
@@ -44,7 +68,7 @@ void QtCanvas::SetMouseCapture(bool on) {
     const bool held = grabbing_;
     grabbing_       = false;
     releaseMouse();
-    if (held) emu_.Get<cerffrontend::CanvasInput>().OnCaptureLost();
+    if (held) gate_.Run([](cerfcore::CerfEmulator& emu) { emu.Get<cerffrontend::CanvasInput>().OnCaptureLost(); });
 }
 
 void QtCanvas::LoseMouseCapture() {
@@ -62,8 +86,8 @@ void QtCanvas::WarpPointerTo(int x, int y) {
     QCursor::setPos(mapToGlobal(LogicalPoint(x, y, Dpr())));
 }
 
-void QtCanvas::ApplyCursor(int x, int y) {
-    const cerffrontend::CanvasCursor want = emu_.Get<cerffrontend::CanvasInput>().CursorAt(x, y);
+void QtCanvas::ApplyCursor(cerfcore::CerfEmulator& emu, int x, int y) {
+    const cerffrontend::CanvasCursor want = emu.Get<cerffrontend::CanvasInput>().CursorAt(x, y);
     if (pointer_hidden_) {
         setCursor(Qt::BlankCursor);
         return;
@@ -74,14 +98,14 @@ void QtCanvas::ApplyCursor(int x, int y) {
         case cerffrontend::CanvasCursor::kNone:    setCursor(Qt::BlankCursor); return;
         case cerffrontend::CanvasCursor::kGuest: {
             bool          active = false;
-            const QCursor cur    = emu_.Get<QtGuestCursor>().Resolve(active);
+            const QCursor cur    = emu.Get<QtGuestCursor>().Resolve(active);
             setCursor(active ? cur : QCursor(Qt::ArrowCursor));
             return;
         }
     }
 }
 
-void QtCanvas::RouteMouse(QMouseEvent* event, cerffrontend::CanvasMouse::Kind kind) {
+void QtCanvas::RouteMouse(cerfcore::CerfEmulator& emu, QMouseEvent* event, cerffrontend::CanvasMouse::Kind kind) {
     const QPoint             pos = DevicePoint(event->position(), Dpr());
     cerffrontend::CanvasMouse m;
     m.kind   = kind;
@@ -90,38 +114,48 @@ void QtCanvas::RouteMouse(QMouseEvent* event, cerffrontend::CanvasMouse::Kind ki
     m.x      = pos.x();
     m.y      = pos.y();
     m.held   = HeldMouseButtons(event->buttons());
-    emu_.Get<cerffrontend::CanvasInput>().OnMouse(m);
+    emu.Get<cerffrontend::CanvasInput>().OnMouse(m);
 }
 
 void QtCanvas::mousePressEvent(QMouseEvent* event) {
-    const QPoint pos = DevicePoint(event->position(), Dpr());
-    ApplyCursor(pos.x(), pos.y());
-    RouteMouse(event, cerffrontend::CanvasMouse::Kind::kDown);
+    gate_.Run([this, event](cerfcore::CerfEmulator& emu) {
+        const QPoint pos = DevicePoint(event->position(), Dpr());
+        ApplyCursor(emu, pos.x(), pos.y());
+        RouteMouse(emu, event, cerffrontend::CanvasMouse::Kind::kDown);
+    });
 }
 
 void QtCanvas::mouseReleaseEvent(QMouseEvent* event) {
-    RouteMouse(event, cerffrontend::CanvasMouse::Kind::kUp);
+    gate_.Run([this, event](cerfcore::CerfEmulator& emu) { RouteMouse(emu, event, cerffrontend::CanvasMouse::Kind::kUp); });
 }
 
 void QtCanvas::mouseMoveEvent(QMouseEvent* event) {
-    const QPoint pos = DevicePoint(event->position(), Dpr());
-    ApplyCursor(pos.x(), pos.y());
-    RouteMouse(event, cerffrontend::CanvasMouse::Kind::kMove);
+    gate_.Run([this, event](cerfcore::CerfEmulator& emu) {
+        const QPoint pos = DevicePoint(event->position(), Dpr());
+        ApplyCursor(emu, pos.x(), pos.y());
+        RouteMouse(emu, event, cerffrontend::CanvasMouse::Kind::kMove);
+    });
 }
 
 void QtCanvas::wheelEvent(QWheelEvent* event) {
-    const QPoint             pos = DevicePoint(event->position(), Dpr());
-    cerffrontend::CanvasMouse m;
-    m.kind  = cerffrontend::CanvasMouse::Kind::kWheel;
-    m.x     = pos.x();
-    m.y     = pos.y();
-    m.held  = HeldMouseButtons(event->buttons());
-    m.wheel = event->angleDelta().y();
-    emu_.Get<cerffrontend::CanvasInput>().OnMouse(m);
+    gate_.Run([this, event](cerfcore::CerfEmulator& emu) {
+        const QPoint             pos = DevicePoint(event->position(), Dpr());
+        cerffrontend::CanvasMouse m;
+        m.kind  = cerffrontend::CanvasMouse::Kind::kWheel;
+        m.x     = pos.x();
+        m.y     = pos.y();
+        m.held  = HeldMouseButtons(event->buttons());
+        m.wheel = event->angleDelta().y();
+        emu.Get<cerffrontend::CanvasInput>().OnMouse(m);
+    });
 }
 
-void QtCanvas::keyPressEvent(QKeyEvent* event) { emu_.Get<QtKeyInput>().Route(event, false, true); }
+void QtCanvas::keyPressEvent(QKeyEvent* event) {
+    gate_.Run([event](cerfcore::CerfEmulator& emu) { emu.Get<QtKeyInput>().Route(event, false, true); });
+}
 
-void QtCanvas::keyReleaseEvent(QKeyEvent* event) { emu_.Get<QtKeyInput>().Route(event, true, true); }
+void QtCanvas::keyReleaseEvent(QKeyEvent* event) {
+    gate_.Run([event](cerfcore::CerfEmulator& emu) { emu.Get<QtKeyInput>().Route(event, true, true); });
+}
 
 bool QtCanvas::focusNextPrevChild(bool) { return false; }

@@ -4,6 +4,7 @@
 
 #include <cerfcore/core/log.h>
 #include <cerfcore/core/product_name.h>
+#include <cerfcore/platform/host_process.h>
 #include <cerfcore/platform/wide_text_win32.h>
 
 #include <windows.h>
@@ -16,7 +17,7 @@ std::vector<std::string> Utf8Arguments(int, char**) {
     if (wide == nullptr) {
         MessageBoxW(nullptr, L"The command line could not be read.",
                     cerfcore::Utf8ToWide(cerfcore::kProductName).c_str(), MB_OK | MB_ICONERROR);
-        cerfcore::CerfFatalExit(cerfcore::CERF_FATAL_USER_ERROR);
+        cerfcore::host_platform::ExitProcessNow(cerfcore::CERF_FATAL_USER_ERROR);
     }
     std::vector<std::string> arguments;
     for (int i = 0; i < count; ++i) arguments.push_back(cerfcore::WideToUtf8(wide[i]));

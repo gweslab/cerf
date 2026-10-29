@@ -23,7 +23,7 @@
 #include <cerfcore/core/cerf_emulator.h>
 #include <cerfcore/core/device_config.h>
 #include <cerfcore/core/log.h>
-#include <cerfcore/host/guest_resize_policy.h>
+#include <cerfcore/platform/host_process.h>
 
 #include <QApplication>
 #include <QGuiApplication>
@@ -32,16 +32,9 @@
 #include <QMenuBar>
 #include <QPixmap>
 #include <QScreen>
-#include <QTimer>
 #include <QVBoxLayout>
 
 REGISTER_SERVICE(QtMainWindow);
-
-namespace {
-
-constexpr int kResizeDebounceMs = 200;
-
-}
 
 QtMainWindow::~QtMainWindow() = default;
 
@@ -55,7 +48,7 @@ void QtMainWindow::OnReady() {
     for (int px : {16, 20, 24, 32, 48, 64, 256})
         app_icon.addPixmap(QPixmap::fromImage(emu_.Get<QtPaintResources>().SvgImage(CERF_LOGO_ASSET, px, px, 1.0)));
     QApplication::setWindowIcon(app_icon);
-    window_ = new QtHostWindow(*this);
+    window_ = new QtHostWindow(emu_);
     window_->setWindowTitle(QString::fromStdString(emu_.Get<cerffrontend::WindowTitle>().Compose()));
     BuildMenus();
 
@@ -65,16 +58,12 @@ void QtMainWindow::OnReady() {
     layout->setSpacing(0);
     canvas_ = new QtCanvas(emu_, central, dc.board_configurable_screen_width, dc.board_configurable_screen_height);
     bar_    = new QtStatusBar(emu_, central);
+    emu_.Get<cerffrontend::CanvasInput>().Attach(canvas_);
+    input_attached_ = true;
     layout->addWidget(canvas_, 1);
     layout->addWidget(bar_, 0);
     window_->setCentralWidget(central);
     AttachView(*canvas_, *window_);
-
-    resize_debounce_ = std::make_unique<QTimer>();
-    resize_debounce_->setSingleShot(true);
-    resize_debounce_->setInterval(kResizeDebounceMs);
-    QObject::connect(resize_debounce_.get(), &QTimer::timeout, [this] { FireAutoResize(); });
-    canvas_->SetResizeListener([this] { OnCanvasResized(); });
 
     const int scale = emu_.Get<cerffrontend::StartupScale>().Factor(
         qRound(cerffrontend::kDefaultDpi * QGuiApplication::primaryScreen()->devicePixelRatio()));
@@ -90,7 +79,8 @@ void QtMainWindow::OnReady() {
 
 void QtMainWindow::OnShutdown() {
     DetachView();
-    if (resize_debounce_) resize_debounce_->stop();
+    if (input_attached_) emu_.Get<cerffrontend::CanvasInput>().Attach(nullptr);
+    input_attached_ = false;
     delete window_;
     window_ = nullptr;
     canvas_ = nullptr;
@@ -101,9 +91,8 @@ void QtMainWindow::BuildMenus() {
     auto& model = emu_.Get<cerffrontend::HostMenuModel>();
     for (int i = 0; i < cerffrontend::HostMenuModel::kMenuCount; ++i) {
         QMenu* menu = window_->menuBar()->addMenu(QString::fromUtf8(model.Title(i)));
-        emu_.Get<QtMenuBuilder>().Bind(menu, [this, i] {
-            return emu_.Get<cerffrontend::HostMenuModel>().Build(i);
-        });
+        emu_.Get<QtMenuBuilder>().Bind(
+            menu, [i](cerfcore::CerfEmulator& emu) { return emu.Get<cerffrontend::HostMenuModel>().Build(i); });
     }
 }
 
@@ -203,14 +192,7 @@ void QtMainWindow::OnDeactivated() {
     canvas_->LoseMouseCapture();
 }
 
-void QtMainWindow::OnCanvasResized() {
-    auto* ar = emu_.TryGet<cerfcore::GuestResizePolicy>();
-    if (ar && ar->Enabled() && !window_->isMinimized()) resize_debounce_->start();
-}
-
-void QtMainWindow::FireAutoResize() {
-    const qreal dpr = canvas_->Dpr();
-    if (auto* ar = emu_.TryGet<cerfcore::GuestResizePolicy>())
-        ar->OnUserResizeEnd(static_cast<uint32_t>(DeviceExtent(canvas_->width(), dpr)),
-                            static_cast<uint32_t>(DeviceExtent(canvas_->height(), dpr)));
+void QtMainWindow::OnTeardownWedged() {
+    cerfcore::Log::Close();
+    cerfcore::host_platform::ExitProcessNow(cerfcore::CERF_FATAL_RUNTIME_ERROR);
 }

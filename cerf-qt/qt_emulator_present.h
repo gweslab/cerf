@@ -6,26 +6,20 @@
 #include <QtGlobal>
 
 #include <cstdint>
-#include <functional>
 
-namespace cerfcore {
-class CerfEmulator;
-}
+class QtEmulatorView;
 
 class QtEmulatorPresent final : public QtPresentHooks {
 public:
-    QtEmulatorPresent(cerfcore::CerfEmulator& emu, std::function<qreal()> dpr, std::function<void()> framebuffer_ready)
-        : emu_(emu), dpr_(std::move(dpr)), framebuffer_ready_(std::move(framebuffer_ready)) {}
+    explicit QtEmulatorPresent(QtEmulatorView& view) : view_(view) {}
 
-    void OnPresentTick(bool source_has_frame) override;
-    bool RenderAlt(uint32_t* bits, int w, int h) override;
-    bool ShouldDesaturate() override;
-    void RenderOverlay(QImage& present, int w, int h) override;
+    void OnPresentTick(cerfcore::CerfEmulator& emu, bool source_has_frame) override;
+    bool RenderAlt(cerfcore::CerfEmulator& emu, uint32_t* bits, int w, int h, qreal dpr) override;
+    bool ShouldDesaturate(cerfcore::CerfEmulator& emu) override;
+    void RenderOverlay(cerfcore::CerfEmulator& emu, QImage& present, int w, int h, qreal dpr) override;
 
 private:
-    int Dpi() const;
+    static int Dpi(qreal dpr);
 
-    cerfcore::CerfEmulator& emu_;
-    std::function<qreal()>  dpr_;
-    std::function<void()>   framebuffer_ready_;
+    QtEmulatorView& view_;
 };

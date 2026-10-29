@@ -2,6 +2,8 @@
 
 #include "frontend_window.h"
 
+#include <cerfcore/core/instance_gate.h>
+
 #include <QObject>
 #include <QPointer>
 
@@ -36,11 +38,15 @@ public:
     void CloseRequested();
     void BeginShutdownTeardown();
 
+    virtual void OnTeardownWedged() = 0;
+
 protected:
     void AttachView(QtEmulatorView& view, QObject& window);
     void PublishNativeHandle(uint64_t handle);
     void DetachView();
     bool AdoptsHostResolution() const;
+
+    const cerfcore::InstanceGate gate_{emu_};
 
 private:
     void Post(std::function<void()> job);
@@ -52,6 +58,7 @@ private:
     bool                               attached_ = false;
     QtEmulatorView*                    view_     = nullptr;
     QPointer<QObject>                  context_;
+    QObject                            jobs_;
     std::unique_ptr<QTimer>            teardown_timer_;
     std::shared_ptr<bool>              alive_ = std::make_shared<bool>(true);
     std::atomic<uint32_t>              surface_w_{0};

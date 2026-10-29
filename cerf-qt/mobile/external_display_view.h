@@ -2,13 +2,13 @@
 
 #include "../qt_frame_presenter.h"
 
+#include <cerfcore/core/instance_gate.h>
+
 #include <QQuickPaintedItem>
 #include <QtQml/qqmlregistration.h>
 
 #include <cstdint>
 #include <memory>
-
-namespace cerfcore { class FrameSource; }
 
 class ExternalDisplayView : public QQuickPaintedItem {
     Q_OBJECT
@@ -20,7 +20,7 @@ public:
     explicit ExternalDisplayView(QQuickItem* parent = nullptr);
     ~ExternalDisplayView() override;
 
-    void Attach(cerfcore::FrameSource& source, uint32_t surf_w, uint32_t surf_h);
+    void Attach(int source_id, cerfcore::CerfEmulator& emu, uint32_t surf_w, uint32_t surf_h);
     void Detach();
     void SetSurfaceSize(uint32_t w, uint32_t h);
 
@@ -34,4 +34,6 @@ signals:
 
 private:
     std::unique_ptr<QtFramePresenter> presenter_;
+    cerfcore::InstanceGate            gate_;
+    int                               source_id_ = 0;
 };

@@ -10,7 +10,6 @@ class IconSources : public QObject {
     QML_ELEMENT
     QML_SINGLETON
     Q_PROPERTY(QString aboutBand READ AboutBand CONSTANT)
-    Q_PROPERTY(QString errorImage READ ErrorImage CONSTANT)
     Q_PROPERTY(QString newIcon READ NewIcon CONSTANT)
     Q_PROPERTY(QString settingsIcon READ SettingsIcon CONSTANT)
     Q_PROPERTY(QString launchSymbol READ LaunchSymbol CONSTANT)
@@ -21,7 +20,6 @@ public:
     using QObject::QObject;
 
     QString AboutBand() const;
-    QString ErrorImage() const;
     QString NewIcon() const;
     QString SettingsIcon() const;
     QString LaunchSymbol() const;

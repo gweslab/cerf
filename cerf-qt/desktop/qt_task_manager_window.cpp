@@ -7,6 +7,7 @@
 
 #include <cerfcore/core/cerf_emulator.h>
 #include <cerfcore/core/device_config.h>
+#include <cerfcore/core/instance_gate.h>
 #include <cerfcore/peripherals/cerf_virt/cerf_virt_task_manager_regs.h>
 
 #include <QHeaderView>
@@ -40,7 +41,7 @@ QColor StatusColor(Model::StatusKind kind) {
 class TaskManagerWidget : public QWidget {
 public:
     TaskManagerWidget(cerfcore::CerfEmulator& emu, QWidget* owner)
-        : QWidget(owner, Qt::Window), emu_(emu) {
+        : QWidget(owner, Qt::Window), gate_(emu) {
         setWindowTitle(QStringLiteral("Guest Task Manager"));
         setAttribute(Qt::WA_DeleteOnClose);
         resize(Model::kClientW, Model::kClientH);
@@ -65,19 +66,27 @@ public:
         run_->setDefault(true);
         status_ = new QLabel(this);
 
-        QObject::connect(tabs_, &QTabBar::currentChanged, this, [this](int) { OnTabChanged(); });
-        QObject::connect(switch_, &QPushButton::clicked, this, [this] { DoSwitchTo(); });
-        QObject::connect(kill_, &QPushButton::clicked, this, [this] { DoKill(); });
-        QObject::connect(run_, &QPushButton::clicked, this, [this] { DoRun(); });
-        QObject::connect(edit_, &QLineEdit::returnPressed, this, [this] { DoRun(); });
+        QObject::connect(tabs_, &QTabBar::currentChanged, this,
+                         gate_.Bind([this](cerfcore::CerfEmulator& emu) { OnTabChanged(emu.Get<Model>()); }));
+        QObject::connect(switch_, &QPushButton::clicked, this,
+                         gate_.Bind([this](cerfcore::CerfEmulator& emu) { DoSwitchTo(emu.Get<Model>()); }));
+        QObject::connect(kill_, &QPushButton::clicked, this,
+                         gate_.Bind([this](cerfcore::CerfEmulator& emu) { DoKill(emu.Get<Model>()); }));
+        QObject::connect(run_, &QPushButton::clicked, this,
+                         gate_.Bind([this](cerfcore::CerfEmulator& emu) { DoRun(emu.Get<Model>()); }));
+        QObject::connect(edit_, &QLineEdit::returnPressed, this,
+                         gate_.Bind([this](cerfcore::CerfEmulator& emu) { DoRun(emu.Get<Model>()); }));
         QObject::connect(list_, &QTreeWidget::customContextMenuRequested, this,
-                         [this](const QPoint& pos) { ShowRowMenu(pos); });
-        QObject::connect(&timer_, &QTimer::timeout, this, [this] { OnTick(); });
+                         gate_.Bind([this](cerfcore::CerfEmulator& emu, const QPoint& pos) {
+                             ShowRowMenu(emu.Get<Model>(), pos);
+                         }));
+        QObject::connect(&timer_, &QTimer::timeout, this,
+                         gate_.Bind([this](cerfcore::CerfEmulator& emu) { OnTick(emu.Get<Model>()); }));
 
-        auto& model = emu_.Get<Model>();
+        auto& model = emu.Get<Model>();
         model.Open();
-        SetColumns();
-        SyncStatus();
+        SetColumns(model);
+        SyncStatus(model);
         timer_.start(static_cast<int>(Model::kRefreshMs));
     }
 
@@ -109,8 +118,8 @@ private:
                              Model::kStatusW, Model::kRowH - 6);
     }
 
-    void SetColumns() {
-        const auto& cols = emu_.Get<Model>().Columns();
+    void SetColumns(Model& model) {
+        const auto& cols = model.Columns();
         list_->clear();
         list_->setColumnCount(static_cast<int>(cols.size()));
         QStringList headers;
@@ -127,11 +136,11 @@ private:
         return true;
     }
 
-    void Fill() {
+    void Fill(Model& model) {
         uint32_t   sel     = 0;
         const bool had_sel = SelectedKey(sel);
         list_->clear();
-        for (const auto& row : emu_.Get<Model>().Rows()) {
+        for (const auto& row : model.Rows()) {
             auto* item = new QTreeWidgetItem(list_);
             for (int c = 0; c < static_cast<int>(row.cells.size()); ++c)
                 item->setText(c, QString::fromStdString(row.cells[static_cast<size_t>(c)]));
@@ -140,8 +149,7 @@ private:
         }
     }
 
-    void SyncStatus() {
-        auto& model = emu_.Get<Model>();
+    void SyncStatus(Model& model) {
         if (model.StatusSerial() == status_serial_) return;
         status_serial_ = model.StatusSerial();
         QPalette pal   = status_->palette();
@@ -150,43 +158,41 @@ private:
         status_->setText(QString::fromStdString(model.StatusText()));
     }
 
-    void OnTabChanged() {
-        auto& model = emu_.Get<Model>();
+    void OnTabChanged(Model& model) {
         model.SetMode(tabs_->currentIndex() == kTabProcesses ? Model::Mode::kProcesses
                                                              : Model::Mode::kWindows);
-        SetColumns();
-        SyncStatus();
+        SetColumns(model);
+        SyncStatus(model);
     }
 
-    void OnTick() {
-        auto& model = emu_.Get<Model>();
+    void OnTick(Model& model) {
         if (model.Tick()) {
-            Fill();
+            Fill(model);
             setWindowTitle(QString::fromStdString(model.Title()));
         }
-        SyncStatus();
+        SyncStatus(model);
     }
 
-    void DoSwitchTo() {
+    void DoSwitchTo(Model& model) {
         uint32_t   key      = 0;
         const bool selected = SelectedKey(key);
-        emu_.Get<Model>().SwitchTo(selected, key);
-        SyncStatus();
+        model.SwitchTo(selected, key);
+        SyncStatus(model);
     }
 
-    void DoKill() {
+    void DoKill(Model& model) {
         uint32_t   key      = 0;
         const bool selected = SelectedKey(key);
-        emu_.Get<Model>().Kill(selected, key);
-        SyncStatus();
+        model.Kill(selected, key);
+        SyncStatus(model);
     }
 
-    void DoRun() {
-        emu_.Get<Model>().Run(edit_->text().toStdU16String());
-        SyncStatus();
+    void DoRun(Model& model) {
+        model.Run(edit_->text().toStdU16String());
+        SyncStatus(model);
     }
 
-    void ShowRowMenu(const QPoint& pos) {
+    void ShowRowMenu(Model& model, const QPoint& pos) {
         if (QTreeWidgetItem* item = list_->itemAt(pos)) {
             list_->clearSelection();
             item->setSelected(true);
@@ -195,21 +201,21 @@ private:
         QAction* sw = menu.addAction(switch_->text());
         QAction* kl = menu.addAction(kill_->text());
         QAction* chosen = menu.exec(list_->viewport()->mapToGlobal(pos));
-        if (chosen == sw) DoSwitchTo();
-        if (chosen == kl) DoKill();
+        if (chosen == sw) DoSwitchTo(model);
+        if (chosen == kl) DoKill(model);
     }
 
-    cerfcore::CerfEmulator& emu_;
-    QTabBar*                tabs_   = nullptr;
-    QTreeWidget*            list_   = nullptr;
-    QPushButton*            switch_ = nullptr;
-    QPushButton*            kill_   = nullptr;
-    QLabel*                 label_  = nullptr;
-    QLineEdit*              edit_   = nullptr;
-    QPushButton*            run_    = nullptr;
-    QLabel*                 status_ = nullptr;
-    QTimer                  timer_;
-    uint64_t                status_serial_ = 0;
+    cerfcore::InstanceGate gate_;
+    QTabBar*               tabs_   = nullptr;
+    QTreeWidget*           list_   = nullptr;
+    QPushButton*           switch_ = nullptr;
+    QPushButton*           kill_   = nullptr;
+    QLabel*                label_  = nullptr;
+    QLineEdit*             edit_   = nullptr;
+    QPushButton*           run_    = nullptr;
+    QLabel*                status_ = nullptr;
+    QTimer                 timer_;
+    uint64_t               status_serial_ = 0;
 };
 
 class QtTaskManagerWindow : public cerfcore::TaskManagerView {

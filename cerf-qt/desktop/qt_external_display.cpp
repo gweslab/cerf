@@ -7,12 +7,14 @@
 #include "qt_presenter_canvas.h"
 #include "qt_window_fit.h"
 
+#include "../external_display_sources.h"
 #include "../frontend_window.h"
 #include "../host_key_binding.h"
 #include "../screenshots.h"
 #include "viewport_menu.h"
 
 #include <cerfcore/core/cerf_emulator.h>
+#include <cerfcore/core/instance_gate.h>
 
 #include <QCloseEvent>
 #include <QKeyEvent>
@@ -32,23 +34,35 @@ namespace {
 constexpr int kMinWidth  = 160;
 constexpr int kMinHeight = 120;
 
+class ExternalCanvas : public QtPresenterCanvas {
+public:
+    ExternalCanvas(cerfcore::CerfEmulator& emu, QWidget* parent, int source_id, uint32_t surf_w, uint32_t surf_h)
+        : QtPresenterCanvas(emu, parent, surf_w, surf_h, cerffrontend::kDefaultPresentIntervalMs),
+          source_id_(source_id) {}
+
+protected:
+    cerfcore::FrameSource& Source(cerfcore::CerfEmulator& emu) override {
+        return emu.Get<ExternalDisplaySources>().Source(source_id_);
+    }
+
+private:
+    int source_id_;
+};
+
 }
 
 class QtExternalWindow : public QMainWindow, public cerffrontend::ViewportMenuTarget {
 public:
-    QtExternalWindow(cerfcore::CerfEmulator& emu, cerfcore::FrameSource& source, QString title,
-                     std::function<void()> on_eject, uint32_t surf_w, uint32_t surf_h)
-        : emu_(emu), on_eject_(std::move(on_eject)) {
+    QtExternalWindow(cerfcore::CerfEmulator& emu, int source_id, QString title, uint32_t surf_w, uint32_t surf_h)
+        : gate_(emu), source_id_(source_id) {
         setWindowTitle(title);
         setMinimumSize(kMinWidth, kMinHeight);
-        canvas_ = new QtPresenterCanvas(emu_, this, source, surf_w, surf_h,
-                                        cerffrontend::kDefaultPresentIntervalMs,
-                                        std::make_unique<QtPresentHooks>());
+        canvas_ = new ExternalCanvas(emu, this, source_id, surf_w, surf_h);
         setCentralWidget(canvas_);
         QMenu* view = menuBar()->addMenu(QStringLiteral("View"));
-        emu_.Get<QtMenuBuilder>().Bind(view, [this] {
+        emu.Get<QtMenuBuilder>().Bind(view, [this](cerfcore::CerfEmulator& menu_emu) {
             std::vector<cerffrontend::MenuItem> items;
-            emu_.Get<cerffrontend::ViewportMenu>().Append(items, *this);
+            menu_emu.Get<cerffrontend::ViewportMenu>().Append(items, *this);
             return items;
         });
     }
@@ -84,7 +98,7 @@ public:
             fullscreen_    = true;
             menuBar()->hide();
             showFullScreen();
-            emu_.Get<QtFocusPolicy>().Raise(this);
+            gate_.Run([this](cerfcore::CerfEmulator& emu) { emu.Get<QtFocusPolicy>().Raise(this); });
             return;
         }
         fullscreen_ = false;
@@ -96,15 +110,17 @@ public:
     void SaveScreenshot() override {
         std::vector<uint32_t> px;
         uint32_t              w = 0, h = 0;
-        if (canvas_->CaptureSurface(px, w, h))
-            emu_.Get<cerffrontend::Screenshots>().SavePixels(px, w, h, windowTitle().toStdString());
+        if (!canvas_->CaptureSurface(px, w, h)) return;
+        gate_.Run([&](cerfcore::CerfEmulator& emu) {
+            emu.Get<cerffrontend::Screenshots>().SavePixels(px, w, h, windowTitle().toStdString());
+        });
     }
 
     void CopyScreenshot() override {
         std::vector<uint32_t> px;
         uint32_t              w = 0, h = 0;
-        if (canvas_->CaptureSurface(px, w, h))
-            emu_.Get<cerffrontend::Screenshots>().CopyPixels(px, w, h);
+        if (!canvas_->CaptureSurface(px, w, h)) return;
+        gate_.Run([&](cerfcore::CerfEmulator& emu) { emu.Get<cerffrontend::Screenshots>().CopyPixels(px, w, h); });
     }
 
     void AfterModeChange(bool integer_scale) override {
@@ -120,33 +136,39 @@ protected:
             return;
         }
         event->ignore();
-        if (QMessageBox::question(this, windowTitle(), QStringLiteral("Eject VGA card?")) == QMessageBox::Yes)
-            emu_.Get<cerffrontend::FrontendWindow>().RunOnUiThread(on_eject_);
+        if (QMessageBox::question(this, windowTitle(), QStringLiteral("Eject VGA card?")) != QMessageBox::Yes) return;
+        gate_.Run([this](cerfcore::CerfEmulator& emu) {
+            emu.Get<cerffrontend::FrontendWindow>().RunOnUiThread(
+                [&sources = emu.Get<ExternalDisplaySources>(), id = source_id_] { sources.Eject(id); });
+        });
     }
 
-    void keyPressEvent(QKeyEvent* event) override { RouteKey(event, false); }
-    void keyReleaseEvent(QKeyEvent* event) override { RouteKey(event, true); }
+    void keyPressEvent(QKeyEvent* event) override {
+        gate_.Run([this, event](cerfcore::CerfEmulator& emu) { RouteKey(emu, event, false); });
+    }
+    void keyReleaseEvent(QKeyEvent* event) override {
+        gate_.Run([this, event](cerfcore::CerfEmulator& emu) { RouteKey(emu, event, true); });
+    }
 
 private:
-    void RouteKey(QKeyEvent* event, bool key_up) {
+    void RouteKey(cerfcore::CerfEmulator& emu, QKeyEvent* event, bool key_up) {
         if (key_up && event->isAutoRepeat()) return;
         QtHostKey key;
-        auto&     keys = emu_.Get<QtKeyInput>();
+        auto&     keys = emu.Get<QtKeyInput>();
         if (!keys.Translate(event, key)) return;
         keys.ForEachTransition(key, key_up, [&](bool up) {
             keys.Note(key, up);
-            if (!up && key.vk == cerffrontend::kVkF &&
-                emu_.Get<cerffrontend::HostKeyBinding>().AllMembersDownNow())
+            if (!up && key.vk == cerffrontend::kVkF && emu.Get<cerffrontend::HostKeyBinding>().AllMembersDownNow())
                 ToggleFullscreen();
         });
     }
 
-    cerfcore::CerfEmulator& emu_;
-    std::function<void()>   on_eject_;
-    QtPresenterCanvas*      canvas_        = nullptr;
-    bool                    fullscreen_    = false;
-    bool                    was_maximized_ = false;
-    bool                    closing_       = false;
+    cerfcore::InstanceGate gate_;
+    int                    source_id_;
+    QtPresenterCanvas*     canvas_        = nullptr;
+    bool                   fullscreen_    = false;
+    bool                   was_maximized_ = false;
+    bool                   closing_       = false;
 };
 
 QtExternalDisplay::QtExternalDisplay(cerfcore::CerfEmulator& emu, cerfcore::FrameSource& source,
@@ -156,10 +178,10 @@ QtExternalDisplay::QtExternalDisplay(cerfcore::CerfEmulator& emu, cerfcore::Fram
 QtExternalDisplay::~QtExternalDisplay() { Close(); }
 
 void QtExternalDisplay::Open(uint32_t surf_w, uint32_t surf_h) {
-    open_.store(true, std::memory_order_release);
+    if (open_.exchange(true, std::memory_order_acq_rel)) return;
+    source_id_ = emu_.Get<ExternalDisplaySources>().Add(source_, on_eject_);
     emu_.Get<QtUiThreadCalls>().Run([this, surf_w, surf_h] {
-        if (window_) return;
-        window_ = new QtExternalWindow(emu_, source_, title_, on_eject_, surf_w, surf_h);
+        window_ = new QtExternalWindow(emu_, source_id_, title_, surf_w, surf_h);
         emu_.Get<QtFocusPolicy>().Show(window_);
         window_->FitToSurface(surf_w, surf_h);
         emu_.Get<QtFocusPolicy>().Focus(window_->centralWidget());
@@ -174,6 +196,7 @@ void QtExternalDisplay::Close() {
         delete window_.data();
         window_ = nullptr;
     });
+    emu_.Get<ExternalDisplaySources>().Remove(source_id_);
 }
 
 void QtExternalDisplay::SetSurfaceSize(uint32_t w, uint32_t h) {

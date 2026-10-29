@@ -1,5 +1,6 @@
 #include "periodic_device_file.h"
 
+#include <cerfcore/core/instance_threads.h>
 #include <cerfcore/core/log.h>
 #include <cerfcore/platform/host_error.h>
 #include <cerfcore/platform/host_file.h>
@@ -9,11 +10,12 @@
 
 namespace cerffrontend {
 
-void PeriodicDeviceFile::Start(std::string path, std::chrono::seconds interval, std::function<void()> tick) {
+void PeriodicDeviceFile::Start(cerfcore::InstanceThreads& threads, std::string path, std::chrono::seconds interval,
+                               std::function<void()> tick) {
     path_     = std::move(path);
     interval_ = interval;
     tick_     = std::move(tick);
-    thread_   = std::thread([this] { Loop(); });
+    thread_   = threads.Start([this] { Loop(); });
 }
 
 void PeriodicDeviceFile::Stop(bool delete_file) {

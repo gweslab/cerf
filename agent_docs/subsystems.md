@@ -55,28 +55,29 @@ state are forbidden.
 - **If no candidate won the slot, `Get<T>()` is fatal.** **`TryGet<T>()`**
   returns `nullptr` for an optional dependency. Both resolve lazily and call
   `EnsureReady`.
-- **Misuse calls `CerfFatalExit` with the types named**: two `ShouldRegister`
+- **Misuse halts the instance with the types named**: two `ShouldRegister`
   true for one Base, a required slot with no winner, or a
   `ShouldRegister`↔`Get` cycle. You need no defensive check around `Get<>`.
+  A derived locator handles the misuse in its `RaiseLocatorError`, at the
+  failing call, so the crash report holds the stack of that call.
 - **`ShouldRegister()`** can call `Get<>`/`TryGet<>` through the same lazy
   path. The idiom is `emu_.Get<BoardContext>().GetSocId() == SocId::X`.
 - **`Get<Foo>()` resolves the `Base` slot first when
   `REGISTER_SERVICE_AS(Foo, Base)` registers `Foo`.**
-- **Slot resolution runs on one thread at a time.** If a second thread must
-  resolve a slot before resolution ends, CERF halts. A job that the resolving
-  thread waits for is the one exception. The thread that runs the job borrows
-  the role for the length of the job (`ResolverBorrow`). After resolution, no
-  slot is left to resolve, and any thread can call `Get<>`.
+- **Any thread can call `Get<>` at any time.** A thread that needs a slot
+  while another thread resolves it waits, then gets the winner of that slot.
+  Each slot resolves once.
 - **The Android frontend boots the emulator on a boot thread.** Qt binds a
   `QObject` service to the thread that creates it. As a result, the GUI thread
-  creates the services. A boot thread resolves every slot, runs the readiness
-  sweep and starts the guest. The emulator window opens after the readiness
-  sweep and before the guest starts. A job that a service posts to the window
-  before that time runs after the window opens.
-- **A GUI job can resolve a slot while the boot thread waits for it.**
-  `QtUiThreadCalls` runs every GUI job under a `ResolverBorrow`. While the boot
-  thread runs, the GUI thread calls `Get<>` on the emulator only inside such a
-  job.
+  creates the services. A boot thread runs the resolution sweep and the
+  readiness sweep, and starts the guest. The emulator window opens after the
+  readiness sweep and before the guest starts. A job that a service posts to the
+  window before that time runs after the window opens.
+- **On Android, every device instance shares the GUI thread with the
+  manager.** Device code opens a nested event loop only through
+  `NestedEventLoops`. `QtEmulatorRun` holds the exit of the instance until every
+  such loop returns. The owner destroys the instance on that exit, so no frame
+  of the instance is on the stack then.
 - **A thread that `OnReady` starts gets its services from `OnReady`.** `Get<>`
   runs `OnReady` on the thread that asks first, also while the boot sweep runs
   on the boot thread. A thread that asks for a service that is not ready yet

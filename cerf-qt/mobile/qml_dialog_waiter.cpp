@@ -1,5 +1,8 @@
 #include "qml_dialog_waiter.h"
 
+#include "../nested_event_loops.h"
+
+#include <QJSValue>
 #include <QMetaObject>
 
 void QmlDialogWaiter::Watch(QObject* dialog) {
@@ -16,13 +19,19 @@ void QmlDialogWaiter::Watch(QObject* dialog) {
 
 void QmlDialogWaiter::TakeCancel() { Finish(QVariant()); }
 
-void QmlDialogWaiter::Wait() {
-    if (!done_) loop_.exec();
+void QmlDialogWaiter::Wait(NestedEventLoops& loops) {
+    if (!done_) loops.Run(loop_);
 }
 
 void QmlDialogWaiter::TakeChoice(const QString& text) { Finish(text); }
 
-void QmlDialogWaiter::TakeResult(const QVariant& result) { Finish(result); }
+void QmlDialogWaiter::TakeResult(const QVariant& result) {
+    if (result.metaType() == QMetaType::fromType<QJSValue>()) {
+        Finish(result.value<QJSValue>().toVariant(QJSValue::ConvertJSObjects));
+        return;
+    }
+    Finish(result);
+}
 
 void QmlDialogWaiter::Finish(QVariant result) {
     if (done_) return;

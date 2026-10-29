@@ -8,6 +8,7 @@
 
 #include <cerfcore/core/cerf_emulator.h>
 #include <cerfcore/core/device_config.h>
+#include <cerfcore/core/instance_gate.h>
 #include <cerfcore/host/customizations_editor.h>
 
 #include <QDialog>
@@ -24,7 +25,7 @@ using Prompt = cerffrontend::CalibrationWarningPrompt;
 
 class CalibrationBody : public QWidget {
 public:
-    CalibrationBody(cerfcore::CerfEmulator& emu, QWidget* parent) : QWidget(parent), emu_(emu) {}
+    CalibrationBody(cerfcore::CerfEmulator& emu, QWidget* parent) : QWidget(parent), gate_(emu) {}
 
     static cerffrontend::Rgb TextColor(const QWidget& w) {
         const QColor c = w.palette().color(QPalette::ButtonText);
@@ -34,14 +35,16 @@ public:
 
 protected:
     void paintEvent(QPaintEvent*) override {
-        QPainter   p(this);
-        QtPainter  painter(emu_, p);
-        const bool dark = emu_.Get<QtTheme>().IsDark();
-        Body::Layout(painter, width(), true, dark, TextColor(*this));
+        gate_.Run([this](cerfcore::CerfEmulator& emu) {
+            QPainter   p(this);
+            QtPainter  painter(emu, p);
+            const bool dark = emu.Get<QtTheme>().IsDark();
+            Body::Layout(painter, width(), true, dark, TextColor(*this));
+        });
     }
 
 private:
-    cerfcore::CerfEmulator& emu_;
+    cerfcore::InstanceGate gate_;
 };
 
 class QtCalibrationWarningPrompt : public cerffrontend::CalibrationWarningPrompt {
@@ -78,14 +81,14 @@ public:
         cl->setGeometry(close_x, by, Body::kCloseW, Body::kButtonH);
         sw->setDefault(true);
 
-        QObject::connect(sw, &QPushButton::clicked, &dialog, [&] {
-            choice = cerffrontend::CalibWarningChoice::kSwitchToStock;
-            dialog.accept();
-        });
-        QObject::connect(cr, &QPushButton::clicked, &dialog, [&] {
-            if (emu_.Get<cerfcore::CustomizationsEditor>().Open(true)) dialog.accept();
-        });
-        QObject::connect(cl, &QPushButton::clicked, &dialog, &QDialog::reject);
+        QObject::connect(sw, &QPushButton::clicked, &dialog, gate_.Bind([&] {
+                             choice = cerffrontend::CalibWarningChoice::kSwitchToStock;
+                             dialog.accept();
+                         }));
+        QObject::connect(cr, &QPushButton::clicked, &dialog, gate_.Bind([&] {
+                             if (emu_.Get<cerfcore::CustomizationsEditor>().Open(true)) dialog.accept();
+                         }));
+        QObject::connect(cl, &QPushButton::clicked, &dialog, gate_.Bind([&dialog] { dialog.reject(); }));
 
         open_ = &dialog;
         dialog.exec();
@@ -98,7 +101,8 @@ public:
     }
 
 private:
-    QPointer<QDialog> open_;
+    const cerfcore::InstanceGate gate_{emu_};
+    QPointer<QDialog>            open_;
 };
 
 }

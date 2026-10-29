@@ -1,6 +1,7 @@
 #include "mobile_emulator_window.h"
 
 #include "../cerfman/manager_engine.h"
+#include "../nested_event_loops.h"
 #include "../qt_screen_pixels.h"
 #include "emulator_controller.h"
 #include "guest_surface.h"
@@ -13,6 +14,7 @@
 
 #include <cerfcore/core/cerf_emulator.h>
 #include <cerfcore/core/device_config.h>
+#include <cerfcore/core/fatal.h>
 #include <cerfcore/core/log.h>
 #include <cerfcore/host/pointer_widget.h>
 
@@ -32,6 +34,8 @@ void MobileEmulatorWindow::OpenWindow() {
     const auto& dc = emu_.Get<cerfcore::DeviceConfig>();
     MakeWindow();
     surface_->Attach(emu_, dc.board_configurable_screen_width, dc.board_configurable_screen_height);
+    emu_.Get<cerffrontend::CanvasInput>().Attach(surface_);
+    input_attached_ = true;
     controller_->Attach(emu_);
     widget_bar_->Attach(emu_);
     AttachView(*surface_, *window_);
@@ -51,12 +55,23 @@ void MobileEmulatorWindow::MakeWindow() {
     widget_bar_ = window_->property("widgetBar").value<MobileWidgetBar*>();
 }
 
-void MobileEmulatorWindow::OnShutdown() {
+void MobileEmulatorWindow::OnShutdown() { CloseWindow(); }
+
+void MobileEmulatorWindow::CloseWindow() {
     DetachView();
     if (widget_bar_) widget_bar_->Detach();
     if (controller_) controller_->Detach();
     if (surface_) surface_->Detach();
+    if (input_attached_) emu_.Get<cerffrontend::CanvasInput>().Attach(nullptr);
+    input_attached_ = false;
     delete window_.data();
+}
+
+void MobileEmulatorWindow::OnTeardownWedged() {
+    cerfcore::Fatal& fatal = emu_.Get<cerfcore::Fatal>();
+    fatal.Guard([&fatal] { fatal.Die("MobileEmulatorWindow: the guest did not stop after close"); });
+    CloseWindow();
+    wedged_handler_();
 }
 
 void MobileEmulatorWindow::ToggleFullscreen() {
@@ -148,7 +163,7 @@ QVariant MobileEmulatorWindow::RunDialog(const QString& type_name, const QVarian
     waiter.Watch(dialog);
     QMetaObject::invokeMethod(dialog, "open");
     if (opened) opened(dialog);
-    waiter.Wait();
+    waiter.Wait(emu_.Get<NestedEventLoops>());
     return waiter.Result();
 }
 

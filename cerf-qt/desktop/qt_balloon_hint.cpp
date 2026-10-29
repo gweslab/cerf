@@ -18,13 +18,13 @@ public:
     void ShowUnderWidget(const cerfcore::HostWidget* anchor, const std::string& text,
                          uint32_t hold_ms) override {
         QRect rc;
-        Show(emu_.Get<QtMainWindow>().Bar().WidgetScreenRect(anchor, rc) ? &rc : nullptr, text,
+        Show(emu_.Get<QtMainWindow>().Bar().WidgetScreenRect(emu_, anchor, rc) ? &rc : nullptr, text,
              hold_ms);
     }
 
     void ShowUnderCaptureWidget(const std::string& text, uint32_t hold_ms) override {
         QRect rc;
-        Show(emu_.Get<QtMainWindow>().Bar().CaptureWidgetScreenRect(rc) ? &rc : nullptr, text,
+        Show(emu_.Get<QtMainWindow>().Bar().CaptureWidgetScreenRect(emu_, rc) ? &rc : nullptr, text,
              hold_ms);
     }
 

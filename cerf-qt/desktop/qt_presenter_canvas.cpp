@@ -9,11 +9,9 @@
 
 #include <algorithm>
 
-QtPresenterCanvas::QtPresenterCanvas(cerfcore::CerfEmulator& emu, QWidget* parent,
-                                     cerfcore::FrameSource& source, uint32_t surf_w,
-                                     uint32_t surf_h, int present_interval_ms,
-                                     std::unique_ptr<QtPresentHooks> hooks)
-    : QWidget(parent), emu_(emu), presenter_(source, std::move(hooks), surf_w, surf_h, Qt::black) {
+QtPresenterCanvas::QtPresenterCanvas(cerfcore::CerfEmulator& emu, QWidget* parent, uint32_t surf_w,
+                                     uint32_t surf_h, int present_interval_ms)
+    : QWidget(parent), gate_(emu), presenter_(std::make_unique<QtPresentHooks>(), surf_w, surf_h, Qt::black) {
     setFocusPolicy(Qt::StrongFocus);
     setMouseTracking(true);
     setAttribute(Qt::WA_OpaquePaintEvent);
@@ -60,16 +58,21 @@ void QtPresenterCanvas::SetFramebufferActive(bool active) {
 }
 
 void QtPresenterCanvas::paintEvent(QPaintEvent*) {
-    int client_w = 0, client_h = 0;
-    VisibleSize(client_w, client_h);
-    QPainter p(this);
-    presenter_.DrawTo(p, client_w, client_h, Dpr());
+    gate_.Run([this](cerfcore::CerfEmulator& emu) {
+        int client_w = 0, client_h = 0;
+        VisibleSize(client_w, client_h);
+        QPainter p(this);
+        presenter_.DrawTo(emu, Source(emu), p, client_w, client_h, Dpr());
+    });
 }
 
-void QtPresenterCanvas::resizeEvent(QResizeEvent*) {
-    Relayout();
-    if (on_resized_) on_resized_();
+bool QtPresenterCanvas::CaptureSurface(std::vector<uint32_t>& out, uint32_t& w, uint32_t& h) {
+    bool captured = false;
+    gate_.Run([&](cerfcore::CerfEmulator& emu) { captured = presenter_.Capture(Source(emu), out, w, h); });
+    return captured;
 }
+
+void QtPresenterCanvas::resizeEvent(QResizeEvent*) { Relayout(); }
 
 void QtPresenterCanvas::changeEvent(QEvent* event) {
     if (event->type() == QEvent::DevicePixelRatioChange) {

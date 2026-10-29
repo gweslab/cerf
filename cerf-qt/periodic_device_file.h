@@ -8,6 +8,10 @@
 #include <string>
 #include <thread>
 
+namespace cerfcore {
+class InstanceThreads;
+}
+
 namespace cerffrontend {
 
 class PeriodicDeviceFile {
@@ -17,7 +21,8 @@ public:
     PeriodicDeviceFile(const PeriodicDeviceFile&)            = delete;
     PeriodicDeviceFile& operator=(const PeriodicDeviceFile&) = delete;
 
-    void Start(std::string path, std::chrono::seconds interval, std::function<void()> tick);
+    void Start(cerfcore::InstanceThreads& threads, std::string path, std::chrono::seconds interval,
+               std::function<void()> tick);
     void RequestStop();
     void Finish(bool delete_file);
     void Stop(bool delete_file);

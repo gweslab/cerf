@@ -1,13 +1,13 @@
 #pragma once
 
+#include <cerfcore/core/instance_gate.h>
+
 #include <QMainWindow>
 #include <QSize>
 
-class QtMainWindow;
-
 class QtHostWindow : public QMainWindow {
 public:
-    explicit QtHostWindow(QtMainWindow& owner) : owner_(owner) {}
+    explicit QtHostWindow(cerfcore::CerfEmulator& emu) : gate_(emu) {}
 
     void ResizeTo(const QSize& size);
 
@@ -17,6 +17,6 @@ protected:
     void resizeEvent(QResizeEvent* event) override;
 
 private:
-    QtMainWindow& owner_;
-    QSize         expected_;
+    cerfcore::InstanceGate gate_;
+    QSize                  expected_;
 };

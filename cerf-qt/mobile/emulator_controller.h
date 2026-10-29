@@ -2,15 +2,13 @@
 
 #include "strip_press_delay.h"
 
+#include <cerfcore/core/instance_gate.h>
+
 #include <QObject>
 #include <QVariantList>
 #include <QtQml/qqmlregistration.h>
 
-namespace cerfcore {
-class CerfEmulator;
-}
-
-class EmulatorController : public QObject {
+class EmulatorController : public QObject, public StripPressReceiver {
     Q_OBJECT
     QML_ELEMENT
     Q_PROPERTY(int rowHoldMs READ RowHoldMs CONSTANT)
@@ -20,10 +18,10 @@ public:
 
     int RowHoldMs() const;
 
-    void Attach(cerfcore::CerfEmulator& emu) { emu_ = &emu; }
+    void Attach(cerfcore::CerfEmulator& emu) { gate_.Attach(emu); }
     void Detach() {
         row_press_.Drop();
-        emu_ = nullptr;
+        gate_ = cerfcore::InstanceGate();
     }
 
     Q_INVOKABLE void OpenGearMenu(qreal x, qreal y);
@@ -37,8 +35,8 @@ public:
     Q_INVOKABLE bool HoldRowButton(int index);
 
 private:
-    void RowStep(StripPressDelay::Step step, int index);
+    void OnStripStep(StripPressDelay::Step step, int index) override;
 
-    cerfcore::CerfEmulator* emu_ = nullptr;
-    StripPressDelay         row_press_{[this](StripPressDelay::Step step, int index) { RowStep(step, index); }};
+    cerfcore::InstanceGate gate_;
+    StripPressDelay        row_press_{*this};
 };

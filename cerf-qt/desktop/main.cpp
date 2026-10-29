@@ -9,11 +9,10 @@
 #include "../qt_back_gesture.h"
 #include "../qt_emulator_run.h"
 #include "../qt_message_log.h"
-#include "crash_report.h"
-#include "crash_report_model.h"
 #include "host_diagnostics.h"
 #include "host_timer_resolution.h"
 #include "qt_arguments.h"
+#include "qt_main_window.h"
 #include "qt_window_erase.h"
 
 #include <QApplication>
@@ -27,24 +26,30 @@ int RunEmulator(int argc, char** argv) {
     const HostTimerResolution timer_resolution;
     cerffrontend::FrontendLaunch::OpenLog(cerfcore::Log::Cat::Cerf, cerfcore::kLogFileName);
     HostDiagnostics::LogReport();
+    std::optional<int> halt;
+    std::string        crash_log_path;
     {
-        QtEmulatorRun run(cfg, argc, argv, [] { QCoreApplication::exit(0); });
-        run.Boot();
-        QCoreApplication::exec();
+        QtEmulatorRun run(cfg, argc, argv, [] { QCoreApplication::exit(0); },
+                          [](cerfcore::CerfEmulator& emu) { emu.Get<QtMainWindow>().OnTeardownWedged(); });
+        if (run.Boot()) QCoreApplication::exec();
+        halt = run.Halt();
+        if (halt) crash_log_path = run.CrashLogPath();
     }
+#if !CERF_DEV_MODE
+    if (halt == cerfcore::CERF_FATAL_RUNTIME_ERROR) {
+        return ManagerApp::Run(argc, argv, [&crash_log_path](cerfcore::CerfEmulator& manager) {
+            return manager.Get<ManagerApp>().RunCrashWindow(cerfcore::CERF_FATAL_RUNTIME_ERROR, crash_log_path);
+        });
+    }
+#endif
     cerfcore::Log::Close();
-    return 0;
+    return halt.value_or(0);
 }
 
 int RunManagerMode(ProcessMode mode, int argc, char** argv) {
     cerffrontend::FrontendLaunch::OpenLog(cerfcore::Log::Cat::Manager, cerffrontend::kManagerLogFileName);
     return ManagerApp::Run(argc, argv, [mode, argc, argv](cerfcore::CerfEmulator& manager) {
-        switch (mode) {
-            case ProcessMode::kCrashReport:  return manager.Get<CrashReportModel>().Run(argc, argv);
-            case ProcessMode::kInstallStage: return manager.Get<ManagerApp>().RunInstallStage(argc, argv);
-            case ProcessMode::kManager:
-            case ProcessMode::kEmulator:     break;
-        }
+        if (mode == ProcessMode::kInstallStage) return manager.Get<ManagerApp>().RunInstallStage(argc, argv);
         return manager.Get<ManagerApp>().RunManager(false);
     });
 }
@@ -55,10 +60,6 @@ int main(int argc, char* argv[]) {
     RouteQtMessagesToLog();
     QtArguments       args(argc, argv);
     const ProcessMode mode = DetectProcessMode(args.Count(), args.Values());
-    if (mode != ProcessMode::kCrashReport) {
-        QtCrashReport::Prepare();
-        cerfcore::Log::SetCrashPresenter(&QtCrashReport::Present);
-    }
     ApplyPlatformAppDefaults();
     QApplication   app(args.QtCount(), args.QtValues());
     args.KeepWhatQtLeft();

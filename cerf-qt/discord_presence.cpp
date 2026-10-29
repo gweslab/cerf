@@ -7,6 +7,7 @@
 #include <cerfcore/boot/rom_parser_queries.h>
 #include <cerfcore/core/byte_order.h>
 #include <cerfcore/core/cerf_emulator.h>
+#include <cerfcore/core/instance_threads.h>
 #include <cerfcore/core/log.h>
 #include <cerfcore/platform/host_process.h>
 
@@ -46,7 +47,7 @@ public:
         state_      = ResolveOsVersion();
         start_secs_ = static_cast<int64_t>(::time(nullptr));
         transport_  = std::make_unique<DiscordIpcTransport>();
-        worker_     = std::thread([this] { Run(); });
+        worker_     = emu_.Get<cerfcore::InstanceThreads>().Start([this] { Run(); });
     }
 
     void OnShutdown() override {

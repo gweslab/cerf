@@ -20,8 +20,7 @@ ShutdownTeardown::Step ShutdownTeardown::Poll() {
     if (emu_.Get<cerfcore::JitRunner>().Stopped()) return Step::kStopped;
     if (std::chrono::steady_clock::now() - start_ < std::chrono::milliseconds(kGraceMs))
         return Step::kWaiting;
-    LOG(Caution, "ShutdownTeardown: JIT did not stop within %ums of close; forcing process "
-        "exit\n", kGraceMs);
+    LOG(Caution, "ShutdownTeardown: JIT did not stop within %ums of close\n", kGraceMs);
     return Step::kWedged;
 }
 

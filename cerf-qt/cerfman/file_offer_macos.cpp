@@ -1,7 +1,7 @@
-#include "file_manager_reveal.h"
+#include "file_offer.h"
 
 #include <QProcess>
 
-bool RevealInFileManager(const QString& absolute_path) {
+bool OfferFile(const QString& absolute_path) {
     return QProcess::startDetached(QStringLiteral("open"), {QStringLiteral("-R"), absolute_path});
 }

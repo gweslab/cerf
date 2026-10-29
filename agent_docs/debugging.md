@@ -217,16 +217,19 @@ branch is named.
 - **`cerf.log`** sits next to `cerf.exe`. Every category logs verbosely
   by default. Read it for every investigation. `--quiet` disables it
   for perf runs only.
-- **`cerf.crash.log`** comes from the lock-free emergency writer on
-  a fatal crash. It contains three kinds of data:
-  - the recent `[CAUTION]` lines - the fatal reason and the guest
-    register dump
-  - every other thread's RIP / RSP / RBP with a 16-slot stack snapshot
-    at the time the dying thread aborted
-  - the last log lines, which `cerf.log` does not have
-
-  Use it when the FATAL message comes from a thread whose state you
-  must cross-reference with another thread.
+- **`cerf.crash.log`** has two sources.
+  - **A fatal halts the instance and rewrites the file.** The file holds
+    the recent `[CAUTION]` lines of that instance: the fatal reason and the
+    guest register dump. It also holds the native stack of the thread that
+    halts. Other threads continue to run, so the file has no dump of them.
+    A user error writes no file. On Android each device instance writes the
+    file in its own device directory.
+  - **A host crash (an unhandled exception or signal) ends the process.**
+    The lock-free emergency writer then writes the same data, plus every
+    other thread's RIP / RSP / RBP with a 16-slot stack snapshot. It also
+    adds the last log lines that `cerf.log` does not have. Use it when the
+    crash comes from a thread whose state you must cross-reference with
+    another thread.
 - Stdout / stderr is flood-controlled and silently drops lines - it is
   NEVER a valid log source, and to read it is prohibited. Pass
   `--log-file=<repo>/tmp/<unique>.log` on every run and read ONLY that

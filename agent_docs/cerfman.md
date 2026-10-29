@@ -15,7 +15,6 @@ The command line of the frontend selects one mode:
 | Command line | Mode |
 |---|---|
 | (none) | The manager window opens. |
-| `--crash-report=<log>` | The crash window opens for that log. |
 | `--wait-for-pid=`, `--install`, `--upgrade`, `--post-upgrade` | The install stage runs. See § Self-update and installation. |
 | anything else, for example `--device=<name>` | The emulator runs. |
 
@@ -25,6 +24,20 @@ emulator opens manager windows directly, in its own process.
 
 The Android app has no command-line modes. Its manager runs each device inside the
 manager process, as one more `CerfEmulator` instance with the options of that start.
+
+When a fatal halts a device on Android, the manager opens the crash window and continues
+to run. A desktop emulator process opens the crash window itself in a production build,
+then exits with the halt code. A dev build exits at once.
+
+A device can fail to stop after the user closes it or after a fatal halts it. A desktop emulator
+process then exits.
+On Android the manager closes the window of that device and opens the crash window. The
+threads of the device stay allocated until the app ends, because CERF cannot join a thread
+that does not stop.
+
+A fatal that halts the manager instance ends the manager and every device that runs in it.
+The app then opens the crash window. The app ends when the user closes that window. When the
+instance that shows the crash window halts too, the app ends at once.
 
 The manager writes its log to `manager.log` in the install root. The install root is the
 folder that holds the global `cerf.json`.
@@ -107,8 +120,8 @@ Windows it uses the window handle. On Linux it sends a datagram to the abstract 
 socket `cerf-show/<pid>`. On macOS the socket is the file `cerf-show-<pid>` in
 `$TMPDIR`. On Android the manager shows the window of the running device directly.
 
-Before the Android manager starts a second device, it asks the user, because a failure in
-one device stops every running device.
+Before the Android manager starts a second device, it asks the user, because a host crash
+or a lack of memory stops every device that runs.
 
 ## Self-update and installation
 

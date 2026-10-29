@@ -8,6 +8,7 @@
 #include "install_directories.h"
 #include "zip_extract.h"
 
+#include <cerfcore/core/instance_threads.h>
 #include <cerfcore/platform/host_process.h>
 #include "../product_links.h"
 
@@ -33,7 +34,7 @@ CerfUpgradeSession::~CerfUpgradeSession() {
     if (worker_.joinable()) worker_.join();
 }
 
-void CerfUpgradeSession::Start() { worker_ = std::thread([this] { Work(); }); }
+void CerfUpgradeSession::Start(cerfcore::InstanceThreads& threads) { worker_ = threads.Start([this] { Work(); }); }
 
 bool CerfUpgradeSession::Stage(QString& staged_frontend, QString& error) {
     const QString install_dir = InstallRoot();

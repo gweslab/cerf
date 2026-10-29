@@ -11,6 +11,8 @@
 #include "self_upgrade.h"
 
 #include <cerfcore/core/cerf_emulator.h>
+#include <cerfcore/core/fatal.h>
+#include <cerfcore/core/instance_threads.h>
 #include <cerfcore/core/log.h>
 #include <cerfcore/platform/host_process.h>
 #include "../frontend_config.h"
@@ -115,7 +117,9 @@ QVariantMap CerfUpdates::Upgrade() {
                          QStringLiteral("An upgrade is already running. Wait until its window closes."));
     session_.reset();
     session_ = std::make_unique<CerfUpgradeSession>(*release_, emu_.Get<HttpClient>().UserAgent());
-    emu_.Get<ManagerEngine>().Open(QString::fromLatin1(UpgradeSession::kWindowType), session_->WindowProperties());
-    session_->Start();
+    emu_.Get<cerfcore::Fatal>().Guard([this] {
+        emu_.Get<ManagerEngine>().Open(QString::fromLatin1(UpgradeSession::kWindowType), session_->WindowProperties());
+        session_->Start(emu_.Get<cerfcore::InstanceThreads>());
+    });
     return {};
 }

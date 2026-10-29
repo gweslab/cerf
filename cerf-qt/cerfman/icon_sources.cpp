@@ -5,8 +5,6 @@
 
 QString IconSources::AboutBand() const { return AssetImageUrl(QStringLiteral(CERF_ABOUT_BAND_ASSET)); }
 
-QString IconSources::ErrorImage() const { return AssetImageUrl(QStringLiteral(CERF_ERROR_ASSET)); }
-
 QString IconSources::NewIcon() const { return SymbolIconUrl(QStringLiteral("add")); }
 
 QString IconSources::SettingsIcon() const { return SymbolIconUrl(QStringLiteral("settings")); }

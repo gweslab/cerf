@@ -1,6 +1,7 @@
 #include "manager_operations.h"
 
 #include <cerfcore/core/cerf_emulator.h>
+#include <cerfcore/core/instance_threads.h>
 #include <cerfcore/core/log.h>
 
 #include <QMetaObject>
@@ -42,7 +43,7 @@ void ManagerOperations::ShowProgress(const QString& label, qint64 done, std::opt
 
 void ManagerOperations::Start(std::function<void()> work) {
     if (worker_.joinable()) worker_.join();
-    worker_ = std::thread(std::move(work));
+    worker_ = emu_.Get<cerfcore::InstanceThreads>().Start(std::move(work));
 }
 
 bool ManagerOperations::RefuseWhileBusy() {

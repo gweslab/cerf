@@ -6,6 +6,7 @@
 #include <cerfcore/core/cerf_paths.h>
 #include <cerfcore/core/config_json.h>
 #include <cerfcore/core/device_config.h>
+#include <cerfcore/core/instance_threads.h>
 #include <cerfcore/core/log.h>
 #include <cerfcore/core/service.h>
 #include <cerfcore/platform/host_error.h>
@@ -37,8 +38,8 @@ public:
         const std::string name = emu_.Get<cerfcore::DeviceConfig>().device_name;
         if (name.empty()) return;
         window_ = &emu_.Get<FrontendWindow>();
-        worker_.Start(cerfcore::GetDeviceDir(name) + kRunningStatusFileName, kHeartbeatInterval,
-                      [this] { WriteStatus(); });
+        worker_.Start(emu_.Get<cerfcore::InstanceThreads>(), cerfcore::GetDeviceDir(name) + kRunningStatusFileName,
+                      kHeartbeatInterval, [this] { WriteStatus(); });
     }
 
     void OnShutdown() override { worker_.Stop(true); }

@@ -1,9 +1,8 @@
 #include "key_press_pacer.h"
 
 #include <algorithm>
-#include <utility>
 
-KeyPressPacer::KeyPressPacer(QtKeyInput::KeySink sink) : sink_(std::move(sink)) {
+KeyPressPacer::KeyPressPacer(KeyPressSink& sink) : sink_(sink) {
     clock_.start();
     due_.setSingleShot(true);
     QObject::connect(&due_, &QTimer::timeout, [this] { Drain(); });
@@ -25,7 +24,7 @@ void KeyPressPacer::Drain() {
     while (!pending_.empty() && pacing_.PopReady(clock_.elapsed())) {
         const KeyEvent e = pending_.front();
         pending_.pop_front();
-        sink_(e.key, e.key_up);
+        sink_.DeliverKey(e.key, e.key_up);
     }
     if (!pending_.empty()) due_.start(static_cast<int>(std::max<qint64>(0, pacing_.HeadDue() - clock_.elapsed())));
 }

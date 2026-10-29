@@ -440,6 +440,9 @@ LuaJIT - https://luajit.org/
 dynarmic - https://github.com/azahar-emu/dynarmic
 FEX - https://github.com/FEX-Emu/FEX
 Box64 - https://github.com/ptitSeb/box64
+GCC - https://gcc.gnu.org/
+LLVM - https://llvm.org/
+Apple libunwind - https://github.com/apple-oss-distributions/libunwind
 discord-rpc - https://github.com/discord/discord-rpc
 Qt - https://www.qt.io/
 

@@ -4,6 +4,7 @@
 #include "qt_ui_thread_calls.h"
 
 #include <cerfcore/core/cerf_emulator.h>
+#include <cerfcore/core/instance_gate.h>
 #include <cerfcore/core/log.h>
 
 #include <QGuiApplication>
@@ -22,11 +23,12 @@ public:
     void OnReady() override {
         emu_.Get<QtUiThreadCalls>().Run([this] {
             for (QScreen* screen : QGuiApplication::screens()) Watch(screen);
-            QObject::connect(qGuiApp, &QGuiApplication::screenAdded, &context_, [this](QScreen* screen) {
-                Watch(screen);
-                RequestRecompute();
-            });
-            QObject::connect(qGuiApp, &QGuiApplication::screenRemoved, &context_, [this] { RequestRecompute(); });
+            QObject::connect(qGuiApp, &QGuiApplication::screenAdded, &context_, gate_.Bind([this](QScreen* screen) {
+                                 Watch(screen);
+                                 RequestRecompute();
+                             }));
+            QObject::connect(qGuiApp, &QGuiApplication::screenRemoved, &context_,
+                             gate_.Bind([this] { RequestRecompute(); }));
             Recompute();
         });
     }
@@ -41,20 +43,18 @@ public:
 
 private:
     void Watch(QScreen* screen) {
-        QObject::connect(screen, &QScreen::geometryChanged, &context_, [this] { RequestRecompute(); });
-        QObject::connect(screen, &QScreen::refreshRateChanged, &context_, [this] { RequestRecompute(); });
+        QObject::connect(screen, &QScreen::geometryChanged, &context_, gate_.Bind([this] { RequestRecompute(); }));
+        QObject::connect(screen, &QScreen::refreshRateChanged, &context_, gate_.Bind([this] { RequestRecompute(); }));
     }
 
     void RequestRecompute() {
         if (recompute_pending_) return;
         recompute_pending_ = true;
-        QMetaObject::invokeMethod(
-            &context_,
-            [this] {
-                recompute_pending_ = false;
-                Recompute();
-            },
-            Qt::QueuedConnection);
+        QMetaObject::invokeMethod(&context_, gate_.Bind([this] {
+                                      recompute_pending_ = false;
+                                      Recompute();
+                                  }),
+                                  Qt::QueuedConnection);
     }
 
     void Recompute() {
@@ -77,10 +77,11 @@ private:
         LOG(Lcd, "QtHostDisplays: largest %ux%u, highest %d Hz\n", width, height, refresh);
     }
 
-    QObject               context_;
-    bool                  recompute_pending_ = false;
-    std::atomic<uint64_t> size_{0};
-    std::atomic<int>      refresh_{0};
+    const cerfcore::InstanceGate gate_{emu_};
+    QObject                      context_;
+    bool                         recompute_pending_ = false;
+    std::atomic<uint64_t>        size_{0};
+    std::atomic<int>             refresh_{0};
 };
 
 }

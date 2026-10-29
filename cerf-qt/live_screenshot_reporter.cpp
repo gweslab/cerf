@@ -6,6 +6,7 @@
 #include <cerfcore/core/cerf_emulator.h>
 #include <cerfcore/core/cerf_paths.h>
 #include <cerfcore/core/device_config.h>
+#include <cerfcore/core/instance_threads.h>
 #include <cerfcore/core/run_timeout.h>
 #include <cerfcore/core/service.h>
 
@@ -32,7 +33,8 @@ public:
         if (name.empty()) return;
         window_   = &emu_.Get<FrontendWindow>();
         exporter_ = &emu_.Get<ImageExporter>();
-        worker_.Start(cerfcore::GetDeviceDir(name) + kLiveScreenshotFileName, kInterval, [this] { Tick(); });
+        worker_.Start(emu_.Get<cerfcore::InstanceThreads>(), cerfcore::GetDeviceDir(name) + kLiveScreenshotFileName,
+                      kInterval, [this] { Tick(); });
     }
 
     void OnShutdown() override { Stop(); }

@@ -6,10 +6,12 @@
 #include "property_sheet.h"
 
 #include "../guest_reset_text.h"
+#include "../nested_event_loops.h"
 
 #include <cerfcore/core/cerf_emulator.h>
 
 #include <QEventLoop>
+#include <QPointer>
 #include <QQmlEngine>
 #include <QVariant>
 
@@ -42,9 +44,10 @@ bool PropertySheets::EditLive(const QVariantMap& window, const QString& device_d
                      });
     QVariantMap properties = window;
     properties.insert(QStringLiteral("sheet"), QVariant::fromValue<QObject*>(sheet));
-    QObject* opened = emu_.Get<ManagerEngine>().Open(QStringLiteral("PropertiesWindow"), properties);
+    const QPointer<QObject> opened = emu_.Get<ManagerEngine>().Open(QStringLiteral("PropertiesWindow"), properties);
     QObject::connect(opened, &QObject::destroyed, &loop, &QEventLoop::quit);
-    loop.exec();
+    emu_.Get<NestedEventLoops>().Run(loop);
+    delete opened.data();
     sheet->deleteLater();
 
     if (!accepted) return false;

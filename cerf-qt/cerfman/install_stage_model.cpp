@@ -9,6 +9,7 @@
 #include "install_directories.h"
 
 #include <cerfcore/core/cerf_emulator.h>
+#include <cerfcore/core/instance_threads.h>
 #include <cerfcore/host/user_alert.h>
 #include <cerfcore/platform/host_process.h>
 #include "../product_links.h"
@@ -29,7 +30,7 @@ int InstallStageModel::RunInstall(const InstallOptions& options) {
     options_ = options;
     SetHeading(options_.Heading());
     emu_.Get<ManagerEngine>().Open(QString::fromLatin1(kWindowType), WindowProperties());
-    worker_ = std::thread([this] { Work(); });
+    worker_ = emu_.Get<cerfcore::InstanceThreads>().Start([this] { Work(); });
     return QCoreApplication::exec();
 }
 

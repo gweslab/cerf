@@ -5,6 +5,7 @@
 #include <cerfcore/core/cerf_emulator.h>
 #include <cerfcore/core/cerf_paths.h>
 #include <cerfcore/core/config_json.h>
+#include <cerfcore/core/config_reader.h>
 #include <cerfcore/core/log.h>
 
 #include <nlohmann/json.hpp>
@@ -38,7 +39,7 @@ std::vector<uint8_t> ReadHostKey(const json& j) {
 
 void FrontendConfig::OnReady() {
     path_ = cerfcore::GetCerfDir() + kGlobalConfigFileName;
-    const json j = cerfcore::CfgReadLoggedJsonFile<json>(path_);
+    const json j = emu_.Get<cerfcore::ConfigReader>().ReadLoggedJsonFile<json>(path_);
     Parse(j.is_null() ? json::object() : j);
 }
 

@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../cerfman/manager_qml_engine.h"
+#include "manager_qml_engine.h"
 
 #include <cerfcore/core/service.h>
 
@@ -8,12 +8,13 @@
 #include <QString>
 #include <QtQml/qqmlregistration.h>
 
+#include <string>
+
 class CrashReportModel : public QObject, public cerfcore::Service {
     Q_OBJECT
     QML_ELEMENT
     QML_SINGLETON
     Q_PROPERTY(QString logPath READ LogPath CONSTANT)
-    Q_PROPERTY(QString crashLogPath READ CrashLogPath CONSTANT)
 
 public:
     explicit CrashReportModel(cerfcore::CerfEmulator& emu) : cerfcore::Service(emu) {}
@@ -21,16 +22,12 @@ public:
         return ManagerQmlEngine::Singleton<CrashReportModel>(qml);
     }
 
-    int Run(int argc, char** argv);
+    void Open(const std::string& crash_log_path);
 
     QString LogPath() const;
-    QString CrashLogPath() const;
 
-    Q_INVOKABLE QString DumpText() const;
+    Q_INVOKABLE QString DumpText(const QString& crash_log_path) const;
     Q_INVOKABLE QString SizeLabel(const QString& path) const;
     Q_INVOKABLE bool    Exists(const QString& path) const;
     Q_INVOKABLE QString ShowFile(const QString& path) const;
-
-private:
-    QString log_path_;
 };

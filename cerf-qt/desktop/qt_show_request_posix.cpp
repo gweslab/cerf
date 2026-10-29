@@ -2,6 +2,7 @@
 #include "qt_show_socket.h"
 
 #include <cerfcore/core/cerf_emulator.h>
+#include <cerfcore/core/instance_gate.h>
 #include <cerfcore/core/log.h>
 #include <cerfcore/core/service.h>
 #include <cerfcore/platform/host_process.h>
@@ -27,7 +28,7 @@ public:
             return;
         }
         notifier_ = new QSocketNotifier(fd_, QSocketNotifier::Read);
-        QObject::connect(notifier_, &QSocketNotifier::activated, notifier_, [this] { Drain(); });
+        QObject::connect(notifier_, &QSocketNotifier::activated, notifier_, gate_.Bind([this] { Drain(); }));
     }
 
     void OnShutdown() override { Close(); }
@@ -49,9 +50,10 @@ private:
         fd_ = -1;
     }
 
-    int              fd_       = -1;
-    uint32_t         pid_      = 0;
-    QSocketNotifier* notifier_ = nullptr;
+    const cerfcore::InstanceGate gate_{emu_};
+    int                          fd_       = -1;
+    uint32_t                     pid_      = 0;
+    QSocketNotifier*             notifier_ = nullptr;
 };
 
 }

@@ -1,4 +1,4 @@
-#include "file_manager_reveal.h"
+#include "file_offer.h"
 
 #include <QDBusConnection>
 #include <QDBusMessage>
@@ -14,7 +14,7 @@ constexpr char kFileManager1[] = "org.freedesktop.FileManager1";
 
 }
 
-bool RevealInFileManager(const QString& absolute_path) {
+bool OfferFile(const QString& absolute_path) {
     QDBusMessage call = QDBusMessage::createMethodCall(
         QString::fromLatin1(kFileManager1), QStringLiteral("/org/freedesktop/FileManager1"),
         QString::fromLatin1(kFileManager1), QStringLiteral("ShowItems"));

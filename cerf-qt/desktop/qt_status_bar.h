@@ -1,6 +1,6 @@
 #pragma once
 
-#include <cerfcore/core/cerf_emulator.h>
+#include <cerfcore/core/instance_gate.h>
 
 #include <QImage>
 #include <QTimer>
@@ -12,8 +12,8 @@ class QtStatusBar : public QWidget {
 public:
     QtStatusBar(cerfcore::CerfEmulator& emu, QWidget* parent);
 
-    bool WidgetScreenRect(const cerfcore::HostWidget* w, QRect& out) const;
-    bool CaptureWidgetScreenRect(QRect& out) const;
+    bool WidgetScreenRect(cerfcore::CerfEmulator& emu, const cerfcore::HostWidget* w, QRect& out) const;
+    bool CaptureWidgetScreenRect(cerfcore::CerfEmulator& emu, QRect& out) const;
 
 protected:
     void paintEvent(QPaintEvent* event) override;
@@ -29,13 +29,13 @@ protected:
 private:
     void Tick();
     void RowHeld();
-    void SecondaryAction(cerfcore::HostWidget* w, const QPoint& pos);
-    int  EntryAt(const QPoint& pos) const;
+    void SecondaryAction(cerfcore::CerfEmulator& emu, cerfcore::HostWidget* w, const QPoint& pos);
+    int  EntryAt(cerfcore::CerfEmulator& emu, const QPoint& pos) const;
 
-    cerfcore::CerfEmulator& emu_;
-    QTimer                  tick_;
-    QTimer                  row_hold_;
-    QImage                  image_;
-    int                     tip_entry_   = -1;
-    int                     row_pressed_ = -1;
+    cerfcore::InstanceGate gate_;
+    QTimer                 tick_;
+    QTimer                 row_hold_;
+    QImage                 image_;
+    int                    tip_entry_   = -1;
+    int                    row_pressed_ = -1;
 };

@@ -5,12 +5,14 @@
 #include <QString>
 #include <QVariant>
 
+class NestedEventLoops;
+
 class QmlDialogWaiter : public QObject {
     Q_OBJECT
 
 public:
     void            Watch(QObject* dialog);
-    void            Wait();
+    void            Wait(NestedEventLoops& loops);
     const QVariant& Result() const { return result_; }
 
 public slots:

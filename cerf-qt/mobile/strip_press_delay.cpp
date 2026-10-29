@@ -3,9 +3,8 @@
 #include "android_view_configuration.h"
 
 #include <algorithm>
-#include <utility>
 
-StripPressDelay::StripPressDelay(Sink sink) : sink_(std::move(sink)) {
+StripPressDelay::StripPressDelay(StripPressReceiver& receiver) : receiver_(receiver) {
     clock_.start();
     tap_timer_.setSingleShot(true);
     tap_timer_.setInterval(AndroidTapTimeoutMs());
@@ -77,7 +76,7 @@ void StripPressDelay::DeliverDue() {
     while (!queue_.empty() && queue_.front().due_ms <= clock_.elapsed()) {
         const Queued q = queue_.front();
         queue_.pop_front();
-        sink_(q.step, q.index);
+        receiver_.OnStripStep(q.step, q.index);
     }
     Arm();
 }
@@ -87,7 +86,7 @@ void StripPressDelay::DeliverAll() {
     while (!queue_.empty()) {
         const Queued q = queue_.front();
         queue_.pop_front();
-        sink_(q.step, q.index);
+        receiver_.OnStripStep(q.step, q.index);
     }
 }
 

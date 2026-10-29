@@ -7,6 +7,7 @@
 #include "qt_theme.h"
 
 #include <cerfcore/core/cerf_emulator.h>
+#include <cerfcore/core/instance_gate.h>
 #include "../dpi_scale.h"
 #include "../html_link.h"
 #include "../link_opener.h"
@@ -23,8 +24,6 @@
 #include <QPushButton>
 #include <QTimer>
 
-#include <functional>
-
 REGISTER_SERVICE(QtShutdownDialog);
 
 namespace {
@@ -36,37 +35,45 @@ using cerffrontend::kDefaultDpi;
 
 QRect ToQRect(const cerffrontend::Rect& r) { return QRect(r.left, r.top, r.right - r.left, r.bottom - r.top); }
 
-class PopupComboBox : public QComboBox {
+class PopupOpenListener {
 public:
-    using QComboBox::QComboBox;
+    virtual void OnPopupOpen() = 0;
 
-    std::function<void()> on_popup;
-
-    void showPopup() override {
-        if (on_popup) on_popup();
-        QComboBox::showPopup();
-    }
+protected:
+    ~PopupOpenListener() = default;
 };
 
-class ShutdownDialogWidget : public QDialog {
+class PopupComboBox : public QComboBox {
+public:
+    PopupComboBox(PopupOpenListener& listener, QWidget* parent) : QComboBox(parent), listener_(listener) {}
+
+    void showPopup() override {
+        listener_.OnPopupOpen();
+        QComboBox::showPopup();
+    }
+
+private:
+    PopupOpenListener& listener_;
+};
+
+class ShutdownDialogWidget : public QDialog, public PopupOpenListener {
 public:
     ShutdownDialogWidget(cerfcore::CerfEmulator& emu, QWidget* owner, cerfcore::ShutdownTrigger trigger)
         : QDialog(owner),
-          emu_(emu),
+          gate_(emu),
           layout_(kDefaultDpi, Layout::kBandH, Layout::kBandW,
                   Layout::ClientHeight(kDefaultDpi, Layout::kBandH)) {
-        auto& prompt = emu_.Get<ShutdownPrompt>();
+        auto& prompt = emu.Get<ShutdownPrompt>();
         setWindowTitle(QString::fromUtf8(prompt.Title()));
         setFixedSize(Layout::kBandW, Layout::ClientHeight(kDefaultDpi, Layout::kBandH));
 
         MakeLabel(QString::fromUtf8(prompt.Intro(trigger)), layout_.Intro());
         MakeLabel(QString::fromUtf8(prompt.Question()), layout_.Question());
 
-        combo_ = new PopupComboBox(this);
+        combo_ = new PopupComboBox(*this, this);
         for (int i = 0; i < ShutdownPrompt::kActionCount; ++i)
             combo_->addItem(QString::fromUtf8(prompt.ActionLabel(static_cast<ShutdownPromptAction>(i))));
         combo_->setGeometry(ToQRect(layout_.Combo()));
-        combo_->on_popup = [this] { Stop(); };
 
         save_ = new QCheckBox(QString::fromStdString(prompt.SaveLabel()), this);
         save_->setChecked(prompt.SaveByDefault());
@@ -87,19 +94,22 @@ public:
         auto* cancel = new QPushButton(QString::fromUtf8(prompt.CancelLabel(trigger)), this);
         cancel->setGeometry(ToQRect(layout_.Cancel()));
 
-        QObject::connect(combo_, &QComboBox::currentIndexChanged, this, [this] {
-            Stop();
-            Sync();
-        });
-        QObject::connect(save_, &QCheckBox::clicked, this, [this] { Stop(); });
-        QObject::connect(remember_, &QCheckBox::clicked, this, [this] { Stop(); });
-        QObject::connect(link_, &QLabel::linkActivated, this, [this](const QString& href) {
-            Stop();
-            emu_.Get<cerffrontend::LinkOpener>().Open(href.toStdString());
-        });
-        QObject::connect(ok, &QPushButton::clicked, this, [this] { Commit(); });
-        QObject::connect(cancel, &QPushButton::clicked, this, [this] { reject(); });
-        QObject::connect(&tick_, &QTimer::timeout, this, [this] { Tick(); });
+        QObject::connect(combo_, &QComboBox::currentIndexChanged, this,
+                         gate_.Bind([this](cerfcore::CerfEmulator& emu) {
+                             Stop();
+                             Sync(emu);
+                         }));
+        QObject::connect(save_, &QCheckBox::clicked, this, gate_.Bind([this] { Stop(); }));
+        QObject::connect(remember_, &QCheckBox::clicked, this, gate_.Bind([this] { Stop(); }));
+        QObject::connect(link_, &QLabel::linkActivated, this,
+                         gate_.Bind([this](cerfcore::CerfEmulator& emu, const QString& href) {
+                             Stop();
+                             emu.Get<cerffrontend::LinkOpener>().Open(href.toStdString());
+                         }));
+        QObject::connect(ok, &QPushButton::clicked, this,
+                         gate_.Bind([this](cerfcore::CerfEmulator& emu) { Commit(emu); }));
+        QObject::connect(cancel, &QPushButton::clicked, this, gate_.Bind([this] { reject(); }));
+        QObject::connect(&tick_, &QTimer::timeout, this, gate_.Bind([this] { Tick(); }));
 
         counting_     = prompt.CountsDown(trigger);
         remaining_ms_ = static_cast<int>(ShutdownPrompt::kCountdownMs);
@@ -112,25 +122,29 @@ public:
 
     cerfcore::ShutdownChoice Choice() const { return choice_; }
 
+    void OnPopupOpen() override { Stop(); }
+
 protected:
     void paintEvent(QPaintEvent*) override {
-        QPainter    p(this);
-        auto&       res = emu_.Get<QtPaintResources>();
-        const qreal dpr = devicePixelRatioF();
-        p.drawImage(QRect(0, 0, Layout::kBandW, Layout::kBandH),
-                    res.SvgImage(CERF_ABOUT_BAND_ASSET, Layout::kBandW, Layout::kBandH, dpr));
-        const QRect icon = ToQRect(layout_.Icon());
-        p.drawImage(icon, res.SvgImage("suspend", icon.width(), icon.height(), dpr));
-        if (!counting_ || combo_->currentIndex() != static_cast<int>(ShutdownPromptAction::Exit)) return;
-        const QColor bg = palette().color(QPalette::Window);
-        QtPainter    painter(emu_, p);
-        layout_.PaintCountdown(painter,
-                               cerffrontend::Rgb{static_cast<uint8_t>(bg.red()),
-                                                 static_cast<uint8_t>(bg.green()),
-                                                 static_cast<uint8_t>(bg.blue())},
-                               emu_.Get<QtTheme>().IsDark(), remaining_ms_);
-        painted_fill_w_ = layout_.BarFillWidth(remaining_ms_);
-        painted_secs_   = Layout::RemainingSeconds(remaining_ms_);
+        gate_.Run([this](cerfcore::CerfEmulator& emu) {
+            QPainter    p(this);
+            auto&       res = emu.Get<QtPaintResources>();
+            const qreal dpr = devicePixelRatioF();
+            p.drawImage(QRect(0, 0, Layout::kBandW, Layout::kBandH),
+                        res.SvgImage(CERF_ABOUT_BAND_ASSET, Layout::kBandW, Layout::kBandH, dpr));
+            const QRect icon = ToQRect(layout_.Icon());
+            p.drawImage(icon, res.SvgImage("suspend", icon.width(), icon.height(), dpr));
+            if (!counting_ || combo_->currentIndex() != static_cast<int>(ShutdownPromptAction::Exit)) return;
+            const QColor bg = palette().color(QPalette::Window);
+            QtPainter    painter(emu, p);
+            layout_.PaintCountdown(painter,
+                                   cerffrontend::Rgb{static_cast<uint8_t>(bg.red()),
+                                                     static_cast<uint8_t>(bg.green()),
+                                                     static_cast<uint8_t>(bg.blue())},
+                                   emu.Get<QtTheme>().IsDark(), remaining_ms_);
+            painted_fill_w_ = layout_.BarFillWidth(remaining_ms_);
+            painted_secs_   = Layout::RemainingSeconds(remaining_ms_);
+        });
     }
 
     void mousePressEvent(QMouseEvent* event) override {
@@ -166,7 +180,7 @@ private:
         update();
     }
 
-    void Sync() {
+    void Sync(cerfcore::CerfEmulator& emu) {
         const auto action  = static_cast<ShutdownPromptAction>(combo_->currentIndex());
         const bool exiting = action == ShutdownPromptAction::Exit;
         save_->setVisible(exiting);
@@ -175,12 +189,12 @@ private:
         remember_->setVisible(exiting);
         desc_->setVisible(!exiting);
         if (!exiting)
-            desc_->setText(QString::fromUtf8(emu_.Get<ShutdownPrompt>().ResetDescription(action)));
+            desc_->setText(QString::fromUtf8(emu.Get<ShutdownPrompt>().ResetDescription(action)));
         update();
     }
 
-    void Commit() {
-        choice_ = emu_.Get<ShutdownPrompt>().Commit(
+    void Commit(cerfcore::CerfEmulator& emu) {
+        choice_ = emu.Get<ShutdownPrompt>().Commit(
             static_cast<ShutdownPromptAction>(combo_->currentIndex()), save_->isChecked(),
             remember_->isChecked());
         accept();
@@ -192,7 +206,7 @@ private:
         if (remaining_ms_ <= 0) {
             counting_ = false;
             tick_.stop();
-            Commit();
+            gate_.Run([this](cerfcore::CerfEmulator& emu) { Commit(emu); });
             return;
         }
         if (layout_.BarFillWidth(remaining_ms_) != painted_fill_w_) update(ToQRect(layout_.Bar()));
@@ -200,7 +214,7 @@ private:
             update(ToQRect(layout_.Countdown()));
     }
 
-    cerfcore::CerfEmulator& emu_;
+    cerfcore::InstanceGate  gate_;
     const Layout            layout_;
     PopupComboBox*          combo_    = nullptr;
     QCheckBox*              save_     = nullptr;

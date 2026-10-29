@@ -8,6 +8,7 @@
 #include "../button_row.h"
 #include "../status_bar.h"
 
+#include <cerfcore/core/cerf_emulator.h>
 #include <cerfcore/host/host_widget.h>
 
 #include <QEvent>
@@ -28,7 +29,7 @@ QRect BoxRect(const cerffrontend::Rect& box) {
 }
 
 QtStatusBar::QtStatusBar(cerfcore::CerfEmulator& emu, QWidget* parent)
-    : QWidget(parent), emu_(emu) {
+    : QWidget(parent), gate_(emu) {
     setFixedHeight(cerffrontend::StatusBar::kHeight);
     setFocusPolicy(Qt::NoFocus);
     setAttribute(Qt::WA_OpaquePaintEvent);
@@ -42,19 +43,23 @@ QtStatusBar::QtStatusBar(cerfcore::CerfEmulator& emu, QWidget* parent)
 
 void QtStatusBar::paintEvent(QPaintEvent*) {
     if (width() <= 0 || height() <= 0) return;
-    FitDeviceImage(image_, width(), height(), devicePixelRatioF(), QImage::Format_RGB32);
-    {
-        QPainter  ip(&image_);
-        QtPainter painter(emu_, ip);
-        emu_.Get<cerffrontend::StatusBar>().Paint(painter, cerffrontend::Rect{0, 0, width(), height()},
-                                                  emu_.Get<QtTheme>().IsDark());
-    }
-    QPainter p(this);
-    p.drawImage(QPointF(0, 0), image_);
+    gate_.Run([this](cerfcore::CerfEmulator& emu) {
+        FitDeviceImage(image_, width(), height(), devicePixelRatioF(), QImage::Format_RGB32);
+        {
+            QPainter  ip(&image_);
+            QtPainter painter(emu, ip);
+            emu.Get<cerffrontend::StatusBar>().Paint(painter, cerffrontend::Rect{0, 0, width(), height()},
+                                                     emu.Get<QtTheme>().IsDark());
+        }
+        QPainter p(this);
+        p.drawImage(QPointF(0, 0), image_);
+    });
 }
 
 void QtStatusBar::resizeEvent(QResizeEvent*) {
-    if (emu_.Get<cerffrontend::StatusBar>().Relayout(width(), height())) update();
+    gate_.Run([this](cerfcore::CerfEmulator& emu) {
+        if (emu.Get<cerffrontend::StatusBar>().Relayout(width(), height())) update();
+    });
 }
 
 void QtStatusBar::changeEvent(QEvent* event) {
@@ -63,21 +68,23 @@ void QtStatusBar::changeEvent(QEvent* event) {
 }
 
 void QtStatusBar::Tick() {
-    auto&                                     bar = emu_.Get<cerffrontend::StatusBar>();
-    const cerffrontend::StatusBar::TickResult r   = bar.Tick(width(), height());
-    if (tip_entry_ >= 0 && QToolTip::isVisible()) {
-        for (size_t idx : r.tooltips_changed) {
-            if (static_cast<int>(idx) != tip_entry_) continue;
-            QToolTip::showText(QCursor::pos(), QString::fromStdString(bar.TooltipAt(idx)), this,
-                               BoxRect(bar.Entries()[idx].box));
+    gate_.Run([this](cerfcore::CerfEmulator& emu) {
+        auto&                                     bar = emu.Get<cerffrontend::StatusBar>();
+        const cerffrontend::StatusBar::TickResult r   = bar.Tick(width(), height());
+        if (tip_entry_ >= 0 && QToolTip::isVisible()) {
+            for (size_t idx : r.tooltips_changed) {
+                if (static_cast<int>(idx) != tip_entry_) continue;
+                QToolTip::showText(QCursor::pos(), QString::fromStdString(bar.TooltipAt(idx)), this,
+                                   BoxRect(bar.Entries()[idx].box));
+            }
         }
-    }
-    if (r.layout_changed) tip_entry_ = -1;
-    if (r.repaint) update();
+        if (r.layout_changed) tip_entry_ = -1;
+        if (r.repaint) update();
+    });
 }
 
-int QtStatusBar::EntryAt(const QPoint& pos) const {
-    const auto& entries = emu_.Get<cerffrontend::StatusBar>().Entries();
+int QtStatusBar::EntryAt(cerfcore::CerfEmulator& emu, const QPoint& pos) const {
+    const auto& entries = emu.Get<cerffrontend::StatusBar>().Entries();
     for (size_t i = 0; i < entries.size(); ++i)
         if (entries[i].box.Contains(pos.x(), pos.y())) return static_cast<int>(i);
     return -1;
@@ -85,51 +92,61 @@ int QtStatusBar::EntryAt(const QPoint& pos) const {
 
 bool QtStatusBar::event(QEvent* event) {
     if (event->type() != QEvent::ToolTip) return QWidget::event(event);
-    auto*     help  = static_cast<QHelpEvent*>(event);
-    const int entry = EntryAt(help->pos());
-    tip_entry_      = entry;
-    if (entry < 0) {
-        QToolTip::hideText();
-        event->ignore();
-        return true;
-    }
-    auto& bar = emu_.Get<cerffrontend::StatusBar>();
-    QToolTip::showText(help->globalPos(), QString::fromStdString(bar.TooltipAt(entry)), this,
-                       BoxRect(bar.Entries()[static_cast<size_t>(entry)].box));
+    gate_.Run([this, event](cerfcore::CerfEmulator& emu) {
+        auto*     help  = static_cast<QHelpEvent*>(event);
+        const int entry = EntryAt(emu, help->pos());
+        tip_entry_      = entry;
+        if (entry < 0) {
+            QToolTip::hideText();
+            event->ignore();
+            return;
+        }
+        auto& bar = emu.Get<cerffrontend::StatusBar>();
+        QToolTip::showText(help->globalPos(), QString::fromStdString(bar.TooltipAt(entry)), this,
+                           BoxRect(bar.Entries()[static_cast<size_t>(entry)].box));
+    });
     return true;
 }
 
-void QtStatusBar::SecondaryAction(cerfcore::HostWidget* w, const QPoint& pos) {
+void QtStatusBar::SecondaryAction(cerfcore::CerfEmulator& emu, cerfcore::HostWidget* w, const QPoint& pos) {
     std::vector<cerffrontend::MenuItem> items;
-    if (!emu_.Get<cerffrontend::StatusBar>().ContextMenu(w, items)) return;
-    emu_.Get<QtMenuBuilder>().RunContextMenu(items, mapToGlobal(pos));
+    if (!emu.Get<cerffrontend::StatusBar>().ContextMenu(w, items)) return;
+    emu.Get<QtMenuBuilder>().RunContextMenu(items, mapToGlobal(pos));
 }
 
 void QtStatusBar::mousePressEvent(QMouseEvent* event) {
     if (event->button() != Qt::LeftButton) return;
-    const QPoint pos = event->position().toPoint();
-    auto&        bar = emu_.Get<cerffrontend::StatusBar>();
-    row_pressed_     = bar.RowIndexAt(pos.x());
-    if (row_pressed_ >= 0) {
-        emu_.Get<cerffrontend::ButtonRow>().PressAt(static_cast<size_t>(row_pressed_));
-        row_hold_.start(cerffrontend::ButtonRow::kHoldMs);
-        return;
-    }
-    if (cerfcore::HostWidget* w = bar.WidgetAt(pos.x()); w && !bar.PrimaryClick(w)) SecondaryAction(w, pos);
+    gate_.Run([this, event](cerfcore::CerfEmulator& emu) {
+        const QPoint pos = event->position().toPoint();
+        auto&        bar = emu.Get<cerffrontend::StatusBar>();
+        row_pressed_     = bar.RowIndexAt(pos.x());
+        if (row_pressed_ >= 0) {
+            emu.Get<cerffrontend::ButtonRow>().PressAt(static_cast<size_t>(row_pressed_));
+            row_hold_.start(cerffrontend::ButtonRow::kHoldMs);
+            return;
+        }
+        if (cerfcore::HostWidget* w = bar.WidgetAt(pos.x()); w && !bar.PrimaryClick(w)) SecondaryAction(emu, w, pos);
+    });
 }
 
 void QtStatusBar::RowHeld() {
     if (row_pressed_ < 0) return;
-    emu_.Get<cerffrontend::ButtonRow>().HoldAt(static_cast<size_t>(row_pressed_));
-    update();
+    gate_.Run([this](cerfcore::CerfEmulator& emu) {
+        emu.Get<cerffrontend::ButtonRow>().HoldAt(static_cast<size_t>(row_pressed_));
+        update();
+    });
 }
 
 void QtStatusBar::mouseMoveEvent(QMouseEvent* event) {
-    if (emu_.Get<cerffrontend::StatusBar>().SetHover(event->position().toPoint().x())) update();
+    gate_.Run([this, event](cerfcore::CerfEmulator& emu) {
+        if (emu.Get<cerffrontend::StatusBar>().SetHover(event->position().toPoint().x())) update();
+    });
 }
 
 void QtStatusBar::leaveEvent(QEvent*) {
-    if (emu_.Get<cerffrontend::StatusBar>().ClearHover()) update();
+    gate_.Run([this](cerfcore::CerfEmulator& emu) {
+        if (emu.Get<cerffrontend::StatusBar>().ClearHover()) update();
+    });
 }
 
 void QtStatusBar::wheelEvent(QWheelEvent* event) {
@@ -138,39 +155,45 @@ void QtStatusBar::wheelEvent(QWheelEvent* event) {
     const int    delta  = !pixels.isNull() ? (pixels.x() != 0 ? pixels.x() : pixels.y())
                                            : (angle.x() != 0 ? angle.x() : angle.y()) * kScrollPerNotch
                                                  / QWheelEvent::DefaultDeltasPerStep;
-    if (emu_.Get<cerffrontend::StatusBar>().Scroll(delta)) {
-        tip_entry_ = -1;
-        update();
-    }
+    gate_.Run([this, delta](cerfcore::CerfEmulator& emu) {
+        if (emu.Get<cerffrontend::StatusBar>().Scroll(delta)) {
+            tip_entry_ = -1;
+            update();
+        }
+    });
 }
 
 void QtStatusBar::mouseReleaseEvent(QMouseEvent* event) {
     if (event->button() == Qt::LeftButton) {
         if (row_pressed_ >= 0 && row_hold_.isActive()) {
             row_hold_.stop();
-            emu_.Get<cerffrontend::ButtonRow>().ReleaseAt(static_cast<size_t>(row_pressed_));
+            gate_.Run([this](cerfcore::CerfEmulator& emu) {
+                emu.Get<cerffrontend::ButtonRow>().ReleaseAt(static_cast<size_t>(row_pressed_));
+            });
             update();
         }
         row_pressed_ = -1;
         return;
     }
     if (event->button() != Qt::RightButton) return;
-    const QPoint pos = event->position().toPoint();
-    if (cerfcore::HostWidget* w = emu_.Get<cerffrontend::StatusBar>().WidgetAt(pos.x()))
-        SecondaryAction(w, pos);
+    gate_.Run([this, event](cerfcore::CerfEmulator& emu) {
+        const QPoint pos = event->position().toPoint();
+        if (cerfcore::HostWidget* w = emu.Get<cerffrontend::StatusBar>().WidgetAt(pos.x()))
+            SecondaryAction(emu, w, pos);
+    });
 }
 
-bool QtStatusBar::WidgetScreenRect(const cerfcore::HostWidget* w, QRect& out) const {
+bool QtStatusBar::WidgetScreenRect(cerfcore::CerfEmulator& emu, const cerfcore::HostWidget* w, QRect& out) const {
     cerffrontend::Rect box;
-    if (!emu_.Get<cerffrontend::StatusBar>().WidgetBox(w, box)) return false;
+    if (!emu.Get<cerffrontend::StatusBar>().WidgetBox(w, box)) return false;
     const QRect local = BoxRect(box);
     out = QRect(mapToGlobal(local.topLeft()), local.size());
     return true;
 }
 
-bool QtStatusBar::CaptureWidgetScreenRect(QRect& out) const {
+bool QtStatusBar::CaptureWidgetScreenRect(cerfcore::CerfEmulator& emu, QRect& out) const {
     cerffrontend::Rect box;
-    if (!emu_.Get<cerffrontend::StatusBar>().CaptureWidgetBox(box)) return false;
+    if (!emu.Get<cerffrontend::StatusBar>().CaptureWidgetBox(box)) return false;
     const QRect local = BoxRect(box);
     out = QRect(mapToGlobal(local.topLeft()), local.size());
     return true;

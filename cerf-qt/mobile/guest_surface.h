@@ -2,6 +2,7 @@
 
 #include "../qt_emulator_view.h"
 #include "../qt_frame_presenter.h"
+#include "gesture_pointer.h"
 #include "key_press_pacer.h"
 #include "pointer_overlay.h"
 #include "relative_mouse_relay.h"
@@ -10,6 +11,8 @@
 #include "view_placement.h"
 
 #include "../canvas_input.h"
+
+#include <cerfcore/core/instance_gate.h>
 
 #include <QMarginsF>
 #include <QPointF>
@@ -21,13 +24,14 @@
 #include <vector>
 
 namespace cerfcore {
-class CerfEmulator;
 enum class PointerKind;
 }
 
 class GuestSurface : public QQuickPaintedItem,
                      public cerffrontend::CanvasInputHost,
                      public TouchGestureHost,
+                     public GesturePointerHost,
+                     public KeyPressSink,
                      public QtEmulatorView {
     Q_OBJECT
     QML_ELEMENT
@@ -96,6 +100,8 @@ public:
     void PinchUpdate(QPointF centroid, double distance) override;
     void PinchEnd() override;
 
+    void DeliverKey(const QtHostKey& key, bool key_up) override;
+
 signals:
     void pointerIconChanged();
     void pointerMenuChanged();
@@ -128,30 +134,28 @@ private:
     void                  ApplyPlacement();
     void                  RouteMouse(QMouseEvent* event, cerffrontend::CanvasMouse::Kind kind);
     void                  SendCanvasMouse(cerffrontend::CanvasMouse::Kind kind, cerffrontend::MouseButton button,
-                                          QPointF device_at, uint32_t held);
+                                          QPointF device_at, uint32_t held) override;
     cerfcore::PointerKind ActiveKind() const;
-    bool                  RelativePath() const;
-    QRectF                VisibleImage() const;
-    void                  ClampCursor();
-    void                  SendCursorMove();
+    bool                  RelativeGuestPointer() const override;
+    QRectF                VisibleImage() const override;
+    double                GuestScale() const override;
+    void                  SendRelative(int dx, int dy, uint32_t buttons) override;
     void                  RouteKey(const QKeyEvent* event, bool key_up);
+    void                  PaintFrame(cerfcore::CerfEmulator& emu, QPainter* painter);
 
     enum class MouseRoute : uint8_t { kNone, kRelative, kCanvas };
 
-    cerfcore::CerfEmulator*            emu_ = nullptr;
+    cerfcore::InstanceGate             gate_;
     std::unique_ptr<QtFramePresenter>  presenter_;
     TouchGestures                      gestures_{*this};
+    GesturePointer                     pointer_{*this};
     RelativeMouseRelay                 relative_mouse_{*this};
     SoftKeyboardRequest                keyboard_{*this};
-    KeyPressPacer                      key_pacer_;
+    KeyPressPacer                      key_pacer_{*this};
     ViewPlacement                      placement_;
     PointerOverlay                     overlay_;
     QMarginsF                          safe_margins_;
-    QPointF                            cursor_;
-    QPointF                            relative_rest_;
     QPointF                            right_down_at_;
-    uint32_t                           held_             = 0;
-    uint32_t                           relative_held_    = 0;
     bool                               cursor_mode_      = false;
     bool                               relative_pointer_ = false;
     bool                               pointer_menu_     = true;

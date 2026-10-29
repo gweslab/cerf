@@ -33,7 +33,7 @@ MobileWidgetBar::MobileWidgetBar(QQuickItem* parent) : QQuickPaintedItem(parent)
 }
 
 void MobileWidgetBar::Attach(cerfcore::CerfEmulator& emu) {
-    emu_ = &emu;
+    gate_.Attach(emu);
     const cerfcore::HostWidget* pointer = emu.TryGet<cerfcore::PointerWidget>();
     auto&                       bar     = emu.Get<cerffrontend::StatusBar>();
     bar.SetFilter([pointer](const cerfcore::HostWidget* w) {
@@ -47,51 +47,53 @@ void MobileWidgetBar::Attach(cerfcore::CerfEmulator& emu) {
 
 void MobileWidgetBar::Detach() {
     tick_.stop();
-    emu_ = nullptr;
+    gate_ = cerfcore::InstanceGate();
 }
 
-int MobileWidgetBar::UnitWidth() const {
-    const size_t count = emu_->Get<cerffrontend::StatusBar>().ShownWidgets().size();
+int MobileWidgetBar::UnitWidth(cerfcore::CerfEmulator& emu) const {
+    const size_t count = emu.Get<cerffrontend::StatusBar>().ShownWidgets().size();
     return static_cast<int>(count) * cerffrontend::StatusBar::kIconBoxW;
 }
 
 void MobileWidgetBar::Tick() {
-    if (!emu_) return;
-    const int units = UnitWidth();
-    setImplicitWidth(units * kScale);
-    setImplicitHeight(cerffrontend::StatusBar::kHeight * kScale);
-    if (emu_->Get<cerffrontend::StatusBar>().Tick(units, cerffrontend::StatusBar::kHeight).repaint) update();
+    gate_.Run([this](cerfcore::CerfEmulator& emu) {
+        const int units = UnitWidth(emu);
+        setImplicitWidth(units * kScale);
+        setImplicitHeight(cerffrontend::StatusBar::kHeight * kScale);
+        if (emu.Get<cerffrontend::StatusBar>().Tick(units, cerffrontend::StatusBar::kHeight).repaint) update();
+    });
 }
 
 void MobileWidgetBar::paint(QPainter* painter) {
-    if (!emu_) return;
-    const int   units = UnitWidth();
-    const int   high  = cerffrontend::StatusBar::kHeight;
-    const qreal dpr   = window()->devicePixelRatio();
-    FitDeviceImage(image_, units, high, dpr * kScale, QImage::Format_ARGB32_Premultiplied);
-    image_.fill(Qt::transparent);
-    {
-        QPainter  ip(&image_);
-        QtPainter qp(*emu_, ip);
-        emu_->Get<cerffrontend::StatusBar>().PaintWidgets(qp, kBackdrop);
-    }
-    painter->drawImage(QRectF(0, 0, units * kScale, high * kScale), image_);
+    gate_.Run([this, painter](cerfcore::CerfEmulator& emu) {
+        const int   units = UnitWidth(emu);
+        const int   high  = cerffrontend::StatusBar::kHeight;
+        const qreal dpr   = window()->devicePixelRatio();
+        FitDeviceImage(image_, units, high, dpr * kScale, QImage::Format_ARGB32_Premultiplied);
+        image_.fill(Qt::transparent);
+        {
+            QPainter  ip(&image_);
+            QtPainter qp(emu, ip);
+            emu.Get<cerffrontend::StatusBar>().PaintWidgets(qp, kBackdrop);
+        }
+        painter->drawImage(QRectF(0, 0, units * kScale, high * kScale), image_);
+    });
 }
 
 void MobileWidgetBar::Activate(qreal x, qreal y, bool menu) {
-    QMetaObject::invokeMethod(this, [this, x, y, menu] { Run(x, y, menu); }, Qt::QueuedConnection);
+    QMetaObject::invokeMethod(
+        this, [this, x, y, menu] { gate_.Run([&](cerfcore::CerfEmulator& emu) { RunWidget(emu, x, y, menu); }); },
+        Qt::QueuedConnection);
 }
 
-void MobileWidgetBar::Run(qreal x, qreal y, bool menu) {
-    if (!emu_) return;
-    auto&                 bar    = emu_->Get<cerffrontend::StatusBar>();
+void MobileWidgetBar::RunWidget(cerfcore::CerfEmulator& emu, qreal x, qreal y, bool menu) {
+    auto&                 bar    = emu.Get<cerffrontend::StatusBar>();
     cerfcore::HostWidget* widget = bar.WidgetAt(static_cast<int>(x / kScale));
     if (!widget) return;
     if (!menu && bar.PrimaryClick(widget)) return;
     std::vector<cerffrontend::MenuItem> items;
     if (!bar.ContextMenu(widget, items)) return;
     if (menu || items.empty())
-        emu_->Get<MobileEmulatorWindow>().ShowHint(QString::fromStdString(widget->Tooltip()), kHintHoldMs,
-                                                   kHintGap);
-    if (!items.empty()) emu_->Get<MobileMenuPresenter>().Show(items, mapToScene(QPointF(x, y)));
+        emu.Get<MobileEmulatorWindow>().ShowHint(QString::fromStdString(widget->Tooltip()), kHintHoldMs, kHintGap);
+    if (!items.empty()) emu.Get<MobileMenuPresenter>().Show(items, mapToScene(QPointF(x, y)));
 }

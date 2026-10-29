@@ -5,10 +5,11 @@
 
 #include "../canvas_input.h"
 
+#include <QTimer>
+
 class QtCanvas : public QtPresenterCanvas, public cerffrontend::CanvasInputHost {
 public:
     QtCanvas(cerfcore::CerfEmulator& emu, QWidget* parent, uint32_t surf_w, uint32_t surf_h);
-    ~QtCanvas() override;
 
     void LoseMouseCapture();
 
@@ -28,12 +29,17 @@ protected:
     void wheelEvent(QWheelEvent* event) override;
     void keyPressEvent(QKeyEvent* event) override;
     void keyReleaseEvent(QKeyEvent* event) override;
+    void resizeEvent(QResizeEvent* event) override;
     bool focusNextPrevChild(bool next) override;
 
-private:
-    void ApplyCursor(int x, int y);
-    void RouteMouse(QMouseEvent* event, cerffrontend::CanvasMouse::Kind kind);
+    cerfcore::FrameSource& Source(cerfcore::CerfEmulator& emu) override;
 
-    bool grabbing_       = false;
-    bool pointer_hidden_ = false;
+private:
+    void ApplyCursor(cerfcore::CerfEmulator& emu, int x, int y);
+    void RouteMouse(cerfcore::CerfEmulator& emu, QMouseEvent* event, cerffrontend::CanvasMouse::Kind kind);
+    void FireAutoResize(cerfcore::CerfEmulator& emu);
+
+    QTimer resize_debounce_;
+    bool   grabbing_       = false;
+    bool   pointer_hidden_ = false;
 };

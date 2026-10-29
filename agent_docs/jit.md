@@ -80,6 +80,19 @@ compilation in `Run()`, so it is valid only there. `Run()` then returns
 `Engine::Panic` reports a broken engine invariant to the host and does
 not return. A service-locator error inside the engine goes the same way.
 
+**A host failure that `RaiseHostFailure` raises leaves `Run()` as the same
+exception.** On Windows x86 the exception passes through the JIT frames on
+the SEH chain. The dispatch filter lets the MSVC C++ exception code pass.
+On Linux, Android and macOS the exception crosses the JIT frames as a forced
+unwind. The engine registers one unwind entry for its code arena, and that
+entry carries the unwind.
+
+On those hosts an exception that a host function throws in any other way
+inside a block ends the process.
+
+The engine reports a host fault inside a block after the dispatch filter
+returns, never inside the filter. The report can then throw.
+
 ## How a block is translated
 
 A block is a straight-line run of guest instructions. The engine

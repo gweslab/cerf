@@ -45,13 +45,13 @@ void QtMenuBuilder::Populate(QMenu* menu, const std::vector<cerffrontend::MenuIt
     Callbacks callbacks;
     Append(menu, items, callbacks);
     for (auto& [action, callback] : callbacks)
-        QObject::connect(action, &QAction::triggered, menu, [cb = callback] { cb(); });
+        QObject::connect(action, &QAction::triggered, menu, gate_.Bind([cb = callback] { cb(); }));
 }
 
 void QtMenuBuilder::Bind(QMenu* menu, MenuSource source) {
-    auto refill = [this, menu, source = std::move(source)] { Populate(menu, source()); };
-    QObject::connect(menu, &QMenu::aboutToShow, menu, refill);
-    QTimer::singleShot(0, menu, refill);
+    const auto refill = [this, menu, source = std::move(source)] { Populate(menu, source(emu_)); };
+    QObject::connect(menu, &QMenu::aboutToShow, menu, gate_.Bind(refill));
+    QTimer::singleShot(0, menu, gate_.Bind(refill));
 }
 
 void QtMenuBuilder::RunContextMenu(const std::vector<cerffrontend::MenuItem>& items,
@@ -63,8 +63,7 @@ void QtMenuBuilder::RunContextMenu(const std::vector<cerffrontend::MenuItem>& it
     if (!chosen) return;
     for (auto& [action, callback] : callbacks) {
         if (action != chosen) continue;
-        std::function<void()> run = callback;
-        run();
+        gate_.Run([&callback](cerfcore::CerfEmulator&) { callback(); });
         return;
     }
 }

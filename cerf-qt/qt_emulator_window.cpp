@@ -12,9 +12,7 @@
 #include <cerfcore/host/frame_renderer.h>
 #include <cerfcore/host/shutdown_host.h>
 #include <cerfcore/peripherals/cerf_virt/cerf_virt_framebuffer.h>
-#include <cerfcore/platform/host_process.h>
 
-#include <QCoreApplication>
 #include <QMetaObject>
 #include <QTimer>
 
@@ -28,7 +26,7 @@ void QtEmulatorWindow::AttachView(QtEmulatorView& view, QObject& window) {
     surface_h_.store(view.GuestSurfaceHeight(), std::memory_order_release);
     teardown_timer_ = std::make_unique<QTimer>();
     teardown_timer_->setInterval(static_cast<int>(cerffrontend::ShutdownTeardown::kPollMs));
-    QObject::connect(teardown_timer_.get(), &QTimer::timeout, [this] { PollTeardown(); });
+    teardown_timer_->callOnTimeout(gate_.Bind([this] { PollTeardown(); }));
     std::lock_guard<std::mutex> lock(held_mutex_);
     attached_ = true;
     for (std::function<void()>& job : held_) Post(std::move(job));
@@ -99,15 +97,15 @@ void QtEmulatorWindow::RunOnUiThread(std::function<void()> job) {
 
 void QtEmulatorWindow::Post(std::function<void()> job) {
     QMetaObject::invokeMethod(
-        QCoreApplication::instance(),
-        [alive = alive_, job = std::move(job)] {
+        &jobs_,
+        [alive = alive_, job = gate_.Bind(std::move(job))]() mutable {
             if (*alive) job();
         },
         Qt::QueuedConnection);
 }
 
 void QtEmulatorWindow::RunOnUiThreadAfter(uint32_t delay_ms, std::function<void()> job) {
-    QTimer::singleShot(static_cast<int>(delay_ms), context_.data(), std::move(job));
+    QTimer::singleShot(static_cast<int>(delay_ms), context_.data(), gate_.Bind([job = std::move(job)] { job(); }));
 }
 
 bool QtEmulatorWindow::CaptureGuestSurface(std::vector<uint32_t>& out, uint32_t& w, uint32_t& h) {
@@ -139,7 +137,7 @@ void QtEmulatorWindow::PollTeardown() {
             return;
         case cerffrontend::ShutdownTeardown::Step::kWedged:
             teardown_timer_->stop();
-            cerfcore::Log::Close();
-            cerfcore::host_platform::ExitProcessNow(cerfcore::CERF_FATAL_RUNTIME_ERROR);
+            OnTeardownWedged();
+            return;
     }
 }

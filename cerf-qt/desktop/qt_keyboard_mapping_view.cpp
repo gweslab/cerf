@@ -7,6 +7,7 @@
 #include "keyboard_mapping_panel.h"
 
 #include <cerfcore/core/cerf_emulator.h>
+#include <cerfcore/core/instance_gate.h>
 #include <cerfcore/host/keyboard_map.h>
 
 #include <QKeyEvent>
@@ -22,7 +23,7 @@ using Panel = cerffrontend::KeyboardMappingPanel;
 class KeyboardMappingWidget : public QWidget {
 public:
     KeyboardMappingWidget(cerfcore::CerfEmulator& emu, QWidget* owner)
-        : QWidget(owner, Qt::Tool), emu_(emu) {
+        : QWidget(owner, Qt::Tool), gate_(emu) {
         setWindowTitle(QString::fromUtf8(Panel::kTitle));
         setAttribute(Qt::WA_DeleteOnClose);
         setFixedSize(Panel::kClientW, Panel::kClientH);
@@ -34,16 +35,19 @@ public:
 
 protected:
     void paintEvent(QPaintEvent*) override {
-        QPainter  p(this);
-        QtPainter painter(emu_, p);
-        emu_.Get<Panel>().Paint(painter, cerffrontend::Rect{0, 0, width(), height()},
-                                emu_.Get<QtTheme>().IsDark());
+        gate_.Run([this](cerfcore::CerfEmulator& emu) {
+            QPainter  p(this);
+            QtPainter painter(emu, p);
+            emu.Get<Panel>().Paint(painter, cerffrontend::Rect{0, 0, width(), height()}, emu.Get<QtTheme>().IsDark());
+        });
     }
 
     void mouseReleaseEvent(QMouseEvent* event) override {
         if (event->button() != Qt::LeftButton) return;
         const QPoint pos = event->position().toPoint();
-        if (emu_.Get<Panel>().OnClick(pos.x(), pos.y())) update();
+        gate_.Run([this, pos](cerfcore::CerfEmulator& emu) {
+            if (emu.Get<Panel>().OnClick(pos.x(), pos.y())) update();
+        });
     }
 
     void keyPressEvent(QKeyEvent* event) override {
@@ -51,7 +55,7 @@ protected:
     }
 
 private:
-    cerfcore::CerfEmulator& emu_;
+    cerfcore::InstanceGate gate_;
 };
 
 class QtKeyboardMappingView : public cerfcore::KeyboardMappingView {

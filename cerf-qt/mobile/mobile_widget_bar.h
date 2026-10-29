@@ -1,13 +1,11 @@
 #pragma once
 
+#include <cerfcore/core/instance_gate.h>
+
 #include <QImage>
 #include <QQuickPaintedItem>
 #include <QTimer>
 #include <QtQml/qqmlregistration.h>
-
-namespace cerfcore {
-class CerfEmulator;
-}
 
 class MobileWidgetBar : public QQuickPaintedItem {
     Q_OBJECT
@@ -24,11 +22,11 @@ public:
     Q_INVOKABLE void Activate(qreal x, qreal y, bool menu);
 
 private:
-    void Run(qreal x, qreal y, bool menu);
+    void RunWidget(cerfcore::CerfEmulator& emu, qreal x, qreal y, bool menu);
     void Tick();
-    int  UnitWidth() const;
+    int  UnitWidth(cerfcore::CerfEmulator& emu) const;
 
-    cerfcore::CerfEmulator* emu_ = nullptr;
-    QTimer                  tick_;
-    QImage                  image_;
+    cerfcore::InstanceGate gate_;
+    QTimer                 tick_;
+    QImage                 image_;
 };

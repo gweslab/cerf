@@ -5,13 +5,11 @@
 
 #include "../viewport_layout.h"
 
-#include <cerfcore/core/cerf_emulator.h>
-#include <cerfcore/host/frame_source.h>
+#include <cerfcore/core/instance_gate.h>
 
 #include <QWidget>
 
 #include <cstdint>
-#include <functional>
 #include <memory>
 #include <vector>
 
@@ -19,9 +17,8 @@ class QScrollBar;
 
 class QtPresenterCanvas : public QWidget, public QtEmulatorView {
 public:
-    QtPresenterCanvas(cerfcore::CerfEmulator& emu, QWidget* parent, cerfcore::FrameSource& source,
-                      uint32_t surf_w, uint32_t surf_h, int present_interval_ms,
-                      std::unique_ptr<QtPresentHooks> hooks);
+    QtPresenterCanvas(cerfcore::CerfEmulator& emu, QWidget* parent, uint32_t surf_w, uint32_t surf_h,
+                      int present_interval_ms);
 
     uint32_t GuestSurfaceWidth() const override { return presenter_.Layout().SurfaceWidth(); }
     uint32_t GuestSurfaceHeight() const override { return presenter_.Layout().SurfaceHeight(); }
@@ -38,10 +35,7 @@ public:
     void                       SetFramebufferActive(bool active) override;
     void                       Repaint() override { update(); }
 
-    bool CaptureSurface(std::vector<uint32_t>& out, uint32_t& w, uint32_t& h) override {
-        return presenter_.Capture(out, w, h);
-    }
-    void SetResizeListener(std::function<void()> listener) { on_resized_ = std::move(listener); }
+    bool CaptureSurface(std::vector<uint32_t>& out, uint32_t& w, uint32_t& h) override;
 
     qreal Dpr() const { return devicePixelRatioF(); }
     void  VisibleSize(int& w, int& h) const;
@@ -53,15 +47,18 @@ protected:
     void resizeEvent(QResizeEvent* event) override;
     void changeEvent(QEvent* event) override;
 
-    cerfcore::CerfEmulator& emu_;
+    void SetPresentHooks(std::unique_ptr<QtPresentHooks> hooks) { presenter_.SetHooks(std::move(hooks)); }
+
+    virtual cerfcore::FrameSource& Source(cerfcore::CerfEmulator& emu) = 0;
+
+    cerfcore::InstanceGate gate_;
 
 private:
     void Relayout();
     void UpdateScrollbars();
     void OnScroll(bool horizontal, int value);
 
-    QtFramePresenter      presenter_;
-    QScrollBar*           hbar_ = nullptr;
-    QScrollBar*           vbar_ = nullptr;
-    std::function<void()> on_resized_;
+    QtFramePresenter presenter_;
+    QScrollBar*      hbar_ = nullptr;
+    QScrollBar*      vbar_ = nullptr;
 };

@@ -1,7 +1,5 @@
 #pragma once
 
-enum class ProcessMode { kManager, kEmulator, kInstallStage, kCrashReport };
-
-inline constexpr char kCrashReportArg[] = "--crash-report=";
+enum class ProcessMode { kManager, kEmulator, kInstallStage };
 
 ProcessMode DetectProcessMode(int argc, char** argv);

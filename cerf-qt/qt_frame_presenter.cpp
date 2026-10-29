@@ -6,9 +6,9 @@
 
 #include <algorithm>
 
-QtFramePresenter::QtFramePresenter(cerfcore::FrameSource& source, std::unique_ptr<QtPresentHooks> hooks,
-                                   uint32_t surf_w, uint32_t surf_h, QColor background)
-    : source_(source), hooks_(std::move(hooks)), background_(background) {
+QtFramePresenter::QtFramePresenter(std::unique_ptr<QtPresentHooks> hooks, uint32_t surf_w, uint32_t surf_h,
+                                   QColor background)
+    : hooks_(std::move(hooks)), background_(background) {
     SetGuestSurfaceSize(surf_w, surf_h);
     repaint_timer_.setTimerType(Qt::PreciseTimer);
 }
@@ -18,8 +18,9 @@ void QtFramePresenter::StartRepaints(int interval_ms, std::function<void()> repa
     repaint_timer_.start(interval_ms);
 }
 
-void QtFramePresenter::DrawTo(QPainter& painter, int visible_w, int visible_h, qreal dpr) {
-    const QImage& image = Present(visible_w, visible_h);
+void QtFramePresenter::DrawTo(cerfcore::CerfEmulator& emu, cerfcore::FrameSource& source, QPainter& painter,
+                              int visible_w, int visible_h, qreal dpr) {
+    const QImage& image = Present(emu, source, visible_w, visible_h, dpr);
     painter.drawImage(QRectF(0, 0, image.width() / dpr, image.height() / dpr), image);
 }
 
@@ -42,24 +43,25 @@ void QtFramePresenter::SetCanvasSize(int w, int h) {
     layout_.SetCanvasSize(w, h);
 }
 
-bool QtFramePresenter::Capture(std::vector<uint32_t>& out, uint32_t& w, uint32_t& h) {
-    if (!source_.HasFrame()) return false;
+bool QtFramePresenter::Capture(cerfcore::FrameSource& source, std::vector<uint32_t>& out, uint32_t& w,
+                               uint32_t& h) {
+    if (!source.HasFrame()) return false;
     const uint32_t sw = layout_.SurfaceWidth();
     const uint32_t sh = layout_.SurfaceHeight();
     if (sw == 0 || sh == 0 || guest_.isNull()) return false;
     auto* bits = reinterpret_cast<uint32_t*>(guest_.bits());
-    source_.RenderInto(bits, sw, sh);
+    source.RenderInto(bits, sw, sh);
     out.assign(bits, bits + static_cast<size_t>(sw) * sh);
     w = sw;
     h = sh;
     return true;
 }
 
-bool QtFramePresenter::ComposeInto() {
+bool QtFramePresenter::ComposeInto(cerfcore::FrameSource& source) {
     present_.fill(background_);
-    if (!source_.HasFrame() || guest_.isNull()) return false;
+    if (!source.HasFrame() || guest_.isNull()) return false;
     auto* guest_bits = reinterpret_cast<uint32_t*>(guest_.bits());
-    source_.RenderInto(guest_bits, layout_.SurfaceWidth(), layout_.SurfaceHeight());
+    source.RenderInto(guest_bits, layout_.SurfaceWidth(), layout_.SurfaceHeight());
     ForceOpaque(guest_bits, static_cast<size_t>(layout_.SurfaceWidth()) * layout_.SurfaceHeight());
 
     const cerffrontend::ViewportLayout::Layout L = layout_.Compute();
@@ -75,16 +77,17 @@ bool QtFramePresenter::ComposeInto() {
     return true;
 }
 
-const QImage& QtFramePresenter::Present(int visible_w, int visible_h) {
-    hooks_->OnPresentTick(source_.HasFrame());
+const QImage& QtFramePresenter::Present(cerfcore::CerfEmulator& emu, cerfcore::FrameSource& source,
+                                        int visible_w, int visible_h, qreal dpr) {
+    hooks_->OnPresentTick(emu, source.HasFrame());
     if (present_.isNull()) return present_;
     auto*     bits = reinterpret_cast<uint32_t*>(present_.bits());
     const int w    = present_.width();
     const int h    = present_.height();
-    if (hooks_->RenderAlt(bits, w, h)) ForceOpaque(bits, static_cast<size_t>(w) * h);
-    else                               ComposeInto();
-    if (hooks_->ShouldDesaturate()) cerffrontend::PresentEffects::DesaturateAndDim(bits, w * h);
-    hooks_->RenderOverlay(present_, std::min(w, visible_w), std::min(h, visible_h));
+    if (hooks_->RenderAlt(emu, bits, w, h, dpr)) ForceOpaque(bits, static_cast<size_t>(w) * h);
+    else                                         ComposeInto(source);
+    if (hooks_->ShouldDesaturate(emu)) cerffrontend::PresentEffects::DesaturateAndDim(bits, w * h);
+    hooks_->RenderOverlay(emu, present_, std::min(w, visible_w), std::min(h, visible_h), dpr);
     return present_;
 }
 

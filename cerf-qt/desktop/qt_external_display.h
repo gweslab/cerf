@@ -31,6 +31,7 @@ private:
     cerfcore::FrameSource&     source_;
     QString                    title_;
     std::function<void()>      on_eject_;
+    int                        source_id_ = 0;
     QPointer<QtExternalWindow> window_;
     std::atomic<bool>          open_{false};
 };

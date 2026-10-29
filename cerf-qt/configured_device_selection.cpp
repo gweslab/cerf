@@ -3,7 +3,7 @@
 #include <cerfcore/host/user_alert.h>
 
 #include <cerfcore/core/cerf_emulator.h>
-#include <cerfcore/core/log.h>
+#include <cerfcore/core/fatal.h>
 #include <cerfcore/core/product_name.h>
 
 #include <string>
@@ -23,8 +23,6 @@ public:
         auto& config = emu_.Get<FrontendConfig>();
         if (!config.Device().empty()) return config.Device();
 
-        LOG(Caution, "device is blank: set \"device\" in %s or pass --device=NAME\n",
-            config.Path().c_str());
 #if !CERF_DEV_MODE
         emu_.Get<cerfcore::UserAlert>().Show(
             cerfcore::AlertLevel::kError, cerfcore::AlertPlacement::kStandalone,
@@ -32,7 +30,8 @@ public:
             "No device is selected. CERF will exit.\n\nStart a device from " CERF_PRODUCT_NAME
             ", or pass --device=NAME.");
 #endif
-        cerfcore::CerfFatalExit(cerfcore::CERF_FATAL_USER_ERROR);
+        emu_.Get<cerfcore::Fatal>().UserError("device is blank: set \"device\" in %s or pass --device=NAME",
+                                              config.Path().c_str());
     }
 };
 

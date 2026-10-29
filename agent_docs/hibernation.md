@@ -85,7 +85,7 @@ file. A check against such a state is dead code.
 
 An image can carry a value that CERF produced under another configuration, for
 example a display depth that the user changed after the save. The reader refuses
-it with `r.Reject`, never with `CerfFatalExit` or `Fatal::Die`.
+it with `r.Reject`, never with `Fatal::Die`.
 
 A buffer whose size this build fixes is read at that size, with no saved count.
 The byte-block tag then refuses an image that saved another size.

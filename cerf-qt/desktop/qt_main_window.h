@@ -4,9 +4,7 @@
 #include "../viewport_layout.h"
 
 #include <cstdint>
-#include <memory>
 
-class QTimer;
 class QWidget;
 class QtCanvas;
 class QtHostWindow;
@@ -45,21 +43,20 @@ public:
     void OnUserResized() { follow_guest_ = false; }
     void OnMaximized() { follow_guest_ = false; }
     void OnDeactivated();
-    void OnCanvasResized();
+    void OnTeardownWedged() override;
 
 private:
     void BuildMenus();
     void AutoResizeToGuest();
     void FitWindowToSurface(uint32_t sw, uint32_t sh);
     void AdoptResolutionToWindowMonitor();
-    void FireAutoResize();
 
-    QtHostWindow*           window_ = nullptr;
-    QtCanvas*               canvas_ = nullptr;
-    QtStatusBar*            bar_    = nullptr;
-    std::unique_ptr<QTimer> resize_debounce_;
+    QtHostWindow* window_ = nullptr;
+    QtCanvas*     canvas_ = nullptr;
+    QtStatusBar*  bar_    = nullptr;
 
-    bool follow_guest_  = true;
-    bool fullscreen_    = false;
-    bool was_maximized_ = false;
+    bool input_attached_ = false;
+    bool follow_guest_   = true;
+    bool fullscreen_     = false;
+    bool was_maximized_  = false;
 };

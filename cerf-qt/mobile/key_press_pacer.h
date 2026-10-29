@@ -8,9 +8,17 @@
 
 #include <deque>
 
+class KeyPressSink {
+public:
+    virtual void DeliverKey(const QtHostKey& key, bool key_up) = 0;
+
+protected:
+    ~KeyPressSink() = default;
+};
+
 class KeyPressPacer {
 public:
-    explicit KeyPressPacer(QtKeyInput::KeySink sink);
+    explicit KeyPressPacer(KeyPressSink& sink);
 
     void Submit(const QtHostKey& key, bool key_up, bool paced);
     void Drop();
@@ -23,7 +31,7 @@ private:
 
     void Drain();
 
-    QtKeyInput::KeySink  sink_;
+    KeyPressSink&        sink_;
     PressPacing          pacing_;
     std::deque<KeyEvent> pending_;
     QElapsedTimer        clock_;

@@ -12,11 +12,13 @@ Page {
     signal cancel()
 
     component ChoiceTile: WizardTile {
-        property bool tall: false
+        property bool bounded: false
+        readonly property int boundedSize: 260
 
         Layout.fillWidth: true
-        Layout.fillHeight: tall
-        Layout.preferredWidth: 1
+        Layout.fillHeight: bounded
+        Layout.preferredWidth: bounded ? boundedSize : 1
+        Layout.preferredHeight: bounded ? boundedSize : -1
     }
 
     header: page.mobile ? mobileBar : null
@@ -30,31 +32,33 @@ Page {
         onBack: page.cancel()
     }
 
-    GridLayout {
-        anchors.left: parent.left
-        anchors.right: parent.right
-        anchors.top: page.mobile ? undefined : parent.top
-        anchors.bottom: page.mobile ? undefined : parent.bottom
-        anchors.verticalCenter: page.mobile ? parent.verticalCenter : undefined
+    Item {
+        anchors.fill: parent
         anchors.margins: Theme.spaceXL
-        columns: 2
-        columnSpacing: Theme.spaceXL
 
-        ChoiceTile {
-            tall: !page.mobile
-            symbol: "folder_open"
-            title: qsTr("New device")
-            description: qsTr("Create a device from your local ROM")
-            enabled: !ManagerOperations.busy
-            onClicked: page.localRom()
-        }
-        ChoiceTile {
-            tall: !page.mobile
-            symbol: "download"
-            title: qsTr("Download ROMs")
-            description: qsTr("Get ready-to-run ROMs from public sources")
-            enabled: !ManagerOperations.busy && !BundleCatalog.loading
-            onClicked: page.download()
+        GridLayout {
+            anchors.centerIn: parent
+            width: page.mobile ? parent.width : Math.min(implicitWidth, parent.width)
+            height: page.mobile ? implicitHeight : Math.min(implicitHeight, parent.height)
+            columns: 2
+            columnSpacing: Theme.spaceXL
+
+            ChoiceTile {
+                bounded: !page.mobile
+                symbol: "folder_open"
+                title: qsTr("New device")
+                description: qsTr("Create a device from your local ROM")
+                enabled: !ManagerOperations.busy
+                onClicked: page.localRom()
+            }
+            ChoiceTile {
+                bounded: !page.mobile
+                symbol: "download"
+                title: qsTr("Download ROMs")
+                description: qsTr("Get ready-to-run ROMs from public sources")
+                enabled: !ManagerOperations.busy && !BundleCatalog.loading
+                onClicked: page.download()
+            }
         }
     }
 

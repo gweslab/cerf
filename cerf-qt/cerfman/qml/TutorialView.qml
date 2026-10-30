@@ -96,6 +96,15 @@ Page {
             }
         }
         TutorialSlide {
+            heading: qsTr("Saves are temporary")
+            text: qsTr("A future emulator update will most likely break your saved states.<br><br>"
+                       + "Don't rely on it - before an upgrade do backups to external storage or use "
+                       + "backup software for Windows CE.")
+            art: Component {
+                SavedStateArt {}
+            }
+        }
+        TutorialSlide {
             heading: qsTr("You are all set")
             art: Component {
                 DoneArt {}

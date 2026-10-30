@@ -65,6 +65,8 @@ QWidgetAction* QtMenuBuilder::RowAction(QMenu* menu, const std::vector<cerffront
     const QColor ink    = menu->palette().color(QPalette::Text);
     const qreal  dpr    = menu->devicePixelRatioF();
     const int    side   = static_cast<int>(std::lround(kRowIconPx * dpr));
+    row->setAttribute(Qt::WA_ShowWithoutActivating);
+    row->setWindowFlag(Qt::WindowDoesNotAcceptFocus);
     layout->setContentsMargins(0, 0, 0, 0);
     layout->setSpacing(0);
     for (const cerffrontend::MenuItem& b : buttons) {

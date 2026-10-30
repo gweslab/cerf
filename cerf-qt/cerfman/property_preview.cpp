@@ -124,7 +124,8 @@ QVariantList PropertyPreview::EmulatorRows(const PropertySheet& sheet) const {
     auto&       options = emu_.Get<PropertyOptions>();
     QVariantList rows{Row(QStringLiteral("Throttle multiplier"),
                           options.MultiplierLabel(
-                              options.MultiplierChoice(ValueAt(data, cerfcore::config_key::kThrottleMultiplier))))};
+                              options.MultiplierChoice(ValueAt(data, cerfcore::config_key::kThrottleMultiplier)))),
+                      Row(QStringLiteral("HUD"), options.HudLabel(sheet.Hud(), sheet.BoardId()))};
     if (sheet.FullScreenSetting()) rows.append(Row(QStringLiteral("Borderless full screen"), OnText(sheet.FullScreen())));
     rows.append(Row(QStringLiteral("Detach internet connection"), OnText(!sheet.NetworkEnabled())));
     if (sheet.DoubleTapHelperSetting())

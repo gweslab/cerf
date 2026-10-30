@@ -4,6 +4,10 @@ Some people host "ROM bundle repositories" - a static HTTP storage in a format t
 
 The Device Manager lets you also to update ROMs if they have anything new in their configuration, metadata or if their ROM got updated.
 
+!!! note
+    A repository usually supports only the latest emulator version. If you update your ROMs too early you might get your devices bricked
+    until you update the emulator itself.
+
 ## Finding and adding a repository
 
 CERF distributes no ROMs out of box.

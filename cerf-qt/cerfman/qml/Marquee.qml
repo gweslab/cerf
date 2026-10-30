@@ -5,36 +5,71 @@ Item {
     id: marquee
     property string text: ""
     property string separator: ""
+    property real gap: 0
+    property Component label: plainLabel
     property real speed: 34
     property int startDelay: 2500
-    readonly property bool scrolling: probe.implicitWidth > width
+    readonly property bool scrolling: probe.item !== null && probe.item.implicitWidth > width
+    readonly property bool moving: scrolling && visible
     property real offset: 0
 
     implicitHeight: probe.implicitHeight
     clip: true
 
-    Label {
+    onMovingChanged: {
+        if (moving)
+            return
+        scroll.stop()
+        offset = 0
+    }
+
+    Component {
+        id: plainLabel
+        Label {}
+    }
+
+    Loader {
         id: probe
+        sourceComponent: marquee.label
         visible: !marquee.scrolling
-        text: marquee.text
+    }
+    Binding {
+        target: probe.item
+        property: "text"
+        value: marquee.text
+        when: probe.item !== null
     }
 
     Row {
         visible: marquee.scrolling
         x: -marquee.offset
+        spacing: marquee.gap
 
-        Label {
+        Loader {
             id: cycle
-            text: marquee.text + marquee.separator
+            sourceComponent: marquee.label
         }
-        Label {
-            text: cycle.text
+        Loader {
+            id: copy
+            sourceComponent: marquee.label
         }
+    }
+    Binding {
+        target: cycle.item
+        property: "text"
+        value: marquee.text + marquee.separator
+        when: cycle.item !== null
+    }
+    Binding {
+        target: copy.item
+        property: "text"
+        value: marquee.text + marquee.separator
+        when: copy.item !== null
     }
 
     Timer {
         interval: marquee.startDelay
-        running: marquee.scrolling && marquee.visible
+        running: marquee.moving
         onTriggered: scroll.start()
     }
 
@@ -43,8 +78,8 @@ Item {
         target: marquee
         property: "offset"
         from: 0
-        to: cycle.implicitWidth
-        duration: cycle.implicitWidth / marquee.speed * 1000
+        to: cycle.implicitWidth + marquee.gap
+        duration: (cycle.implicitWidth + marquee.gap) / marquee.speed * 1000
         loops: Animation.Infinite
     }
 }

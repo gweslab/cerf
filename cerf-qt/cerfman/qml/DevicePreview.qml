@@ -114,23 +114,31 @@ Item {
                 anchors.bottom: parent.bottom
                 color: Theme.previewScrim
             }
-            ColumnLayout {
-                anchors.left: parent.left
-                anchors.right: parent.right
-                anchors.bottom: parent.bottom
-                anchors.margins: Theme.spaceXL
-                spacing: 0
+        }
+    }
 
-                Repeater {
-                    model: preview.lines
+    ColumnLayout {
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.bottom: parent.bottom
+        anchors.margins: Theme.spaceXL
+        spacing: 0
+        opacity: preview.textOpacity
 
+        Repeater {
+            model: preview.lines
+
+            Marquee {
+                id: line
+                required property string modelData
+                required property int index
+                Layout.fillWidth: true
+                visible: modelData !== ""
+                text: modelData
+                gap: Theme.spaceXL
+                label: Component {
                     PreviewLabel {
-                        required property string modelData
-                        required property int index
-                        Layout.fillWidth: true
-                        visible: modelData !== ""
-                        text: modelData
-                        emphasized: index === 0
+                        emphasized: line.index === 0
                     }
                 }
             }

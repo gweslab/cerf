@@ -25,6 +25,7 @@ class SheetIds : public QObject {
     Q_PROPERTY(QString throttleMultiplier READ ThrottleMultiplier CONSTANT)
     Q_PROPERTY(QString cpuRateMultiplier READ CpuRateMultiplier CONSTANT)
     Q_PROPERTY(QString doubleTapHelper READ DoubleTapHelper CONSTANT)
+    Q_PROPERTY(QString hud READ Hud CONSTANT)
     Q_PROPERTY(QString boardPage READ BoardPage CONSTANT)
     Q_PROPERTY(QString guestAdditionsPage READ GuestAdditionsPage CONSTANT)
     Q_PROPERTY(QString displayPage READ DisplayPage CONSTANT)
@@ -55,6 +56,7 @@ public:
     QString ThrottleMultiplier() const;
     QString CpuRateMultiplier() const;
     QString DoubleTapHelper() const;
+    QString Hud() const;
     QString BoardPage() const;
     QString GuestAdditionsPage() const;
     QString DisplayPage() const;

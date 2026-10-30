@@ -34,6 +34,7 @@ public:
     void     RunOnUiThreadAfter(uint32_t delay_ms, std::function<void()> job) override;
     bool     CaptureGuestSurface(std::vector<uint32_t>& out, uint32_t& w, uint32_t& h) override;
     uint64_t NativeHandle() const override { return native_handle_.load(std::memory_order_acquire); }
+    void     OnPresentationChanged() override;
 
     void CloseRequested();
     void BeginShutdownTeardown();
@@ -49,6 +50,7 @@ protected:
     const cerfcore::InstanceGate gate_{emu_};
 
 private:
+    void ApplyPresentation();
     void Post(std::function<void()> job);
     void RunShutdownPrompt();
     void PollTeardown();

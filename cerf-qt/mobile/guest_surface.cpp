@@ -4,20 +4,18 @@
 #include "../qt_device_pixels.h"
 #include "../qt_emulator_present.h"
 #include "../qt_guest_cursor_cache.h"
-#include "../qt_key_input.h"
 #include "android_haptics.h"
 #include "mobile_emulator_window.h"
-#include "soft_keyboard_text.h"
 
 #include "../balloon_hint.h"
+#include "../hud_controls.h"
+#include "../hud_selection.h"
 #include "../hw_screen_renderer.h"
 #include "../qt_resource_paths.h"
 
 #include <cerfcore/core/cerf_emulator.h>
 #include <cerfcore/core/device_config.h>
 #include <cerfcore/host/frame_renderer.h>
-#include <cerfcore/host/keyboard_input.h>
-#include <cerfcore/host/keyboard_router.h>
 #include <cerfcore/host/pointer_router.h>
 #include <cerfcore/host/pointer_source.h>
 #include <cerfcore/host/refresh_rate_service.h>
@@ -55,27 +53,24 @@ GuestSurface::GuestSurface(QQuickItem* parent) : QQuickPaintedItem(parent) {
     setFlag(ItemAcceptsInputMethod, true);
     setActiveFocusOnTab(false);
     setOpaquePainting(true);
-    QObject::connect(&keyboard_, &SoftKeyboardRequest::requestedChanged, this,
+    QObject::connect(&text_.Keyboard(), &SoftKeyboardRequest::requestedChanged, this,
                      &GuestSurface::keyboardRequestedChanged);
-    QObject::connect(&keyboard_, &SoftKeyboardRequest::offeredChanged, this, &GuestSurface::keyboardButtonChanged);
+    QObject::connect(&text_.Keyboard(), &SoftKeyboardRequest::offeredChanged, this,
+                     &GuestSurface::keyboardButtonChanged);
 }
 
 GuestSurface::~GuestSurface() { Detach(); }
-
-void GuestSurface::DeliverKey(const QtHostKey& key, bool key_up) {
-    gate_.Run([&](cerfcore::CerfEmulator& emu) { emu.Get<QtKeyInput>().Deliver(key, key_up, false); });
-}
 
 void GuestSurface::Attach(cerfcore::CerfEmulator& emu, uint32_t surf_w, uint32_t surf_h) {
     gate_.Attach(emu);
     presenter_ = std::make_unique<QtFramePresenter>(std::make_unique<QtEmulatorPresent>(*this), surf_w, surf_h,
                                                     fillColor());
-    placement_.SetSurface(GuestSurfaceWidth(), GuestSurfaceHeight());
+    SyncPlacementSurface();
     Relayout();
     presenter_->StartRepaints(static_cast<int>(emu.Get<cerfcore::RefreshRateService>().FrameIntervalMs()), [this] {
         gate_.Run([this](cerfcore::CerfEmulator&) {
             RefreshRelativePointer();
-            RefreshKeyboardButton();
+            text_.RefreshOffer();
         });
         update();
     });
@@ -83,7 +78,7 @@ void GuestSurface::Attach(cerfcore::CerfEmulator& emu, uint32_t surf_w, uint32_t
 }
 
 void GuestSurface::Detach() {
-    key_pacer_.Drop();
+    text_.Drop();
     if (gate_.Attached()) {
         gestures_.Cancel();
         gestures_.Flush();
@@ -107,7 +102,8 @@ void GuestSurface::PaintFrame(cerfcore::CerfEmulator& emu, QPainter* painter) {
     auto& guest = emu.Get<QtGuestCursorCache>();
     if (ActiveKind() == cerfcore::PointerKind::Absolute && guest.Refresh()) {
         if (guest.Drawable())
-            overlay_.PaintGuest(*painter, guest.Image(), guest.Hotspot(), pointer_.Position(), dpr, GuestScale());
+            overlay_.PaintGuest(*painter, guest.Image(), guest.Hotspot(), presenter_->Layout().Presentation().quarter,
+                                pointer_.Position(), dpr, GuestScale());
         return;
     }
     overlay_.PaintArrow(*painter, pointer_.Position(), dpr);
@@ -115,8 +111,19 @@ void GuestSurface::PaintFrame(cerfcore::CerfEmulator& emu, QPainter* painter) {
 
 void GuestSurface::SetGuestSurfaceSize(uint32_t w, uint32_t h) {
     if (!presenter_ || !presenter_->SetGuestSurfaceSize(w, h)) return;
-    placement_.SetSurface(GuestSurfaceWidth(), GuestSurfaceHeight());
-    ApplyPlacement();
+    SyncPlacementSurface();
+    Relayout();
+}
+
+void GuestSurface::SetPresentation(const cerffrontend::ViewPresentation& presentation) {
+    presenter_->Layout().SetPresentation(cerffrontend::ViewPresentation{{}, presentation.quarter});
+    SyncPlacementSurface();
+    Relayout();
+}
+
+void GuestSurface::SyncPlacementSurface() {
+    const cerffrontend::ViewportLayout& layout = presenter_->Layout();
+    placement_.SetSurface(static_cast<uint32_t>(layout.PresentedWidth()), static_cast<uint32_t>(layout.PresentedHeight()));
 }
 
 uint32_t GuestSurface::GuestSurfaceWidth() const { return presenter_->Layout().SurfaceWidth(); }
@@ -153,20 +160,40 @@ bool GuestSurface::CaptureSurface(std::vector<uint32_t>& out, uint32_t& w, uint3
 
 void GuestSurface::Relayout() {
     if (!presenter_) return;
-    const qreal dpr    = Dpr();
-    const QSize canvas = DeviceCanvasSize(width(), height(), dpr);
-    const int   cw     = canvas.width();
-    const int   ch     = canvas.height();
-    presenter_->SetCanvasSize(cw, ch);
-    const int safe_l = DeviceExtent(safe_margins_.left(), dpr);
-    const int safe_t = DeviceExtent(safe_margins_.top(), dpr);
-    const int safe_r = DeviceExtent(safe_margins_.right(), dpr);
-    const int safe_b = DeviceExtent(safe_margins_.bottom(), dpr);
-    placement_.SetArea(ViewArea{cw, ch, safe_l, safe_t, safe_r, safe_b});
-    gate_.Run([&](cerfcore::CerfEmulator& emu) {
-        emu.Get<cerffrontend::HwScreenRenderer>().SetTextInsets(safe_l, safe_t, safe_r, safe_b);
+    const QSize canvas = DeviceCanvasSize(width(), height(), Dpr());
+    presenter_->SetCanvasSize(canvas.width(), canvas.height());
+    const ViewArea a = AreaFor(canvas.width(), canvas.height());
+    placement_.SetArea(a);
+    gate_.Run([&a](cerfcore::CerfEmulator& emu) {
+        emu.Get<cerffrontend::HwScreenRenderer>().SetTextInsets(a.left, a.top, a.right, a.bottom);
+        emu.Get<cerffrontend::HudControls>().SetCanvasArea(cerffrontend::FrameRect{
+            double(a.left), double(a.top), double(a.width - a.left - a.right), double(a.height - a.top - a.bottom)});
     });
     ApplyPlacement();
+}
+
+ViewArea GuestSurface::AreaFor(int canvas_w, int canvas_h) const {
+    const qreal dpr = Dpr();
+    ViewArea    a{canvas_w, canvas_h, DeviceExtent(safe_margins_.left(), dpr), DeviceExtent(safe_margins_.top(), dpr),
+               DeviceExtent(safe_margins_.right(), dpr), DeviceExtent(safe_margins_.bottom(), dpr)};
+    const cerffrontend::ViewportLayout& layout = presenter_->Layout();
+    cerffrontend::HudInsets             hud;
+    gate_.Run([&](cerfcore::CerfEmulator& emu) {
+        hud = emu.Get<cerffrontend::HudSelection>().InsideInsets(
+            a.width - a.left - a.right, a.height - a.top - a.bottom, layout.Presentation().quarter,
+            layout.SurfaceWidth(), layout.SurfaceHeight());
+    });
+    const auto edge = [](int safe, double depth) { return depth > 0.0 ? safe + static_cast<int>(std::ceil(depth)) : 0; };
+    a.hud_left   = edge(a.left, hud.left);
+    a.hud_top    = edge(a.top, hud.top);
+    a.hud_right  = edge(a.right, hud.right);
+    a.hud_bottom = edge(a.bottom, hud.bottom);
+    return a;
+}
+
+QSize GuestSurface::ScreenRegionFor(QSize canvas) const {
+    const ViewArea a = AreaFor(canvas.width(), canvas.height());
+    return QSize(a.width - a.hud_left - a.hud_right, a.height - a.hud_top - a.hud_bottom);
 }
 
 void GuestSurface::SetSafeMargins(const QMarginsF& margins) {
@@ -192,13 +219,6 @@ void GuestSurface::RefreshRelativePointer() {
     relative_pointer_ = relative;
     emit pointerIconChanged();
     RefreshPointerMenu();
-}
-
-void GuestSurface::RefreshKeyboardButton() {
-    gate_.Run([this](cerfcore::CerfEmulator& emu) {
-        const cerfcore::KeyboardInput* active = emu.Get<cerfcore::KeyboardRouter>().Active();
-        keyboard_.SetOffered(active != nullptr && active->HasLetterKeys());
-    });
 }
 
 void GuestSurface::RefreshPointerMenu() {
@@ -387,8 +407,7 @@ void GuestSurface::PenRightUp() {
 QRectF GuestSurface::VisibleImage() const {
     const Placement p = placement_.Current();
     const QRectF    image(p.x, p.y, placement_.SurfaceWidth() * p.scale, placement_.SurfaceHeight() * p.scale);
-    const QRectF    shown = image.intersected(QRectF(0, 0, presenter_->Layout().CanvasWidth(),
-                                                        presenter_->Layout().CanvasHeight()));
+    const QRectF    shown = image.intersected(placement_.ScreenRegion());
     return shown.isEmpty() ? image : shown;
 }
 
@@ -407,8 +426,12 @@ void GuestSurface::PointerMoveBy(QPointF delta) {
 }
 
 void GuestSurface::SendRelative(int dx, int dy, uint32_t buttons) {
-    gate_.Run([dx, dy, buttons](cerfcore::CerfEmulator& emu) {
-        emu.Get<cerfcore::RelativeMouseInput>().OnRelativeMove(dx, dy, buttons);
+    const cerffrontend::FramePoint turned =
+        presenter_->Layout().Compute().Placement().TurnDelta(cerffrontend::FramePoint{double(dx), double(dy)});
+    const int gx = static_cast<int>(turned.x);
+    const int gy = static_cast<int>(turned.y);
+    gate_.Run([gx, gy, buttons](cerfcore::CerfEmulator& emu) {
+        emu.Get<cerfcore::RelativeMouseInput>().OnRelativeMove(gx, gy, buttons);
     });
 }
 
@@ -433,11 +456,7 @@ void GuestSurface::PinchEnd() {
     });
 }
 
-void GuestSurface::ToggleKeyboard() { keyboard_.Toggle(); }
-
-Qt::InputMethodHints GuestSurface::InputMethodHints() const {
-    return Qt::ImhNoPredictiveText | Qt::ImhNoAutoUppercase | Qt::ImhMultiLine | Qt::ImhNoFullscreen;
-}
+void GuestSurface::ToggleKeyboard() { text_.Keyboard().Toggle(); }
 
 QVariant GuestSurface::inputMethodQuery(Qt::InputMethodQuery query) const {
     switch (query) {
@@ -451,31 +470,15 @@ QVariant GuestSurface::inputMethodQuery(Qt::InputMethodQuery query) const {
     }
 }
 
-void GuestSurface::RouteKey(const QKeyEvent* event, bool key_up) {
-    gate_.Run([this, event, key_up](cerfcore::CerfEmulator& emu) {
-        emu.Get<QtKeyInput>().RouteTo(event, key_up,
-                                      [this](const QtHostKey& key, bool up) { key_pacer_.Submit(key, up, false); });
-    });
-}
-
 void GuestSurface::inputMethodEvent(QInputMethodEvent* event) {
-    if (gate_.Attached() && !event->commitString().isEmpty())
-        TypeText(event->commitString(), [this](const QtHostKey& key, bool up) { key_pacer_.Submit(key, up, true); });
+    text_.Commit(event);
     event->accept();
 }
 
 void GuestSurface::keyPressEvent(QKeyEvent* event) {
-    if (event->key() == Qt::Key_Back) {
-        event->ignore();
-        return;
-    }
-    if (gate_.Attached()) RouteKey(event, false);
+    if (!text_.Key(event, false)) event->ignore();
 }
 
 void GuestSurface::keyReleaseEvent(QKeyEvent* event) {
-    if (event->key() == Qt::Key_Back) {
-        event->ignore();
-        return;
-    }
-    if (gate_.Attached()) RouteKey(event, true);
+    if (!text_.Key(event, true)) event->ignore();
 }

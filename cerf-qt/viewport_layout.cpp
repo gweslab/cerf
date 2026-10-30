@@ -5,9 +5,23 @@
 
 namespace cerffrontend {
 
+namespace {
+
+int Round(double v) { return static_cast<int>(std::lround(v)); }
+
+}
+
 void ViewportLayout::SetSurfaceSize(uint32_t w, uint32_t h) {
     surface_w_.store(w, std::memory_order_release);
     surface_h_.store(h, std::memory_order_release);
+}
+
+int ViewportLayout::PresentedWidth() const {
+    return static_cast<int>(presentation_.Turned() ? SurfaceHeight() : SurfaceWidth());
+}
+
+int ViewportLayout::PresentedHeight() const {
+    return static_cast<int>(presentation_.Turned() ? SurfaceWidth() : SurfaceHeight());
 }
 
 void ViewportLayout::SetCanvasSize(int w, int h) {
@@ -15,14 +29,35 @@ void ViewportLayout::SetCanvasSize(int w, int h) {
     canvas_h_ = h;
 }
 
+void ViewportLayout::ContentFor(uint32_t surface_w, uint32_t surface_h, int& content_w, int& content_h) const {
+    const ContentBox box = presentation_.PresentedBox(surface_w, surface_h);
+    const int        f   = ScaleFactor();
+    const double     pw  = presentation_.Turned() ? surface_h : surface_w;
+    const double     ph  = presentation_.Turned() ? surface_w : surface_h;
+    content_w            = Round(pw * box.Width() * f);
+    content_h            = Round(ph * box.Height() * f);
+}
+
 int ViewportLayout::ContentWidth() const {
-    const int sw = static_cast<int>(SurfaceWidth());
-    return mode_ == ViewportMode::Integer ? sw * integer_factor_ : sw;
+    int w = 0, h = 0;
+    ContentFor(SurfaceWidth(), SurfaceHeight(), w, h);
+    return w;
 }
 
 int ViewportLayout::ContentHeight() const {
-    const int sh = static_cast<int>(SurfaceHeight());
-    return mode_ == ViewportMode::Integer ? sh * integer_factor_ : sh;
+    int w = 0, h = 0;
+    ContentFor(SurfaceWidth(), SurfaceHeight(), w, h);
+    return h;
+}
+
+void ViewportLayout::SurfaceFor(int content_w, int content_h, uint32_t& surface_w, uint32_t& surface_h) const {
+    const int    f  = ScaleFactor();
+    const double cw = static_cast<double>(presentation_.Turned() ? content_h : content_w) / f;
+    const double ch = static_cast<double>(presentation_.Turned() ? content_w : content_h) / f;
+    double       sw = 0.0, sh = 0.0;
+    presentation_.frame.SurfaceFor(cw, ch, sw, sh);
+    surface_w = static_cast<uint32_t>(std::max(0.0, std::floor(sw)));
+    surface_h                  = static_cast<uint32_t>(std::max(0.0, std::floor(sh)));
 }
 
 bool ViewportLayout::SetMode(ViewportMode m) {
@@ -56,6 +91,13 @@ bool ViewportLayout::SetPlacement(double scale, double x, double y) {
     return true;
 }
 
+bool ViewportLayout::SetPresentation(const ViewPresentation& presentation) {
+    if (presentation_ == presentation) return false;
+    presentation_ = presentation;
+    ResetScroll();
+    return true;
+}
+
 bool ViewportLayout::SetActive(bool active) {
     if (active_ == active) return false;
     active_ = active;
@@ -64,75 +106,60 @@ bool ViewportLayout::SetActive(bool active) {
 
 ViewportLayout::Layout ViewportLayout::Compute() const {
     Layout    L  = {};
-    const int sw = static_cast<int>(SurfaceWidth());
-    const int sh = static_cast<int>(SurfaceHeight());
+    const int pw = PresentedWidth();
+    const int ph = PresentedHeight();
     const int cw = canvas_w_;
     const int ch = canvas_h_;
-    if (sw <= 0 || sh <= 0 || cw <= 0 || ch <= 0) return L;
+    if (pw <= 0 || ph <= 0 || cw <= 0 || ch <= 0) return L;
+
+    L.quarter            = presentation_.quarter & 3;
+    L.surface_w          = static_cast<int>(SurfaceWidth());
+    L.surface_h          = static_cast<int>(SurfaceHeight());
+    const ContentBox box = presentation_.PresentedBox(SurfaceWidth(), SurfaceHeight());
+    const double     bw  = pw * box.Width();
+    const double     bh  = ph * box.Height();
 
     if (mode_ == ViewportMode::Stretch) {
-        L.stretch = true;
-        L.dst_w   = cw;
-        L.dst_h   = ch;
-        L.src_w   = sw;
-        L.src_h   = sh;
+        const double sx = cw / bw;
+        const double sy = ch / bh;
+        L.dst_x         = Round(-box.left * pw * sx);
+        L.dst_y         = Round(-box.top * ph * sy);
+        L.dst_w         = std::max(1, Round(pw * sx));
+        L.dst_h         = std::max(1, Round(ph * sy));
         return L;
     }
     if (mode_ == ViewportMode::Aspect) {
-        const double scale = std::min(static_cast<double>(cw) / sw, static_cast<double>(ch) / sh);
-        const int    fw    = std::max(1, static_cast<int>(sw * scale + 0.5));
-        const int    fh    = std::max(1, static_cast<int>(sh * scale + 0.5));
-        L.stretch = true;
-        L.dst_x   = (cw - fw) / 2;
-        L.dst_y   = (ch - fh) / 2;
-        L.dst_w   = fw;
-        L.dst_h   = fh;
-        L.src_w   = sw;
-        L.src_h   = sh;
+        const double scale = std::min(cw / bw, ch / bh);
+        L.dst_x            = Round((cw - bw * scale) / 2.0 - box.left * pw * scale);
+        L.dst_y            = Round((ch - bh * scale) / 2.0 - box.top * ph * scale);
+        L.dst_w            = std::max(1, Round(pw * scale));
+        L.dst_h            = std::max(1, Round(ph * scale));
         return L;
     }
     if (mode_ == ViewportMode::Placed) {
-        L.stretch = true;
-        L.src_w   = sw;
-        L.src_h   = sh;
-        L.dst_x   = static_cast<int>(std::lround(placed_x_));
-        L.dst_y   = static_cast<int>(std::lround(placed_y_));
-        L.dst_w   = std::max(1, static_cast<int>(std::lround(sw * placed_scale_)));
-        L.dst_h   = std::max(1, static_cast<int>(std::lround(sh * placed_scale_)));
-        return L;
-    }
-    if (mode_ == ViewportMode::Integer) {
-        const int scaled_w = sw * integer_factor_;
-        const int scaled_h = sh * integer_factor_;
-        L.stretch = true;
-        L.src_w   = sw;
-        L.src_h   = sh;
-        L.dst_w   = scaled_w;
-        L.dst_h   = scaled_h;
-        L.dst_x   = scaled_w <= cw ? (cw - scaled_w) / 2 : -std::clamp(scroll_x_, 0, scaled_w - cw);
-        L.dst_y   = scaled_h <= ch ? (ch - scaled_h) / 2 : -std::clamp(scroll_y_, 0, scaled_h - ch);
+        L.dst_x = Round(placed_x_);
+        L.dst_y = Round(placed_y_);
+        L.dst_w = std::max(1, Round(pw * placed_scale_));
+        L.dst_h = std::max(1, Round(ph * placed_scale_));
         return L;
     }
 
-    if (sw > cw) {
-        L.src_x = std::clamp(scroll_x_, 0, sw - cw);
-        L.src_w = cw;
-        L.dst_w = cw;
-    } else {
-        L.src_w = sw;
-        L.dst_x = (cw - sw) / 2;
-        L.dst_w = sw;
-    }
-    if (sh > ch) {
-        L.src_y = std::clamp(scroll_y_, 0, sh - ch);
-        L.src_h = ch;
-        L.dst_h = ch;
-    } else {
-        L.src_h = sh;
-        L.dst_y = (ch - sh) / 2;
-        L.dst_h = sh;
-    }
+    const int f         = ScaleFactor();
+    const int content_w = ContentWidth();
+    const int content_h = ContentHeight();
+    const int origin_x  = content_w <= cw ? (cw - content_w) / 2 : -std::clamp(scroll_x_, 0, content_w - cw);
+    const int origin_y  = content_h <= ch ? (ch - content_h) / 2 : -std::clamp(scroll_y_, 0, content_h - ch);
+    L.dst_x             = origin_x + Round(-box.left * pw * f);
+    L.dst_y             = origin_y + Round(-box.top * ph * f);
+    L.dst_w             = pw * f;
+    L.dst_h             = ph * f;
     return L;
+}
+
+void ViewportLayout::GuestPixelScale(double& sx, double& sy) const {
+    const Layout L = Compute();
+    sx             = L.dst_w > 0 ? static_cast<double>(L.dst_w) / PresentedWidth() : 0.0;
+    sy             = L.dst_h > 0 ? static_cast<double>(L.dst_h) / PresentedHeight() : 0.0;
 }
 
 bool ViewportLayout::HostToGuest(int cx, int cy, int& sx, int& sy) const {
@@ -141,14 +168,13 @@ bool ViewportLayout::HostToGuest(int cx, int cy, int& sx, int& sy) const {
         sx = sy = 0;
         return false;
     }
-    if (L.stretch) {
-        sx = L.src_x + static_cast<int>(static_cast<long long>(cx - L.dst_x) * L.src_w / L.dst_w);
-        sy = L.src_y + static_cast<int>(static_cast<long long>(cy - L.dst_y) * L.src_h / L.dst_h);
-    } else {
-        sx = L.src_x + (cx - L.dst_x);
-        sy = L.src_y + (cy - L.dst_y);
-    }
-    return cx >= L.dst_x && cx < L.dst_x + L.dst_w && cy >= L.dst_y && cy < L.dst_y + L.dst_h;
+    const FramePlacement place  = L.Placement();
+    const FramePoint     device = place.ToDevice(FramePoint{cx + 0.5, cy + 0.5});
+    const double         dw     = place.DeviceWidth();
+    const double         dh     = place.DeviceHeight();
+    sx = static_cast<int>(std::floor(device.x * SurfaceWidth() / dw));
+    sy = static_cast<int>(std::floor(device.y * SurfaceHeight() / dh));
+    return device.x >= 0.0 && device.x < dw && device.y >= 0.0 && device.y < dh;
 }
 
 void ViewportLayout::ClampGuest(int& sx, int& sy) const {

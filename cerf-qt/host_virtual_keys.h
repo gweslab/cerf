@@ -4,8 +4,9 @@
 
 namespace cerffrontend {
 
-/* Windows SDK WinUser.h, VK_SHIFT / VK_CONTROL / VK_MENU / VK_ESCAPE / VK_DELETE / VK_F10 /
-   VK_LSHIFT .. VK_RMENU; "VK_A - VK_Z are the same as ASCII 'A' - 'Z'". */
+/* Windows SDK WinUser.h, VK_RETURN / VK_SHIFT / VK_CONTROL / VK_MENU / VK_ESCAPE / VK_DELETE /
+   VK_F10 / VK_LSHIFT .. VK_RMENU; "VK_A - VK_Z are the same as ASCII 'A' - 'Z'". */
+inline constexpr uint8_t kVkReturn   = 0x0D;
 inline constexpr uint8_t kVkShift    = 0x10;
 inline constexpr uint8_t kVkControl  = 0x11;
 inline constexpr uint8_t kVkMenu     = 0x12;

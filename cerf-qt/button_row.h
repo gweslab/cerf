@@ -16,16 +16,10 @@ struct SpecialKey;
 namespace cerffrontend {
 
 struct RowButton {
-    enum class Kind : uint8_t { kKey, kAction };
-
-    Kind        kind        = Kind::kKey;
-    uint8_t     vk          = 0;
-    size_t      group       = 0;
-    size_t      item        = 0;
+    uint8_t     vk    = 0;
     std::string label;
-    bool        named       = false;
-    bool        held        = false;
-    bool        group_start = false;
+    bool        named = false;
+    bool        held  = false;
 };
 
 class ButtonRow : public cerfcore::Service {
@@ -34,7 +28,7 @@ public:
 
     static constexpr int kHoldMs = 1000;
 
-    void                   SetPcKeysShown(bool shown) { pc_keys_shown_ = shown; }
+    void                   SetKeysShown(bool shown);
     std::vector<RowButton> Buttons();
     void                   PressAt(size_t index);
     void                   ReleaseAt(size_t index);
@@ -45,11 +39,11 @@ private:
     bool        Shown(const cerfcore::SpecialKey& key) const;
     std::string Label(const cerfcore::SpecialKey& key) const;
     void        SendKey(uint8_t vk, bool key_up);
-    void        RunAction(const RowButton& button);
+    void        ReleaseHeld();
 
     cerfcore::KeyboardInput* source_        = nullptr;
     std::bitset<256>         held_;
-    bool                     pc_keys_shown_ = false;
+    bool                     keys_shown_    = false;
     uint8_t                  pressed_vk_    = 0;
     bool                     pressing_      = false;
     bool                     press_open_    = false;

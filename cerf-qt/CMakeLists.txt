@@ -139,12 +139,14 @@ cerf_read_string_define(cerfqt_product_name
                         "${CMAKE_CURRENT_SOURCE_DIR}/../libCerfCore/include/cerfcore/core/product_name_text.h"
                         CERF_PRODUCT_NAME)
 cerf_read_string_define(cerfqt_db_json_name "${CERF_INSTALL_LAYOUT_HEADER}" CERF_DB_JSON_NAME)
+cerf_read_string_define(cerfqt_huds_json_name "${CERF_INSTALL_LAYOUT_HEADER}" CERF_HUDS_JSON_NAME)
 cerf_read_string_define(cerfqt_ce_apps_name "${CERF_INSTALL_LAYOUT_HEADER}" CERF_CE_APPS_DIR_NAME)
 cerf_read_string_define(cerfqt_global_config_name "${CERF_INSTALL_ROOT_HEADER}" CERF_GLOBAL_CONFIG_NAME)
 cerf_read_string_define(cerfqt_license_name "${CERF_INSTALL_ROOT_HEADER}" CERF_LICENSE_NAME)
 cerf_read_string_define(cerfqt_notices_name "${CERF_INSTALL_ROOT_HEADER}" CERF_NOTICES_NAME)
 cerf_read_string_define(cerfqt_licenses_dir_name "${CERF_INSTALL_ROOT_HEADER}" CERF_LICENSES_DIR_NAME)
 set(cerfqt_db_json "${CMAKE_CURRENT_SOURCE_DIR}/../libCerfCore/${cerfqt_db_json_name}")
+set(cerfqt_huds_json "${CMAKE_CURRENT_SOURCE_DIR}/../libCerfCore/${cerfqt_huds_json_name}")
 if(NOT APPLE)
     set_target_properties(cerf-qt PROPERTIES OUTPUT_NAME "${cerfqt_frontend_name}")
 endif()
@@ -222,10 +224,12 @@ if(ANDROID)
         endif()
     endif()
     configure_file("${cerfqt_db_json}" "${cerfqt_install_dir}/${cerfqt_db_json_name}" COPYONLY)
+    configure_file("${cerfqt_huds_json}" "${cerfqt_install_dir}/${cerfqt_huds_json_name}" COPYONLY)
     qt_add_resources(cerf-qt "cerfqt_install"
         PREFIX "${cerfqt_install_prefix}"
         BASE "${cerfqt_install_dir}"
-        FILES "${cerfqt_global_config}" "${cerfqt_install_dir}/${cerfqt_db_json_name}")
+        FILES "${cerfqt_global_config}" "${cerfqt_install_dir}/${cerfqt_db_json_name}"
+              "${cerfqt_install_dir}/${cerfqt_huds_json_name}")
     file(TO_CMAKE_PATH "${CERFQT_ANDROID_CE_APPS_DIR}" cerfqt_ce_apps_dir)
     file(GLOB_RECURSE cerfqt_ce_apps CONFIGURE_DEPENDS "${cerfqt_ce_apps_dir}/*")
     qt_add_resources(cerf-qt "cerfqt_ce_apps"
@@ -255,6 +259,8 @@ else()
                 "-DCERFQT_LOCAL_CONFIG_NAME=${CERFQT_LOCAL_CONFIG_NAME}"
                 "-DCERFQT_DB_JSON=${cerfqt_db_json}"
                 "-DCERFQT_DB_JSON_NAME=${cerfqt_db_json_name}"
+                "-DCERFQT_HUDS_JSON=${cerfqt_huds_json}"
+                "-DCERFQT_HUDS_JSON_NAME=${cerfqt_huds_json_name}"
                 "-DCERFQT_OUTPUT_DIR=${cerfqt_output_dir}"
                 -P "${CMAKE_CURRENT_SOURCE_DIR}/copy_bundled.cmake"
         VERBATIM)

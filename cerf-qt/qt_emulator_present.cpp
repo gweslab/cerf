@@ -7,6 +7,7 @@
 #include "canvas_input.h"
 #include "canvas_tabs.h"
 #include "dpi_scale.h"
+#include "hud_renderer.h"
 #include "notification_overlay.h"
 
 #include <cerfcore/core/cerf_emulator.h>
@@ -27,6 +28,15 @@ bool QtEmulatorPresent::RenderAlt(cerfcore::CerfEmulator& emu, uint32_t* bits, i
 
 bool QtEmulatorPresent::ShouldDesaturate(cerfcore::CerfEmulator& emu) {
     return emu.Get<cerffrontend::CanvasTabs>().ShouldDesaturate();
+}
+
+void QtEmulatorPresent::RenderFrameOverlay(cerfcore::CerfEmulator& emu, QImage& present,
+                                           const cerffrontend::ViewportLayout::Layout& frame, qreal dpr) {
+    const cerffrontend::CanvasPixels canvas{reinterpret_cast<const uint32_t*>(present.constBits()), present.width(),
+                                            present.height()};
+    QPainter  p(&present);
+    QtPainter painter(emu, p);
+    emu.Get<cerffrontend::HudRenderer>().Render(painter, frame, Dpi(dpr), canvas);
 }
 
 void QtEmulatorPresent::RenderOverlay(cerfcore::CerfEmulator& emu, QImage& present, int w, int h, qreal dpr) {

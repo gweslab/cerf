@@ -148,6 +148,12 @@ Item {
                 onClicked: bar.surface.ToggleKeyboard()
             }
             OverlayButton {
+                visible: bar.emulator.hudAvailable
+                icon.source: IconSources.Icon("gamepad")
+                active: bar.emulator.hudShown
+                onClicked: bar.emulator.ToggleHud()
+            }
+            OverlayButton {
                 icon.source: IconSources.Icon("widgets")
                 active: bar.stripShown
                 onClicked: bar.stripRequested()

@@ -5,11 +5,13 @@
 #include "../qt_screen_pixels.h"
 #include "emulator_controller.h"
 #include "guest_surface.h"
+#include "hud_touch_area.h"
 #include "mobile_widget_bar.h"
 #include "qml_dialog_waiter.h"
 #include "view_placement.h"
 
 #include "../tab_menu.h"
+#include "../view_rotation.h"
 #include "../widget_menu_builder.h"
 
 #include <cerfcore/core/cerf_emulator.h>
@@ -38,6 +40,7 @@ void MobileEmulatorWindow::OpenWindow() {
     input_attached_ = true;
     controller_->Attach(emu_);
     widget_bar_->Attach(emu_);
+    hud_area_->Attach(emu_);
     AttachView(*surface_, *window_);
     LOG(Lcd, "MobileEmulatorWindow: opening at %ux%u\n", dc.board_configurable_screen_width,
         dc.board_configurable_screen_height);
@@ -53,6 +56,7 @@ void MobileEmulatorWindow::MakeWindow() {
     surface_    = window_->property("surface").value<GuestSurface*>();
     controller_ = window_->property("controller").value<EmulatorController*>();
     widget_bar_ = window_->property("widgetBar").value<MobileWidgetBar*>();
+    hud_area_   = window_->property("hudArea").value<HudTouchArea*>();
 }
 
 void MobileEmulatorWindow::OnShutdown() { CloseWindow(); }
@@ -60,6 +64,7 @@ void MobileEmulatorWindow::OnShutdown() { CloseWindow(); }
 void MobileEmulatorWindow::CloseWindow() {
     DetachView();
     if (widget_bar_) widget_bar_->Detach();
+    if (hud_area_) hud_area_->Detach();
     if (controller_) controller_->Detach();
     if (surface_) surface_->Detach();
     if (input_attached_) emu_.Get<cerffrontend::CanvasInput>().Attach(nullptr);
@@ -85,6 +90,11 @@ void MobileEmulatorWindow::MatchGuestSize() { surface_->Refit(); }
 void MobileEmulatorWindow::RefitIfFollowingGuest() { surface_->Refit(); }
 
 void MobileEmulatorWindow::FitToResolution(uint32_t, uint32_t) { surface_->Refit(); }
+
+void MobileEmulatorWindow::OnPresentationChanged() {
+    QtEmulatorWindow::OnPresentationChanged();
+    RunOnUiThread([this] { controller_->RefreshHud(); });
+}
 
 void MobileEmulatorWindow::Raise() {
     RunOnUiThread([this] {
@@ -120,8 +130,9 @@ std::vector<cerffrontend::MenuItem> MobileEmulatorWindow::GearMenu() {
     const ViewMode        view = surface_->CurrentViewMode();
     auto&                 tabs = emu_.Get<cerffrontend::TabMenu>();
     std::vector<MenuItem> items;
-    items.push_back(MenuItem::Action("Return to my devices", [this] { ReturnToManager(); }));
-    items.push_back(MenuItem::Action("Power off/reset", [this] { CloseRequested(); }));
+    items.push_back(MenuItem::Row(
+        "Device", {MenuItem::IconAction("Return to my devices", "home", [this] { ReturnToManager(); }),
+                   MenuItem::IconAction("Power off/reset", "power_settings_new", [this] { CloseRequested(); })}));
     items.push_back(MenuItem{});
     items.push_back(tabs.Item(Tab::Hw));
     items.push_back(tabs.Item(Tab::Framebuffer));
@@ -132,14 +143,17 @@ std::vector<cerffrontend::MenuItem> MobileEmulatorWindow::GearMenu() {
                                     [this] { surface_->SetViewMode(ViewMode::FitSafeZone); }));
     items.push_back(MenuItem::Radio("Original scale", view == ViewMode::OriginalScale,
                                     [this] { surface_->SetViewMode(ViewMode::OriginalScale); }));
+    items.push_back(MenuItem{});
+    items.push_back(emu_.Get<cerffrontend::ViewRotation>().MenuRow());
     return items;
 }
 
 void MobileEmulatorWindow::AdoptResolutionToScreen() {
     if (!AdoptsHostResolution()) return;
-    const QSize pixels = ScreenPixels(*window_->screen());
-    const auto  w      = static_cast<uint32_t>(pixels.width());
-    const auto  h      = static_cast<uint32_t>(pixels.height());
+    const QSize region = surface_->ScreenRegionFor(ScreenPixels(*window_->screen()));
+    uint32_t    w      = 0;
+    uint32_t    h      = 0;
+    surface_->Layout().SurfaceFor(region.width(), region.height(), w, h);
     if (w == 0 || h == 0) return;
     SetGuestResolution(w, h);
     LOG(Lcd, "MobileEmulatorWindow: adopt screen -> guest surface %ux%u\n", w, h);

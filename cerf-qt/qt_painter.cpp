@@ -5,6 +5,7 @@
 #include "resource_paths_text.h"
 
 #include <QFontMetrics>
+#include <QLinearGradient>
 #include <QPainter>
 #include <QPainterPath>
 #include <QPolygon>
@@ -154,6 +155,16 @@ void QtPainter::FillRoundRectAlphaAA(const cerffrontend::Rect& r, int radius, ce
     p_.restore();
 }
 
+void QtPainter::FillGradient(const cerffrontend::Rect& r, cerffrontend::Point from, cerffrontend::Point to,
+                             const cerffrontend::GradientStop* stops, int count) {
+    QLinearGradient gradient(QPointF(from.x, from.y), QPointF(to.x, to.y));
+    for (int i = 0; i < count; ++i) gradient.setColorAt(stops[i].at, ToQColor(stops[i].color, stops[i].alpha));
+    p_.save();
+    p_.setCompositionMode(QPainter::CompositionMode_SourceOver);
+    p_.fillRect(FillArea(r), gradient);
+    p_.restore();
+}
+
 QStringList QtPainter::Lines(const QString& text, int width, uint32_t flags) {
     if (flags & text::kSingleLine) return {text};
     QStringList out;
@@ -245,6 +256,12 @@ cerffrontend::FontMetrics QtPainter::Metrics(const cerffrontend::Font& font) {
 
 void QtPainter::DrawIcon(const cerffrontend::Rect& box, std::string_view stem, int px) {
     const QImage& icon = emu_.Get<QtPaintResources>().Icon(stem, px, p_.device()->devicePixelRatioF());
+    p_.drawImage(QPoint(box.left + (box.Width() - px) / 2, box.top + (box.Height() - px) / 2), icon);
+}
+
+void QtPainter::DrawSymbol(const cerffrontend::Rect& box, std::string_view stem, int px,
+                           cerffrontend::Rgb color) {
+    const QImage& icon = emu_.Get<QtPaintResources>().Symbol(stem, px, p_.device()->devicePixelRatioF(), color);
     p_.drawImage(QPoint(box.left + (box.Width() - px) / 2, box.top + (box.Height() - px) / 2), icon);
 }
 

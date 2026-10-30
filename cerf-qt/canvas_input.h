@@ -69,7 +69,9 @@ private:
     static uint32_t  PointerMask(uint32_t held);
 
     bool RouteNotification(const CanvasMouse& m);
+    bool RouteHud(const CanvasMouse& m);
     bool RouteLocked(const CanvasMouse& m);
+    void SendRelative(int dx, int dy, uint32_t buttons);
     void RecenterLockedPointer();
     void AnchorAt(const CanvasMouse& m);
     bool RoutePointer(const CanvasMouse& m, bool framebuffer);
@@ -81,6 +83,8 @@ private:
     bool             native_lock_             = false;
     bool             lock_hint_shown_         = false;
     uint32_t         notification_click_mask_ = 0;
+    uint32_t         hud_click_mask_          = 0;
+    bool             hud_pressed_             = false;
     uint32_t         pointer_buttons_         = 0;
     uint32_t         relative_buttons_        = 0;
     bool             relative_anchored_       = false;

@@ -5,7 +5,6 @@
 #include "mobile_emulator_window.h"
 #include "mobile_menu_presenter.h"
 
-#include "../button_row.h"
 #include "../status_bar.h"
 
 #include <cerfcore/core/cerf_emulator.h>
@@ -39,8 +38,6 @@ void MobileWidgetBar::Attach(cerfcore::CerfEmulator& emu) {
     bar.SetFilter([pointer](const cerfcore::HostWidget* w) {
         return w != pointer && w->Group() != cerfcore::WidgetGroup::InputCapture;
     });
-    bar.SetRowShown(false);
-    emu.Get<cerffrontend::ButtonRow>().SetPcKeysShown(true);
     tick_.start();
     Tick();
 }

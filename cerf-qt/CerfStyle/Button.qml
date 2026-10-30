@@ -8,7 +8,7 @@ M.Button {
     readonly property bool hasIcon: icon.source.toString() !== ""
 
     icon.color: !enabled ? Material.hintTextColor
-              : highlighted && !flat ? Theme.readableOn(background.color)
+              : highlighted && !flat ? Theme.onAccent
               : (flat && highlighted) || (checked && !highlighted) ? Material.accentColor
               : Material.foreground
 

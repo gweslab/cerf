@@ -1,5 +1,4 @@
 #include "../guest_additions_ui_policy.h"
-#include "../viewport_layout.h"
 #include "qt_main_window.h"
 
 #include <cerfcore/core/cerf_emulator.h>
@@ -37,13 +36,9 @@ public:
     void OnUserResizeEnd(uint32_t canvas_w, uint32_t canvas_h) override {
         if (!Enabled()) return;
         const auto& window = emu_.Get<QtMainWindow>();
-        uint32_t    w      = canvas_w;
-        uint32_t    h      = canvas_h;
-        if (window.Mode() == ViewportMode::Integer) {
-            const uint32_t factor = static_cast<uint32_t>(window.IntegerFactor());
-            w /= factor;
-            h /= factor;
-        }
+        uint32_t    w      = 0;
+        uint32_t    h      = 0;
+        window.SurfaceForCanvas(canvas_w, canvas_h, w, h);
         if (w == 0 || h == 0) return;
         const uint32_t surface_w = window.GuestSurfaceWidth();
         const uint32_t surface_h = window.GuestSurfaceHeight();

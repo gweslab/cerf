@@ -67,12 +67,14 @@ CERF does not read a broken `cerf-user.json`. It does not report the broken file
 write overwrites a configuration file that it cannot read or parse.
 
 The emulator writes `board.configurable_screen_width` and `_height` into
-`cerf-user.json` when the user resizes the window. No other emulator path writes the
-file outside the property sheet.
+`cerf-user.json` when the user resizes the window. It writes `hud` when the user hides or
+shows the HUD. No other emulator path writes the file outside the property
+sheet.
 
 ## The property sheet
 
-The property sheet is the only place that edits a device setting. It holds one model
+The property sheet is the only place that edits a device setting, apart from the
+emulator writes above. It holds one model
 of the device. A page loads its values from that model when the sheet shows it and
 stores them back when the user leaves it. OK writes the model. Cancel writes nothing.
 No control writes on change.

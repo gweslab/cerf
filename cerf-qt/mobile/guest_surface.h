@@ -3,10 +3,9 @@
 #include "../qt_emulator_view.h"
 #include "../qt_frame_presenter.h"
 #include "gesture_pointer.h"
-#include "key_press_pacer.h"
 #include "pointer_overlay.h"
 #include "relative_mouse_relay.h"
-#include "soft_keyboard_request.h"
+#include "surface_text_input.h"
 #include "touch_gestures.h"
 #include "view_placement.h"
 
@@ -31,7 +30,6 @@ class GuestSurface : public QQuickPaintedItem,
                      public cerffrontend::CanvasInputHost,
                      public TouchGestureHost,
                      public GesturePointerHost,
-                     public KeyPressSink,
                      public QtEmulatorView {
     Q_OBJECT
     QML_ELEMENT
@@ -52,6 +50,7 @@ public:
     void paint(QPainter* painter) override;
 
     void                          SetGuestSurfaceSize(uint32_t w, uint32_t h) override;
+    void                          SetPresentation(const cerffrontend::ViewPresentation& presentation) override;
     uint32_t                      GuestSurfaceWidth() const override;
     uint32_t                      GuestSurfaceHeight() const override;
     cerffrontend::ViewportLayout& Layout() { return presenter_->Layout(); }
@@ -62,18 +61,19 @@ public:
     void                          Repaint() override { update(); }
     bool CaptureSurface(std::vector<uint32_t>& out, uint32_t& w, uint32_t& h) override;
     qreal                         Dpr() const override;
+    QSize                         ScreenRegionFor(QSize canvas) const;
 
     bool      CursorMode() const { return cursor_mode_; }
     void      SetCursorMode(bool on);
     bool      RelativePointer() const { return relative_pointer_; }
     QString   PointerIcon() const;
     bool      PointerMenu() const { return pointer_menu_; }
-    bool      KeyboardButton() const { return keyboard_.Offered(); }
+    bool      KeyboardButton() const { return text_.Keyboard().Offered(); }
     QMarginsF SafeMargins() const { return safe_margins_; }
     void      SetSafeMargins(const QMarginsF& margins);
 
-    Qt::InputMethodHints InputMethodHints() const;
-    bool                 KeyboardRequested() const { return keyboard_.Requested(); }
+    Qt::InputMethodHints InputMethodHints() const { return SurfaceTextInput::Hints(); }
+    bool                 KeyboardRequested() const { return text_.Keyboard().Requested(); }
 
     Q_INVOKABLE void ToggleKeyboard();
 
@@ -102,8 +102,6 @@ public:
     void PinchUpdate(QPointF centroid, double distance) override;
     void PinchEnd() override;
 
-    void DeliverKey(const QtHostKey& key, bool key_up) override;
-
 signals:
     void pointerIconChanged();
     void pointerMenuChanged();
@@ -131,9 +129,10 @@ protected:
 private:
     void                  RefreshRelativePointer();
     void                  RefreshPointerMenu();
-    void                  RefreshKeyboardButton();
     void                  Relayout();
+    ViewArea              AreaFor(int canvas_w, int canvas_h) const;
     void                  ApplyPlacement();
+    void                  SyncPlacementSurface();
     void                  RouteMouse(QMouseEvent* event, cerffrontend::CanvasMouse::Kind kind);
     void                  SendCanvasMouse(cerffrontend::CanvasMouse::Kind kind, cerffrontend::MouseButton button,
                                           QPointF device_at, uint32_t held) override;
@@ -142,7 +141,6 @@ private:
     QRectF                VisibleImage() const override;
     double                GuestScale() const override;
     void                  SendRelative(int dx, int dy, uint32_t buttons) override;
-    void                  RouteKey(const QKeyEvent* event, bool key_up);
     void                  PaintFrame(cerfcore::CerfEmulator& emu, QPainter* painter);
 
     enum class MouseRoute : uint8_t { kNone, kRelative, kCanvas };
@@ -152,8 +150,7 @@ private:
     TouchGestures                      gestures_{*this};
     GesturePointer                     pointer_{*this};
     RelativeMouseRelay                 relative_mouse_{*this};
-    SoftKeyboardRequest                keyboard_{*this};
-    KeyPressPacer                      key_pacer_{*this};
+    SurfaceTextInput                   text_{*this, gate_};
     ViewPlacement                      placement_;
     PointerOverlay                     overlay_;
     QMarginsF                          safe_margins_;

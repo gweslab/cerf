@@ -9,7 +9,9 @@
 namespace {
 
 constexpr jint kLongPress                   = 0;
+constexpr jint kVirtualKey                  = 1;
 constexpr jint kClockTick                   = 4;
+constexpr jint kVirtualKeyRelease           = 8;
 constexpr jint kGestureThresholdActivate    = 23;
 constexpr int  kGestureThresholdActivateSdk = 34;
 
@@ -28,3 +30,7 @@ void PerformThresholdHaptic(QWindow& window) {
 }
 
 void PerformLongPressHaptic(QWindow& window) { Perform(window, kLongPress); }
+
+void PerformKeyPressHaptic(QWindow& window) { Perform(window, kVirtualKey); }
+
+void PerformKeyReleaseHaptic(QWindow& window) { Perform(window, kVirtualKeyRelease); }

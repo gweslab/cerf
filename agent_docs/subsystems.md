@@ -479,31 +479,70 @@ per-SoC/per-board concretes (strategy pattern, selected by `BoardContext`).
   guest does not render them. They are extra areas of the same touch panel,
   in a raw-ADC band past the screen's active range. The board maps its screen
   to a raw sub-range (a per-board seam) and reserves the rest of the range for
-  the buttons. Each of these buttons has a button in the status-bar button row
-  (`ButtonRow`, below). That row button sends a held synthetic raw pen tap to
-  its zone, because no on-screen pixel maps to the zone. The guest driver
-  resolves the zone-to-key mapping and its own calibration. CERF models only the
-  panel geometry, never the guest's button table.
+  the buttons. Each of these buttons is an action of the `DeviceButtons` service
+  of the board. The HUD of the board shows it. The action sends a synthetic pen
+  tap with a hold at the raw position of its zone, because no on-screen pixel
+  maps to the zone. The guest driver resolves the zone-to-key mapping and its own
+  calibration. CERF models only the panel geometry, never the guest's button
+  table.
 
-- **`ButtonRow`** - the buttons left of the host widgets in the status bar. The
-  row holds the special keys of the active keyboard source, then the
-  `DeviceButtons` groups of the board. A device button is anything that is not
-  on the keyboard: a printed bezel button, or a device key that no host key
-  sends.
+- **`ButtonRow`** - the special keys of the active keyboard source on the
+  Android strip. The desktop status bar shows no keys. The HUD carries the keys
+  of the device.
+
+  **The Android strip shows special keys only while the soft keyboard is open.**
+  It shows the keys that the board does not rename and that the soft keyboard
+  lacks. The soft keyboard has Enter, so the strip never shows it. A key that the
+  board renames, for example LSK, belongs on the HUD.
 
   **A special key stays down for as long as the user presses its button.** The
-  desktop sends the key-down at the press and the key-up at the release. The
   Android strip scrolls, so it sends the key-down when the press becomes a tap.
   It sends the key-up when the key was down for as long as the finger held the
   button. A press held for one second latches the key. The key then stays down
-  until the next click on its button.
+  until the next tap on its button, or until the strip hides the key.
+  - `cerf-qt/button_row.h`
 
-  A device button runs its whole action on one click.
+- **The HUD** - the device buttons and d-pads that the frontend draws around the
+  framebuffer. `libCerfCore/huds.json` holds the presets.
 
-  **The desktop shows a special key only when the board names it differently
-  from the host key that sends it.** The Android strip shows every special key
-  of the board.
-  - `cerf-qt/button_row.h`, `libCerfCore/include/cerfcore/host/device_buttons.h`
+  **A HUD press is a press on the stock keyboard of the board.**
+  `KeyboardRouter::OnStockKey` sends it to the stock keyboard, also while the
+  guest-additions keyboard is active. A HUD key is a key of the device, for
+  example a key on the Fn layer of the Device Emulator keypad. The
+  guest-additions keyboard sends raw virtual keys and has no such layer. A HUD
+  button shows as held while the HUD or the host keyboard holds its keys.
+
+  **A HUD key changes its face on a layer only where the keyboard map of the board
+  binds it on that layer.** While a key that holds a layer is down, such a HUD key
+  shows the face that the HUD preset gives it for that layer. Without that face, it
+  shows the label of the binding. A HUD key with no label or icon of its own shows the label of its
+  binding on the base layer. On the desktop, a HUD key that the map renames shows the name
+  of its host key in small text in a corner.
+
+  **A HUD action button runs one action of the `DeviceButtons` service of the
+  board.** The whole action runs on one press.
+
+  **On the desktop, the fit modes fit the framebuffer and its HUD as one box.**
+  Every host-to-guest point maps through that fit. The HUD keeps the size of its
+  screen in guest pixels, so a larger guest resolution does not enlarge it.
+
+  **On Android, the HUD sits at the sides of the safe zone.** A panel names a
+  side of the framebuffer. The panel goes to the canvas side that this
+  framebuffer side faces after the rotation. Each panel spans its whole side.
+  When that makes a panel longer than on the desktop, the panel also gets deeper
+  by the same factor. It never takes more than the space that the framebuffer
+  leaves free.
+
+  While the canvas, seen from the turned framebuffer, is taller than wide, a
+  panel uses its portrait form when the preset gives one. The framebuffer fits, pans and zooms in the rest of the
+  canvas. The HUD band takes every touch inside it that no notification card covers.
+  - `cerf-qt/hud_selection.h`, `cerf-qt/hud_controls.h`, `cerf-qt/hud_renderer.h`,
+    `cerf-qt/view_presentation.h`, `libCerfCore/include/cerfcore/host/device_buttons.h`
+
+- **`ViewRotation`** - turns the presented framebuffer by quarter turns. The guest
+  sees no change. The HUD panels, the host-to-guest point map and the relative
+  mouse deltas turn with the frame. The rotation lasts for the session only.
+  - `cerf-qt/view_rotation.h`
 
 - **`KeyboardInput`** (abstract) - one keyboard source: `OnHostKey(vk, key_up)`
   plus `SourceName` / `SourcePriority` / `SourceReady`. Concretes self-register

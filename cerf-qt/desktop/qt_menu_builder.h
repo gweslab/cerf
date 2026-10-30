@@ -12,6 +12,7 @@
 class QAction;
 class QMenu;
 class QPoint;
+class QWidgetAction;
 
 class QtMenuBuilder : public cerfcore::Service {
 public:
@@ -26,7 +27,8 @@ public:
 private:
     using Callbacks = std::vector<std::pair<QAction*, std::function<void()>>>;
 
-    void Append(QMenu* menu, const std::vector<cerffrontend::MenuItem>& items, Callbacks& out);
+    void           Append(QMenu* menu, const std::vector<cerffrontend::MenuItem>& items, Callbacks& out);
+    QWidgetAction* RowAction(QMenu* menu, const std::vector<cerffrontend::MenuItem>& buttons);
 
     const cerfcore::InstanceGate gate_{emu_};
 };

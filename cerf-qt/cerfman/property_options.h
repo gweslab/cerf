@@ -42,6 +42,8 @@ public:
     Q_INVOKABLE QString      CleartypeLabel(const QVariant& value) const;
     Q_INVOKABLE QVariantList ColorSchemeKeys() const;
     Q_INVOKABLE QString      ColorSchemeLabel(const QString& key) const;
+    Q_INVOKABLE QVariantList HudChoices() const;
+    Q_INVOKABLE QString      HudLabel(const QVariant& value, const QString& board_id) const;
     Q_INVOKABLE QVariantList ScalePresetIndexes() const;
     Q_INVOKABLE QString      ScalePresetLabel(int index) const;
     Q_INVOKABLE int          ScalePresetIndex(const QVariant& dpi, const QVariant& font_size,

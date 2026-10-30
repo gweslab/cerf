@@ -3,11 +3,13 @@
 #include "frontend_dialogs.h"
 #include "../frontend_window.h"
 #include "../host_key_binding.h"
+#include "../hud_selection.h"
 #include "../input_capture.h"
 #include "../link_opener.h"
 #include "../product_links.h"
 #include "../screenshots.h"
 #include "../tab_menu.h"
+#include "../view_rotation.h"
 #include "../widget_menu_builder.h"
 #include "qt_main_window.h"
 #include "qt_manager_window_opener.h"
@@ -136,6 +138,14 @@ std::vector<MenuItem> HostMenuModel::View() {
     items.push_back(tabs.Item(FrontendWindow::Tab::Framebuffer));
     items.push_back(MenuItem{});
     emu_.Get<ViewportMenu>().Append(items, main_viewport_);
+    items.push_back(MenuItem{});
+    if (win.MenuBarIsNative()) {
+        const auto& hud  = emu_.Get<HudSelection>();
+        MenuItem    show = MenuItem::Check("Show HUD", hud.Shown(), [this] { emu_.Get<HudSelection>().Toggle(); });
+        show.enabled     = hud.CanShow();
+        items.push_back(std::move(show));
+    }
+    items.push_back(emu_.Get<ViewRotation>().MenuRow());
     items.push_back(MenuItem{});
     items.push_back(MenuItem::Check("Match guest size", win.FollowGuest(),
                                     [this] { emu_.Get<QtMainWindow>().MatchGuestSize(); }));

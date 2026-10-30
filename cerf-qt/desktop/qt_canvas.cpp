@@ -17,9 +17,14 @@
 #include <QResizeEvent>
 #include <QWheelEvent>
 
+#include <algorithm>
+#include <cmath>
+
 namespace {
 
 constexpr int kResizeDebounceMs = 200;
+
+int WholeScale(double scale) { return std::max(1, static_cast<int>(std::lround(scale))); }
 
 }
 
@@ -115,8 +120,12 @@ void QtCanvas::ApplyCursor(cerfcore::CerfEmulator& emu, int x, int y) {
         case cerffrontend::CanvasCursor::kHand:    setCursor(Qt::PointingHandCursor); return;
         case cerffrontend::CanvasCursor::kNone:    setCursor(Qt::BlankCursor); return;
         case cerffrontend::CanvasCursor::kGuest: {
-            bool          active = false;
-            const QCursor cur    = emu.Get<QtGuestCursor>().Resolve(active);
+            double sx = 0.0;
+            double sy = 0.0;
+            GuestPixelScale(sx, sy);
+            const QtGuestCursorLook look{WholeScale(sx), WholeScale(sy), Quarter(), Dpr()};
+            bool                    active = false;
+            const QCursor           cur    = emu.Get<QtGuestCursor>().Resolve(look, active);
             setCursor(active ? cur : QCursor(Qt::ArrowCursor));
             return;
         }

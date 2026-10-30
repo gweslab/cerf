@@ -71,6 +71,22 @@ that the guest programs stays in code. The CPU clock is one example.
 The order of `cpu_config_params` is the display order. Put a new parameter
 next to the parameters that it relates to.
 
+## HUD presets - `libCerfCore/huds.json`
+
+`huds.json` holds the on-screen HUDs of the frontend.
+
+A HUD binds through `board_ids`, `board_family_ids`, or both. A HUD that names
+the board wins over a HUD that names its family.
+
+A key is the name of a Windows virtual-key code, for example `VK_RETURN`. A
+button has `keys` or an `action`. An action is the id of a `DeviceButtons`
+action of the board.
+
+The width and the height of a panel are fractions of the length of the screen
+edge that the panel sits on. The screen of a HUD is the `lcd_panel_size` of one
+of its bound boards. That board has the panel size that is the closest to the size
+of the framebuffer.
+
 ## Where an id constant lives
 
 Declare each id constant once, in its own header, next to the thing that it

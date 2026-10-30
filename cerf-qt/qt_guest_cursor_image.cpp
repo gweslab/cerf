@@ -11,6 +11,40 @@ namespace {
 constexpr QRgb kBlack = 0xFF000000u;
 constexpr QRgb kWhite = 0xFFFFFFFFu;
 
+QPoint SourcePixel(int x, int y, int w, int h, int quarter) {
+    switch (quarter & 3) {
+        case 1:  return {y, h - 1 - x};
+        case 2:  return {w - 1 - x, h - 1 - y};
+        case 3:  return {w - 1 - y, x};
+        default: return {x, y};
+    }
+}
+
+}
+
+QImage TurnedGuestCursor(const QImage& image, int quarter, int scale_x, int scale_y) {
+    const int  w      = image.width();
+    const int  h      = image.height();
+    const bool turned = (quarter & 1) != 0;
+    QImage     out((turned ? h : w) * scale_x, (turned ? w : h) * scale_y, QImage::Format_ARGB32);
+    for (int y = 0; y < out.height(); ++y) {
+        QRgb* line = reinterpret_cast<QRgb*>(out.scanLine(y));
+        for (int x = 0; x < out.width(); ++x) line[x] = image.pixel(SourcePixel(x / scale_x, y / scale_y, w, h, quarter));
+    }
+    return out;
+}
+
+QPoint TurnedGuestHotspot(QPoint hotspot, QSize size, int quarter, int scale_x, int scale_y) {
+    const int w = size.width();
+    const int h = size.height();
+    QPoint    turned;
+    switch (quarter & 3) {
+        case 1:  turned = {h - 1 - hotspot.y(), hotspot.x()}; break;
+        case 2:  turned = {w - 1 - hotspot.x(), h - 1 - hotspot.y()}; break;
+        case 3:  turned = {hotspot.y(), w - 1 - hotspot.x()}; break;
+        default: turned = hotspot; break;
+    }
+    return {turned.x() * scale_x, turned.y() * scale_y};
 }
 
 /* Wine dlls/winex11.drv/mouse.c create_xlib_monochrome_cursor: an inverted pixel is

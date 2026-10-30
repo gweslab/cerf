@@ -9,6 +9,7 @@ class QWidget;
 class QtCanvas;
 class QtHostWindow;
 class QtStatusBar;
+class QToolButton;
 
 class QtMainWindow : public QtEmulatorWindow {
 public:
@@ -31,11 +32,13 @@ public:
     void MatchGuestSize() override;
     void RefitIfFollowingGuest() override;
     void FitToResolution(uint32_t w, uint32_t h) override;
+    void SurfaceForCanvas(uint32_t canvas_w, uint32_t canvas_h, uint32_t& w, uint32_t& h) const;
 
     void Raise();
 
     QWidget*     Window() const;
     QWidget*     CanvasWidget() const;
+    bool         MenuBarIsNative() const;
     QtStatusBar& Bar() const { return *bar_; }
 
     void SetKeyboardGrab(bool on);
@@ -44,16 +47,20 @@ public:
     void OnMaximized() { follow_guest_ = false; }
     void OnDeactivated();
     void OnTeardownWedged() override;
+    void OnPresentationChanged() override;
 
 private:
     void BuildMenus();
+    void BuildHudButton();
+    void RefreshHudButton();
     void AutoResizeToGuest();
     void FitWindowToSurface(uint32_t sw, uint32_t sh);
     void AdoptResolutionToWindowMonitor();
 
-    QtHostWindow* window_ = nullptr;
-    QtCanvas*     canvas_ = nullptr;
-    QtStatusBar*  bar_    = nullptr;
+    QtHostWindow* window_     = nullptr;
+    QtCanvas*     canvas_     = nullptr;
+    QtStatusBar*  bar_        = nullptr;
+    QToolButton*  hud_button_ = nullptr;
 
     bool input_attached_ = false;
     bool follow_guest_   = true;

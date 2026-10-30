@@ -67,13 +67,16 @@ bool QtFramePresenter::ComposeInto(cerfcore::FrameSource& source) {
     const cerffrontend::ViewportLayout::Layout L = layout_.Compute();
     if (L.dst_w <= 0 || L.dst_h <= 0) return true;
     QPainter p(&present_);
-    if (L.stretch) {
-        p.setRenderHint(QPainter::SmoothPixmapTransform, layout_.Antialias());
-        p.drawImage(QRect(L.dst_x, L.dst_y, L.dst_w, L.dst_h), guest_,
-                    QRect(L.src_x, L.src_y, L.src_w, L.src_h));
-    } else {
-        p.drawImage(QPoint(L.dst_x, L.dst_y), guest_, QRect(L.src_x, L.src_y, L.dst_w, L.dst_h));
+    p.setRenderHint(QPainter::SmoothPixmapTransform, layout_.Antialias());
+    const bool turned = (L.quarter & 1) != 0;
+    switch (L.quarter) {
+        case 1:  p.translate(L.dst_x + L.dst_w, L.dst_y); break;
+        case 2:  p.translate(L.dst_x + L.dst_w, L.dst_y + L.dst_h); break;
+        case 3:  p.translate(L.dst_x, L.dst_y + L.dst_h); break;
+        default: p.translate(L.dst_x, L.dst_y); break;
     }
+    p.rotate(90.0 * L.quarter);
+    p.drawImage(QRect(0, 0, turned ? L.dst_h : L.dst_w, turned ? L.dst_w : L.dst_h), guest_);
     return true;
 }
 
@@ -84,8 +87,12 @@ const QImage& QtFramePresenter::Present(cerfcore::CerfEmulator& emu, cerfcore::F
     auto*     bits = reinterpret_cast<uint32_t*>(present_.bits());
     const int w    = present_.width();
     const int h    = present_.height();
-    if (hooks_->RenderAlt(emu, bits, w, h, dpr)) ForceOpaque(bits, static_cast<size_t>(w) * h);
-    else                                         ComposeInto(source);
+    if (hooks_->RenderAlt(emu, bits, w, h, dpr)) {
+        ForceOpaque(bits, static_cast<size_t>(w) * h);
+    } else {
+        ComposeInto(source);
+        hooks_->RenderFrameOverlay(emu, present_, layout_.Compute(), dpr);
+    }
     if (hooks_->ShouldDesaturate(emu)) cerffrontend::PresentEffects::DesaturateAndDim(bits, w * h);
     hooks_->RenderOverlay(emu, present_, std::min(w, visible_w), std::min(h, visible_h), dpr);
     return present_;

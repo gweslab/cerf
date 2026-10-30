@@ -1,7 +1,7 @@
 #include "soft_keyboard_text.h"
 
 #include "../host_virtual_keys.h"
-#include "../pc_keyboard_layout.h"
+#include "../pc_key_legend.h"
 
 #include <cerfcore/core/log.h>
 
@@ -15,13 +15,10 @@ constexpr char kPlainCharacters[]   = "`1234567890-=[]\\;',./";
 constexpr char kShiftedCharacters[] = "~!@#$%^&*()_+{}|:\"<>?";
 
 bool KeyForLegend(const char* legend, bool shift, TypedKey& out) {
-    for (const cerffrontend::KeyCap& cap : cerffrontend::kPcKeyboard) {
-        if (std::strcmp(cap.legend, legend) == 0) {
-            out = {cap.vk, shift};
-            return true;
-        }
-    }
-    return false;
+    uint8_t vk = 0;
+    if (!cerffrontend::PcLegendKey(legend, vk)) return false;
+    out = {vk, shift};
+    return true;
 }
 
 const char* NamedLegend(char32_t character) {

@@ -4,6 +4,7 @@
 #include "qt_resource_paths.h"
 #include "resource_paths_text.h"
 #include "svg_document.h"
+#include "tinted_symbol_icon.h"
 
 #include <cerfcore/core/cerf_emulator.h>
 #include <cerfcore/core/log.h>
@@ -69,4 +70,16 @@ const QImage& QtPaintResources::SvgImage(std::string_view stem, int width, int h
     QImage image = document.Render(QSize(DeviceExtent(width, dpr), DeviceExtent(height, dpr)));
     image.setDevicePixelRatio(dpr);
     return svgs_.emplace(std::move(key), std::move(image)).first->second;
+}
+
+const QImage& QtPaintResources::Symbol(std::string_view stem, int px, qreal dpr, cerffrontend::Rgb color) {
+    auto key = std::make_tuple(std::string(stem), px, dpr, color.r, color.g, color.b);
+    auto it  = symbols_.find(key);
+    if (it != symbols_.end()) return it->second;
+
+    const int side  = DeviceExtent(px, dpr);
+    QImage    image = TintedSymbolIcon(QString::fromUtf8(stem.data(), stem.size()), QSize(side, side),
+                                       QColor(color.r, color.g, color.b));
+    image.setDevicePixelRatio(dpr);
+    return symbols_.emplace(std::move(key), std::move(image)).first->second;
 }

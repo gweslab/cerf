@@ -17,6 +17,8 @@ QVariantList MobileMenuPresenter::Model(const std::vector<cerffrontend::MenuItem
         QVariantMap entry;
         entry.insert(QStringLiteral("separator"), item.label.empty());
         entry.insert(QStringLiteral("text"), QString::fromStdString(item.label));
+        entry.insert(QStringLiteral("icon"), QString::fromStdString(item.icon));
+        entry.insert(QStringLiteral("row"), Model(item.row));
         entry.insert(QStringLiteral("enabled"), item.enabled);
         entry.insert(QStringLiteral("checked"), item.checked);
         entry.insert(QStringLiteral("checkable"), item.checkable);

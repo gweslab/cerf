@@ -25,9 +25,9 @@ namespace pf = persist_field;
 namespace sf = sheet_field;
 namespace sp = sheet_page;
 
-constexpr std::array<const char*, 11> kGaKeys = {
+constexpr std::array<const char*, 12> kLiveKeys = {
     pf::kGuestAdditions, pf::kShareFolder, pf::kMountPoint, pf::kWidth,       pf::kHeight,      pf::kBpp,
-    pf::kDpi,            pf::kFontSize,    pf::kClearType,  pf::kColorScheme, pf::kAllowUntrustedApps};
+    pf::kDpi,            pf::kFontSize,    pf::kClearType,  pf::kColorScheme, pf::kAllowUntrustedApps, pf::kHud};
 constexpr std::array<const char*, 4> kRebootKeys      = {pf::kBpp, pf::kDpi, pf::kFontSize, pf::kColorScheme};
 constexpr std::array<const char*, 2> kLiveResizeKeys  = {pf::kWidth, pf::kHeight};
 constexpr int                        kLiveResizeMinCe = 4;
@@ -121,6 +121,8 @@ bool PropertySheet::FullScreen() const { return Flag(pf::kFullScreen); }
 bool PropertySheet::NetworkEnabled() const { return Flag(pf::kNetworkEnabled); }
 
 bool PropertySheet::DoubleTapHelper() const { return Flag(cerfcore::config_key::kDoubleTapHelper); }
+
+QVariant PropertySheet::Hud() const { return values_.contains(pf::kHud) ? QVariant(JsonText(values_, pf::kHud)) : NullVariant(); }
 
 bool PropertySheet::AllowUntrustedApps() const { return Flag(pf::kAllowUntrustedApps); }
 
@@ -309,7 +311,7 @@ QString PropertySheet::SaveOwned(bool all) {
         if (!PersistSubset(subject_.device, baseline_, kPersistKeys, values, error)) return error;
         return QString();
     }
-    if (!PersistSubset(subject_.device, baseline_, kGaKeys, values, error)) return error;
+    if (!PersistSubset(subject_.device, baseline_, kLiveKeys, values, error)) return error;
     return QString();
 }
 

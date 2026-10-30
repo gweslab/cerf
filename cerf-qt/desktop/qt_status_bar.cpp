@@ -5,7 +5,6 @@
 #include "qt_menu_builder.h"
 #include "qt_theme.h"
 
-#include "../button_row.h"
 #include "../status_bar.h"
 
 #include <cerfcore/core/cerf_emulator.h>
@@ -37,8 +36,6 @@ QtStatusBar::QtStatusBar(cerfcore::CerfEmulator& emu, QWidget* parent)
     setMouseTracking(true);
     QObject::connect(&tick_, &QTimer::timeout, this, [this] { Tick(); });
     tick_.start(static_cast<int>(cerffrontend::StatusBar::kTickMs));
-    row_hold_.setSingleShot(true);
-    QObject::connect(&row_hold_, &QTimer::timeout, this, [this] { RowHeld(); });
 }
 
 void QtStatusBar::paintEvent(QPaintEvent*) {
@@ -119,21 +116,7 @@ void QtStatusBar::mousePressEvent(QMouseEvent* event) {
     gate_.Run([this, event](cerfcore::CerfEmulator& emu) {
         const QPoint pos = event->position().toPoint();
         auto&        bar = emu.Get<cerffrontend::StatusBar>();
-        row_pressed_     = bar.RowIndexAt(pos.x());
-        if (row_pressed_ >= 0) {
-            emu.Get<cerffrontend::ButtonRow>().PressAt(static_cast<size_t>(row_pressed_));
-            row_hold_.start(cerffrontend::ButtonRow::kHoldMs);
-            return;
-        }
         if (cerfcore::HostWidget* w = bar.WidgetAt(pos.x()); w && !bar.PrimaryClick(w)) SecondaryAction(emu, w, pos);
-    });
-}
-
-void QtStatusBar::RowHeld() {
-    if (row_pressed_ < 0) return;
-    gate_.Run([this](cerfcore::CerfEmulator& emu) {
-        emu.Get<cerffrontend::ButtonRow>().HoldAt(static_cast<size_t>(row_pressed_));
-        update();
     });
 }
 
@@ -164,17 +147,6 @@ void QtStatusBar::wheelEvent(QWheelEvent* event) {
 }
 
 void QtStatusBar::mouseReleaseEvent(QMouseEvent* event) {
-    if (event->button() == Qt::LeftButton) {
-        if (row_pressed_ >= 0 && row_hold_.isActive()) {
-            row_hold_.stop();
-            gate_.Run([this](cerfcore::CerfEmulator& emu) {
-                emu.Get<cerffrontend::ButtonRow>().ReleaseAt(static_cast<size_t>(row_pressed_));
-            });
-            update();
-        }
-        row_pressed_ = -1;
-        return;
-    }
     if (event->button() != Qt::RightButton) return;
     gate_.Run([this, event](cerfcore::CerfEmulator& emu) {
         const QPoint pos = event->position().toPoint();

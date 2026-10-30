@@ -31,6 +31,8 @@ public:
                          cerffrontend::Rgb rim) override;
     void FillRoundRectAlphaAA(const cerffrontend::Rect& r, int radius, cerffrontend::Rgb fill,
                               uint8_t alpha) override;
+    void FillGradient(const cerffrontend::Rect& r, cerffrontend::Point from, cerffrontend::Point to,
+                      const cerffrontend::GradientStop* stops, int count) override;
 
     void DrawTextBox(const cerffrontend::Rect& r, std::string_view utf8,
                      const cerffrontend::Font& font, cerffrontend::Rgb color,
@@ -43,6 +45,8 @@ public:
     cerffrontend::FontMetrics Metrics(const cerffrontend::Font& font) override;
 
     void DrawIcon(const cerffrontend::Rect& box, std::string_view stem, int px) override;
+    void DrawSymbol(const cerffrontend::Rect& box, std::string_view stem, int px,
+                    cerffrontend::Rgb color) override;
     void DrawImage(const cerffrontend::Rect& dst, cerffrontend::PainterImage image,
                    float opacity) override;
 

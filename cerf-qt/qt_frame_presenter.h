@@ -27,6 +27,8 @@ public:
     virtual void OnPresentTick(cerfcore::CerfEmulator&, bool) {}
     virtual bool RenderAlt(cerfcore::CerfEmulator&, uint32_t*, int, int, qreal) { return false; }
     virtual bool ShouldDesaturate(cerfcore::CerfEmulator&) { return false; }
+    virtual void RenderFrameOverlay(cerfcore::CerfEmulator&, QImage&, const cerffrontend::ViewportLayout::Layout&,
+                                    qreal) {}
     virtual void RenderOverlay(cerfcore::CerfEmulator&, QImage&, int, int, qreal) {}
 };
 

@@ -1,6 +1,7 @@
 #include "pointer_overlay.h"
 
 #include "../qt_device_pixels.h"
+#include "../qt_guest_cursor_image.h"
 #include "../tinted_symbol_icon.h"
 
 #include <QPainter>
@@ -28,10 +29,11 @@ const QImage& PointerOverlay::Arrow(qreal dpr) {
     return arrow_;
 }
 
-void PointerOverlay::PaintGuest(QPainter& painter, const QImage& image, QPoint hotspot, QPointF device_at, qreal dpr,
-                                double guest_scale) {
-    const QPointF origin = device_at - QPointF(hotspot) * guest_scale;
-    painter.drawImage(QRectF(origin / dpr, QSizeF(image.size()) * guest_scale / dpr), image);
+void PointerOverlay::PaintGuest(QPainter& painter, const QImage& image, QPoint hotspot, int quarter, QPointF device_at,
+                                qreal dpr, double guest_scale) {
+    const QImage  turned = TurnedGuestCursor(image, quarter, 1, 1);
+    const QPointF origin = device_at - QPointF(TurnedGuestHotspot(hotspot, image.size(), quarter, 1, 1)) * guest_scale;
+    painter.drawImage(QRectF(origin / dpr, QSizeF(turned.size()) * guest_scale / dpr), turned);
 }
 
 void PointerOverlay::PaintArrow(QPainter& painter, QPointF device_at, qreal dpr) {

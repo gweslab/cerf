@@ -11,11 +11,20 @@ constexpr double kSnapDistance = 0.04;
 constexpr double kMinScale     = 0.05;
 constexpr double kMaxScale     = 40.0;
 
-int SafeWidth(const ViewArea& area) { return area.width - area.left - area.right; }
+QRectF ScreenOf(const ViewArea& a) {
+    return QRectF(a.hud_left, a.hud_top, a.width - a.hud_left - a.hud_right, a.height - a.hud_top - a.hud_bottom);
+}
 
-int SafeHeight(const ViewArea& area) { return area.height - area.top - area.bottom; }
+QRectF SafeOf(const ViewArea& a) {
+    const int left   = std::max(a.left, a.hud_left);
+    const int top    = std::max(a.top, a.hud_top);
+    const int right  = std::max(a.right, a.hud_right);
+    const int bottom = std::max(a.bottom, a.hud_bottom);
+    return QRectF(left, top, a.width - left - right, a.height - top - bottom);
+}
 
-double MovedAxis(double position, double extent, int old_start, int old_length, int new_start, int new_length) {
+double MovedAxis(double position, double extent, double old_start, double old_length, double new_start,
+                 double new_length) {
     if (extent <= new_length) return new_start + (new_length - extent) / 2.0;
     const double old_centre = old_start + old_length / 2.0;
     return new_start + new_length / 2.0 - (old_centre - position);
@@ -39,23 +48,28 @@ void ViewPlacement::SetMode(ViewMode mode) { mode_ = mode; }
 
 Placement ViewPlacement::Current() const { return mode_ == ViewMode::FreeForm ? free_ : ForMode(mode_); }
 
-Placement ViewPlacement::Fit(double left, double top, double width, double height) const {
+QRectF ViewPlacement::ScreenRegion() const { return ScreenOf(area_); }
+
+Placement ViewPlacement::Fit(const QRectF& region) const {
     Placement p;
-    if (surface_w_ <= 0.0 || surface_h_ <= 0.0 || width <= 0.0 || height <= 0.0) return p;
-    p.scale = std::min(width / surface_w_, height / surface_h_);
-    p.x     = left + (width - surface_w_ * p.scale) / 2.0;
-    p.y     = top + (height - surface_h_ * p.scale) / 2.0;
+    if (surface_w_ <= 0.0 || surface_h_ <= 0.0 || region.width() <= 0.0 || region.height() <= 0.0) return p;
+    p.scale = std::min(region.width() / surface_w_, region.height() / surface_h_);
+    p.x     = region.left() + (region.width() - surface_w_ * p.scale) / 2.0;
+    p.y     = region.top() + (region.height() - surface_h_ * p.scale) / 2.0;
     return p;
 }
 
 Placement ViewPlacement::ForMode(ViewMode mode) const {
     switch (mode) {
         case ViewMode::FitScreen:
-            return Fit(0.0, 0.0, area_.width, area_.height);
+            return Fit(ScreenOf(area_));
         case ViewMode::FitSafeZone:
-            return Fit(area_.left, area_.top, SafeWidth(area_), SafeHeight(area_));
-        case ViewMode::OriginalScale:
-            return Placement{1.0, (area_.width - surface_w_) / 2.0, (area_.height - surface_h_) / 2.0};
+            return Fit(SafeOf(area_));
+        case ViewMode::OriginalScale: {
+            const QRectF region = ScreenOf(area_);
+            return Placement{1.0, region.left() + (region.width() - surface_w_) / 2.0,
+                             region.top() + (region.height() - surface_h_) / 2.0};
+        }
         case ViewMode::FreeForm:
             return free_;
     }
@@ -105,18 +119,19 @@ void ViewPlacement::UpdatePinch(QPointF centroid, double distance) {
 }
 
 Placement ViewPlacement::Centered(double scale) const {
-    const double width  = SafeWidth(area_);
-    const double height = SafeHeight(area_);
-    return Placement{scale, area_.left + (width - surface_w_ * scale) / 2.0,
-                     area_.top + (height - surface_h_ * scale) / 2.0};
+    const QRectF region = SafeOf(area_);
+    return Placement{scale, region.left() + (region.width() - surface_w_ * scale) / 2.0,
+                     region.top() + (region.height() - surface_h_ * scale) / 2.0};
 }
 
 Placement ViewPlacement::Moved(const Placement& placement, const ViewArea& from) const {
-    Placement moved = placement;
-    moved.x = MovedAxis(placement.x, surface_w_ * placement.scale, from.left, SafeWidth(from), area_.left,
-                        SafeWidth(area_));
-    moved.y = MovedAxis(placement.y, surface_h_ * placement.scale, from.top, SafeHeight(from), area_.top,
-                        SafeHeight(area_));
+    Placement    moved  = placement;
+    const QRectF before = SafeOf(from);
+    const QRectF after  = SafeOf(area_);
+    moved.x = MovedAxis(placement.x, surface_w_ * placement.scale, before.left(), before.width(), after.left(),
+                        after.width());
+    moved.y = MovedAxis(placement.y, surface_h_ * placement.scale, before.top(), before.height(), after.top(),
+                        after.height());
     return moved;
 }
 

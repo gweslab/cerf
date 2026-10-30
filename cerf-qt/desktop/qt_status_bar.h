@@ -28,14 +28,11 @@ protected:
 
 private:
     void Tick();
-    void RowHeld();
     void SecondaryAction(cerfcore::CerfEmulator& emu, cerfcore::HostWidget* w, const QPoint& pos);
     int  EntryAt(cerfcore::CerfEmulator& emu, const QPoint& pos) const;
 
     cerfcore::InstanceGate gate_;
     QTimer                 tick_;
-    QTimer                 row_hold_;
     QImage                 image_;
-    int                    tip_entry_   = -1;
-    int                    row_pressed_ = -1;
+    int                    tip_entry_ = -1;
 };

@@ -23,6 +23,20 @@ SheetPage {
     }
 
     SettingsGroup {
+        SettingsRow {
+            title: qsTr("HUD")
+            description: qsTr("On-screen device buttons around the screen.")
+            ChoiceBox {
+                enabled: page.editable || page.sheet.live
+                values: PropertyOptions.HudChoices()
+                current: page.sheet.hud
+                labelOf: v => PropertyOptions.HudLabel(v, page.sheet.boardId)
+                onPicked: value => page.sheet.SetOrClear(SheetIds.hud, value)
+            }
+        }
+    }
+
+    SettingsGroup {
         SwitchRow {
             visible: page.sheet.fullScreenSetting
             title: qsTr("Borderless full screen")

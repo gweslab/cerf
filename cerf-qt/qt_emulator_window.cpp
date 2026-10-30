@@ -3,8 +3,10 @@
 #include "qt_emulator_view.h"
 
 #include "canvas_tabs.h"
+#include "hud_selection.h"
 #include "shutdown_prompt.h"
 #include "shutdown_teardown.h"
+#include "view_rotation.h"
 
 #include <cerfcore/core/cerf_emulator.h>
 #include <cerfcore/core/device_config.h>
@@ -21,6 +23,7 @@ QtEmulatorWindow::~QtEmulatorWindow() = default;
 void QtEmulatorWindow::AttachView(QtEmulatorView& view, QObject& window) {
     view_    = &view;
     context_ = &window;
+    ApplyPresentation();
     view.SetFramebufferActive(CurrentTab() == Tab::Framebuffer);
     surface_w_.store(view.GuestSurfaceWidth(), std::memory_order_release);
     surface_h_.store(view.GuestSurfaceHeight(), std::memory_order_release);
@@ -78,6 +81,19 @@ void QtEmulatorWindow::OnLcdEnabled() {
         LOG(Lcd, "QtEmulatorWindow: LCD resize, presented %ux%u\n", w, h);
         if (w == 0 || h == 0) return;
         SetGuestSurfaceSize(w, h);
+        RefitIfFollowingGuest();
+    });
+}
+
+void QtEmulatorWindow::ApplyPresentation() {
+    view_->SetPresentation(cerffrontend::ViewPresentation{emu_.Get<cerffrontend::HudSelection>().Frame(),
+                                                          emu_.Get<cerffrontend::ViewRotation>().Quarter()});
+}
+
+void QtEmulatorWindow::OnPresentationChanged() {
+    RunOnUiThread([this] {
+        ApplyPresentation();
+        view_->Repaint();
         RefitIfFollowingGuest();
     });
 }

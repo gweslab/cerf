@@ -10,7 +10,7 @@ class QPainter;
 
 class PointerOverlay {
 public:
-    void PaintGuest(QPainter& painter, const QImage& image, QPoint hotspot, QPointF device_at, qreal dpr,
+    void PaintGuest(QPainter& painter, const QImage& image, QPoint hotspot, int quarter, QPointF device_at, qreal dpr,
                     double guest_scale);
     void PaintArrow(QPainter& painter, QPointF device_at, qreal dpr);
 

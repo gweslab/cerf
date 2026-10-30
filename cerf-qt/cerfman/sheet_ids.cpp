@@ -22,6 +22,8 @@ QString SheetIds::ShareFolder() const { return QString::fromLatin1(persist_field
 QString SheetIds::ThrottleMultiplier() const { return QString::fromLatin1(cerfcore::config_key::kThrottleMultiplier); }
 QString SheetIds::CpuRateMultiplier() const { return QString::fromLatin1(cerfcore::config_key::kCpuRateMultiplier); }
 QString SheetIds::DoubleTapHelper() const { return QString::fromLatin1(cerfcore::config_key::kDoubleTapHelper); }
+
+QString SheetIds::Hud() const { return QString::fromLatin1(cerfcore::config_key::kHud); }
 QString SheetIds::BoardPage() const { return QString::fromLatin1(sheet_page::kBoard); }
 QString SheetIds::GuestAdditionsPage() const { return QString::fromLatin1(sheet_page::kGuestAdditions); }
 QString SheetIds::DisplayPage() const { return QString::fromLatin1(sheet_page::kDisplay); }

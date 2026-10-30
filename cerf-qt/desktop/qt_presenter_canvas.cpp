@@ -35,6 +35,12 @@ void QtPresenterCanvas::SetGuestSurfaceSize(uint32_t w, uint32_t h) {
     update();
 }
 
+void QtPresenterCanvas::SetPresentation(const cerffrontend::ViewPresentation& presentation) {
+    if (!presenter_.Layout().SetPresentation(presentation)) return;
+    UpdateScrollbars();
+    update();
+}
+
 void QtPresenterCanvas::SetViewportMode(cerffrontend::ViewportMode m) {
     if (!presenter_.Layout().SetMode(m)) return;
     UpdateScrollbars();

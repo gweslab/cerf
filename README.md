@@ -272,8 +272,8 @@ python run_claude.py
       <td><img src="assets/icons_sources/stylus.svg" width="32" height="32" title="Touch" alt="Touch"/> <img src="assets/icons_sources/ga_autoresize.svg" width="32" height="32" title="Guest Additions" alt="Guest Additions"/> <img src="assets/icons_sources/speaker_active.svg" width="32" height="32" title="Sound" alt="Sound"/></td>
     </tr>
     <tr>
-      <td rowspan="5" align="center"><b>Samsung S3C2410</b><br/><sub>ARM920T</sub></td>
-      <td rowspan="4"><b>Samsung SMDK2410</b></td>
+      <td rowspan="8" align="center"><b>Samsung S3C2410</b><br/><sub>ARM920T</sub></td>
+      <td rowspan="7"><b>Samsung SMDK2410</b></td>
       <td><img src="assets/icons_sources/board.svg" width="16" height="16" title="PDA" alt="PDA"/> <b>Device Emulator (QVGA)</b> <code>devemu</code></td>
       <td><img src="assets/icons_sources/stylus.svg" width="32" height="32" title="Touch" alt="Touch"/> <img src="assets/icons_sources/keyboard.svg" width="32" height="32" title="Keyboard" alt="Keyboard"/> <img src="assets/icons_sources/suspend.svg" width="32" height="32" title="Suspend / Resume" alt="Suspend / Resume"/> <img src="assets/icons_sources/ga_autoresize.svg" width="32" height="32" title="Guest Additions" alt="Guest Additions"/> <img src="assets/icons_sources/speaker_active.svg" width="32" height="32" title="Sound" alt="Sound"/> <img src="assets/icons_sources/pcmcia_enabled.svg" width="32" height="32" title="PCMCIA" alt="PCMCIA"/> <img src="assets/icons_sources/internet.svg" width="32" height="32" title="Network" alt="Network"/> <img src="assets/icons_sources/battery.svg" width="32" height="32" title="Battery" alt="Battery"/></td>
     </tr>
@@ -287,6 +287,18 @@ python run_claude.py
     </tr>
     <tr>
       <td><img src="assets/icons_sources/board.svg" width="16" height="16" title="PDA" alt="PDA"/> <b>Device Emulator (WVGA)</b> <code>devemu_wvga</code></td>
+      <td><img src="assets/icons_sources/stylus.svg" width="32" height="32" title="Touch" alt="Touch"/> <img src="assets/icons_sources/keyboard.svg" width="32" height="32" title="Keyboard" alt="Keyboard"/> <img src="assets/icons_sources/suspend.svg" width="32" height="32" title="Suspend / Resume" alt="Suspend / Resume"/> <img src="assets/icons_sources/ga_autoresize.svg" width="32" height="32" title="Guest Additions" alt="Guest Additions"/> <img src="assets/icons_sources/speaker_active.svg" width="32" height="32" title="Sound" alt="Sound"/> <img src="assets/icons_sources/pcmcia_enabled.svg" width="32" height="32" title="PCMCIA" alt="PCMCIA"/> <img src="assets/icons_sources/internet.svg" width="32" height="32" title="Network" alt="Network"/> <img src="assets/icons_sources/battery.svg" width="32" height="32" title="Battery" alt="Battery"/></td>
+    </tr>
+    <tr>
+      <td><img src="assets/icons_sources/board.svg" width="16" height="16" title="PDA" alt="PDA"/> <b>Device Emulator Smartphone (QCIF+)</b> <code>devemu_smartphone</code></td>
+      <td><img src="assets/icons_sources/stylus.svg" width="32" height="32" title="Touch" alt="Touch"/> <img src="assets/icons_sources/keyboard.svg" width="32" height="32" title="Keyboard" alt="Keyboard"/> <img src="assets/icons_sources/suspend.svg" width="32" height="32" title="Suspend / Resume" alt="Suspend / Resume"/> <img src="assets/icons_sources/ga_autoresize.svg" width="32" height="32" title="Guest Additions" alt="Guest Additions"/> <img src="assets/icons_sources/speaker_active.svg" width="32" height="32" title="Sound" alt="Sound"/> <img src="assets/icons_sources/pcmcia_enabled.svg" width="32" height="32" title="PCMCIA" alt="PCMCIA"/> <img src="assets/icons_sources/internet.svg" width="32" height="32" title="Network" alt="Network"/> <img src="assets/icons_sources/battery.svg" width="32" height="32" title="Battery" alt="Battery"/></td>
+    </tr>
+    <tr>
+      <td><img src="assets/icons_sources/board.svg" width="16" height="16" title="PDA" alt="PDA"/> <b>Device Emulator Smartphone (QVGA)</b> <code>devemu_smartphone_qvga</code></td>
+      <td><img src="assets/icons_sources/stylus.svg" width="32" height="32" title="Touch" alt="Touch"/> <img src="assets/icons_sources/keyboard.svg" width="32" height="32" title="Keyboard" alt="Keyboard"/> <img src="assets/icons_sources/suspend.svg" width="32" height="32" title="Suspend / Resume" alt="Suspend / Resume"/> <img src="assets/icons_sources/ga_autoresize.svg" width="32" height="32" title="Guest Additions" alt="Guest Additions"/> <img src="assets/icons_sources/speaker_active.svg" width="32" height="32" title="Sound" alt="Sound"/> <img src="assets/icons_sources/pcmcia_enabled.svg" width="32" height="32" title="PCMCIA" alt="PCMCIA"/> <img src="assets/icons_sources/internet.svg" width="32" height="32" title="Network" alt="Network"/> <img src="assets/icons_sources/battery.svg" width="32" height="32" title="Battery" alt="Battery"/></td>
+    </tr>
+    <tr>
+      <td><img src="assets/icons_sources/board.svg" width="16" height="16" title="PDA" alt="PDA"/> <b>Device Emulator WinCE (SVGA)</b> <code>devemu_wince_svga</code></td>
       <td><img src="assets/icons_sources/stylus.svg" width="32" height="32" title="Touch" alt="Touch"/> <img src="assets/icons_sources/keyboard.svg" width="32" height="32" title="Keyboard" alt="Keyboard"/> <img src="assets/icons_sources/suspend.svg" width="32" height="32" title="Suspend / Resume" alt="Suspend / Resume"/> <img src="assets/icons_sources/ga_autoresize.svg" width="32" height="32" title="Guest Additions" alt="Guest Additions"/> <img src="assets/icons_sources/speaker_active.svg" width="32" height="32" title="Sound" alt="Sound"/> <img src="assets/icons_sources/pcmcia_enabled.svg" width="32" height="32" title="PCMCIA" alt="PCMCIA"/> <img src="assets/icons_sources/internet.svg" width="32" height="32" title="Network" alt="Network"/> <img src="assets/icons_sources/battery.svg" width="32" height="32" title="Battery" alt="Battery"/></td>
     </tr>
     <tr>
@@ -408,6 +420,7 @@ python run_claude.py
           🆕 Support for macOS (ARM64)<br/>
           🆕 Support for Android (ARM64)<br/>
           🆕 Startup screen scale configuration and dynamic mode for retina screen<br/>
+          🆕 Device HUDs - simplified hardware buttons in a canvas<br/>
           ✅ Serial connection regression on some MIPS boards</p>
         <p><b>🚀 Launcher</b><br/>
           ❌ Replaced with Devices Manager</p>

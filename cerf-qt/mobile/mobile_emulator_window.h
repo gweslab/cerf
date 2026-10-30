@@ -14,6 +14,7 @@
 
 class EmulatorController;
 class GuestSurface;
+class HudTouchArea;
 class MobileWidgetBar;
 class QQuickItem;
 class QQuickWindow;
@@ -30,6 +31,7 @@ public:
     void MatchGuestSize() override;
     void RefitIfFollowingGuest() override;
     void FitToResolution(uint32_t w, uint32_t h) override;
+    void OnPresentationChanged() override;
 
     void                                OpenWindow();
     void                                Raise();
@@ -55,6 +57,7 @@ private:
     QPointer<GuestSurface>       surface_;
     QPointer<EmulatorController> controller_;
     QPointer<MobileWidgetBar>    widget_bar_;
+    QPointer<HudTouchArea>       hud_area_;
     std::function<void()>        wedged_handler_;
 
     bool input_attached_ = false;

@@ -15,6 +15,8 @@
 
 #include "../dpi_scale.h"
 #include "../frontend_config.h"
+#include "../hud_selection.h"
+#include "../tinted_symbol_icon.h"
 #include "host_menu_model.h"
 #include "../input_capture.h"
 #include "startup_scale.h"
@@ -32,9 +34,18 @@
 #include <QMenuBar>
 #include <QPixmap>
 #include <QScreen>
+#include <QToolButton>
 #include <QVBoxLayout>
 
+#include <cmath>
+
 REGISTER_SERVICE(QtMainWindow);
+
+namespace {
+
+constexpr int kHudIconPx = 20;
+
+}
 
 QtMainWindow::~QtMainWindow() = default;
 
@@ -82,9 +93,10 @@ void QtMainWindow::OnShutdown() {
     if (input_attached_) emu_.Get<cerffrontend::CanvasInput>().Attach(nullptr);
     input_attached_ = false;
     delete window_;
-    window_ = nullptr;
-    canvas_ = nullptr;
-    bar_    = nullptr;
+    window_     = nullptr;
+    canvas_     = nullptr;
+    bar_        = nullptr;
+    hud_button_ = nullptr;
 }
 
 void QtMainWindow::BuildMenus() {
@@ -94,6 +106,41 @@ void QtMainWindow::BuildMenus() {
         emu_.Get<QtMenuBuilder>().Bind(
             menu, [i](cerfcore::CerfEmulator& emu) { return emu.Get<cerffrontend::HostMenuModel>().Build(i); });
     }
+    if (!MenuBarIsNative()) BuildHudButton();
+}
+
+bool QtMainWindow::MenuBarIsNative() const { return window_->menuBar()->isNativeMenuBar(); }
+
+void QtMainWindow::BuildHudButton() {
+    QMenuBar*    bar  = window_->menuBar();
+    const qreal  dpr  = bar->devicePixelRatioF();
+    const int    side = static_cast<int>(std::lround(kHudIconPx * dpr));
+    QPixmap icon = QPixmap::fromImage(
+        TintedSymbolIcon(QStringLiteral("gamepad"), QSize(side, side), bar->palette().color(QPalette::WindowText)));
+    icon.setDevicePixelRatio(dpr);
+    hud_button_ = new QToolButton(bar);
+    hud_button_->setAutoRaise(true);
+    hud_button_->setCheckable(true);
+    hud_button_->setIcon(QIcon(icon));
+    hud_button_->setIconSize(QSize(kHudIconPx, kHudIconPx));
+    hud_button_->setToolTip(QStringLiteral("Show HUD"));
+    hud_button_->setAccessibleName(QStringLiteral("Show HUD"));
+    QObject::connect(hud_button_, &QToolButton::clicked, hud_button_, gate_.Bind([](cerfcore::CerfEmulator& emu) {
+        emu.Get<cerffrontend::HudSelection>().Toggle();
+    }));
+    bar->setCornerWidget(hud_button_, Qt::TopRightCorner);
+    RefreshHudButton();
+}
+
+void QtMainWindow::RefreshHudButton() {
+    const auto& hud = emu_.Get<cerffrontend::HudSelection>();
+    hud_button_->setEnabled(hud.CanShow());
+    hud_button_->setChecked(hud.Shown());
+}
+
+void QtMainWindow::OnPresentationChanged() {
+    QtEmulatorWindow::OnPresentationChanged();
+    if (hud_button_ != nullptr) RunOnUiThread([this] { RefreshHudButton(); });
 }
 
 QWidget* QtMainWindow::Window() const { return window_; }
@@ -110,7 +157,13 @@ void QtMainWindow::SetAntialias(bool on) { canvas_->SetAntialias(on); }
 void QtMainWindow::FitToResolution(uint32_t sw, uint32_t sh) {
     if (!window_ || sw == 0 || sh == 0) return;
     if (window_->isMaximized()) return;
-    FitWindowToSurface(sw, sh);
+    int content_w = 0, content_h = 0;
+    canvas_->ContentFor(sw, sh, content_w, content_h);
+    FitWindowToSurface(static_cast<uint32_t>(content_w), static_cast<uint32_t>(content_h));
+}
+
+void QtMainWindow::SurfaceForCanvas(uint32_t canvas_w, uint32_t canvas_h, uint32_t& w, uint32_t& h) const {
+    canvas_->SurfaceFor(static_cast<int>(canvas_w), static_cast<int>(canvas_h), w, h);
 }
 
 void QtMainWindow::Raise() {
@@ -126,11 +179,12 @@ void QtMainWindow::AdoptResolutionToWindowMonitor() {
     const QSize work   = ScreenWorkAreaPixels(*window_->screen());
     const QSize chrome = WindowChrome(*window_, *canvas_);
     const qreal dpr    = window_->devicePixelRatioF();
-    const int   surf_w = work.width() - DeviceExtent(chrome.width(), dpr);
-    const int   surf_h = work.height() - DeviceExtent(chrome.height(), dpr);
+    uint32_t    surf_w = 0, surf_h = 0;
+    canvas_->SurfaceFor(work.width() - DeviceExtent(chrome.width(), dpr), work.height() - DeviceExtent(chrome.height(), dpr),
+                        surf_w, surf_h);
     if (surf_w < 1 || surf_h < 1) return;
-    SetGuestResolution(static_cast<uint32_t>(surf_w), static_cast<uint32_t>(surf_h));
-    LOG(Lcd, "QtMainWindow: adopt fit monitor work=%dx%d -> guest surface %dx%d\n", work.width(),
+    SetGuestResolution(surf_w, surf_h);
+    LOG(Lcd, "QtMainWindow: adopt fit monitor work=%dx%d -> guest surface %ux%u\n", work.width(),
         work.height(), surf_w, surf_h);
 }
 

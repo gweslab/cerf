@@ -1,6 +1,5 @@
 #pragma once
 
-#include "button_row.h"
 #include "painter.h"
 #include "widget_menu_model.h"
 
@@ -38,12 +37,10 @@ public:
     using WidgetFilter = std::function<bool(const cerfcore::HostWidget*)>;
 
     void       SetFilter(WidgetFilter shown) { filter_ = std::move(shown); }
-    void       SetRowShown(bool shown) { row_shown_ = shown; }
     bool       Relayout(int width, int height);
     bool       Scroll(int delta);
     bool       SetHover(int x);
     bool       ClearHover();
-    int        RowIndexAt(int x) const;
     TickResult Tick(int width, int height);
     void       Paint(Painter& p, const Rect& client, bool dark);
     void       PaintWidgets(Painter& p, Rgb backdrop);
@@ -66,30 +63,19 @@ private:
         bool was_active = false;
     };
 
-    struct RowEntry {
-        RowButton button;
-        Rect      box;
-    };
-
     bool SampleActivity(cerfcore::HostWidget* w);
-    bool RefreshRow();
     int  HoverTarget() const;
     bool Hovered(const Rect& box) const;
-    void PaintRow(Painter& p, const Rect& client, bool dark);
     void DrawComposited(Painter& p, cerfcore::HostWidget* w, const Rect& box, Rgb bar_bg);
 
     std::vector<Entry>                                 layout_;
     std::unordered_map<const cerfcore::HostWidget*, Glow> glow_;
     WidgetFilter                                       filter_;
-    std::vector<RowButton>                             row_buttons_;
-    std::vector<RowEntry>                              row_;
-    int                                                row_width_ = 0;
-    int                                                scroll_    = 0;
-    int                                                width_     = 0;
-    int                                                height_    = 0;
-    bool                                               row_shown_ = true;
-    bool                                               hovering_  = false;
-    int                                                hover_x_   = 0;
+    int                                                scroll_   = 0;
+    int                                                width_    = 0;
+    int                                                height_   = 0;
+    bool                                               hovering_ = false;
+    int                                                hover_x_  = 0;
 };
 
 }

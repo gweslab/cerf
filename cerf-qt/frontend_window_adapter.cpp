@@ -16,6 +16,8 @@ void FrontendWindowAdapter::MatchGuestSize() { PlatformWindow().MatchGuestSize()
 
 void FrontendWindowAdapter::RefitIfFollowingGuest() { PlatformWindow().RefitIfFollowingGuest(); }
 
+void FrontendWindowAdapter::OnPresentationChanged() { PlatformWindow().OnPresentationChanged(); }
+
 void FrontendWindowAdapter::SetGuestResolution(uint32_t w, uint32_t h) { PlatformWindow().SetGuestResolution(w, h); }
 
 void FrontendWindowAdapter::FitToResolution(uint32_t w, uint32_t h) { PlatformWindow().FitToResolution(w, h); }

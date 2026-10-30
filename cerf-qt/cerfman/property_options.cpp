@@ -6,7 +6,10 @@
 
 #include "../dpi_scale.h"
 
+#include <cerfcore/core/board_database.h>
 #include <cerfcore/core/cerf_emulator.h>
+#include <cerfcore/core/device_config_keys.h>
+#include <cerfcore/core/hud_database.h>
 #include <cerfcore/core/share_folder_mount_name.h>
 #include <cerfcore/peripherals/cerf_virt/guest_color_schemes.h>
 
@@ -28,6 +31,7 @@ struct Resolution {
 };
 
 constexpr Resolution kResolutions[] = {
+    {176, 220, "QCIF+"},
     {240, 320, "QVGA"},        {320, 240, "QVGA"},       {320, 480, "HVGA"},
     {480, 320, "HVGA"},        {640, 480, "VGA"},        {480, 640, "VGA"},
     {800, 480, "WVGA"},        {480, 800, "WVGA"},       {854, 480, "FWVGA"},
@@ -179,6 +183,25 @@ QString PropertyOptions::ColorSchemeLabel(const QString& key) const {
     for (const auto& scheme : cerfcore::GuestColorSchemes())
         if (Utf8(scheme.key) == key) return Utf8(scheme.label);
     return key;
+}
+
+QVariantList PropertyOptions::HudChoices() const {
+    QVariantList out{NullVariant(), QString::fromLatin1(cerfcore::config_key::kHudNone)};
+    for (const cerfcore::DbHud& hud : emu_.Get<cerfcore::HudDatabase>().Huds()) out.append(Utf8(hud.id));
+    return out;
+}
+
+QString PropertyOptions::HudLabel(const QVariant& value, const QString& board_id) const {
+    const QString none = QStringLiteral("None");
+    auto&         huds = emu_.Get<cerfcore::HudDatabase>();
+    if (value.isNull()) {
+        const cerfcore::DbBoard* board = emu_.Get<cerfcore::BoardDatabase>().FindBoard(board_id.toStdString());
+        const cerfcore::DbHud*   hud   = board ? huds.AutoFor(board->id, board->family_id) : nullptr;
+        return QStringLiteral("Auto - %1").arg(hud ? Utf8(hud->name) : none);
+    }
+    if (value.toString() == QLatin1String(cerfcore::config_key::kHudNone)) return none;
+    const cerfcore::DbHud* hud = huds.Find(value.toString().toStdString());
+    return hud ? Utf8(hud->name) : value.toString();
 }
 
 QVariantList PropertyOptions::ScalePresetIndexes() const {

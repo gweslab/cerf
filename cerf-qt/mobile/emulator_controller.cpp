@@ -6,6 +6,7 @@
 
 #include "../button_row.h"
 #include "../host_virtual_keys.h"
+#include "../hud_selection.h"
 
 #include <cerfcore/core/cerf_emulator.h>
 
@@ -15,7 +16,7 @@
 namespace {
 
 QString ArrowSymbol(const cerffrontend::RowButton& b) {
-    if (b.kind != cerffrontend::RowButton::Kind::kKey || b.named) return {};
+    if (b.named) return {};
     switch (b.vk) {
         case cerffrontend::kVkLeft:  return QStringLiteral("arrow_back");
         case cerffrontend::kVkUp:    return QStringLiteral("arrow_upward");
@@ -49,10 +50,12 @@ void EmulatorController::RequestClose() {
     gate_.Run([](cerfcore::CerfEmulator& emu) { emu.Get<MobileEmulatorWindow>().CloseRequested(); });
 }
 
-QVariantList EmulatorController::RowButtons() {
+QVariantList EmulatorController::RowButtons(bool keyboard_open) {
     QVariantList out;
-    gate_.Run([&out](cerfcore::CerfEmulator& emu) {
-        const std::vector<cerffrontend::RowButton> buttons = emu.Get<cerffrontend::ButtonRow>().Buttons();
+    gate_.Run([&out, keyboard_open](cerfcore::CerfEmulator& emu) {
+        auto& row = emu.Get<cerffrontend::ButtonRow>();
+        row.SetKeysShown(keyboard_open);
+        const std::vector<cerffrontend::RowButton> buttons = row.Buttons();
         for (size_t i = 0; i < buttons.size(); ++i) {
             const cerffrontend::RowButton& b = buttons[i];
             QVariantMap                    entry;
@@ -60,7 +63,6 @@ QVariantList EmulatorController::RowButtons() {
             entry["label"]      = QString::fromStdString(b.label);
             entry["symbol"]     = ArrowSymbol(b);
             entry["held"]       = b.held;
-            entry["groupStart"] = b.group_start;
             out.append(entry);
         }
     });
@@ -68,6 +70,24 @@ QVariantList EmulatorController::RowButtons() {
 }
 
 int EmulatorController::RowHoldMs() const { return cerffrontend::ButtonRow::kHoldMs; }
+
+bool EmulatorController::HudAvailable() const {
+    bool available = false;
+    gate_.Run([&available](cerfcore::CerfEmulator& emu) {
+        available = emu.Get<cerffrontend::HudSelection>().CanShow();
+    });
+    return available;
+}
+
+bool EmulatorController::HudShown() const {
+    bool shown = false;
+    gate_.Run([&shown](cerfcore::CerfEmulator& emu) { shown = emu.Get<cerffrontend::HudSelection>().Shown(); });
+    return shown;
+}
+
+void EmulatorController::ToggleHud() {
+    gate_.Run([](cerfcore::CerfEmulator& emu) { emu.Get<cerffrontend::HudSelection>().Toggle(); });
+}
 
 void EmulatorController::PressRowButton(int index) { row_press_.Begin(index); }
 

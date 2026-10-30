@@ -1,6 +1,8 @@
 import QtQuick
 import QtQuick.Controls
+import QtQuick.Layouts
 import CerfStyle
+import Cerfman
 
 Menu {
     id: menu
@@ -25,6 +27,8 @@ Menu {
         for (const entry of model) {
             if (entry.separator) {
                 addItem(separatorComponent.createObject(menu.contentItem))
+            } else if (entry.row.length > 0) {
+                addItem(rowComponent.createObject(menu.contentItem, {"buttons": entry.row}))
             } else if (entry.submenu.length > 0) {
                 const sub = Qt.createComponent("EmulatorMenu.qml").createObject(menu, {
                     "title": entry.text,
@@ -70,5 +74,26 @@ Menu {
     Component {
         id: separatorComponent
         MenuSeparator {}
+    }
+
+    Component {
+        id: rowComponent
+        RowLayout {
+            id: buttonRow
+            property var buttons: []
+            spacing: 0
+
+            Repeater {
+                model: buttonRow.buttons
+                ToolButton {
+                    required property var modelData
+                    Layout.fillWidth: true
+                    icon.source: IconSources.Icon(modelData.icon)
+                    enabled: modelData.enabled && modelData.id >= 0
+                    Accessible.name: modelData.text
+                    onClicked: menu.picked(modelData.id)
+                }
+            }
+        }
     }
 }

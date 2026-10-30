@@ -21,6 +21,7 @@ public:
     virtual void ToggleFullscreen()      = 0;
     virtual void MatchGuestSize()        = 0;
     virtual void RefitIfFollowingGuest() = 0;
+    virtual void OnPresentationChanged() = 0;
 
     virtual void SetGuestResolution(uint32_t w, uint32_t h) = 0;
     virtual void FitToResolution(uint32_t w, uint32_t h)    = 0;

@@ -49,16 +49,7 @@ QtObject {
     readonly property real chipAlpha: 0.9
     readonly property color success: "#3fb950"
     readonly property color successMark: "#ffffff"
-
-    function luminance(color) {
-        const channel = c => c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4)
-        return 0.2126 * channel(color.r) + 0.7152 * channel(color.g) + 0.0722 * channel(color.b)
-    }
-
-    function readableOn(background) {
-        const l = luminance(background)
-        return (l + 0.05) / 0.05 >= 1.05 / (l + 0.05) ? "#000000" : "#ffffff"
-    }
+    readonly property color onAccent: dark ? "#000000" : "#ffffff"
 
     function chipColor(text) {
         let hash = 0

@@ -7,6 +7,8 @@
 #include <cerfcore/core/cerf_emulator.h>
 #include <cerfcore/core/log.h>
 
+#include <algorithm>
+
 namespace cerffrontend {
 
 REGISTER_SERVICE(StartupScale);
@@ -17,14 +19,11 @@ int StartupScale::Factor(int primary_display_dpi) const {
         LOG(Lcd, "StartupScale: configured %dx\n", configured);
         return configured;
     }
-    if (emu_.Get<cerfcore::BoardContext>().HasHighDpi()) {
-        LOG(Lcd, "StartupScale: dynamic, high-DPI board -> %dx\n", FrontendConfig::kOriginalScale);
-        return FrontendConfig::kOriginalScale;
-    }
-    int factor = IntegerFactorForDpi(primary_display_dpi);
-    if (factor > kDynamicMaxFactor) factor = kDynamicMaxFactor;
-    LOG(Lcd, "StartupScale: dynamic, primary display %d dpi -> %dx\n", primary_display_dpi,
-        factor);
+    const int host   = std::min(IntegerFactorForDpi(primary_display_dpi), kDynamicMaxFactor);
+    const int board  = emu_.Get<cerfcore::BoardContext>().DynamicScaleFactor();
+    const int factor = std::max(FrontendConfig::kOriginalScale, host + board);
+    LOG(Lcd, "StartupScale: dynamic, primary display %d dpi -> %dx, board %+d -> %dx\n", primary_display_dpi, host,
+        board, factor);
     return factor;
 }
 

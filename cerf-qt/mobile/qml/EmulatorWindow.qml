@@ -8,6 +8,7 @@ ApplicationWindow {
     property alias surface: guestSurface
     property alias controller: controller
     property alias widgetBar: widgetBar
+    property alias hudArea: hudArea
     property var openDialogs: []
     property var menuTree: null
     readonly property int stripSlideMs: 150
@@ -38,6 +39,11 @@ ApplicationWindow {
         safeMargins: SafeArea.margins
     }
 
+    HudTouchArea {
+        id: hudArea
+        anchors.fill: parent
+    }
+
     Rectangle {
         id: strip
         property bool shown: false
@@ -52,7 +58,7 @@ ApplicationWindow {
         onShownChanged: {
             if (!shown)
                 return
-            buttons = controller.RowButtons()
+            buttons = controller.RowButtons(guestSurface.keyboardRequested)
             stripScroll.stop()
             stripFlick.contentX = 0
         }
@@ -112,7 +118,6 @@ ApplicationWindow {
                         label: modelData.label
                         symbol: modelData.symbol
                         held: modelData.held
-                        groupStart: modelData.groupStart
                         holdMs: controller.rowHoldMs
                         Accessible.name: modelData.label
                         onKeyDown: controller.PressRowButton(modelData.index)
@@ -155,8 +160,8 @@ ApplicationWindow {
     Connections {
         target: guestSurface
         function onKeyboardRequestedChanged() {
+            strip.buttons = controller.RowButtons(guestSurface.keyboardRequested)
             if (guestSurface.keyboardRequested) {
-                strip.buttons = controller.RowButtons()
                 if (!strip.shown) {
                     strip.shownByKeyboard = true
                     strip.shown = true

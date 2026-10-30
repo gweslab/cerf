@@ -22,6 +22,7 @@ public:
     QFont         Font(const cerffrontend::Font& font) const;
     const QImage& Icon(std::string_view stem, int px, qreal dpr);
     const QImage& SvgImage(std::string_view stem, int width, int height, qreal dpr);
+    const QImage& Symbol(std::string_view stem, int px, qreal dpr, cerffrontend::Rgb color);
 
 private:
     QString LoadFamily(const char* file_name);
@@ -29,4 +30,5 @@ private:
     QString                                                    ui_family_;
     QString                                                    mono_family_;
     std::map<std::tuple<std::string, int, int, qreal>, QImage> svgs_;
+    std::map<std::tuple<std::string, int, qreal, uint8_t, uint8_t, uint8_t>, QImage> symbols_;
 };

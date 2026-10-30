@@ -6,6 +6,7 @@
       Support for macOS (ARM64)
       Support for Android (ARM64)
       Startup screen scale configuration and dynamic mode for retina screen
+      Device HUDs - simplified hardware buttons in a canvas
     fixed: |
       Serial connection regression on some MIPS boards
   launcher:

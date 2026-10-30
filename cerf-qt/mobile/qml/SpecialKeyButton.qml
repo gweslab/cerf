@@ -6,13 +6,11 @@ import CerfStyle
 OverlayButton {
     id: key
     property bool held: false
-    property bool groupStart: false
     property real leadingInset: 0
     property string label: ""
     property string symbol: ""
     property bool holdFired: false
     property int holdMs: 0
-    readonly property real dividerShare: 0.5
     readonly property real heldLineShare: 0.5
     signal keyDown()
     signal keyUp()
@@ -65,16 +63,6 @@ OverlayButton {
             key.holdFired = true
             key.heldLong()
         }
-    }
-
-    Rectangle {
-        visible: key.groupStart
-        anchors.left: parent.left
-        anchors.leftMargin: key.leadingInset
-        anchors.verticalCenter: parent.verticalCenter
-        width: Theme.hairline
-        height: parent.height * key.dividerShare
-        color: Theme.overlayBarBorder
     }
 
     Rectangle {

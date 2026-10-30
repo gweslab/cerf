@@ -221,15 +221,15 @@ python run_claude.py
       <td rowspan="6" align="center"><b>Intel SA-1110</b><br/><sub>StrongARM</sub></td>
       <td rowspan="3"><b>Compaq iPAQ H3000</b></td>
       <td><img src="assets/icons_sources/board.svg" width="16" height="16" title="PDA" alt="PDA"/> <b>Compaq iPAQ H3100 Series</b> <code>ipaq_h31xx</code></td>
-      <td><img src="assets/icons_sources/stylus.svg" width="32" height="32" title="Touch" alt="Touch"/> <img src="assets/icons_sources/suspend.svg" width="32" height="32" title="Suspend / Resume" alt="Suspend / Resume"/> <img src="assets/icons_sources/ga_autoresize.svg" width="32" height="32" title="Guest Additions" alt="Guest Additions"/> <img src="assets/icons_sources/speaker_active.svg" width="32" height="32" title="Sound" alt="Sound"/> <img src="assets/icons_sources/microphone.svg" width="32" height="32" title="Microphone" alt="Microphone"/> <img src="assets/icons_sources/pcmcia_enabled.svg" width="32" height="32" title="PCMCIA" alt="PCMCIA"/> <img src="assets/icons_sources/internet.svg" width="32" height="32" title="Network" alt="Network"/></td>
+      <td><img src="assets/icons_sources/stylus.svg" width="32" height="32" title="Touch" alt="Touch"/> <img src="assets/icons_sources/keyboard.svg" width="32" height="32" title="Keyboard" alt="Keyboard"/> <img src="assets/icons_sources/suspend.svg" width="32" height="32" title="Suspend / Resume" alt="Suspend / Resume"/> <img src="assets/icons_sources/ga_autoresize.svg" width="32" height="32" title="Guest Additions" alt="Guest Additions"/> <img src="assets/icons_sources/speaker_active.svg" width="32" height="32" title="Sound" alt="Sound"/> <img src="assets/icons_sources/microphone.svg" width="32" height="32" title="Microphone" alt="Microphone"/> <img src="assets/icons_sources/pcmcia_enabled.svg" width="32" height="32" title="PCMCIA" alt="PCMCIA"/> <img src="assets/icons_sources/internet.svg" width="32" height="32" title="Network" alt="Network"/> <img src="assets/icons_sources/battery.svg" width="32" height="32" title="Battery" alt="Battery"/></td>
     </tr>
     <tr>
       <td><img src="assets/icons_sources/board.svg" width="16" height="16" title="PDA" alt="PDA"/> <b>Compaq iPAQ H3600 Series</b> <code>ipaq_h36xx</code></td>
-      <td><img src="assets/icons_sources/stylus.svg" width="32" height="32" title="Touch" alt="Touch"/> <img src="assets/icons_sources/suspend.svg" width="32" height="32" title="Suspend / Resume" alt="Suspend / Resume"/> <img src="assets/icons_sources/ga_autoresize.svg" width="32" height="32" title="Guest Additions" alt="Guest Additions"/> <img src="assets/icons_sources/speaker_active.svg" width="32" height="32" title="Sound" alt="Sound"/> <img src="assets/icons_sources/microphone.svg" width="32" height="32" title="Microphone" alt="Microphone"/> <img src="assets/icons_sources/pcmcia_enabled.svg" width="32" height="32" title="PCMCIA" alt="PCMCIA"/> <img src="assets/icons_sources/internet.svg" width="32" height="32" title="Network" alt="Network"/></td>
+      <td><img src="assets/icons_sources/stylus.svg" width="32" height="32" title="Touch" alt="Touch"/> <img src="assets/icons_sources/keyboard.svg" width="32" height="32" title="Keyboard" alt="Keyboard"/> <img src="assets/icons_sources/suspend.svg" width="32" height="32" title="Suspend / Resume" alt="Suspend / Resume"/> <img src="assets/icons_sources/ga_autoresize.svg" width="32" height="32" title="Guest Additions" alt="Guest Additions"/> <img src="assets/icons_sources/speaker_active.svg" width="32" height="32" title="Sound" alt="Sound"/> <img src="assets/icons_sources/microphone.svg" width="32" height="32" title="Microphone" alt="Microphone"/> <img src="assets/icons_sources/pcmcia_enabled.svg" width="32" height="32" title="PCMCIA" alt="PCMCIA"/> <img src="assets/icons_sources/internet.svg" width="32" height="32" title="Network" alt="Network"/> <img src="assets/icons_sources/battery.svg" width="32" height="32" title="Battery" alt="Battery"/></td>
     </tr>
     <tr>
       <td><img src="assets/icons_sources/board.svg" width="16" height="16" title="PDA" alt="PDA"/> <b>Compaq iPAQ H3660/H3670</b> <code>ipaq_h3660_h3670</code></td>
-      <td><img src="assets/icons_sources/stylus.svg" width="32" height="32" title="Touch" alt="Touch"/> <img src="assets/icons_sources/suspend.svg" width="32" height="32" title="Suspend / Resume" alt="Suspend / Resume"/> <img src="assets/icons_sources/ga_autoresize.svg" width="32" height="32" title="Guest Additions" alt="Guest Additions"/> <img src="assets/icons_sources/speaker_active.svg" width="32" height="32" title="Sound" alt="Sound"/> <img src="assets/icons_sources/microphone.svg" width="32" height="32" title="Microphone" alt="Microphone"/> <img src="assets/icons_sources/pcmcia_enabled.svg" width="32" height="32" title="PCMCIA" alt="PCMCIA"/> <img src="assets/icons_sources/internet.svg" width="32" height="32" title="Network" alt="Network"/></td>
+      <td><img src="assets/icons_sources/stylus.svg" width="32" height="32" title="Touch" alt="Touch"/> <img src="assets/icons_sources/keyboard.svg" width="32" height="32" title="Keyboard" alt="Keyboard"/> <img src="assets/icons_sources/suspend.svg" width="32" height="32" title="Suspend / Resume" alt="Suspend / Resume"/> <img src="assets/icons_sources/ga_autoresize.svg" width="32" height="32" title="Guest Additions" alt="Guest Additions"/> <img src="assets/icons_sources/speaker_active.svg" width="32" height="32" title="Sound" alt="Sound"/> <img src="assets/icons_sources/microphone.svg" width="32" height="32" title="Microphone" alt="Microphone"/> <img src="assets/icons_sources/pcmcia_enabled.svg" width="32" height="32" title="PCMCIA" alt="PCMCIA"/> <img src="assets/icons_sources/internet.svg" width="32" height="32" title="Network" alt="Network"/> <img src="assets/icons_sources/battery.svg" width="32" height="32" title="Battery" alt="Battery"/></td>
     </tr>
     <tr>
       <td><b>HP Jornada 700 series</b></td>
@@ -272,8 +272,16 @@ python run_claude.py
       <td><img src="assets/icons_sources/stylus.svg" width="32" height="32" title="Touch" alt="Touch"/> <img src="assets/icons_sources/ga_autoresize.svg" width="32" height="32" title="Guest Additions" alt="Guest Additions"/> <img src="assets/icons_sources/speaker_active.svg" width="32" height="32" title="Sound" alt="Sound"/></td>
     </tr>
     <tr>
-      <td rowspan="8" align="center"><b>Samsung S3C2410</b><br/><sub>ARM920T</sub></td>
-      <td rowspan="7"><b>Samsung SMDK2410</b></td>
+      <td rowspan="11" align="center"><b>Samsung S3C2410</b><br/><sub>ARM920T</sub></td>
+      <td rowspan="10"><b>Samsung SMDK2410</b></td>
+      <td><img src="assets/icons_sources/board.svg" width="16" height="16" title="PDA" alt="PDA"/> <b>Device Emulator (1st gen, QVGA)</b> <code>devemu_1st_gen</code></td>
+      <td><img src="assets/icons_sources/stylus.svg" width="32" height="32" title="Touch" alt="Touch"/> <img src="assets/icons_sources/keyboard.svg" width="32" height="32" title="Keyboard" alt="Keyboard"/> <img src="assets/icons_sources/suspend.svg" width="32" height="32" title="Suspend / Resume" alt="Suspend / Resume"/> <img src="assets/icons_sources/ga_autoresize.svg" width="32" height="32" title="Guest Additions" alt="Guest Additions"/> <img src="assets/icons_sources/speaker_active.svg" width="32" height="32" title="Sound" alt="Sound"/> <img src="assets/icons_sources/pcmcia_enabled.svg" width="32" height="32" title="PCMCIA" alt="PCMCIA"/> <img src="assets/icons_sources/internet.svg" width="32" height="32" title="Network" alt="Network"/> <img src="assets/icons_sources/battery.svg" width="32" height="32" title="Battery" alt="Battery"/></td>
+    </tr>
+    <tr>
+      <td><img src="assets/icons_sources/board.svg" width="16" height="16" title="PDA" alt="PDA"/> <b>Device Emulator (1st gen, VGA)</b> <code>devemu_1st_gen_vga</code></td>
+      <td><img src="assets/icons_sources/stylus.svg" width="32" height="32" title="Touch" alt="Touch"/> <img src="assets/icons_sources/keyboard.svg" width="32" height="32" title="Keyboard" alt="Keyboard"/> <img src="assets/icons_sources/suspend.svg" width="32" height="32" title="Suspend / Resume" alt="Suspend / Resume"/> <img src="assets/icons_sources/ga_autoresize.svg" width="32" height="32" title="Guest Additions" alt="Guest Additions"/> <img src="assets/icons_sources/speaker_active.svg" width="32" height="32" title="Sound" alt="Sound"/> <img src="assets/icons_sources/pcmcia_enabled.svg" width="32" height="32" title="PCMCIA" alt="PCMCIA"/> <img src="assets/icons_sources/internet.svg" width="32" height="32" title="Network" alt="Network"/> <img src="assets/icons_sources/battery.svg" width="32" height="32" title="Battery" alt="Battery"/></td>
+    </tr>
+    <tr>
       <td><img src="assets/icons_sources/board.svg" width="16" height="16" title="PDA" alt="PDA"/> <b>Device Emulator (QVGA)</b> <code>devemu</code></td>
       <td><img src="assets/icons_sources/stylus.svg" width="32" height="32" title="Touch" alt="Touch"/> <img src="assets/icons_sources/keyboard.svg" width="32" height="32" title="Keyboard" alt="Keyboard"/> <img src="assets/icons_sources/suspend.svg" width="32" height="32" title="Suspend / Resume" alt="Suspend / Resume"/> <img src="assets/icons_sources/ga_autoresize.svg" width="32" height="32" title="Guest Additions" alt="Guest Additions"/> <img src="assets/icons_sources/speaker_active.svg" width="32" height="32" title="Sound" alt="Sound"/> <img src="assets/icons_sources/pcmcia_enabled.svg" width="32" height="32" title="PCMCIA" alt="PCMCIA"/> <img src="assets/icons_sources/internet.svg" width="32" height="32" title="Network" alt="Network"/> <img src="assets/icons_sources/battery.svg" width="32" height="32" title="Battery" alt="Battery"/></td>
     </tr>
@@ -287,6 +295,10 @@ python run_claude.py
     </tr>
     <tr>
       <td><img src="assets/icons_sources/board.svg" width="16" height="16" title="PDA" alt="PDA"/> <b>Device Emulator (WVGA)</b> <code>devemu_wvga</code></td>
+      <td><img src="assets/icons_sources/stylus.svg" width="32" height="32" title="Touch" alt="Touch"/> <img src="assets/icons_sources/keyboard.svg" width="32" height="32" title="Keyboard" alt="Keyboard"/> <img src="assets/icons_sources/suspend.svg" width="32" height="32" title="Suspend / Resume" alt="Suspend / Resume"/> <img src="assets/icons_sources/ga_autoresize.svg" width="32" height="32" title="Guest Additions" alt="Guest Additions"/> <img src="assets/icons_sources/speaker_active.svg" width="32" height="32" title="Sound" alt="Sound"/> <img src="assets/icons_sources/pcmcia_enabled.svg" width="32" height="32" title="PCMCIA" alt="PCMCIA"/> <img src="assets/icons_sources/internet.svg" width="32" height="32" title="Network" alt="Network"/> <img src="assets/icons_sources/battery.svg" width="32" height="32" title="Battery" alt="Battery"/></td>
+    </tr>
+    <tr>
+      <td><img src="assets/icons_sources/board.svg" width="16" height="16" title="PDA" alt="PDA"/> <b>Device Emulator Smartphone (1st gen, QCIF+)</b> <code>devemu_1st_gen_smartphone</code></td>
       <td><img src="assets/icons_sources/stylus.svg" width="32" height="32" title="Touch" alt="Touch"/> <img src="assets/icons_sources/keyboard.svg" width="32" height="32" title="Keyboard" alt="Keyboard"/> <img src="assets/icons_sources/suspend.svg" width="32" height="32" title="Suspend / Resume" alt="Suspend / Resume"/> <img src="assets/icons_sources/ga_autoresize.svg" width="32" height="32" title="Guest Additions" alt="Guest Additions"/> <img src="assets/icons_sources/speaker_active.svg" width="32" height="32" title="Sound" alt="Sound"/> <img src="assets/icons_sources/pcmcia_enabled.svg" width="32" height="32" title="PCMCIA" alt="PCMCIA"/> <img src="assets/icons_sources/internet.svg" width="32" height="32" title="Network" alt="Network"/> <img src="assets/icons_sources/battery.svg" width="32" height="32" title="Battery" alt="Battery"/></td>
     </tr>
     <tr>
@@ -415,12 +427,18 @@ python run_claude.py
       <td>v8.0</td>
       <td>TBA</td>
       <td>
+        <p><b>📱 Devices</b><br/>
+          🆕 Devemu: Added Smartphone, SVGA and legacy board types (appropriate resolution and keyboard layout)<br/>
+          🆕 iPAQ 1st gen: keypad support<br/>
+          🆕 iPAQ 1st gen: battery support<br/>
+          🆕 iPAQ 1st gen: alarm/charge LED</p>
         <p><b>💿 Emulator</b><br/>
           🆕 Support for Linux (x86-64)<br/>
           🆕 Support for macOS (ARM64)<br/>
           🆕 Support for Android (ARM64)<br/>
           🆕 Startup screen scale configuration and dynamic mode for retina screen<br/>
           🆕 Device HUDs - simplified hardware buttons in a canvas<br/>
+          🆕 Screen rotation<br/>
           ✅ Serial connection regression on some MIPS boards</p>
         <p><b>🚀 Launcher</b><br/>
           ❌ Replaced with Devices Manager</p>

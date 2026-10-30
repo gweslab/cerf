@@ -192,6 +192,11 @@ that a single `RestoreState` cannot establish. The interrupt line
 own a computed line. **Fix the whole bug class, not one instance.** If one INTC
 needs `PostRestore`, audit every INTC.
 
+A service that is not a `Peripheral` can drive a peripheral input, for example a
+board button on a GPIO pin. Such a service registers a
+`Hibernation::RegisterPostRestoreListener` callback. Hibernation runs the callback
+after the `PostRestore` of every peripheral.
+
 ### 3. Worker-thread wrapping
 
 If your peripheral starts a worker thread that touches guest state, wrap the

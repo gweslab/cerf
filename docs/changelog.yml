@@ -1,5 +1,11 @@
 - version: v8.0
   date: TBA
+  devices:
+    new: |
+      Devemu: Added Smartphone, SVGA and legacy board types (appropriate resolution and keyboard layout)
+      iPAQ 1st gen: keypad support
+      iPAQ 1st gen: battery support
+      iPAQ 1st gen: alarm/charge LED
   emulator:
     new: |
       Support for Linux (x86-64)
@@ -7,6 +13,7 @@
       Support for Android (ARM64)
       Startup screen scale configuration and dynamic mode for retina screen
       Device HUDs - simplified hardware buttons in a canvas
+      Screen rotation
     fixed: |
       Serial connection regression on some MIPS boards
   launcher:

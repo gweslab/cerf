@@ -12,7 +12,10 @@ Item {
     property bool stripShown: false
     property bool stripPaged: false
     property real stripProgress: 0
+    property bool busy: false
+    property bool revealed: true
     signal stripRequested()
+    signal faded()
 
     component ChevronButton: OverlayButton {
         readonly property int chevronWidth: 22
@@ -30,6 +33,10 @@ Item {
     readonly property int handleIconSize: 22
     readonly property int slideMs: 220
     readonly property int edgeZone: 26
+    readonly property int idleMs: 4000
+    readonly property int bubbleIdleMs: 1500
+    readonly property int fadeMs: 400
+    readonly property bool held: busy || touchWatch.active || drag.active
 
     property bool moved: false
     property bool bubble: false
@@ -48,6 +55,32 @@ Item {
     width: row.implicitWidth
     height: barHeight
     containmentMask: body
+    opacity: revealed ? 1 : 0
+    visible: opacity > 0
+    enabled: revealed
+
+    Behavior on opacity {
+        NumberAnimation {
+            duration: bar.fadeMs
+        }
+    }
+
+    onHeldChanged: rearm()
+    onBubbleChanged: rearm()
+    Component.onCompleted: rearm()
+
+    PointHandler {
+        id: touchWatch
+    }
+
+    Timer {
+        id: idle
+        interval: bar.bubble ? bar.bubbleIdleMs : bar.idleMs
+        onTriggered: {
+            bar.revealed = false
+            bar.faded()
+        }
+    }
 
     onXChanged: if (drag.active && bubble && sideEdge && Math.abs(x - dockX) > height) bubble = false
     onYChanged: if (drag.active && bubble && !sideEdge && Math.abs(y - dockY) > height) bubble = false
@@ -189,6 +222,18 @@ Item {
                 onClicked: bar.bubbleTo(Qt.RightEdge)
             }
         }
+    }
+
+    function reveal() {
+        revealed = true
+        rearm()
+    }
+
+    function rearm() {
+        if (revealed && !held)
+            idle.restart()
+        else
+            idle.stop()
     }
 
     function clampX(value) {

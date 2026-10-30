@@ -8,9 +8,12 @@
 #include <QStyleHints>
 #include <QTouchEvent>
 
+#include <algorithm>
+
 namespace {
 
-constexpr int kDoubleClickPaceMs = 50;
+constexpr int       kDoubleClickPaceMs = 50;
+constexpr qsizetype kThreeFingers      = 3;
 
 double Slop() { return QGuiApplication::styleHints()->startDragDistance(); }
 
@@ -203,17 +206,23 @@ void TouchGestures::BeginPinch(QPointF a, QPointF b) {
     pinch_start_a_ = a;
     pinch_start_b_ = b;
     pinch_moved_   = false;
+    pinch_points_  = 0;
     since_down_.start();
     host_.PinchBegin((a + b) / 2.0, QLineF(a, b).length());
 }
 
 void TouchGestures::EndPinch() {
     host_.PinchEnd();
-    if (!pinch_moved_) {
-        if (host_.DirectPen()) PenRightClick(pinch_start_a_, since_down_.elapsed());
-        else                   Click(GestureButton::kRight, since_down_.elapsed());
-    }
+    if (!pinch_moved_ && pinch_points_ >= kThreeFingers) host_.ThreeFingerTap();
+    else if (!pinch_moved_ && host_.DirectPen()) PenRightClick(pinch_start_a_, since_down_.elapsed());
+    else if (!pinch_moved_)                      Click(GestureButton::kRight, since_down_.elapsed());
     state_ = State::kDrain;
+}
+
+void TouchGestures::TrackPinchPoints(const QList<QEventPoint>& points) {
+    pinch_points_ = std::max(pinch_points_, points.size());
+    for (qsizetype i = 2; i < points.size(); ++i)
+        if (QLineF(points[i].pressPosition(), points[i].position()).length() >= Slop()) pinch_moved_ = true;
 }
 
 void TouchGestures::OnTouch(QTouchEvent* event) {
@@ -227,10 +236,12 @@ void TouchGestures::OnTouch(QTouchEvent* event) {
             const QPointF b = points[1].position();
             if (QLineF(a, pinch_start_a_).length() >= Slop() || QLineF(b, pinch_start_b_).length() >= Slop())
                 pinch_moved_ = true;
+            TrackPinchPoints(points);
             host_.PinchUpdate((a + b) / 2.0, QLineF(a, b).length());
         }
     } else if (points.size() >= 2 && state_ != State::kDrain) {
         BeginPinch(points[0].position(), points[1].position());
+        TrackPinchPoints(points);
     } else if (state_ == State::kIdle && points.size() == 1 &&
                points[0].state() == QEventPoint::Pressed) {
         BeginOne(points[0].id(), points[0].position());

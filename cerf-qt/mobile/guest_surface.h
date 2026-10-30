@@ -101,8 +101,10 @@ public:
     void PinchBegin(QPointF centroid, double distance) override;
     void PinchUpdate(QPointF centroid, double distance) override;
     void PinchEnd() override;
+    void ThreeFingerTap() override { emit threeFingerTapped(); }
 
 signals:
+    void threeFingerTapped();
     void pointerIconChanged();
     void pointerMenuChanged();
     void keyboardButtonChanged();

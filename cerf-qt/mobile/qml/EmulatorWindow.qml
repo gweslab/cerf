@@ -27,6 +27,12 @@ ApplicationWindow {
     rightPadding: 0
 
     Component.onCompleted: WindowLifetime.DeleteWhenClosed(root)
+    onActiveChanged: {
+        if (active)
+            floatingBar.reveal()
+        else if (menuTree !== null)
+            menuTree.closeTree()
+    }
 
     EmulatorController {
         id: controller
@@ -158,7 +164,25 @@ ApplicationWindow {
     }
 
     Connections {
+        target: SystemBars
+        function onShown() {
+            floatingBar.reveal()
+        }
+    }
+
+    Connections {
+        target: Qt.application
+        function onStateChanged() {
+            if (Qt.application.state === Qt.ApplicationActive)
+                floatingBar.reveal()
+        }
+    }
+
+    Connections {
         target: guestSurface
+        function onThreeFingerTapped() {
+            floatingBar.reveal()
+        }
         function onKeyboardRequestedChanged() {
             strip.buttons = controller.RowButtons(guestSurface.keyboardRequested)
             if (guestSurface.keyboardRequested) {
@@ -174,6 +198,7 @@ ApplicationWindow {
     }
 
     FloatingBar {
+        id: floatingBar
         z: 1
         surface: guestSurface
         emulator: controller
@@ -182,7 +207,12 @@ ApplicationWindow {
         stripShown: strip.shown
         stripPaged: strip.paged
         stripProgress: strip.pageProgress
+        busy: strip.shown || root.menuTree !== null || root.openDialogs.length > 0
         onStripRequested: root.cycleStrip()
+        onFaded: {
+            if (root.active && root.visibility === Window.FullScreen)
+                SystemBars.Hide()
+        }
     }
 
     ToolTip {
@@ -265,6 +295,7 @@ ApplicationWindow {
     }
 
     function goBack() {
+        floatingBar.reveal()
         if (openDialogs.length > 0) {
             openDialogs[openDialogs.length - 1].close()
             return true
@@ -290,6 +321,8 @@ ApplicationWindow {
     }
 
     function createDialog(name, properties) {
+        if (menuTree !== null)
+            menuTree.closeTree()
         const dialog = Qt.createComponent(name + ".qml").createObject(root.contentItem, properties)
         openDialogs = openDialogs.concat([dialog])
         const ended = dialog.closed !== undefined ? dialog.closed : dialog.finished

@@ -1,6 +1,8 @@
 #pragma once
 
 #include <QElapsedTimer>
+#include <QEventPoint>
+#include <QList>
 #include <QObject>
 #include <QPointF>
 #include <QTimer>
@@ -30,6 +32,7 @@ public:
     virtual void PinchBegin(QPointF centroid, double distance) = 0;
     virtual void PinchUpdate(QPointF centroid, double distance) = 0;
     virtual void PinchEnd() = 0;
+    virtual void ThreeFingerTap() = 0;
 };
 
 class TouchGestures {
@@ -53,6 +56,7 @@ private:
     void ReleaseHeld();
     void BeginPinch(QPointF a, QPointF b);
     void EndPinch();
+    void TrackPinchPoints(const QList<QEventPoint>& points);
     void OnHold();
     void Click(GestureButton button, qint64 held_ms);
     void PenTap(QPointF at, qint64 held_ms);
@@ -82,6 +86,7 @@ private:
     QPointF           pinch_start_a_;
     QPointF           pinch_start_b_;
     bool              pinch_moved_  = false;
+    qsizetype         pinch_points_ = 0;
     Release           release_      = Release::kNone;
     GestureButton     pending_up_   = GestureButton::kLeft;
     QPointF           pen_up_at_;

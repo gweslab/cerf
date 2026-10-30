@@ -363,6 +363,16 @@ per-SoC/per-board concretes (strategy pattern, selected by `BoardContext`).
   size is right for the board, it declares none, and the window opens at the
   CERF default.
 
+- **The Android system bars** - the Android emulator window runs in full screen
+  with the system bars hidden. Its floating bar fades when nobody uses it. A
+  swipe that brings back the system bars also brings back the floating bar.
+  When the floating bar fades, the system bars hide again.
+
+  **Qt hides the bars in the mode that reports no swipe to the app.**
+  `AndroidSystemBars` switches the hidden bars to the mode that reports the swipe.
+  - `cerf-qt/mobile/android_system_bars.{h,cpp}`,
+    `cerf-qt/mobile/android/src/cx/cerf/SystemBarsWatch.java`
+
 - **The canvas** - the drawable area of the emulator window. It implements
   `CanvasInputHost` and owns the one transform from host pixels to
   guest-surface coordinates (`HostToGuest`). As a result, taps land on the

@@ -1,19 +1,3 @@
-"""MkDocs hook: fills the placeholders whose content lives outside the site.
-
-{version}         cerf-qt/version.h
-{boards_table}    libCerfCore/db.json (via compile_readme.py)
-{changelog_table} docs/changelog.yml (via changelog.py)
-{stats}           board / SoC / CPU counts, from libCerfCore/db.json
-{devices}         the front-page device row, from docs/website/devices.yml
-{features}        the front-page feature cards, from docs/website/features.yml
-{articles}        the front-page article cards, from docs/website/articles.yml
-{links}           GitHub / Discord / support pills, from .github/FUNDING.yml
-{cur_year}        today's year, in the mkdocs.yml copyright line
-
-Keeping these as placeholders - rather than files generated into the docs dir -
-lets `mkdocs serve` run straight from docs/website with live reload.
-"""
-
 import datetime
 import html
 import os
@@ -71,8 +55,8 @@ def _stats():
     cpus      = sorted({soc_family_of(b['id'])['arch'] for b in boards})
 
     cells = [
-        (str(len(boards)),    'boards'),
-        (str(len(platforms)), 'platforms'),
+        (str(len(platforms)), 'devices'),
+        (str(len(boards)), 'board variants'),
         (str(len(socs)),      'SoCs'),
         (' + '.join(cpus), 'guest CPUs'),
     ]

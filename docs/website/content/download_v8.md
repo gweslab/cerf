@@ -3,6 +3,9 @@ hide:
   - navigation
 ---
 
+!!! warning
+    This draft is intended to replace the primary download page for CERF 8.0 release. These installers do work, but always pick an unstable build option.
+
 # Download
 
 <div class="cerf-download" markdown>

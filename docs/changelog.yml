@@ -2,7 +2,7 @@
   date: 31 Oct 2026
   devices:
     new: |
-      Devemu: Added Smartphone, SVGA and legacy board types (appropriate resolution and keyboard layout)
+      DevEmu 2003: Added board type, keyboard layout and screen configuration support
       iPAQ 1st gen: keypad support
       iPAQ 1st gen: battery support
       iPAQ 1st gen: alarm/charge LED

@@ -436,7 +436,7 @@ python run_claude.py
       <td>31 Oct 2026</td>
       <td>
         <p><b>📱 Devices</b><br/>
-          🆕 Devemu: Added Smartphone, SVGA and legacy board types (appropriate resolution and keyboard layout)<br/>
+          🆕 DevEmu 2003: Added board type, keyboard layout and screen configuration support<br/>
           🆕 iPAQ 1st gen: keypad support<br/>
           🆕 iPAQ 1st gen: battery support<br/>
           🆕 iPAQ 1st gen: alarm/charge LED<br/>

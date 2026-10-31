@@ -22,11 +22,11 @@ GB = 1 << 30
 ROOT_TAG = "%USE_PWD_TO_FIND_OUT_IF_YOU_READ_THIS%"
 DOCS = ("CLAUDE.md", "README_SOURCE.md", "agent_docs/workflow.md",
         "agent_docs/workflow_examples.md", "agent_docs/subsystems.md",
-        "agent_docs/boot_loaders.md", "agent_docs/rom_acceptance.md", "agent_docs/jit.md",
+         "agent_docs/jit.md",
         "agent_docs/timers_clocks.md", "agent_docs/rules.md", "agent_docs/hibernation.md",
-        "agent_docs/code_style.md", "agent_docs/debugging.md", "agent_docs/guest_additions.md",
-        "agent_docs/deep_sleep.md", "agent_docs/cerfman.md",
-        "agent_docs/psychological_support.md", "agent_docs/leds.md", "agent_docs/database.md",
+        "agent_docs/code_style.md", "agent_docs/debugging.md", 
+        "agent_docs/deep_sleep.md",
+         "agent_docs/database.md",
         "agent_docs/submodules.md")
 
 YELLOW, CYAN, GREEN, GRAY, RESET = "\x1b[33m", "\x1b[36m", "\x1b[32m", "\x1b[90m", "\x1b[0m"

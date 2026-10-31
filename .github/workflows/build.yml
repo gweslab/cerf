@@ -183,6 +183,7 @@ jobs:
           python tools/announce_build.py
           --run-id=${{ github.run_id }}
           ${{ contains(github.event.head_commit.message, '[rc]') && '--rc' || '' }}
+          ${{ contains(github.event.head_commit.message, '[no ping]') && '--no-ping' || '' }}
           ${{ needs.build-android.outputs.signed != 'true' && '--without=android-arm64' || '' }}
 
   release:
@@ -220,4 +221,6 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
           DISCORD_SECRET: ${{ secrets.DISCORD_SECRET }}
-        run: python tools/deploy.py --yes --sha=${{ github.sha }}
+        run: >-
+          python tools/deploy.py --yes --sha=${{ github.sha }}
+          ${{ contains(github.event.head_commit.message, '[no ping]') && '--no-ping' || '' }}

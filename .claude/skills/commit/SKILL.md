@@ -83,6 +83,7 @@ These keywords in the commit message start a CI action. CI reads the full messag
 - `[skip build]` - CI does not build this commit.
 - `[rc]` - CI announces the artifact on the QA Discord channel as a release candidate. Every member of the channel receives a notification.
 - `[release cerf]` - CI publishes the artifact as a release on all platforms. The release is public, and users download it.
+- `[no ping]` - CI announces the release candidate or the release with no role mention, so nobody receives a notification. It goes with `[rc]` or `[release cerf]`, for example on a hotfix build that follows the previous build at once.
 
 When the user asks for one of these actions directly, write its keyword. The request "/commit a release build" names the release action, so write `[release cerf]`. When the user asks for no action, write no keyword.
 

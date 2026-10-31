@@ -3,6 +3,7 @@
 
   --sha=<commit>  release the artifact built from that commit, not the newest
   --yes           take every confirmation as yes
+  --no-ping       announce the release without the role mention
 
 The release is built from a CI artifact, never from the working tree - the tree
 may already be ahead of what is being released. Every step asks first, so an
@@ -100,9 +101,10 @@ def upload_asset(token: str, release_id: int, archive: Path) -> str:
     return payload["browser_download_url"]
 
 
-def release_message(artifact: Artifact) -> str:
-    return (f"**v{artifact.series} build {artifact.run_number}** released "
-            f"<@&{RELEASE_WATCHERS_ROLE_ID}>\n"
+def release_message(artifact: Artifact, ping_role: Optional[str]) -> str:
+    mention = f" <@&{ping_role}>" if ping_role else ""
+    return (f"**v{artifact.series} build {artifact.run_number}** released"
+            f"{mention}\n"
             f"[Download]({DOWNLOAD_URL}) · "
             f"[Release](https://github.com/{REPO}/releases/tag/{artifact.tag}) · "
             f"[CI build]({artifact.run_url}) · "
@@ -111,6 +113,7 @@ def release_message(artifact: Artifact) -> str:
 
 def main(argv: List[str]) -> int:
     assume_yes = "--yes" in argv
+    ping_role = None if "--no-ping" in argv else RELEASE_WATCHERS_ROLE_ID
     sha = next((a.partition("=")[2] for a in argv if a.startswith("--sha=")), None)
     token, secret = load_credentials()
 
@@ -150,8 +153,8 @@ def main(argv: List[str]) -> int:
         print(f"  asset: {upload_asset(token, release['id'], path)}")
 
     confirm(f"\nPost the {artifact.tag} announcement to Discord?", assume_yes)
-    post_discord(secret, DISCORD_CHANNEL_ID, release_message(artifact),
-                 ping_role=RELEASE_WATCHERS_ROLE_ID, image=card)
+    post_discord(secret, DISCORD_CHANNEL_ID, release_message(artifact, ping_role),
+                 ping_role=ping_role, image=card)
     print("  posted.\n")
     print(f"Released {artifact.tag}: {release['html_url']}")
     return 0

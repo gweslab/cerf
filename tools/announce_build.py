@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import os
 import sys
-from typing import List, Tuple
+from typing import List, Optional, Tuple
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import host_branch
@@ -16,13 +16,14 @@ QA_CHANNEL_ID = "1537263681228771349"
 QA_ROLE_ID = "1537262210118852708"
 
 
-def message(builds: List[Tuple[HostBranch, Artifact]], release_candidate: bool) -> str:
+def message(builds: List[Tuple[HostBranch, Artifact]], release_candidate: bool,
+            ping_role: Optional[str]) -> str:
     run = builds[0][1]
     title = f"**v{run.series} build {run.run_number}**"
-    if release_candidate:
-        headline = f"{title} [release candidate] available <@&{QA_ROLE_ID}>"
-    else:
-        headline = f"{title} [unstable] available"
+    kind = "release candidate" if release_candidate else "unstable"
+    headline = f"{title} [{kind}] available"
+    if ping_role:
+        headline += f" <@&{ping_role}>"
     downloads = " · ".join(f"[{branch.label}]({build.download_url})"
                            for branch, build in builds)
     return (f"{headline}\n"
@@ -39,6 +40,7 @@ def main(argv: List[str]) -> int:
     if not run_id.isdigit():
         raise CiError("--run-id=<id> is required")
     release_candidate = "--rc" in argv
+    ping_role = QA_ROLE_ID if release_candidate and "--no-ping" not in argv else None
     without = {host_branch.by_name(name).name
                for a in argv if a.startswith("--without=")
                for name in a.partition("=")[2].split(",") if name}
@@ -55,11 +57,9 @@ def main(argv: List[str]) -> int:
 
     kind = "candidate" if release_candidate else "unstable"
     card = artifact_card(token, run, kind)
-    content = message(builds, release_candidate)
+    content = message(builds, release_candidate, ping_role)
     print(f"\n{content}\n  card: {len(card) // 1024} KB\n")
-    post_discord(secret, QA_CHANNEL_ID, content,
-                 ping_role=QA_ROLE_ID if release_candidate else None,
-                 image=card)
+    post_discord(secret, QA_CHANNEL_ID, content, ping_role=ping_role, image=card)
     print(f"Announced run {run_id} in channel {QA_CHANNEL_ID}.")
     return 0
 

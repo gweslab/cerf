@@ -10,6 +10,7 @@
 #include "../CerfStyle/touch_frontend.h"
 
 #include "../guest_reset_text.h"
+#include "../qt_qml_value.h"
 
 #include <cerfcore/core/board_database.h>
 #include <cerfcore/core/cerf_emulator.h>
@@ -261,7 +262,7 @@ void PropertySheet::SetOrClear(const QString& key, const QVariant& value) {
 }
 
 void PropertySheet::SetResolution(const QVariant& size) {
-    const QVariantList pair = size.toList();
+    const QVariantList pair = PlainQmlValue(size).toList();
     if (pair.size() == 2) {
         values_[pf::kWidth]  = VariantToJson(pair.at(0));
         values_[pf::kHeight] = VariantToJson(pair.at(1));

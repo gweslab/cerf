@@ -2,6 +2,7 @@
 
 #include "host_error_text.h"
 #include "whole_number.h"
+#include "../qt_qml_value.h"
 
 #include <cerfcore/core/config_json.h>
 
@@ -142,7 +143,8 @@ QVariant JsonToVariant(const Json& value) {
     }
 }
 
-Json VariantToJson(const QVariant& value) {
+Json VariantToJson(const QVariant& qml_value) {
+    const QVariant value = PlainQmlValue(qml_value);
     switch (value.typeId()) {
         case QMetaType::QVariantMap: {
             Json        out  = Json::object();

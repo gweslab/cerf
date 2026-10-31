@@ -9,7 +9,8 @@ Item {
     property Component label: plainLabel
     property real speed: 34
     property int startDelay: 2500
-    readonly property bool scrolling: probe.item !== null && probe.item.implicitWidth > width
+    readonly property real textWidth: probe.item !== null ? probe.item.implicitWidth : 0
+    readonly property bool scrolling: textWidth > width
     readonly property bool moving: scrolling && visible
     property real offset: 0
 

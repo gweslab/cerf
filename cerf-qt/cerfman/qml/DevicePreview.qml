@@ -157,22 +157,31 @@ Item {
         }
     }
 
-    RowLayout {
+    GridLayout {
+        id: chips
+        readonly property bool wrapped: boardChip.visible && archChip.visible
+                                        && boardChip.implicitWidth + columnSpacing + archChip.implicitWidth > width
+
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.top: parent.top
         anchors.margins: Theme.spaceM
-        spacing: Theme.spaceM
+        columns: wrapped ? 1 : 3
+        columnSpacing: Theme.spaceM
+        rowSpacing: Theme.spaceS
         opacity: preview.textOpacity
 
         ColorChip {
+            id: boardChip
+            Layout.maximumWidth: chips.width
             text: preview.row !== null ? preview.row.board : ""
         }
         Item {
+            visible: !chips.wrapped
             Layout.fillWidth: true
         }
         ColorChip {
-            Layout.minimumWidth: implicitWidth
+            id: archChip
             text: preview.row !== null ? preview.row.arch : ""
         }
     }

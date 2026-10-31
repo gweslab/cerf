@@ -47,6 +47,8 @@ protected:
     void DetachView();
     bool AdoptsHostResolution() const;
 
+    virtual void RefitForPresentation() { RefitIfFollowingGuest(); }
+
     const cerfcore::InstanceGate gate_{emu_};
 
 private:

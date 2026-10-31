@@ -49,12 +49,17 @@ public:
     void OnTeardownWedged() override;
     void OnPresentationChanged() override;
 
+protected:
+    void RefitForPresentation() override;
+
 private:
     void BuildMenus();
     void BuildHudButton();
     void RefreshHudButton();
-    void AutoResizeToGuest();
-    void FitWindowToSurface(uint32_t sw, uint32_t sh);
+    bool AutoResizeToGuest();
+    bool FitWindowToSurface(uint32_t sw, uint32_t sh);
+    bool LiveResizeOn() const;
+    void ArmLiveResize();
     void AdoptResolutionToWindowMonitor();
 
     QtHostWindow* window_     = nullptr;

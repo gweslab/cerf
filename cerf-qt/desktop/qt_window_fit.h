@@ -10,6 +10,7 @@ class QWidget;
 struct WindowFit {
     QSize  client;
     QPoint position;
+    bool   whole = true;
 };
 
 QSize     WindowChrome(const QWidget& window, const QWidget& content);

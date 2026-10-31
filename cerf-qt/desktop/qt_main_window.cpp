@@ -25,6 +25,7 @@
 #include <cerfcore/core/cerf_emulator.h>
 #include <cerfcore/core/device_config.h>
 #include <cerfcore/core/log.h>
+#include <cerfcore/host/guest_resize_policy.h>
 #include <cerfcore/platform/host_process.h>
 
 #include <QApplication>
@@ -189,20 +190,22 @@ void QtMainWindow::AdoptResolutionToWindowMonitor() {
         work.height(), surf_w, surf_h);
 }
 
-void QtMainWindow::FitWindowToSurface(uint32_t sw, uint32_t sh) {
-    if (!window_ || sw == 0 || sh == 0 || fullscreen_) return;
+bool QtMainWindow::FitWindowToSurface(uint32_t sw, uint32_t sh) {
+    if (!window_ || sw == 0 || sh == 0 || fullscreen_) return true;
     const WindowFit fit = FitAroundContent(*window_, *canvas_, sw, sh);
     if (window_->isMaximized()) window_->showNormal();
     window_->ResizeTo(fit.client);
     window_->move(fit.position);
+    return fit.whole;
 }
 
-void QtMainWindow::AutoResizeToGuest() {
+bool QtMainWindow::AutoResizeToGuest() {
     const int sw = canvas_->ContentWidth();
     const int sh = canvas_->ContentHeight();
-    if (sw <= 0 || sh <= 0) return;
-    FitWindowToSurface(static_cast<uint32_t>(sw), static_cast<uint32_t>(sh));
-    LOG(Lcd, "QtMainWindow: matched guest size %dx%d\n", sw, sh);
+    if (sw <= 0 || sh <= 0) return true;
+    const bool whole = FitWindowToSurface(static_cast<uint32_t>(sw), static_cast<uint32_t>(sh));
+    LOG(Lcd, "QtMainWindow: matched guest size %dx%d%s\n", sw, sh, whole ? "" : ", clamped to the screen");
+    return whole;
 }
 
 void QtMainWindow::MatchGuestSize() {
@@ -214,6 +217,24 @@ void QtMainWindow::RefitIfFollowingGuest() {
     if (follow_guest_) AutoResizeToGuest();
 }
 
+void QtMainWindow::RefitForPresentation() {
+    if (fullscreen_ || window_->isMaximized()) {
+        ArmLiveResize();
+        return;
+    }
+    if (!follow_guest_ && !canvas_->FixedScale() && !LiveResizeOn()) return;
+    if (!AutoResizeToGuest()) ArmLiveResize();
+}
+
+bool QtMainWindow::LiveResizeOn() const {
+    const auto* policy = emu_.TryGet<cerfcore::GuestResizePolicy>();
+    return policy != nullptr && policy->Enabled();
+}
+
+void QtMainWindow::ArmLiveResize() {
+    if (LiveResizeOn()) canvas_->ArmLiveResize();
+}
+
 void QtMainWindow::ToggleFullscreen() {
     if (!window_) return;
     if (!fullscreen_) {
@@ -223,7 +244,7 @@ void QtMainWindow::ToggleFullscreen() {
         bar_->hide();
         window_->showFullScreen();
         emu_.Get<QtFocusPolicy>().Raise(window_);
-        canvas_->ArmLiveResize();
+        ArmLiveResize();
         return;
     }
     fullscreen_ = false;
@@ -231,12 +252,12 @@ void QtMainWindow::ToggleFullscreen() {
     bar_->show();
     if (was_maximized_) window_->showMaximized();
     else                window_->showNormal();
-    canvas_->ArmLiveResize();
+    ArmLiveResize();
 }
 
 void QtMainWindow::OnUserResized() {
     follow_guest_ = false;
-    canvas_->ArmLiveResize();
+    ArmLiveResize();
 }
 
 void QtMainWindow::SetKeyboardGrab(bool on) {

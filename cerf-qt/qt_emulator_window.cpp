@@ -94,7 +94,7 @@ void QtEmulatorWindow::OnPresentationChanged() {
     RunOnUiThread([this] {
         ApplyPresentation();
         view_->Repaint();
-        RefitIfFollowingGuest();
+        RefitForPresentation();
     });
 }
 

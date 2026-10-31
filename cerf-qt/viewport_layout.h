@@ -52,6 +52,7 @@ public:
     void SurfaceFor(int content_w, int content_h, uint32_t& surface_w, uint32_t& surface_h) const;
 
     ViewportMode            Mode() const { return mode_; }
+    bool                    FixedScale() const { return mode_ == ViewportMode::Original || mode_ == ViewportMode::Integer; }
     bool                    Antialias() const { return antialias_; }
     int                     IntegerFactor() const { return integer_factor_; }
     const ViewPresentation& Presentation() const { return presentation_; }

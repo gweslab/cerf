@@ -40,10 +40,7 @@ QtCanvas::QtCanvas(cerfcore::CerfEmulator& emu, QWidget* parent, uint32_t surf_w
 }
 
 void QtCanvas::ArmLiveResize() {
-    gate_.Run([this](cerfcore::CerfEmulator& emu) {
-        auto* policy = emu.TryGet<cerfcore::GuestResizePolicy>();
-        if (policy && policy->Enabled() && !window()->isMinimized()) resize_debounce_.start();
-    });
+    if (!window()->isMinimized()) resize_debounce_.start();
 }
 
 void QtCanvas::FireAutoResize(cerfcore::CerfEmulator& emu) {

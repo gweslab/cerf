@@ -195,7 +195,7 @@ ViewportLayout::Scroll ViewportLayout::UpdateScroll() {
     s.content_h           = ContentHeight();
     s.page_w              = canvas_w_;
     s.page_h              = canvas_h_;
-    const bool scrollable = active_ && (mode_ == ViewportMode::Original || mode_ == ViewportMode::Integer);
+    const bool scrollable = active_ && FixedScale();
     s.horizontal          = scrollable && s.content_w > canvas_w_;
     s.vertical            = scrollable && s.content_h > canvas_h_;
     scroll_x_             = s.horizontal ? std::clamp(scroll_x_, 0, s.content_w - canvas_w_) : 0;

@@ -531,6 +531,13 @@ per-SoC/per-board concretes (strategy pattern, selected by `BoardContext`).
   Every host-to-guest point maps through that fit. The HUD keeps the size of its
   screen in guest pixels, so a larger guest resolution does not enlarge it.
 
+  **After a HUD toggle or a view turn, the desktop window takes the size of the
+  new box when it can.** This also occurs after a user resize. Some guests cannot
+  change their resolution. The guest resolution changes only when the window
+  cannot change. That occurs when the window is maximized or full screen, or when
+  the box does not fit the screen. Then a Guest Additions live resize fits the
+  guest to the canvas, if the guest supports it.
+
   **On Android, the HUD sits at the sides of the safe zone.** A panel names a
   side of the framebuffer. The panel goes to the canvas side that this
   framebuffer side faces after the rotation. Each panel spans its whole side.

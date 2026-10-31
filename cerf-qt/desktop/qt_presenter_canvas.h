@@ -34,6 +34,7 @@ public:
     void     SetPresentation(const cerffrontend::ViewPresentation& presentation) override;
 
     cerffrontend::ViewportMode Mode() const { return presenter_.Layout().Mode(); }
+    bool                       FixedScale() const { return presenter_.Layout().FixedScale(); }
     int                        IntegerFactor() const { return presenter_.Layout().IntegerFactor(); }
     bool                       Antialias() const { return presenter_.Layout().Antialias(); }
     void                       SetViewportMode(cerffrontend::ViewportMode m);

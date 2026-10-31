@@ -3,14 +3,18 @@
 #include "include/ddraw_ce6.h"
 #include "cerf_ddgpe.h"
 #include "cerf_ddgpe_ddhal.h"
+#include "cerf_ddgpe_primary_layout.h"
 #include "cerf_ddhal.h"
 #include "cerf_ddhal_ce5.h"
 #include "cerf_debug_log.h"
 #include "main.h"
 
 #define CE5_LCL_DWRESERVED1_OFF 0x10u
+#define CE5_LCL_GBL_OFF         0x04u
+#define CE5_GBL_FPVIDMEM_OFF    0x14u
 struct Ce5SurfBind { void* lcl; ULONG_PTR surf; };
 static Ce5SurfBind s_ce5BindTab[64];
+static BOOL        s_ce5Core;
 
 static Ce5SurfBind* Ce5Binds(void) { return s_ce5BindTab; }
 
@@ -18,6 +22,24 @@ static ULONG_PTR* Ce5BindFind(void* lcl) {
     Ce5SurfBind* binds = Ce5Binds();
     for (int i = 0; i < 64; ++i) if (binds[i].lcl == lcl) return &binds[i].surf;
     return NULL;
+}
+
+static ULONG* Ce5FpVidMem(void* lcl) {
+    const ULONG gbl = *(ULONG*)((BYTE*)lcl + CE5_LCL_GBL_OFF);
+    return (ULONG*)((BYTE*)(ULONG_PTR)gbl + CE5_GBL_FPVIDMEM_OFF);
+}
+
+static void Ce5BindFollowVidMem(void* lcl, ULONG_PTR* own) {
+    Ce5SurfBind* binds = Ce5Binds();
+    const ULONG  fp    = *Ce5FpVidMem(lcl);
+    if (CerfDDGPESurfBufferVa((ULONG)*own) == fp) return;
+    for (int i = 0; i < 64; ++i)
+        if (binds[i].lcl && binds[i].surf && CerfDDGPESurfBufferVa((ULONG)binds[i].surf) == fp) {
+            const ULONG_PTR held = binds[i].surf;
+            binds[i].surf = *own;
+            *own          = held;
+            return;
+        }
 }
 
 static void Ce5BindForget(void* lcl) {
@@ -69,6 +91,7 @@ static ULONG_PTR Ce5LclEnter(void* lcl) {
     ULONG_PTR* slot = (ULONG_PTR*)((BYTE*)lcl + CE5_LCL_DWRESERVED1_OFF);
     ULONG_PTR ce5val = *slot;
     ULONG_PTR* b = Ce5BindFind(lcl);
+    if (b) Ce5BindFollowVidMem(lcl, b);
     *slot = b ? *b : 0;
     return ce5val;
 }
@@ -142,6 +165,12 @@ static DWORD WINAPI Ce5CreateSurfaceWrap(Ce5_DDHAL_CREATESURFACEDATA* pd) {
         Ce5DescToC6(ce5sd, &c6sd);
         CERF_LOG_X_DEV("cerf_guest: Ce5 CS req ddsCaps", c6sd.ddsCaps.dwCaps);
         CERF_LOG_X_DEV("cerf_guest: Ce5 CS req dwFlags", c6sd.dwFlags);
+        GPESurf* primary = GetGPE()->PrimarySurface();
+        if ((c6sd.ddsCaps.dwCaps & CE6_DDSCAPS_PRIMARYSURFACE) && primary->IsRotate()) {
+            CERF_LOG_X("cerf_guest: Ce5 primary refused while turned, DMDO", (DWORD)primary->Rotate());
+            pd->ddRVal = CERF_DDERR_UNSUPPORTEDMODE;
+            return DDHAL_DRIVER_HANDLED;
+        }
     }
     Ce6_DDHAL_CREATESURFACEDATA c6;
     c6.lpDD           = (CerfDDrawGbl)pd->lpDD;
@@ -165,10 +194,10 @@ static DWORD WINAPI Ce5CreateSurfaceWrap(Ce5_DDHAL_CREATESURFACEDATA* pd) {
             Ce5LclLeave(sl[j], saved10[j]);
             Ce5CreateMarshalOut(sl[j], &savedCaps[j]);
 
-            ULONG gbl = *(ULONG*)((BYTE*)sl[j] + 0x04u);
+            ULONG gbl = *(ULONG*)((BYTE*)sl[j] + CE5_LCL_GBL_OFF);
             ULONG_PTR* bind = Ce5BindFind(sl[j]);
             ULONG bufva = CerfDDGPESurfBufferVa(bind ? (ULONG)*bind : 0u);
-            if (gbl && bufva) *(ULONG*)((BYTE*)(ULONG_PTR)gbl + 0x14u) = bufva;
+            if (gbl && bufva) *Ce5FpVidMem(sl[j]) = bufva;
             CERF_LOG_X_DEV("cerf_guest: Ce5 CS surf fpVidMem set", bufva);
         }
     if (ce5sd) Ce5DescFromC6(ce5sd, &c6sd);
@@ -245,13 +274,12 @@ static DWORD WINAPI Ce5DestroySurfaceWrap(Ce6_DDHAL_DESTROYSURFACEDATA* pd) {
 }
 
 static DWORD WINAPI Ce5FlipWrap(Ce6_DDHAL_FLIPDATA* pd) {
-
-    ULONG_PTR svC = Ce5LclEnter(pd->lpSurfCurr);
-    ULONG_PTR svT = Ce5LclEnter(pd->lpSurfTarg);
-    DWORD r = DDGPEFlip(pd);
-    Ce5LclLeave(pd->lpSurfTarg, svT);
-    Ce5LclLeave(pd->lpSurfCurr, svC);
-    return r;
+    ULONG_PTR sv = Ce5LclEnter(pd->lpSurfTarg);
+    ((CerfDDGPE*)GetGPE())->SetVisibleSurface(DDGPESurf::GetDDGPESurf(pd->lpSurfTarg),
+                                              (pd->dwFlags & CERF_DDFLIP_WAITVSYNC) != 0u);
+    Ce5LclLeave(pd->lpSurfTarg, sv);
+    pd->ddRVal = CERF_DD_OK;
+    return DDHAL_DRIVER_HANDLED;
 }
 
 static DWORD WINAPI Ce5SetColorKeyWrap(Ce6_DDHAL_SETCOLORKEYDATA* pd) {
@@ -305,7 +333,7 @@ static Ce5_DDHAL_DDSURFACECALLBACKS g_ce5SurfCallbacks = {
     (PVOID)Ce5FlipWrap,
     NULL,
     (PVOID)Ce5LockWrap,
-    (PVOID)CerfDDGPEUnlockWrap,
+    (PVOID)DDGPEUnlock,
     (PVOID)Ce5BltWrap,
     (PVOID)Ce5SetColorKeyWrap,
     NULL,
@@ -390,5 +418,10 @@ extern "C" BOOL Ce5HALInit(void* lpddhi) {
     h->lpModeInfo = &s_modeInfo;
 
     h->GetDriverInfo = (PVOID)CerfHalGetDriverInfo;
+    s_ce5Core = TRUE;
     return TRUE;
+}
+
+extern "C" BOOL CerfCe5PrimaryHeld(void) {
+    return s_ce5Core && CerfPrimaryLayoutAnyBound();
 }

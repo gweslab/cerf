@@ -1,31 +1,29 @@
 #include "cerf_ddgpe.h"
+#include "cerf_ddgpe_primary_layout.h"
+#include "cerf_display_mode.h"
+#include "cerf_display_orientation.h"
 #include "cerf_eng_callbacks.h"
 #include "main.h"
-
-#ifndef DMDO_0
-#define DMDO_0 0
-#endif
 
 class CerfVidSurf : public DDGPESurf {
 public:
     CerfVidSurf(int w, int h, void* pBits, int stride, EGPEFormat fmt,
                 EDDGPEPixelFormat pf, unsigned long offset, SurfaceHeap* node)
-        : DDGPESurf(w, h, pBits, stride, fmt, pf), m_node(node) {
+        : DDGPESurf(w, h, pBits, stride, fmt, pf), m_node(node), m_window(NULL) {
         m_fInVideoMemory       = 1;
         m_nOffsetInVideoMemory = offset;
     }
     virtual ~CerfVidSurf() {
+        if (m_window) CerfUnmapFbWindow(m_window);
         if (m_node) { m_node->Free(); m_node = NULL; }
+    }
+    void* Window(ULONG pa, ULONG bytes) {
+        if (!m_window) m_window = CerfMapFbWindow(pa, bytes);
+        return m_window;
     }
 private:
     SurfaceHeap* m_node;
-};
-
-class CerfSysVidSurf : public DDGPESurf {
-public:
-    CerfSysVidSurf(int w, int h, EGPEFormat fmt) : DDGPESurf(w, h, fmt) {
-        m_fInVideoMemory = 1;
-    }
+    void*        m_window;
 };
 
 bool CerfDDGPE::EnsureVideoHeap() {
@@ -69,7 +67,7 @@ bool CerfDDGPE::SurfaceFbPa(GPESurf* s, ULONG* pa) {
 
     if (s->InVideoMemory() && m_vidBaseVa) {
         BYTE* buf = (BYTE*)s->Buffer();
-        if (buf >= m_vidBaseVa && buf < m_vidBaseVa + m_vidSize) {
+        if (buf >= m_vidBaseVa && (ULONG)(buf - m_vidBaseVa) < m_vidSize) {
             *pa = CerfGpeFbMemBasePa() + (ULONG)(buf - m_fbRegionVa);
             return true;
         }
@@ -107,17 +105,6 @@ SCODE CerfDDGPE::AllocSurface(GPESurf** ppSurf, int width, int height,
         return E_OUTOFMEMORY;
     }
 
-    if (surfaceFlags & GPE_BACK_BUFFER) {
-        CerfSysVidSurf* bb = new CerfSysVidSurf(width, height, format);
-        if (bb == NULL || bb->Buffer() == NULL) {
-            if (bb) delete bb;
-            *ppSurf = NULL;
-            return E_OUTOFMEMORY;
-        }
-        *ppSurf = bb;
-        return S_OK;
-    }
-
     DDGPESurf* sys = new DDGPESurf(width, height, format);
     if (sys == NULL || sys->Buffer() == NULL) {
         if (sys) delete sys;
@@ -125,6 +112,25 @@ SCODE CerfDDGPE::AllocSurface(GPESurf** ppSurf, int width, int height,
         return E_OUTOFMEMORY;
     }
     *ppSurf = sys;
+    return S_OK;
+}
+
+SCODE CerfDDGPE::AllocBackBuffer(GPESurf** ppSurf) {
+    GPESurf*     p = m_pPrimarySurface;
+    SurfaceHeap* node;
+    CerfVidSurf* s;
+    *ppSurf = NULL;
+    if (!EnsureVideoHeap()) return E_OUTOFMEMORY;
+    node = m_pVidHeap->Alloc((DWORD)p->Stride() * (DWORD)p->ScreenHeight());
+    if (!node) return E_OUTOFMEMORY;
+    s = new CerfVidSurf(p->Width(), p->Height(), m_vidBaseVa + node->Address(), p->Stride(),
+                        p->Format(), CerfFormatToDDGPE(p->Format()), node->Address(), node);
+    if (!s) {
+        node->Free();
+        return E_OUTOFMEMORY;
+    }
+    s->SetRotation(p->ScreenWidth(), p->ScreenHeight(), p->Rotate());
+    *ppSurf = s;
     return S_OK;
 }
 
@@ -138,15 +144,20 @@ SCODE CerfDDGPE::ApplyFbMode() {
                    : (g_FbBpp == 24) ? gpe24Bpp
                    : (g_FbBpp == 32) ? gpe32Bpp : gpe8Bpp;
 
+    const int  angle = (int)CerfDisplayModeAngle();
+    const bool turned = CerfDisplayOrientationSideways((ULONG)angle) != FALSE;
+    const int  logical_w = turned ? (int)g_FbHeight : (int)g_FbWidth;
+    const int  logical_h = turned ? (int)g_FbWidth : (int)g_FbHeight;
+
     if (m_pPrimarySurface) {
-        delete m_pPrimarySurface;
-        m_pPrimarySurface = NULL;
+        m_pPrimarySurface->Resize(logical_w, logical_h, (int)g_FbStride);
+    } else {
+        m_pPrimarySurface = new CerfVidSurf(logical_w, logical_h, fb,
+                                            (int)g_FbStride, fmt, CerfFormatToDDGPE(fmt),
+                                            0u, NULL);
+        if (m_pPrimarySurface == NULL) return E_OUTOFMEMORY;
     }
-    m_pPrimarySurface = new CerfVidSurf((int)g_FbWidth, (int)g_FbHeight, fb,
-                                        (int)g_FbStride, fmt, CerfFormatToDDGPE(fmt),
-                                        0u, NULL);
-    if (m_pPrimarySurface == NULL) return E_OUTOFMEMORY;
-    m_pPrimarySurface->SetRotation((int)g_FbWidth, (int)g_FbHeight, DMDO_0);
+    m_pPrimarySurface->SetRotation((int)g_FbWidth, (int)g_FbHeight, angle);
 
     m_gpeMode.width     = (int)g_FbWidth;
     m_gpeMode.height    = (int)g_FbHeight;
@@ -154,8 +165,9 @@ SCODE CerfDDGPE::ApplyFbMode() {
     m_gpeMode.frequency = (int)g_FbRefreshRate;
     m_gpeMode.format    = fmt;
     m_pMode = &m_gpeMode;
-    m_nScreenWidth  = m_gpeMode.width;
-    m_nScreenHeight = m_gpeMode.height;
+    m_nScreenWidth  = logical_w;
+    m_nScreenHeight = logical_h;
+    SetVisibleSurface(m_pPrimarySurface);
     return S_OK;
 }
 
@@ -235,16 +247,34 @@ extern "C" void CerfFillSurfaceFromSurfobj(cerfcore::CerfVirt::CerfBltSurface* s
     ((CerfDDGPE*)GetGPE())->FillSurfaceFromSurfobj(s, pso, y0, y1, wb);
 }
 
-extern "C" BOOL CerfDDSurfFbInfo(void* lcl, ULONG* pa, int* stride, int* bpp,
-                                 int* height) {
-    if (!lcl) return FALSE;
-    DDGPESurf* s = DDGPESurf::GetDDGPESurf((LPDDRAWI_DDRAWSURFACE_LCL)lcl);
-    if (!s) return FALSE;
-    ULONG p;
-    if (!((CerfDDGPE*)GetGPE())->SurfaceFbPa(s, &p)) return FALSE;
-    if (pa)     *pa = p;
-    if (stride) *stride = s->Stride();
-    if (bpp)    *bpp = CerfFormatBpp(s->Format());
-    if (height) *height = s->Height();
+void CerfDDGPE::SurfaceLayout(void* lcl, GPESurf* s, CerfPrimaryLayout* out) {
+    if (s == m_pPrimarySurface) {
+        CerfPrimaryLayoutOf(lcl, out);
+        return;
+    }
+    CerfPrimaryLayoutFor(s->Rotate(), s->ScreenWidth(), s->ScreenHeight(), s->Stride(),
+                         s->BytesPerPixel(), out);
+}
+
+void* CerfDDGPE::FbLockBase(GPESurf* s, ULONG pa) {
+    if (m_vidBacking == kCerfVidHeapMapped) {
+        BYTE* region = (BYTE*)CerfMapFbGlobal();
+        return region ? region + (pa - CerfGpeFbMemBasePa()) : NULL;
+    }
+    const ULONG bytes = (s == m_pPrimarySurface) ? g_FbPrimaryReserve
+                                                 : (ULONG)s->Stride() * (ULONG)s->ScreenHeight();
+    return ((CerfVidSurf*)s)->Window(pa, bytes);
+}
+
+extern "C" BOOL CerfDDSurfFbLock(void* lcl, int x, int y, void** va) {
+    ULONG             pa;
+    CerfPrimaryLayout lay;
+    BYTE*             base;
+    CerfDDGPE*        gpe = (CerfDDGPE*)GetGPE();
+    DDGPESurf*        s   = DDGPESurf::GetDDGPESurf((LPDDRAWI_DDRAWSURFACE_LCL)lcl);
+    if (!gpe->SurfaceFbPa(s, &pa)) return FALSE;
+    gpe->SurfaceLayout(lcl, s, &lay);
+    base = (BYTE*)gpe->FbLockBase(s, pa);
+    *va  = base ? (void*)(base + cerfcore::CerfVirt::CerfRotatedOffset(lay, x, y)) : NULL;
     return TRUE;
 }

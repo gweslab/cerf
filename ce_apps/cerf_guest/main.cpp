@@ -15,6 +15,7 @@
 #include "cerf_autorun.h"
 #include "cerf_dma_arena.h"
 #include "cerf_ddgpe.h"
+#include "cerf_ddgpe_primary_layout.h"
 #include "cerf_driver_in_driver.h"
 #include "cerf_eng_callbacks.h"
 #include "cerf_gradient.h"
@@ -92,6 +93,16 @@ void CerfReadFbRegs(void) {
     g_FbSystemFontPresent = mn->fb_regs[12];
 }
 
+extern "C" void CerfSetScanoutOffset(ULONG offset) {
+    CerfMainState* mn = Mn();
+    CerfReadFbRegs();
+    if (!mn->fb_regs) {
+        CERF_FATAL("cerf_guest: FB register map FAILED");
+        return;
+    }
+    mn->fb_regs[cerfcore::CerfVirt::kFbRegScanoutOffset / 4] = offset;
+}
+
 static BOOL CerfMapGpeCmd(CerfMainState* mn) {
     if (mn->gpe_cmd) return TRUE;
     mn->gpe_cmd = (volatile ULONG*)CerfMapRegsPage(
@@ -148,18 +159,33 @@ void* CerfMapFbMemory(void) {
     return g_FbMemVa;
 }
 
-static void* CerfMapFbWindow(ULONG fb_pa, ULONG bytes) {
+#define CERF_FB_SHARED_RESERVE 0x200000u
+#define CERF_VA_SECTION_BYTES  0x2000000u
+
+extern "C" void* CerfMapFbWindow(ULONG fb_pa, ULONG bytes) {
     const ULONG page_off  = fb_pa & 0xFFFu;
     const ULONG base_pa   = fb_pa & ~0xFFFu;
     const ULONG map_bytes = (page_off + bytes + 0xFFFu) & ~0xFFFu;
-    void* va = VirtualAlloc(0, map_bytes, MEM_RESERVE, PAGE_NOACCESS);
+    const ULONG reserve   = (map_bytes < CERF_FB_SHARED_RESERVE) ? CERF_FB_SHARED_RESERVE : map_bytes;
+    BYTE* const va = (BYTE*)VirtualAlloc(0, reserve, MEM_RESERVE, PAGE_NOACCESS);
     if (!va) return NULL;
-    if (!VirtualCopy(va, (LPVOID)(base_pa >> 8), map_bytes,
-                     PAGE_READWRITE | PAGE_NOCACHE | PAGE_PHYSICAL)) {
-        VirtualFree(va, 0, MEM_RELEASE);
-        return NULL;
+    ULONG done = 0;
+    while (done < map_bytes) {
+        const ULONG at    = (ULONG)(ULONG_PTR)va + done;
+        const ULONG room  = CERF_VA_SECTION_BYTES - (at & (CERF_VA_SECTION_BYTES - 1u));
+        const ULONG piece = (map_bytes - done < room) ? map_bytes - done : room;
+        if (!VirtualCopy(va + done, (LPVOID)((base_pa + done) >> 8), piece,
+                         PAGE_READWRITE | PAGE_NOCACHE | PAGE_PHYSICAL)) {
+            VirtualFree(va, 0, MEM_RELEASE);
+            return NULL;
+        }
+        done += piece;
     }
-    return (void*)((BYTE*)va + page_off);
+    return (void*)(va + page_off);
+}
+
+extern "C" void CerfUnmapFbWindow(void* va) {
+    VirtualFree((void*)((ULONG_PTR)va & ~(ULONG_PTR)0xFFFu), 0, MEM_RELEASE);
 }
 
 extern "C" void* CerfMapFbGlobal(void) {
@@ -299,6 +325,7 @@ extern "C" BOOL APIENTRY DllEntryPoint(HANDLE hInst, DWORD reason, LPVOID) {
         CERF_LOG("cerf_guest: DLL_PROCESS_ATTACH");
         Mn()->hinst = (HMODULE)hInst;
         CerfArenaProcessAttach();
+        CerfPrimaryLayoutInit();
     } else if (reason == DLL_PROCESS_DETACH) {
         CERF_LOG("cerf_guest: DLL_PROCESS_DETACH");
     }

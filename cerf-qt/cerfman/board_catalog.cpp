@@ -151,6 +151,11 @@ int BoardCatalog::GaColorDepth(const QString& board_id) const {
     return static_cast<int>(board ? board->ga_color_depth : cerfcore::kDefaultGaColorDepth);
 }
 
+uint32_t BoardCatalog::GaWindowSize(const QString& board_id) const {
+    const DbBoard* board = Find(board_id);
+    return board ? board->ga_window_size : cerfcore::kDefaultGaWindowSize;
+}
+
 int BoardCatalog::DeviceYear(const QString& board_id) const {
     const DbBoard* board = Find(board_id);
     return board ? static_cast<int>(board->device_year) : 0;

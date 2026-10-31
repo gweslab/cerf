@@ -57,7 +57,12 @@ void ViewportLayout::SurfaceFor(int content_w, int content_h, uint32_t& surface_
     double       sw = 0.0, sh = 0.0;
     presentation_.frame.SurfaceFor(cw, ch, sw, sh);
     surface_w = static_cast<uint32_t>(std::max(0.0, std::floor(sw)));
-    surface_h                  = static_cast<uint32_t>(std::max(0.0, std::floor(sh)));
+    surface_h = static_cast<uint32_t>(std::max(0.0, std::floor(sh)));
+    int fit_w = 0, fit_h = 0;
+    ContentFor(surface_w + 1u, surface_h, fit_w, fit_h);
+    if (fit_w <= content_w && fit_h <= content_h) ++surface_w;
+    ContentFor(surface_w, surface_h + 1u, fit_w, fit_h);
+    if (fit_w <= content_w && fit_h <= content_h) ++surface_h;
 }
 
 bool ViewportLayout::SetMode(ViewportMode m) {

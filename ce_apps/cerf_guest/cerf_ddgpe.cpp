@@ -1,5 +1,6 @@
 #include "cerf_ddgpe.h"
 #include "cerf_cursor.h"
+#include "cerf_display_mode.h"
 #include "cerf_power.h"
 #include "main.h"
 
@@ -11,21 +12,6 @@
 #endif
 #ifndef DRVESC_GETSCREENROTATION
 #define DRVESC_GETSCREENROTATION 6302
-#endif
-#ifndef DMDO_0
-#define DMDO_0   0
-#endif
-#ifndef DMDO_90
-#define DMDO_90  1
-#endif
-#ifndef DMDO_180
-#define DMDO_180 2
-#endif
-#ifndef DMDO_270
-#define DMDO_270 4
-#endif
-#ifndef DISP_CHANGE_SUCCESSFUL
-#define DISP_CHANGE_SUCCESSFUL 0
 #endif
 
 extern "C" int APIENTRY MulDiv(int a, int b, int c) {
@@ -48,7 +34,7 @@ CerfDDGPE::CerfDDGPE() : DDGPE() {
     m_vidBaseVa  = NULL;
     m_vidSize    = 0;
     m_vidBacking = kCerfVidHeapByPa;
-    m_currentRotation = 0;
+    m_pScanout   = NULL;
 }
 
 SCODE CerfDDGPE::BltComplete(GPEBltParms* p) {
@@ -65,14 +51,17 @@ SCODE CerfDDGPE::Line(GPELineParms* pLineParms, EGPEPhase phase) {
 
 void CerfDDGPE::SetVisibleSurface(GPESurf* pSurf, BOOL bWaitForVBlank) {
     (void)bWaitForVBlank;
-    DDGPESurf* primary = DDGPEPrimarySurface();
-    DDGPESurf* target  = (DDGPESurf*)pSurf;
-    if (!primary || !target || target == primary) return;
-    RECT r;
-    r.left = 0; r.top = 0;
-    r.right  = primary->Width();
-    r.bottom = primary->Height();
-    BltExpanded(primary, target, NULL, &r, &r, 0u, 0u, 0xCCCCu);
+    ULONG pa;
+    if (!SurfaceFbPa(pSurf, &pa)) {
+        CERF_FATAL("cerf_guest: scanout of a surface outside video memory");
+        return;
+    }
+    m_pScanout = pSurf;
+    CerfSetScanoutOffset(pa - CerfGpeFbMemBasePa());
+}
+
+void CerfDDGPE::ReleaseScanout(GPESurf* s) {
+    if (s == m_pScanout) SetVisibleSurface(m_pPrimarySurface);
 }
 
 SCODE CerfDDGPE::SetPointerShape(GPESurf* pMask, GPESurf*, int xHot, int yHot,
@@ -153,24 +142,15 @@ ULONG CerfDDGPE::DrvEscape(SURFOBJ* pso, ULONG iEsc, ULONG cjIn, PVOID pvIn,
         return GPE::DrvEscape(pso, iEsc, cjIn, pvIn, cjOut, pvOut);
     }
     if (iEsc == DRVESC_GETSCREENROTATION) {
-
-        if (pvOut)
-            *(int*)pvOut = ((DMDO_0 | DMDO_90 | DMDO_180 | DMDO_270) << 8)
-                         | (m_currentRotation & 0xFF);
+        const ULONG caps = CerfDisplayModeRotationCaps();
+        if (pvOut) {
+            if (cjOut >= sizeof(DWORD)) *(DWORD*)pvOut = caps;
+            else                        *(WORD*)pvOut  = (WORD)caps;
+        }
         CERF_LOG_X_DEV("cerf_guest: DrvEscape GETSCREENROTATION cjOut", (DWORD)cjOut);
         return DISP_CHANGE_SUCCESSFUL;
     }
-    if (iEsc == DRVESC_SETSCREENROTATION) {
-
-        m_currentRotation = (int)cjIn;
-
-        if (m_pPrimarySurface == NULL ||
-            m_pPrimarySurface->Width()  != (int)g_FbWidth ||
-            m_pPrimarySurface->Height() != (int)g_FbHeight)
-            ApplyFbMode();
-        CERF_LOG_X_DEV("cerf_guest: DrvEscape SETSCREENROTATION orient", (DWORD)cjIn);
-        return DISP_CHANGE_SUCCESSFUL;
-    }
+    if (iEsc == DRVESC_SETSCREENROTATION) return (ULONG)CerfDisplayModeRotate(cjIn);
     DWORD firstIn = (pvIn && cjIn >= sizeof(ULONG)) ? *(DWORD*)pvIn : 0xFFFFFFFFu;
     ULONG r = GPE::DrvEscape(pso, iEsc, cjIn, pvIn, cjOut, pvOut);
     CERF_LOG_X_DEV("cerf_guest: DrvEscape iEsc", (DWORD)iEsc);
@@ -206,8 +186,8 @@ BOOL CerfDDGPE::GetScreenDimensions(GPEScreenProps* pProps) {
     ULONG dpiY = g_FbDpi ? g_FbDpi : CerfReadGpeDpi(L"LogicalPixelsY");
     if (!dpiX) dpiX = 96;
     if (!dpiY) dpiY = 96;
-    pProps->ulHorzSize   = (g_FbWidth  * 254) / dpiX / 10;
-    pProps->ulVertSize   = (g_FbHeight * 254) / dpiY / 10;
+    pProps->ulHorzSize   = ((ULONG)m_nScreenWidth  * 254) / dpiX / 10;
+    pProps->ulVertSize   = ((ULONG)m_nScreenHeight * 254) / dpiY / 10;
     pProps->ulLogPixelsX = dpiX;
     pProps->ulLogPixelsY = dpiY;
     pProps->ulAspectX    = 36;

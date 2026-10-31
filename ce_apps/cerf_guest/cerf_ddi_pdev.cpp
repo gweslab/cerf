@@ -111,8 +111,8 @@ extern "C" DHPDEV APIENTRY DrvEnablePDEV(DEVMODEW* pdm, LPWSTR, ULONG, HSURF*,
     CerfWriteCap(pdevcaps, cjCaps,  1, CERF_DT_RASDISPLAY);
     CerfWriteCap(pdevcaps, cjCaps,  2, props.ulHorzSize);
     CerfWriteCap(pdevcaps, cjCaps,  3, props.ulVertSize);
-    CerfWriteCap(pdevcaps, cjCaps,  4, g_FbWidth);
-    CerfWriteCap(pdevcaps, cjCaps,  5, g_FbHeight);
+    CerfWriteCap(pdevcaps, cjCaps,  4, (ULONG)pGPE->ScreenWidth());
+    CerfWriteCap(pdevcaps, cjCaps,  5, (ULONG)pGPE->ScreenHeight());
     CerfWriteCap(pdevcaps, cjCaps,  6, bpp);
     CerfWriteCap(pdevcaps, cjCaps,  7, 1u);
     CerfWriteCap(pdevcaps, cjCaps,  8, (ULONG)(((ULONGLONG)1) << bpp));

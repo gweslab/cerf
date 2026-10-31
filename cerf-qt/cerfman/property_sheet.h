@@ -126,6 +126,7 @@ signals:
 
 private:
     bool    GuestAdditionsAvailable(const QString& board_id) const;
+    bool    ScreenFits() const;
     bool    Flag(const char* key) const;
     Json    BoardCpuOverrideJson() const;
     QString SaveOwned(bool all);

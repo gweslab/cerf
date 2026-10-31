@@ -13,26 +13,14 @@ extern "C" DWORD WINAPI CerfGetBltStatus(Ce6_DDHAL_GETBLTSTATUSDATA* pd) {
 }
 
 extern "C" DWORD WINAPI CerfDDGPELockWrap(Ce6_DDHAL_LOCKDATA* pd) {
-    ULONG pa; int stride = 0, bpp = 0, height = 0;
-    if (!CerfDDSurfFbInfo(pd->lpDDSurface, &pa, &stride, &bpp, &height))
-        return DDGPELock(pd);
-    int x = pd->bHasRect ? pd->rArea.left : 0;
-    int y = pd->bHasRect ? pd->rArea.top  : 0;
-    ULONG origin = pa + (ULONG)y * (ULONG)stride + (ULONG)x * ((ULONG)bpp / 8u);
-    void* g = CerfMapFbGlobal();
-    if (!g) { pd->ddRVal = CERF_DDERR_OUTOFMEMORY; return DDHAL_DRIVER_HANDLED; }
-    pd->lpSurfData = (void*)((BYTE*)g + (origin - CerfGpeFbMemBasePa()));
+    const int x = pd->bHasRect ? pd->rArea.left : 0;
+    const int y = pd->bHasRect ? pd->rArea.top  : 0;
+    void* va;
+    if (!CerfDDSurfFbLock(pd->lpDDSurface, x, y, &va)) return DDGPELock(pd);
+    if (!va) { pd->ddRVal = CERF_DDERR_OUTOFMEMORY; return DDHAL_DRIVER_HANDLED; }
+    pd->lpSurfData = va;
     pd->ddRVal = CERF_DD_OK;
     return DDHAL_DRIVER_HANDLED;
-}
-
-extern "C" DWORD WINAPI CerfDDGPEUnlockWrap(Ce6_DDHAL_UNLOCKDATA* pd) {
-    ULONG pa; int stride = 0, bpp = 0, height = 0;
-    if (CerfDDSurfFbInfo(pd->lpDDSurface, &pa, &stride, &bpp, &height)) {
-        pd->ddRVal = CERF_DD_OK;
-        return DDHAL_DRIVER_HANDLED;
-    }
-    return DDGPEUnlock(pd);
 }
 
 static DWORD WINAPI CerfCreateSurface(Ce6_DDHAL_CREATESURFACEDATA* pd) {
@@ -73,7 +61,7 @@ static Ce6_DDHAL_DDSURFACECALLBACKS g_cbDDSurfaceCallbacks = {
     (PVOID)DDGPEDestroySurface,
     (PVOID)DDGPEFlip,
     (PVOID)CerfDDGPELockWrap,
-    (PVOID)CerfDDGPEUnlockWrap,
+    (PVOID)DDGPEUnlock,
     (PVOID)DDGPESetColorKey,
     (PVOID)CerfGetBltStatus,
     (PVOID)DDGPEGetFlipStatus,

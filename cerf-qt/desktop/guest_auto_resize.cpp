@@ -3,8 +3,10 @@
 
 #include <cerfcore/core/cerf_emulator.h>
 #include <cerfcore/core/device_config.h>
+#include <cerfcore/core/log.h>
 #include <cerfcore/core/user_config_writer.h>
 #include <cerfcore/host/guest_resize_policy.h>
+#include <cerfcore/peripherals/cerf_virt/cerf_virt_framebuffer.h>
 #include <cerfcore/peripherals/cerf_virt/cerf_virt_resize.h>
 
 #include <atomic>
@@ -42,8 +44,11 @@ public:
         if (w == 0 || h == 0) return;
         const uint32_t surface_w = window.GuestSurfaceWidth();
         const uint32_t surface_h = window.GuestSurfaceHeight();
+        LOG(Lcd, "GuestAutoResize: canvas %ux%u -> surface %ux%u, current %ux%u\n", canvas_w, canvas_h, w, h,
+            surface_w, surface_h);
         const bool     pending   = last_w_ != 0 && (last_w_ != surface_w || last_h_ != surface_h);
         if (pending ? (w == last_w_ && h == last_h_) : (w == surface_w && h == surface_h)) return;
+        if (!emu_.Get<cerfcore::CerfVirtFramebuffer>().FitsPrimary(w, h, "live resize")) return;
         last_w_ = w;
         last_h_ = h;
         emu_.Get<cerfcore::CerfVirtResize>().RequestResize(w, h);

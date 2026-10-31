@@ -25,3 +25,6 @@ extern "C" ULONG CerfGpeLine(ULONG desc_va);
 extern "C" ULONG CerfGpeFbMemBasePa(void);
 extern "C" void  CerfPublishPalette(const ULONG* rgb, unsigned first, unsigned count);
 extern "C" void* CerfMapFbGlobal(void);
+extern "C" void* CerfMapFbWindow(ULONG fb_pa, ULONG bytes);
+extern "C" void  CerfUnmapFbWindow(void* va);
+extern "C" void  CerfSetScanoutOffset(ULONG offset);

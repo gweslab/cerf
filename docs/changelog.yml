@@ -13,13 +13,15 @@
       Support for Android (ARM64)
       Startup screen scale configuration and dynamic mode for retina screen
       Device HUDs - simplified hardware buttons in a canvas
-      Screen rotation
+      Rotation of any device screen
     fixed: |
       Serial connection regression on some MIPS boards
   launcher:
     deleted: |
       Replaced with Devices Manager
   guest_additions:
+    new: |
+      Screen rotation support
     fixed: |
       Moved "untrusted apps hack" for WM into optional switch since it broke WM6
       Fixed miniport driver causing hangs at soft resets

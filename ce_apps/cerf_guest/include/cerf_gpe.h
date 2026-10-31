@@ -3,12 +3,7 @@
 #include <windows.h>
 #include <winddi.h>
 
-#ifndef DMDO_0
-#define DMDO_0   0
-#define DMDO_90  1
-#define DMDO_180 2
-#define DMDO_270 4
-#endif
+#include "../cerf_display_orientation.h"
 
 typedef unsigned long COLOR;
 typedef unsigned long ADDRESS;
@@ -42,7 +37,6 @@ enum EDDGPEPixelFormat {
 
 #define GPE_REQUIRE_VIDEO_MEMORY 0x0001
 #define GPE_PREFER_VIDEO_MEMORY  0x0002
-#define GPE_BACK_BUFFER          0x0004
 
 class GPE;
 class GPESurf;
@@ -131,6 +125,12 @@ public:
     int         Rotate()        { return m_iRotate; }
     int         ScreenWidth()   { return m_ScreenWidth; }
     int         ScreenHeight()  { return m_ScreenHeight; }
+
+    void Resize(int width, int height, int stride) {
+        m_nWidth       = width;
+        m_nHeight      = height;
+        m_nStrideBytes = (ULONG)stride;
+    }
 
     void SetRotation(int screen_width, int screen_height, int angle) {
         m_ScreenWidth  = screen_width;

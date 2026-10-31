@@ -1,4 +1,5 @@
 #include "cerf_ddgpe.h"
+#include "cerf_display_orientation.h"
 #include "cerf_dma_arena.h"
 #include "main.h"
 
@@ -182,12 +183,7 @@ void CerfDDGPE::FillSurface(cerfcore::CerfVirt::CerfBltSurface* s, GPESurf* surf
     }
     if (surf->IsRotate()) {
         s->is_rotate = 1u;
-        switch (surf->Rotate()) {
-            case DMDO_90:  s->rotate = cerfcore::CerfVirt::kCerfRotate90;  break;
-            case DMDO_180: s->rotate = cerfcore::CerfVirt::kCerfRotate180; break;
-            case DMDO_270: s->rotate = cerfcore::CerfVirt::kCerfRotate270; break;
-            default:       s->rotate = cerfcore::CerfVirt::kCerfRotate0;   break;
-        }
+        s->rotate    = (uint32_t)CerfDisplayOrientationQuarter((ULONG)surf->Rotate());
         s->screen_w = (uint32_t)surf->ScreenWidth();
         s->screen_h = (uint32_t)surf->ScreenHeight();
     }

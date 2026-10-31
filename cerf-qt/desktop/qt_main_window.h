@@ -43,7 +43,7 @@ public:
 
     void SetKeyboardGrab(bool on);
 
-    void OnUserResized() { follow_guest_ = false; }
+    void OnUserResized();
     void OnMaximized() { follow_guest_ = false; }
     void OnDeactivated();
     void OnTeardownWedged() override;

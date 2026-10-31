@@ -48,11 +48,6 @@ extern "C" BOOL APIENTRY DrvStrokePath(SURFOBJ* pso, PATHOBJ* ppo, CLIPOBJ* pco,
     GPESurf* pDst = CerfWrapSurfobj(&tDst, pso);
     if (!pDst) return FALSE;
 
-    if (pDst->IsRotate()) {
-        CERF_LOG("cerf_guest: UNIMPLEMENTED DrvStrokePath on rotated surface");
-        return FALSE;
-    }
-
     GPELineParms parms;
     memset(&parms, 0, sizeof(parms));
     parms.solidColor = pbo->iSolidColor;

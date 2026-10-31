@@ -43,6 +43,7 @@ public:
     QVariantMap                      GroupHardware(const QStringList& board_ids) const;
     bool                             ConfigurableScreen(const QString& board_id) const;
     int                              GaColorDepth(const QString& board_id) const;
+    uint32_t                         GaWindowSize(const QString& board_id) const;
     int                              DeviceYear(const QString& board_id) const;
 
     std::vector<const cerfcore::DbDeviceFeature*> UnsupportedFeatures(const QString& board_id) const;

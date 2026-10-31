@@ -15,6 +15,7 @@
 #include <cerfcore/core/cerf_emulator.h>
 #include <cerfcore/core/cpu_config_database.h>
 #include <cerfcore/core/product_name.h>
+#include <cerfcore/peripherals/cerf_virt/cerf_virt_framebuffer.h>
 
 #include <array>
 #include <optional>
@@ -106,8 +107,24 @@ QVariantMap PropertySheet::Problem() const {
         if (!options.MountPointValid(JsonText(values_, pf::kMountPoint).trimmed()))
             return failure(sp::kGuestAdditions, QStringLiteral("Invalid mount point"),
                            options.MountPointInvalidMessage());
+        if (!ScreenFits())
+            return failure(sp::kGuestAdditions, QStringLiteral("Display resolution"),
+                           QStringLiteral("Guest Additions cannot hold this resolution at this "
+                                          "color depth."));
     }
     return {};
+}
+
+bool PropertySheet::ScreenFits() const {
+    const QVariantList size = Resolution().toList();
+    if (size.size() != 2) return true;
+    const uint32_t w   = size.at(0).toUInt();
+    const uint32_t h   = size.at(1).toUInt();
+    const uint32_t bpp = uint32_t(JsonInteger(values_, pf::kBpp).value_or(AutoDepth()));
+    if (Live()) return emu_.Get<cerfcore::CerfVirtFramebuffer>().CanApply(w, h, bpp);
+    using cerfcore::CerfVirtFramebuffer;
+    return CerfVirtFramebuffer::PrimaryBytesAt(w, h, bpp) <=
+           CerfVirtFramebuffer::RegionBytesIn(emu_.Get<BoardCatalog>().GaWindowSize(BoardId()));
 }
 
 bool PropertySheet::Flag(const char* key) const { return values_.at(key).get<bool>(); }

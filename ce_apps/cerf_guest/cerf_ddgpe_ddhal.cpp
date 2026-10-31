@@ -1,5 +1,6 @@
 #include "cerf_ddgpe_ddhal.h"
 #include "cerf_ddgpe.h"
+#include "cerf_ddgpe_primary_layout.h"
 #include "include/ddraw_ce6.h"
 
 static bool CerfDDrawDetectFmt(const Ce6_DDSURFACEDESC* d, EGPEFormat* fmt,
@@ -53,9 +54,10 @@ extern "C" DWORD WINAPI DDGPECreateSurface(Ce6_DDHAL_CREATESURFACEDATA* pd) {
             if (!primary) { pd->ddRVal = CERF_DDERR_GENERIC; return DDHAL_DRIVER_HANDLED; }
             primary->SetDDGPESurf(lcl);
         } else {
-            GPESurf* s = NULL;
+            GPESurf*   s              = NULL;
+            const bool display_memory = bPrimaryChain || (dwCaps & CE6_DDSCAPS_VIDEOMEMORY) != 0u;
             if (bPrimaryChain) {
-                sc = gpe->AllocSurface(&s, aw, ah, fmt, GPE_BACK_BUFFER);
+                sc = gpe->AllocBackBuffer(&s);
             } else if (dwCaps & CE6_DDSCAPS_VIDEOMEMORY) {
                 sc = gpe->AllocSurface(&s, aw, ah, fmt, GPE_REQUIRE_VIDEO_MEMORY);
             } else if (dwFlags & CE6_DDSD_LPSURFACE) {
@@ -68,7 +70,10 @@ extern "C" DWORD WINAPI DDGPECreateSurface(Ce6_DDHAL_CREATESURFACEDATA* pd) {
             } else {
                 sc = gpe->AllocSurface(&s, aw, ah, fmt, GPE_PREFER_VIDEO_MEMORY);
             }
-            if (FAILED(sc) || !s) { pd->ddRVal = sc ? sc : CERF_DDERR_OUTOFMEMORY; return DDHAL_DRIVER_HANDLED; }
+            if (FAILED(sc) || !s) {
+                pd->ddRVal = display_memory ? CERF_DDERR_OUTOFVIDEOMEMORY : (sc ? sc : CERF_DDERR_OUTOFMEMORY);
+                return DDHAL_DRIVER_HANDLED;
+            }
             ((DDGPESurf*)s)->SetDDGPESurf(lcl);
         }
 
@@ -77,12 +82,26 @@ extern "C" DWORD WINAPI DDGPECreateSurface(Ce6_DDHAL_CREATESURFACEDATA* pd) {
         else                                 lcl->ddsCaps.dwCaps |= CE6_DDSCAPS_SYSTEMMEMORY;
     }
 
+    if (bPrimaryChain) {
+        CerfPrimaryLayout chain;
+        CerfPrimaryLayoutFor(primary->Rotate(), primary->ScreenWidth(), primary->ScreenHeight(),
+                             primary->Stride(), primary->BytesPerPixel(), &chain);
+        for (DWORD i = 0; i < pd->dwSCnt; ++i) {
+            if (CerfPrimaryLayoutBind(pd->lplpSList[i], &chain)) continue;
+            for (DWORD j = 0; j < i; ++j) CerfPrimaryLayoutForget(pd->lplpSList[j]);
+            pd->ddRVal = CERF_DDERR_OUTOFMEMORY;
+            return DDHAL_DRIVER_HANDLED;
+        }
+    }
+
     if (desc && pd->dwSCnt) {
         DDGPESurf* s0 = DDGPESurf::GetDDGPESurf(pd->lplpSList[0]);
         if (s0) {
-            desc->lPitch  = s0->Stride();
-            desc->lXPitch = s0->BytesPerPixel();
-            desc->dwSurfaceSize = (DWORD)s0->Stride() * (DWORD)s0->Height();
+            CerfPrimaryLayout lay;
+            gpe->SurfaceLayout(pd->lplpSList[0], s0, &lay);
+            desc->lPitch  = lay.y_pitch;
+            desc->lXPitch = lay.x_pitch;
+            desc->dwSurfaceSize = (DWORD)s0->Stride() * (DWORD)s0->ScreenHeight();
             desc->dwFlags |= (CE6_DDSD_PITCH | CE6_DDSD_XPITCH | CE6_DDSD_SURFACESIZE);
             if (s0->InVideoMemory()) desc->ddsCaps.dwCaps |= CE6_DDSCAPS_VIDEOMEMORY;
             else                     desc->ddsCaps.dwCaps |= CE6_DDSCAPS_SYSTEMMEMORY;
@@ -97,17 +116,19 @@ extern "C" DWORD WINAPI DDGPEDestroySurface(Ce6_DDHAL_DESTROYSURFACEDATA* pd) {
     CerfDDGPE* gpe = (CerfDDGPE*)GetGPE();
     DDGPESurf* s = DDGPESurf::GetDDGPESurf(pd->lpDDSurface);
     if (s && s != (DDGPESurf*)gpe->PrimarySurface()) {
+        gpe->ReleaseScanout(s);
         delete s;
         pd->lpDDSurface->dwReserved1 = 0;
     }
+    CerfPrimaryLayoutForget(pd->lpDDSurface);
     pd->ddRVal = CERF_DD_OK;
     return DDHAL_DRIVER_HANDLED;
 }
 
 extern "C" DWORD WINAPI DDGPEFlip(Ce6_DDHAL_FLIPDATA* pd) {
-    CerfDDGPE* gpe = (CerfDDGPE*)GetGPE();
-    DDGPESurf* target = DDGPESurf::GetDDGPESurf(pd->lpSurfTarg);
-    if (target) gpe->SetVisibleSurface(target, (pd->dwFlags & CERF_DDFLIP_WAITVSYNC) != 0u);
+    if (pd->lpSurfCurr->ddsCaps.dwCaps & CE6_DDSCAPS_PRIMARYSURFACE)
+        ((CerfDDGPE*)GetGPE())->SetVisibleSurface(DDGPESurf::GetDDGPESurf(pd->lpSurfTarg),
+                                                  (pd->dwFlags & CERF_DDFLIP_WAITVSYNC) != 0u);
     pd->ddRVal = CERF_DD_OK;
     return DDHAL_DRIVER_HANDLED;
 }

@@ -2,6 +2,7 @@
 
 #include "../qt_canvas_mouse_buttons.h"
 #include "../qt_device_pixels.h"
+#include "../guest_canvas_turn.h"
 #include "../qt_emulator_present.h"
 #include "../qt_guest_cursor_cache.h"
 #include "android_haptics.h"
@@ -102,8 +103,10 @@ void GuestSurface::PaintFrame(cerfcore::CerfEmulator& emu, QPainter* painter) {
     auto& guest = emu.Get<QtGuestCursorCache>();
     if (ActiveKind() == cerfcore::PointerKind::Absolute && guest.Refresh()) {
         if (guest.Drawable())
-            overlay_.PaintGuest(*painter, guest.Image(), guest.Hotspot(), presenter_->Layout().Presentation().quarter,
-                                pointer_.Position(), dpr, GuestScale());
+            overlay_.PaintGuest(
+                *painter, guest.Image(), guest.Hotspot(),
+                emu.Get<cerffrontend::GuestCanvasTurn>().LogicalQuarter(presenter_->Layout().Presentation().quarter),
+                pointer_.Position(), dpr, GuestScale());
         return;
     }
     overlay_.PaintArrow(*painter, pointer_.Position(), dpr);

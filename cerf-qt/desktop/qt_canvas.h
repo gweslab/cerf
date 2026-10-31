@@ -15,6 +15,7 @@ public:
     QtCanvas(cerfcore::CerfEmulator& emu, QWidget* parent, uint32_t surf_w, uint32_t surf_h);
 
     void LoseMouseCapture();
+    void ArmLiveResize();
 
     void SetMouseCapture(bool on) override;
     bool HasMouseCapture() const override { return grabbing_; }
@@ -37,7 +38,6 @@ protected:
     void wheelEvent(QWheelEvent* event) override;
     void keyPressEvent(QKeyEvent* event) override;
     void keyReleaseEvent(QKeyEvent* event) override;
-    void resizeEvent(QResizeEvent* event) override;
     bool focusNextPrevChild(bool next) override;
 
     cerfcore::FrameSource& Source(cerfcore::CerfEmulator& emu) override;

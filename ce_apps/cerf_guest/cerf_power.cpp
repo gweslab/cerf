@@ -13,6 +13,9 @@ static const GUID kPmClassDisplay =
 typedef BOOL (*PFN_AdvertiseInterface)(const GUID*, LPCWSTR, BOOL);
 
 extern "C" void CerfAdvertiseDisplayPower(void) {
+    static BOOL advertised = FALSE;
+    if (advertised) return;
+    advertised = TRUE;
 
     wchar_t leaf[MAX_PATH];
     leaf[0] = 0;

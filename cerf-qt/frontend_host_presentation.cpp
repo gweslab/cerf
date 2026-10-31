@@ -3,6 +3,7 @@
 #include "boot_screen.h"
 #include "frontend_window.h"
 #include "screenshots.h"
+#include "view_rotation.h"
 
 #include <cerfcore/core/cerf_emulator.h>
 #include <cerfcore/core/device_config.h>
@@ -27,6 +28,11 @@ public:
 
     void GuestRemoded(uint32_t guest_w, uint32_t guest_h) override {
         emu_.Get<FrontendWindow>().NotifyGuestRemoded(guest_w, guest_h);
+    }
+
+    void GuestTurned(uint32_t quarters) override {
+        emu_.Get<FrontendWindow>().RunOnUiThread(
+            [this, quarters] { emu_.Get<ViewRotation>().Rotate(static_cast<int>(quarters)); });
     }
 
     uint32_t SurfaceWidth() const override {

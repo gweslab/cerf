@@ -2,6 +2,7 @@
 
 #include "../qt_canvas_mouse_buttons.h"
 #include "../qt_device_pixels.h"
+#include "../guest_canvas_turn.h"
 #include "../qt_emulator_present.h"
 #include "../qt_key_input.h"
 #include "qt_guest_cursor.h"
@@ -14,7 +15,6 @@
 #include <QCursor>
 #include <QKeyEvent>
 #include <QMouseEvent>
-#include <QResizeEvent>
 #include <QWheelEvent>
 
 #include <algorithm>
@@ -39,8 +39,7 @@ QtCanvas::QtCanvas(cerfcore::CerfEmulator& emu, QWidget* parent, uint32_t surf_w
                      [this] { gate_.Run([this](cerfcore::CerfEmulator& gate_emu) { FireAutoResize(gate_emu); }); });
 }
 
-void QtCanvas::resizeEvent(QResizeEvent* event) {
-    QtPresenterCanvas::resizeEvent(event);
+void QtCanvas::ArmLiveResize() {
     gate_.Run([this](cerfcore::CerfEmulator& emu) {
         auto* policy = emu.TryGet<cerfcore::GuestResizePolicy>();
         if (policy && policy->Enabled() && !window()->isMinimized()) resize_debounce_.start();
@@ -123,7 +122,9 @@ void QtCanvas::ApplyCursor(cerfcore::CerfEmulator& emu, int x, int y) {
             double sx = 0.0;
             double sy = 0.0;
             GuestPixelScale(sx, sy);
-            const QtGuestCursorLook look{WholeScale(sx), WholeScale(sy), Quarter(), Dpr()};
+            const QtGuestCursorLook look{WholeScale(sx), WholeScale(sy),
+                                         emu.Get<cerffrontend::GuestCanvasTurn>().LogicalQuarter(Quarter()),
+                                         Dpr()};
             bool                    active = false;
             const QCursor           cur    = emu.Get<QtGuestCursor>().Resolve(look, active);
             setCursor(active ? cur : QCursor(Qt::ArrowCursor));

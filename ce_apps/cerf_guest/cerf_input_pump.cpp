@@ -3,8 +3,10 @@
 #include "cerf_coredll_proc.h"
 #include "cerf_regs_map.h"
 #include "cerf_debug_log.h"
+#include "cerf_display_mode.h"
 #include "cerf_gwes_ready.h"
 #include "cerf_input_pump.h"
+#include "include/cerf_gpe.h"
 
 #include "cerfcore/peripherals/cerf_virt/cerf_virt_addr_map.h"
 #include "cerfcore/peripherals/cerf_virt/cerf_virt_keyboard_regs.h"
@@ -12,6 +14,7 @@
 
 #define CERF_INPUT_POLL_MS    10u
 #define CERF_INPUT_CE_PRIO    145
+#define CERF_MOUSEEVENTF_ROTATE 0x00200000u
 
 typedef VOID (WINAPI *PFN_mouse_event)(DWORD, DWORD, DWORD, DWORD, DWORD);
 typedef VOID (WINAPI *PFN_keybd_event)(BYTE, BYTE, DWORD, DWORD);
@@ -79,7 +82,9 @@ static DWORD WINAPI CerfInputPumpThread(LPVOID) {
                 ULONG changed;
                 last_seq = seq;
 
-                me(MOUSEEVENTF_ABSOLUTE | MOUSEEVENTF_MOVE, nx, ny, 0, 0);
+                me(MOUSEEVENTF_ABSOLUTE | MOUSEEVENTF_MOVE |
+                       (CerfDisplayModeAngle() != DMDO_0 ? CERF_MOUSEEVENTF_ROTATE : 0u),
+                   nx, ny, 0, 0);
 
                 changed = btn ^ last_btn;
                 CerfSendButton(me, btn, changed, kPtrButtonLeft, MOUSEEVENTF_LEFTDOWN, MOUSEEVENTF_LEFTUP);

@@ -402,14 +402,9 @@ per-SoC/per-board concretes (strategy pattern, selected by `BoardContext`).
 
   `PresentedSize` is not the only source of the guest-surface size.
   `FrontendWindow::SetGuestSurfaceSize` is the single entry point, and the
-  panel-enable edge is only one of its callers.
-  `FrontendWindow::SetGuestResolution` calls it for a guest re-mode and for
-  the resolution dialog. `GuestAutoResize::OnUserResizeEnd` reaches it
-  through that same path, and is not a separate setter.
-  `Hibernation::RestorePresentation` reaches it through
-  `HostPresentation::RestoreSurfaceSize` with the size from the state image.
-  As a result, a restore installs a surface size that `PresentedSize` never
-  produced.
+  panel-enable edge is only one of its callers. A guest re-mode, the
+  resolution dialog and a state restore also set the size. A restore installs
+  the size from the state image, which `PresentedSize` never produced.
 
   Three slots build on this base:
 

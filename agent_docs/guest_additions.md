@@ -243,11 +243,11 @@ The host presents both layers. `PresentedFrameRenderer` (see
 panel layer under the guest-additions layer. That splash therefore stays
 visible until the guest-additions driver renders its first frame.
 
-The content latch of each layer switches between them. The guest-additions
-layer must therefore not report content until it paints the visible primary
-surface. Its region also holds the offscreen surfaces. Its `MarkDirty` fires
+The content latch of each layer switches between them. As a result, the
+guest-additions layer must not report content until it paints the surface at
+its scanout offset. Its region also holds the offscreen surfaces. Its `MarkDirty` fires
 for a write anywhere in that region (the framebuffer write path, the blitter,
-the gradient and line drawers, the palette, and the `kFbRegPresent` doorbell).
+the gradient and line drawers, and the palette).
 Without this rule, a first offscreen paint ends the splash early.
 
 **HW means HW.** The `cerf_guest` accelerator must handle every blit class
@@ -270,6 +270,27 @@ the palette over the `cerf_virt` palette channel, and the host expands
 index→RGB on scanout. The framebuffer bpp selects the path, never the OS
 version (CE2.11 is already ≥16bpp).
 
+A DirectDraw flip moves the scanout offset of the guest-additions display to
+the target surface. GDI continues to draw into the GDI primary. As a result, a
+GDI read does not show a flipped surface while that surface is on screen. The
+display shows the GDI primary again after a mode change, after a turn, and
+after the driver destroys the surface on screen.
+
+The WM6 and CE6 cores call the HAL flip for every flip chain. As a result, the
+driver moves the scanout offset only when the front buffer is the primary.
+After a flip, the CE 5.0 core moves the surface memory (`fpVidMem`) between the
+members of the chain. As a result, the CE 5.0 HAL finds the driver surface of
+each surface object (lcl) through its `fpVidMem`.
+
+The guest reads the refresh rate once, when its display driver loads. The host
+latches the rate at the first read after each boot. A reset clears the latch.
+A deep-sleep resume keeps the latch. A state image carries the latch.
+
+On CE 5.x, the kernel puts a reservation of 2 MB or more in the shared area,
+which every process can use. A reservation of 32 MiB or more takes whole 32 MiB
+sections. One `VirtualCopy` cannot cross the edge of a section. A DirectDraw
+lock window obeys these rules.
+
 **The floor is CE 2.0. CE 1.0 GA is impossible, not unimplemented.** GA
 replaces the *loadable* display driver of the guest, the DDI `DrvEnableDriver`
 that the body implements. That DDI is present from CE 2.0. CE 1.0 gwes is the
@@ -280,6 +301,60 @@ external display hook is an optional dirty-rectangle flush
 renderer. With no replaceable driver, the core of GA cannot attach. The CE 1.0
 desktop reaches the host through the native LCD aperture of the board. Do not
 attempt CE 1.0 GA.
+
+## Screen rotation and live resolution
+
+An app turns the screen with `ChangeDisplaySettingsEx` and
+`DM_DISPLAYORIENTATION`. gwes then sends `DRVESC_SETSCREENROTATION` (6301) to
+the driver, with the angle in `cjIn`. gwes reads the new screen size from the
+GDIINFO of a second `DrvEnablePDEV` call. gwes does not call
+`DrvEnableSurface` again, so it keeps the primary `dhsurf` from driver load.
+The primary surface therefore keeps its object and changes its size in place.
+
+The framebuffer keeps the size and the orientation of the panel. The primary
+becomes a rotated surface with the logical size, and GDIINFO reports that
+size. The guest reports the angle to the host, and the host turns only its
+view, with the regular view rotation. The host does not save that view
+rotation, so after a restore the user turns the view again.
+
+`DRVESC_GETSCREENROTATION` returns the supported angles in the high byte and
+the current angle in the low byte. Some gwes builds receive this value in a
+WORD, so the driver writes four bytes only when `cjOut` is 4 or more.
+
+The live resize turns the screen twice. CE 4 and CE 5 gwes change the screen
+size only through the rotation path. CE 6 gwes also changes it through
+`DM_PELSWIDTH`, but only to a mode that the driver listed at load. gwes calls
+the driver only when the angle changes. The resize pump therefore turns the
+screen to the angle 180° away, then back to the angle it had.
+
+During those two turns the guest reports the angle it had. gwes returns
+`DISP_CHANGE_FAILED` while another call is in progress. The driver turns the
+screen for the pump only from the angle that the pump expects. An app that
+turns the screen between the two turns therefore keeps its angle.
+
+gwes always turns touch-panel points by the angle. gwes turns mouse points
+only when the event carries flag `0x200000`. The host sends every point in the
+orientation of the panel, so the guest-additions pointer sets that flag while
+the screen is turned.
+
+A DirectDraw primary reports the pitches and the origin that it had when the
+app created it. Every lock of that primary uses them, also after a turn. The
+WM6 and CE6 cores report the primary lost after a turn. The CE 5.0 core keeps
+it. The `Restore` of the CE 5.0 core does nothing for a surface that the core
+did not mark lost. As a result, a live resize waits while the CE 5.0 core holds
+a primary.
+
+A CE5-style surface description has no `lXPitch`, so the driver refuses a
+CE5-style primary while the screen is turned.
+
+The WM6 and CE6 cores build every surface of a flip chain from the one surface
+description that the driver fills. After each flip, these cores swap the driver
+surfaces of the front buffer and the back buffer. Every surface of a primary
+flip chain therefore has the stride, the size and the layout that the primary
+had when the app created the chain.
+
+A reset turns the display back to angle 0. It turns the host view by the same
+amount. A deep-sleep resume keeps the angle.
 
 ## Guest thread topology
 

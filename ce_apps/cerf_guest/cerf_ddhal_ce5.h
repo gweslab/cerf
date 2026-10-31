@@ -183,3 +183,4 @@ typedef struct _Ce5_DDHAL_LOCKDATA {
 #pragma pack(pop)
 
 extern "C" BOOL Ce5HALInit(void* lpddhi);
+extern "C" BOOL CerfCe5PrimaryHeld(void);

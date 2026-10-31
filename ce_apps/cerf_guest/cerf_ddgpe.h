@@ -6,6 +6,7 @@
 #include "include/cerf_gpe.h"
 #include "cerfcore/peripherals/cerf_virt/cerf_virt_blt_descriptor.h"
 #include "cerfcore/peripherals/cerf_virt/cerf_virt_line_descriptor.h"
+#include "cerf_ddgpe_primary_layout.h"
 
 struct CerfStageWb { BOOL active; ULONG dst_va; void* arena_ptr; ULONG span; };
 
@@ -14,7 +15,7 @@ extern "C" void  CerfSetVidBackingByOsMajor(unsigned long os_major);
 extern "C" void  CerfGetVideoMem(unsigned long* base, unsigned long* size,
                                  unsigned long* freeBytes);
 extern "C" void  CerfGetVideoRegion(unsigned long* base, unsigned long* size);
-extern "C" BOOL  CerfDDSurfFbInfo(void* lcl, ULONG* pa, int* stride, int* bpp, int* height);
+extern "C" BOOL  CerfDDSurfFbLock(void* lcl, int x, int y, void** va);
 extern "C" unsigned long CerfDDGPESurfBufferVa(unsigned long surf);
 extern "C" void  CerfFillSurfaceFromSurfobj(cerfcore::CerfVirt::CerfBltSurface* s, SURFOBJ* pso,
                                             int y0, int y1, CerfStageWb* wb);
@@ -85,6 +86,10 @@ public:
                                unsigned long* freeBytes);
     void GetVideoRegion(unsigned long* base, unsigned long* size);
     bool SurfaceFbPa(GPESurf* s, ULONG* pa);
+    void SurfaceLayout(void* lcl, GPESurf* s, CerfPrimaryLayout* out);
+    void* FbLockBase(GPESurf* s, ULONG pa);
+    SCODE AllocBackBuffer(GPESurf** ppSurf);
+    void  ReleaseScanout(GPESurf* s);
     CerfAliasKind BltAliasKind(GPEBltParms* p);
     BOOL  SnapshotSource(GPEBltParms* p, GPESurf** ppTemp);
     SCODE PlanAliasedBlt(GPEBltParms* p, CerfBandOrder* order, GPESurf** ppTemp);
@@ -131,7 +136,7 @@ private:
     BYTE*           m_vidBaseVa;
     ULONG           m_vidSize;
     CerfVidBacking  m_vidBacking;
-    int             m_currentRotation;
+    GPESurf*        m_pScanout;
     void EmitBltBand(const CerfBltBand& b, GPEBltParms* p, int r0, int r1);
     void EmitBltBands(const CerfBltBand& b, GPEBltParms* p, ULONG budget,
                       CerfBandOrder order);

@@ -70,7 +70,7 @@ void QtEmulatorWindow::SetGuestSurfaceSize(uint32_t w, uint32_t h) {
 
 void QtEmulatorWindow::SetGuestResolution(uint32_t w, uint32_t h) {
     if (w == 0 || h == 0) return;
-    emu_.Get<cerfcore::CerfVirtFramebuffer>().ApplyGuestMode(w, h);
+    if (!emu_.Get<cerfcore::CerfVirtFramebuffer>().SetHostMode(w, h)) return;
     SetGuestSurfaceSize(w, h);
 }
 
@@ -99,7 +99,7 @@ void QtEmulatorWindow::OnPresentationChanged() {
 }
 
 void QtEmulatorWindow::NotifyGuestRemoded(uint32_t w, uint32_t h) {
-    RunOnUiThread([this, w, h] { SetGuestResolution(w, h); });
+    RunOnUiThread([this, w, h] { SetGuestSurfaceSize(w, h); });
 }
 
 void QtEmulatorWindow::RunOnUiThread(std::function<void()> job) {

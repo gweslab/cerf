@@ -8,6 +8,7 @@
 #include <cerfcore/core/device_config_refresh.h>
 #include <cerfcore/host/customizations_editor.h>
 #include <cerfcore/peripherals/cerf_virt/cerf_virt_customizations_reset.h>
+#include <cerfcore/peripherals/cerf_virt/cerf_virt_framebuffer.h>
 #include <cerfcore/peripherals/cerf_virt/cerf_virt_resize.h>
 #include <cerfcore/socs/guest_cpu_reset.h>
 
@@ -48,20 +49,25 @@ private:
         const uint32_t w   = cfg.board_configurable_screen_width;
         const uint32_t h   = cfg.board_configurable_screen_height;
 
-        auto& win = emu_.Get<FrontendWindow>();
+        auto&      win  = emu_.Get<FrontendWindow>();
+        const bool fits = emu_.Get<cerfcore::CerfVirtFramebuffer>().FitsPrimary(w, h, "live customization");
         switch (reset) {
             case GuestReset::kSoft:
-                win.SetGuestResolution(w, h);
-                win.FitToResolution(w, h);
+                if (fits) {
+                    win.SetGuestResolution(w, h);
+                    win.FitToResolution(w, h);
+                }
                 emu_.Get<cerfcore::GuestCpuReset>().WarmReset();
                 return;
             case GuestReset::kHard:
-                win.SetGuestResolution(w, h);
-                win.FitToResolution(w, h);
+                if (fits) {
+                    win.SetGuestResolution(w, h);
+                    win.FitToResolution(w, h);
+                }
                 emu_.Get<cerfcore::GuestColdBoot>().RequestHardReset();
                 return;
             case GuestReset::kNone:
-                if (w != prev_w || h != prev_h) {
+                if (fits && (w != prev_w || h != prev_h)) {
                     win.FitToResolution(w, h);
                     emu_.Get<cerfcore::CerfVirtResize>().RequestResize(w, h);
                 }

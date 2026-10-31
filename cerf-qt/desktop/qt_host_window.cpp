@@ -21,6 +21,10 @@ void QtHostWindow::closeEvent(QCloseEvent* event) {
 void QtHostWindow::changeEvent(QEvent* event) {
     if (event->type() == QEvent::WindowStateChange && isMaximized())
         gate_.Run([](cerfcore::CerfEmulator& emu) { emu.Get<QtMainWindow>().OnMaximized(); });
+    if (event->type() == QEvent::WindowStateChange && event->spontaneous() &&
+        (static_cast<QWindowStateChangeEvent*>(event)->oldState() ^ windowState())
+            .testAnyFlags(Qt::WindowMaximized | Qt::WindowFullScreen))
+        gate_.Run([](cerfcore::CerfEmulator& emu) { emu.Get<QtMainWindow>().OnUserResized(); });
     if (event->type() == QEvent::ActivationChange && !isActiveWindow())
         gate_.Run([](cerfcore::CerfEmulator& emu) { emu.Get<QtMainWindow>().OnDeactivated(); });
     QMainWindow::changeEvent(event);

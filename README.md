@@ -438,11 +438,12 @@ python run_claude.py
           🆕 Support for Android (ARM64)<br/>
           🆕 Startup screen scale configuration and dynamic mode for retina screen<br/>
           🆕 Device HUDs - simplified hardware buttons in a canvas<br/>
-          🆕 Screen rotation<br/>
+          🆕 Rotation of any device screen<br/>
           ✅ Serial connection regression on some MIPS boards</p>
         <p><b>🚀 Launcher</b><br/>
           ❌ Replaced with Devices Manager</p>
         <p><b>✨ Guest Additions</b><br/>
+          🆕 Screen rotation support<br/>
           ✅ Moved &quot;untrusted apps hack&quot; for WM into optional switch since it broke WM6<br/>
           ✅ Fixed miniport driver causing hangs at soft resets</p>
       </td>

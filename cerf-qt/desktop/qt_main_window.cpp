@@ -159,6 +159,7 @@ void QtMainWindow::FitToResolution(uint32_t sw, uint32_t sh) {
     if (window_->isMaximized()) return;
     int content_w = 0, content_h = 0;
     canvas_->ContentFor(sw, sh, content_w, content_h);
+    LOG(Lcd, "QtMainWindow: fit to surface %ux%u -> content %dx%d\n", sw, sh, content_w, content_h);
     FitWindowToSurface(static_cast<uint32_t>(content_w), static_cast<uint32_t>(content_h));
 }
 
@@ -222,6 +223,7 @@ void QtMainWindow::ToggleFullscreen() {
         bar_->hide();
         window_->showFullScreen();
         emu_.Get<QtFocusPolicy>().Raise(window_);
+        canvas_->ArmLiveResize();
         return;
     }
     fullscreen_ = false;
@@ -229,6 +231,12 @@ void QtMainWindow::ToggleFullscreen() {
     bar_->show();
     if (was_maximized_) window_->showMaximized();
     else                window_->showNormal();
+    canvas_->ArmLiveResize();
+}
+
+void QtMainWindow::OnUserResized() {
+    follow_guest_ = false;
+    canvas_->ArmLiveResize();
 }
 
 void QtMainWindow::SetKeyboardGrab(bool on) {

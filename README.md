@@ -439,7 +439,8 @@ python run_claude.py
           🆕 Devemu: Added Smartphone, SVGA and legacy board types (appropriate resolution and keyboard layout)<br/>
           🆕 iPAQ 1st gen: keypad support<br/>
           🆕 iPAQ 1st gen: battery support<br/>
-          🆕 iPAQ 1st gen: alarm/charge LED</p>
+          🆕 iPAQ 1st gen: alarm/charge LED<br/>
+          ✅ Fixed WM2003SE touch crash regression</p>
         <p><b>💿 Emulator</b><br/>
           🆕 Support for Linux (x86-64)<br/>
           🆕 Support for macOS (ARM64)<br/>

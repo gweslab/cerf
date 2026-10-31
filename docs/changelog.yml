@@ -6,6 +6,8 @@
       iPAQ 1st gen: keypad support
       iPAQ 1st gen: battery support
       iPAQ 1st gen: alarm/charge LED
+    fixed: |
+      Fixed WM2003SE touch crash regression
   emulator:
     new: |
       Support for Linux (x86-64)

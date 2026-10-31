@@ -235,7 +235,7 @@ def verification_text(rel_path, sample):
         f"session for each one. If you did not - open the reference. "
         f"This reference goes into Skill(verify) and to user. Following action is "
         f"removing this comment. Logic based on a fabricated citation goes into Skill(verify) "
-        f"under guessed/ungrounded category
+        f"under guessed/ungrounded category (prevent it by opening citations or/and fixing logic please)"
     )
 
 

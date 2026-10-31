@@ -433,7 +433,7 @@ python run_claude.py
   <tbody>
     <tr>
       <td>v8.0</td>
-      <td>TBA</td>
+      <td>31 Oct 2026</td>
       <td>
         <p><b>📱 Devices</b><br/>
           🆕 Devemu: Added Smartphone, SVGA and legacy board types (appropriate resolution and keyboard layout)<br/>

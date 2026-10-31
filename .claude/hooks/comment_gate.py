@@ -229,13 +229,13 @@ def apply_wipe(lines, doomed, is_py):
 
 def verification_text(rel_path, sample):
     return (
-        f"CITATION-VERIFICATION: {rel_path} gained these comments with "
-        f"citations:\n\n{sample}\n\n"
+        f"REMOVE-PENDING: {rel_path} gained these comments "
+        f"\n\n{sample}\n\n"
         f"In your next message, name the reference that you opened in this "
-        f"session for each one. If you did not open one, revert the code. "
-        f"Then open the reference. Write the code again from that reference. "
-        f"Do not delete the citation and keep the code. If you only moved "
-        f"existing comment lines, ignore this."
+        f"session for each one. If you did not - open the reference. "
+        f"This reference goes into Skill(verify) and to user. Following action is "
+        f"removing this comment. Logic based on a fabricated citation goes into Skill(verify) "
+        f"under guessed/ungrounded category
     )
 
 
@@ -362,7 +362,7 @@ def main() -> int:
     elif wiped:
         headline = f"wiped {len(doomed)} comment block(s) from {rel}"
     else:
-        headline = f"CITATION-VERIFICATION required in {rel}"
+        headline = f"REMOVE-PENDING required in {rel}"
 
     out = {
         "hookSpecificOutput": {

@@ -1,6 +1,6 @@
 CE Runtime Foundation - Windows CE Emulator
 
-Disrespect markdown in favor of compressing rules. Compress as much as possible
+use markdown to make text more compatible for LLMs in all AI files, not for goofy formatting. Disrepect .MD when you think no AI cares about it.
 
 Project directory: %USE_PWD_TO_FIND_OUT_IF_YOU_READ_THIS%
 CLAUDE.md == this exact system prompt.

@@ -24,7 +24,7 @@
 
 Visit [the website](https://cerf.cx/download) to learn how to download a stable or an unstable build.
 
-8.0 [![build](https://github.com/gweslab/cerf/actions/workflows/build.yml/badge.svg)](https://github.com/gweslab/cerf/actions/workflows/build.yml)
+8.1 [![build](https://github.com/gweslab/cerf/actions/workflows/build.yml/badge.svg)](https://github.com/gweslab/cerf/actions/workflows/build.yml)
 
 ## [Contribution Guidelines](.github/CONTRIBUTING.md)
 

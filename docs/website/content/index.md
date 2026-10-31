@@ -19,7 +19,7 @@ Handhelds, PDAs, industrial panels and more. Windows CE 1.0 to Windows Embedded 
 [:fontawesome-brands-apple: Download for macOS](download.md){ .md-button .md-button--primary .cerf-hidden data-platform="macOS" }
 [:fontawesome-brands-linux: Download for Linux](download.md){ .md-button .md-button--primary .cerf-hidden data-platform="Linux" }
 [:fontawesome-brands-android: Download for Android](download.md){ .md-button .md-button--primary .cerf-hidden data-platform="Android" }
-[:fontawesome-solid-download: Other downloads](download.md){ .md-button .cerf-download-other .cerf-hidden }
+[:fontawesome-solid-download: Other platforms](download.md){ .md-button .cerf-download-other .cerf-hidden }
 
 {links}
 

@@ -1,5 +1,5 @@
 (function () {
-  var enabled = false;
+  var enabled = true;
   var platforms = ['Windows', 'Linux', 'macOS', 'Android'];
 
   function platform() {

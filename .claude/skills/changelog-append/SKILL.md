@@ -39,6 +39,7 @@ Component groups:
 - **`ce_apps`** - CERF-built CE binaries and shipped tools (xplorer, romdump, `tools\fileserver.py`, bundled CE apps).
 - **`guest_additions`** - the Guest Additions subsystem: display driver, ROM injection, mouse/keyboard, shared folders, task manager, DPI, resolution.
 - **`website`** - the cerf.cx docs site.
+- **`patches`** - a hotfix/patch, usually only `fixed` category, format `Patch X: Change`, where `X` - the patch number from `version.h`
 
 Subcategories:
 

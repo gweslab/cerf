@@ -17,6 +17,7 @@ GROUPS = [
     ('ce_apps',         'CE Apps',         '💾'),
     ('guest_additions', 'Guest Additions', '✨'),
     ('website',         'Website',         '🌐'),
+    ('patches',         'Patches',         '🚑')
 ]
 
 SUBCATS = [

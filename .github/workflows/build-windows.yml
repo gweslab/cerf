@@ -46,10 +46,11 @@ jobs:
         shell: pwsh
         run: python tools/stamp_version.py --run=${{ github.run_number }} --sha=${{ github.sha }} --host-branch=${{ env.HOST_BRANCH }}
 
-      - uses: ./.github/actions/ce-tools
+      - name: Fetch the CE apps
+        uses: actions/download-artifact@v4
         with:
-          url: ${{ secrets.CE_TOOLCHAIN_URL }}
-          python: python
+          name: ce-apps
+          path: ci/ce_apps
 
       - name: Install ccache
         shell: bash
@@ -62,7 +63,7 @@ jobs:
 
       - name: Build
         shell: pwsh
-        run: python build.py --config Release --mode production
+        run: python build.py --config Release --mode production --ce-apps-from=ci/ce_apps
 
       - uses: ./.github/actions/compiler-cache
         if: ${{ !cancelled() }}

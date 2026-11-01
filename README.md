@@ -25,7 +25,7 @@
 
 Visit [the website](https://cerf.cx/download) to learn how to download a stable or an unstable build.
 
-8.0.2 [![build](https://github.com/gweslab/cerf/actions/workflows/build.yml/badge.svg)](https://github.com/gweslab/cerf/actions/workflows/build.yml)
+8.0.3 [![build](https://github.com/gweslab/cerf/actions/workflows/build.yml/badge.svg)](https://github.com/gweslab/cerf/actions/workflows/build.yml)
 
 ## [Contribution Guidelines](.github/CONTRIBUTING.md)
 
@@ -47,8 +47,10 @@ Install modern Visual Studio with the C++ desktop development workload.
 Install the build packages. These are the Ubuntu 26.04 names:
 
 ```
-sudo apt install git cmake ninja-build g++ pkg-config ccache wine qt6-base-dev qt6-svg-dev qt6-declarative-dev qt6-declarative-dev-tools qml6-module-qtquick qml6-module-qtquick-controls qml6-module-qtquick-templates qml6-module-qtquick-layouts qml6-module-qtquick-window qml6-module-qtqml-workerscript qml6-module-qtquick-dialogs qml6-module-qtquick-effects qml6-module-qtqml qml6-module-qtqml-models libslirp-dev libzip-dev nlohmann-json3-dev libasound2-dev libxcb1-dev libxcb-randr0-dev libwayland-dev
+sudo apt install git cmake ninja-build g++ pkg-config ccache wine patchelf curl zip unzip tar make perl bison flex libgl-dev libasound2-dev libxcb1-dev libxcb-randr0-dev libwayland-dev
 ```
+
+Clone vcpkg and run `bootstrap-vcpkg.sh` in the clone. Set `VCPKG_ROOT` to the clone. The build downloads Qt into `third_party/qt/` and ships it with CERF.
 
 ### macOS
 
@@ -97,7 +99,7 @@ The build script will:
 
 - the Android SDK with `platforms;android-36`, `build-tools;36.0.0` and `ndk;29.0.14206865`, and set `ANDROID_SDK_ROOT` to it
 - a JDK 17 or newer, and set `JAVA_HOME` to it
-- on Linux, a vcpkg checkout, and set `VCPKG_ROOT` to it
+- on Linux, a vcpkg checkout with `bootstrap-vcpkg.sh` run in it, and set `VCPKG_ROOT` to it
 
 The build downloads Qt 6.12 for Android and for the host into `third_party/qt/`.
 
@@ -441,7 +443,6 @@ python run_claude.py
           🆕 iPAQ 1st gen: keypad support<br/>
           🆕 iPAQ 1st gen: battery support<br/>
           🆕 iPAQ 1st gen: alarm/charge LED<br/>
-          ✅ Patch 1: Added DevEmu 2003 screen configuration support<br/>
           ✅ Fixed WM2003SE touch crash regression</p>
         <p><b>💿 Emulator</b><br/>
           🆕 Support for Linux (x86-64)<br/>
@@ -450,7 +451,6 @@ python run_claude.py
           🆕 Startup screen scale configuration and dynamic mode for retina screen<br/>
           🆕 Device HUDs - simplified hardware buttons in a canvas<br/>
           🆕 Rotation of any device screen<br/>
-          ✅ Patch 2: Fixed emulator startup race crash<br/>
           ✅ Serial connection regression on some MIPS boards</p>
         <p><b>🚀 Launcher</b><br/>
           ❌ Replaced with Devices Manager</p>
@@ -458,6 +458,10 @@ python run_claude.py
           🆕 Screen rotation support<br/>
           ✅ Moved &quot;untrusted apps hack&quot; for WM into optional switch since it broke WM6<br/>
           ✅ Fixed miniport driver causing hangs at soft resets</p>
+        <p><b>🚑 Patches</b><br/>
+          ✅ Patch 1: Added DevEmu 2003 screen configuration support<br/>
+          ✅ Patch 2: Fixed emulator startup race crash<br/>
+          ✅ Patch 3: Linux build now bundles many libraries instead of using system ones</p>
       </td>
     </tr>
     <tr>

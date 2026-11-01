@@ -1,6 +1,9 @@
 cmake_minimum_required(VERSION 3.25)
 project(cerfqt LANGUAGES CXX)
 
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    set(OpenGL_GL_PREFERENCE LEGACY)
+endif()
 if(ANDROID)
     find_package(Qt6 6.8 REQUIRED COMPONENTS Svg Network Qml Quick QuickControls2)
 else()
@@ -114,12 +117,22 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
         target_sources(cerf-qt PRIVATE "${cerfqt_protocol_header}" "${cerfqt_protocol_code}")
     endforeach()
     target_include_directories(cerf-qt PRIVATE "${cerfqt_wayland_dir}")
-    set_target_properties(cerf-qt cerfqt_style PROPERTIES QT_QMLCACHEGEN_ARGUMENTS "--only-bytecode")
-    foreach(cerfqt_target IN ITEMS cerf-qt cerfqt_style cerfqt_styleplugin)
-        target_compile_options(${cerfqt_target} PRIVATE
-            $<$<CXX_COMPILER_ID:GNU>:-mno-direct-extern-access>
-            $<$<CXX_COMPILER_ID:Clang>:-fno-direct-access-external-data>)
-    endforeach()
+    set_target_properties(cerf-qt PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}"
+                                             INSTALL_RPATH "$ORIGIN/lib")
+    target_link_options(cerf-qt PRIVATE
+        "LINKER:--exclude-libs,$<TARGET_LINKER_FILE_NAME:libzip::zip>:$<TARGET_LINKER_FILE_NAME:ZLIB::ZLIB>")
+    install(TARGETS cerf-qt RUNTIME DESTINATION .)
+    find_program(cerfqt_patchelf patchelf REQUIRED)
+    find_library(cerfqt_libssl NAMES libssl.so.3 REQUIRED)
+    qt6_generate_deploy_script(TARGET cerf-qt OUTPUT_SCRIPT cerfqt_deploy_script CONTENT "
+set(CERFQT_DEPLOY_EXECUTABLE \"$<TARGET_FILE:cerf-qt>\")
+set(CERFQT_DEPLOY_EXECUTABLE_NAME \"$<TARGET_FILE_NAME:cerf-qt>\")
+set(CERFQT_DEPLOY_PATCHELF \"${cerfqt_patchelf}\")
+set(CERFQT_DEPLOY_LIBSSL \"${cerfqt_libssl}\")
+set(CERFQT_DEPLOY_EXCLUDELIST \"${CERFQT_DEPLOY_EXCLUDELIST}\")
+include(\"${CMAKE_CURRENT_SOURCE_DIR}/deploy_linux.cmake\")
+")
+    install(SCRIPT "${cerfqt_deploy_script}")
 endif()
 
 set(cerfqt_assets "${CMAKE_CURRENT_SOURCE_DIR}/../assets")
@@ -200,6 +213,8 @@ if(APPLE)
         MACOSX_BUNDLE_SHORT_VERSION_STRING "${cerfqt_version}"
         MACOSX_BUNDLE_BUNDLE_VERSION "${cerfqt_version}")
     set(cerfqt_output_dir "$<TARGET_BUNDLE_DIR:cerf-qt>/..")
+elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    set(cerfqt_output_dir "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}")
 else()
     set(cerfqt_output_dir "$<TARGET_FILE_DIR:cerf-qt>")
 endif()

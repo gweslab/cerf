@@ -50,6 +50,8 @@ Install the build packages. These are the Ubuntu 26.04 names:
 {apt_install}
 ```
 
+Clone vcpkg and run `bootstrap-vcpkg.sh` in the clone. Set `VCPKG_ROOT` to the clone. The build downloads Qt into `third_party/qt/` and ships it with CERF.
+
 ### macOS
 
 Install the Xcode Command Line Tools (`xcode-select --install`) and [Homebrew](https://brew.sh). Then install the build packages:
@@ -97,7 +99,7 @@ The build script will:
 
 - the Android SDK with {android_sdk_packages}, and set `ANDROID_SDK_ROOT` to it
 - a JDK 17 or newer, and set `JAVA_HOME` to it
-- on Linux, a vcpkg checkout, and set `VCPKG_ROOT` to it
+- on Linux, a vcpkg checkout with `bootstrap-vcpkg.sh` run in it, and set `VCPKG_ROOT` to it
 
 The build downloads Qt 6.12 for Android and for the host into `third_party/qt/`.
 

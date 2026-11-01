@@ -2,17 +2,14 @@ import sys
 
 from tool_process import exit_code
 
-BUILD_TOOLS = ("cmake", "ninja-build", "g++", "pkg-config", "ccache", "wine")
-BUILD_PACKAGES = ("git",) + BUILD_TOOLS + (
-    "qt6-base-dev", "qt6-svg-dev", "qt6-declarative-dev", "qt6-declarative-dev-tools",
-    "qml6-module-qtquick", "qml6-module-qtquick-controls", "qml6-module-qtquick-templates",
-    "qml6-module-qtquick-layouts", "qml6-module-qtquick-window", "qml6-module-qtqml-workerscript",
-    "qml6-module-qtquick-dialogs", "qml6-module-qtquick-effects", "qml6-module-qtqml", "qml6-module-qtqml-models",
-    "libslirp-dev", "libzip-dev", "nlohmann-json3-dev", "libasound2-dev", "libxcb1-dev", "libxcb-randr0-dev",
-    "libwayland-dev")
-ANDROID_BUILD_PACKAGES = BUILD_TOOLS + ("curl", "make", "perl", "bison", "flex", "zip", "unzip", "tar",
-                                        "python3-venv", "openjdk-21-jdk-headless")
-PACKAGE_SETS = {"linux": BUILD_PACKAGES, "android": ANDROID_BUILD_PACKAGES}
+COMPILE_TOOLS = ("cmake", "ninja-build", "g++", "pkg-config", "ccache")
+CE_APPS_PACKAGES = ("wine",)
+BUILD_PACKAGES = ("git",) + COMPILE_TOOLS + CE_APPS_PACKAGES + (
+    "patchelf", "curl", "zip", "unzip", "tar", "make", "perl", "bison", "flex", "libgl-dev", "libasound2-dev", "libxcb1-dev",
+    "libxcb-randr0-dev", "libwayland-dev")
+ANDROID_BUILD_PACKAGES = COMPILE_TOOLS + ("curl", "make", "perl", "bison", "flex", "zip", "unzip", "tar",
+                                          "python3-venv", "openjdk-21-jdk-headless")
+PACKAGE_SETS = {"linux": BUILD_PACKAGES, "ce-apps": CE_APPS_PACKAGES, "android": ANDROID_BUILD_PACKAGES}
 
 
 def install_command():

@@ -166,12 +166,11 @@ PowerShell 3.0 and .NET Framework 4.5.
 Its install root is `~/CE Runtime Foundation` by default. It reads its answers from
 `/dev/tty`, so it also works when `curl` pipes it into `sh`.
 
-On Linux, the script installs the packages that CERF needs with `apt-get`, `pacman`,
-`dnf` or `zypper`. It holds one package list for each of these package managers. Each
-list names the packages that own the libraries that `cerf` links, the Qt plugins that
-it loads and the QML modules that it imports. A new library, plugin or QML import in
-the frontend needs its package in every list. Before the script starts the staged
-frontend, `ldd` must find every library and symbol version that `cerf` needs.
+On Linux, the release carries every library that `cerf` and the shipped Qt files link.
+Only the libraries that AppImage's exclude list names stay on the system. The script
+installs only the tools that it uses itself, with `apt-get`, `pacman`, `dnf` or `zypper`. Before the script starts the staged
+frontend, `ldd` must find every library and symbol version that `cerf` and the platform
+plugin of the session need.
 
 `uninstaller-win32/` builds `uninstall.exe`, a Win32 program with the static C runtime.
 It sits in the install root, copies itself to `%TEMP%`, runs from the copy, and removes

@@ -6,37 +6,60 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-    container: ubuntu:26.04
+    container: almalinux:9
     env:
       HOST_BRANCH: linux-amd64
+      VCPKG_ROOT: /opt/vcpkg
 
     steps:
       - name: Install the checkout tools
         run: |
-          apt-get update
-          DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends ca-certificates curl git python3
+          dnf -y install epel-release dnf-plugins-core
+          dnf config-manager --set-enabled crb
+          dnf -y install git python3
 
       - uses: actions/checkout@v4
         with:
           submodules: false
 
       - name: Install the build dependencies
-        env:
-          DEBIAN_FRONTEND: noninteractive
-        run: python3 tools/apt_packages.py linux
+        run: python3 tools/dnf_packages.py
 
       - name: Fetch core libraries
         run: |
           git config --global --add safe.directory "$GITHUB_WORKSPACE"
           git submodule update --init libservicelocator libCerfEngine libCerfCore
 
+      - name: Install vcpkg
+        run: |
+          git clone --quiet https://github.com/microsoft/vcpkg.git "$VCPKG_ROOT"
+          "$VCPKG_ROOT/bootstrap-vcpkg.sh" -disableMetrics
+
+      - uses: ./.github/actions/vcpkg-cache
+        with:
+          stage: restore
+          host-branch: ${{ env.HOST_BRANCH }}
+
+      - name: Name the Qt download folder
+        id: qt
+        run: python3 tools/qt_online_repository.py --cache-outputs >> "$GITHUB_OUTPUT"
+
+      - name: Restore the Qt download
+        id: cache-qt
+        uses: actions/cache/restore@v4
+        with:
+          path: ${{ steps.qt.outputs.path }}
+          key: qt-linux-${{ steps.qt.outputs.key }}
+
       - name: Stamp version.h with CI build info
         id: version
         run: python3 tools/stamp_version.py --run=${{ github.run_number }} --sha=${{ github.sha }} --host-branch=${{ env.HOST_BRANCH }}
 
-      - uses: ./.github/actions/ce-tools
+      - name: Fetch the CE apps
+        uses: actions/download-artifact@v4
         with:
-          url: ${{ secrets.CE_TOOLCHAIN_URL }}
+          name: ce-apps
+          path: ci/ce_apps
 
       - uses: ./.github/actions/compiler-cache
         with:
@@ -49,7 +72,22 @@ jobs:
           host-branch: ${{ env.HOST_BRANCH }}
 
       - name: Build
-        run: python3 build.py --config Release --mode production
+        shell: bash
+        run: |
+          source /opt/rh/gcc-toolset-15/enable
+          python3 build.py --config Release --mode production --ce-apps-from=ci/ce_apps
+
+      - uses: ./.github/actions/vcpkg-cache
+        with:
+          stage: save
+          host-branch: ${{ env.HOST_BRANCH }}
+
+      - name: Save the Qt download
+        if: ${{ !cancelled() && steps.cache-qt.outputs.cache-hit != 'true' && hashFiles(steps.qt.outputs.stamp) != '' }}
+        uses: actions/cache/save@v4
+        with:
+          path: ${{ steps.qt.outputs.path }}
+          key: qt-linux-${{ steps.qt.outputs.key }}
 
       - uses: ./.github/actions/resvg-cache
         if: ${{ !cancelled() }}

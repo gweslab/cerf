@@ -11,6 +11,7 @@ import android_sdk
 import build_report
 import local_config
 import qt_android
+import qt_online_repository
 import vcpkg_install
 import verified_download
 import vs_toolchain
@@ -76,7 +77,7 @@ class AndroidBuild(FrontendBuild):
     vcpkg_root = Path()
 
     def discover(self) -> None:
-        if not qt_android.host_supported():
+        if not qt_online_repository.host_supported():
             raise BuildAbort("The Android build runs on a Windows or Linux host, not on {}."
                              .format(sys.platform))
         self.sdk = _sdk_root()
@@ -114,7 +115,8 @@ class AndroidBuild(FrontendBuild):
                                          self.heartbeat)
             qt_target, qt_host = qt_android.ensure(self.root, self.branch.name, self.cmake, self.heartbeat)
             openssl = android_openssl.fetch(self.root, self.branch.name)
-        except (vcpkg_install.VcpkgError, qt_android.QtFetchError, verified_download.DownloadError, OSError) as exc:
+        except (vcpkg_install.VcpkgError, qt_online_repository.QtFetchError, verified_download.DownloadError,
+                OSError) as exc:
             raise BuildAbort(exc)
         resvg = self.resvg_options(env)
         out = output_dir(self.root, self.config, self.branch)

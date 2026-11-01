@@ -4,17 +4,10 @@ set -eu
 PRODUCT='CE Runtime Foundation'
 RELEASE_API='https://api.github.com/repos/gweslab/cerf/releases/latest'
 CI_BASE='https://cerf-bundles.dz3n.net/cerf_ci'
-APT_PACKAGES='libasound2t64 libc6 libgcc-s1 libqt6core6t64 libqt6dbus6 libqt6gui6 libqt6network6
-libqt6qml6 libqt6quick6 libqt6widgets6 libslirp0 libstdc++6 libwayland-client0 libxcb1 libxcb-randr0
-libzip5 qml6-module-qtqml qml6-module-qtqml-models qml6-module-qtqml-workerscript qml6-module-qtquick
-qml6-module-qtquick-controls qml6-module-qtquick-dialogs qml6-module-qtquick-effects qml6-module-qtquick-layouts
-qml6-module-qtquick-templates qml6-module-qtquick-window qt6-svg-plugins unzip python3'
-PACMAN_PACKAGES='qt6-base qt6-declarative qt6-svg libslirp libzip alsa-lib libxcb wayland unzip python'
-DNF_PACKAGES='qt6-qtbase qt6-qtbase-gui qt6-qtdeclarative qt6-qtsvg libslirp libzip alsa-lib libxcb
-libwayland-client unzip python3'
-ZYPPER_PACKAGES='libQt6Core6 libQt6Gui6 libQt6Widgets6 libQt6Network6 libQt6DBus6 libQt6Qml6 libQt6Quick6
-qt6-declarative-imports libQt6Svg6 libslirp0 libzip5 libasound2 libxcb1 libxcb-randr0 libwayland-client0
-unzip python3'
+APT_PACKAGES='unzip python3'
+PACMAN_PACKAGES='unzip python'
+DNF_PACKAGES='unzip python3'
+ZYPPER_PACKAGES='unzip python3'
 
 fail() {
     printf '%s\n' "$*" >&2
@@ -262,7 +255,8 @@ main() {
     stage="$upgrade_dir/$FRONTEND"
     [ -x "$stage" ] || fail "$name contains no $FRONTEND. $PRODUCT was not installed."
     if [ "$BRANCH" = linux-amd64 ]; then
-        unresolved=$(ldd "$stage" 2>&1 | grep 'not found' || true)
+        if [ -n "${WAYLAND_DISPLAY:-}" ]; then platform=wayland; else platform=xcb; fi
+        unresolved=$(ldd "$stage" "$upgrade_dir/plugins/platforms/libq$platform.so" 2>&1 | grep 'not found' || true)
         [ -z "$unresolved" ] || fail "$PRODUCT needs libraries that this system does not have:
 $unresolved
 $PRODUCT was not installed."

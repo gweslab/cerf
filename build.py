@@ -32,6 +32,8 @@ def parse_args(argv):
                              "the frontend of this host".format(host_branch.by_name(ANDROID_ARM64).frontend))
     parser.add_argument("--ce-apps-from", metavar="DIR",
                         help="copy ce_apps from the ce_apps directory of another build")
+    parser.add_argument("--ce-apps-only", action="store_true",
+                        help="build only ce_apps, not the frontend")
     args = parser.parse_args(argv)
     if args.config.lower() in ("d", "debug"):
         args.config = "Debug"
@@ -74,7 +76,8 @@ def run(args, branch, lock) -> int:
     builder = host_build(branch, args, heartbeat)
     dev_flag = "0" if args.mode == "production" else "1"
     try:
-        builder.discover()
+        if not args.ce_apps_only:
+            builder.discover()
         print("[BUILD] Mode: {} (CERF_DEV_MODE={})".format(args.mode, dev_flag), flush=True)
         report = build_common.BuildReport()
         heartbeat()
@@ -82,6 +85,8 @@ def run(args, branch, lock) -> int:
             return 1
         build_common.build_ce_apps(ROOT, branch, args.config, args.mode, heartbeat, report,
                                    args.ce_apps_from)
+        if args.ce_apps_only:
+            return summarize(report, started)
         if branch.package_file and report.failed:
             print("[BUILD] FAILED! {} holds every CE app, and {} of them failed.".format(
                 branch.frontend, report.failed), flush=True)
@@ -108,7 +113,10 @@ def run(args, branch, lock) -> int:
         report.ok()
     else:
         report.fail(branch.frontend)
+    return summarize(report, started)
 
+
+def summarize(report, started) -> int:
     print("============================================================")
     if report.failed:
         print("[BUILD] Failed: {}".format(", ".join(report.failed_names)))

@@ -84,9 +84,11 @@ jobs:
         id: version
         run: python3 tools/stamp_version.py --run=${{ github.run_number }} --sha=${{ github.sha }} --host-branch=${{ env.HOST_BRANCH }}
 
-      - uses: ./.github/actions/ce-tools
+      - name: Fetch the CE apps
+        uses: actions/download-artifact@v4
         with:
-          url: ${{ secrets.CE_TOOLCHAIN_URL }}
+          name: ce-apps
+          path: ci/ce_apps
 
       - name: Build
         id: build
@@ -101,7 +103,7 @@ jobs:
             export QT_ANDROID_KEYSTORE_PATH="$RUNNER_TEMP/cerf-release.jks"
           fi
           python3 tools/build_android.py --signed-output >> "$GITHUB_OUTPUT"
-          python3 build.py --android --config Release --mode production
+          python3 build.py --android --config Release --mode production --ce-apps-from=ci/ce_apps
 
       - uses: ./.github/actions/vcpkg-cache
         with:

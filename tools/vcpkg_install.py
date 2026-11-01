@@ -6,11 +6,12 @@ import sys
 from pathlib import Path
 from typing import Callable, Dict, List
 
-from host_branch import ANDROID_AMD64, ANDROID_ARM64, WIN32_X86
+from host_branch import ANDROID_AMD64, ANDROID_ARM64, LINUX_AMD64, WIN32_X86
 from json_files import json_digest
 from tool_process import run_or_raise
 
-TRIPLETS = {WIN32_X86: "x86-windows-static-md", ANDROID_ARM64: "arm64-android", ANDROID_AMD64: "x64-android"}
+TRIPLETS = {WIN32_X86: "x86-windows-static-md", LINUX_AMD64: "x64-linux", ANDROID_ARM64: "arm64-android",
+            ANDROID_AMD64: "x64-android"}
 
 
 class VcpkgError(Exception):

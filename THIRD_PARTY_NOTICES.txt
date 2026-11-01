@@ -49,14 +49,16 @@ alsa-lib 1.2.15.3 - https://www.alsa-project.org/
     Copyright: (c) 1998 Jaroslav Kysela; (c) 2000 Abramo Bagnara
     Text:      licenses/LGPL-2.1.txt
 
-libxcb 1.17.0 (libxcb, libxcb-randr) - https://xcb.freedesktop.org/
+libxcb 1.13.1 (libxcb, libxcb-randr) - https://xcb.freedesktop.org/
     License:   MIT
     Copyright: (c) 2001-2006 Bart Massey, Jamey Sharp, and Josh Triplett
+    Text:      licenses/libxcb.txt
 
-Wayland 1.24.0 (libwayland-client) - https://wayland.freedesktop.org/
+Wayland 1.21.0 (libwayland-client) - https://wayland.freedesktop.org/
     License:   MIT
     Copyright: (c) 2008-2012 Kristian Høgsberg; (c) 2010-2012 Intel Corporation;
                (c) 2011 Benjamin Franzke; (c) 2012 Collabora, Ltd.
+    Text:      licenses/wayland.txt
 
 wayland-protocols 1.45 (xdg-output-unstable-v1, relative-pointer-unstable-v1,
 pointer-constraints-unstable-v1) - https://gitlab.freedesktop.org/wayland/wayland-protocols
@@ -346,6 +348,95 @@ libb2 - https://github.com/BLAKE2/libb2
 MD4C - https://github.com/mity/md4c
     License:   MIT
     Text:      licenses/md4c.txt
+
+GLib (libglib, libgio, libgobject, libgmodule, libgthread) - https://gitlab.gnome.org/GNOME/glib
+    License:   LGPL-2.1-or-later
+    Text:      licenses/LGPL-2.1.txt
+
+PCRE (libpcre) - https://www.pcre.org/
+    License:   BSD-3-Clause
+    Text:      licenses/PCRE.txt
+
+PCRE2 (libpcre2-8) - https://github.com/PCRE2Project/pcre2
+    License:   BSD-3-Clause
+    Text:      licenses/PCRE2.txt
+
+MIT Kerberos (libgssapi_krb5, libkrb5, libk5crypto, libkrb5support) - https://web.mit.edu/kerberos/
+    License:   MIT
+    Text:      licenses/krb5.txt
+
+libgcrypt - https://www.gnupg.org/software/libgcrypt/
+    License:   LGPL-2.1-or-later
+    Text:      licenses/LGPL-2.1.txt
+
+systemd (libsystemd) - https://systemd.io/
+    License:   LGPL-2.1-or-later and MIT
+    Text:      licenses/LGPL-2.1.txt, licenses/systemd-MIT.txt
+
+libselinux - https://github.com/SELinuxProject/selinux
+    License:   Public Domain
+    Text:      licenses/libselinux.txt
+
+util-linux (libblkid, libmount) - https://github.com/util-linux/util-linux
+    License:   LGPL-2.1-or-later
+    Text:      licenses/LGPL-2.1.txt
+
+libcap - https://sites.google.com/site/fullycapable/
+    License:   BSD-3-Clause or GPL-2.0-only
+    Text:      licenses/libcap.txt
+
+keyutils (libkeyutils) - https://git.kernel.org/pub/scm/linux/kernel/git/dhowells/keyutils.git
+    License:   LGPL-2.1-or-later
+    Text:      licenses/LGPL-2.1.txt
+
+libffi - https://sourceware.org/libffi/
+    License:   MIT
+    Text:      licenses/libffi.txt
+
+LZ4 (liblz4) - https://lz4.org/
+    License:   BSD-2-Clause
+    Text:      licenses/lz4.txt
+
+libXau - https://gitlab.freedesktop.org/xorg/lib/libxau
+    License:   MIT
+    Text:      licenses/libXau.txt
+
+libxcb (libxcb-glx, libxcb-render, libxcb-shape, libxcb-shm, libxcb-sync, libxcb-xfixes, libxcb-xkb)
+- https://xcb.freedesktop.org/
+    License:   MIT
+    Text:      licenses/libxcb.txt
+
+xcb-util (libxcb-util) - https://gitlab.freedesktop.org/xorg/lib/libxcb-util
+    License:   MIT
+    Text:      licenses/xcb-util.txt
+
+xcb-util-cursor (libxcb-cursor) - https://gitlab.freedesktop.org/xorg/lib/libxcb-cursor
+    License:   MIT
+    Text:      licenses/xcb-util-cursor.txt
+
+xcb-util-image (libxcb-image) - https://gitlab.freedesktop.org/xorg/lib/libxcb-image
+    License:   MIT
+    Text:      licenses/xcb-util-image.txt
+
+xcb-util-keysyms (libxcb-keysyms) - https://gitlab.freedesktop.org/xorg/lib/libxcb-keysyms
+    License:   MIT
+    Text:      licenses/xcb-util-keysyms.txt
+
+xcb-util-renderutil (libxcb-render-util) - https://gitlab.freedesktop.org/xorg/lib/libxcb-render-util
+    License:   MIT
+    Text:      licenses/xcb-util-renderutil.txt
+
+xcb-util-wm (libxcb-icccm) - https://gitlab.freedesktop.org/xorg/lib/libxcb-wm
+    License:   MIT
+    Text:      licenses/xcb-util-wm.txt
+
+libxkbcommon (libxkbcommon, libxkbcommon-x11) - https://xkbcommon.org/
+    License:   MIT
+    Text:      licenses/libxkbcommon.txt
+
+Wayland (libwayland-cursor, libwayland-egl) - https://wayland.freedesktop.org/
+    License:   MIT
+    Text:      licenses/wayland.txt
 
 This software is based in part on the work of the Independent JPEG Group.
 

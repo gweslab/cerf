@@ -1,0 +1,44 @@
+name: build-ce-apps
+
+on:
+  workflow_call:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    container: ubuntu:26.04
+    env:
+      HOST_BRANCH: linux-amd64
+
+    steps:
+      - name: Install the checkout tools
+        run: |
+          apt-get update
+          DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends ca-certificates curl git python3
+
+      - uses: actions/checkout@v4
+        with:
+          submodules: false
+
+      - name: Install Wine
+        env:
+          DEBIAN_FRONTEND: noninteractive
+        run: python3 tools/apt_packages.py ce-apps
+
+      - name: Fetch core libraries
+        run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          git submodule update --init libservicelocator libCerfEngine libCerfCore
+
+      - uses: ./.github/actions/ce-tools
+        with:
+          url: ${{ secrets.CE_TOOLCHAIN_URL }}
+
+      - name: Build the CE apps
+        run: python3 build.py --config Release --mode production --ce-apps-only
+
+      - name: Upload the CE apps
+        uses: actions/upload-artifact@v4
+        with:
+          name: ce-apps
+          path: build/Release/linux-amd64/ce_apps

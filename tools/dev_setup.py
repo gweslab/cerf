@@ -15,12 +15,8 @@ sys.path.insert(0, str(ROOT / "tools"))
 
 CE_TOOLS = ("clarm.exe", "clthumb.exe", "clmips.exe", "clsh.exe", "link.exe", "lib.exe", "rc.exe")
 CE_ARCHES = ("Armv4", "Armv4i", "Mipsii", "Mipsiv", "Sh3")
-LINUX_PKGCONFIG = (("Qt6Widgets", "Qt 6 Widgets development files"),
-                   ("Qt6Quick", "Qt 6 Quick development files"),
+LINUX_PKGCONFIG = (("gl", "OpenGL development files"),
                    ("alsa", "ALSA development files"),
-                   ("slirp", "libslirp development files"),
-                   ("libzip", "libzip development files"),
-                   ("nlohmann_json", "nlohmann-json development files"),
                    ("xcb", "XCB development files"),
                    ("xcb-randr", "XCB RandR development files"),
                    ("wayland-client", "Wayland client development files"))
@@ -210,9 +206,18 @@ def check_ce_toolchain(c: Checks) -> None:
 
 def check_linux_toolchain(c: Checks) -> None:
     import build_posix
-    for tool in build_posix.BUILD_TOOLS + ("pkg-config", "wine"):
+    for tool in build_posix.BUILD_TOOLS + ("pkg-config", "patchelf", "wine"):
         path = shutil.which(tool)
         c.report("OK" if path else "FAIL", tool, path or "absent from PATH")
+    import vcpkg_install
+    from host_branch import LINUX_AMD64
+    try:
+        tool = vcpkg_install.executable(vcpkg_install.vcpkg_root(LINUX_AMD64))
+    except vcpkg_install.VcpkgError as exc:
+        c.report("FAIL", "vcpkg", str(exc))
+    else:
+        c.report("OK" if tool.is_file() else "FAIL", "vcpkg",
+                 str(tool) if tool.is_file() else "{} absent -- run bootstrap-vcpkg.sh".format(tool))
     if shutil.which("pkg-config"):
         for module, what in LINUX_PKGCONFIG:
             found = subprocess.run(["pkg-config", "--modversion", module], capture_output=True,

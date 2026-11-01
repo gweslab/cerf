@@ -1,5 +1,10 @@
 - version: v8.0
   date: 31 Oct 2026
+  patches:
+    fixed: |
+      Patch 1: Added DevEmu 2003 screen configuration support
+      Patch 2: Fixed emulator startup race crash
+      Patch 3: Linux build now bundles many libraries instead of using system ones
   devices:
     new: |
       DevEmu 2003: Added board type, keyboard layout and screen configuration support
@@ -7,7 +12,6 @@
       iPAQ 1st gen: battery support
       iPAQ 1st gen: alarm/charge LED
     fixed: |
-      Patch 1: Added DevEmu 2003 screen configuration support
       Fixed WM2003SE touch crash regression
   emulator:
     new: |
@@ -18,7 +22,6 @@
       Device HUDs - simplified hardware buttons in a canvas
       Rotation of any device screen
     fixed: |
-      Patch 2: Fixed emulator startup race crash
       Serial connection regression on some MIPS boards
   launcher:
     deleted: |

@@ -33,7 +33,7 @@ std::vector<char*> QtEmulatorRun::PointersTo(std::vector<std::string>& args) {
 
 QtEmulatorRun::~QtEmulatorRun() { Stop(); }
 
-bool QtEmulatorRun::Boot() {
+bool QtEmulatorRun::Boot(const std::function<void(cerfcore::CerfEmulator&)>& open_window) {
     const cerfcore::Log::CautionScope outside_instance(nullptr);
     emu_->CreateAllServices();
     cerfcore::Fatal& fatal = emu_->Get<cerfcore::Fatal>();
@@ -43,9 +43,10 @@ bool QtEmulatorRun::Boot() {
     }
     WatchStopAfterHalt(fatal);
     bool booted = false;
-    fatal.Guard([this, &booted] {
+    fatal.Guard([this, &booted, &open_window] {
         emu_->ResolveAllSlots();
         emu_->ReadyAllServices();
+        open_window(*emu_);
         {
             std::lock_guard<std::mutex> lock(window_mutex_);
             ui_calls_      = &emu_->Get<QtUiThreadCalls>();

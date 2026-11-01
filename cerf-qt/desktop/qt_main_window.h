@@ -18,6 +18,7 @@ public:
 
     void OnReady() override;
     void OnShutdown() override;
+    void Open();
 
     cerffrontend::ViewportMode Mode() const;
     int                        IntegerFactor() const;

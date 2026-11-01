@@ -29,7 +29,7 @@ public:
     QtEmulatorRun(const QtEmulatorRun&)            = delete;
     QtEmulatorRun& operator=(const QtEmulatorRun&) = delete;
 
-    bool                    Boot();
+    bool                    Boot(const std::function<void(cerfcore::CerfEmulator&)>& open_window);
     void                    BootInBackground(std::function<void(cerfcore::CerfEmulator&)> open_window);
     cerfcore::CerfEmulator* OpenEmulator();
     std::optional<int>      Halt();

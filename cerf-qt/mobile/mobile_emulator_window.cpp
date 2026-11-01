@@ -48,6 +48,7 @@ void MobileEmulatorWindow::OpenWindow() {
     window_->showFullScreen();
     PublishNativeHandle(static_cast<uint64_t>(window_->winId()));
     AdoptResolutionToScreen();
+    ReleaseHeldJobs();
 }
 
 void MobileEmulatorWindow::MakeWindow() {

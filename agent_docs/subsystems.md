@@ -67,12 +67,17 @@ state are forbidden.
 - **Any thread can call `Get<>` at any time.** A thread that needs a slot
   while another thread resolves it waits, then gets the winner of that slot.
   Each slot resolves once.
+- **The emulator window opens after the readiness sweep and before the guest
+  starts.** A shown window can paint at once. That paint reads services whose
+  `OnReady` can still be on the stack. A job that a service posts to the window
+  before it opens runs after it opens.
+
+  On Android, a start-up alert before a user-error halt opens the window during
+  the sweep. Its items read no services during the sweep.
 - **The Android frontend boots the emulator on a boot thread.** Qt binds a
   `QObject` service to the thread that creates it. As a result, the GUI thread
   creates the services. A boot thread runs the resolution sweep and the
-  readiness sweep, and starts the guest. The emulator window opens after the
-  readiness sweep and before the guest starts. A job that a service posts to the
-  window before that time runs after the window opens.
+  readiness sweep, and starts the guest.
 - **On Android, every device instance shares the GUI thread with the
   manager.** Device code opens a nested event loop only through
   `NestedEventLoops`. `QtEmulatorRun` holds the exit of the instance until every

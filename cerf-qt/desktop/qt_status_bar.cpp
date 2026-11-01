@@ -35,8 +35,9 @@ QtStatusBar::QtStatusBar(cerfcore::CerfEmulator& emu, QWidget* parent)
     setAttribute(Qt::WA_AlwaysShowToolTips);
     setMouseTracking(true);
     QObject::connect(&tick_, &QTimer::timeout, this, [this] { Tick(); });
-    tick_.start(static_cast<int>(cerffrontend::StatusBar::kTickMs));
 }
+
+void QtStatusBar::Start() { tick_.start(static_cast<int>(cerffrontend::StatusBar::kTickMs)); }
 
 void QtStatusBar::paintEvent(QPaintEvent*) {
     if (width() <= 0 || height() <= 0) return;

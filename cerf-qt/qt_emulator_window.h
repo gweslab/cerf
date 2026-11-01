@@ -43,6 +43,7 @@ public:
 
 protected:
     void AttachView(QtEmulatorView& view, QObject& window);
+    void ReleaseHeldJobs();
     void PublishNativeHandle(uint64_t handle);
     void DetachView();
     bool AdoptsHostResolution() const;
@@ -59,8 +60,8 @@ private:
 
     std::mutex                         held_mutex_;
     std::vector<std::function<void()>> held_;
-    bool                               attached_ = false;
-    QtEmulatorView*                    view_     = nullptr;
+    bool                               open_ = false;
+    QtEmulatorView*                    view_ = nullptr;
     QPointer<QObject>                  context_;
     QObject                            jobs_;
     std::unique_ptr<QTimer>            teardown_timer_;

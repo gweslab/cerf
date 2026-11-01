@@ -12,6 +12,7 @@ class QtStatusBar : public QWidget {
 public:
     QtStatusBar(cerfcore::CerfEmulator& emu, QWidget* parent);
 
+    void Start();
     bool WidgetScreenRect(cerfcore::CerfEmulator& emu, const cerfcore::HostWidget* w, QRect& out) const;
     bool CaptureWidgetScreenRect(cerfcore::CerfEmulator& emu, QRect& out) const;
 

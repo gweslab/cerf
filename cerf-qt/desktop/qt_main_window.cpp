@@ -80,13 +80,17 @@ void QtMainWindow::OnReady() {
     const int scale = emu_.Get<cerffrontend::StartupScale>().Factor(
         qRound(cerffrontend::kDefaultDpi * QGuiApplication::primaryScreen()->devicePixelRatio()));
     if (scale > cerffrontend::FrontendConfig::kOriginalScale) canvas_->SetIntegerScale(scale);
+}
 
+void QtMainWindow::Open() {
     emu_.Get<QtFocusPolicy>().Show(window_);
+    bar_->Start();
     PublishNativeHandle(static_cast<uint64_t>(window_->winId()));
     AdoptResolutionToWindowMonitor();
     FitWindowToSurface(static_cast<uint32_t>(canvas_->ContentWidth()),
                        static_cast<uint32_t>(canvas_->ContentHeight()));
     emu_.Get<QtFocusPolicy>().Focus(canvas_);
+    ReleaseHeldJobs();
 }
 
 void QtMainWindow::OnShutdown() {

@@ -30,8 +30,11 @@ void QtEmulatorWindow::AttachView(QtEmulatorView& view, QObject& window) {
     teardown_timer_ = std::make_unique<QTimer>();
     teardown_timer_->setInterval(static_cast<int>(cerffrontend::ShutdownTeardown::kPollMs));
     teardown_timer_->callOnTimeout(gate_.Bind([this] { PollTeardown(); }));
+}
+
+void QtEmulatorWindow::ReleaseHeldJobs() {
     std::lock_guard<std::mutex> lock(held_mutex_);
-    attached_ = true;
+    open_ = true;
     for (std::function<void()>& job : held_) Post(std::move(job));
     held_.clear();
 }
@@ -104,7 +107,7 @@ void QtEmulatorWindow::NotifyGuestRemoded(uint32_t w, uint32_t h) {
 
 void QtEmulatorWindow::RunOnUiThread(std::function<void()> job) {
     std::lock_guard<std::mutex> lock(held_mutex_);
-    if (!attached_) {
+    if (!open_) {
         held_.push_back(std::move(job));
         return;
     }

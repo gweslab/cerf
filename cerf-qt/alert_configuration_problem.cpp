@@ -34,13 +34,13 @@ public:
     }
 
     void LaunchCompactFlashMissing(const std::string& card_name) override {
-        emu_.Get<cerfcore::UserAlert>().Show(
-            cerfcore::AlertLevel::kWarning, cerfcore::AlertPlacement::kStandalone,
-            "Missing CF Card - " CERF_PRODUCT_NAME,
+        emu_.Get<cerfcore::UserAlert>().Post(
+            cerfcore::AlertLevel::kWarning, "Missing CF Card - " CERF_PRODUCT_NAME,
             "This ROM requires additional package '" + card_name +
                 "' CF card to be present in the device directory. You can do that in " CERF_PRODUCT_NAME
                 ", in the side panel of the device.\n\n"
-                "The guest might not boot as intended without this card attached.");
+                "The guest might not boot as intended without this card attached.",
+            {});
     }
 };
 

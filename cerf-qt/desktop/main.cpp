@@ -31,7 +31,8 @@ int RunEmulator(int argc, char** argv) {
     {
         QtEmulatorRun run(cfg, argc, argv, [] { QCoreApplication::exit(0); },
                           [](cerfcore::CerfEmulator& emu) { emu.Get<QtMainWindow>().OnTeardownWedged(); });
-        if (run.Boot()) QCoreApplication::exec();
+        if (run.Boot([](cerfcore::CerfEmulator& emu) { emu.Get<QtMainWindow>().Open(); }))
+            QCoreApplication::exec();
         halt = run.Halt();
         if (halt) crash_log_path = run.CrashLogPath();
     }

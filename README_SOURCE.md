@@ -1,9 +1,12 @@
+> **This document covers development and contribution aspects**. Visit [cerf.cx](https://cerf.cx)
+> for user-oriented documentation. This repository includes emulator frontends, website and other tools.
+
 <img src="docs/github_band.svg" width="100%"/>
 <div align="center">
-  <b>Universal Windows CE emulator</b><br/> 
-  <b><a href="https://cerf.cx">cerf.cx</a></b> - read more information about the project<br/>
+  <b>Root repository - UIs and build tools</b><br/> 
   <a href="https://github.com/gweslab/libCerfEngine">libCerfEngine</a> - JIT repository;
     <a href="https://github.com/gweslab/libCerfCore">libCerfCore</a> - Emulator repository
+  <b><a href="https://cerf.cx">cerf.cx</a></b> - read more information about the project<br/>
 </div><br/>
 
 <div align="center">
@@ -15,10 +18,7 @@
 > [!WARNING]
 > **Beta stage.** It is a hobby project, developed in spare time
 > and can't be a called production-grade/exceptionally stable project.
-> **Expect bugs, crashes, and breaking changes.** CERF stays beta permanently.
->
-> **This document covers development and contribution aspects**. Visit [cerf.cx](https://cerf.cx)
-> for user-oriented documentation.
+> **Expect bugs, crashes, and breaking changes.** CERF stays beta permanently
 
 ## Downloads
 

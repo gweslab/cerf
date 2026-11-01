@@ -10,10 +10,6 @@ CHANGELOG_LINK = 'https://cerf.cx/changelog/'
 CHANGELOG_RECENT = 2
 FUNDING = os.path.join(ROOT, '.github', 'FUNDING.yml')
 
-# FUNDING.yml platform key -> shields.io badge (label, hex, logo, logo color)
-# + the profile URL its username slots into. The label is shields' static-badge
-# path, where a lone '-' separates label from message: a literal dash in a label
-# is escaped as '--', and a space as '%20'.
 FUNDING_BADGES = [
     ('patreon',         'Patreon',
      'FF424D', 'patreon',      'white', 'https://www.patreon.com/{user}'),

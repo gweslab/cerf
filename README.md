@@ -1,3 +1,4 @@
+> [!WARNING]
 > **This document covers development and contribution aspects**. Visit [cerf.cx](https://cerf.cx)
 > for user-oriented documentation. This repository includes emulator frontends, website and other tools.
 

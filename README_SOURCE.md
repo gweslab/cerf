@@ -6,7 +6,7 @@
 <div align="center">
   <b>Root repository - UIs and build tools</b><br/> 
   <a href="https://github.com/gweslab/libCerfEngine">libCerfEngine</a> - JIT repository;
-    <a href="https://github.com/gweslab/libCerfCore">libCerfCore</a> - Emulator repository
+    <a href="https://github.com/gweslab/libCerfCore">libCerfCore</a> - Emulator repository;
   <b><a href="https://cerf.cx">cerf.cx</a></b> - read more information about the project<br/>
 </div><br/>
 

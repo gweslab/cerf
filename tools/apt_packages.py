@@ -7,8 +7,10 @@ CE_APPS_PACKAGES = ("wine",)
 BUILD_PACKAGES = ("git",) + COMPILE_TOOLS + CE_APPS_PACKAGES + (
     "patchelf", "curl", "zip", "unzip", "tar", "make", "perl", "bison", "flex", "libgl-dev", "libasound2-dev", "libxcb1-dev",
     "libxcb-randr0-dev", "libwayland-dev")
-ANDROID_BUILD_PACKAGES = COMPILE_TOOLS + ("curl", "make", "perl", "bison", "flex", "zip", "unzip", "tar",
-                                          "python3-venv", "openjdk-21-jdk-headless")
+HOST_QT_TOOL_LIBRARIES = ("libgl1", "libegl1", "libglib2.0-0t64", "libxkbcommon0", "libdbus-1-3", "libfreetype6",
+                          "libfontconfig1", "libx11-6")
+ANDROID_BUILD_PACKAGES = COMPILE_TOOLS + HOST_QT_TOOL_LIBRARIES + (
+    "curl", "make", "perl", "bison", "flex", "zip", "unzip", "tar", "python3-venv", "openjdk-21-jdk-headless")
 PACKAGE_SETS = {"linux": BUILD_PACKAGES, "ce-apps": CE_APPS_PACKAGES, "android": ANDROID_BUILD_PACKAGES}
 
 

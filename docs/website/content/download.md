@@ -33,7 +33,7 @@ hide:
 
         Known supported platforms: Ubuntu 26.04, Debian testing, Arch, Fedora 44, openSUSE Tumbleweed
 
-        Linux builds are only x86-64. [Send feedback](https://cerf.cx/feedback) if you want ARM64 too.
+        x86-64 and ARM64 only.
 
     [:fontawesome-solid-code: Installer Source Code](https://github.com/gweslab/cerf/blob/main/installers/linux_macos_installer.sh)
 

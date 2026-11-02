@@ -78,8 +78,8 @@ class AndroidBuild(FrontendBuild):
 
     def discover(self) -> None:
         if not qt_online_repository.host_supported():
-            raise BuildAbort("The Android build runs on a Windows or Linux host, not on {}."
-                             .format(sys.platform))
+            raise BuildAbort("The Android build runs only on the host branches {}."
+                             .format(", ".join(qt_online_repository.HOSTS)))
         self.sdk = _sdk_root()
         self.ndk = self.sdk / "ndk" / android_sdk.NDK_VERSION
         revision = _ndk_revision(self.ndk)

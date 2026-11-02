@@ -83,6 +83,10 @@ jobs:
           out: ${{ steps.version.outputs.out }}
           frontend: ${{ steps.version.outputs.frontend }}
 
+      - name: List the third-party sources
+        shell: pwsh
+        run: python tools/third_party_sources.py list $env:HOST_BRANCH "${{ steps.version.outputs.out }}"
+
       - name: Upload Artifacts
         uses: actions/upload-artifact@v4
         with:

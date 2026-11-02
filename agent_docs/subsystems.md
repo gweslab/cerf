@@ -767,8 +767,9 @@ directory of the host. This tree hosts the `cerf_guest`
 guest-additions display driver next to sample binaries. It is the home
 for any CERF-built CE binary.
 
-On Linux the build runs the same toolchain through Wine. macOS cannot run it, so a macOS
-build copies the CE apps of a Windows or Linux build (`build.py --ce-apps-from`).
+On x86-64 Linux the build runs the same toolchain through Wine. macOS and ARM64 Linux cannot
+run it, so a build there copies the CE apps of a Windows or x86-64 Linux build
+(`build.py --ce-apps-from`).
 
 The Android package (`build.py --android`) carries every CE app inside the APK. As a result,
 the CE apps must exist before the frontend builds. A partial set of CE apps must not ship.

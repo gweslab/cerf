@@ -55,6 +55,9 @@ jobs:
           stage: save
           host-branch: ${{ env.HOST_BRANCH }}
 
+      - name: List the third-party sources
+        run: python3 tools/third_party_sources.py list "$HOST_BRANCH" "${{ steps.version.outputs.out }}"
+
       - name: Pack the build
         id: pack
         run: |

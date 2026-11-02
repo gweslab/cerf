@@ -21,11 +21,15 @@
 > and can't be a called production-grade/exceptionally stable project.
 > **Expect bugs, crashes, and breaking changes.** CERF stays beta permanently
 
+> [!WARNING]
+> - Any fork [must show](LICENSE) "Based on CE Runtime Foundation by Yaroslav Kibysh - https://cerf.cx" in its UI
+> - Non-commercial use only. Contact cerf.commercial@yaroslavkibysh.com for commercial usage license.
+
 ## Downloads
 
 Visit [the website](https://cerf.cx/download) to learn how to download a stable or an unstable build.
 
-8.0.3 [![build](https://github.com/gweslab/cerf/actions/workflows/build.yml/badge.svg)](https://github.com/gweslab/cerf/actions/workflows/build.yml)
+8.0.4 [![build](https://github.com/gweslab/cerf/actions/workflows/build.yml/badge.svg)](https://github.com/gweslab/cerf/actions/workflows/build.yml)
 
 ## [Contribution Guidelines](.github/CONTRIBUTING.md)
 
@@ -47,7 +51,7 @@ Install modern Visual Studio with the C++ desktop development workload.
 Install the build packages. These are the Ubuntu 26.04 names:
 
 ```
-sudo apt install git cmake ninja-build g++ pkg-config ccache wine patchelf curl zip unzip tar make perl bison flex libgl-dev libasound2-dev libxcb1-dev libxcb-randr0-dev libwayland-dev
+sudo apt install git cmake ninja-build g++ pkg-config ccache wine clang patchelf curl zip unzip tar make perl bison flex libgl-dev libasound2-dev libxcb1-dev libxcb-randr0-dev libwayland-dev
 ```
 
 Clone vcpkg and run `bootstrap-vcpkg.sh` in the clone. Set `VCPKG_ROOT` to the clone. The build downloads Qt into `third_party/qt/` and ships it with CERF.
@@ -93,7 +97,7 @@ The build script will:
 
 ### Android
 
-`python build.py --android` builds `build/<Config>/android-arm64/cerf.apk` on any host.
+`python build.py --android` builds `build/<Config>/android-arm64/cerf.apk` on a Windows or x86-64 Linux host.
 
 `python build.py --android=amd64` builds `build/<Config>/android-amd64/cerf.apk` for an x86_64 Android emulator. Install these first:
 
@@ -109,9 +113,9 @@ To sign the package, set `QT_ANDROID_KEYSTORE_PATH`, `QT_ANDROID_KEYSTORE_ALIAS`
 
 `ce_apps/` holds various Windows CE applications CERF is bundled with including the Guest Additions driver.
 
-You don't need those if you are not working with Guest Additions. You may copy Guest Additions binaries from an artifact or skip them entirely. On Linux the build runs these tools through Wine.
+You don't need those if you are not working with Guest Additions. You may copy Guest Additions binaries from an artifact or skip them entirely. On x86-64 Linux the build runs these tools through Wine.
 
-macOS cannot run these tools. Give `build.py` the `ce_apps` directory of a Windows or Linux build, for example from a CI artifact. The build then copies the binaries from that directory:
+macOS and ARM64 Linux cannot run these tools. Give `build.py` the `ce_apps` directory of a Windows or x86-64 Linux build, for example from a CI artifact. The build then copies the binaries from that directory:
 
 ```
 python3 build.py --ce-apps-from=<the ce_apps directory>
@@ -445,7 +449,7 @@ python run_claude.py
           🆕 iPAQ 1st gen: alarm/charge LED<br/>
           ✅ Fixed WM2003SE touch crash regression</p>
         <p><b>💿 Emulator</b><br/>
-          🆕 Support for Linux (x86-64)<br/>
+          🆕 Support for Linux (x86-64 and ARM64)<br/>
           🆕 Support for macOS (ARM64)<br/>
           🆕 Support for Android (ARM64)<br/>
           🆕 Startup screen scale configuration and dynamic mode for retina screen<br/>
@@ -461,7 +465,8 @@ python run_claude.py
         <p><b>🚑 Patches</b><br/>
           ✅ Patch 1: Added DevEmu 2003 screen configuration support<br/>
           ✅ Patch 2: Fixed emulator startup race crash<br/>
-          ✅ Patch 3: Linux build now bundles many libraries instead of using system ones</p>
+          ✅ Patch 3: Linux build now bundles many libraries instead of using system ones<br/>
+          ✅ Patch 4: Live theme change bug fixed; Linux ARM64 support</p>
       </td>
     </tr>
     <tr>
@@ -545,5 +550,5 @@ python run_claude.py
 
 CERF was known earlier as [WCECL](https://github.com/dz333n/wcecl) (2019)
 
-[**MIT License**](LICENSE) | [**Third-Party Notices**](THIRD_PARTY_NOTICES.txt)<br/>
+[**CE Runtime Foundation License**](LICENSE) | [**Third-Party Notices**](THIRD_PARTY_NOTICES.txt)<br/>
 **Copyright &copy; 2019-2026 [Yaroslav Kibysh](https://yaroslavkibysh.com)**

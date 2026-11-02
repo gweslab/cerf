@@ -4,6 +4,7 @@ set(QT_DEPLOY_PLUGINS_DIR plugins)
 set(QT_DEPLOY_QML_DIR qml)
 
 file(STRINGS "${CERFQT_DEPLOY_EXCLUDELIST}" cerfqt_excluded_lines REGEX "^[^# \t]")
+list(APPEND cerfqt_excluded_lines ld-linux-aarch64.so.1)
 set(cerfqt_excluded_regexes "")
 set(cerfqt_excluded_names "")
 foreach(cerfqt_line IN LISTS cerfqt_excluded_lines)

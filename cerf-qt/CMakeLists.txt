@@ -240,24 +240,30 @@ if(ANDROID)
     endif()
     configure_file("${cerfqt_db_json}" "${cerfqt_install_dir}/${cerfqt_db_json_name}" COPYONLY)
     configure_file("${cerfqt_huds_json}" "${cerfqt_install_dir}/${cerfqt_huds_json_name}" COPYONLY)
+    set(cerfqt_repo_dir "${CMAKE_CURRENT_SOURCE_DIR}/..")
+    configure_file("${cerfqt_repo_dir}/${cerfqt_notices_name}" "${cerfqt_install_dir}/${cerfqt_notices_name}" COPYONLY)
+    execute_process(COMMAND "${Python3_EXECUTABLE}" "${cerfqt_repo_dir}/tools/third_party_sources.py"
+                            list "${CERFQT_HOST_BRANCH}" "${cerfqt_install_dir}"
+                    RESULT_VARIABLE cerfqt_sources_rc)
+    if(NOT cerfqt_sources_rc EQUAL 0)
+        message(FATAL_ERROR "tools/third_party_sources.py list failed (${cerfqt_sources_rc})")
+    endif()
     qt_add_resources(cerf-qt "cerfqt_install"
         PREFIX "${cerfqt_install_prefix}"
         BASE "${cerfqt_install_dir}"
         FILES "${cerfqt_global_config}" "${cerfqt_install_dir}/${cerfqt_db_json_name}"
-              "${cerfqt_install_dir}/${cerfqt_huds_json_name}")
+              "${cerfqt_install_dir}/${cerfqt_huds_json_name}" "${cerfqt_install_dir}/${cerfqt_notices_name}")
     file(TO_CMAKE_PATH "${CERFQT_ANDROID_CE_APPS_DIR}" cerfqt_ce_apps_dir)
     file(GLOB_RECURSE cerfqt_ce_apps CONFIGURE_DEPENDS "${cerfqt_ce_apps_dir}/*")
     qt_add_resources(cerf-qt "cerfqt_ce_apps"
         PREFIX "${cerfqt_install_prefix}/${cerfqt_ce_apps_name}"
         BASE "${cerfqt_ce_apps_dir}"
         FILES ${cerfqt_ce_apps})
-    set(cerfqt_repo_dir "${CMAKE_CURRENT_SOURCE_DIR}/..")
     file(GLOB cerfqt_licenses CONFIGURE_DEPENDS "${cerfqt_repo_dir}/${cerfqt_licenses_dir_name}/*")
     qt_add_resources(cerf-qt "cerfqt_notices"
         PREFIX "${cerfqt_install_prefix}"
         BASE "${cerfqt_repo_dir}"
-        FILES "${cerfqt_repo_dir}/${cerfqt_license_name}" "${cerfqt_repo_dir}/${cerfqt_notices_name}"
-              ${cerfqt_licenses})
+        FILES "${cerfqt_repo_dir}/${cerfqt_license_name}" ${cerfqt_licenses})
     set_property(TARGET cerf-qt APPEND PROPERTY QT_ANDROID_EXTRA_LIBS ${CERFQT_ANDROID_EXTRA_LIBS})
     set_target_properties(cerf-qt PROPERTIES
         QT_ANDROID_PACKAGE_NAME "cx.cerf"

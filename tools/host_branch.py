@@ -14,6 +14,7 @@ KEY = "host_branch"
 HOST_KEY_KEY = "host_key"
 WIN32_X86 = "win32-x86"
 LINUX_AMD64 = "linux-amd64"
+LINUX_ARM64 = "linux-arm64"
 MACOS_ARM64 = "macos-arm64"
 ANDROID_ARM64 = "android-arm64"
 ANDROID_AMD64 = "android-amd64"
@@ -54,6 +55,10 @@ _BRANCHES = {
         name=LINUX_AMD64, label="Linux", platform_dir=LINUX_AMD64,
         frontend=FRONTEND_NAME,
         builds_ce_apps=True, packed_artifact=True),
+    LINUX_ARM64: HostBranch(
+        name=LINUX_ARM64, label="Linux ARM64", platform_dir=LINUX_ARM64,
+        frontend=FRONTEND_NAME,
+        builds_ce_apps=False, packed_artifact=True),
     MACOS_ARM64: HostBranch(
         name=MACOS_ARM64, label="macOS", platform_dir=MACOS_ARM64,
         frontend="{0}.app/Contents/MacOS/{0}".format(PRODUCT_NAME),
@@ -95,6 +100,8 @@ def current() -> HostBranch:
         return _BRANCHES[WIN32_X86]
     if sys.platform.startswith("linux") and machine in ("x86_64", "amd64"):
         return _BRANCHES[LINUX_AMD64]
+    if sys.platform.startswith("linux") and machine in ("aarch64", "arm64"):
+        return _BRANCHES[LINUX_ARM64]
     if sys.platform == "darwin" and machine == "arm64":
         return _BRANCHES[MACOS_ARM64]
     raise UnsupportedHost("no CERF host branch for {} on {}".format(sys.platform, machine))

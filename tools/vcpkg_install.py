@@ -6,12 +6,12 @@ import sys
 from pathlib import Path
 from typing import Callable, Dict, List
 
-from host_branch import ANDROID_AMD64, ANDROID_ARM64, LINUX_AMD64, WIN32_X86
+from host_branch import ANDROID_AMD64, ANDROID_ARM64, LINUX_AMD64, LINUX_ARM64, WIN32_X86
 from json_files import json_digest
 from tool_process import run_or_raise
 
-TRIPLETS = {WIN32_X86: "x86-windows-static-md", LINUX_AMD64: "x64-linux", ANDROID_ARM64: "arm64-android",
-            ANDROID_AMD64: "x64-android"}
+TRIPLETS = {WIN32_X86: "x86-windows-static-md", LINUX_AMD64: "x64-linux", LINUX_ARM64: "arm64-linux",
+            ANDROID_ARM64: "arm64-android", ANDROID_AMD64: "x64-android"}
 
 
 class VcpkgError(Exception):
@@ -60,7 +60,8 @@ def install(repo: Path, vcpkg_root: Path, triplet: str, env: Dict[str, str],
     stamp = installed / ".msbuildstamp-{}.stamp".format(triplet)
     inputs = [repo / "vcpkg.json", repo / "vcpkg-configuration.json"]
     inputs += [p for p in (repo / "libCerfCore" / "vcpkg-ports").rglob("*") if p.is_file()]
-    current = stamp.is_file() and \
+    compilers = "CC={}\nCXX={}\n".format(env.get("CC", ""), env.get("CXX", ""))
+    current = stamp.is_file() and stamp.read_text(encoding="utf-8") == compilers and \
         not any(p.stat().st_mtime > stamp.stat().st_mtime for p in inputs)
     if current:
         return installed_prefix(repo, triplet)
@@ -70,7 +71,7 @@ def install(repo: Path, vcpkg_root: Path, triplet: str, env: Dict[str, str],
                   "--x-install-root={}".format(installed)], VcpkgError, "vcpkg install", env=env)
     heartbeat()
     stamp.parent.mkdir(parents=True, exist_ok=True)
-    stamp.touch()
+    stamp.write_text(compilers, encoding="utf-8")
     return installed_prefix(repo, triplet)
 
 

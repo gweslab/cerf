@@ -1,0 +1,2 @@
+- [ ] I have read the [Contribution Guidelines](https://github.com/gweslab/cerf/blob/main/.github/CONTRIBUTING.md).
+- [ ] I have read the [CE Runtime Foundation CLA 1.0](https://github.com/gweslab/cerf/blob/main/.github/CLA.md) and I agree to it.

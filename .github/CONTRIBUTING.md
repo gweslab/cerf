@@ -5,6 +5,12 @@
 
 Thank you for your interest! Any features you add will be attributed to you in the changelog and in the About window!
 
+## License and Contributor License Agreement
+
+CERF is under the [CE Runtime Foundation License](../LICENSE). Before the author merges your first pull request, agree to the [Contributor License Agreement](CLA.md). To agree, tick the CLA box in the description of the pull request.
+
+You keep the copyright of your work. The agreement lets the author ship your contribution under the CE Runtime Foundation License and under the commercial licenses that he sells.
+
 ## Working from a fork
 
 Only the author can push to the CERF repositories. To send a change, work in your own forks on GitHub.

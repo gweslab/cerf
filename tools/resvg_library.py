@@ -9,7 +9,7 @@ from typing import Callable, Dict, List
 
 import rust_toolchain
 import tar_archives
-from host_branch import ANDROID_AMD64, ANDROID_ARM64, LINUX_AMD64, MACOS_ARM64, WIN32_X86
+from host_branch import ANDROID_AMD64, ANDROID_ARM64, LINUX_AMD64, LINUX_ARM64, MACOS_ARM64, WIN32_X86
 from json_files import json_digest, read_json_or_none, write_json
 from tool_log import tagged
 from tool_process import failure_text
@@ -35,6 +35,7 @@ class RustTarget:
 TARGETS = {
     WIN32_X86: RustTarget("i686-win7-windows-msvc", rust_toolchain.NIGHTLY, True),
     LINUX_AMD64: RustTarget("x86_64-unknown-linux-gnu", rust_toolchain.STABLE, False),
+    LINUX_ARM64: RustTarget("aarch64-unknown-linux-gnu", rust_toolchain.STABLE, False),
     MACOS_ARM64: RustTarget("aarch64-apple-darwin", rust_toolchain.STABLE, False),
     ANDROID_ARM64: RustTarget("aarch64-linux-android", rust_toolchain.STABLE, False),
     ANDROID_AMD64: RustTarget("x86_64-linux-android", rust_toolchain.STABLE, False),

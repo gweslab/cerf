@@ -21,6 +21,10 @@
 > and can't be a called production-grade/exceptionally stable project.
 > **Expect bugs, crashes, and breaking changes.** CERF stays beta permanently
 
+> [!WARNING]
+> - Any fork [must show](LICENSE) "Based on CE Runtime Foundation by Yaroslav Kibysh - https://cerf.cx" in its UI
+> - Non-commercial use only. Contact cerf.commercial@yaroslavkibysh.com for commercial usage license.
+
 ## Downloads
 
 Visit [the website](https://cerf.cx/download) to learn how to download a stable or an unstable build.
@@ -93,7 +97,7 @@ The build script will:
 
 ### Android
 
-`python build.py --android` builds `build/<Config>/android-arm64/cerf.apk` on any host.
+`python build.py --android` builds `build/<Config>/android-arm64/cerf.apk` on a Windows or x86-64 Linux host.
 
 `python build.py --android=amd64` builds `build/<Config>/android-amd64/cerf.apk` for an x86_64 Android emulator. Install these first:
 
@@ -109,9 +113,9 @@ To sign the package, set `QT_ANDROID_KEYSTORE_PATH`, `QT_ANDROID_KEYSTORE_ALIAS`
 
 `ce_apps/` holds various Windows CE applications CERF is bundled with including the Guest Additions driver.
 
-You don't need those if you are not working with Guest Additions. You may copy Guest Additions binaries from an artifact or skip them entirely. On Linux the build runs these tools through Wine.
+You don't need those if you are not working with Guest Additions. You may copy Guest Additions binaries from an artifact or skip them entirely. On x86-64 Linux the build runs these tools through Wine.
 
-macOS cannot run these tools. Give `build.py` the `ce_apps` directory of a Windows or Linux build, for example from a CI artifact. The build then copies the binaries from that directory:
+macOS and ARM64 Linux cannot run these tools. Give `build.py` the `ce_apps` directory of a Windows or x86-64 Linux build, for example from a CI artifact. The build then copies the binaries from that directory:
 
 ```
 python3 build.py --ce-apps-from=<the ce_apps directory>
@@ -178,5 +182,5 @@ python run_claude.py
 
 CERF was known earlier as [WCECL](https://github.com/dz333n/wcecl) (2019)
 
-[**MIT License**](LICENSE) | [**Third-Party Notices**](THIRD_PARTY_NOTICES.txt)<br/>
+[**CE Runtime Foundation License**](LICENSE) | [**Third-Party Notices**](THIRD_PARTY_NOTICES.txt)<br/>
 **Copyright &copy; 2019-{cur_year} [Yaroslav Kibysh](https://yaroslavkibysh.com)**

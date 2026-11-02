@@ -45,6 +45,24 @@ jobs:
       group: ${{ github.workflow }}-${{ github.ref }}-linux
       cancel-in-progress: true
     uses: ./.github/workflows/build-linux.yml
+    with:
+      host-branch: linux-amd64
+      runner: ubuntu-latest
+      container: almalinux:9
+      compiler-env: /opt/rh/gcc-toolset-15/enable
+    secrets: inherit
+
+  build-linux-arm64:
+    needs: build-ce-apps
+    concurrency:
+      group: ${{ github.workflow }}-${{ github.ref }}-linux-arm64
+      cancel-in-progress: true
+    uses: ./.github/workflows/build-linux.yml
+    with:
+      host-branch: linux-arm64
+      runner: ubuntu-24.04-arm
+      container: almalinux:10
+      compiler-env: /usr/lib/gcc-toolset/15-env.source
     secrets: inherit
 
   build-macos:
@@ -65,7 +83,7 @@ jobs:
 
   publish:
     name: publish beta binaries
-    needs: [build-windows, build-linux, build-macos, build-android]
+    needs: [build-windows, build-linux, build-linux-arm64, build-macos, build-android]
     if: ${{ github.event_name == 'push' }}
     concurrency:
       group: ${{ github.workflow }}-${{ github.ref }}-publish
@@ -118,6 +136,17 @@ jobs:
           name="${{ steps.version.outputs.artifact-linux-amd64 }}"
           python tools/publish_r2_build.py --zip="ci/linux/$name.zip" --host-branch=linux-amd64
 
+      - name: Fetch the Linux ARM64 build
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ steps.version.outputs.artifact-linux-arm64 }}
+          path: ci/linux-arm64
+
+      - name: Publish the Linux ARM64 build to the R2 beta channel
+        run: |
+          name="${{ steps.version.outputs.artifact-linux-arm64 }}"
+          python tools/publish_r2_build.py --zip="ci/linux-arm64/$name.zip" --host-branch=linux-arm64
+
       - name: Fetch the macOS build
         uses: actions/download-artifact@v4
         with:
@@ -155,7 +184,7 @@ jobs:
           python tools/publish_r2_object.py --file=ci/dist/cerf_latest.apk --content-type=application/vnd.android.package-archive
 
   announce:
-    needs: [build-windows, build-linux, build-macos, build-android, publish]
+    needs: [build-windows, build-linux, build-linux-arm64, build-macos, build-android, publish]
     if: >-
       ${{ github.event_name == 'push' &&
           !contains(github.event.head_commit.message, '[release cerf]') }}
@@ -193,7 +222,7 @@ jobs:
 
   release:
     name: publish release binaries
-    needs: [build-windows, build-linux, build-macos, build-android]
+    needs: [build-windows, build-linux, build-linux-arm64, build-macos, build-android]
     if: github.event_name == 'push' && contains(github.event.head_commit.message, '[release cerf]')
     concurrency:
       group: ${{ github.workflow }}-${{ github.ref }}-release

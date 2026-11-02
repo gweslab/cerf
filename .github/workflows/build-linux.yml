@@ -2,13 +2,26 @@ name: build-linux
 
 on:
   workflow_call:
+    inputs:
+      host-branch:
+        type: string
+        required: true
+      runner:
+        type: string
+        required: true
+      container:
+        type: string
+        required: true
+      compiler-env:
+        type: string
+        required: true
 
 jobs:
   build:
-    runs-on: ubuntu-latest
-    container: almalinux:9
+    runs-on: ${{ inputs.runner }}
+    container: ${{ inputs.container }}
     env:
-      HOST_BRANCH: linux-amd64
+      HOST_BRANCH: ${{ inputs.host-branch }}
       VCPKG_ROOT: /opt/vcpkg
 
     steps:
@@ -42,14 +55,14 @@ jobs:
 
       - name: Name the Qt download folder
         id: qt
-        run: python3 tools/qt_online_repository.py --cache-outputs >> "$GITHUB_OUTPUT"
+        run: python3 tools/qt_online_repository.py --cache-outputs "$HOST_BRANCH" >> "$GITHUB_OUTPUT"
 
       - name: Restore the Qt download
         id: cache-qt
         uses: actions/cache/restore@v4
         with:
           path: ${{ steps.qt.outputs.path }}
-          key: qt-linux-${{ steps.qt.outputs.key }}
+          key: qt-${{ env.HOST_BRANCH }}-${{ steps.qt.outputs.key }}
 
       - name: Stamp version.h with CI build info
         id: version
@@ -74,7 +87,7 @@ jobs:
       - name: Build
         shell: bash
         run: |
-          source /opt/rh/gcc-toolset-15/enable
+          source "${{ inputs.compiler-env }}"
           python3 build.py --config Release --mode production --ce-apps-from=ci/ce_apps
 
       - uses: ./.github/actions/vcpkg-cache
@@ -87,7 +100,7 @@ jobs:
         uses: actions/cache/save@v4
         with:
           path: ${{ steps.qt.outputs.path }}
-          key: qt-linux-${{ steps.qt.outputs.key }}
+          key: qt-${{ env.HOST_BRANCH }}-${{ steps.qt.outputs.key }}
 
       - uses: ./.github/actions/resvg-cache
         if: ${{ !cancelled() }}
@@ -100,6 +113,9 @@ jobs:
         with:
           stage: save
           host-branch: ${{ env.HOST_BRANCH }}
+
+      - name: List the third-party sources
+        run: python3 tools/third_party_sources.py list "$HOST_BRANCH" "${{ steps.version.outputs.out }}"
 
       - name: Pack the build
         id: pack

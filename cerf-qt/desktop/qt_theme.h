@@ -1,6 +1,9 @@
 #pragma once
 
+#include <cerfcore/core/instance_gate.h>
 #include <cerfcore/core/service.h>
+
+#include <QObject>
 
 class QtTheme : public cerfcore::Service {
 public:
@@ -10,5 +13,9 @@ public:
     bool IsDark() const { return dark_; }
 
 private:
-    bool dark_ = false;
+    void ApplyPalette();
+
+    const cerfcore::InstanceGate gate_{emu_};
+    QObject                      scheme_receiver_;
+    bool                         dark_ = false;
 };

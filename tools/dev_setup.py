@@ -206,18 +206,20 @@ def check_ce_toolchain(c: Checks) -> None:
 
 def check_linux_toolchain(c: Checks) -> None:
     import build_posix
-    for tool in build_posix.BUILD_TOOLS + ("pkg-config", "patchelf", "wine"):
+    import host_branch
+    branch = host_branch.current()
+    tools = build_posix.BUILD_TOOLS + ("pkg-config", "patchelf") + (("wine",) if branch.builds_ce_apps else ())
+    for tool in tools:
         path = shutil.which(tool)
         c.report("OK" if path else "FAIL", tool, path or "absent from PATH")
     import vcpkg_install
-    from host_branch import LINUX_AMD64
     try:
-        tool = vcpkg_install.executable(vcpkg_install.vcpkg_root(LINUX_AMD64))
+        vcpkg = vcpkg_install.executable(vcpkg_install.vcpkg_root(branch.name))
     except vcpkg_install.VcpkgError as exc:
         c.report("FAIL", "vcpkg", str(exc))
     else:
-        c.report("OK" if tool.is_file() else "FAIL", "vcpkg",
-                 str(tool) if tool.is_file() else "{} absent -- run bootstrap-vcpkg.sh".format(tool))
+        c.report("OK" if vcpkg.is_file() else "FAIL", "vcpkg",
+                 str(vcpkg) if vcpkg.is_file() else "{} absent -- run bootstrap-vcpkg.sh".format(vcpkg))
     if shutil.which("pkg-config"):
         for module, what in LINUX_PKGCONFIG:
             found = subprocess.run(["pkg-config", "--modversion", module], capture_output=True,

@@ -5,8 +5,6 @@ import os
 import re
 import sys
 import time
-import urllib.error
-import urllib.request
 import uuid
 from dataclasses import dataclass, replace
 from pathlib import Path
@@ -15,6 +13,7 @@ from typing import Optional, Tuple
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import changelog
 import host_branch
+import http_request
 
 REPO = "gweslab/cerf"
 GITHUB_API = "https://api.github.com"
@@ -96,31 +95,9 @@ def load_credentials() -> tuple:
     return pick("GITHUB_TOKEN", "GH_TOKEN"), pick("DISCORD_SECRET")
 
 
-class AuthStrippingRedirect(urllib.request.HTTPRedirectHandler):
-    def redirect_request(self, req, fp, code, msg, headers, newurl):
-        new = super().redirect_request(req, fp, code, msg, headers, newurl)
-        if new is not None:
-            for name in [h for h in new.headers if h.lower() == "authorization"]:
-                del new.headers[name]
-        return new
-
-
 def request(url: str, headers: dict, method: str = "GET",
             body: Optional[bytes] = None, content_type: Optional[str] = None):
-    headers = dict(headers)
-    headers["User-Agent"] = USER_AGENT
-    if content_type:
-        headers["Content-Type"] = content_type
-    req = urllib.request.Request(url, data=body, headers=headers, method=method)
-    opener = urllib.request.build_opener(AuthStrippingRedirect)
-    try:
-        with opener.open(req, timeout=120) as response:
-            return response.read()
-    except urllib.error.HTTPError as exc:
-        detail = exc.read().decode("utf-8", "replace")[:400]
-        raise CiError(f"{method} {url} -> HTTP {exc.code}: {detail}") from exc
-    except urllib.error.URLError as exc:
-        raise CiError(f"{method} {url} unreachable: {exc}") from exc
+    return http_request.request(url, headers, CiError, USER_AGENT, method, body, content_type)
 
 
 def github(token: str, path: str, method: str = "GET",

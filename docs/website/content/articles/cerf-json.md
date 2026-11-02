@@ -29,7 +29,7 @@ Later wins. Below is an unfinished description of schema. Some values are absent
 | `tutorial_finished` | boolean | - |
 | `host_key` | integer, or array of integers | One VK or max 8 VKs. Absent: Right Ctrl (`163`). |
 | `default_scale` | integer | Integer scaling at start. `0` (Dynamic), `1` (Original view), `2`, `3`, or `5`. Absent: `0`. |
-| `host_branch` | string | `win32-x86`, `linux-amd64`, `macos-arm64`, `android-arm64`, `android-amd64`. Reserved: `windows-amd64`, `windows-arm64`, `linux-arm64`. Absent: `win32-x86`. |
+| `host_branch` | string | `win32-x86`, `linux-amd64`, `linux-arm64`, `macos-arm64`, `android-arm64`, `android-amd64`. Reserved: `windows-amd64`, `windows-arm64`. Absent: `win32-x86`. |
 
 ## Layer 2 - the device `cerf.json`
 

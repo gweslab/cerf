@@ -5,7 +5,7 @@
       Patch 1: Added DevEmu 2003 screen configuration support
       Patch 2: Fixed emulator startup race crash
       Patch 3: Linux build now bundles many libraries instead of using system ones
-      Patch 4: Linux ARM64 support; CE Runtime Foundation License 1.0 introduction
+      Patch 4: Live theme change bug fixed; Linux ARM64 support
   devices:
     new: |
       DevEmu 2003: Added board type, keyboard layout and screen configuration support

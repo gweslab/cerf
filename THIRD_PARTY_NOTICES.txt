@@ -19,9 +19,9 @@ libzip 1.11.4 - https://libzip.org/
     Text:      licenses/libzip.txt
 
 GLib 2.88.0 - https://gitlab.gnome.org/GNOME/glib
-    License:   LGPL-2.1-or-later
+    License:   LGPL-2.1-or-later, used under LGPL-3.0
     Copyright: (c) The GLib authors
-    Text:      licenses/LGPL-2.1.txt
+    Text:      licenses/LGPL-3.0.txt, licenses/GPL-3.0.txt
 
 PCRE2 10.47 - https://github.com/PCRE2Project/pcre2
     License:   BSD-3-Clause
@@ -30,14 +30,14 @@ PCRE2 10.47 - https://github.com/PCRE2Project/pcre2
     Text:      licenses/PCRE2.txt
 
 GNU libiconv 1.18 - https://www.gnu.org/software/libiconv/
-    License:   LGPL-2.1-or-later
+    License:   LGPL-2.1-or-later, used under LGPL-3.0
     Copyright: (c) Free Software Foundation
-    Text:      licenses/LGPL-2.1.txt
+    Text:      licenses/LGPL-3.0.txt, licenses/GPL-3.0.txt
 
 GNU gettext (libintl) 0.22.5 - https://www.gnu.org/software/gettext/
-    License:   LGPL-2.1-or-later
+    License:   LGPL-2.1-or-later, used under LGPL-3.0
     Copyright: (c) Free Software Foundation
-    Text:      licenses/LGPL-2.1.txt
+    Text:      licenses/LGPL-3.0.txt, licenses/GPL-3.0.txt
 
 Material Symbols - https://github.com/google/material-design-icons
     License:   Apache-2.0
@@ -45,16 +45,16 @@ Material Symbols - https://github.com/google/material-design-icons
     Text:      licenses/Apache-2.0.txt
 
 alsa-lib 1.2.15.3 - https://www.alsa-project.org/
-    License:   LGPL-2.1-or-later
+    License:   LGPL-2.1-or-later, used under LGPL-3.0
     Copyright: (c) 1998 Jaroslav Kysela; (c) 2000 Abramo Bagnara
-    Text:      licenses/LGPL-2.1.txt
+    Text:      licenses/LGPL-3.0.txt, licenses/GPL-3.0.txt
 
-libxcb 1.13.1 (libxcb, libxcb-randr) - https://xcb.freedesktop.org/
+libxcb (libxcb, libxcb-randr) - https://xcb.freedesktop.org/
     License:   MIT
     Copyright: (c) 2001-2006 Bart Massey, Jamey Sharp, and Josh Triplett
     Text:      licenses/libxcb.txt
 
-Wayland 1.21.0 (libwayland-client) - https://wayland.freedesktop.org/
+Wayland (libwayland-client) - https://wayland.freedesktop.org/
     License:   MIT
     Copyright: (c) 2008-2012 Kristian Høgsberg; (c) 2010-2012 Intel Corporation;
                (c) 2011 Benjamin Franzke; (c) 2012 Collabora, Ltd.
@@ -72,7 +72,7 @@ Qt 6 - https://www.qt.io/
 
 qt6windows7 - https://github.com/crystalidea/qt6windows7
     License:   LGPL-3.0-only
-    Text:      licenses/LGPL-3.0.txt
+    Text:      licenses/LGPL-3.0.txt, licenses/GPL-3.0.txt
 
 resvg 0.48.1 (resvg, usvg, resvg-capi) - https://github.com/linebender/resvg
     License:   MIT
@@ -322,8 +322,8 @@ HarfBuzz - https://harfbuzz.github.io/
     Text:      licenses/HarfBuzz.txt
 
 Graphite2 - https://github.com/silnrsi/graphite
-    License:   LGPL-2.1-or-later
-    Text:      licenses/graphite2.txt, licenses/LGPL-2.1.txt
+    License:   LGPL-2.1-or-later, MPL or GPL-2.0-or-later, used under LGPL-3.0
+    Text:      licenses/graphite2.txt, licenses/LGPL-3.0.txt, licenses/GPL-3.0.txt
 
 ICU - https://icu.unicode.org/
     License:   Unicode License v3
@@ -350,8 +350,8 @@ MD4C - https://github.com/mity/md4c
     Text:      licenses/md4c.txt
 
 GLib (libglib, libgio, libgobject, libgmodule, libgthread) - https://gitlab.gnome.org/GNOME/glib
-    License:   LGPL-2.1-or-later
-    Text:      licenses/LGPL-2.1.txt
+    License:   LGPL-2.1-or-later, used under LGPL-3.0
+    Text:      licenses/LGPL-3.0.txt, licenses/GPL-3.0.txt
 
 PCRE (libpcre) - https://www.pcre.org/
     License:   BSD-3-Clause
@@ -366,28 +366,28 @@ MIT Kerberos (libgssapi_krb5, libkrb5, libk5crypto, libkrb5support) - https://we
     Text:      licenses/krb5.txt
 
 libgcrypt - https://www.gnupg.org/software/libgcrypt/
-    License:   LGPL-2.1-or-later
-    Text:      licenses/LGPL-2.1.txt
+    License:   LGPL-2.1-or-later, used under LGPL-3.0; BSD-3-Clause, X11 and OCB license 1
+    Text:      licenses/LGPL-3.0.txt, licenses/GPL-3.0.txt, licenses/libgcrypt.txt
 
 systemd (libsystemd) - https://systemd.io/
-    License:   LGPL-2.1-or-later and MIT
-    Text:      licenses/LGPL-2.1.txt, licenses/systemd-MIT.txt
+    License:   LGPL-2.1-or-later, used under LGPL-3.0; MIT
+    Text:      licenses/LGPL-3.0.txt, licenses/GPL-3.0.txt, licenses/systemd-MIT.txt
 
 libselinux - https://github.com/SELinuxProject/selinux
     License:   Public Domain
     Text:      licenses/libselinux.txt
 
 util-linux (libblkid, libmount) - https://github.com/util-linux/util-linux
-    License:   LGPL-2.1-or-later
-    Text:      licenses/LGPL-2.1.txt
+    License:   LGPL-2.1-or-later, used under LGPL-3.0
+    Text:      licenses/LGPL-3.0.txt, licenses/GPL-3.0.txt
 
 libcap - https://sites.google.com/site/fullycapable/
     License:   BSD-3-Clause or GPL-2.0-only
     Text:      licenses/libcap.txt
 
 keyutils (libkeyutils) - https://git.kernel.org/pub/scm/linux/kernel/git/dhowells/keyutils.git
-    License:   LGPL-2.1-or-later
-    Text:      licenses/LGPL-2.1.txt
+    License:   LGPL-2.0-or-later, used under LGPL-3.0
+    Text:      licenses/LGPL-3.0.txt, licenses/GPL-3.0.txt
 
 libffi - https://sourceware.org/libffi/
     License:   MIT

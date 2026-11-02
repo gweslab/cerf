@@ -5,7 +5,7 @@ from tool_process import exit_code
 COMPILE_TOOLS = ("cmake", "ninja-build", "g++", "pkg-config", "ccache")
 CE_APPS_PACKAGES = ("wine",)
 BUILD_PACKAGES = ("git",) + COMPILE_TOOLS + CE_APPS_PACKAGES + (
-    "patchelf", "curl", "zip", "unzip", "tar", "make", "perl", "bison", "flex", "libgl-dev", "libasound2-dev", "libxcb1-dev",
+    "clang", "patchelf", "curl", "zip", "unzip", "tar", "make", "perl", "bison", "flex", "libgl-dev", "libasound2-dev", "libxcb1-dev",
     "libxcb-randr0-dev", "libwayland-dev")
 HOST_QT_TOOL_LIBRARIES = ("libgl1", "libegl1", "libglib2.0-0t64", "libxkbcommon0", "libdbus-1-3", "libfreetype6",
                           "libfontconfig1", "libx11-6")

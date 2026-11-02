@@ -37,6 +37,9 @@ detect_host() {
         'Linux x86_64')
             BRANCH=linux-amd64
             FRONTEND='cerf' ;;
+        'Linux aarch64' | 'Linux arm64')
+            BRANCH=linux-arm64
+            FRONTEND='cerf' ;;
         'Darwin arm64')
             BRANCH=macos-arm64
             FRONTEND='CE Runtime Foundation.app/Contents/MacOS/CE Runtime Foundation' ;;
@@ -197,7 +200,7 @@ main() {
         yes_no 'Would you like to continue?' no || return 0
     fi
 
-    if [ "$BRANCH" = linux-amd64 ]; then install_linux_packages; fi
+    if [ "$BRANCH" != macos-arm64 ]; then install_linux_packages; fi
     command -v unzip > /dev/null 2>&1 || fail 'This installer needs unzip.'
 
     meta=$(mktemp "${TMPDIR:-/tmp}/cerf-installer.XXXXXX")
@@ -254,7 +257,7 @@ main() {
 
     stage="$upgrade_dir/$FRONTEND"
     [ -x "$stage" ] || fail "$name contains no $FRONTEND. $PRODUCT was not installed."
-    if [ "$BRANCH" = linux-amd64 ]; then
+    if [ "$BRANCH" != macos-arm64 ]; then
         if [ -n "${WAYLAND_DISPLAY:-}" ]; then platform=wayland; else platform=xcb; fi
         unresolved=$(ldd "$stage" "$upgrade_dir/plugins/platforms/libq$platform.so" 2>&1 | grep 'not found' || true)
         [ -z "$unresolved" ] || fail "$PRODUCT needs libraries that this system does not have:

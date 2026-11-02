@@ -5,7 +5,8 @@ import sys
 from pathlib import Path
 from typing import Callable, List, Tuple
 
-from host_branch import LINUX_AMD64
+import host_branch
+from host_branch import LINUX_AMD64, LINUX_ARM64, WIN32_X86
 from json_files import json_digest, read_json_or_none, write_json
 from qt_common import QT_DIR, STAMP_NAME, say
 from tool_process import run_or_raise
@@ -42,6 +43,24 @@ LINUX_HOST_ARCHIVES: Tuple[Archive, ...] = LINUX_DESKTOP_ARCHIVES + (
      "66892450a2baf559b230778f34f879db76d93fdc58b4241522a5d495643f00a5"),
 )
 
+LINUX_ARM64_FOLDER = "linux_arm64/desktop/qt6_6120/qt6_6120"
+LINUX_ARM64_DESKTOP_ARCHIVES: Tuple[Archive, ...] = (
+    ("qt.qt6.6120.linux_gcc_arm64", "qtbase-Linux-Ubuntu_24_04-GCC-Linux-Ubuntu_24_04-AARCH64.7z",
+     "d73c10b46bfb81b7bd15e143c7d5b87d5f21ab6180b305709d67b2b356b4d38a"),
+    ("qt.qt6.6120.linux_gcc_arm64", "qtsvg-Linux-Ubuntu_24_04-GCC-Linux-Ubuntu_24_04-AARCH64.7z",
+     "6e6df8cd2a5600f3518658f10f786fde69c715f649073493bfd1bfb3d1efa589"),
+    ("qt.qt6.6120.linux_gcc_arm64", "qtdeclarative-Linux-Ubuntu_24_04-GCC-Linux-Ubuntu_24_04-AARCH64.7z",
+     "a5ca21e64e43ba72ee2586323c4720afa278e127f07a3d1c89006c66bf8e0009"),
+    ("qt.qt6.6120.linux_gcc_arm64", "qtwayland-Linux-Ubuntu_24_04-GCC-Linux-Ubuntu_24_04-AARCH64.7z",
+     "0ad298a6a1391a8c6a81ef8957a7810750d1dc27f9cbb12056576267600131e0"),
+    ("qt.qt6.6120.linux_gcc_arm64", "icu-linux-Debian11.6-arm64.7z",
+     "7f0650e312f06949999e60fa20609650f39f120412c61d930ec88002991fdb4e"),
+)
+LINUX_DESKTOPS = {
+    LINUX_AMD64: (LINUX_HOST_FOLDER, LINUX_DESKTOP_ARCHIVES),
+    LINUX_ARM64: (LINUX_ARM64_FOLDER, LINUX_ARM64_DESKTOP_ARCHIVES),
+}
+
 WINDOWS_HOST_FOLDER = "windows_x86/desktop/qt6_6120/qt6_6120_msvc2022_64"
 WINDOWS_HOST_ARCHIVES: Tuple[Archive, ...] = (
     ("qt.qt6.6120.win64_msvc2022_64", "qtbase-Windows-Windows_11_24H2-MSVC2022-Windows-Windows_11_24H2-X86_64.7z",
@@ -69,11 +88,12 @@ WINDOWS_HOST_ARCHIVES: Tuple[Archive, ...] = (
 
 ARCHIVE_DESTINATIONS = {
     "icu-linux-Rhel8.6-x86_64.7z": "lib",
+    "icu-linux-Debian11.6-arm64.7z": "lib",
 }
 
 HOSTS = {
-    "linux": ("linux-x64", LINUX_HOST_FOLDER, LINUX_HOST_ARCHIVES),
-    "win32": ("windows-x64", WINDOWS_HOST_FOLDER, WINDOWS_HOST_ARCHIVES),
+    LINUX_AMD64: ("linux-x64", LINUX_HOST_FOLDER, LINUX_HOST_ARCHIVES),
+    WIN32_X86: ("windows-x64", WINDOWS_HOST_FOLDER, WINDOWS_HOST_ARCHIVES),
 }
 
 
@@ -123,38 +143,42 @@ def downloads_dir(root: Path) -> Path:
 
 
 def host_supported() -> bool:
-    return sys.platform in HOSTS
+    try:
+        return host_branch.current().name in HOSTS
+    except host_branch.UnsupportedHost:
+        return False
 
 
 def host_prefix(root: Path) -> Path:
-    return root / QT_DIR / "{}-{}".format(QT_VERSION, HOSTS[sys.platform][0])
+    return root / QT_DIR / "{}-{}".format(QT_VERSION, HOSTS[host_branch.current().name][0])
 
 
 def host_archives() -> Tuple[Archive, ...]:
-    return HOSTS[sys.platform][2]
+    return HOSTS[host_branch.current().name][2]
 
 
 def ensure_host(root: Path, cmake: Path, heartbeat: Callable[[], None]) -> Path:
-    _, folder, archives = HOSTS[sys.platform]
+    _, folder, archives = HOSTS[host_branch.current().name]
     return install(host_prefix(root), folder, archives, cmake, downloads_dir(root), heartbeat)
 
 
-def linux_desktop_prefix(root: Path) -> Path:
-    return root / QT_DIR / "{}-{}".format(QT_VERSION, LINUX_AMD64)
+def linux_desktop_prefix(root: Path, branch_name: str) -> Path:
+    return root / QT_DIR / "{}-{}".format(QT_VERSION, branch_name)
 
 
-def ensure_linux_desktop(root: Path, cmake: Path, heartbeat: Callable[[], None]) -> Path:
-    return install(linux_desktop_prefix(root), LINUX_HOST_FOLDER, LINUX_DESKTOP_ARCHIVES, cmake,
-                   downloads_dir(root), heartbeat)
+def ensure_linux_desktop(root: Path, branch_name: str, cmake: Path, heartbeat: Callable[[], None]) -> Path:
+    folder, archives = LINUX_DESKTOPS[branch_name]
+    return install(linux_desktop_prefix(root, branch_name), folder, archives, cmake, downloads_dir(root), heartbeat)
 
 
-def linux_desktop_cache_outputs() -> List[str]:
-    prefix = linux_desktop_prefix(Path("."))
-    return ["key={}".format(json_digest(wanted_stamp(LINUX_DESKTOP_ARCHIVES))), "path={}".format(prefix.as_posix()),
+def linux_desktop_cache_outputs(branch_name: str) -> List[str]:
+    prefix = linux_desktop_prefix(Path("."), branch_name)
+    archives = LINUX_DESKTOPS[branch_name][1]
+    return ["key={}".format(json_digest(wanted_stamp(archives))), "path={}".format(prefix.as_posix()),
             "stamp={}".format((prefix / STAMP_NAME).as_posix())]
 
 
 if __name__ == "__main__":
-    if sys.argv[1:] != ["--cache-outputs"]:
-        raise SystemExit("usage: qt_online_repository.py --cache-outputs")
-    print("\n".join(linux_desktop_cache_outputs()))
+    if len(sys.argv) != 3 or sys.argv[1] != "--cache-outputs" or sys.argv[2] not in LINUX_DESKTOPS:
+        raise SystemExit("usage: qt_online_repository.py --cache-outputs <{}>".format("|".join(LINUX_DESKTOPS)))
+    print("\n".join(linux_desktop_cache_outputs(sys.argv[2])))

@@ -27,12 +27,14 @@ def _homebrew_prefix() -> str:
     return output_or_raise([brew, "--prefix"], BuildAbort).strip()
 
 
-COMPILER = "clang++" if sys.platform == "darwin" else "g++"
-BUILD_TOOLS = ("cmake", "ninja", COMPILER)
+C_COMPILER = "clang"
+CXX_COMPILER = "clang++"
+COMPILER_ENV = {"CC": C_COMPILER, "CXX": CXX_COMPILER}
+BUILD_TOOLS = ("cmake", "ninja", C_COMPILER, CXX_COMPILER)
 
 
 class PosixBuild(FrontendBuild):
-    compiler = COMPILER
+    compiler = CXX_COMPILER
     cmake: Optional[str] = None
     prefix_path: Optional[str] = None
 
@@ -53,8 +55,9 @@ class PosixBuild(FrontendBuild):
     def _linux_prefix_path(self) -> str:
         try:
             deps = vcpkg_install.install(self.root, vcpkg_install.vcpkg_root(self.branch.name),
-                                         vcpkg_install.TRIPLETS[self.branch.name], dict(os.environ), self.heartbeat)
-            qt = qt_online_repository.ensure_linux_desktop(self.root, Path(self.cmake), self.heartbeat)
+                                         vcpkg_install.TRIPLETS[self.branch.name], dict(os.environ, **COMPILER_ENV),
+                                         self.heartbeat)
+            qt = qt_online_repository.ensure_linux_desktop(self.root, self.branch.name, Path(self.cmake), self.heartbeat)
         except (vcpkg_install.VcpkgError, qt_online_repository.QtFetchError, verified_download.DownloadError,
                 OSError) as exc:
             raise BuildAbort(exc)
@@ -88,7 +91,8 @@ class PosixBuild(FrontendBuild):
                 excludelist = appimage_excludelist.ensure(self.root)
             except (verified_download.DownloadError, OSError) as exc:
                 raise BuildAbort(exc)
-            configure.append("-DCERFQT_DEPLOY_EXCLUDELIST={}".format(excludelist.as_posix()))
+            configure += ["-DCMAKE_C_COMPILER=" + C_COMPILER,
+                          "-DCERFQT_DEPLOY_EXCLUDELIST={}".format(excludelist.as_posix())]
         self.configure(cmake_dir, configure)
         if not self.compile([self.cmake, "--build", cmake_dir, "--parallel"]):
             return False

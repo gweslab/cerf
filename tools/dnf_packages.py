@@ -2,7 +2,7 @@ import sys
 
 from tool_process import exit_code
 
-BUILD_PACKAGES = ("git", "python3", "cmake", "ninja-build", "gcc-toolset-15-gcc-c++", "ccache", "patchelf",
+BUILD_PACKAGES = ("git", "python3", "cmake", "ninja-build", "clang", "gcc-toolset-15-gcc-c++", "ccache", "patchelf",
                   "pkgconf-pkg-config", "alsa-lib-devel", "libxcb-devel", "wayland-devel", "mesa-libGL-devel",
                   "zip", "unzip", "tar", "xz", "perl", "make", "bison", "flex", "libbrotli", "fontconfig", "freetype",
                   "harfbuzz", "libxkbcommon", "libxkbcommon-x11", "xcb-util-cursor", "xcb-util-wm", "xcb-util-image",

@@ -167,7 +167,8 @@ Its install root is `~/CE Runtime Foundation` by default. It reads its answers f
 `/dev/tty`, so it also works when `curl` pipes it into `sh`.
 
 On Linux, the release carries every library that `cerf` and the shipped Qt files link.
-Only the libraries that AppImage's exclude list names stay on the system. The script
+Only the libraries that AppImage's exclude list names, and the ARM64 dynamic loader that the
+list lacks, stay on the system. The script
 installs only the tools that it uses itself, with `apt-get`, `pacman`, `dnf` or `zypper`. Before the script starts the staged
 frontend, `ldd` must find every library and symbol version that `cerf` and the platform
 plugin of the session need.

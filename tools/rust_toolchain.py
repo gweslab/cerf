@@ -1,10 +1,11 @@
 from __future__ import annotations
 
 import os
-import sys
 from pathlib import Path
 from typing import Callable, Dict, List, Sequence
 
+import host_branch
+from host_branch import LINUX_AMD64, LINUX_ARM64, MACOS_ARM64, WIN32_X86
 from json_files import read_json_or_none, write_json
 from tool_log import tagged
 from tool_process import prepend_path, run_or_raise
@@ -17,12 +18,14 @@ RUST_DIR = Path("third_party") / "rust"
 STAMP_NAME = "cerf_rust.json"
 
 INSTALLERS = {
-    "win32": ("x86_64-pc-windows-msvc", "rustup-init.exe",
-              "00f139da614dced87d3c3d4121c43eebdac3c1bf8a5ee86b9d80dfd71c8d70fd"),
-    "linux": ("x86_64-unknown-linux-gnu", "rustup-init",
-              "5be191e8c70a5007074254cb74d78dbfdd25cd5a61c27de7b8e5410122ec24f4"),
-    "darwin": ("aarch64-apple-darwin", "rustup-init",
-               "f7c7e11eb2e07f006e532a8aaac77b32f4527d305ac386c0c633ca6133d35ca9"),
+    WIN32_X86: ("x86_64-pc-windows-msvc", "rustup-init.exe",
+                "00f139da614dced87d3c3d4121c43eebdac3c1bf8a5ee86b9d80dfd71c8d70fd"),
+    LINUX_AMD64: ("x86_64-unknown-linux-gnu", "rustup-init",
+                  "5be191e8c70a5007074254cb74d78dbfdd25cd5a61c27de7b8e5410122ec24f4"),
+    LINUX_ARM64: ("aarch64-unknown-linux-gnu", "rustup-init",
+                  "a9c168dbea81a84671c6b7a5c1795cb0eb699020110d107ddfca427bd797e697"),
+    MACOS_ARM64: ("aarch64-apple-darwin", "rustup-init",
+                  "f7c7e11eb2e07f006e532a8aaac77b32f4527d305ac386c0c633ca6133d35ca9"),
 }
 
 
@@ -60,7 +63,7 @@ class RustToolchain:
     def _install_rustup(self) -> None:
         if self._rustup().is_file():
             return
-        triple, name, sha256 = INSTALLERS[sys.platform]
+        triple, name, sha256 = INSTALLERS[host_branch.current().name]
         local = self.home / "downloads" / RUSTUP_VERSION / triple / name
         fetch_verified("https://static.rust-lang.org/rustup/archive/{}/{}/{}".format(RUSTUP_VERSION, triple, name),
                        local, sha256, say)

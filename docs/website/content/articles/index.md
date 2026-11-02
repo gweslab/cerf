@@ -1,8 +1,5 @@
 # Articles
 
-Everything CERF does that is not obvious from the UI - what the features are, how to drive them,
-and reference for the parts underneath.
-
 !!! warning
 
     Some articles don't get updated often and might be out of sync with the latest emulator version or be ahead of it.
@@ -10,6 +7,7 @@ and reference for the parts underneath.
 
 ## General about emulator
 
+- [**Principles**](principles.md) - emulator under the hood; author's notes, choices and shortcuts
 - [**Guest Additions**](guest-additions.md) - how do Guest Additions works
 - [**PC Cards and serial ports**](pc-cards.md) - what you can put into a PCMCIA slot/Serial port
 - [**Getting the guest online**](networking.md) - put a network card in the slot and browse the web

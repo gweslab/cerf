@@ -6,6 +6,7 @@ repo_name: gweslab/cerf
 copyright: >-
   &copy; 2019-{cur_year}
   <a href="https://yaroslavkibysh.com" target="_blank" rel="noopener">Yaroslav Kibysh</a>
+  &middot; <a href="/license" target="_blank" rel="noopener">License</a>
 
 docs_dir: content
 site_dir: ../../build/site

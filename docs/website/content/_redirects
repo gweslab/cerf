@@ -19,6 +19,9 @@
 /feedback             https://github.com/gweslab/cerf/issues   302
 /feedback/            https://github.com/gweslab/cerf/issues   302
 
+/license              https://raw.githubusercontent.com/gweslab/cerf/main/LICENSE   302
+/license/             https://raw.githubusercontent.com/gweslab/cerf/main/LICENSE   302
+
 /unix_installer.sh     https://raw.githubusercontent.com/gweslab/cerf/main/installers/linux_macos_installer.sh 302
 /win_installer.ps1     https://raw.githubusercontent.com/gweslab/cerf/main/installers/windows_installer.ps1 302
 /cerf_latest_arm64.apk https://cerf-bundles.dz3n.net/cerf_android/cerf_latest.apk 302

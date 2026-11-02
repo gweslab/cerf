@@ -61,7 +61,7 @@ hide:
 </div>
 
 !!! warning
-    Non commercial use only. Contact cerf.commercial@yaroslavkibysh.com for enterprise license details.
+    Non commercial use only. Read the [license](/license). Contact cerf.commercial@yaroslavkibysh.com for enterprise license details.
 
 
 ## Manual download

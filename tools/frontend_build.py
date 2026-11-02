@@ -70,9 +70,13 @@ class FrontendBuild:
             raise BuildAbort(failure_text("CMake configure of {}".format(build_dir), code))
 
     def compile(self, argv: List[object], env: Optional[Dict[str, str]] = None) -> bool:
-        code = exit_code(argv, env=env)
+        return self.run_tool(self.branch.frontend, "cmake --build", argv, env)
+
+    def run_tool(self, name: str, tool: str, argv: List[object], env: Optional[Dict[str, str]] = None,
+                 cwd: Optional[Path] = None) -> bool:
+        code = exit_code(argv, cwd, env)
         self.heartbeat()
         if code != 0:
-            build_report.build_exit_failed(self.branch.frontend, code)
+            build_report.tool_failed(name, tool, code)
             return False
         return True

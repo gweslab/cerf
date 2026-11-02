@@ -44,6 +44,7 @@ class HostBranch:
     cerf_json_defaults: Dict[str, object] = field(default_factory=dict)
     package_file: bool = False
     ci_built: bool = True
+    store_bundle: str = ""
 
 
 _BRANCHES = {
@@ -67,11 +68,13 @@ _BRANCHES = {
     ANDROID_ARM64: HostBranch(
         name=ANDROID_ARM64, label="Android", platform_dir=ANDROID_ARM64,
         frontend=FRONTEND_NAME + ".apk",
-        builds_ce_apps=False, packed_artifact=False, package_file=True),
+        builds_ce_apps=False, packed_artifact=False, package_file=True,
+        store_bundle=FRONTEND_NAME + ".aab"),
     ANDROID_AMD64: HostBranch(
         name=ANDROID_AMD64, label="Android", platform_dir=ANDROID_AMD64,
         frontend=FRONTEND_NAME + ".apk",
-        builds_ce_apps=False, packed_artifact=False, package_file=True, ci_built=False),
+        builds_ce_apps=False, packed_artifact=False, package_file=True, ci_built=False,
+        store_bundle=FRONTEND_NAME + ".aab"),
 }
 
 

@@ -43,10 +43,11 @@ signals:
 
 private:
     void SetStatus(const QString& status);
-    void Apply(const std::optional<CerfRelease>& release);
+    void Apply(const std::optional<CerfRelease>& release, bool unstable);
 
     QString                             status_;
     std::optional<CerfRelease>          release_;
+    bool                                release_unstable_ = false;
     int                                 generation_ = 0;
     std::unique_ptr<CerfUpgradeSession> session_;
 };

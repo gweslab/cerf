@@ -64,16 +64,17 @@ void CerfUpdates::Check() {
                                                 : ParseStableRelease(body, branch, parse_error);
                                    if (!parse_error.isEmpty())
                                        LOG(Manager, "update check: %s\n", qUtf8Printable(parse_error));
-                                   Apply(release);
+                                   Apply(release, unstable);
                                });
 }
 
-void CerfUpdates::Apply(const std::optional<CerfRelease>& release) {
+void CerfUpdates::Apply(const std::optional<CerfRelease>& release, bool unstable) {
     if (!release || !IsNewerVersion(release->tag)) {
         SetStatus(QString());
         return;
     }
-    release_ = release;
+    release_          = release;
+    release_unstable_ = unstable;
     SetStatus(QStringLiteral("CERF %1 is available").arg(release->tag));
     if (SelfUpgradeSupported()) emit offerReady();
 }
@@ -90,7 +91,7 @@ QVariantMap CerfUpdates::Offer() const {
         {QStringLiteral("tag"), release_->tag},
         {QStringLiteral("body"), release_->body},
         {QStringLiteral("htmlUrl"), release_->html_url},
-        {QStringLiteral("downloadUrl"), QString::fromUtf8(ManualDownloadUrl())},
+        {QStringLiteral("downloadUrl"), QString::fromUtf8(ManualDownloadUrl(release_unstable_))},
         {QStringLiteral("warningUrl"), QString::fromUtf8(cerffrontend::kHibernationWarningUrl.text)}};
 }
 

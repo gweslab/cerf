@@ -10,6 +10,7 @@ on:
       - "compile_readme.py"
       - "tools/build_site.py"
       - "cerf-qt/version.h"
+      - "cerf-qt/play_store_links_text.h"
       - ".github/workflows/site.yml"
   workflow_dispatch:
 
@@ -48,3 +49,10 @@ jobs:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           command: pages deploy build/site --project-name=cerf --branch=main
+
+      - name: Deploy the Google Play copy to Cloudflare Pages
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: pages deploy build/site-googleplay --project-name=cerf-play-store --branch=main

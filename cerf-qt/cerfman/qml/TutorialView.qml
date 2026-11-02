@@ -112,7 +112,9 @@ Page {
 
             Label {
                 Layout.fillWidth: true
-                text: qsTr("Get help from the community, or help the project:")
+                text: ProductLinks.donateShown
+                      ? qsTr("Get help from the community, or help the project:")
+                      : qsTr("Get help from the community:")
                 horizontalAlignment: Text.AlignHCenter
                 wrapMode: Text.Wrap
             }
@@ -130,6 +132,7 @@ Page {
                     onClicked: tutorial.openLink(ProductLinks.discordUrl)
                 }
                 Button {
+                    visible: ProductLinks.donateShown
                     text: qsTr("Support project")
                     onClicked: tutorial.openLink(ProductLinks.donateUrl)
                 }

@@ -29,6 +29,8 @@ SITE_LINKS = [
 
 sys.path.insert(0, ROOT)
 sys.path.insert(0, os.path.join(ROOT, 'tools'))
+sys.path.insert(0, HERE)
+import store_copy
 import changelog
 import compile_readme
 from board_database import running_boards, soc_family_of
@@ -193,12 +195,21 @@ def on_config(config):
     if config.copyright and '{cur_year}' in config.copyright:
         config.copyright = config.copyright.replace(
             '{cur_year}', str(datetime.date.today().year))
+    if store_copy.active(config):
+        store_copy.configure(config)
     return config
+
+
+def on_post_build(config):
+    if store_copy.active(config):
+        store_copy.post_build(config)
 
 
 def on_page_content(content, page, config, files):
     if page.is_homepage:
         content = HERO_PERMALINK.sub(r'\1\2', content, count=1)
+    if store_copy.active(config):
+        content = store_copy.page_html(content, page, config)
     return content
 
 

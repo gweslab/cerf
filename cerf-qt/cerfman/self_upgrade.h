@@ -1,4 +1,4 @@
 #pragma once
 
 bool        SelfUpgradeSupported();
-const char* ManualDownloadUrl();
+const char* ManualDownloadUrl(bool unstable);

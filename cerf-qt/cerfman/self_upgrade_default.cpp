@@ -4,4 +4,4 @@
 
 bool SelfUpgradeSupported() { return true; }
 
-const char* ManualDownloadUrl() { return cerffrontend::kDownloadUrl.text; }
+const char* ManualDownloadUrl(bool) { return cerffrontend::kDownloadUrl.text; }

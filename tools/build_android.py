@@ -147,17 +147,46 @@ class AndroidBuild(FrontendBuild):
         if not self.compile([self.cmake, "--build", build_dir, "--target", "apk"], env):
             return False
         kind = self.config.lower()
-        apk = build_dir / "cerf-qt" / "android-build" / "build" / "outputs" / "apk" / kind / \
+        android_build = build_dir / "cerf-qt" / "android-build"
+        outputs = android_build / "build" / "outputs"
+        apk = outputs / "apk" / kind / \
             "android-build-{}-{}.apk".format(kind, "signed" if signed or kind == "debug" else "unsigned")
-        return self._deliver(apk, out, signed or kind == "debug")
+        bundle = None
+        if signed:
+            bundle = outputs / "bundle" / kind / "android-build-{}.aab".format(kind)
+            if not self._sign_bundle(android_build, kind, bundle, env):
+                return False
+        return self._deliver(apk, bundle, out, signed or kind == "debug")
 
-    def _deliver(self, apk: Path, out: Path, signed: bool) -> bool:
+    def _sign_bundle(self, android_build: Path, kind: str, bundle: Path, env: Dict[str, str]) -> bool:
+        gradlew = android_build / ("gradlew.bat" if os.name == "nt" else "gradlew")
+        task = "bundle" + kind.capitalize()
+        name = self.branch.store_bundle
+        if not self.run_tool(name, "gradlew " + task, [gradlew, task], env, android_build):
+            return False
+        jarsigner = self.java_home / "bin" / ("jarsigner.exe" if os.name == "nt" else "jarsigner")
+        return self.run_tool(name, "jarsigner", [jarsigner, "-sigalg", "SHA256withRSA", "-digestalg", "SHA-256",
+                                                 "-keystore", env["QT_ANDROID_KEYSTORE_PATH"],
+                                                 "-storepass:env", "QT_ANDROID_KEYSTORE_STORE_PASS",
+                                                 "-keypass:env", "QT_ANDROID_KEYSTORE_KEY_PASS",
+                                                 bundle, env["QT_ANDROID_KEYSTORE_ALIAS"]], env)
+
+    def _deliver(self, apk: Path, bundle: Optional[Path], out: Path, signed: bool) -> bool:
+        bundle_name = self.branch.store_bundle
         if not build_report.built_file_present(self.branch.frontend, apk, "package"):
+            return False
+        if bundle is not None and not build_report.built_file_present(bundle_name, bundle, "package"):
             return False
         out.mkdir(parents=True, exist_ok=True)
         target = out / self.branch.frontend
         shutil.copy2(str(apk), str(target))
         build_report.built_file(self.branch.frontend, target)
+        bundle_target = out / bundle_name
+        if bundle is None:
+            bundle_target.unlink(missing_ok=True)
+        else:
+            shutil.copy2(str(bundle), str(bundle_target))
+            build_report.built_file(bundle_name, bundle_target)
         if not signed:
             print("[BUILD] {} is unsigned. Set {} to sign it.".format(
                 self.branch.frontend, ", ".join(SIGNING_VARIABLES)), flush=True)

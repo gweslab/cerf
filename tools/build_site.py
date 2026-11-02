@@ -1,15 +1,3 @@
-"""Builds the CERF website into build/site, or serves it locally with live reload.
-
-    python tools/build_site.py                      build into build/site
-    python tools/build_site.py --serve              http://127.0.0.1:8000, reloads on edit
-    python tools/build_site.py --serve --port 8123  the same, on another port
-
-The board table, changelog and version are pulled in by docs/website/hooks/render.py
-from the same sources README.md uses, so the site cannot drift from
-them. This script only syncs the shared image assets - which live outside the site
-tree - into the docs dir, where MkDocs can see them.
-"""
-
 import argparse
 import glob
 import os
@@ -22,8 +10,11 @@ from product_facts import ASSET_ICONS_DIR, LOGO_ASSET
 ROOT      = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SITE      = os.path.join(ROOT, 'docs', 'website')
 CONTENT   = os.path.join(SITE, 'content')
-OUT       = os.path.join(ROOT, 'build', 'site')
 ICONS_SVG = os.path.join(ROOT, 'assets', ASSET_ICONS_DIR)
+COPIES    = {
+    'main':      ('mkdocs.yml', os.path.join(ROOT, 'build', 'site')),
+    'playstore': ('mkdocs.googleplay.yml', os.path.join(ROOT, 'build', 'site-googleplay')),
+}
 
 IMAGES = [
     (os.path.join('assets', LOGO_ASSET + '.ico'), LOGO_ASSET + '.ico'),
@@ -53,8 +44,8 @@ def sync_assets():
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--serve', action='store_true',
-                        help='serve locally with live reload instead of building')
+    parser.add_argument('--serve', nargs='?', const='main', choices=sorted(COPIES),
+                        help='serve one copy locally with live reload instead of building (default: main)')
     parser.add_argument('--port', type=int, default=None,
                         help='port for --serve (default: mkdocs\' own 8000)')
     args = parser.parse_args()
@@ -62,29 +53,25 @@ def main():
         parser.error('--port applies to --serve')
 
     sync_assets()
-    config = os.path.join(SITE, 'mkdocs.yml')
 
     if args.serve:
-        # --livereload is passed explicitly: mkdocs 1.6.1 declares it as a hidden
-        # flag paired with --no-livereload, and click 8.3 resolves that pair to
-        # False by default, which silently starts the server with no file watching.
-        #
-        # -w: the manifests, the hook and the data the hook reads all live outside
-        # content/, which is the only tree mkdocs watches on its own.
+        config = os.path.join(SITE, COPIES[args.serve][0])
         cmd = [sys.executable, '-m', 'mkdocs', 'serve',
                '--livereload',
                '-f', config,
                '-w', SITE,
                '-w', os.path.join(ROOT, 'libCerfCore', 'db.json'),
-               '-w', os.path.join(ROOT, 'docs', 'changelog.yml')]
+               '-w', os.path.join(ROOT, 'docs', 'changelog.yml'),
+               '-w', os.path.join(ROOT, 'cerf-qt', 'play_store_links_text.h')]
         if args.port is not None:
             cmd += ['-a', f'127.0.0.1:{args.port}']
         subprocess.check_call(cmd)
         return
 
-    subprocess.check_call([sys.executable, '-m', 'mkdocs', 'build', '--strict',
-                           '-f', config, '-d', OUT])
-    print(f'site built into {OUT}')
+    for config_name, out in COPIES.values():
+        subprocess.check_call([sys.executable, '-m', 'mkdocs', 'build', '--strict',
+                               '-f', os.path.join(SITE, config_name), '-d', out])
+        print(f'site built into {out}')
 
 
 if __name__ == '__main__':

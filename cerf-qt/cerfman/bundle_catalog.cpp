@@ -5,11 +5,11 @@
 #include "http_client.h"
 #include "local_manifest_store.h"
 #include "manager_operations.h"
+#include "self_upgrade.h"
 #include "text_compare.h"
 
 #include <cerfcore/core/cerf_emulator.h>
 #include <cerfcore/core/log.h>
-#include "../product_links.h"
 
 #include <QStringList>
 
@@ -140,7 +140,7 @@ void BundleCatalog::Apply(const Fetch& fetch) {
                                         "devices remain available to launch.")
                              .arg(remote)
                              .arg(kSupportedManifestVersion)
-                             .arg(QString::fromUtf8(cerffrontend::kDownloadUrl.text)));
+                             .arg(QString::fromUtf8(ManualDownloadUrl(false))));
         else
             emit message(QStringLiteral("Remote manifest outdated"),
                          QStringLiteral("The server's catalog (manifest version %1) is older than this build expects "

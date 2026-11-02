@@ -2,6 +2,9 @@
 
 {% block extrahead %}
   <script>document.documentElement.classList.add('cerf-anim');</script>
+  {% if config.extra.play_store_copy %}
+    <meta name="robots" content="noindex, nofollow">
+  {% endif %}
 {% endblock %}
 
 {% block hero %}

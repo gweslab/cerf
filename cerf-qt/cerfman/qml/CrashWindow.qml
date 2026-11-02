@@ -85,8 +85,11 @@ PageWindow {
 
             LinkLabel {
                 Layout.fillWidth: true
-                text: qsTr("If you think you have found an actual bug - %1.  Maybe someone has already reported that - "
-                           + "you can upvote it.").arg(host.feedbackLink(qsTr("see GitHub issues")))
+                text: FeedbackModel.available
+                      ? qsTr("If you think you have found an actual bug - %1.  Maybe someone has already reported "
+                             + "that - you can upvote it.").arg(host.feedbackLink(qsTr("see GitHub issues")))
+                      : qsTr("If you think you have found an actual bug - %1.")
+                            .arg(HtmlText.Link(ProductLinks.discordUrl, qsTr("report it on Discord")))
                 onAnchorActivated: host.openFeedback()
             }
 
@@ -122,18 +125,17 @@ PageWindow {
 
                     LinkLabel {
                         Layout.fillWidth: true
+                        visible: FeedbackModel.available
                         text: qsTr("Or you can %1.").arg(host.feedbackLink(qsTr("create your own ticket")))
                         onAnchorActivated: host.openFeedback()
                     }
                     Label {
                         Layout.fillWidth: true
-                        text: host.mobile
-                              ? qsTr("You must attach both log files - tap to share. Log files might include "
-                                     + "<b>personal data</b> like folder paths or computer specs. "
-                                     + "<b>GitHub profile is required</b>")
-                              : qsTr("You must attach both log files - click to locate. Log files might include "
-                                     + "<b>personal data</b> like folder paths or computer specs. "
-                                     + "<b>GitHub profile is required</b>")
+                        text: (host.mobile ? qsTr("You must attach both log files - tap to share.")
+                                           : qsTr("You must attach both log files - click to locate."))
+                              + " " + qsTr("Log files might include <b>personal data</b> like folder paths or "
+                                           + "computer specs.")
+                              + (FeedbackModel.available ? " " + qsTr("<b>GitHub profile is required</b>") : "")
                         textFormat: Text.StyledText
                         wrapMode: Text.Wrap
                     }

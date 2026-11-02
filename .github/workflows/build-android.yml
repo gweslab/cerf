@@ -137,3 +137,10 @@ jobs:
         with:
           name: ${{ steps.version.outputs.artifact }}
           path: ${{ steps.version.outputs.out }}/${{ steps.version.outputs.frontend }}
+
+      - name: Upload the app bundle
+        if: ${{ steps.build.outputs.signed == 'true' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.version.outputs.artifact }}-bundle
+          path: ${{ steps.version.outputs.out }}/${{ steps.version.outputs.bundle }}

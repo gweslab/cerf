@@ -5,6 +5,7 @@
 
 #include "../html_link.h"
 #include "../install_root_files.h"
+#include "../link_target.h"
 #include "../product_links.h"
 #include "../qt_resource_paths.h"
 #include "../resource_paths_text.h"
@@ -35,10 +36,14 @@ QString AboutModel::LinksHtml() const {
         {"Website", cerffrontend::kWebsiteUrl},
         {"Discord", cerffrontend::kDiscordUrl},
         {"Patreon", cerffrontend::kPatreonUrl},
+        {"Privacy policy", cerffrontend::kPrivacyUrl.text},
     };
-    for (const auto& [label, url] : entries)
-        links.append(HtmlLink(QString::fromUtf8(url), QString::fromUtf8(label)));
-    return links.join(QStringLiteral("&nbsp;&nbsp;·&nbsp;&nbsp;"));
+    for (const auto& [label, url] : entries) {
+        if (LinkTarget(QString::fromUtf8(url)).isEmpty()) continue;
+        links.append(HtmlLink(QString::fromUtf8(url), QString::fromUtf8(label).replace(u' ', QChar(QChar::Nbsp)))
+                         .replace(QChar(QChar::Nbsp), QStringLiteral("&nbsp;")));
+    }
+    return links.join(QStringLiteral("&nbsp;&nbsp;·&nbsp; "));
 }
 
 QString AboutModel::ContributorsHeader() const {

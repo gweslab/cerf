@@ -4,8 +4,8 @@ from datetime import datetime
 from pathlib import Path
 
 
-def build_exit_failed(name: str, code: int) -> None:
-    print("[BUILD] {} FAILED (cmake --build exit={})".format(name, code), flush=True)
+def tool_failed(name: str, tool: str, code: int) -> None:
+    print("[BUILD] {} FAILED ({} exit={})".format(name, tool, code), flush=True)
 
 
 def built_file_present(name: str, path: Path, what: str) -> bool:

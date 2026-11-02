@@ -23,7 +23,8 @@ ScrollPage {
         ColumnLayout {
             spacing: 0
 
-            RowLayout {
+            Flow {
+                Layout.fillWidth: true
                 spacing: Theme.spaceXS
 
                 TitleLabel {
@@ -31,7 +32,6 @@ ScrollPage {
                     text: ProductLinks.productName
                 }
                 SecondaryLabel {
-                    Layout.alignment: Qt.AlignTop
                     text: content.about.versionLabel
                 }
             }

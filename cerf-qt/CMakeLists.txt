@@ -185,12 +185,13 @@ endif()
 
 target_include_directories(cerf-qt PRIVATE "${CERF_GENERATED_DIR}")
 
+foreach(cerfqt_part MAJOR MINOR PATCH BUILD)
+    cerf_read_int_define(cerfqt_version_${cerfqt_part} "${CMAKE_CURRENT_SOURCE_DIR}/version.h"
+                         CERF_VERSION_${cerfqt_part})
+endforeach()
+set(cerfqt_version "${cerfqt_version_MAJOR}.${cerfqt_version_MINOR}.${cerfqt_version_PATCH}")
+
 if(APPLE)
-    foreach(cerfqt_part MAJOR MINOR PATCH)
-        cerf_read_int_define(cerfqt_version_${cerfqt_part} "${CMAKE_CURRENT_SOURCE_DIR}/version.h"
-                             CERF_VERSION_${cerfqt_part})
-    endforeach()
-    set(cerfqt_version "${cerfqt_version_MAJOR}.${cerfqt_version_MINOR}.${cerfqt_version_PATCH}")
     cerf_read_string_define(cerfqt_logo_asset "${CERF_RESOURCE_PATHS_HEADER}" CERF_LOGO_ASSET)
     cerf_read_int_define(cerfqt_logo_px "${CERF_RESOURCE_PATHS_HEADER}" CERF_LOGO_PX)
     set(cerfqt_logo_png "${cerfqt_assets}/${cerfqt_logo_asset}_${cerfqt_logo_px}.png")
@@ -265,13 +266,19 @@ if(ANDROID)
         BASE "${cerfqt_repo_dir}"
         FILES "${cerfqt_repo_dir}/${cerfqt_license_name}" ${cerfqt_licenses})
     set_property(TARGET cerf-qt APPEND PROPERTY QT_ANDROID_EXTRA_LIBS ${CERFQT_ANDROID_EXTRA_LIBS})
+    cerf_read_string_define(cerfqt_android_package "${CMAKE_CURRENT_SOURCE_DIR}/android_package_text.h"
+                            CERF_ANDROID_PACKAGE_NAME)
     set_target_properties(cerf-qt PROPERTIES
-        QT_ANDROID_PACKAGE_NAME "cx.cerf"
+        QT_ANDROID_PACKAGE_NAME "${cerfqt_android_package}"
         QT_ANDROID_APP_NAME "${cerfqt_product_name}"
         QT_ANDROID_PACKAGE_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/mobile/android"
         QT_ANDROID_APP_ICON "@mipmap/ic_launcher"
+        QT_ANDROID_VERSION_NAME "${cerfqt_version}"
         QT_ANDROID_MIN_SDK_VERSION ${CERFQT_ANDROID_MIN_SDK}
         QT_ANDROID_TARGET_SDK_VERSION ${CERFQT_ANDROID_TARGET_SDK})
+    if(cerfqt_version_BUILD GREATER 0)
+        set_target_properties(cerf-qt PROPERTIES QT_ANDROID_VERSION_CODE ${cerfqt_version_BUILD})
+    endif()
     qt_add_android_permission(cerf-qt NAME android.permission.RECORD_AUDIO)
 else()
     add_custom_target(cerf-qt-bundled ALL

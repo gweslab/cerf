@@ -53,6 +53,8 @@ def main(argv) -> int:
             lines.append("artifact=" + artifact_name(version, sha, job_branch))
             lines.append("out=" + host_branch.output_dir(Path("."), "Release", job_branch).as_posix())
             lines.append("frontend=" + job_branch.frontend)
+            if job_branch.store_bundle:
+                lines.append("bundle=" + job_branch.store_bundle)
         with open(output, "a", encoding="utf-8") as f:
             f.write("\n".join(lines) + "\n")
     print("Stamped: {} build {} (word {}), {}, {}".format(version, args.run, word, stamp, sha))

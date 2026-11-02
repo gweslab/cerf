@@ -1,0 +1,11 @@
+INHERIT: mkdocs.yml
+copyright: >-
+  &copy; 2019-{cur_year} Yaroslav Kibysh
+exclude_docs: |
+  download.md
+validation:
+  links:
+    not_found: info
+
+extra:
+  play_store_copy: true

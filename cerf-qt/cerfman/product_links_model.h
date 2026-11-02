@@ -18,6 +18,7 @@ class ProductLinksModel : public QObject, public cerfcore::Service {
     Q_PROPERTY(QString websiteUrl READ WebsiteUrl CONSTANT)
     Q_PROPERTY(QString discordUrl READ DiscordUrl CONSTANT)
     Q_PROPERTY(QString donateUrl READ DonateUrl CONSTANT)
+    Q_PROPERTY(bool donateShown READ DonateShown CONSTANT)
 
 public:
     explicit ProductLinksModel(cerfcore::CerfEmulator& emu) : cerfcore::Service(emu) {}
@@ -30,4 +31,5 @@ public:
     QString WebsiteUrl() const;
     QString DiscordUrl() const;
     QString DonateUrl() const;
+    bool    DonateShown() const;
 };

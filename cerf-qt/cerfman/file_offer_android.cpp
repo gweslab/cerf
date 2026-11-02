@@ -1,5 +1,7 @@
 #include "file_offer.h"
 
+#include "../android_package.h"
+
 #include <QJniEnvironment>
 #include <QJniObject>
 #include <QtCore/qcoreapplication_platform.h>
@@ -14,7 +16,7 @@ QJniObject IntentString(const char* field) { return QJniObject::getStaticObjectF
 
 bool OfferFile(const QString& absolute_path) {
     const QJniObject context = QNativeInterface::QAndroidApplication::context();
-    const QJniObject package = context.callObjectMethod("getPackageName", "()Ljava/lang/String;");
+    const QJniObject package = AndroidPackageName();
     const QJniObject file("java/io/File", "(Ljava/lang/String;)V",
                           QJniObject::fromString(absolute_path).object<jstring>());
     const QJniObject uri = QJniObject::callStaticObjectMethod(

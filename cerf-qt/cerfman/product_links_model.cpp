@@ -1,5 +1,7 @@
 #include "product_links_model.h"
 
+#include "../link_target.h"
+
 REGISTER_SERVICE(ProductLinksModel);
 
 QString ProductLinksModel::ProductName() const { return QString::fromUtf8(cerffrontend::kProductName); }
@@ -13,3 +15,5 @@ QString ProductLinksModel::WebsiteUrl() const { return QString::fromUtf8(cerffro
 QString ProductLinksModel::DiscordUrl() const { return QString::fromUtf8(cerffrontend::kDiscordUrl); }
 
 QString ProductLinksModel::DonateUrl() const { return QString::fromUtf8(cerffrontend::kDonateUrl.text); }
+
+bool ProductLinksModel::DonateShown() const { return !LinkTarget(DonateUrl()).isEmpty(); }

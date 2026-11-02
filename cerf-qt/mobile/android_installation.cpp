@@ -10,6 +10,7 @@
 #include <cerfcore/core/cerf_paths.h>
 #include <cerfcore/core/log.h>
 #include <cerfcore/platform/host_app_data_directory.h>
+#include "../android_package.h"
 #include "../install_root_files.h"
 #include "../qt_resource_paths.h"
 
@@ -22,7 +23,6 @@
 #include <QStandardPaths>
 #include <QString>
 #include <QStringList>
-#include <QtCore/qcoreapplication_platform.h>
 
 #include <optional>
 
@@ -33,9 +33,8 @@ constexpr char kUpdateTimeKey[] = "package_update_time";
 constexpr char kFilesKey[]      = "files";
 
 qint64 PackageUpdateTime() {
-    const QJniObject context = QNativeInterface::QAndroidApplication::context();
-    const QJniObject manager = context.callObjectMethod("getPackageManager", "()Landroid/content/pm/PackageManager;");
-    const QJniObject name    = context.callObjectMethod("getPackageName", "()Ljava/lang/String;");
+    const QJniObject manager = AndroidPackageManager();
+    const QJniObject name    = AndroidPackageName();
     const QJniObject info    = manager.callObjectMethod(
         "getPackageInfo", "(Ljava/lang/String;I)Landroid/content/pm/PackageInfo;", name.object<jstring>(), jint(0));
     return qint64(info.getField<jlong>("lastUpdateTime"));

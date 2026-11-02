@@ -17,6 +17,7 @@ class FeedbackModel : public QObject, public cerfcore::Service {
     Q_PROPERTY(QString header READ Header CONSTANT)
     Q_PROPERTY(QString createText READ CreateText CONSTANT)
     Q_PROPERTY(QString createUrl READ CreateUrl CONSTANT)
+    Q_PROPERTY(bool available READ Available CONSTANT)
     Q_PROPERTY(QString loadingText READ LoadingText CONSTANT)
 
 public:
@@ -29,6 +30,7 @@ public:
     QString Header() const;
     QString CreateText() const { return QStringLiteral("Create issue"); }
     QString CreateUrl() const;
+    bool    Available() const;
     QString LoadingText() const;
 
     Q_INVOKABLE void Load();

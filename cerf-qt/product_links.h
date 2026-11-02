@@ -1,6 +1,8 @@
 #pragma once
 
 #include <cerfcore/core/product_name.h>
+#include "android_package_text.h"
+#include "play_store_links_text.h"
 #include "product_author_text.h"
 
 #include <cstddef>
@@ -23,25 +25,29 @@ constexpr LinkText<A + B - 1> JoinLink(const char (&base)[A], const char (&path)
 }
 
 inline constexpr char kProductAuthor[]    = CERF_PRODUCT_AUTHOR;
-inline constexpr char kProductAuthorUrl[] = "https://yaroslavkibysh.com";
+inline constexpr char kProductAuthorUrl[] = CERF_PRODUCT_AUTHOR_URL;
 inline constexpr int  kProductFirstYear   = 2019;
-inline constexpr char kWebsiteUrl[]       = "https://cerf.cx";
+inline constexpr char kWebsiteUrl[]       = CERF_WEBSITE_URL;
+inline constexpr char kStoreWebsiteUrl[]  = CERF_PLAY_STORE_WEBSITE_URL;
 inline constexpr char kDiscordUrl[]       = "https://discord.gg/QREE9Y2v2d";
-inline constexpr char kPatreonUrl[]       = "https://www.patreon.com/dz3n";
+inline constexpr char kPatreonUrl[]       = CERF_PATREON_URL;
 
 inline constexpr auto kDownloadUrl           = JoinLink(kWebsiteUrl, "/download/");
 inline constexpr auto kAndroidDownloadUrl    = JoinLink(kWebsiteUrl, "/download?system=android");
+inline constexpr auto kPlayStoreUrl =
+    JoinLink("https://play.google.com/store/apps/details?id=", CERF_ANDROID_PACKAGE_NAME);
 inline constexpr auto kDonateUrl             = JoinLink(kWebsiteUrl, "/donate");
 inline constexpr auto kArticlesUrl           = JoinLink(kWebsiteUrl, "/articles/");
 inline constexpr auto kGuestAdditionsUrl     = JoinLink(kArticlesUrl.text, "guest-additions/");
 inline constexpr auto kBundleRepositoriesUrl = JoinLink(kArticlesUrl.text, "bundle-repositories/");
 inline constexpr auto kHibernationWarningUrl = JoinLink(kWebsiteUrl, "/hibernation-warning");
 inline constexpr auto kFeedbackUrl           = JoinLink(kWebsiteUrl, "/feedback");
+inline constexpr auto kPrivacyUrl            = JoinLink(kWebsiteUrl, "/privacy/");
 
 inline constexpr char kGitHubUrl[]          = "https://github.com/";
 inline constexpr char kGitHubApiUrl[]       = "https://api.github.com/";
 inline constexpr char kGitHubApiMediaType[] = "application/vnd.github+json";
-inline constexpr char kRepository[]         = "gweslab/cerf";
+inline constexpr char kRepository[]         = CERF_GITHUB_OWNER "/cerf";
 
 inline constexpr auto kRepositoryUrl       = JoinLink(kGitHubUrl, kRepository);
 inline constexpr auto kLatestReleaseUrl    = JoinLink(kRepositoryUrl.text, "/releases/latest");

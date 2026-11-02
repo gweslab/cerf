@@ -3,6 +3,7 @@
 #include "http_client.h"
 #include "json_file.h"
 
+#include "../link_target.h"
 #include "../product_links.h"
 
 #include <QUrl>
@@ -31,6 +32,8 @@ QString FeedbackModel::Header() const {
 }
 
 QString FeedbackModel::CreateUrl() const { return QString::fromUtf8(cerffrontend::kFeedbackUrl.text); }
+
+bool FeedbackModel::Available() const { return !LinkTarget(CreateUrl()).isEmpty(); }
 
 QString FeedbackModel::LoadingText() const { return QStringLiteral("Loading issues…"); }
 

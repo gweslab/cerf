@@ -16,12 +16,14 @@ SheetView {
         })
     }
 
+    readonly property var allPages: [{"key": SheetIds.settingsEmulatorPage, "title": qsTr("Emulator Settings")},
+                                     {"key": SheetIds.settingsTutorialPage, "title": qsTr("Tutorial")},
+                                     {"key": SheetIds.settingsFeedbackPage, "title": FeedbackModel.title},
+                                     {"key": SheetIds.settingsAboutPage, "title": qsTr("About")}]
+
     title: qsTr("Settings")
-    pages: [{"key": SheetIds.settingsEmulatorPage, "title": qsTr("Emulator Settings")},
-            {"key": SheetIds.settingsTutorialPage, "title": qsTr("Tutorial")},
-            {"key": SheetIds.settingsFeedbackPage, "title": FeedbackModel.title},
-            {"key": SheetIds.settingsAboutPage, "title": qsTr("About")}]
-    pageKeys: pages.map(page => page.key)
+    pages: allPages.filter(page => page.key !== SheetIds.settingsFeedbackPage || FeedbackModel.available)
+    pageKeys: allPages.map(page => page.key)
     launchKeys: view.mobile ? [] : [SheetIds.settingsTutorialPage]
     actionVisible: current === SheetIds.settingsEmulatorPage && (split || !menuShown)
     actionName: qsTr("OK")

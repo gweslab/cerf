@@ -29,7 +29,7 @@ Fun fact: you can't edit a bundle repository and nobody wants to develop that "f
 
 ## Running your own repository
 
-If you want to be a pirate - use the toolchain at [gweslab/bundles](https://github.com/gweslab/bundles). Improvements are welcome too.
+Use the toolchain at [gweslab/bundles](https://github.com/gweslab/bundles). Improvements are welcome too.
 
 ## Copyright removal
 

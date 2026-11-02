@@ -1,4 +1,4 @@
-# CE Runtime Foundation License 1.0
+# CE Runtime Foundation License 1.1
 
 Required Notice: Copyright 2019-2026 Yaroslav Kibysh. CE Runtime Foundation - https://cerf.cx
 
@@ -22,7 +22,7 @@ You must ensure that anyone who gets a copy of any part of the software from you
 
 If you distribute a changed copy of the software, or any work that contains any part of the software, and that work has a user interface, the work must show this text on a screen that its users can open from its main interface, such as an About window, a credits screen or a help page:
 
-Based on CE Runtime Foundation by Yaroslav Kibysh - https://cerf.cx
+Based on CE Runtime Foundation - https://cerf.cx
 
 The work must show the text exactly as written above, where its users can read it. Where the interface can open links, the address in the text must open as a link. If the work has no user interface, its documentation must show the text.
 

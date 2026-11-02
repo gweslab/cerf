@@ -60,6 +60,10 @@ hide:
 
 </div>
 
+!!! warning
+    Non commercial use only. Contact cerf.commercial@yaroslavkibysh.com for enterprise license details.
+
+
 ## Manual download
 
 If you can't or don't want to use an installer, download the archive for your platform from the [latest release on GitHub](https://github.com/gweslab/cerf/releases/latest).

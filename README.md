@@ -32,7 +32,7 @@
 
 Visit [the website](https://cerf.cx/download) to learn how to download a stable or an unstable build.
 
-8.0.4 [![build](https://github.com/gweslab/cerf/actions/workflows/build.yml/badge.svg)](https://github.com/gweslab/cerf/actions/workflows/build.yml)
+8.1 [![build](https://github.com/gweslab/cerf/actions/workflows/build.yml/badge.svg)](https://github.com/gweslab/cerf/actions/workflows/build.yml)
 
 ## [Contribution Guidelines](.github/CONTRIBUTING.md)
 
@@ -442,6 +442,14 @@ python run_claude.py
   </thead>
   <tbody>
     <tr>
+      <td>v8.1</td>
+      <td>TBA</td>
+      <td>
+        <p><b>📝 Changes</b><br/>
+          -</p>
+      </td>
+    </tr>
+    <tr>
       <td>v8.0</td>
       <td>31 Oct 2026</td>
       <td>
@@ -470,77 +478,6 @@ python run_claude.py
           ✅ Patch 2: Fixed emulator startup race crash<br/>
           ✅ Patch 3: Linux build now bundles many libraries instead of using system ones<br/>
           ✅ Patch 4: Live theme change bug fixed; Linux ARM64 support</p>
-      </td>
-    </tr>
-    <tr>
-      <td>v7.0</td>
-      <td>14 Oct 2026</td>
-      <td>
-        <p><b>📱 Devices</b><br/>
-          🆕 Casio Cassiopeia E-55 support<br/>
-          🆕 Symbol Mk500 support (by @Katamaran21)<br/>
-          🆕 Siemens MP377 support (by @RaulMerelli)<br/>
-          🆕 Casio Toricomail: bezel touch buttons<br/>
-          🆕 Casio Cassiopeia E-700 support<br/>
-          🆕 Philips Velo 1: Various DRAM Miniature Card profiles<br/>
-          🆕 iPAQ H3660/H3670 support<br/>
-          ✅ Device Emulator: keyboard no longer drops or repeats keys while typing<br/>
-          ✅ Device Emulator: Windows Mobile 2003 SE no longer freezes<br/>
-          ✅ Casio Toricomail: fixed rendering crashes<br/>
-          ✅ Ford Sync 2: Massive rendering improvements, navigation maps and more (by @cavenderbi)<br/>
-          ✅ iPAQ H3100: fixed audio playback<br/>
-          ✅ iPAQ H3600: standard RAM size<br/>
-          ✅ Siemens SIMpad SL4: 64 MB RAM</p>
-        <p><b>💿 Emulator</b><br/>
-          🆕 BREAKING: Device database has been updated, check your launcher and fix your entries before running on old values<br/>
-          🆕 Configurable display colour depth for Guest Additions and Device Emulator<br/>
-          🆕 Bundled CompactFlash cards can be auto-inserted at launch<br/>
-          🆕 Thumb32 support. Windows Embedded Compact 2013 is now supported<br/>
-          🆕 Right Click simulation mode for the stock stylus (synths LAlt+Tap)<br/>
-          🆕 Shutdown dialog has received reboot options<br/>
-          🆕 Host key is now reassignable<br/>
-          🆕 Improved UI and added notification cards<br/>
-          🆕 Catch up throttle multiplier knob (see in launcher)<br/>
-          🆕 CPU rate multiplier knob (see in launcher)<br/>
-          ✅ ARM JIT and JIT core full rewrite. ARM JIT/peripherals massive performance optimizations<br/>
-          ✅ Audio systems were reworked - less sound stuttering<br/>
-          ✅ Media instructions for Zune 30 - music is now playable<br/>
-          ✅ System clock improvements<br/>
-          ✅ Keyboard input no longer stops working after switching to another window and back<br/>
-          ❌ Memory visualizer</p>
-        <p><b>🚀 Launcher</b><br/>
-          🆕 Feedback window listing GitHub issues<br/>
-          🆕 Copyright issues contact window<br/>
-          🆕 Configurable update channel<br/>
-          🆕 UI revamp and optimizations<br/>
-          🆕 Configurable board types, ROM and storage sources<br/>
-          🆕 CPU Configuration<br/>
-          ✅ Launcher does not wait depend on internet connection and it&#x27;s speed to let you use it<br/>
-          ✅ Toolbar buttons are now properly trimmed when not enough width</p>
-        <p><b>💾 CE Apps</b><br/>
-          🆕 romdump: SH3 support<br/>
-          🆕 romdump: universal reset vector presets for MIPS and SH3</p>
-        <p><b>✨ Guest Additions</b><br/>
-          🆕 Virtual Ethernet adapter<br/>
-          🆕 Persistant customization/settings from CERF UI<br/>
-          🆕 Windows Embedded Compact 2013 support<br/>
-          🆕 Font size override support<br/>
-          🆕 Stylus simulation mode for the mouse pointer<br/>
-          🆕 Shared folders on Windows CE 2.0<br/>
-          🆕 Driver automatically disables system-wide signature checks on Windows Mobile<br/>
-          🆕 Hack to the WinCE shell for Ford SYNC 2<br/>
-          🆕 ClearType support (by @RaulMerelli) and configuration<br/>
-          ✅ Pre-OS graphics (stock framebuffer) is now visible too and usable (switch to GA inputs is deferred now)<br/>
-          ✅ Crash when drawing off-screen (GiNi)<br/>
-          ✅ Default colour depth is now 24bpp instead of 32bpp - fixes Device Emulator Windows Mobile 6.5 shell rendering<br/>
-          ✅ Colour corruption in 16bpp mode - alpha-blended elements rendered green/cyan<br/>
-          ✅ Gradients on WM 2003 - the taskbar and application backgrounds render again<br/>
-          ✅ Mouse and keyboard no longer stop working for the whole session when input arrives early during boot<br/>
-          ✅ Crash/artifacts when scrolling under complex rendering<br/>
-          ✅ Apps run from a shared folder no longer crash<br/>
-          ✅ Shared folders no longer crash Explorer on Windows CE .NET<br/>
-          ✅ Fixed memory errors on Windows CE 6 branch<br/>
-          ✅ Fixed shared storage caps</p>
       </td>
     </tr>
     <tr>

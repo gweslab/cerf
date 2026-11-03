@@ -260,3 +260,5 @@ follow them):
    peripherals are never stubbed (`agent_docs/rules.md` § Board Implementation).
 7. **`/verify`**, fix any `CRITICAL PROBLEM FOUND`;
 8. **Repeat** until GUI, then interaction - the user-observable bring-up target.
+
+Do NOT jump chunks. Record bring-up loop into tracing document. One chunk at the time. Never mix chunks unless this is required.

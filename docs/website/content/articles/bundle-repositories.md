@@ -10,9 +10,7 @@ The Device Manager lets you also to update ROMs if they have anything new in the
 
 ## Finding and adding a repository
 
-CERF distributes no ROMs out of box.
-
-There are chances you might run into a community hosted repository. Seek those on our [Discord server](/discord).
+--8<-- "rom_sources.md"
 
 !!! warning
     Be careful - someone might host a malicious repository. If there are any vulerabilities in the code we are unaware of, a hacker might expose those and obtain an access to your device. Add only verified sources.

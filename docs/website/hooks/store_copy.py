@@ -11,7 +11,9 @@ ROOT  = os.path.dirname(os.path.dirname(SITE))
 sys.path.insert(0, os.path.join(ROOT, 'tools'))
 from header_defines import str_define
 
-LINKS_HEADER = os.path.join(ROOT, 'cerf-qt', 'play_store_links_text.h')
+LINKS_HEADER   = os.path.join(ROOT, 'cerf-qt', 'play_store_links_text.h')
+SNIPPETS       = os.path.join(SITE, 'snippets')
+STORE_SNIPPETS = os.path.join(SNIPPETS, 'googleplay')
 REDIRECTS    = os.path.join(SITE, 'content', '_redirects')
 HEADERS      = '/*\n  X-Robots-Tag: noindex, nofollow\n'
 HREF         = re.compile(r'\bhref="[^"]*"')
@@ -211,6 +213,7 @@ def configure(config):
     config.site_url = store_url() + '/'
     config.repo_url = None
     config.edit_uri = None
+    config.mdx_configs.setdefault('pymdownx.snippets', {})['base_path'] = [STORE_SNIPPETS, SNIPPETS]
     links = StoreLinks()
     config.extra['social'] = [entry for entry in config.extra.get('social', [])
                               if links.target(entry['link']) is not None]

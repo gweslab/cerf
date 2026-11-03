@@ -50,7 +50,7 @@ ColumnLayout {
     SideBlock {
         Layout.fillWidth: true
         visible: details.unsupportedFeatures.length > 0
-        title: qsTr("Unsupported Features")
+        title: qsTr("Unsupported built-in/pluggable devices")
 
         Flow {
             Layout.fillWidth: true

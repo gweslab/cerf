@@ -155,7 +155,7 @@ QVariantMap DeviceCards::Details(const QString& name) const {
     for (const cerfcore::DbDeviceFeature* feature : boards.UnsupportedFeatures(device.meta.board_id))
         unsupported_features.append(QVariantMap{
             {QStringLiteral("icon"), QString::fromStdString(feature->icon)},
-            {QStringLiteral("tip"), QStringLiteral("CERF does not support this feature: %1")
+            {QStringLiteral("tip"), QStringLiteral("The emulator might product no effect or crash if you access %1")
                                         .arg(QString::fromStdString(feature->name))}});
 
     const QStringList note_lines = device.meta.notes + boards.Notes(device.meta.board_id);

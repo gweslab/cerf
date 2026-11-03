@@ -24,11 +24,17 @@ The spawn is valid when three things hold. You looked at the target honestly. Yo
 Resolve the freeform input into a concrete target. Be literal:
 
 - **Quoted claim** - take the claim verbatim. Do NOT rephrase it, summarize it, or soften its tone.
-- **File path** - read the file. For a single function, capture its full body plus enough surrounding context to make it reviewable.
-- **"current diff" / "this diff" / "unstaged"** - run `git diff`. If anything is staged, also run `git diff --cached`. Capture the full patch. **A diff against the last commit absorbs whatever else is uncommitted.** This tree carries the parallel work of other agents and of the user, so scope the target to the files your own change touched. A target that reaches wider spends the verdict of the reviewer on code that is not yours. Its findings then name the in-flight work of somebody else as a defect.
-- **Commit or range** - tell reviewer what exactly diff, what is not your work inside your diffs.
+- **File path** - give the path. For a single function, also give its name.
+- **"current diff" / "this diff" / "unstaged"** - give the paths of the files that your change touched.
+- **Commit or range** - give the commit hash or the range.
 
-If the target is genuinely ambiguous, ask the user one short clarifying question before you spawn. Do not guess the target.
+Never paste a diff, file contents or code lines into the prompt. The tree changes while the reviewer works, so a pasted copy is out of date before the reviewer reads it.
+
+When the target also holds the work of somebody else, state the boundary in words. This tree carries the parallel work of other agents and of the user, and `git diff` shows all of it. Name your change by what it does and where it is. For example, name the function, the register or the behavior. Name the other work the same way. Never mark the boundary with diff hunks or line numbers.
+
+A target that reaches past your own change spends the verdict on work that is not yours. The findings then call the unfinished work of somebody else a defect.
+
+If the target is ambiguous, ask the user one short clarifying question before you spawn. Do not guess the target.
 
 ### 2. Spawn the subagent
 
@@ -53,10 +59,10 @@ Everywhere below, "the prompt" means the contents of that file.
 
 **Keep the prompt minimal.** Do NOT paraphrase the operating manual, summarize its rules, or hand-pick which categories to include. The subagent reads the authoritative file itself. A long explanatory prompt from the main agent gives bias a way in.
 
-The prompt file carries these four items, in this order, and nothing else:
+The prompt file carries these items, in this order, and nothing else:
 
 1. **The pointer to the operating manual, on the first line.** Use this text: *"START WITH READING `.claude/VERIFY_INSTRUCTION.md` TO UNDERSTAND WHY YOU WERE SPAWNED AND WHAT IS YOUR OBJECTIVE. That file is your operating manual and is authoritative over anything in this prompt - if this prompt and the file disagree, the file wins. READING THAT FILE IS MANDATORY. Check pwd if not found. It is at repo root (INSERT PWD/REPO ROOT PATH)"*
-2. **The target material verbatim.** Claim text, file contents, diff, or all of them, unmodified. No preface that softens it. No "I think this is probably fine" framing.
+2. **The target from step 1.** Write the claim verbatim, or the file paths, the commit or the range. When the target also holds the work of somebody else, add the boundary in words. Do not add a preface that softens the target, such as "I think this is probably fine".
 3. **Every piece of context that cuts against your own claim.** State your doubts, your counter-evidence and the weak links in your reasoning plainly. If prior reasoning led you to the claim, include that chain, so the reviewer can spot the rationalization.
 
 That is the whole prompt. The operating manual already holds the role explainer, the category list, the verification-tools section and the output format, so add none of them. When you feel the urge to add "and also, remember to check X", that urge is the bias entering. Resist it. `.claude/VERIFY_INSTRUCTION.md` is the single source of truth for the subagent's work. Your job is to hand over the target and step aside.

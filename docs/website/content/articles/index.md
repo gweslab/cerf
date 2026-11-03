@@ -7,7 +7,6 @@
 
 ## General about emulator
 
-- [**Principles**](principles.md) - emulator under the hood; author's notes, choices and shortcuts
 - [**Guest Additions**](guest-additions.md) - how do Guest Additions works
 - [**PC Cards and serial ports**](pc-cards.md) - what you can put into a PCMCIA slot/Serial port
 - [**Getting the guest online**](networking.md) - put a network card in the slot and browse the web
@@ -17,13 +16,14 @@
 - [**Running your own ROM**](own-rom.md) - boot a dump of a board CERF already supports.
 - [**Connecting to ActiveSync**](activesync.md) - connect a guest handheld to a desktop ActiveSync
   and move files both ways.
+- [**ROM bundle repositories**](bundle-repositories.md) - where to get ROMs
 
 ## Advanced users and developers
 
+
+- [**Principles**](principles.md) - emulator under the hood; author's notes, choices and shortcuts
 - [**The configuration files**](cerf-json.md) - the three layers of `cerf.json`, and what each one
   can set.
-- [**ROM bundle repositories**](bundle-repositories.md) - where the emulator downloads ROMs from,
-  running your own, and copyright removal.
 - [**Save and restore**](hibernation.md) - how saved state works
 - [**Windows CE ROM containers**](rom-containers.md) - the ROM file formats, how they differ across
   CE versions, and how to extract them.

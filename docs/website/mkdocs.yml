@@ -65,11 +65,11 @@ nav:
       - Save and restore: articles/hibernation.md
       - Getting the guest online: articles/networking.md
       - Touch and mouse: articles/pointer-input.md
-      - Principles: articles/principles.md
       - The configuration files: articles/cerf-json.md
       - ROM bundle repositories: articles/bundle-repositories.md
       - Connecting to ActiveSync: articles/activesync.md
       - Windows CE ROM containers: articles/rom-containers.md
+      - Principles: articles/principles.md
       - Send feedback: /feedback
   - Changelog: changelog.md
 

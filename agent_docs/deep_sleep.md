@@ -162,7 +162,10 @@ applies to every board.
    returns true, CERF halts. A wake-up event can already be present when sleep
    begins, for example a held level input. Latch that event in the
    sleep-entry callback. Then register the current `SleptNs()` total as its
-   due time.
+   due time. A due time can change during the park. For example, a host input can
+   end a state that blocks a wake source. Apply such an input on the JIT thread, for
+   example in a `GuestDeepSleep::RegisterParkClock` callback. Then call
+   `GuestDeepSleep::RefreshParkWakeDue()`.
 9. **Make a user wake operate the input that a user operates.** A dialog Cancel
    stands for a user who wakes the device. Some firmware reads the input that caused
    a wake, and puts the device back to sleep when no user input caused it. For such

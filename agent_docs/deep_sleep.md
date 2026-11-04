@@ -33,6 +33,10 @@ Cancel wakes (`DeliverWake`), OK exits (with an optional save). The recovery dia
 **no-timeout** by design - a countdown can auto-exit and discard live guest RAM
 while the user is away.
 
+**On a clock-stop board, the Soft Reset of the recovery dialog powers the system up
+before it resets the CPU.** The Soft Reset resets only the CPU. The Suspend State leaves
+the rest of the system powered down.
+
 ## Wake shapes - read the SoC and the board before picking one
 
 Sleep-exit is silicon behavior, and it takes one of two forms. A board can also cut the

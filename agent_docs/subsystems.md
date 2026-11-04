@@ -311,8 +311,9 @@ every reset listener and after the cold boot.
 **An interrupt edge that a release listener causes still falls inside the
 reset.** No guest instruction runs between the first reset listener and the
 last release listener, and `GuestCpuReset::Delivering()` is true for that whole
-span. An interrupt controller that holds its status clear for the duration of
-reset latches no edge while it is true.
+span. Some interrupt controllers hold their status clear for the duration of
+reset. Such a controller latches no edge in that span if the reset is of a kind
+that resets it.
 
 - `libCerfCore/include/cerfcore/socs/guest_cpu_reset.h`, `libCerfCore/src/socs/guest_cpu_reset.cpp`
 

@@ -27,6 +27,8 @@ void QtHostWindow::changeEvent(QEvent* event) {
         gate_.Run([](cerfcore::CerfEmulator& emu) { emu.Get<QtMainWindow>().OnUserResized(); });
     if (event->type() == QEvent::ActivationChange && !isActiveWindow())
         gate_.Run([](cerfcore::CerfEmulator& emu) { emu.Get<QtMainWindow>().OnDeactivated(); });
+    if (event->type() == QEvent::PaletteChange)
+        gate_.Run([](cerfcore::CerfEmulator& emu) { emu.Get<QtMainWindow>().OnPaletteChanged(); });
     QMainWindow::changeEvent(event);
 }
 

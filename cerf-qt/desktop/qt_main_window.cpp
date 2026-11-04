@@ -117,16 +117,11 @@ void QtMainWindow::BuildMenus() {
 bool QtMainWindow::MenuBarIsNative() const { return window_->menuBar()->isNativeMenuBar(); }
 
 void QtMainWindow::BuildHudButton() {
-    QMenuBar*    bar  = window_->menuBar();
-    const qreal  dpr  = bar->devicePixelRatioF();
-    const int    side = static_cast<int>(std::lround(kHudIconPx * dpr));
-    QPixmap icon = QPixmap::fromImage(
-        TintedSymbolIcon(QStringLiteral("gamepad"), QSize(side, side), bar->palette().color(QPalette::WindowText)));
-    icon.setDevicePixelRatio(dpr);
-    hud_button_ = new QToolButton(bar);
+    QMenuBar* bar = window_->menuBar();
+    hud_button_   = new QToolButton(bar);
     hud_button_->setAutoRaise(true);
     hud_button_->setCheckable(true);
-    hud_button_->setIcon(QIcon(icon));
+    TintHudButton();
     hud_button_->setIconSize(QSize(kHudIconPx, kHudIconPx));
     hud_button_->setToolTip(QStringLiteral("Show HUD"));
     hud_button_->setAccessibleName(QStringLiteral("Show HUD"));
@@ -135,6 +130,20 @@ void QtMainWindow::BuildHudButton() {
     }));
     bar->setCornerWidget(hud_button_, Qt::TopRightCorner);
     RefreshHudButton();
+}
+
+void QtMainWindow::TintHudButton() {
+    const QMenuBar* bar  = window_->menuBar();
+    const qreal     dpr  = bar->devicePixelRatioF();
+    const int       side = static_cast<int>(std::lround(kHudIconPx * dpr));
+    QPixmap icon = QPixmap::fromImage(
+        TintedSymbolIcon(QStringLiteral("gamepad"), QSize(side, side), bar->palette().color(QPalette::WindowText)));
+    icon.setDevicePixelRatio(dpr);
+    hud_button_->setIcon(QIcon(icon));
+}
+
+void QtMainWindow::OnPaletteChanged() {
+    if (hud_button_ != nullptr) TintHudButton();
 }
 
 void QtMainWindow::RefreshHudButton() {

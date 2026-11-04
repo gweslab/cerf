@@ -13,7 +13,7 @@
 #include <QWidget>
 #include <QWindow>
 
-REGISTER_SERVICE(QtManagerWindowOpener);
+REGISTER_SERVICE_AS(QtManagerWindowOpener, cerffrontend::ManagerWindows);
 
 namespace {
 

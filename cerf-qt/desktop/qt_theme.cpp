@@ -1,6 +1,7 @@
 #include "qt_theme.h"
 
 #include "qt_compact_menu_bar_style.h"
+#include "qt_corner_height_menu_bar_style.h"
 
 #include <cerfcore/core/cerf_emulator.h>
 #include <cerfcore/core/log.h>
@@ -30,7 +31,7 @@ void QtTheme::ApplyStyle() {
     if (native == QLatin1String(kFluentStyle))
         QApplication::setStyle(new QtCompactMenuBarStyle(QStyleFactory::create(QLatin1String(kFluentStyle))));
     else
-        QApplication::setStyle(QLatin1String(kFusionStyle));
+        QApplication::setStyle(new QtCornerHeightMenuBarStyle(QStyleFactory::create(QLatin1String(kFusionStyle))));
     LOG(Cerf, "QtTheme: platform style %s\n", qUtf8Printable(native));
     ApplyPalette();
     QObject::connect(QGuiApplication::styleHints(), &QStyleHints::colorSchemeChanged, &scheme_receiver_,

@@ -456,6 +456,8 @@ python run_claude.py
       <td>
         <p><b>📱 Devices</b><br/>
           🆕 NEC MobilePro 790 support</p>
+        <p><b>✨ Guest Additions</b><br/>
+          🆕 Allow 8bpp guest to set a palette</p>
       </td>
     </tr>
     <tr>
@@ -486,7 +488,8 @@ python run_claude.py
           ✅ Patch 1: Added DevEmu 2003 screen configuration support<br/>
           ✅ Patch 2: Fixed emulator startup race crash<br/>
           ✅ Patch 3: Linux build now bundles many libraries instead of using system ones<br/>
-          ✅ Patch 4: Live theme change bug fixed; Linux ARM64 support</p>
+          ✅ Patch 4: Live theme change bug fixed; Linux ARM64 support<br/>
+          ✅ Patch 5: Crash fixes on non-Windows systems; styling fixes</p>
       </td>
     </tr>
     <tr>

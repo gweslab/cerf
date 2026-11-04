@@ -15,6 +15,7 @@
       Patch 2: Fixed emulator startup race crash
       Patch 3: Linux build now bundles many libraries instead of using system ones
       Patch 4: Live theme change bug fixed; Linux ARM64 support
+      Patch 5: Crash fixes on non-Windows systems; styling fixes
   devices:
     new: |
       DevEmu 2003: Added board type, keyboard layout and screen configuration support

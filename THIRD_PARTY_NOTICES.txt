@@ -527,6 +527,7 @@ pySerial - https://github.com/pyserial/pyserial
 Wine - https://www.winehq.org/
 XNU - https://github.com/apple-oss-distributions/xnu
 Android Open Source Project - https://source.android.com/
+X.Org Trident driver - https://gitlab.freedesktop.org/xorg/driver/xf86-video-trident
 CMake - https://cmake.org/
 LuaJIT - https://luajit.org/
 dynarmic - https://github.com/azahar-emu/dynarmic

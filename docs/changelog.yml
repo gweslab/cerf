@@ -3,6 +3,7 @@
   devices:
     new: |
       NEC MobilePro 790 support
+      Sharp Mobilon HC4500, HC4600 support
   guest_additions:
     new: |
       Indexed palettes rework and configuration

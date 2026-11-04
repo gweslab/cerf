@@ -308,6 +308,12 @@ are a new clock rate, a pin level that the other unit latches, and a value
 that a skipped bootloader leaves in another unit. Release listeners run after
 every reset listener and after the cold boot.
 
+**An interrupt edge that a release listener causes still falls inside the
+reset.** No guest instruction runs between the first reset listener and the
+last release listener, and `GuestCpuReset::Delivering()` is true for that whole
+span. An interrupt controller that holds its status clear for the duration of
+reset latches no edge while it is true.
+
 - `libCerfCore/include/cerfcore/socs/guest_cpu_reset.h`, `libCerfCore/src/socs/guest_cpu_reset.cpp`
 
 **`GuestColdBoot`** implements hard reset (cold boot). At reset

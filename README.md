@@ -362,15 +362,15 @@ python run_claude.py
       <td rowspan="5" align="center"><b>NEC VR4121</b><br/><sub>MIPS III</sub></td>
       <td rowspan="3"><b>Casio PocketPostPet</b></td>
       <td><img src="assets/icons_sources/board.svg" width="16" height="16" title="PDA" alt="PDA"/> <b>Casio Message-Cam</b> <code>casio_message_cam</code></td>
-      <td><img src="assets/icons_sources/stylus.svg" width="32" height="32" title="Touch Panel" alt="Touch Panel"/> <img src="assets/icons_sources/keyboard.svg" width="32" height="32" title="Keyboard or keypad" alt="Keyboard or keypad"/> <img src="assets/icons_sources/ga_autoresize.svg" width="32" height="32" title="Emulator's Guest Additions" alt="Emulator's Guest Additions"/></td>
+      <td><img src="assets/icons_sources/stylus.svg" width="32" height="32" title="Touch Panel" alt="Touch Panel"/> <img src="assets/icons_sources/keyboard.svg" width="32" height="32" title="Keyboard or keypad" alt="Keyboard or keypad"/> <img src="assets/icons_sources/ga_autoresize.svg" width="32" height="32" title="Emulator's Guest Additions" alt="Emulator's Guest Additions"/> <img src="assets/icons_sources/speaker_active.svg" width="32" height="32" title="Built-in/Pluggable Sound" alt="Built-in/Pluggable Sound"/> <img src="assets/icons_sources/microphone.svg" width="32" height="32" title="Built-in/Pluggable Microphone" alt="Built-in/Pluggable Microphone"/></td>
     </tr>
     <tr>
       <td><img src="assets/icons_sources/board.svg" width="16" height="16" title="PDA" alt="PDA"/> <b>Casio PocketPostPet</b> <code>casio_pocketpostpet</code></td>
-      <td><img src="assets/icons_sources/stylus.svg" width="32" height="32" title="Touch Panel" alt="Touch Panel"/> <img src="assets/icons_sources/keyboard.svg" width="32" height="32" title="Keyboard or keypad" alt="Keyboard or keypad"/> <img src="assets/icons_sources/ga_autoresize.svg" width="32" height="32" title="Emulator's Guest Additions" alt="Emulator's Guest Additions"/></td>
+      <td><img src="assets/icons_sources/stylus.svg" width="32" height="32" title="Touch Panel" alt="Touch Panel"/> <img src="assets/icons_sources/keyboard.svg" width="32" height="32" title="Keyboard or keypad" alt="Keyboard or keypad"/> <img src="assets/icons_sources/ga_autoresize.svg" width="32" height="32" title="Emulator's Guest Additions" alt="Emulator's Guest Additions"/> <img src="assets/icons_sources/speaker_active.svg" width="32" height="32" title="Built-in/Pluggable Sound" alt="Built-in/Pluggable Sound"/> <img src="assets/icons_sources/microphone.svg" width="32" height="32" title="Built-in/Pluggable Microphone" alt="Built-in/Pluggable Microphone"/></td>
     </tr>
     <tr>
       <td><img src="assets/icons_sources/board.svg" width="16" height="16" title="PDA" alt="PDA"/> <b>Casio Toricomail</b> <code>casio_toricomail</code></td>
-      <td><img src="assets/icons_sources/stylus.svg" width="32" height="32" title="Touch Panel" alt="Touch Panel"/> <img src="assets/icons_sources/keyboard.svg" width="32" height="32" title="Keyboard or keypad" alt="Keyboard or keypad"/> <img src="assets/icons_sources/ga_autoresize.svg" width="32" height="32" title="Emulator's Guest Additions" alt="Emulator's Guest Additions"/></td>
+      <td><img src="assets/icons_sources/stylus.svg" width="32" height="32" title="Touch Panel" alt="Touch Panel"/> <img src="assets/icons_sources/keyboard.svg" width="32" height="32" title="Keyboard or keypad" alt="Keyboard or keypad"/> <img src="assets/icons_sources/ga_autoresize.svg" width="32" height="32" title="Emulator's Guest Additions" alt="Emulator's Guest Additions"/> <img src="assets/icons_sources/speaker_active.svg" width="32" height="32" title="Built-in/Pluggable Sound" alt="Built-in/Pluggable Sound"/> <img src="assets/icons_sources/microphone.svg" width="32" height="32" title="Built-in/Pluggable Microphone" alt="Built-in/Pluggable Microphone"/></td>
     </tr>
     <tr>
       <td rowspan="2"><b>NEC CRONOS3E</b></td>
@@ -424,14 +424,18 @@ python run_claude.py
       <td><img src="assets/icons_sources/stylus.svg" width="32" height="32" title="Touch Panel" alt="Touch Panel"/> <img src="assets/icons_sources/keyboard.svg" width="32" height="32" title="Keyboard or keypad" alt="Keyboard or keypad"/> <img src="assets/icons_sources/suspend.svg" width="32" height="32" title="CPU Supend/Resume" alt="CPU Supend/Resume"/> <img src="assets/icons_sources/speaker_active.svg" width="32" height="32" title="Built-in/Pluggable Sound" alt="Built-in/Pluggable Sound"/> <img src="assets/icons_sources/pcmcia_enabled.svg" width="32" height="32" title="PC Card Socket" alt="PC Card Socket"/> <img src="assets/icons_sources/internet.svg" width="32" height="32" title="Built-in Network Adapter" alt="Built-in Network Adapter"/> <img src="assets/icons_sources/battery.svg" width="32" height="32" title="Battery" alt="Battery"/> <img src="assets/icons_sources/serial_com.svg" width="32" height="32" title="Serial Port" alt="Serial Port"/></td>
     </tr>
     <tr>
-      <td rowspan="2" align="center"><b>Philips PR31700</b><br/><sub>MIPS I</sub></td>
+      <td rowspan="3" align="center"><b>Philips PR31700</b><br/><sub>MIPS I</sub></td>
       <td><b>Philips Nino</b></td>
       <td><img src="assets/icons_sources/board.svg" width="16" height="16" title="PDA" alt="PDA"/> <b>Philips Nino 300</b> <code>philips_nino_300</code></td>
       <td><img src="assets/icons_sources/stylus.svg" width="32" height="32" title="Touch Panel" alt="Touch Panel"/> <img src="assets/icons_sources/keyboard.svg" width="32" height="32" title="Keyboard or keypad" alt="Keyboard or keypad"/> <img src="assets/icons_sources/suspend.svg" width="32" height="32" title="CPU Supend/Resume" alt="CPU Supend/Resume"/> <img src="assets/icons_sources/ga_autoresize.svg" width="32" height="32" title="Emulator's Guest Additions" alt="Emulator's Guest Additions"/> <img src="assets/icons_sources/speaker_active.svg" width="32" height="32" title="Built-in/Pluggable Sound" alt="Built-in/Pluggable Sound"/> <img src="assets/icons_sources/pcmcia_enabled.svg" width="32" height="32" title="PC Card Socket" alt="PC Card Socket"/> <img src="assets/icons_sources/battery.svg" width="32" height="32" title="Battery" alt="Battery"/> <img src="assets/icons_sources/serial_com.svg" width="32" height="32" title="Serial Port" alt="Serial Port"/></td>
     </tr>
     <tr>
-      <td><b>Sharp Mobilon HC</b></td>
+      <td rowspan="2"><b>Sharp Mobilon HC</b></td>
       <td><img src="assets/icons_sources/board.svg" width="16" height="16" title="PDA" alt="PDA"/> <b>Sharp Mobilon HC-4100</b> <code>sharp_mobilon_hc4100</code></td>
+      <td><img src="assets/icons_sources/stylus.svg" width="32" height="32" title="Touch Panel" alt="Touch Panel"/> <img src="assets/icons_sources/keyboard.svg" width="32" height="32" title="Keyboard or keypad" alt="Keyboard or keypad"/> <img src="assets/icons_sources/ga_autoresize.svg" width="32" height="32" title="Emulator's Guest Additions" alt="Emulator's Guest Additions"/> <img src="assets/icons_sources/speaker_active.svg" width="32" height="32" title="Built-in/Pluggable Sound" alt="Built-in/Pluggable Sound"/> <img src="assets/icons_sources/pcmcia_enabled.svg" width="32" height="32" title="PC Card Socket" alt="PC Card Socket"/> <img src="assets/icons_sources/internet.svg" width="32" height="32" title="Built-in Network Adapter" alt="Built-in Network Adapter"/> <img src="assets/icons_sources/battery.svg" width="32" height="32" title="Battery" alt="Battery"/> <img src="assets/icons_sources/serial_com.svg" width="32" height="32" title="Serial Port" alt="Serial Port"/></td>
+    </tr>
+    <tr>
+      <td><img src="assets/icons_sources/board.svg" width="16" height="16" title="PDA" alt="PDA"/> <b>Sharp Mobilon HC-4100 (8 MB)</b> <code>sharp_mobilon_hc4100_8mb</code></td>
       <td><img src="assets/icons_sources/stylus.svg" width="32" height="32" title="Touch Panel" alt="Touch Panel"/> <img src="assets/icons_sources/keyboard.svg" width="32" height="32" title="Keyboard or keypad" alt="Keyboard or keypad"/> <img src="assets/icons_sources/ga_autoresize.svg" width="32" height="32" title="Emulator's Guest Additions" alt="Emulator's Guest Additions"/> <img src="assets/icons_sources/speaker_active.svg" width="32" height="32" title="Built-in/Pluggable Sound" alt="Built-in/Pluggable Sound"/> <img src="assets/icons_sources/pcmcia_enabled.svg" width="32" height="32" title="PC Card Socket" alt="PC Card Socket"/> <img src="assets/icons_sources/internet.svg" width="32" height="32" title="Built-in Network Adapter" alt="Built-in Network Adapter"/> <img src="assets/icons_sources/battery.svg" width="32" height="32" title="Battery" alt="Battery"/> <img src="assets/icons_sources/serial_com.svg" width="32" height="32" title="Serial Port" alt="Serial Port"/></td>
     </tr>
   </tbody>
@@ -455,9 +459,10 @@ python run_claude.py
       <td>TBA</td>
       <td>
         <p><b>📱 Devices</b><br/>
-          🆕 NEC MobilePro 790 support</p>
+          🆕 NEC MobilePro 790 support<br/>
+          🆕 Sharp Mobilon HC4500, HC4600 support</p>
         <p><b>✨ Guest Additions</b><br/>
-          🆕 Allow 8bpp guest to set a palette</p>
+          🆕 Indexed palettes rework and configuration</p>
       </td>
     </tr>
     <tr>

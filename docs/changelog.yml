@@ -8,8 +8,8 @@
     new: |
       Indexed palettes rework and configuration
   emulator:
-    fixed: |
-      Improved save state backwards compatibility: Old save state now might warm boot instead of fully rejected
+    new: |
+      Save state backward compatibility: Old save state now might warm boot instead of fully rejected
 
 - version: v8.0
   date: 31 Oct 2026

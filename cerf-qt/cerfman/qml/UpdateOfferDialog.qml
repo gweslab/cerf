@@ -59,7 +59,7 @@ PopupDialog {
             Layout.fillWidth: true
             warning: true
             textFormat: Text.RichText
-            text: qsTr("Your saved states will be broken - ") + HtmlText.Link(dialog.offer.warningUrl, qsTr("Learn more"))
+            text: qsTr("Your saved states might get broken - ") + HtmlText.Link(dialog.offer.warningUrl, qsTr("Learn more"))
         }
         Label {
             Layout.topMargin: Theme.spaceXS

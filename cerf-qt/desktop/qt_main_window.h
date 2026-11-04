@@ -47,7 +47,6 @@ public:
     void OnUserResized();
     void OnMaximized() { follow_guest_ = false; }
     void OnDeactivated();
-    void OnPaletteChanged();
     void OnTeardownWedged() override;
     void OnPresentationChanged() override;
 
@@ -57,7 +56,6 @@ protected:
 private:
     void BuildMenus();
     void BuildHudButton();
-    void TintHudButton();
     void RefreshHudButton();
     bool AutoResizeToGuest();
     bool FitWindowToSurface(uint32_t sw, uint32_t sh);

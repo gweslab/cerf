@@ -8,6 +8,7 @@
 #include "qt_canvas.h"
 #include "qt_focus_policy.h"
 #include "qt_host_window.h"
+#include "qt_hud_button.h"
 #include "qt_menu_builder.h"
 #include "qt_status_bar.h"
 #include "qt_theme.h"
@@ -16,7 +17,6 @@
 #include "../dpi_scale.h"
 #include "../frontend_config.h"
 #include "../hud_selection.h"
-#include "../tinted_symbol_icon.h"
 #include "host_menu_model.h"
 #include "../input_capture.h"
 #include "startup_scale.h"
@@ -38,15 +38,7 @@
 #include <QToolButton>
 #include <QVBoxLayout>
 
-#include <cmath>
-
 REGISTER_SERVICE(QtMainWindow);
-
-namespace {
-
-constexpr int kHudIconPx = 20;
-
-}
 
 QtMainWindow::~QtMainWindow() = default;
 
@@ -118,32 +110,12 @@ bool QtMainWindow::MenuBarIsNative() const { return window_->menuBar()->isNative
 
 void QtMainWindow::BuildHudButton() {
     QMenuBar* bar = window_->menuBar();
-    hud_button_   = new QToolButton(bar);
-    hud_button_->setAutoRaise(true);
-    hud_button_->setCheckable(true);
-    TintHudButton();
-    hud_button_->setIconSize(QSize(kHudIconPx, kHudIconPx));
-    hud_button_->setToolTip(QStringLiteral("Show HUD"));
-    hud_button_->setAccessibleName(QStringLiteral("Show HUD"));
+    hud_button_   = new QtHudButton(bar);
     QObject::connect(hud_button_, &QToolButton::clicked, hud_button_, gate_.Bind([](cerfcore::CerfEmulator& emu) {
         emu.Get<cerffrontend::HudSelection>().Toggle();
     }));
     bar->setCornerWidget(hud_button_, Qt::TopRightCorner);
     RefreshHudButton();
-}
-
-void QtMainWindow::TintHudButton() {
-    const QMenuBar* bar  = window_->menuBar();
-    const qreal     dpr  = bar->devicePixelRatioF();
-    const int       side = static_cast<int>(std::lround(kHudIconPx * dpr));
-    QPixmap icon = QPixmap::fromImage(
-        TintedSymbolIcon(QStringLiteral("gamepad"), QSize(side, side), bar->palette().color(QPalette::WindowText)));
-    icon.setDevicePixelRatio(dpr);
-    hud_button_->setIcon(QIcon(icon));
-}
-
-void QtMainWindow::OnPaletteChanged() {
-    if (hud_button_ != nullptr) TintHudButton();
 }
 
 void QtMainWindow::RefreshHudButton() {

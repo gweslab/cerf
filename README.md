@@ -473,6 +473,8 @@ python run_claude.py
         <p><b>📱 Devices</b><br/>
           🆕 NEC MobilePro 790 support<br/>
           🆕 Sharp Mobilon HC4xxx: HC4500/HC4600 support; suspend support</p>
+        <p><b>💿 Emulator</b><br/>
+          ✅ Improved save state backwards compatibility: Old save state now might warm boot instead of fully rejected</p>
         <p><b>✨ Guest Additions</b><br/>
           🆕 Indexed palettes rework and configuration</p>
       </td>

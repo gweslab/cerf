@@ -2,7 +2,7 @@ name: build
 
 on:
   push:
-    branches: ["main"]
+    branches: ["main", "release-8.0"]
   pull_request:
     branches: ["main"]
 
@@ -84,7 +84,7 @@ jobs:
   publish:
     name: publish beta binaries
     needs: [build-windows, build-linux, build-linux-arm64, build-macos, build-android]
-    if: ${{ github.event_name == 'push' }}
+    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
     concurrency:
       group: ${{ github.workflow }}-${{ github.ref }}-publish
       cancel-in-progress: true

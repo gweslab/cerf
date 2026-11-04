@@ -15,12 +15,11 @@
 #include "qt_manager_window_opener.h"
 
 #include <cerfcore/boards/board_context.h>
-#include <cerfcore/boot/guest_cold_boot.h>
 #include <cerfcore/core/cerf_emulator.h>
 #include <cerfcore/core/product_name.h>
 #include <cerfcore/host/emulation_pause.h>
-#include <cerfcore/socs/guest_cpu_reset.h>
 #include <cerfcore/state/hibernation.h>
+#include <cerfcore/state/shutdown_action.h>
 
 #include <functional>
 #include <string>
@@ -62,7 +61,7 @@ void HostMenuModel::ConfirmHardReset() {
             "Hard reset - " CERF_PRODUCT_NAME,
             "Hard reset clears all guest RAM.\nUnsaved guest data and the object store are "
             "lost.\n\nContinue?"))
-        emu_.Get<cerfcore::GuestColdBoot>().RequestHardReset();
+        emu_.Get<cerfcore::ShutdownAction>().Perform(cerfcore::ShutdownChoice::HardReset);
 }
 
 std::vector<MenuItem> HostMenuModel::Actions() {
@@ -80,7 +79,9 @@ std::vector<MenuItem> HostMenuModel::Actions() {
     items.push_back(MenuItem::Action("Send Ctrl+Alt+Del\t" + key.LabelWith("Del"),
                                      [this] { emu_.Get<InputCapture>().SendCtrlAltDel(); }));
     items.push_back(MenuItem{});
-    items.push_back(MenuItem::Action("Soft reset", [this] { emu_.Get<cerfcore::GuestCpuReset>().WarmReset(); }));
+    items.push_back(MenuItem::Action("Soft reset", [this] {
+        emu_.Get<cerfcore::ShutdownAction>().Perform(cerfcore::ShutdownChoice::SoftReset);
+    }));
     items.push_back(MenuItem::Action("Hard reset…", [this] { ConfirmHardReset(); }));
     items.push_back(MenuItem{});
     items.push_back(MenuItem::Action("Settings…",

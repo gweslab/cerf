@@ -8,11 +8,11 @@ Use **Save state…** and **Load state…** in the Actions menu or just close th
 
 !!! note
 
-    **A state file belongs to the exact CERF build that wrote it.** Any other build refuses the file.
-    If a newer build didn't refuse your save state that's a luck.
+    **Only the emulator build that wrote a state file can resume it.**
+
+    In a worse scenario emulator attempts to restore only RAM which gives you a chance
+    to restore your data but with a warm reboot.
 
     Consider persisting your files on various kinds of extrenal storage CERF provides and using
     OEM/3rd party backup apps for Windows CE.
 
-    The dev team has no plans on developing a migration mechanism since it covers more than one device
-    and more than a thousand files of source code. Sorry.

@@ -21,8 +21,10 @@ Three outcomes from a saved `.img`:
 
 - **Full restore** - resume the exact desktop (every register, all RAM, all
   peripheral state) as if the machine never stopped.
-- **Warm boot** - keep RAM + flash, re-init CPU / cp15 / peripherals cold. The OS
-  reboots, but the filesystem-in-RAM and any flash writes survive.
+- **Warm boot** - reset the machine as at power-on, then load RAM from the image.
+  For an image of the same ROM, the warm boot also loads flash. The guest sees a
+  power loss that kept RAM, and the boot code of the guest decides whether to
+  keep that RAM. Some guests ask the user, and some boot clean.
 - **Cold boot** - ignore the image, boot from scratch.
 
 **Why it exists:** real vintage HPC devices (Jornada 720, …) are battery-backed and
@@ -43,15 +45,16 @@ follow. Each peripheral has its own frame inside the Periph section, with its
 `MmioBase` as the frame id. Every field carries a tag with its name, kind and
 size.
 
-Hibernation compares the identity **before** CERF mutates any live state.
+Hibernation compares the identity **before** it writes any part of the image into
+the live machine.
 
 ## Compatibility
 
 The image describes its own layout. The reader compares each field name, kind
 and size, each frame id and each frame length with what this build expects. A
-difference refuses the image. A build that serializes a peripheral the same way
-loads an image from another build. A build that changes a layout refuses only an
-image that carries the old layout.
+difference stops the full restore. A build that serializes a peripheral the same
+way resumes an image from another build. A build that changes a layout cannot
+resume an image that has the old layout.
 
 **The stream takes scalars, enums and arrays of them only.** A struct written as
 one blob can gain a field inside its padding, and its `sizeof` stays the same.
@@ -68,13 +71,73 @@ name on the save side and the restore side is one field. A rename is a layout
 change. When a field changes its meaning, its units or its set of values, give
 it a new name.
 
-The restore is transactional. Before it applies an image, CERF writes the live
-machine to `rollback.img` in the device directory. When the reader refuses the
-image part way through, CERF restores the rollback image and shows the reason.
-The machine then equals a save and restore of the live machine. Host coupling
-that every restore resets stays reset, for example an open shared-folder handle
-or an in-flight audio stream. A failed boot-time restore leaves the unmodified cold-boot
-machine. A rollback that fails is a CERF bug, and CERF halts.
+**A load that cannot resume an image falls back to a warm boot.** Every load path
+does this, also the load from the Actions menu. These cases start the warm boot:
+
+- The image is for a different ROM.
+- The image has a different peripheral set.
+- CERF cannot write the rollback image.
+- The reader refuses a section other than Ram and Flash.
+
+CERF refuses the image in these cases:
+
+- CERF cannot open the file, or its magic differs.
+- Its guest-additions setting differs.
+- The reader refuses the Ram section, or the Flash section of the same ROM.
+
+**For an image of another ROM, the warm boot loads RAM only.** The Flash section
+holds the ROM that CERF saved with the image. The flash of this build keeps the
+ROM that this build placed, and its replays match that ROM.
+
+The warm boot reads the header and the Ram and Flash sections, and skips every
+other section by its frame. It finds a section by its id, in any order. Every
+later build must keep this part of the format. It is the magic, the frame and
+tag encoding, the header fields, the ids of the Ram and Flash sections, and
+every field in them. A change there refuses every image that users already
+saved.
+
+**The warm boot loads the image at the place of the wipe of a hard reset.** The
+load comes after the reset listeners, and before the `GuestColdBoot` replays and
+the release listeners. As a result, a boot stand-in in a release listener reads
+the loaded RAM. A real bootloader reads the RAM that a power loss kept in the
+same way. Before CERF starts the guest, the first dispatch delivers this reset.
+
+Before the reset, the warm boot reads the region records of the image and
+writes nothing. As a result, a refused memory layout leaves the running machine
+as it was. Until the reset, a peripheral of the running machine can still write
+guest memory, and the load replaces that write.
+
+The replays write the bytes that this build registered as replays, for example
+the ROM in RAM. A boot-time write with no replay keeps the copy from the image.
+The guest-additions injection into an IMGFS in flash is such a write.
+
+**A state operation holds the delivery of every reset that it does not request.**
+While Hibernation saves or restores, the JIT does not deliver such a reset. It
+delivers the reset after the state operation. A restore first delivers a reset
+that is pending when the restore starts. The warm boot then lets only its own
+reset through.
+
+A host write that holds the freeze goes through `EmulationFreeze::RunOrQueue`
+when it can come from the UI thread. During a state operation, the write waits
+in a queue. The end of the operation runs the queue in order, before any later
+write. A user reset or wake from the UI uses the same queue.
+
+A UI-thread write never waits for a snapshot that a state operation holds. A
+restore can wait for the UI thread while it holds the snapshot, and the two
+waits deadlock.
+
+CERF refuses a save before the guest starts. At that time, the machine never
+ran, and the reset of a warm boot can still be pending. Such a save replaces
+the image with an empty machine. After the start, a save waits for the
+first dispatch, and that dispatch delivers the warm boot.
+
+The full restore is transactional. Before it applies an image, CERF writes the
+live machine to `rollback.img` in the device directory. When the reader refuses
+the image part way through, CERF restores the rollback image. The machine then
+equals a save and restore of the live machine. Host coupling that every restore
+resets stays reset, for example an open shared-folder handle
+or an in-flight audio stream. A refused boot-time restore leaves the unmodified
+cold-boot machine. A rollback that fails is a CERF bug, and CERF halts.
 
 The magic moves only when the frame or tag encoding in `state_stream` changes.
 
@@ -102,8 +165,8 @@ skips that frame with `SkipFrame`.
   Restore flushes them and never serializes them.
 - **Ram** - the volatile memory regions.
 - **Flash** - the read-only memory regions. Flash writes since boot are machine
-  state. Restore applies this section on a warm boot too, because flash survives
-  a reboot on real hardware.
+  state. A warm boot from an image of the same ROM applies this section too,
+  because flash survives a power loss on real hardware.
 - **Periph** - every registered peripheral.
 - **Presentation** - the guest-surface dimensions, so a custom resolution
   restores its window size.
@@ -134,7 +197,8 @@ state, and a pause of one does NOT pause the other:
    - A worker holds `WorkerSection()` (a `shared_lock`) **around the part of each
      iteration that reads or writes guest state**.
    - Hibernation holds `SnapshotSection()` (a `unique_lock`) across the whole
-     save or restore.
+     save or restore. The memory load of a warm boot runs on the JIT thread
+     during the reset, and it holds `SnapshotSection()` itself.
    - **Lock-order invariant (a violation deadlocks):** take the freeze lock
      BEFORE any peripheral mutex. A worker **never** holds `WorkerSection`
      across a cv wait / sleep / thread join. Acquire it, do the state touch,

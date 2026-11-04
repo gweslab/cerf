@@ -2,7 +2,6 @@
 #include "guest_additions_ui_policy.h"
 #include "manager_windows.h"
 
-#include <cerfcore/boot/guest_cold_boot.h>
 #include <cerfcore/core/cerf_emulator.h>
 #include <cerfcore/core/device_config.h>
 #include <cerfcore/core/device_config_refresh.h>
@@ -10,7 +9,7 @@
 #include <cerfcore/peripherals/cerf_virt/cerf_virt_customizations_reset.h>
 #include <cerfcore/peripherals/cerf_virt/cerf_virt_framebuffer.h>
 #include <cerfcore/peripherals/cerf_virt/cerf_virt_resize.h>
-#include <cerfcore/socs/guest_cpu_reset.h>
+#include <cerfcore/state/shutdown_action.h>
 
 #include <cstdint>
 #include <optional>
@@ -57,14 +56,14 @@ private:
                     win.SetGuestResolution(w, h);
                     win.FitToResolution(w, h);
                 }
-                emu_.Get<cerfcore::GuestCpuReset>().WarmReset();
+                emu_.Get<cerfcore::ShutdownAction>().Perform(cerfcore::ShutdownChoice::SoftReset);
                 return;
             case GuestReset::kHard:
                 if (fits) {
                     win.SetGuestResolution(w, h);
                     win.FitToResolution(w, h);
                 }
-                emu_.Get<cerfcore::GuestColdBoot>().RequestHardReset();
+                emu_.Get<cerfcore::ShutdownAction>().Perform(cerfcore::ShutdownChoice::HardReset);
                 return;
             case GuestReset::kNone:
                 if (fits && (w != prev_w || h != prev_h)) {

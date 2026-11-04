@@ -37,6 +37,7 @@ private:
     void Arm(uint32_t ms, Phase next);
     void Disarm() { timer_gen_.fetch_add(1u, std::memory_order_acq_rel); }
     void OnTimer(uint32_t gen);
+    void Step(uint32_t gen);
     void UnwindHeld();
 
     Phase CurrentPhase() const { return phase_.load(std::memory_order_acquire); }

@@ -327,6 +327,9 @@ allocates and must not run again, register a byte-exact `RecordPatch`
 instead. Without one of the two, the bytes of that service are silently
 absent after every hard reset on that board.
 
+A warm boot from a saved image uses the same reset. It fills RAM, and
+flash for an image of the same ROM, from the image in place of the wipe.
+
 - `libCerfCore/include/cerfcore/boot/guest_cold_boot.h`, `libCerfCore/src/boot/guest_cold_boot.cpp`
 
 ## Host window & presentation

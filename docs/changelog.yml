@@ -3,6 +3,9 @@
   devices:
     new: |
       NEC MobilePro 790 support
+  guest_additions:
+    new: |
+      Allow 8bpp guest to set a palette
 
 - version: v8.0
   date: 31 Oct 2026

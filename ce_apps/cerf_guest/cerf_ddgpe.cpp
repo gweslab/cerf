@@ -161,7 +161,7 @@ ULONG CerfDDGPE::DrvEscape(SURFOBJ* pso, ULONG iEsc, ULONG cjIn, PVOID pvIn,
 
 BOOL CerfDDGPE::IsPaletteSettable() {
     CERF_LOG_DEV("cerf_guest: GPE::IsPaletteSettable");
-    return FALSE;
+    return g_FbBpp <= 8;
 }
 
 static ULONG CerfReadGpeDpi(const wchar_t* value_name) {

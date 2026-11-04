@@ -3,6 +3,7 @@
 #include "cerf_display_mode.h"
 #include "cerf_display_orientation.h"
 #include "cerf_eng_callbacks.h"
+#include "include/cerf_ddi.h"
 #include "main.h"
 
 class CerfVidSurf : public DDGPESurf {
@@ -140,9 +141,7 @@ SCODE CerfDDGPE::ApplyFbMode() {
         CERF_LOG("cerf_guest: GPE::ApplyFbMode FB map FAILED");
         return E_FAIL;
     }
-    EGPEFormat fmt = (g_FbBpp == 16) ? gpe16Bpp
-                   : (g_FbBpp == 24) ? gpe24Bpp
-                   : (g_FbBpp == 32) ? gpe32Bpp : gpe8Bpp;
+    const EGPEFormat fmt = CerfEGPEFormatOfBpp(g_FbBpp);
 
     const int  angle = (int)CerfDisplayModeAngle();
     const bool turned = CerfDisplayOrientationSideways((ULONG)angle) != FALSE;
@@ -180,35 +179,21 @@ SCODE CerfDDGPE::SetMode(int modeId, HPALETTE* pPalette) {
 
     if (pPalette) {
         if (g_FbBpp <= 8) {
-
-            static const ULONG kLv[6] = { 0u, 51u, 102u, 153u, 204u, 255u };
+            const unsigned entries = 1u << g_FbBpp;
             ULONG palHost[256], palRealize[256];
-            palHost[0] = 0u;             palRealize[0] = 0u;
-            palHost[255] = 0x00FFFFFFu;  palRealize[255] = 0x00FFFFFFu;
-            int k = 1;
-            for (int r = 0; r < 6; ++r)
-                for (int g = 0; g < 6; ++g)
-                    for (int b = 0; b < 6; ++b) {
-                        ULONG R = kLv[r], G = kLv[g], B = kLv[b];
-                        if ((R == 0u && G == 0u && B == 0u) ||
-                            (R == 255u && G == 255u && B == 255u)) continue;
-                        palHost[k]    = (R << 16) | (G << 8) | B;
-                        palRealize[k] = (B << 16) | (G << 8) | R;
-                        ++k;
-                    }
-            for (int i = 215; i < 255; ++i) {
-                ULONG y = 6u + (ULONG)((i - 215) * 243 / 39);
-                palHost[i] = palRealize[i] = (y << 16) | (y << 8) | y;
+            if (!CerfReadPalette(palHost, entries)) {
+                CERF_FATAL("cerf_guest: palette register map FAILED");
+                return E_FAIL;
             }
-            for (int p = 0; p < 256; ++p) {
+            for (unsigned p = 0; p < entries; ++p) {
                 m_palette[p].peRed   = (BYTE)((palHost[p] >> 16) & 0xFFu);
                 m_palette[p].peGreen = (BYTE)((palHost[p] >> 8) & 0xFFu);
                 m_palette[p].peBlue  = (BYTE)(palHost[p] & 0xFFu);
                 m_palette[p].peFlags = 0;
+                palRealize[p] = CerfSwapRedBlue(palHost[p]);
             }
-            m_paletteEntries = 256;
-            *pPalette = EngCreatePalette(PAL_INDEXED, 256, palRealize, 0, 0, 0);
-            CerfPublishPalette(palHost, 0, 256);
+            m_paletteEntries = (unsigned short)entries;
+            *pPalette = EngCreatePalette(PAL_INDEXED, entries, palRealize, 0, 0, 0);
         } else if (g_FbBpp == 16) {
             *pPalette = EngCreatePalette(PAL_BITFIELDS, 0, NULL,
                                           0xF800u, 0x07E0u, 0x001Fu);
@@ -273,8 +258,11 @@ extern "C" BOOL CerfDDSurfFbLock(void* lcl, int x, int y, void** va) {
     CerfDDGPE*        gpe = (CerfDDGPE*)GetGPE();
     DDGPESurf*        s   = DDGPESurf::GetDDGPESurf((LPDDRAWI_DDRAWSURFACE_LCL)lcl);
     if (!gpe->SurfaceFbPa(s, &pa)) return FALSE;
+    const ULONG bits = (ULONG)CerfFormatBpp(s->Format());
     gpe->SurfaceLayout(lcl, s, &lay);
     base = (BYTE*)gpe->FbLockBase(s, pa);
-    *va  = base ? (void*)(base + cerfcore::CerfVirt::CerfRotatedOffset(lay, x, y)) : NULL;
+    LONG offset = cerfcore::CerfVirt::CerfRotatedOffset(lay, x, y);
+    if (bits < 8u) offset += (LONG)(((ULONG)x * bits) / 8u);
+    *va  = base ? (void*)(base + offset) : NULL;
     return TRUE;
 }

@@ -138,14 +138,25 @@ extern "C" ULONG CerfGpeFbMemBasePa(void) {
     return g_CerfVirtBase + cerfcore::CerfVirt::kFramebufferMemOffset;
 }
 
-extern "C" void CerfPublishPalette(const ULONG* rgb, unsigned first, unsigned count) {
-    CerfMainState* mn = Mn();
+static volatile ULONG* CerfPaletteRegs(CerfMainState* mn) {
     if (!mn->palette_regs)
         mn->palette_regs = (volatile ULONG*)CerfMapRegsPage(
             g_CerfVirtBase + cerfcore::CerfVirt::kPaletteOffset, cerfcore::CerfVirt::kPaletteSize);
-    if (!mn->palette_regs || !rgb) return;
+    return mn->palette_regs;
+}
+
+extern "C" void CerfPublishPalette(const ULONG* rgb, unsigned first, unsigned count) {
+    volatile ULONG* regs = CerfPaletteRegs(Mn());
+    if (!regs || !rgb) return;
     for (unsigned i = 0; i < count && first + i < cerfcore::CerfVirt::kPaletteEntries; ++i)
-        mn->palette_regs[first + i] = rgb[i] & 0x00FFFFFFu;
+        regs[first + i] = rgb[i] & 0x00FFFFFFu;
+}
+
+extern "C" BOOL CerfReadPalette(ULONG* rgb, unsigned count) {
+    volatile ULONG* regs = CerfPaletteRegs(Mn());
+    if (!regs || count > cerfcore::CerfVirt::kPaletteEntries) return FALSE;
+    for (unsigned i = 0; i < count; ++i) rgb[i] = regs[i];
+    return TRUE;
 }
 
 void* CerfMapFbMemory(void) {

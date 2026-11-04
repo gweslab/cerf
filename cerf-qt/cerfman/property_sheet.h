@@ -56,6 +56,9 @@ class PropertySheet : public QObject {
     Q_PROPERTY(QVariantList preview READ Preview NOTIFY valuesChanged)
     Q_PROPERTY(QSize autoSize READ AutoSize NOTIFY valuesChanged)
     Q_PROPERTY(int autoDepth READ AutoDepth NOTIFY valuesChanged)
+    Q_PROPERTY(QVariantList paletteChoices READ PaletteChoices NOTIFY valuesChanged)
+    Q_PROPERTY(QVariant paletteChoice READ PaletteChoice NOTIFY valuesChanged)
+    Q_PROPERTY(QVariantList paletteSwatches READ PaletteSwatches NOTIFY valuesChanged)
     Q_PROPERTY(bool rebootRequired READ RebootRequired NOTIFY valuesChanged)
     Q_PROPERTY(QVariantList resetChoices READ ResetChoices CONSTANT)
     Q_PROPERTY(QString noReset READ NoReset CONSTANT)
@@ -97,6 +100,10 @@ public:
     QVariantList Preview() const;
     QSize        AutoSize() const;
     int          AutoDepth() const;
+    uint32_t     EffectiveDepth() const;
+    QVariantList PaletteChoices() const;
+    QVariant     PaletteChoice() const;
+    QVariantList PaletteSwatches() const;
     bool         RebootRequired() const;
     QVariantList ResetChoices() const;
     QString      NoReset() const;
@@ -108,6 +115,9 @@ public:
     Q_INVOKABLE void         SetValue(const QString& key, const QVariant& value);
     Q_INVOKABLE void         ClearValue(const QString& key);
     Q_INVOKABLE void         SetOrClear(const QString& key, const QVariant& value);
+    Q_INVOKABLE void         SetBpp(const QVariant& value);
+    Q_INVOKABLE QString      PaletteLabel(const QVariant& choice) const;
+    Q_INVOKABLE void         SetPalette(const QVariant& choice);
     Q_INVOKABLE void         SetResolution(const QVariant& size);
     Q_INVOKABLE QVariantList ResolutionForPrompt() const;
     Q_INVOKABLE int          DpiForPrompt() const;

@@ -3,6 +3,7 @@
 #include "board_catalog.h"
 #include "cpu_config_catalog.h"
 #include "device_form_rules.h"
+#include "ga_palette_catalog.h"
 #include "persisted_options.h"
 #include "property_options.h"
 #include "property_preview.h"
@@ -27,10 +28,12 @@ namespace pf = persist_field;
 namespace sf = sheet_field;
 namespace sp = sheet_page;
 
-constexpr std::array<const char*, 12> kLiveKeys = {
+constexpr std::array<const char*, 13> kLiveKeys = {
     pf::kGuestAdditions, pf::kShareFolder, pf::kMountPoint, pf::kWidth,       pf::kHeight,      pf::kBpp,
-    pf::kDpi,            pf::kFontSize,    pf::kClearType,  pf::kColorScheme, pf::kAllowUntrustedApps, pf::kHud};
-constexpr std::array<const char*, 4> kRebootKeys      = {pf::kBpp, pf::kDpi, pf::kFontSize, pf::kColorScheme};
+    pf::kPalette,        pf::kDpi,         pf::kFontSize,   pf::kClearType,   pf::kColorScheme,
+    pf::kAllowUntrustedApps, pf::kHud};
+constexpr std::array<const char*, 5> kRebootKeys = {pf::kBpp, pf::kPalette, pf::kDpi, pf::kFontSize,
+                                                    pf::kColorScheme};
 constexpr std::array<const char*, 2> kLiveResizeKeys  = {pf::kWidth, pf::kHeight};
 constexpr int                        kLiveResizeMinCe = 4;
 
@@ -232,6 +235,39 @@ QSize PropertySheet::AutoSize() const {
 }
 
 int PropertySheet::AutoDepth() const { return emu_.Get<BoardCatalog>().GaColorDepth(BoardId()); }
+
+uint32_t PropertySheet::EffectiveDepth() const {
+    return uint32_t(JsonInteger(values_, pf::kBpp).value_or(AutoDepth()));
+}
+
+QVariantList PropertySheet::PaletteChoices() const { return emu_.Get<GaPaletteCatalog>().Choices(EffectiveDepth()); }
+
+QVariant PropertySheet::PaletteChoice() const {
+    const auto it = values_.find(pf::kPalette);
+    return it == values_.end() ? NullVariant() : emu_.Get<GaPaletteCatalog>().ChoiceOf(*it);
+}
+
+QVariantList PropertySheet::PaletteSwatches() const {
+    const auto it = values_.find(pf::kPalette);
+    return emu_.Get<GaPaletteCatalog>().Swatches(it == values_.end() ? nullptr : &*it, EffectiveDepth());
+}
+
+QString PropertySheet::PaletteLabel(const QVariant& choice) const {
+    return emu_.Get<GaPaletteCatalog>().Label(choice, EffectiveDepth());
+}
+
+void PropertySheet::SetPalette(const QVariant& choice) {
+    if (choice.isNull()) values_.erase(pf::kPalette);
+    else                 values_[pf::kPalette] = emu_.Get<GaPaletteCatalog>().ColorsOf(choice.toString());
+    emit valuesChanged();
+}
+
+void PropertySheet::SetBpp(const QVariant& value) {
+    if (value.isNull()) values_.erase(pf::kBpp);
+    else                values_[pf::kBpp] = VariantToJson(value);
+    values_.erase(pf::kPalette);
+    emit valuesChanged();
+}
 
 bool PropertySheet::RebootRequired() const {
     if (!Live()) return false;

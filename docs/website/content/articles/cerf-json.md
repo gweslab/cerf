@@ -82,6 +82,7 @@ Identical conception as above but for writable persistant user storage.
 | `guest_additions.override_font_size` | integer | same as `--ga-font-size`. |
 | `guest_additions.override_cleartype` | boolean | - |
 | `guest_additions.allow_untrusted_apps` | boolean | - |
+| `guest_additions.indexed_palette` | array of `[r, g, b]` | Palette for 1, 2, 4 or 8 bpp. Absent: Auto. |
 | `guest_additions.share_folder` | string | The same as `--ga-share-folder`. |
 | `guest_additions.shared_folder_mount_point` | string | - |
 | `guest_additions.autorun` | array of strings | Guest paths. When the shell is up, the guest driver starts each path, in order. `--ga-autorun=PATH` replaces the array. (FIXME: should we add this to UI?) |

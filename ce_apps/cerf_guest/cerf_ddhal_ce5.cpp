@@ -377,7 +377,14 @@ extern "C" BOOL Ce5HALInit(void* lpddhi) {
     h->vmiData.ddpfDisplay.dwSize        = sizeof(Ce5_DDPIXELFORMAT);
     h->vmiData.ddpfDisplay.dwFlags       = CERF_DDPF_RGB;
     h->vmiData.ddpfDisplay.dwRGBBitCount = g_FbBpp;
-    if (g_FbBpp == 16) {
+    if (g_FbBpp <= 8) {
+        h->vmiData.ddpfDisplay.dwFlags |= (g_FbBpp == 1) ? CERF_DDPF_PALETTEINDEXED1
+                                        : (g_FbBpp == 2) ? CERF_DDPF_PALETTEINDEXED2
+                                        : (g_FbBpp == 4) ? CERF_DDPF_PALETTEINDEXED4 : CERF_DDPF_PALETTEINDEXED;
+        h->vmiData.ddpfDisplay.dwRBitMask = 0u;
+        h->vmiData.ddpfDisplay.dwGBitMask = 0u;
+        h->vmiData.ddpfDisplay.dwBBitMask = 0u;
+    } else if (g_FbBpp == 16) {
         h->vmiData.ddpfDisplay.dwRBitMask = 0xF800u;
         h->vmiData.ddpfDisplay.dwGBitMask = 0x07E0u;
         h->vmiData.ddpfDisplay.dwBBitMask = 0x001Fu;

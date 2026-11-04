@@ -137,10 +137,6 @@ static BOOL CerfDecodeXlate(XLATEOBJ* pxlo, GPEBltParms* parms, BOOL* lookup_own
         *lookup_owned = TRUE;
         return TRUE;
     }
-    if (pxlo->iDstType == PAL_INDEXED) {
-        CERF_LOG("cerf_guest: UNIMPLEMENTED masked-src to PAL_INDEXED dst");
-        return FALSE;
-    }
     parms->pConvert        = &ColorConverter::Convert;
     parms->pColorConverter = &g_Converter;
     return TRUE;

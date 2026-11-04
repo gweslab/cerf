@@ -84,11 +84,11 @@ static BOOL CerfGradMeshRect(const GRADIENT_RECT* m, const TRIVERTEX* pVertex,
 }
 
 extern "C" BOOL APIENTRY CerfDrvGradientFill(SURFOBJ* pso, CLIPOBJ* pco,
-                                              XLATEOBJ* ,
+                                              XLATEOBJ* pxlo,
                                               TRIVERTEX* pVertex, ULONG nVertex,
                                               PVOID pMesh, ULONG nMesh,
                                               RECTL* ,
-                                              POINTL* , ULONG ulMode) {
+                                              POINTL* pptlDitherOrg, ULONG ulMode) {
     if (!pso || !pVertex || !pMesh) {
         CERF_LOG("cerf_guest: DrvGradientFill reject - null surface, vertex or mesh");
         return FALSE;
@@ -124,8 +124,17 @@ extern "C" BOOL APIENTRY CerfDrvGradientFill(SURFOBJ* pso, CLIPOBJ* pco,
     if (ext_hi > H) ext_hi = H;
     if (ext_hi <= ext_lo) return TRUE;
 
+    ULONG palette_entries = 0u;
+    if (dst_bits <= 8) {
+        if (!pxlo || !pptlDitherOrg)
+            CERF_FATAL("cerf_guest: DrvGradientFill to an indexed dst without XLATEOBJ or dither origin - halting");
+        palette_entries = XLATEOBJ_cGetPalette(pxlo, XO_DESTPALETTE, 0, NULL);
+        if (palette_entries == 0u || palette_entries > 256u)
+            CERF_FATAL("cerf_guest: DrvGradientFill indexed dst palette size out of range - halting");
+    }
     const ULONG budget = cerfcore::CerfVirt::kDmaPartitionSize - cerfcore::CerfVirt::kDmaPartHdrSize
-                         - (ULONG)sizeof(cerfcore::CerfVirt::CerfGradDescriptor) - 64u;
+                         - (ULONG)sizeof(cerfcore::CerfVirt::CerfGradDescriptor)
+                         - palette_entries * (ULONG)sizeof(ULONG) - 64u;
     BOOL ok = TRUE;
     int yb0 = ext_lo;
     while (yb0 < ext_hi) {
@@ -146,6 +155,16 @@ extern "C" BOOL APIENTRY CerfDrvGradientFill(SURFOBJ* pso, CLIPOBJ* pco,
         g.axis  = horiz ? cerfcore::CerfVirt::kCerfGradAxisH : cerfcore::CerfVirt::kCerfGradAxisV;
         g.band_y_first = (uint32_t)yb0;
         g.band_y_count = (uint32_t)(yb1 - yb0);
+        if (palette_entries) {
+            ULONG  pal_off = 0u;
+            ULONG* pal = (ULONG*)CerfArenaAlloc(palette_entries * (ULONG)sizeof(ULONG), &pal_off);
+            if (!pal) CERF_FATAL("cerf_guest: DMA arena gradient palette alloc failed - halting");
+            XLATEOBJ_cGetPalette(pxlo, XO_DESTPALETTE, palette_entries, pal);
+            g.dst_palette_off     = pal_off;
+            g.dst_palette_entries = palette_entries;
+            g.dither_x            = pptlDitherOrg->x;
+            g.dither_y            = pptlDitherOrg->y;
+        }
         CerfFillSurfaceFromSurfobj(&g.dst, pso, yb0, yb1, &dstwb);
 
         for (ULONG i = 0; i < nMesh; ++i) {

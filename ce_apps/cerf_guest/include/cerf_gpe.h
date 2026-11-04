@@ -76,6 +76,7 @@ public:
 };
 
 int CerfEGPEFormatBpp(EGPEFormat fmt);
+EGPEFormat CerfEGPEFormatOfBpp(ULONG bpp);
 int CerfEGPEFormatStride(int width, EGPEFormat fmt);
 
 EGPEFormat CerfIFormatToEGPE(ULONG iFormat);

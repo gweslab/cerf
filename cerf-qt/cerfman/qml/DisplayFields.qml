@@ -5,6 +5,7 @@ import QtQuick.Layouts
 SheetGroup {
     id: group
     property int autoDepth: 0
+    property bool palettes: false
     signal bppHelp()
 
     function askResolution() {
@@ -45,7 +46,21 @@ SheetGroup {
             values: PropertyOptions.BppChoices()
             current: group.sheet.values[SheetIds.bpp]
             labelOf: v => PropertyOptions.BppLabel(v, group.autoDepth)
-            onPicked: value => group.sheet.SetOrClear(SheetIds.bpp, value)
+            onPicked: value => group.sheet.SetBpp(value)
+        }
+    }
+    SettingsRow {
+        visible: group.palettes
+        title: qsTr("Indexed palette")
+        detail: PaletteSwatches {
+            colors: group.sheet.paletteSwatches
+        }
+        ChoiceBox {
+            enabled: group.editable && group.sheet.paletteChoices.length > 0
+            values: group.sheet.paletteChoices
+            current: group.sheet.paletteChoice
+            labelOf: v => group.sheet.PaletteLabel(v)
+            onPicked: value => group.sheet.SetPalette(value)
         }
     }
 }

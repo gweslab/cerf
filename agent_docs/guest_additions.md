@@ -262,13 +262,25 @@ blit shape that renders correctly under software, but that you declined to that
 path, is unaccelerated work, not a finished feature.
 
 **Display color model.** Direct-color on CE3+/CE2.11 (≥16bpp). But **CE2.0
-must be 8bpp-indexed**: its gwes creates only `PAL_INDEXED`. A ≥16bpp
+must be indexed**: its gwes creates only `PAL_INDEXED`. The other palette types
+of its `EngCreatePalette` end in a return-0 stub. A ≥16bpp
 framebuffer therefore leaves `hpalDefault` = 0 and faults gwes (Exception 002)
 in display init. A CE2.0 board forces 8bpp through its `ga_color_depth`
-board-database field. The indexed path publishes
-the palette over the `cerf_virt` palette channel, and the host expands
-index→RGB on scanout. The framebuffer bpp selects the path, never the OS
+board-database field. The framebuffer bpp selects the path, never the OS
 version (CE2.11 is already ≥16bpp).
+
+The indexed depths are 1, 2, 4 and 8 bpp. A row of the framebuffer holds
+`(width × bpp + 7) / 8` bytes on the host and in the driver. A pixel narrower
+than a byte is MSB-first: the leftmost pixel uses the high bits of the byte.
+
+The host owns the default palette. At startup and at every reset that is
+not a resume, the host loads the palette of the depth into the `cerf_virt`
+palette registers. That palette is `guest_additions.indexed_palette` of the
+device configuration, or else the first `ga_palettes` row of `db.json` for the
+depth. The driver creates its default palette from those registers and holds no
+palette table of its own. A palette change of the guest writes the same
+registers, and the host expands index→RGB on scanout. The driver accepts a
+change to every entry.
 
 A DirectDraw flip moves the scanout offset of the guest-additions display to
 the target surface. GDI continues to draw into the GDI primary. As a result, a
@@ -346,6 +358,11 @@ a primary.
 
 A CE5-style surface description has no `lXPitch`, so the driver refuses a
 CE5-style primary while the screen is turned.
+
+At 1, 2 or 4 bpp, a pixel takes part of a byte, and the pixels of a row run
+from the high bits of each byte. A turned screen at these depths stores the
+pixels in another order, and no pitch can describe it. The driver therefore
+refuses a primary at these depths while the screen is turned.
 
 The WM6 and CE6 cores build every surface of a flip chain from the one surface
 description that the driver fills. After each flip, these cores swap the driver

@@ -16,6 +16,19 @@ int CerfEGPEFormatBpp(EGPEFormat fmt) {
     }
 }
 
+EGPEFormat CerfEGPEFormatOfBpp(ULONG bpp) {
+    switch (bpp) {
+    case 1:  return gpe1Bpp;
+    case 2:  return gpe2Bpp;
+    case 4:  return gpe4Bpp;
+    case 8:  return gpe8Bpp;
+    case 16: return gpe16Bpp;
+    case 24: return gpe24Bpp;
+    case 32: return gpe32Bpp;
+    default: return gpeUndefined;
+    }
+}
+
 int CerfEGPEFormatStride(int width, EGPEFormat fmt) {
     return ((CerfEGPEFormatBpp(fmt) * width + 31) >> 5) << 2;
 }

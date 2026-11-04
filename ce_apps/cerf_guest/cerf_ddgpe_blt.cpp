@@ -257,6 +257,18 @@ void CerfDDGPE::EmitBltBand(const CerfBltBand& b, GPEBltParms* p, int r0, int r1
         }
         d.to_mono = p->toMono ? 1u : 0u;
         d.mono_bg = (uint32_t)p->monoBg;
+        if ((d.convert_active || (p->bltFlags & BLT_ALPHABLEND)) && b.dst_bits <= 8) {
+            GPEFormat* df = p->pDst->FormatPtr();
+            if (!df->m_pPalette || df->m_PaletteEntries <= 0)
+                CERF_FATAL("cerf_guest: direct-colour blit to an indexed dst without a palette - halting");
+            const ULONG pal_bytes = (ULONG)df->m_PaletteEntries * (ULONG)sizeof(ULONG);
+            ULONG  pal_off = 0u;
+            ULONG* pal = (ULONG*)CerfArenaAlloc(pal_bytes, &pal_off);
+            if (!pal) CERF_FATAL("cerf_guest: DMA arena dst palette alloc failed - halting");
+            memcpy(pal, df->m_pPalette, pal_bytes);
+            d.dst_palette_off     = pal_off;
+            d.dst_palette_entries = (uint32_t)df->m_PaletteEntries;
+        }
         RectToDesc(&d.src_rect, p->prclSrc);
         int sxa = b.sl + sx0,     sya = b.st + sy0;
         int sxb = b.sl + sx1 + 1, syb = b.st + sy1 + 1;
@@ -369,6 +381,8 @@ SCODE CerfDDGPE::HwBlt(GPEBltParms* p) {
     ULONG lut_bytes = 0;
     if (has_src && src_pal && p->pLookup)
         lut_bytes = (1u << CerfFormatBpp(p->pSrc->Format())) * (ULONG)sizeof(ULONG);
+    if (has_src && dst_bits <= 8 && (p->pConvert || (p->bltFlags & BLT_ALPHABLEND)))
+        lut_bytes += (ULONG)p->pDst->FormatPtr()->m_PaletteEntries * (ULONG)sizeof(ULONG);
     int bw = 0, bh = 0, brush_t = 0, brush_stride = 0, brush_bits = 0;
     bool brush_fb = false;
     if (has_brush) {

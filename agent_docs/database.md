@@ -71,6 +71,14 @@ that the guest programs stays in code. The CPU clock is one example.
 The order of `cpu_config_params` is the display order. Put a new parameter
 next to the parameters that it relates to.
 
+## Guest-additions palettes
+
+A `ga_palettes` row is one palette of the guest-additions display. `bpp` is the
+indexed depth of the palette. `values` holds `1 << bpp` `[red, green, blue]`
+colors. The first row for a depth is the default of that depth. A device
+configuration stores a chosen palette as its colors, never as its `id`. The
+manager names such a palette by its colors.
+
 ## HUD presets - `libCerfCore/huds.json`
 
 `huds.json` holds the on-screen HUDs of the frontend.

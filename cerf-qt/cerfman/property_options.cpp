@@ -50,7 +50,7 @@ constexpr int                 kFontSizeMin         = 6;
 constexpr int                 kFontSizeMax         = 48;
 constexpr QChar               kGuestRootSeparator  = u'\\';
 
-constexpr std::array<int, 4> kBppChoices = {8, 16, 24, 32};
+constexpr std::array<int, 7> kBppChoices = {1, 2, 4, 8, 16, 24, 32};
 
 struct ScalePreset {
     const char*  name;

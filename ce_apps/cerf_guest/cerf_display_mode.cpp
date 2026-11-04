@@ -7,6 +7,7 @@
 #include "main.h"
 
 #include "cerfcore/peripherals/cerf_virt/cerf_virt_addr_map.h"
+#include "cerfcore/peripherals/cerf_virt/cerf_virt_fb_regs.h"
 #include "cerfcore/peripherals/cerf_virt/cerf_virt_resize_regs.h"
 
 #define CERF_DM_SIZE_BITS 16u
@@ -71,7 +72,7 @@ LONG CerfDisplayModeRotate(ULONG dmdo) {
     if (pending) {
         g_FbWidth  = (ULONG)pending >> CERF_DM_SIZE_BITS;
         g_FbHeight = (ULONG)pending & CERF_DM_SIZE_MAX;
-        g_FbStride = g_FbWidth * (g_FbBpp >> 3);
+        g_FbStride = cerfcore::CerfVirt::FbRowBytes(g_FbWidth, g_FbBpp);
     }
     d->angle = dmdo;
     ((CerfDDGPE*)GetGPE())->ApplyFbMode();

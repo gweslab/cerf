@@ -57,6 +57,7 @@ SheetPage {
             sheet: page.sheet
             editable: page.editable
             autoDepth: page.sheet.autoDepth
+            palettes: true
             onBppHelp: page.bppHelp()
         }
 

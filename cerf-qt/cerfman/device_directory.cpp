@@ -59,6 +59,8 @@ Json ExtractPersistFields(const Json& object) {
             out[pf::kClearType] = *v;
         if (auto v = ga->find(cfg::kAllowUntrustedApps); v != ga->end() && v->is_boolean())
             out[pf::kAllowUntrustedApps] = *v;
+        if (auto v = ga->find(cfg::kIndexedPalette); v != ga->end() && v->is_array())
+            out[pf::kPalette] = *v;
         if (auto v = ga->find(cfg::kShareFolder);
             v != ga->end() && v->is_string() && !v->get<std::string>().empty())
             out[pf::kShareFolder] = *v;
@@ -219,7 +221,8 @@ bool DeviceDirectory::WritePersistOverrides(const Json& fields, QString& error) 
             Json  ga_scratch;
             Json& ga = SubObject(object, cfg::kGuestAdditions, ga_scratch);
             for (const char* name : {cfg::kEnabled, cfg::kColorScheme, cfg::kFontSize, cfg::kClearType,
-                                     cfg::kAllowUntrustedApps, cfg::kShareFolder, cfg::kShareFolderMountPoint})
+                                     cfg::kAllowUntrustedApps, cfg::kIndexedPalette, cfg::kShareFolder,
+                                     cfg::kShareFolderMountPoint})
                 ga.erase(name);
             if (fields.contains(pf::kGuestAdditions)) ga[cfg::kEnabled] = fields[pf::kGuestAdditions];
             if (auto cs = fields.find(pf::kColorScheme); cs != fields.end() && !cs->get<std::string>().empty())
@@ -228,6 +231,7 @@ bool DeviceDirectory::WritePersistOverrides(const Json& fields, QString& error) 
             if (fields.contains(pf::kClearType)) ga[cfg::kClearType] = fields[pf::kClearType];
             if (auto v = fields.find(pf::kAllowUntrustedApps); v != fields.end() && v->get<bool>())
                 ga[cfg::kAllowUntrustedApps] = true;
+            if (fields.contains(pf::kPalette)) ga[cfg::kIndexedPalette] = fields[pf::kPalette];
             if (auto v = fields.find(pf::kShareFolder); v != fields.end() && !v->get<std::string>().empty())
                 ga[cfg::kShareFolder] = *v;
             if (auto v = fields.find(pf::kMountPoint); v != fields.end() && !v->get<std::string>().empty())

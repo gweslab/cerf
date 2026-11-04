@@ -88,6 +88,8 @@ QVariantList PropertyPreview::GuestAdditionsRows(const PropertySheet& sheet) con
                         options.ResolutionLabel(ValueAt(data, pf::kWidth), ValueAt(data, pf::kHeight), sheet.AutoSize())));
     if (data.contains(pf::kBpp))
         rows.append(Row(QStringLiteral("Color depth"), options.BppLabel(ValueAt(data, pf::kBpp), sheet.AutoDepth())));
+    if (data.contains(pf::kPalette))
+        rows.append(Row(QStringLiteral("Indexed palette"), sheet.PaletteLabel(sheet.PaletteChoice())));
     if (data.contains(pf::kDpi)) rows.append(Row(QStringLiteral("DPI"), options.DpiLabel(ValueAt(data, pf::kDpi))));
     if (data.contains(pf::kFontSize))
         rows.append(Row(QStringLiteral("Font size"), options.FontSizeLabel(ValueAt(data, pf::kFontSize))));

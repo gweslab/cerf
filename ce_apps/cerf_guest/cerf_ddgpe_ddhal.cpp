@@ -1,6 +1,7 @@
 #include "cerf_ddgpe_ddhal.h"
 #include "cerf_ddgpe.h"
 #include "cerf_ddgpe_primary_layout.h"
+#include "cerf_debug_log.h"
 #include "include/ddraw_ce6.h"
 
 static bool CerfDDrawDetectFmt(const Ce6_DDSURFACEDESC* d, EGPEFormat* fmt,
@@ -42,6 +43,13 @@ extern "C" DWORD WINAPI DDGPECreateSurface(Ce6_DDHAL_CREATESURFACEDATA* pd) {
     int aw = (int)nWidth;
     int ah = (int)nHeight;
     if ((aw <= 0 || ah <= 0) && primary) { aw = primary->Width(); ah = primary->Height(); }
+
+    if (primary && pd->dwSCnt && (pd->lplpSList[0]->ddsCaps.dwCaps & CE6_DDSCAPS_PRIMARYSURFACE) &&
+        CerfFormatBpp(primary->Format()) < 8 && primary->IsRotate()) {
+        CERF_LOG_X("cerf_guest: DirectDraw primary refused while turned, bpp", CerfFormatBpp(primary->Format()));
+        pd->ddRVal = CERF_DDERR_UNSUPPORTEDMODE;
+        return DDHAL_DRIVER_HANDLED;
+    }
 
     BOOL bPrimaryChain = FALSE;
     for (DWORD i = 0; i < pd->dwSCnt; ++i) {
@@ -140,7 +148,7 @@ extern "C" DWORD WINAPI DDGPELock(Ce6_DDHAL_LOCKDATA* pd) {
     int y = pd->bHasRect ? pd->rArea.top  : 0;
     ULONG addr = (ULONG)(ULONG_PTR)s->Buffer()
                + (ULONG)y * (ULONG)s->Stride()
-               + (ULONG)x * (ULONG)s->BytesPerPixel();
+               + ((ULONG)x * (ULONG)CerfFormatBpp(s->Format())) / 8u;
     pd->lpSurfData = (LPVOID)(ULONG_PTR)addr;
     pd->ddRVal = CERF_DD_OK;
     return DDHAL_DRIVER_HANDLED;

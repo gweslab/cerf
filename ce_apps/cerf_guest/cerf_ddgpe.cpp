@@ -107,9 +107,7 @@ SCODE CerfDDGPE::GetModeInfo(GPEMode* pMode, int modeNo) {
     pMode->height    = (int)g_FbHeight;
     pMode->Bpp       = (int)g_FbBpp;
     pMode->frequency = (int)g_FbRefreshRate;
-    pMode->format    = (g_FbBpp == 16) ? gpe16Bpp
-                     : (g_FbBpp == 24) ? gpe24Bpp
-                     : (g_FbBpp == 32) ? gpe32Bpp : gpe8Bpp;
+    pMode->format    = CerfEGPEFormatOfBpp(g_FbBpp);
     return S_OK;
 }
 
@@ -161,7 +159,7 @@ ULONG CerfDDGPE::DrvEscape(SURFOBJ* pso, ULONG iEsc, ULONG cjIn, PVOID pvIn,
 
 BOOL CerfDDGPE::IsPaletteSettable() {
     CERF_LOG_DEV("cerf_guest: GPE::IsPaletteSettable");
-    return g_FbBpp <= 8;
+    return g_FbBpp == 8;
 }
 
 static ULONG CerfReadGpeDpi(const wchar_t* value_name) {

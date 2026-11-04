@@ -10,6 +10,7 @@ GridLayout {
     property bool wideControl: true
     readonly property bool stacked: columns === 1
     default property alias control: slot.data
+    property alias detail: detailSlot.data
     signal anchorActivated(string link)
 
     columns: wideControl ? Theme.rowColumns(width, 2) : 2
@@ -32,6 +33,12 @@ GridLayout {
             textFormat: Text.StyledText
             wrapMode: Text.Wrap
             onAnchorActivated: link => row.anchorActivated(link)
+        }
+        Item {
+            id: detailSlot
+            Layout.fillWidth: true
+            visible: childrenRect.height > 0
+            implicitHeight: childrenRect.height
         }
     }
 

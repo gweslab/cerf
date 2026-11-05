@@ -14,7 +14,7 @@ class QtCanvas : public QtPresenterCanvas, public cerffrontend::CanvasInputHost,
 public:
     QtCanvas(cerfcore::CerfEmulator& emu, QWidget* parent, uint32_t surf_w, uint32_t surf_h);
 
-    void LoseMouseCapture();
+    void LoseMouse();
     void ArmLiveResize();
 
     void SetMouseCapture(bool on) override;

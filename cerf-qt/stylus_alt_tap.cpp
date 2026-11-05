@@ -20,7 +20,7 @@ namespace {
 
 constexpr uint32_t kAltLeadMs  = 500;
 constexpr uint32_t kPenHoldMs  = 150;
-constexpr uint32_t kAltTrailMs = 150;
+constexpr uint32_t kAltTrailMs = 500;
 
 }
 

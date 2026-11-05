@@ -477,6 +477,24 @@ per-SoC/per-board concretes (strategy pattern, selected by `BoardContext`).
 - **`NotificationStack`** is the card stack over every canvas tab, and it takes
   only notices that interrupt the user's workflow, never routine events.
 
+- **`OverlayInput`** - the one owner of the input for the overlays above the
+  guest canvas, for example the notification cards and the HUD. A press goes to
+  the top overlay at its point. That overlay owns the pressed button of that
+  pointer until the release of the button. A left press on a HUD control also
+  owns the motion of the pointer until its release.
+
+  Every other button and all other motion stay with the route that owns them.
+  The guest never sees a button that an overlay owns. When the window loses the
+  pointer, for example when it loses activation, every overlay press ends. A
+  guest route that releases the host capture does not end an overlay press.
+
+  On Android, one Qt Quick item above the canvas takes each touch and mouse
+  press on an overlay, in every pointer mode. Each source of pointer events is
+  a producer of this service, and a pointer id has a meaning only inside its
+  producer. A new overlay is a layer of this service, never a check in another
+  overlay or in a guest input route.
+  - `cerf-qt/overlay_input.{h,cpp}`, `cerf-qt/mobile/overlay_touch_area.{h,cpp}`
+
 - **`BootScreen`** - the CERF-logo boot animation behind the `Tab::Boot` tab,
   plus the `BootBar`. The 60 Hz present loop drives it in time, with no
   thread. `Restart` (guest reboot / deep-sleep wake) and
@@ -562,7 +580,7 @@ per-SoC/per-board concretes (strategy pattern, selected by `BoardContext`).
 
   While the canvas, seen from the turned framebuffer, is taller than wide, a
   panel uses its portrait form when the preset gives one. The framebuffer fits, pans and zooms in the rest of the
-  canvas. The HUD band takes every touch inside it that no notification card covers.
+  canvas. A touch inside the HUD band never reaches the guest.
   - `cerf-qt/hud_selection.h`, `cerf-qt/hud_controls.h`, `cerf-qt/hud_renderer.h`,
     `cerf-qt/view_presentation.h`, `libCerfCore/include/cerfcore/host/device_buttons.h`
 

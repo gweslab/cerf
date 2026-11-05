@@ -173,7 +173,8 @@ std::vector<uint8_t> HudControls::DpadKeys(const HudShown& shown, FramePoint dev
     return keys;
 }
 
-bool HudControls::Press(int pointer, int x, int y) {
+bool HudControls::Press(HudPointer pointer, int x, int y) {
+    if (Holds(pointer)) Release(pointer, false);
     const HudShown* s = At(x, y);
     if (s == nullptr) return false;
     PointerPress press;
@@ -191,7 +192,7 @@ bool HudControls::Press(int pointer, int x, int y) {
     return true;
 }
 
-void HudControls::Move(int pointer, int x, int y) {
+void HudControls::Move(HudPointer pointer, int x, int y) {
     const auto it = pointers_.find(pointer);
     if (it == pointers_.end() || it->second.node->kind != HudNode::Kind::kDpad) return;
     const HudShown* s = Of(it->second.node);
@@ -203,7 +204,7 @@ void HudControls::Move(int pointer, int x, int y) {
     it->second.keys = std::move(keys);
 }
 
-void HudControls::Release(int pointer, bool hold_latches) {
+void HudControls::Release(HudPointer pointer, bool hold_latches) {
     const auto it = pointers_.find(pointer);
     if (it == pointers_.end()) return;
     const PointerPress press = std::move(it->second);

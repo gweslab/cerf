@@ -257,7 +257,7 @@ void QtMainWindow::SetKeyboardGrab(bool on) {
 
 void QtMainWindow::OnDeactivated() {
     emu_.Get<cerffrontend::InputCapture>().OnFocusLost();
-    canvas_->LoseMouseCapture();
+    canvas_->LoseMouse();
 }
 
 void QtMainWindow::OnTeardownWedged() {

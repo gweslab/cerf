@@ -7,6 +7,7 @@
 
 #include <array>
 #include <chrono>
+#include <compare>
 #include <cstdint>
 #include <map>
 #include <optional>
@@ -19,6 +20,13 @@ struct HudShown {
     const cerfcore::HudNode* node = nullptr;
     FrameRect                device;
     FrameRect                canvas;
+};
+
+struct HudPointer {
+    int source = 0;
+    int id     = 0;
+
+    auto operator<=>(const HudPointer&) const = default;
 };
 
 struct HudBandShown {
@@ -34,8 +42,6 @@ class HudControls : public cerfcore::Service {
 public:
     using cerfcore::Service::Service;
 
-    static constexpr int kMousePointer = -1;
-
     void SetCanvasArea(const std::optional<FrameRect>& area) { canvas_area_ = area; }
     void Place(const cerfcore::DbHud& hud, const ViewportLayout::Layout& frame);
     void Clear();
@@ -48,15 +54,16 @@ public:
 
     bool HitTest(int x, int y) const;
     bool InBand(int x, int y) const;
-    bool Press(int pointer, int x, int y);
-    void Move(int pointer, int x, int y);
-    void Release(int pointer, bool hold_latches);
+    bool Press(HudPointer pointer, int x, int y);
+    void Move(HudPointer pointer, int x, int y);
+    void Release(HudPointer pointer, bool hold_latches);
     bool ToggleLatch(int x, int y);
     void CancelAll();
 
     bool KeyDown(uint8_t vk) const;
     bool KeysDown(const std::vector<uint8_t>& keys) const;
     bool Latched(const cerfcore::HudNode* node) const { return latched_.count(node) != 0; }
+    bool Holds(HudPointer pointer) const { return pointers_.count(pointer) != 0; }
     bool Pressed(const cerfcore::HudNode* node) const;
 
     std::vector<uint8_t> DpadKeys(const HudShown& shown, FramePoint device) const;
@@ -84,7 +91,7 @@ private:
     std::vector<HudShown>                          shown_;
     std::vector<HudBandShown>                      bands_;
     std::vector<HudSeparator>                      separators_;
-    std::map<int, PointerPress>                    pointers_;
+    std::map<HudPointer, PointerPress>             pointers_;
     std::map<const cerfcore::HudNode*, std::vector<uint8_t>> latched_;
     std::array<uint8_t, 256>                       count_{};
 };

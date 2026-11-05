@@ -49,12 +49,15 @@ public:
 
     bool         OnMouse(const CanvasMouse& m);
     bool         OnCaptureLost();
+    void         OnPointerLost();
     void         OnPointerLeave();
     void         OnRelativeMotion(int dx, int dy);
     CanvasCursor CursorAt(int x, int y);
     void         OnKey(uint32_t vk, bool key_up);
     void         ReleasePenIfDown();
     void         RefreshLock();
+
+    static uint32_t ButtonBit(MouseButton b);
 
 private:
     CanvasInputHost& Host();
@@ -68,8 +71,7 @@ private:
     static uint32_t  RelativeMask(uint32_t held);
     static uint32_t  PointerMask(uint32_t held);
 
-    bool RouteNotification(const CanvasMouse& m);
-    bool RouteHud(const CanvasMouse& m);
+    bool RouteOverlay(const CanvasMouse& m);
     bool RouteLocked(const CanvasMouse& m);
     void SendRelative(int dx, int dy, uint32_t buttons);
     void RecenterLockedPointer();
@@ -77,19 +79,16 @@ private:
     bool RoutePointer(const CanvasMouse& m, bool framebuffer);
     bool RouteStylus(const CanvasMouse& m, bool framebuffer);
 
-    CanvasInputHost* host_                    = nullptr;
-    bool             pen_down_                = false;
-    bool             mouse_locked_active_     = false;
-    bool             native_lock_             = false;
-    bool             lock_hint_shown_         = false;
-    uint32_t         notification_click_mask_ = 0;
-    uint32_t         hud_click_mask_          = 0;
-    bool             hud_pressed_             = false;
-    uint32_t         pointer_buttons_         = 0;
-    uint32_t         relative_buttons_        = 0;
-    bool             relative_anchored_       = false;
-    int              relative_last_x_         = 0;
-    int              relative_last_y_         = 0;
+    CanvasInputHost* host_                = nullptr;
+    bool             pen_down_            = false;
+    bool             mouse_locked_active_ = false;
+    bool             native_lock_         = false;
+    bool             lock_hint_shown_     = false;
+    uint32_t         pointer_buttons_     = 0;
+    uint32_t         relative_buttons_    = 0;
+    bool             relative_anchored_   = false;
+    int              relative_last_x_     = 0;
+    int              relative_last_y_     = 0;
 };
 
 }

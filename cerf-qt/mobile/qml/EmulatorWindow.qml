@@ -8,7 +8,7 @@ ApplicationWindow {
     property alias surface: guestSurface
     property alias controller: controller
     property alias widgetBar: widgetBar
-    property alias hudArea: hudArea
+    property alias overlayArea: overlayArea
     property var openDialogs: []
     property var menuTree: null
     readonly property int stripSlideMs: 150
@@ -45,8 +45,8 @@ ApplicationWindow {
         safeMargins: SafeArea.margins
     }
 
-    HudTouchArea {
-        id: hudArea
+    OverlayTouchArea {
+        id: overlayArea
         anchors.fill: parent
     }
 

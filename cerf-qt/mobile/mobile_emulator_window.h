@@ -14,8 +14,8 @@
 
 class EmulatorController;
 class GuestSurface;
-class HudTouchArea;
 class MobileWidgetBar;
+class OverlayTouchArea;
 class QQuickItem;
 class QQuickWindow;
 
@@ -57,7 +57,7 @@ private:
     QPointer<GuestSurface>       surface_;
     QPointer<EmulatorController> controller_;
     QPointer<MobileWidgetBar>    widget_bar_;
-    QPointer<HudTouchArea>       hud_area_;
+    QPointer<OverlayTouchArea>   overlay_area_;
     std::function<void()>        wedged_handler_;
 
     bool input_attached_ = false;

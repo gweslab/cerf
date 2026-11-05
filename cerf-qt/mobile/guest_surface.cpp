@@ -350,7 +350,7 @@ void GuestSurface::mouseUngrabEvent() {
     if (gate_.Attached()) relative_mouse_.Release();
     if (!gate_.Attached() || !pressed_) return;
     pressed_ = false;
-    SendCanvasMouse(cerffrontend::CanvasMouse::Kind::kCaptureLost, cerffrontend::MouseButton::kNone, QPointF(), 0);
+    gate_.Run([](cerfcore::CerfEmulator& emu) { emu.Get<cerffrontend::CanvasInput>().OnPointerLost(); });
 }
 
 void GuestSurface::touchEvent(QTouchEvent* event) {
@@ -392,7 +392,7 @@ void GuestSurface::PenUp(QPointF at) {
 }
 
 void GuestSurface::PenCancel() {
-    SendCanvasMouse(cerffrontend::CanvasMouse::Kind::kCaptureLost, cerffrontend::MouseButton::kNone, QPointF(), 0);
+    gate_.Run([](cerfcore::CerfEmulator& emu) { emu.Get<cerffrontend::CanvasInput>().OnPointerLost(); });
 }
 
 void GuestSurface::PenRightDown(QPointF at) {

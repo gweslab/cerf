@@ -1,5 +1,7 @@
 #pragma once
 
+#include "../canvas_input.h"
+
 #include <cerfcore/core/instance_gate.h>
 
 #include <QPoint>
@@ -7,14 +9,12 @@
 #include <QQuickItem>
 #include <QtQml/qqmlregistration.h>
 
-#include <set>
-
-class HudTouchArea : public QQuickItem {
+class OverlayTouchArea : public QQuickItem {
     Q_OBJECT
     QML_ELEMENT
 
 public:
-    explicit HudTouchArea(QQuickItem* parent = nullptr);
+    explicit OverlayTouchArea(QQuickItem* parent = nullptr);
 
     void Attach(cerfcore::CerfEmulator& emu);
     void Detach();
@@ -31,9 +31,8 @@ protected:
 
 private:
     QPoint DevicePoint(QPointF at) const;
+    void   SendMouse(cerffrontend::CanvasMouse::Kind kind, QMouseEvent* event);
     void   ReleaseAll();
 
     cerfcore::InstanceGate gate_;
-    std::set<int>          pointers_;
-    bool                   mouse_pressed_ = false;
 };

@@ -5,8 +5,8 @@
 #include "../qt_screen_pixels.h"
 #include "emulator_controller.h"
 #include "guest_surface.h"
-#include "hud_touch_area.h"
 #include "mobile_widget_bar.h"
+#include "overlay_touch_area.h"
 #include "qml_dialog_waiter.h"
 #include "view_placement.h"
 
@@ -40,7 +40,7 @@ void MobileEmulatorWindow::OpenWindow() {
     input_attached_ = true;
     controller_->Attach(emu_);
     widget_bar_->Attach(emu_);
-    hud_area_->Attach(emu_);
+    overlay_area_->Attach(emu_);
     AttachView(*surface_, *window_);
     LOG(Lcd, "MobileEmulatorWindow: opening at %ux%u\n", dc.board_configurable_screen_width,
         dc.board_configurable_screen_height);
@@ -57,7 +57,7 @@ void MobileEmulatorWindow::MakeWindow() {
     surface_    = window_->property("surface").value<GuestSurface*>();
     controller_ = window_->property("controller").value<EmulatorController*>();
     widget_bar_ = window_->property("widgetBar").value<MobileWidgetBar*>();
-    hud_area_   = window_->property("hudArea").value<HudTouchArea*>();
+    overlay_area_ = window_->property("overlayArea").value<OverlayTouchArea*>();
 }
 
 void MobileEmulatorWindow::OnShutdown() { CloseWindow(); }
@@ -65,7 +65,7 @@ void MobileEmulatorWindow::OnShutdown() { CloseWindow(); }
 void MobileEmulatorWindow::CloseWindow() {
     DetachView();
     if (widget_bar_) widget_bar_->Detach();
-    if (hud_area_) hud_area_->Detach();
+    if (overlay_area_) overlay_area_->Detach();
     if (controller_) controller_->Detach();
     if (surface_) surface_->Detach();
     if (input_attached_) emu_.Get<cerffrontend::CanvasInput>().Attach(nullptr);

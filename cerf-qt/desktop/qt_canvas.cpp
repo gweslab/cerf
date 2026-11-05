@@ -66,8 +66,8 @@ void QtCanvas::SetMouseCapture(bool on) {
     if (held) gate_.Run([](cerfcore::CerfEmulator& emu) { emu.Get<cerffrontend::CanvasInput>().OnCaptureLost(); });
 }
 
-void QtCanvas::LoseMouseCapture() {
-    if (grabbing_) SetMouseCapture(false);
+void QtCanvas::LoseMouse() {
+    gate_.Run([](cerfcore::CerfEmulator& emu) { emu.Get<cerffrontend::CanvasInput>().OnPointerLost(); });
 }
 
 void QtCanvas::FocusCanvas() { setFocus(Qt::MouseFocusReason); }

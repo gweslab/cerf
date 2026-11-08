@@ -26,8 +26,19 @@ double Aligned(HudAlign align, double span, double extent) {
     }
 }
 
+bool HoldsControl(const HudNode& node) {
+    switch (node.kind) {
+        case HudNode::Kind::kButton:
+        case HudNode::Kind::kDpad:   return true;
+        case HudNode::Kind::kRow:
+        case HudNode::Kind::kColumn: return std::any_of(node.children.begin(), node.children.end(), HoldsControl);
+        default:                     return false;
+    }
+}
+
 void Place(const HudNode& node, FrameRect rect, double gap, HudArrangement& out) {
-    if (node.kind == HudNode::Kind::kButton || node.kind == HudNode::Kind::kDpad) {
+    if (node.kind == HudNode::Kind::kButton || node.kind == HudNode::Kind::kDpad ||
+        node.kind == HudNode::Kind::kSticker) {
         out.elements.push_back({&node, rect});
         return;
     }
@@ -35,14 +46,14 @@ void Place(const HudNode& node, FrameRect rect, double gap, HudArrangement& out)
     const bool row   = node.kind == HudNode::Kind::kRow;
     double     total = 0.0;
     for (const HudNode& child : node.children) total += child.grow;
-    const double span = (row ? rect.w : rect.h) - gap * static_cast<double>(node.children.size() - 1);
-    double       at   = row ? rect.x : rect.y;
+    const double pitch = ((row ? rect.w : rect.h) + gap) / total;
+    double       at    = row ? rect.x : rect.y;
     for (size_t i = 0; i < node.children.size(); ++i) {
         const HudNode& child  = node.children[i];
-        const double   extent = span * child.grow / total;
+        const double   extent = pitch * child.grow - gap;
         Place(child, row ? FrameRect{at, rect.y, extent, rect.h} : FrameRect{rect.x, at, rect.w, extent}, gap, out);
         at += extent + gap;
-        if (i + 1 == node.children.size()) continue;
+        if (i + 1 == node.children.size() || !HoldsControl(child) || !HoldsControl(node.children[i + 1])) continue;
         const double line = at - gap / 2.0;
         out.separators.push_back(row ? HudSeparator{{line, rect.y}, {line, rect.y + rect.h}}
                                      : HudSeparator{{rect.x, line}, {rect.x + rect.w, line}});

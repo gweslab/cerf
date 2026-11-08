@@ -34,6 +34,7 @@ private:
     static bool              Renamed(const std::vector<uint8_t>& keys, const cerfcore::KeyboardMap* map);
     void DrawBackdrop(Painter& p, const HudBandShown& band, const CanvasPixels& canvas);
     void DrawButton(Painter& p, const HudShown& shown, const cerfcore::HudFace& face, bool renamed, int dpi);
+    void DrawSticker(Painter& p, const HudShown& shown);
     void DrawDpad(Painter& p, const HudShown& shown);
     void DrawArrow(Painter& p, FramePoint center, FramePoint along, double reach, double size, bool down);
     void DrawHint(Painter& p, const Rect& box, const std::string& hint, int px, uint32_t flags);

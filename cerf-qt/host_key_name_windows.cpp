@@ -16,6 +16,7 @@ constexpr uint32_t kExtendedKeyLParamBit = 1u << 24;
 
 bool IsExtendedVk(uint8_t vk) {
     switch (vk) {
+        case VK_NUMLOCK:
         case VK_RMENU:
         case VK_RCONTROL:
         case VK_INSERT:

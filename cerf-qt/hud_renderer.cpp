@@ -102,7 +102,8 @@ void HudRenderer::Render(Painter& p, const ViewportLayout::Layout& frame, int dp
     for (const HudShown& shown : controls.Shown()) {
         if (shown.node->kind == HudNode::Kind::kButton)
             DrawButton(p, shown, Face(shown.node->button, map, layer), Renamed(shown.node->button.keys, map), dpi);
-        else                                            DrawDpad(p, shown);
+        else if (shown.node->kind == HudNode::Kind::kSticker) DrawSticker(p, shown);
+        else                                                   DrawDpad(p, shown);
     }
 }
 
@@ -183,6 +184,20 @@ void HudRenderer::DrawButton(Painter& p, const HudShown& shown, const cerfcore::
     DrawHint(p, box, hint, HintPx(side, dpi), text::kLeft | text::kBottom);
 }
 
+void HudRenderer::DrawSticker(Painter& p, const HudShown& shown) {
+    const cerfcore::HudFace& face = shown.node->sticker;
+    const Rect               box  = ToRect(shown.canvas);
+    const int                side = std::max(1, std::min(box.Width(), box.Height()));
+    if (!face.icon.empty()) {
+        p.DrawSymbol(box, face.icon, side, kHint);
+        return;
+    }
+    Font      font{FontFace::kUi, std::max(1, Round(side * kLabelPart / kIconPart)), true};
+    const int width = p.TextWidth(face.label, font);
+    if (width > box.Width()) font.px = std::max(1, font.px * box.Width() / width);
+    p.DrawTextBox(box, face.label, font, kHint, text::kCenter | text::kVCenter | text::kSingleLine);
+}
+
 void HudRenderer::DrawDpad(Painter& p, const HudShown& shown) {
     auto&                    controls = emu_.Get<HudControls>();
     const cerfcore::HudDpad& dpad     = shown.node->dpad;
@@ -228,12 +243,10 @@ void HudRenderer::DrawArrow(Painter& p, FramePoint center, FramePoint along, dou
 }
 
 void HudRenderer::DrawHint(Painter& p, const Rect& box, const std::string& hint, int px, uint32_t flags) {
-    const int  pad = std::max(1, px / 3);
-    const Rect inner{box.left + pad, box.top + pad, box.right - pad, box.bottom - pad};
-    Font       font{FontFace::kUi, std::max(1, std::min(px, inner.Height())), false};
-    const int  width = p.TextWidth(hint, font);
-    if (width > inner.Width()) font.px = std::max(1, font.px * inner.Width() / width);
-    p.DrawTextBox(inner, hint, font, kHint, flags | text::kSingleLine);
+    Font      font{FontFace::kUi, std::max(1, std::min(px, box.Height())), false};
+    const int width = p.TextWidth(hint, font);
+    if (width > box.Width()) font.px = std::max(1, font.px * box.Width() / width);
+    p.DrawTextBox(box, hint, font, kHint, flags | text::kSingleLine);
 }
 
 std::string HudRenderer::KeyHint(const std::vector<uint8_t>& keys) {

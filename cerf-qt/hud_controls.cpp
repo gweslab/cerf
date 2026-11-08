@@ -136,7 +136,7 @@ const HudShown* HudControls::At(int x, int y) const {
     const double px = x + 0.5;
     const double py = y + 0.5;
     for (const HudShown& s : shown_) {
-        if (!Contains(s.canvas, px, py)) continue;
+        if (s.node->kind == HudNode::Kind::kSticker || !Contains(s.canvas, px, py)) continue;
         if (s.node->kind == HudNode::Kind::kDpad && s.node->dpad.shape == HudDpadShape::kCircle) {
             const double r  = std::min(s.canvas.w, s.canvas.h) / 2.0;
             const double dx = px - (s.canvas.x + s.canvas.w / 2.0);

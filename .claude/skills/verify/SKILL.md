@@ -34,7 +34,7 @@ When the target also holds the work of somebody else, state the boundary in word
 
 A target that reaches past your own change spends the verdict on work that is not yours. The findings then call the unfinished work of somebody else a defect.
 
-If the target is ambiguous, ask the user one short clarifying question before you spawn. Do not guess the target.
+If the target is ambiguous, resolve it from your own diff and the session record before you spawn. Do not guess the target.
 
 ### 2. Spawn the subagent
 

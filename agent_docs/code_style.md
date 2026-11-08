@@ -209,4 +209,4 @@ These rules apply to every QML file of the Qt frontend and to the C++ that confi
 - You are about to write code whose behavior you cannot state as a verifiable claim grounded in a chip datasheet, BSP source, architecture reference manual section, or runtime log
 - A host caller seems to need to share host stateful subsystem with the guest and you cannot name a concrete CE app feature that requires the share. 
 
-The cost of one question is one message. The cost of a wrong abstraction is hours of work to unwind it.
+In each of these cases, run /verify-options and decide by these documents before you write code. The cost of a wrong abstraction is hours of work to unwind it.

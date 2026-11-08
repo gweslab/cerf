@@ -88,7 +88,13 @@ the board wins over a HUD that names its family.
 
 A key is the name of a Windows virtual-key code, for example `VK_RETURN`. A
 button has `keys` or an `action`. An action is the id of a `DeviceButtons`
-action of the board.
+action of the board. A `sticker` is an `icon` or a short `label` in its own
+cell, and it takes no press. An example is the icon that the device prints above a
+key.
+
+A cell with a `grow` of n takes n units of its row or column, together with the gaps
+between those units. Cells at the same unit position in two rows or columns with the
+same total `grow` line up.
 
 The width and the height of a panel are fractions of the length of the screen
 edge that the panel sits on. The screen of a HUD is the `lcd_panel_size` of one

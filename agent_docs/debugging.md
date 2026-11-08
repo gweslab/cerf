@@ -39,7 +39,8 @@ This entire section exists to keep you off the rediscovery and
 destruction path. If you work more than 1 session on the problem, the
 problem most likely already has tons of debugging details stored. Never
 rediscover. Never destroy the wallet to repeat an entire debug setup
-session. Ask the user if he has a tracking document for the current bug.
+session. Look for a tracking document of the current bug in
+`docs/ai_checklists/` and its `pre-compact/` archive.
 Always verify the pre-existing tracing setup, so that you do not
 accidentally spend huge money to create tracing hooks which already
 exist.

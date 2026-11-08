@@ -532,7 +532,7 @@ Use only the groups you have content for. Keep the order below. Write each item 
      Open the kernel address above.
 ```
 
-**2. GROUNDING ROUTES.** For each value, register or behavior you flagged as guessed or unverified, name where the spawner CAN ground it. Give the binary and address to decompile, the datasheet section, the standard clause, or the permitted open-source model. One route for each finding. If you know no route, write nothing for that finding. Never invent one, because the spawner will follow it.
+**2. GROUNDING ROUTES.** For each value, register or behavior you flagged as guessed or unverified, name where the spawner CAN ground it. Give the binary and address to decompile, the datasheet section, the standard clause, or the permitted open-source model. One route for each finding. If you know no route, write nothing for that finding. Never invent one, because the spawner will follow it. A ruling from the user is never a route: agent_docs answer every open question in autonomous work, and the spawner never stops to wait for a ruling.
 
 **3. INCIDENTAL FINDINGS.** Facts you verified on the way that the spawner does not hold. Resolved addresses, symbol names, the service that already owns a responsibility, a register meaning you confirmed while you chased something else. Each item is a fact you verified in this session, with its evidence.
 

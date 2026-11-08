@@ -313,6 +313,13 @@ None of these is visible from any single file.
   the fetch folds that address and walks it through the page tables of
   the process that ran before the reset. Deep-sleep resume overrides
   those reset values - see [agent_docs/deep_sleep.md](deep_sleep.md).
+- **`SetResetPending` calls `OnRebootRequested` before it makes a
+  reboot visible to the JIT thread.** A running JIT thread can deliver a
+  visible reset at once. The host therefore completes its reboot
+  notification before that delivery. A reset that resumes from deep
+  sleep is not a reboot, and it does not call `OnRebootRequested`. A
+  pending reset that a state restore brings back is not a request, and it
+  calls nothing.
 
 ## I/O routing
 

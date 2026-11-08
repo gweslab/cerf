@@ -67,6 +67,13 @@ public:
             panel->RearmContentLatch();
     }
 
+    void CaptureResetBaseline() override {
+        if (auto* ga = emu_.TryGet<cerfcore::GuestAdditionsFrameRenderer>())
+            ga->CaptureResetBaseline();
+        if (auto* panel = emu_.TryGet<cerfcore::PanelFrameRenderer>())
+            panel->CaptureResetBaseline();
+    }
+
 private:
     void ComposeLayer(uint32_t* dst, uint32_t dst_w, uint32_t dst_h,
                       cerfcore::FrameRenderer& layer) {

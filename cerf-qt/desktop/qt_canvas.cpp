@@ -50,7 +50,10 @@ void QtCanvas::FireAutoResize(cerfcore::CerfEmulator& emu) {
                                 static_cast<uint32_t>(DeviceExtent(height(), dpr)));
 }
 
-cerfcore::FrameSource& QtCanvas::Source(cerfcore::CerfEmulator& emu) { return emu.Get<cerfcore::FrameRenderer>(); }
+bool QtCanvas::UseSource(cerfcore::CerfEmulator& emu, const std::function<void(cerfcore::FrameSource&)>& use) {
+    use(emu.Get<cerfcore::FrameRenderer>());
+    return true;
+}
 
 void QtCanvas::ClientSize(int& width, int& height) const { VisibleSize(width, height); }
 

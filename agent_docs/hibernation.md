@@ -21,10 +21,11 @@ Three outcomes from a saved `.img`:
 
 - **Full restore** - resume the exact desktop (every register, all RAM, all
   peripheral state) as if the machine never stopped.
-- **Warm boot** - reset the machine as at power-on, then load RAM from the image.
-  For an image of the same ROM, the warm boot also loads flash. The guest sees a
-  power loss that kept RAM, and the boot code of the guest decides whether to
-  keep that RAM. Some guests ask the user, and some boot clean.
+- **Warm boot** - deliver a reset of the power-on kind, load RAM from the image,
+  and report the cause of a warm reset to the guest. A warm reset is a reset
+  that the guest does not read as a power-on, for example the reset button. For
+  an image of the same ROM, the warm boot also loads flash. The guest takes the
+  boot path of its own warm reset, and keeps what that path keeps.
 - **Cold boot** - ignore the image, boot from scratch.
 
 **Why it exists:** real vintage HPC devices (Jornada 720, …) are battery-backed and
@@ -96,11 +97,19 @@ tag encoding, the header fields, the ids of the Ram and Flash sections, and
 every field in them. A change there refuses every image that users already
 saved.
 
+**The warm boot reports a warm reset, never a power-on reset.** A guest treats
+a power-on reset as a loss of RAM, and some guests clear RAM before the kernel
+starts. Some other guests discard their RAM data after every reset and keep
+their data in flash or on a disk. After the reset listeners, the
+`ResetCauseLatch` of the SoC reports a warm reset. Only the reported cause is
+warm. The units take a reset of the power-on kind, the same one on every load
+path.
+
 **The warm boot loads the image at the place of the wipe of a hard reset.** The
 load comes after the reset listeners, and before the `GuestColdBoot` replays and
 the release listeners. As a result, a boot stand-in in a release listener reads
-the loaded RAM. A real bootloader reads the RAM that a power loss kept in the
-same way. Before CERF starts the guest, the first dispatch delivers this reset.
+the loaded RAM. Before CERF starts the guest, the first dispatch delivers this
+reset.
 
 Before the reset, the warm boot reads the region records of the image and
 writes nothing. As a result, a refused memory layout leaves the running machine
@@ -116,15 +125,6 @@ While Hibernation saves or restores, the JIT does not deliver such a reset. It
 delivers the reset after the state operation. A restore first delivers a reset
 that is pending when the restore starts. The warm boot then lets only its own
 reset through.
-
-A host write that holds the freeze goes through `EmulationFreeze::RunOrQueue`
-when it can come from the UI thread. During a state operation, the write waits
-in a queue. The end of the operation runs the queue in order, before any later
-write. A user reset or wake from the UI uses the same queue.
-
-A UI-thread write never waits for a snapshot that a state operation holds. A
-restore can wait for the UI thread while it holds the snapshot, and the two
-waits deadlock.
 
 CERF refuses a save before the guest starts. At that time, the machine never
 ran, and the reset of a warm boot can still be pending. Such a save replaces
@@ -166,7 +166,7 @@ skips that frame with `SkipFrame`.
 - **Ram** - the volatile memory regions.
 - **Flash** - the read-only memory regions. Flash writes since boot are machine
   state. A warm boot from an image of the same ROM applies this section too,
-  because flash survives a power loss on real hardware.
+  because flash keeps its contents across every reset on real hardware.
 - **Periph** - every registered peripheral.
 - **Presentation** - the guest-surface dimensions, so a custom resolution
   restores its window size.

@@ -291,7 +291,15 @@ serial driver of the board. Never guess them.
 (host reset actions, watchdog expiry). Never call bare
 `ArmJit::SetResetPending`. The SoC peripheral that owns the reset-cause
 register implements `ResetCauseLatch` (warm / cold / watchdog), so the
-re-entered guest boot path reads a true reset cause. Peripherals whose
+re-entered guest boot path reads a true reset cause. Its `ReportOnlyWarmReset`
+sets the register to the cause of a warm reset, with no other cause. Other
+parts can also report a reset cause to the guest, for example a second status
+register or a board microcontroller. Such a part reports the same cause as the
+latch. It reports a warm reset when `DeliveredResetReportedWarm()` is true,
+also during a reset of the power-on kind. Some guest
+writes reset the SoC with a cause that the latch does not name, for example a
+software reset bit. The peripheral that takes such a write latches that cause
+itself, then calls `ResetWithLatchedCause`. Peripherals whose
 silicon resets with the system reset line register reset listeners that run
 at reset delivery on the JIT thread. One such peripheral is a drive that
 re-presents its power-on diagnostic signature. A board without this wiring
@@ -327,8 +335,14 @@ allocates and must not run again, register a byte-exact `RecordPatch`
 instead. Without one of the two, the bytes of that service are silently
 absent after every hard reset on that board.
 
-A warm boot from a saved image uses the same reset. It fills RAM, and
-flash for an image of the same ROM, from the image in place of the wipe.
+**A reset delivery replays the writes only on a hard reset and on a warm
+boot.** A bootloader can copy the OS image into RAM also on a reset that keeps
+RAM. The stand-in of such a bootloader replays the writes where that
+bootloader copies the image. Without the replay, that reset enters RAM that
+the guest used for other data.
+
+A warm boot from a saved image fills RAM, and flash for an image of the
+same ROM, from the image in place of the wipe.
 
 - `libCerfCore/include/cerfcore/boot/guest_cold_boot.h`, `libCerfCore/src/boot/guest_cold_boot.cpp`
 
@@ -459,6 +473,21 @@ per-SoC/per-board concretes (strategy pattern, selected by `BoardContext`).
 
   The compositor sends `RearmContentLatch` to every layer, so a guest reset
   rearms all of them.
+
+  **A frame that a layer shows when a reset releases the CPU is stale.** Each
+  layer has a content latch, a one-way flag that marks the first guest frame.
+  The canvas switches from the boot screen to the framebuffer on that frame.
+  A reset rearms the latch when the reset is requested. Until the reset
+  releases the CPU, the latch takes no baseline and latches nothing. A
+  baseline is the content that a later frame must differ from.
+
+  At the release, after the release listeners, the compositor sends
+  `CaptureResetBaseline` to every layer. A layer that still shows a frame
+  takes that frame as its baseline. It latches when its content differs from
+  the baseline. A layer that shows nothing latches the next frame that the
+  guest shows. A baseline taken after the release can be a screen that the
+  guest drew. If the guest keeps that screen static, the canvas never leaves
+  the boot screen.
 
   To add a layer, register it on its own role slot. Then put the layer in the
   order of the compositor.

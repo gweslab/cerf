@@ -68,13 +68,17 @@ void QtPresenterCanvas::paintEvent(QPaintEvent*) {
         int client_w = 0, client_h = 0;
         VisibleSize(client_w, client_h);
         QPainter p(this);
-        presenter_.DrawTo(emu, Source(emu), p, client_w, client_h, Dpr());
+        UseSource(emu, [&](cerfcore::FrameSource& source) {
+            presenter_.DrawTo(emu, source, p, client_w, client_h, Dpr());
+        });
     });
 }
 
 bool QtPresenterCanvas::CaptureSurface(std::vector<uint32_t>& out, uint32_t& w, uint32_t& h) {
     bool captured = false;
-    gate_.Run([&](cerfcore::CerfEmulator& emu) { captured = presenter_.Capture(Source(emu), out, w, h); });
+    gate_.Run([&](cerfcore::CerfEmulator& emu) {
+        UseSource(emu, [&](cerfcore::FrameSource& source) { captured = presenter_.Capture(source, out, w, h); });
+    });
     return captured;
 }
 

@@ -1,7 +1,7 @@
 #include "qt_external_display.h"
 
 #include "../qt_key_input.h"
-#include "../qt_ui_thread_calls.h"
+#include "../qt_ui_thread.h"
 #include "qt_focus_policy.h"
 #include "qt_menu_builder.h"
 #include "qt_presenter_canvas.h"
@@ -41,8 +41,8 @@ public:
           source_id_(source_id) {}
 
 protected:
-    cerfcore::FrameSource& Source(cerfcore::CerfEmulator& emu) override {
-        return emu.Get<ExternalDisplaySources>().Source(source_id_);
+    bool UseSource(cerfcore::CerfEmulator& emu, const std::function<void(cerfcore::FrameSource&)>& use) override {
+        return emu.Get<ExternalDisplaySources>().UseSource(source_id_, use);
     }
 
 private:
@@ -180,27 +180,36 @@ QtExternalDisplay::~QtExternalDisplay() { Close(); }
 void QtExternalDisplay::Open(uint32_t surf_w, uint32_t surf_h) {
     if (open_.exchange(true, std::memory_order_acq_rel)) return;
     source_id_ = emu_.Get<ExternalDisplaySources>().Add(source_, on_eject_);
-    emu_.Get<QtUiThreadCalls>().Run([this, surf_w, surf_h] {
-        window_ = new QtExternalWindow(emu_, source_id_, title_, surf_w, surf_h);
-        emu_.Get<QtFocusPolicy>().Show(window_);
-        window_->FitToSurface(surf_w, surf_h);
-        emu_.Get<QtFocusPolicy>().Focus(window_->centralWidget());
+    RunOnUi([&emu = emu_, window = window_, id = source_id_, title = title_, surf_w, surf_h] {
+        QtExternalWindow* created = new QtExternalWindow(emu, id, title, surf_w, surf_h);
+        *window = created;
+        emu.Get<QtFocusPolicy>().Show(created);
+        created->FitToSurface(surf_w, surf_h);
+        emu.Get<QtFocusPolicy>().Focus(created->centralWidget());
     });
 }
 
 void QtExternalDisplay::Close() {
     if (!open_.exchange(false, std::memory_order_acq_rel)) return;
-    emu_.Get<QtUiThreadCalls>().Run([this] {
-        if (!window_) return;
-        window_->AllowClose();
-        delete window_.data();
-        window_ = nullptr;
-    });
     emu_.Get<ExternalDisplaySources>().Remove(source_id_);
+    RunOnUi([window = window_] {
+        QtExternalWindow* closing = window->data();
+        if (!closing) return;
+        closing->AllowClose();
+        delete closing;
+    });
 }
 
 void QtExternalDisplay::SetSurfaceSize(uint32_t w, uint32_t h) {
-    emu_.Get<QtUiThreadCalls>().Run([this, w, h] {
-        if (window_) window_->SetSurface(w, h);
+    RunOnUi([window = window_, w, h] {
+        if (*window) (*window)->SetSurface(w, h);
     });
+}
+
+void QtExternalDisplay::RunOnUi(std::function<void()> job) {
+    if (OnUiThread()) {
+        job();
+        return;
+    }
+    emu_.Get<cerffrontend::FrontendWindow>().RunOnUiThread(std::move(job));
 }

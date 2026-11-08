@@ -14,10 +14,10 @@ class ExternalDisplaySources : public cerfcore::Service {
 public:
     using cerfcore::Service::Service;
 
-    int                   Add(cerfcore::FrameSource& source, std::function<void()> on_eject);
-    void                   Remove(int id);
-    cerfcore::FrameSource& Source(int id);
-    void                   Eject(int id);
+    int  Add(cerfcore::FrameSource& source, std::function<void()> on_eject);
+    void Remove(int id);
+    bool UseSource(int id, const std::function<void(cerfcore::FrameSource&)>& use);
+    void Eject(int id);
 
 private:
     struct Entry {

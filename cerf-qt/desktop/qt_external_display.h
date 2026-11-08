@@ -8,6 +8,7 @@
 #include <atomic>
 #include <cstdint>
 #include <functional>
+#include <memory>
 
 namespace cerfcore {
 class CerfEmulator;
@@ -27,11 +28,13 @@ public:
     void SetSurfaceSize(uint32_t w, uint32_t h) override;
 
 private:
-    cerfcore::CerfEmulator&    emu_;
-    cerfcore::FrameSource&     source_;
-    QString                    title_;
-    std::function<void()>      on_eject_;
-    int                        source_id_ = 0;
-    QPointer<QtExternalWindow> window_;
-    std::atomic<bool>          open_{false};
+    void RunOnUi(std::function<void()> job);
+
+    cerfcore::CerfEmulator&                     emu_;
+    cerfcore::FrameSource&                      source_;
+    QString                                     title_;
+    std::function<void()>                       on_eject_;
+    int                                         source_id_ = 0;
+    std::shared_ptr<QPointer<QtExternalWindow>> window_ = std::make_shared<QPointer<QtExternalWindow>>();
+    std::atomic<bool>                           open_{false};
 };

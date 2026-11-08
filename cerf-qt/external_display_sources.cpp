@@ -18,9 +18,12 @@ void ExternalDisplaySources::Remove(int id) {
     entries_.erase(id);
 }
 
-cerfcore::FrameSource& ExternalDisplaySources::Source(int id) {
+bool ExternalDisplaySources::UseSource(int id, const std::function<void(cerfcore::FrameSource&)>& use) {
     std::lock_guard<std::mutex> lock(mutex_);
-    return *entries_.at(id).source;
+    const auto entry = entries_.find(id);
+    if (entry == entries_.end()) return false;
+    use(*entry->second.source);
+    return true;
 }
 
 void ExternalDisplaySources::Eject(int id) {

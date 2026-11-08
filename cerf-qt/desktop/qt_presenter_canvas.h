@@ -10,6 +10,7 @@
 #include <QWidget>
 
 #include <cstdint>
+#include <functional>
 #include <memory>
 #include <vector>
 
@@ -59,7 +60,7 @@ protected:
 
     void SetPresentHooks(std::unique_ptr<QtPresentHooks> hooks) { presenter_.SetHooks(std::move(hooks)); }
 
-    virtual cerfcore::FrameSource& Source(cerfcore::CerfEmulator& emu) = 0;
+    virtual bool UseSource(cerfcore::CerfEmulator& emu, const std::function<void(cerfcore::FrameSource&)>& use) = 0;
 
     cerfcore::InstanceGate gate_;
 

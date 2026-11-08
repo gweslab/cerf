@@ -40,7 +40,7 @@ protected:
     void keyReleaseEvent(QKeyEvent* event) override;
     bool focusNextPrevChild(bool next) override;
 
-    cerfcore::FrameSource& Source(cerfcore::CerfEmulator& emu) override;
+    bool UseSource(cerfcore::CerfEmulator& emu, const std::function<void(cerfcore::FrameSource&)>& use) override;
 
 private:
     void ApplyCursor(cerfcore::CerfEmulator& emu, int x, int y);

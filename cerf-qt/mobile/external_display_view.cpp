@@ -50,7 +50,8 @@ void ExternalDisplayView::paint(QPainter* painter) {
         const qreal dpr    = window()->devicePixelRatio();
         const QSize canvas = DeviceCanvasSize(width(), height(), dpr);
         presenter_->SetCanvasSize(canvas.width(), canvas.height());
-        presenter_->DrawTo(emu, emu.Get<ExternalDisplaySources>().Source(source_id_), *painter, canvas.width(),
-                           canvas.height(), dpr);
+        emu.Get<ExternalDisplaySources>().UseSource(source_id_, [&](cerfcore::FrameSource& source) {
+            presenter_->DrawTo(emu, source, *painter, canvas.width(), canvas.height(), dpr);
+        });
     });
 }

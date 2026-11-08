@@ -25,8 +25,8 @@ void Trim(std::vector<MenuItem>& out) {
 
 const char* InsertLabel(cerfcore::SlotKind kind) {
     switch (kind) {
-        case cerfcore::SlotKind::kPcCard:
-        case cerfcore::SlotKind::kSerialPort: return "Insert card";
+        case cerfcore::SlotKind::kPcCard:     return "Insert card";
+        case cerfcore::SlotKind::kSerialPort: return "Insert cable";
         case cerfcore::SlotKind::kUsbDisk:
         case cerfcore::SlotKind::kSdCard:     return "Insert media";
     }

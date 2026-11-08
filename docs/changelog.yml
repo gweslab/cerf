@@ -4,12 +4,15 @@
     new: |
       NEC MobilePro 790 support
       Sharp Mobilon HC4xxx: HC4500/HC4600 support; suspend support
+      IBM WorkPad z50 support
   guest_additions:
     new: |
       Indexed palettes rework and configuration
   emulator:
+    fixed: |
+      Various styling/usability fixes on all platforms
     new: |
-      Save state backward compatibility: Old save state now might warm boot instead of fully rejected
+      Save states improved: Emulator attempts to restore RAM with user objects instead of giving up
 
 - version: v8.0
   date: 31 Oct 2026

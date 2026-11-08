@@ -68,7 +68,11 @@ A change to a core library gets a commit in that library and a commit in each re
 1. Commit inside each changed library first, in the repository of that library, with this skill.
 2. Commit the repository that holds the library last. Stage the path of each changed library together with the changes of that repository. The staged library paths record the new library commits. If the other changes stay uncommitted, stage only the library paths.
 
+To move a pointer, check out the new commit inside the folder of the library. Then stage that folder. Do not write a pointer into the index with `git update-index`. This also applies when the library folder is a plain clone without a submodule entry. With that command, the folder stays at the old commit. `git status` then lists the folder as changed. A commit that stages the folder puts the pointer back to the old commit.
+
 Push a library before the repository that holds its pointer. Push the root last. Before you push a repository, make sure that the remote of each library holds the commit that the pointer names. A pointer to a commit that is only local breaks every CI checkout.
+
+The check covers every commit that the push sends, not only the last one. A library commit can be amended or rebased after a pointer to it was committed. A pointer in those commits can then name a commit that the library branch no longer holds. If it does, rewrite that commit locally with the correct pointer before you push. After the push, the same fix needs a force push.
 
 ## GitHub issues
 

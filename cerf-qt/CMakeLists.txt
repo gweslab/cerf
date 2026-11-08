@@ -214,6 +214,8 @@ if(APPLE)
         MACOSX_BUNDLE_SHORT_VERSION_STRING "${cerfqt_version}"
         MACOSX_BUNDLE_BUNDLE_VERSION "${cerfqt_version}")
     set(cerfqt_output_dir "$<TARGET_BUNDLE_DIR:cerf-qt>/..")
+    configure_file("${CMAKE_CURRENT_SOURCE_DIR}/macos_read_me_first.txt"
+                   "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/READ ME FIRST.txt" COPYONLY)
 elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
     set(cerfqt_output_dir "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}")
 else()

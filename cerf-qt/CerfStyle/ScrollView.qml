@@ -7,8 +7,10 @@ M.ScrollView {
     readonly property real visibleHeight: availableHeight - keyboardRoom
     property real revealedHeight: 0
 
-    M.ScrollBar.vertical.interactive: !Theme.touchPlatform
-    M.ScrollBar.horizontal.interactive: !Theme.touchPlatform
+    M.ScrollBar.vertical.interactive: Theme.scrollBarInteractive(M.ScrollBar.vertical.size)
+    M.ScrollBar.vertical.hoverEnabled: M.ScrollBar.vertical.interactive
+    M.ScrollBar.horizontal.interactive: Theme.scrollBarInteractive(M.ScrollBar.horizontal.size)
+    M.ScrollBar.horizontal.hoverEnabled: M.ScrollBar.horizontal.interactive
 
     function measureKeyboard() {
         const window = control.Window.window

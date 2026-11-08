@@ -62,6 +62,10 @@ QtObject {
         return width < stackedRowWidth ? 1 : columns
     }
 
+    function scrollBarInteractive(size) {
+        return !touchPlatform && size < 1.0
+    }
+
     readonly property int captionSize: 12
     readonly property int tileTitleSize: 16
     readonly property int sectionTitleSize: 17

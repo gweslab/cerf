@@ -472,9 +472,11 @@ python run_claude.py
       <td>
         <p><b>📱 Devices</b><br/>
           🆕 NEC MobilePro 790 support<br/>
-          🆕 Sharp Mobilon HC4xxx: HC4500/HC4600 support; suspend support</p>
+          🆕 Sharp Mobilon HC4xxx: HC4500/HC4600 support; suspend support<br/>
+          🆕 IBM WorkPad z50 support</p>
         <p><b>💿 Emulator</b><br/>
-          🆕 Save state backward compatibility: Old save state now might warm boot instead of fully rejected</p>
+          🆕 Save states improved: Emulator attempts to restore RAM with user objects instead of giving up<br/>
+          ✅ Various styling/usability fixes on all platforms</p>
         <p><b>✨ Guest Additions</b><br/>
           🆕 Indexed palettes rework and configuration</p>
       </td>

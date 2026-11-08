@@ -97,7 +97,7 @@ Page {
         }
         TutorialSlide {
             heading: qsTr("Saves might break")
-            text: qsTr("A future emulator update has a chance break your saved states.<br><br>"
+            text: qsTr("A future emulator update has a chance to break your saved states.<br><br>"
                        + "Before upgrading - prefer doing backups to external storage; use "
                        + "backup software for Windows CE.")
             art: Component {

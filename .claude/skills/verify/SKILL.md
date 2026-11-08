@@ -40,6 +40,7 @@ If the target is ambiguous, ask the user one short clarifying question before yo
 
 Use the Agent tool with:
 
+- `subagent_type: verify-reviewer` - **mandatory, never omitted.**
 - `model: opus` - **mandatory, never omitted.** Without it the reviewer runs on whatever the agent definition or the parent session supplies, which can be a smaller model. This review is the gate for guessed implementations, fabricated IDA citations and reader-side suppression. A weaker reviewer waves those through with a confident `LEGIT`. A false `LEGIT` is worse than no review, because the main agent then treats the target as cleared.
 - `description` - short, for example `Reality-check on <short target>`.
 - `prompt` - the pointer to the prompt file, and nothing else. See § The prompt file below.
@@ -57,15 +58,14 @@ Give the Agent call this text as its `prompt`, and nothing else. Replace the pat
 
 Everywhere below, "the prompt" means the contents of that file.
 
-**Keep the prompt minimal.** Do NOT paraphrase the operating manual, summarize its rules, or hand-pick which categories to include. The subagent reads the authoritative file itself. A long explanatory prompt from the main agent gives bias a way in.
+**Keep the prompt minimal.** Do NOT paraphrase the operating manual, summarize its rules, or hand-pick which categories to include. The reviewer already holds the manual as its system prompt. A long explanatory prompt from the main agent gives bias a way in.
 
 The prompt file carries these items, in this order, and nothing else:
 
-1. **The pointer to the operating manual, on the first line.** Use this text: *"START WITH READING `.claude/VERIFY_INSTRUCTION.md` TO UNDERSTAND WHY YOU WERE SPAWNED AND WHAT IS YOUR OBJECTIVE. That file is your operating manual and is authoritative over anything in this prompt - if this prompt and the file disagree, the file wins. READING THAT FILE IS MANDATORY. Check pwd if not found. It is at repo root (INSERT PWD/REPO ROOT PATH)"*
-2. **The target from step 1.** Write the claim verbatim, or the file paths, the commit or the range. When the target also holds the work of somebody else, add the boundary in words. Do not add a preface that softens the target, such as "I think this is probably fine".
-3. **Every piece of context that cuts against your own claim.** State your doubts, your counter-evidence and the weak links in your reasoning plainly. If prior reasoning led you to the claim, include that chain, so the reviewer can spot the rationalization.
+1. **The target from step 1.** Write the claim verbatim, or the file paths, the commit or the range. When the target also holds the work of somebody else, add the boundary in words. Do not add a preface that softens the target, such as "I think this is probably fine".
+2. **Every piece of context that cuts against your own claim.** State your doubts, your counter-evidence and the weak links in your reasoning plainly. If prior reasoning led you to the claim, include that chain, so the reviewer can spot the rationalization.
 
-That is the whole prompt. The operating manual already holds the role explainer, the category list, the verification-tools section and the output format, so add none of them. When you feel the urge to add "and also, remember to check X", that urge is the bias entering. Resist it. `.claude/VERIFY_INSTRUCTION.md` is the single source of truth for the subagent's work. Your job is to hand over the target and step aside.
+That is the whole prompt. The operating manual already holds the role explainer, the category list, the verification-tools section and the output format, so add none of them. When you feel the urge to add "and also, remember to check X", that urge is the bias entering. Resist it. The body of `.claude/agents/verify-reviewer.md` is the single source of truth for the subagent's work. Your job is to hand over the target and step aside.
 
 - `AUDIT MODE: PLAN` - the work is not implemented yet. The reviewer audits the plan itself: decomple grounding, hidden assumptions, bullet ambiguity, and every "known gaps" section. It also verifies that the steps in literal order produce the claimed runtime behavior. The reviewer does NOT compare the codebase against the checklist, because the work has not started.
 - `AUDIT MODE: IMPLEMENTATION` - the work is done, and this diff or branch claims to implement it. The reviewer audits the codebase against each bullet: literal file-layout compliance, per-bullet code mapping, silent deviations from checklist values, and fabricated citations.
@@ -83,7 +83,7 @@ For `GROUNDING:` line for a reference you did not open, or for an address you di
 
 - `PORTED MODEL: <what> <- references/<path>/<file>:<function>`
 
-**A re-spawn after a `CRITICAL` verdict keeps the first prompt file and appends the round history.** **The prompt file you wrote for round 1 holds the base. Every later round reuses that file, and the base text in it stays verbatim.** The base holds the manual pointer, the target description, and the context that cuts against you. It also holds any `AUDIT MODE:` or `PORTED MODEL:` line, and the closing line. Never rewrite the base to describe the last fix. Never shrink the target to the files of one round. Never start a second file for the same body of work. Spawn a fresh reviewer for each round, with the same pointer.
+**A re-spawn after a `CRITICAL` verdict keeps the first prompt file and appends the round history.** **The prompt file you wrote for round 1 holds the base. Every later round reuses that file, and the base text in it stays verbatim.** The base holds the target description and the context that cuts against you. It also holds any `AUDIT MODE:` or `PORTED MODEL:` line, and the closing line. Never rewrite the base to describe the last fix. Never shrink the target to the files of one round. Never start a second file for the same body of work. Spawn a fresh reviewer for each round, with the same pointer.
 
 Then add one `ROUND HISTORY` block to the file, directly above the closing neutral line. Write one entry per round that returned `CRITICAL`, oldest first:
 

@@ -83,6 +83,8 @@ Json ExtractPersistFields(const Json& object) {
         for (const ScreenFieldKey& screen : kScreenFieldKeys)
             if (auto v = board->find(screen.config_key); v != board->end() && IsPositiveInt(*v))
                 out[screen.field] = *v;
+        if (auto v = board->find(cfg::kConfig); v != board->end() && v->is_object())
+            out[pf::kBoardConfig] = *v;
     }
     return out;
 }
@@ -259,6 +261,10 @@ bool DeviceDirectory::WritePersistOverrides(const Json& fields, QString& error) 
                 if (fields.contains(screen.field)) board[screen.config_key] = fields[screen.field];
                 else                               board.erase(screen.config_key);
             }
+            if (auto config = fields.find(pf::kBoardConfig); config != fields.end() && !config->empty())
+                board[cfg::kConfig] = *config;
+            else
+                board.erase(cfg::kConfig);
             StoreSub(object, cfg::kBoard, board);
         },
         error);

@@ -22,6 +22,7 @@ inline constexpr const char* kShareFolder   = cerfcore::config_key::kShareFolder
 inline constexpr char kMountPoint[]         = "mount_point";
 inline constexpr const char* kCpuConfig     = cerfcore::config_key::kCpuConfig;
 inline constexpr const char* kHud           = cerfcore::config_key::kHud;
+inline constexpr char kBoardConfig[]        = "board_config";
 
 }
 
@@ -44,14 +45,15 @@ inline constexpr char kEmulator[]       = "emulator";
 
 }
 
-inline constexpr std::array<const char*, 19> kPersistKeys = {
+inline constexpr std::array<const char*, 20> kPersistKeys = {
     persist_field::kNetworkEnabled, persist_field::kGuestAdditions, persist_field::kColorScheme,
     persist_field::kFullScreen,     persist_field::kWidth,          persist_field::kHeight,
     persist_field::kDpi,            persist_field::kFontSize,       persist_field::kClearType,
     persist_field::kAllowUntrustedApps, persist_field::kBpp,        persist_field::kPalette,
     persist_field::kShareFolder,
     persist_field::kMountPoint,     persist_field::kCpuConfig,      cerfcore::config_key::kThrottleMultiplier,
-    cerfcore::config_key::kCpuRateMultiplier, cerfcore::config_key::kDoubleTapHelper, persist_field::kHud};
+    cerfcore::config_key::kCpuRateMultiplier, cerfcore::config_key::kDoubleTapHelper, persist_field::kHud,
+    persist_field::kBoardConfig};
 
 struct ScreenFieldKey {
     const char* field;

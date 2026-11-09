@@ -22,7 +22,8 @@ public:
 
     Q_INVOKABLE QString NameProblem(const QString& name) const;
     Q_INVOKABLE QString SuggestedName(const QString& board_name) const;
-    Q_INVOKABLE void    Start(const QString& name, const QString& board_id, const QVariantMap& files, bool copy);
+    Q_INVOKABLE void    Start(const QString& name, const QString& board_id, const QVariantMap& files,
+                              const QVariantMap& board_config, bool copy);
 
 signals:
     void created(const QString& name);

@@ -1,6 +1,7 @@
 #include "property_sheet.h"
 
 #include "board_catalog.h"
+#include "board_config_catalog.h"
 #include "cpu_config_catalog.h"
 #include "device_form_rules.h"
 #include "ga_palette_catalog.h"
@@ -42,6 +43,11 @@ Json FilesToJson(const FileValues& files) {
     for (auto it = files.constBegin(); it != files.constEnd(); ++it)
         out[it.key().toStdString()] = it.value().toStdString();
     return out;
+}
+
+QVariantMap ObjectAt(const Json& data, const char* key) {
+    const auto it = data.find(key);
+    return it != data.end() && it->is_object() ? JsonToVariant(*it).toMap() : QVariantMap();
 }
 
 FileValues JsonToFiles(const Json& object) {
@@ -192,6 +198,19 @@ QVariantMap PropertySheet::CpuOverrides() const {
 
 QVariant PropertySheet::CpuPreset() const {
     return emu_.Get<CpuConfigCatalog>().CurrentPreset(BoardId(), BoardCpuOverrides());
+}
+
+QVariantMap PropertySheet::BoardConfigSet() const { return ObjectAt(values_, pf::kBoardConfig); }
+
+Json PropertySheet::BoardConfigJson() const {
+    return emu_.Get<BoardConfigCatalog>().Diff(BoardId(), BoardConfigSet(), ObjectAt(baseline_, pf::kBoardConfig));
+}
+
+void PropertySheet::SetBoardConfig(const QString& param_id, const QVariant& value) {
+    Json config = values_.contains(pf::kBoardConfig) ? values_[pf::kBoardConfig] : Json::object();
+    config[param_id.toStdString()] = VariantToJson(value);
+    values_[pf::kBoardConfig]      = config;
+    emit valuesChanged();
 }
 
 QVariantList PropertySheet::ResetChoices() const {
@@ -352,7 +371,8 @@ QString PropertySheet::SaveOwned(bool all) {
     Json          values   = values_;
     const QString board_id = BoardId();
     if (!GuestAdditionsAvailable(board_id)) values[pf::kGuestAdditions] = false;
-    values[pf::kCpuConfig] = BoardCpuOverrideJson();
+    values[pf::kCpuConfig]   = BoardCpuOverrideJson();
+    values[pf::kBoardConfig] = BoardConfigJson();
 
     QString error;
     if (all) {

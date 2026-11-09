@@ -23,8 +23,10 @@ SheetPage {
         Layout.fillWidth: true
         editable: page.editable
         baseDir: page.sheet.deviceDirectory
+        boardConfig: page.sheet.boardConfig
         onPickBoard: page.pickBoard(fields.boardId)
         onChanged: page.push()
+        onConfigPicked: (id, value) => page.sheet.SetBoardConfig(id, value)
 
         Component.onCompleted: {
             const values = page.sheet.values

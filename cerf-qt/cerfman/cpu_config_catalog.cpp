@@ -179,8 +179,8 @@ QString CpuConfigCatalog::ValueLabel(const QString& param_id, const QVariant& va
         case CpuConfigParamType::Boolean:
             return value.toBool() ? QStringLiteral("Enabled") : QStringLiteral("Disabled");
         case CpuConfigParamType::Enum:
-            for (const auto& e : param->enum_values)
-                if (QString::fromStdString(e.id) == value.toString()) return QString::fromStdString(e.name);
+            if (const auto* e = cerfcore::FindConfigEnumValue(param->enum_values, value.toString().toStdString()))
+                return QString::fromStdString(e->name);
             return value.toString();
         case CpuConfigParamType::Hex: {
             const QVariant number = Normalized(*param, value);

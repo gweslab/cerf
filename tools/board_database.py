@@ -58,6 +58,13 @@ def _effective_board(board_row: dict) -> dict:
             if isinstance(feature, dict) and isinstance(feature.get("feature_id"), str):
                 merged[feature["feature_id"]] = feature
     out["device_features"] = list(merged.values())
+    config: Dict[str, dict] = {}
+    for row in (family, board_row):
+        if isinstance(row.get("board_config"), dict):
+            for param, setting in row["board_config"].items():
+                config[param] = {**config.get(param, {}), **setting}
+    if config:
+        out["board_config"] = config
     return out
 
 

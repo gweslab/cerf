@@ -52,6 +52,7 @@ class PropertySheet : public QObject {
     Q_PROPERTY(QString mountPoint READ MountPoint NOTIFY valuesChanged)
     Q_PROPERTY(QVariantMap cpuOverrides READ CpuOverrides NOTIFY valuesChanged)
     Q_PROPERTY(QVariant cpuPreset READ CpuPreset NOTIFY valuesChanged)
+    Q_PROPERTY(QVariantMap boardConfig READ BoardConfigSet NOTIFY valuesChanged)
     Q_PROPERTY(QVariantList pages READ Pages NOTIFY valuesChanged)
     Q_PROPERTY(QVariantList preview READ Preview NOTIFY valuesChanged)
     Q_PROPERTY(QSize autoSize READ AutoSize NOTIFY valuesChanged)
@@ -96,6 +97,7 @@ public:
     QString      MountPoint() const;
     QVariantMap  CpuOverrides() const;
     QVariant     CpuPreset() const;
+    QVariantMap  BoardConfigSet() const;
     QVariantList Pages() const;
     QVariantList Preview() const;
     QSize        AutoSize() const;
@@ -125,6 +127,7 @@ public:
     Q_INVOKABLE void         SetMountPoint(const QString& name);
     Q_INVOKABLE void         SetCpuOverride(const QString& param_id, const QVariant& value);
     Q_INVOKABLE void         ApplyCpuPreset(const QVariant& choice);
+    Q_INVOKABLE void         SetBoardConfig(const QString& param_id, const QVariant& value);
     Q_INVOKABLE QVariantMap  Problem() const;
     Q_INVOKABLE QString      Save();
     Q_INVOKABLE void         Finish(const QString& reboot);
@@ -139,6 +142,7 @@ private:
     bool    ScreenFits() const;
     bool    Flag(const char* key) const;
     Json    BoardCpuOverrideJson() const;
+    Json    BoardConfigJson() const;
     QString SaveOwned(bool all);
 
     cerfcore::CerfEmulator& emu_;

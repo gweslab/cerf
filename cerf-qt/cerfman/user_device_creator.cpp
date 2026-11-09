@@ -1,5 +1,6 @@
 #include "user_device_creator.h"
 
+#include "board_config_catalog.h"
 #include "bundle_name.h"
 #include "device_directory.h"
 #include "device_file_value.h"
@@ -83,7 +84,12 @@ QString UserDeviceCreator::NameProblem(const QString& name) const {
 
 QString UserDeviceCreator::SuggestedName(const QString& board_name) const { return SafeBundleNameFrom(board_name); }
 
-void UserDeviceCreator::Start(const QString& name, const QString& board_id, const QVariantMap& files, bool copy) {
+void UserDeviceCreator::Start(const QString& name, const QString& board_id, const QVariantMap& files,
+                              const QVariantMap& board_config, bool copy) {
+    Json       board  = {{cfg::kId, board_id.toStdString()}};
+    const Json config = emu_.Get<BoardConfigCatalog>().Diff(board_id, board_config, {});
+    if (!config.empty()) board[cfg::kConfig] = config;
+
     std::vector<RomFile> roms;
     Json                 storage = Json::object();
     for (const FormFile& file : emu_.Get<DeviceFormRules>().FormFiles(board_id, files)) {
@@ -94,7 +100,7 @@ void UserDeviceCreator::Start(const QString& name, const QString& board_id, cons
         }
     }
 
-    auto job = [name, board_id, roms, storage, copy](const OperationProgress& progress, QString& error) {
+    auto job = [name, board, roms, storage, copy](const OperationProgress& progress, QString& error) {
         error = ExistingDeviceProblem(name);
         if (!error.isEmpty()) return OperationResult::kFailed;
         for (const RomFile& rom : roms) {
@@ -127,7 +133,7 @@ void UserDeviceCreator::Start(const QString& name, const QString& board_id, cons
         if (result == OperationResult::kDone) {
             Json config = {{cfg::kMeta, {{cfg::kName, name.toStdString()}}},
                            {cfg::kRom, rom_block},
-                           {cfg::kBoard, {{cfg::kId, board_id.toStdString()}}}};
+                           {cfg::kBoard, board}};
             if (!storage.empty()) config[cfg::kStorage] = storage;
             if (!WriteJsonFile(QDir(target).filePath(DeviceDirectory::UserConfigName()), config, error))
                 result = OperationResult::kFailed;

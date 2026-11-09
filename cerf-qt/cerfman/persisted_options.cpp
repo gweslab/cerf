@@ -34,7 +34,7 @@ Json ResolvePersistBaseline(const Json& base, const QString& mount_default) {
     out[kAllowUntrustedApps] = ValueOr(base, kAllowUntrustedApps, cerfcore::kDefaultAllowUntrustedApps);
     out[kMountPoint]         = EffectiveMountPoint(JsonText(base, kMountPoint), mount_default).toStdString();
     for (const char* key : kMultiplierKeys) out[key] = ValueOr(base, key, kDefaultMultiplier);
-    for (const char* key : {kShareFolder, kDpi, kFontSize, kClearType, kHud, kPalette})
+    for (const char* key : {kShareFolder, kDpi, kFontSize, kClearType, kHud, kPalette, kBoardConfig})
         if (base.contains(key)) out[key] = base[key];
     return out;
 }
@@ -44,7 +44,10 @@ PersistedValues ReadPersistedValues(const DeviceDirectory& device, const QString
     PersistedValues out;
     out.baseline = ResolvePersistBaseline(base, mount_default);
     out.values   = out.baseline;
-    for (const auto& [key, value] : user.items()) out.values[key] = value;
+    for (const auto& [key, value] : user.items()) {
+        if (key == persist_field::kBoardConfig && out.values.contains(key)) out.values[key].update(value);
+        else                                                              out.values[key] = value;
+    }
     return out;
 }
 

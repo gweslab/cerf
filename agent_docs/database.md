@@ -30,8 +30,8 @@ of its own. A panel or size variant is also a member of its own.
 
 A field on the family applies to every member. A board sets the field only
 where the board differs, and the value of the board wins. `device_features`
-merge by `feature_id`, and the `notes` of a board add to the notes of the
-family.
+merge by `feature_id`, `board_config` merges by parameter, and the `notes` of a
+board add to the notes of the family.
 
 The board sets `support_level`. The values are:
 
@@ -54,6 +54,16 @@ The name of a family is the name of its platform. Use the public name of the
 vendor for the platform. If no public name exists, use the name that the ROM
 gives its platform. If the ROM gives no name, use the name of the design that
 the other members came from.
+
+## Board configuration
+
+A board configuration parameter lets the user of one device change a fact of
+its board, for example the RAM size or a memory card. Its default choice is
+Auto. Auto takes the value that the family or board row gives. A real model
+stays a member of its own. Its row sets the Auto value for that model. A part
+that the user plugs in is never a member of its own.
+
+The order of `board_config_params` is the display order.
 
 ## CPU configurations
 

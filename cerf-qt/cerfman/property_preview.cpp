@@ -1,6 +1,7 @@
 #include "property_preview.h"
 
 #include "board_catalog.h"
+#include "board_config_catalog.h"
 #include "cpu_config_catalog.h"
 #include "device_form_rules.h"
 #include "filesystem_path.h"
@@ -69,6 +70,8 @@ QVariantList PropertyPreview::BoardRows(const PropertySheet& sheet) const {
         Row(QStringLiteral("Board"), emu_.Get<BoardCatalog>().BoardLabel(board_id, QStringLiteral("-")))};
     for (const FormFile& file : emu_.Get<DeviceFormRules>().FormFiles(board_id, files))
         rows.append(Row(file.name, FileShown(file.value)));
+    for (const auto& [name, value] : emu_.Get<BoardConfigCatalog>().Rows(board_id, sheet.BoardConfigSet()))
+        rows.append(Row(name, value));
     return rows;
 }
 

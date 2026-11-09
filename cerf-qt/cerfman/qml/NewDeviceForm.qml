@@ -9,6 +9,7 @@ WizardPage {
     signal created()
 
     function setBoard(id) {
+        fields.boardConfig = ({})
         fields.setBoard(id)
     }
 
@@ -21,7 +22,7 @@ WizardPage {
             flows.inform(qsTr("Cannot create device"), reason, form)
             return
         }
-        UserDeviceCreator.Start(name, fields.boardId, fields.currentFiles(), copySwitch.checked)
+        UserDeviceCreator.Start(name, fields.boardId, fields.currentFiles(), fields.boardConfig, copySwitch.checked)
         created()
     }
 
@@ -39,6 +40,7 @@ WizardPage {
             Layout.fillWidth: true
             nameFollowsBoard: true
             onPickBoard: form.pickBoard(fields.boardId)
+            onConfigPicked: (id, value) => fields.boardConfig = Object.assign({}, fields.boardConfig, {[id]: value})
         }
 
         SettingsGroup {

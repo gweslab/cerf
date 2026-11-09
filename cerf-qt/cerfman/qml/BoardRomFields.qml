@@ -13,9 +13,13 @@ ColumnLayout {
     property bool nameFollowsBoard: false
     property bool editable: true
     property string prefilled: ""
+    property var boardConfig: ({})
     readonly property var fileRows: DeviceFormRules.FileTypes(boardId)
+    readonly property var configParams: BoardConfigCatalog.Params(boardId)
+    readonly property var configValues: BoardConfigCatalog.Values(boardId, boardConfig)
     signal pickBoard()
     signal changed()
+    signal configPicked(string id, var value)
 
     function valueOf(row) {
         return files[row.block][row.id]
@@ -139,6 +143,30 @@ ColumnLayout {
                     editable: fields.editable
                     onEdited: text => fields.setFile(modelData, text)
                     onBrowse: fields.browse(modelData)
+                }
+            }
+        }
+    }
+
+    SettingsGroup {
+        visible: fields.configParams.length > 0
+
+        SettingsNote {
+            divider: false
+            text: qsTr("Parts incompatible with ROM/board will be broken or crash")
+        }
+        Repeater {
+            model: fields.configParams
+            delegate: SettingsRow {
+                id: configRow
+                required property var modelData
+                title: modelData.name
+                ChoiceBox {
+                    enabled: fields.editable
+                    values: configRow.modelData.values
+                    current: fields.configValues[configRow.modelData.id]
+                    labelOf: v => BoardConfigCatalog.ValueLabel(configRow.modelData.board, configRow.modelData.id, v)
+                    onPicked: value => fields.configPicked(configRow.modelData.id, value)
                 }
             }
         }

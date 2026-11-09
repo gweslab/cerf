@@ -4,6 +4,7 @@
     new: |
       NEC MobilePro 790 support
       IBM WorkPad z50 support
+      Compaq Aero 1500 family support
       Sharp Mobilon HC4xxx: HC4500/HC4600 support; suspend support
   guest_additions:
     new: |

@@ -53,24 +53,48 @@ public:
             {QStringLiteral("saveDefault"), prompt.SaveByDefault()},
             {QStringLiteral("rememberLabel"), QString::fromUtf8(prompt.RememberLabel())}};
         open_                 = true;
+        dismissed_            = false;
         const QVariant result = emu_.Get<MobileEmulatorWindow>().RunDialog(
             QStringLiteral("EmulatorShutdownDialog"), QVariantMap{{QStringLiteral("texts"), texts}});
+        const cerfcore::ShutdownChoice choice = Choice(result);
+        if (!dismissed_) OfferAc(trigger, choice);
         open_ = false;
-        if (result.typeId() != QMetaType::QVariantMap) return cerfcore::ShutdownChoice::Cancel;
-        const QVariantMap chosen = result.toMap();
-        return prompt.Commit(static_cast<ShutdownPromptAction>(chosen.value(QStringLiteral("action")).toInt()),
-                             chosen.value(QStringLiteral("save")).toBool(),
-                             chosen.value(QStringLiteral("remember")).toBool());
+        return choice;
     }
 
-    void DismissAsCancel() override { emu_.Get<MobileEmulatorWindow>().CloseDialogs(); }
+    void DismissAsCancel() override {
+        if (open_) dismissed_ = true;
+        emu_.Get<MobileEmulatorWindow>().CloseDialogs();
+    }
 
     void BeginTeardown() override { emu_.Get<MobileEmulatorWindow>().BeginShutdownTeardown(); }
 
     void CancelTeardown() override { emu_.Get<ShutdownPrompt>().CancelCloseRequest(); }
 
 private:
-    bool open_ = false;
+    cerfcore::ShutdownChoice Choice(const QVariant& result) {
+        if (result.typeId() != QMetaType::QVariantMap) return cerfcore::ShutdownChoice::Cancel;
+        const QVariantMap chosen = result.toMap();
+        return emu_.Get<ShutdownPrompt>().Commit(
+            static_cast<ShutdownPromptAction>(chosen.value(QStringLiteral("action")).toInt()),
+            chosen.value(QStringLiteral("save")).toBool(), chosen.value(QStringLiteral("remember")).toBool());
+    }
+
+    void OfferAc(cerfcore::ShutdownTrigger trigger, cerfcore::ShutdownChoice choice) {
+        auto&                       prompt     = emu_.Get<ShutdownPrompt>();
+        const std::function<void()> plug_in_ac = prompt.AcOffer(trigger, choice);
+        if (!plug_in_ac) return;
+        const QString  yes    = QStringLiteral("Yes");
+        const QVariant answer = emu_.Get<MobileEmulatorWindow>().RunDialog(
+            QStringLiteral("FlowDialog"),
+            QVariantMap{{QStringLiteral("title"), QString::fromUtf8(prompt.PlugInAcQuestion())},
+                        {QStringLiteral("message"), QString::fromUtf8(prompt.PlugInAcReason())},
+                        {QStringLiteral("buttons"), QVariantList{yes, QStringLiteral("No")}}});
+        if (answer.toString() == yes) plug_in_ac();
+    }
+
+    bool open_      = false;
+    bool dismissed_ = false;
 };
 
 }

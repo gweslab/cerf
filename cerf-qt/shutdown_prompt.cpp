@@ -3,6 +3,9 @@
 #include <cerfcore/core/cerf_emulator.h>
 #include <cerfcore/core/product_name.h>
 #include <cerfcore/cpu/emulated_memory.h>
+#include <cerfcore/host/host_widget.h>
+#include <cerfcore/host/host_widget_registry.h>
+#include <cerfcore/host/widget_control.h>
 #include <cerfcore/state/shutdown_action.h>
 #include "frontend_config.h"
 #include "product_links.h"
@@ -10,10 +13,31 @@
 #include "version.h"
 
 #include <cstdio>
+#include <string_view>
+#include <variant>
+#include <vector>
 
 namespace cerffrontend {
 
 REGISTER_SERVICE(ShutdownPrompt);
+
+namespace {
+
+constexpr std::string_view kOnBatteryControlId = "on_battery";
+
+const cerfcore::ToggleControl* FindToggle(const std::vector<cerfcore::WidgetControl>& controls,
+                                          std::string_view id) {
+    for (const cerfcore::WidgetControl& c : controls) {
+        if (const auto* toggle = std::get_if<cerfcore::ToggleControl>(&c.control)) {
+            if (toggle->id == id) return toggle;
+        } else if (const auto* group = std::get_if<cerfcore::GroupControl>(&c.control)) {
+            if (const cerfcore::ToggleControl* found = FindToggle(group->children, id)) return found;
+        }
+    }
+    return nullptr;
+}
+
+}
 
 const char* ShutdownPrompt::Title() const { return "Shut down - " CERF_PRODUCT_NAME; }
 
@@ -90,6 +114,27 @@ bool ShutdownPrompt::CountsDown(cerfcore::ShutdownTrigger trigger) const {
 
 bool ShutdownPrompt::SaveByDefault() const {
     return emu_.Get<FrontendConfig>().LastSaveStateMode();
+}
+
+const char* ShutdownPrompt::PlugInAcQuestion() const { return "Plug in AC?"; }
+
+const char* ShutdownPrompt::PlugInAcReason() const {
+    return "A guest OS might deadlock in sleep if the battery is low.";
+}
+
+std::function<void()> ShutdownPrompt::AcOffer(cerfcore::ShutdownTrigger trigger,
+                                              cerfcore::ShutdownChoice choice) {
+    const bool resumes = trigger == cerfcore::ShutdownTrigger::DeepSleep &&
+                         choice == cerfcore::ShutdownChoice::Cancel;
+    const bool resets = choice == cerfcore::ShutdownChoice::SoftReset ||
+                        choice == cerfcore::ShutdownChoice::HardReset;
+    if (!resumes && !resets) return {};
+    for (cerfcore::HostWidget* widget : emu_.Get<cerfcore::HostWidgetRegistry>().Ordered()) {
+        const std::vector<cerfcore::WidgetControl> controls   = widget->Controls();
+        const cerfcore::ToggleControl*             on_battery = FindToggle(controls, kOnBatteryControlId);
+        if (on_battery != nullptr && on_battery->value) return [set = on_battery->set] { set(false); };
+    }
+    return {};
 }
 
 cerfcore::ShutdownChoice ShutdownPrompt::Commit(ShutdownPromptAction action, bool save,

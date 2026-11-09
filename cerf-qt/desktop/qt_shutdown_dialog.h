@@ -13,5 +13,8 @@ public:
     void DismissAsCancel();
 
 private:
-    QDialog* open_ = nullptr;
+    void OfferAc(cerfcore::ShutdownTrigger trigger, cerfcore::ShutdownChoice choice);
+
+    QDialog* open_      = nullptr;
+    bool     dismissed_ = false;
 };

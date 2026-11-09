@@ -4,6 +4,7 @@
 #include <cerfcore/state/shutdown_choice.h>
 
 #include <cstdint>
+#include <functional>
 #include <string>
 
 namespace cerffrontend {
@@ -32,8 +33,12 @@ public:
     const char* SaveTail() const;
     bool        CountsDown(cerfcore::ShutdownTrigger trigger) const;
     bool        SaveByDefault() const;
+    const char* PlugInAcQuestion() const;
+    const char* PlugInAcReason() const;
 
     cerfcore::ShutdownChoice Commit(ShutdownPromptAction action, bool save, bool remember);
+
+    std::function<void()> AcOffer(cerfcore::ShutdownTrigger trigger, cerfcore::ShutdownChoice choice);
 
     bool BeginCloseRequest();
     void FinishCloseRequest(cerfcore::ShutdownChoice choice);

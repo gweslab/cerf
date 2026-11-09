@@ -19,6 +19,7 @@
 #include <QDialog>
 #include <QElapsedTimer>
 #include <QLabel>
+#include <QMessageBox>
 #include <QMouseEvent>
 #include <QPainter>
 #include <QPushButton>
@@ -236,12 +237,29 @@ private:
 cerfcore::ShutdownChoice QtShutdownDialog::Show(cerfcore::ShutdownTrigger trigger) {
     if (open_ != nullptr) return cerfcore::ShutdownChoice::Cancel;
     ShutdownDialogWidget dialog(emu_, emu_.Get<QtMainWindow>().Window(), trigger);
-    open_ = &dialog;
+    open_      = &dialog;
+    dismissed_ = false;
     dialog.exec();
+    const cerfcore::ShutdownChoice choice = dialog.Choice();
+    if (!dismissed_) OfferAc(trigger, choice);
     open_ = nullptr;
-    return dialog.Choice();
+    return choice;
 }
 
 void QtShutdownDialog::DismissAsCancel() {
-    if (open_ != nullptr) open_->reject();
+    if (open_ == nullptr) return;
+    dismissed_ = true;
+    open_->reject();
+}
+
+void QtShutdownDialog::OfferAc(cerfcore::ShutdownTrigger trigger, cerfcore::ShutdownChoice choice) {
+    auto&                       prompt     = emu_.Get<ShutdownPrompt>();
+    const std::function<void()> plug_in_ac = prompt.AcOffer(trigger, choice);
+    if (!plug_in_ac) return;
+    QMessageBox box(QMessageBox::Question, QString::fromUtf8(prompt.Title()),
+                    QString::fromUtf8(prompt.PlugInAcQuestion()), QMessageBox::Yes | QMessageBox::No,
+                    emu_.Get<QtMainWindow>().Window());
+    box.setInformativeText(QString::fromUtf8(prompt.PlugInAcReason()));
+    open_ = &box;
+    if (box.exec() == QMessageBox::Yes) plug_in_ac();
 }

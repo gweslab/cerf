@@ -24,9 +24,9 @@ one or two lines. Do not write a paragraph.
    /<name> - <one-line explanation>
    ```
 
-Order: print `/start-board-implementation` first. It is the entry point for the
+Order: print `/implement-device` first. It is the entry point for the
 core work of the project, which is board bring-up. Print the other skills after
-it, in alphabetical order by name. If `/start-board-implementation` is absent,
+it, in alphabetical order by name. If `/implement-device` is absent,
 print all the skills in alphabetical order.
 
 ## Step 2 - note forks for an external contributor

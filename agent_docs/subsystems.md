@@ -600,16 +600,20 @@ per-SoC/per-board concretes (strategy pattern, selected by `BoardContext`).
   the box does not fit the screen. Then a Guest Additions live resize fits the
   guest to the canvas, if the guest supports it.
 
-  **On Android, the HUD sits at the sides of the safe zone.** A panel names a
-  side of the framebuffer. The panel goes to the canvas side that this
-  framebuffer side faces after the rotation. Each panel spans its whole side.
-  When that makes a panel longer than on the desktop, the panel also gets deeper
-  by the same factor. It never takes more than the space that the framebuffer
-  leaves free.
+  **On Android, the HUD sits at the sides of the safe zone.** While the canvas,
+  seen from the turned framebuffer, is taller than wide, a panel uses its portrait
+  form. While the canvas is wider than tall, or square, it uses its landscape form.
+  A panel without the form for that shape uses its desktop form. The desktop always
+  uses the desktop form.
 
-  While the canvas, seen from the turned framebuffer, is taller than wide, a
-  panel uses its portrait form when the preset gives one. The framebuffer fits, pans and zooms in the rest of the
-  canvas. A touch inside the HUD band never reaches the guest.
+  A panel names a side of the framebuffer. The panel goes to the canvas side that
+  this framebuffer side faces after the rotation. Each panel spans its whole side.
+  When that makes a panel longer than the length that its form sets, the panel also
+  gets deeper by the same factor. It never takes more than the space that the
+  framebuffer leaves free.
+
+  The framebuffer fits, pans and zooms in the rest of the canvas. A touch inside the
+  HUD band never reaches the guest.
   - `cerf-qt/hud_selection.h`, `cerf-qt/hud_controls.h`, `cerf-qt/hud_renderer.h`,
     `cerf-qt/view_presentation.h`, `libCerfCore/include/cerfcore/host/device_buttons.h`
 

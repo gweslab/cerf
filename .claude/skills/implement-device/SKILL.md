@@ -1,5 +1,5 @@
 ---
-name: start-board-implementation
+name: implement-device
 description: Start the bring-up of a new board or ROM in CERF.
 ---
 
@@ -59,7 +59,7 @@ like a human picking the obvious match.
 **Only if `ls` produced ZERO plausible candidates** - STOP and FAIL:
 
 > ❌ I couldn't find any ROM for "<what the user said>" under `bundled/devices/`.
-> Point me at the ROM path directly, then re-run `/start-board-implementation`.
+> Point me at the ROM path directly, then re-run `/implement-device`.
 
 ### Gate A2 - IDA MCP connectivity (warn + ask if absent)
 
@@ -153,7 +153,7 @@ source; `Status` = one emoji (✅ present/reusable/good · ⚠️ caution/new
 work/unconfirmed · ❌ missing/blocker).
 
 ```
-## /start-board-implementation - bring-up readiness
+## /implement-device - bring-up readiness
 
 | # | Check                          | Finding                                   | Status |
 |---|--------------------------------|-------------------------------------------|--------|
@@ -198,7 +198,7 @@ keep it a coarse index. Seed it with:
   recorded in that session's `/tracking update` (CODE STATE, verbatim with
   file:line). Never skip the gate on JIT/MMU/CPU changes."*
 - **A `PROCEDURE` line** pointing at the durable method: *"Follow the bring-up
-  loop and ground rules in `.claude/skills/start-board-implementation/SKILL.md`
+  loop and ground rules in `.claude/skills/implement-device/SKILL.md`
   § The bring-up loop."* (Plus the committed reference set: `CLAUDE.md`,
   `agent_docs/rules.md`, `agent_docs/debugging.md`, `agent_docs/code_style.md`.)
 - **`Session 0`** - paste the Phase C readiness table verbatim (identity +
@@ -261,4 +261,4 @@ follow them):
 7. **`/verify`**, fix any `CRITICAL PROBLEM FOUND`;
 8. **Repeat** until GUI, then interaction - the user-observable bring-up target.
 
-Do NOT jump chunks. Record bring-up loop into tracing document. One chunk at the time. Never mix chunks unless this is required.
+ONCE HALT HAS CHANGED MESSGAGE/MOVED AGENT DECIDES IF IT'S A CHUNK AND TIME TO SPAWN /verify, IN MOST SCENARIOS IT IS TRUE. Do NOT jump chunks - the working tree will be wiped. Record bring-up loop into tracking document. One chunk at the time. Never mix chunks unless this is required. 

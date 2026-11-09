@@ -273,6 +273,9 @@ The indexed depths are 1, 2, 4 and 8 bpp. A row of the framebuffer holds
 `(width × bpp + 7) / 8` bytes on the host and in the driver. A pixel narrower
 than a byte is MSB-first: the leftmost pixel uses the high bits of the byte.
 
+**Guest Additions** supports 4K resolution on any device at max of supported bpp.
+We decrease size only when it's required by a device specifics.
+
 The host owns the default palette. At startup and at every reset that is
 not a resume, the host loads the palette of the depth into the `cerf_virt`
 palette registers. That palette is `guest_additions.indexed_palette` of the

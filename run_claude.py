@@ -76,7 +76,7 @@ def first_run_gate() -> None:
         (YELLOW, "  started."),
         ("", ""),
         (GREEN, "  Tip: once inside, start by running  /cerf  to see the special skills this"),
-        (GREEN, "  project provides (including /start-board-implementation to bring up a ROM)."),
+        (GREEN, "  project provides (including /implement-device to bring up a ROM)."),
         ("", ""),
         (CYAN, "  Press Enter to proceed (this message will never be shown again)."),
     ]

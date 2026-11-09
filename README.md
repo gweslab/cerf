@@ -165,7 +165,7 @@ The environment includes several controversial things you need to know before us
 - IDA MCP is ready to be installed at `tools\ida_server.py` and `tools\ida_claude.py`
 - FS Read MCP is a workaround for `Read()` tool, useful for `/tracking restore` and massive text files (`tools\fs_read_mcp.py`)
 
-The environment gives you the **`/start-board-implementation`** skill. Run the skill and agent will start the new board bring-up on its own. You need experience - the skill won't do all the work instead of you. (it actually will do, and [that's the problem](#ai-usage--vibecode-notice))
+The environment gives you the **`/implement-device`** skill. Run the skill and agent will start the new board bring-up on its own. You need experience - the skill won't do all the work instead of you. (it actually will do, and [that's the problem](#ai-usage--vibecode-notice))
 
 Run the environment:
 

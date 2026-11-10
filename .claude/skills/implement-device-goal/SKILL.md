@@ -18,6 +18,11 @@ Order:
 - Bring guest additions if a device has a place for this mod and use guest
   additions for easier user-mode tests when applicable
 - Ensure soft reset works
+- Ensure every guest-initiated reboot works: find each way the ROM resets itself
+  (IOCTL_HAL_REBOOT 0x0101003C in OEMIoControl, watchdog/deadman units, reset
+  registers, companion-chip reset triggers), model the hardware it writes, and
+  trigger it from inside the guest (a setting that asks for a restart, bare Win32 app loaded through --guest-additions)
+  until it reaches a clean boot with no reboot loop
 - Ensure CPU suspend/resume works
 - Ensure hibernation works
 - Ensure touch/keypad input still works after a chain of soft reset + cpu suspend
@@ -26,6 +31,7 @@ Order:
 - Ensure PC Cards still work after CPU suspend/soft reset
 - Identical scenario for COM ports - implement and smoke test if a device has COM ports
 - Implement phone line if a device has one (optional - might be too complex, PC Card/COM might replace that)
+
 
 Hint for implementer agent only: Each chunk is wrapped into Skill(verify). Don't jump chunks, get LEGIT everywhere. Solve questions via Skill(verify-options)
 

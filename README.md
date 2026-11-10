@@ -32,7 +32,7 @@
 
 Visit [the website](https://cerf.cx/download) to learn how to download a stable or an unstable build.
 
-8.1.1 [![build](https://github.com/gweslab/cerf/actions/workflows/build.yml/badge.svg)](https://github.com/gweslab/cerf/actions/workflows/build.yml)
+8.1.2 [![build](https://github.com/gweslab/cerf/actions/workflows/build.yml/badge.svg)](https://github.com/gweslab/cerf/actions/workflows/build.yml)
 
 ## [Contribution Guidelines](.github/CONTRIBUTING.md)
 
@@ -486,7 +486,8 @@ python run_claude.py
         <p><b>✨ Guest Additions</b><br/>
           🆕 Indexed palettes rework and configuration</p>
         <p><b>🚑 Patches</b><br/>
-          ✅ Patch 1: Compaq Aero - fixed in-guest reset crash; Philips Velo 1 - proper Windows CE 2.0 ROM support (thx @Gadgetoid)</p>
+          ✅ Patch 1: Compaq Aero - fixed in-guest reset crash; Philips Velo 1 - proper Windows CE 2.0 ROM support (thx @Gadgetoid)<br/>
+          ✅ Patch 2: Guest Additions are working again on Mobilon family</p>
       </td>
     </tr>
     <tr>

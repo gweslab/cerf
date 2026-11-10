@@ -21,6 +21,7 @@
   patches:
     fixed: |
       Patch 1: Compaq Aero - fixed in-guest reset crash; Philips Velo 1 - proper Windows CE 2.0 ROM support (thx @Gadgetoid)
+      Patch 2: Guest Additions are working again on Mobilon family
 
 - version: v8.0
   date: 31 Oct 2026

@@ -5,6 +5,7 @@
 #include <QPainter>
 
 #include <algorithm>
+#include <cmath>
 
 QtFramePresenter::QtFramePresenter(std::unique_ptr<QtPresentHooks> hooks, uint32_t surf_w, uint32_t surf_h,
                                    QColor background)
@@ -57,26 +58,41 @@ bool QtFramePresenter::Capture(cerfcore::FrameSource& source, std::vector<uint32
     return true;
 }
 
-bool QtFramePresenter::ComposeInto(cerfcore::FrameSource& source) {
-    present_.fill(background_);
-    if (!source.HasFrame() || guest_.isNull()) return false;
+bool QtFramePresenter::ComposeInto(cerfcore::CerfEmulator& emu, cerfcore::FrameSource& source) {
+    if (!source.HasFrame() || guest_.isNull()) {
+        present_.fill(background_);
+        return false;
+    }
     auto* guest_bits = reinterpret_cast<uint32_t*>(guest_.bits());
     source.RenderInto(guest_bits, layout_.SurfaceWidth(), layout_.SurfaceHeight());
     ForceOpaque(guest_bits, static_cast<size_t>(layout_.SurfaceWidth()) * layout_.SurfaceHeight());
 
     const cerffrontend::ViewportLayout::Layout L = layout_.Compute();
-    if (L.dst_w <= 0 || L.dst_h <= 0) return true;
+    if (L.dst_w <= 0 || L.dst_h <= 0) {
+        present_.fill(background_);
+        return true;
+    }
+    QTransform turn;
+    switch (L.quarter) {
+        case 1:  turn.translate(L.dst_x + L.dst_w, L.dst_y); break;
+        case 2:  turn.translate(L.dst_x + L.dst_w, L.dst_y + L.dst_h); break;
+        case 3:  turn.translate(L.dst_x, L.dst_y + L.dst_h); break;
+        default: turn.translate(L.dst_x, L.dst_y); break;
+    }
+    turn.rotate(90.0 * L.quarter);
+    const bool turned   = (L.quarter & 1) != 0;
+    const int  target_w = turned ? L.dst_h : L.dst_w;
+    const int  target_h = turned ? L.dst_w : L.dst_h;
+    const int  margin   = std::max({L.dst_x, L.dst_y, present_.width() - L.dst_x - L.dst_w,
+                                    present_.height() - L.dst_y - L.dst_h});
+    const double zoom     = layout_.FitZoom();
+    const bool   glowing  = margin > 0 && glow_.Shows(zoom);
+    const int    reach    = glowing ? static_cast<int>(std::lround(hooks_->GlowReach(emu, L))) : 0;
+    glow_.Compose(present_, guest_, turn, target_w, target_h, reach, zoom, background_);
     QPainter p(&present_);
     p.setRenderHint(QPainter::SmoothPixmapTransform, layout_.Antialias());
-    const bool turned = (L.quarter & 1) != 0;
-    switch (L.quarter) {
-        case 1:  p.translate(L.dst_x + L.dst_w, L.dst_y); break;
-        case 2:  p.translate(L.dst_x + L.dst_w, L.dst_y + L.dst_h); break;
-        case 3:  p.translate(L.dst_x, L.dst_y + L.dst_h); break;
-        default: p.translate(L.dst_x, L.dst_y); break;
-    }
-    p.rotate(90.0 * L.quarter);
-    p.drawImage(QRect(0, 0, turned ? L.dst_h : L.dst_w, turned ? L.dst_w : L.dst_h), guest_);
+    p.setTransform(turn);
+    p.drawImage(QRect(0, 0, target_w, target_h), guest_);
     return true;
 }
 
@@ -90,7 +106,7 @@ const QImage& QtFramePresenter::Present(cerfcore::CerfEmulator& emu, cerfcore::F
     if (hooks_->RenderAlt(emu, bits, w, h, dpr)) {
         ForceOpaque(bits, static_cast<size_t>(w) * h);
     } else {
-        ComposeInto(source);
+        ComposeInto(emu, source);
         hooks_->RenderFrameOverlay(emu, present_, layout_.Compute(), dpr);
     }
     if (hooks_->ShouldDesaturate(emu)) cerffrontend::PresentEffects::DesaturateAndDim(bits, w * h);

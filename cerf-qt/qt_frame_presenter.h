@@ -1,5 +1,6 @@
 #pragma once
 
+#include "qt_frame_glow.h"
 #include "viewport_layout.h"
 
 #include <cerfcore/host/frame_source.h>
@@ -26,7 +27,8 @@ public:
 
     virtual void OnPresentTick(cerfcore::CerfEmulator&, bool) {}
     virtual bool RenderAlt(cerfcore::CerfEmulator&, uint32_t*, int, int, qreal) { return false; }
-    virtual bool ShouldDesaturate(cerfcore::CerfEmulator&) { return false; }
+    virtual bool   ShouldDesaturate(cerfcore::CerfEmulator&) { return false; }
+    virtual double GlowReach(cerfcore::CerfEmulator&, const cerffrontend::ViewportLayout::Layout&) { return 0.0; }
     virtual void RenderFrameOverlay(cerfcore::CerfEmulator&, QImage&, const cerffrontend::ViewportLayout::Layout&,
                                     qreal) {}
     virtual void RenderOverlay(cerfcore::CerfEmulator&, QImage&, int, int, qreal) {}
@@ -50,7 +52,7 @@ public:
 private:
     const QImage& Present(cerfcore::CerfEmulator& emu, cerfcore::FrameSource& source, int visible_w,
                           int visible_h, qreal dpr);
-    bool          ComposeInto(cerfcore::FrameSource& source);
+    bool          ComposeInto(cerfcore::CerfEmulator& emu, cerfcore::FrameSource& source);
     static void   ForceOpaque(uint32_t* pixels, size_t count);
 
     std::unique_ptr<QtPresentHooks> hooks_;
@@ -58,5 +60,6 @@ private:
     cerffrontend::ViewportLayout    layout_;
     QImage                          guest_;
     QImage                          present_;
+    QtFrameGlow                     glow_;
     QTimer                          repaint_timer_;
 };

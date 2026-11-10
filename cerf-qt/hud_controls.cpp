@@ -45,41 +45,10 @@ struct SideReach {
     double reach = 0.0;
 };
 
-}
-
-void HudControls::Place(const cerfcore::DbHud& hud, const ViewportLayout::Layout& frame) {
-    if (&hud == hud_ && SameFrame(frame, frame_) && canvas_area_ == placed_area_) return;
-    hud_         = &hud;
-    frame_       = frame;
-    placed_area_ = canvas_area_;
-    shown_.clear();
-    bands_.clear();
-    separators_.clear();
-    const cerfcore::DbLcdPanelSize& units = hud.ScreenFor(frame.surface_w, frame.surface_h);
-    if (canvas_area_) {
-        placement_ = FramePlacement(*canvas_area_, frame.quarter);
-        Publish(hud, HudInside(hud, placement_.DeviceWidth(), placement_.DeviceHeight(), units), 1.0, 1.0);
-        return;
-    }
-    placement_ = frame.Placement();
-    Publish(hud, HudOutside(hud, frame.surface_w, frame.surface_h, units), placement_.DeviceWidth() / frame.surface_w,
-            placement_.DeviceHeight() / frame.surface_h);
-}
-
-void HudControls::Publish(const cerfcore::DbHud& hud, const HudFrame& frame, double sx, double sy) {
+void MeasureSides(const HudFrame& frame, double width, double height, double sx, double sy,
+                  SideReach (&sides)[kSideCount]) {
     const auto scaled = [sx, sy](const FrameRect& r) { return FrameRect{r.x * sx, r.y * sy, r.w * sx, r.h * sy}; };
-    const auto turned = [this, sx, sy](FramePoint p) { return placement_.ToCanvas(FramePoint{p.x * sx, p.y * sy}); };
-    const HudArrangement arrangement = HudArrange(hud, frame);
-    for (const HudPlaced& e : arrangement.elements) {
-        const FrameRect device = scaled(e.rect);
-        shown_.push_back({e.node, device, placement_.ToCanvas(device)});
-    }
-    for (const HudSeparator& s : arrangement.separators) separators_.push_back({turned(s.from), turned(s.to)});
-
-    const double                 width  = placement_.DeviceWidth();
-    const double                 height = placement_.DeviceHeight();
     const std::vector<HudPanelPlace> places = HudPanelPlaces(frame);
-    SideReach                        sides[kSideCount];
     for (size_t i = 0; i < places.size(); ++i) {
         const HudSide   side     = (*frame.panels)[i].side;
         const FrameRect r        = scaled(places[i].rect);
@@ -97,6 +66,14 @@ void HudControls::Publish(const cerfcore::DbHud& hud, const HudFrame& frame, dou
         s.hi    = std::max({s.hi, places[i].slot_hi * slot_s, (along ? r.x : r.y) + (along ? r.w : r.h)});
         s.reach = std::max(s.reach, reach);
     }
+}
+
+std::vector<FrameRect> BandRects(const HudFrame& frame, const FramePlacement& placement, double sx, double sy) {
+    const double width  = placement.DeviceWidth();
+    const double height = placement.DeviceHeight();
+    SideReach    sides[kSideCount];
+    MeasureSides(frame, width, height, sx, sy, sides);
+    std::vector<FrameRect> rects;
     for (int i = 0; i < kSideCount; ++i) {
         const SideReach& s = sides[i];
         if (!s.used) continue;
@@ -104,18 +81,68 @@ void HudControls::Publish(const cerfcore::DbHud& hud, const HudFrame& frame, dou
         const bool    along = AlongX(side);
         const double  out   = Outward(side);
         const double  edge  = out > 0 ? (along ? height : width) : 0.0;
-        HudBandShown  band;
-        band.side         = side;
-        band.inner        = frame.inside ? edge - out * s.reach : edge;
-        band.outer        = frame.inside ? edge : edge + out * s.reach;
-        band.lo           = s.lo;
-        band.hi           = s.hi;
-        const double near = std::min(band.inner, band.outer);
-        const double span = std::abs(band.outer - band.inner);
-        band.canvas = placement_.ToCanvas(along ? FrameRect{s.lo, near, s.hi - s.lo, span}
-                                                : FrameRect{near, s.lo, span, s.hi - s.lo});
-        bands_.push_back(band);
+        const double  inner = frame.inside ? edge - out * s.reach : edge;
+        const double  outer = frame.inside ? edge : edge + out * s.reach;
+        const double  near  = std::min(inner, outer);
+        const double  span  = std::abs(outer - inner);
+        rects.push_back(placement.ToCanvas(along ? FrameRect{s.lo, near, s.hi - s.lo, span}
+                                                 : FrameRect{near, s.lo, span, s.hi - s.lo}));
     }
+    return rects;
+}
+
+double FarDistance(const FrameRect& from, const FrameRect& to) {
+    const double dx = std::max({0.0, from.x - to.x, to.x + to.w - (from.x + from.w)});
+    const double dy = std::max({0.0, from.y - to.y, to.y + to.h - (from.y + from.h)});
+    return std::max(dx, dy);
+}
+
+}
+
+void HudControls::Place(const cerfcore::DbHud& hud, const ViewportLayout::Layout& frame) {
+    if (&hud == hud_ && SameFrame(frame, frame_) && canvas_area_ == placed_area_) return;
+    hud_         = &hud;
+    frame_       = frame;
+    placed_area_ = canvas_area_;
+    shown_.clear();
+    bands_.clear();
+    separators_.clear();
+    const HudFit fit = FitFor(hud, frame);
+    placement_       = fit.placement;
+    Publish(hud, fit.frame, fit.sx, fit.sy);
+}
+
+double HudControls::PanelReach(const cerfcore::DbHud& hud, const ViewportLayout::Layout& frame) const {
+    const HudFit    fit   = FitFor(hud, frame);
+    const FrameRect image = frame.Rect();
+    double          reach = 0.0;
+    for (const FrameRect& band : BandRects(fit.frame, fit.placement, fit.sx, fit.sy))
+        reach = std::max(reach, FarDistance(image, band));
+    return reach;
+}
+
+HudControls::HudFit HudControls::FitFor(const cerfcore::DbHud& hud, const ViewportLayout::Layout& frame) const {
+    const cerfcore::DbLcdPanelSize& units = hud.ScreenFor(frame.surface_w, frame.surface_h);
+    if (canvas_area_) {
+        const FramePlacement placement(*canvas_area_, frame.quarter);
+        return {placement, HudInside(hud, placement.DeviceWidth(), placement.DeviceHeight(), units), 1.0, 1.0};
+    }
+    const FramePlacement placement = frame.Placement();
+    return {placement, HudOutside(hud, frame.surface_w, frame.surface_h, units),
+            placement.DeviceWidth() / frame.surface_w, placement.DeviceHeight() / frame.surface_h};
+}
+
+void HudControls::Publish(const cerfcore::DbHud& hud, const HudFrame& frame, double sx, double sy) {
+    const auto scaled = [sx, sy](const FrameRect& r) { return FrameRect{r.x * sx, r.y * sy, r.w * sx, r.h * sy}; };
+    const auto turned = [this, sx, sy](FramePoint p) { return placement_.ToCanvas(FramePoint{p.x * sx, p.y * sy}); };
+    const HudArrangement arrangement = HudArrange(hud, frame);
+    for (const HudPlaced& e : arrangement.elements) {
+        const FrameRect device = scaled(e.rect);
+        shown_.push_back({e.node, device, placement_.ToCanvas(device)});
+    }
+    for (const HudSeparator& s : arrangement.separators) separators_.push_back({turned(s.from), turned(s.to)});
+
+    bands_ = BandRects(frame, placement_, sx, sy);
 }
 
 void HudControls::Clear() {
@@ -129,7 +156,7 @@ bool HudControls::InBand(int x, int y) const {
     const double px = x + 0.5;
     const double py = y + 0.5;
     return std::any_of(bands_.begin(), bands_.end(),
-                       [px, py](const HudBandShown& band) { return Contains(band.canvas, px, py); });
+                       [px, py](const FrameRect& band) { return Contains(band, px, py); });
 }
 
 const HudShown* HudControls::At(int x, int y) const {

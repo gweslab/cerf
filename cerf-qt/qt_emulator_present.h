@@ -15,8 +15,9 @@ public:
 
     void OnPresentTick(cerfcore::CerfEmulator& emu, bool source_has_frame) override;
     bool RenderAlt(cerfcore::CerfEmulator& emu, uint32_t* bits, int w, int h, qreal dpr) override;
-    bool ShouldDesaturate(cerfcore::CerfEmulator& emu) override;
-    void RenderFrameOverlay(cerfcore::CerfEmulator& emu, QImage& present,
+    bool   ShouldDesaturate(cerfcore::CerfEmulator& emu) override;
+    double GlowReach(cerfcore::CerfEmulator& emu, const cerffrontend::ViewportLayout::Layout& frame) override;
+    void   RenderFrameOverlay(cerfcore::CerfEmulator& emu, QImage& present,
                             const cerffrontend::ViewportLayout::Layout& frame, qreal dpr) override;
     void RenderOverlay(cerfcore::CerfEmulator& emu, QImage& present, int w, int h, qreal dpr) override;
 

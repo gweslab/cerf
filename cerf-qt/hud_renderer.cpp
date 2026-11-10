@@ -21,8 +21,9 @@ namespace {
 using cerfcore::HudDpadShape;
 using cerfcore::HudNode;
 
-constexpr Rgb     kBlack{0, 0, 0};
 constexpr Rgb     kSeparator{64, 64, 64};
+constexpr Rgb     kBackdrop{0, 0, 0};
+constexpr uint8_t kBackdropAlpha   = 128;
 constexpr Rgb     kVeil{255, 255, 255};
 constexpr uint8_t kVeilAlpha       = 28;
 constexpr uint8_t kVeilCenterAlpha = 40;
@@ -45,10 +46,6 @@ constexpr double kArrowDepth  = 1.3;
 constexpr double kCenterPart  = 0.3;
 constexpr int    kSeparatorPx = 1;
 constexpr int    kLatchRimPx  = 2;
-constexpr int     kBackdropSamples = 4;
-constexpr double  kSampleSide      = 8.0;
-constexpr uint8_t kFadeEdgeAlpha   = 128;
-constexpr uint8_t kFadeMidAlpha    = 200;
 
 int Round(double v) { return static_cast<int>(std::lround(v)); }
 
@@ -56,34 +53,9 @@ Rect ToRect(const FrameRect& r) { return {Round(r.x), Round(r.y), Round(r.x + r.
 
 Point ToPoint(FramePoint p) { return {Round(p.x), Round(p.y)}; }
 
-using cerfcore::HudSide;
-
-bool AlongX(HudSide side) { return side == HudSide::kTop || side == HudSide::kBottom; }
-
-double Outward(HudSide side) { return side == HudSide::kBottom || side == HudSide::kRight ? 1.0 : -1.0; }
-
-Rgb Average(const CanvasPixels& canvas, FramePoint center) {
-    const int x0 = std::max(0, Round(center.x - kSampleSide / 2.0));
-    const int y0 = std::max(0, Round(center.y - kSampleSide / 2.0));
-    const int x1 = std::min(canvas.width, Round(center.x + kSampleSide / 2.0));
-    const int y1 = std::min(canvas.height, Round(center.y + kSampleSide / 2.0));
-    uint64_t  r = 0, g = 0, b = 0, n = 0;
-    for (int y = y0; y < y1; ++y) {
-        for (int x = x0; x < x1; ++x) {
-            const uint32_t v = canvas.bits[static_cast<size_t>(y) * canvas.width + x];
-            r += (v >> 16) & 0xFFu;
-            g += (v >> 8) & 0xFFu;
-            b += v & 0xFFu;
-            ++n;
-        }
-    }
-    if (n == 0) return kBlack;
-    return {static_cast<uint8_t>(r / n), static_cast<uint8_t>(g / n), static_cast<uint8_t>(b / n)};
 }
 
-}
-
-void HudRenderer::Render(Painter& p, const ViewportLayout::Layout& frame, int dpi, const CanvasPixels& canvas) {
+void HudRenderer::Render(Painter& p, const ViewportLayout::Layout& frame, int dpi) {
     auto&                  controls = emu_.Get<HudControls>();
     const cerfcore::DbHud* hud      = emu_.Get<HudSelection>().Active();
     if (hud == nullptr || frame.dst_w <= 0 || frame.dst_h <= 0) {
@@ -91,7 +63,10 @@ void HudRenderer::Render(Painter& p, const ViewportLayout::Layout& frame, int dp
         return;
     }
     controls.Place(*hud, frame);
-    for (const HudBandShown& band : controls.Bands()) DrawBackdrop(p, band, canvas);
+    const std::vector<FrameRect>& bands = controls.Bands();
+    const FrameRect               image = frame.Rect();
+    if (std::any_of(bands.begin(), bands.end(), [&image](const FrameRect& band) { return band.Overlaps(image); }))
+        for (const FrameRect& band : bands) p.BlendRect(ToRect(band), kBackdrop, kBackdropAlpha);
     const int separator_px = ScaleForDpi(kSeparatorPx, dpi);
     for (const HudSeparator& s : controls.Separators()) {
         const Point line[] = {ToPoint(s.from), ToPoint(s.to)};
@@ -139,24 +114,6 @@ bool HudRenderer::Renamed(const std::vector<uint8_t>& keys, const cerfcore::Keyb
         const char* legend = PcKeyLegend(vk);
         return guest != nullptr && (legend == nullptr || !SameKeyName(guest, legend));
     });
-}
-
-void HudRenderer::DrawBackdrop(Painter& p, const HudBandShown& band, const CanvasPixels& canvas) {
-    const FramePlacement& place  = emu_.Get<HudControls>().Placement();
-    const bool            along  = AlongX(band.side);
-    const double          extent = along ? place.DeviceWidth() : place.DeviceHeight();
-    const double          inner  = band.inner;
-    const auto at = [&](double t, double v) { return place.ToCanvas(along ? FramePoint{t, v} : FramePoint{v, t}); };
-
-    GradientStop samples[kBackdropSamples];
-    for (int i = 0; i < kBackdropSamples; ++i) {
-        const double share = (i + 0.5) / kBackdropSamples;
-        samples[i] = {share, Average(canvas, at(extent * share, inner - Outward(band.side) * kSampleSide / 2.0)), 255};
-    }
-    const Rect area = ToRect(band.canvas);
-    p.FillGradient(area, ToPoint(at(0.0, inner)), ToPoint(at(extent, inner)), samples, kBackdropSamples);
-    const GradientStop fade[] = {{0.0, kBlack, kFadeEdgeAlpha}, {0.5, kBlack, kFadeMidAlpha}, {1.0, kBlack, 255}};
-    p.FillGradient(area, ToPoint(at(0.0, inner)), ToPoint(at(0.0, band.outer)), fade, 3);
 }
 
 void HudRenderer::DrawButton(Painter& p, const HudShown& shown, const cerfcore::HudFace& face, bool renamed, int dpi) {

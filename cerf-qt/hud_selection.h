@@ -2,6 +2,7 @@
 
 #include "hud_layout.h"
 #include "view_presentation.h"
+#include "viewport_layout.h"
 
 #include <cerfcore/core/service.h>
 
@@ -26,6 +27,7 @@ public:
     void                   Toggle();
     ContentFrame           Frame() const;
     HudInsets              InsideInsets(double area_w, double area_h, int quarter, double fb_w, double fb_h) const;
+    double                 PanelReach(const ViewportLayout::Layout& frame) const;
 
 private:
     const cerfcore::DbHud* Resolve(const std::string& setting) const;

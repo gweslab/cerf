@@ -29,25 +29,17 @@ struct HudPointer {
     auto operator<=>(const HudPointer&) const = default;
 };
 
-struct HudBandShown {
-    cerfcore::HudSide side  = cerfcore::HudSide::kBottom;
-    double            inner = 0.0;
-    double            outer = 0.0;
-    double            lo    = 0.0;
-    double            hi    = 0.0;
-    FrameRect         canvas;
-};
-
 class HudControls : public cerfcore::Service {
 public:
     using cerfcore::Service::Service;
 
     void SetCanvasArea(const std::optional<FrameRect>& area) { canvas_area_ = area; }
-    void Place(const cerfcore::DbHud& hud, const ViewportLayout::Layout& frame);
-    void Clear();
+    void   Place(const cerfcore::DbHud& hud, const ViewportLayout::Layout& frame);
+    double PanelReach(const cerfcore::DbHud& hud, const ViewportLayout::Layout& frame) const;
+    void   Clear();
 
     const std::vector<HudShown>&     Shown() const { return shown_; }
-    const std::vector<HudBandShown>& Bands() const { return bands_; }
+    const std::vector<FrameRect>&    Bands() const { return bands_; }
     const std::vector<HudSeparator>& Separators() const { return separators_; }
     const FramePlacement&            Placement() const { return placement_; }
     bool                             InsideCanvas() const { return placed_area_.has_value(); }
@@ -76,6 +68,14 @@ private:
         bool                                  unlatch = false;
     };
 
+    struct HudFit {
+        FramePlacement placement;
+        HudFrame       frame;
+        double         sx = 1.0;
+        double         sy = 1.0;
+    };
+
+    HudFit          FitFor(const cerfcore::DbHud& hud, const ViewportLayout::Layout& frame) const;
     void            Publish(const cerfcore::DbHud& hud, const HudFrame& frame, double sx, double sy);
     const HudShown* At(int x, int y) const;
     const HudShown* Of(const cerfcore::HudNode* node) const;
@@ -89,7 +89,7 @@ private:
     std::optional<FrameRect>                       placed_area_;
     FramePlacement                                 placement_{FrameRect{}, 0};
     std::vector<HudShown>                          shown_;
-    std::vector<HudBandShown>                      bands_;
+    std::vector<FrameRect>                         bands_;
     std::vector<HudSeparator>                      separators_;
     std::map<HudPointer, PointerPress>             pointers_;
     std::map<const cerfcore::HudNode*, std::vector<uint8_t>> latched_;

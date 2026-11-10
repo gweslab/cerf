@@ -50,6 +50,8 @@ Placement ViewPlacement::Current() const { return mode_ == ViewMode::FreeForm ? 
 
 QRectF ViewPlacement::ScreenRegion() const { return ScreenOf(area_); }
 
+double ViewPlacement::FitZoom() const { return Current().scale / Fit(SafeOf(area_)).scale; }
+
 Placement ViewPlacement::Fit(const QRectF& region) const {
     Placement p;
     if (surface_w_ <= 0.0 || surface_h_ <= 0.0 || region.width() <= 0.0 || region.height() <= 0.0) return p;

@@ -16,23 +16,16 @@ class KeyboardMap;
 
 namespace cerffrontend {
 
-struct CanvasPixels {
-    const uint32_t* bits   = nullptr;
-    int             width  = 0;
-    int             height = 0;
-};
-
 class HudRenderer : public cerfcore::Service {
 public:
     using cerfcore::Service::Service;
 
-    void Render(Painter& p, const ViewportLayout::Layout& frame, int dpi, const CanvasPixels& canvas);
+    void Render(Painter& p, const ViewportLayout::Layout& frame, int dpi);
 
 private:
     uint8_t                  HeldLayer(const cerfcore::KeyboardMap& map);
     static cerfcore::HudFace Face(const cerfcore::HudButton& button, const cerfcore::KeyboardMap* map, uint8_t layer);
     static bool              Renamed(const std::vector<uint8_t>& keys, const cerfcore::KeyboardMap* map);
-    void DrawBackdrop(Painter& p, const HudBandShown& band, const CanvasPixels& canvas);
     void DrawButton(Painter& p, const HudShown& shown, const cerfcore::HudFace& face, bool renamed, int dpi);
     void DrawSticker(Painter& p, const HudShown& shown);
     void DrawDpad(Painter& p, const HudShown& shown);

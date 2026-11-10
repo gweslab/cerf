@@ -87,13 +87,31 @@ bool ViewportLayout::SetIntegerScale(int factor) {
     return true;
 }
 
-bool ViewportLayout::SetPlacement(double scale, double x, double y) {
-    if (mode_ == ViewportMode::Placed && placed_scale_ == scale && placed_x_ == x && placed_y_ == y) return false;
-    mode_         = ViewportMode::Placed;
-    placed_scale_ = scale;
-    placed_x_     = x;
-    placed_y_     = y;
+bool ViewportLayout::SetPlacement(double scale, double x, double y, double fit_zoom) {
+    if (mode_ == ViewportMode::Placed && placed_scale_ == scale && placed_x_ == x && placed_y_ == y &&
+        placed_fit_zoom_ == fit_zoom)
+        return false;
+    mode_            = ViewportMode::Placed;
+    placed_scale_    = scale;
+    placed_x_        = x;
+    placed_y_        = y;
+    placed_fit_zoom_ = fit_zoom;
     return true;
+}
+
+double ViewportLayout::FitZoom() const {
+    if (mode_ == ViewportMode::Placed) return placed_fit_zoom_;
+    if (!FixedScale()) return 1.0;
+    return ScaleFactor() / FitScale(PresentedExtent());
+}
+
+ViewportLayout::BoxExtent ViewportLayout::PresentedExtent() const {
+    const ContentBox box = presentation_.PresentedBox(SurfaceWidth(), SurfaceHeight());
+    return {box, PresentedWidth() * box.Width(), PresentedHeight() * box.Height()};
+}
+
+double ViewportLayout::FitScale(const BoxExtent& extent) const {
+    return std::min(canvas_w_ / extent.width, canvas_h_ / extent.height);
 }
 
 bool ViewportLayout::SetPresentation(const ViewPresentation& presentation) {
@@ -120,9 +138,10 @@ ViewportLayout::Layout ViewportLayout::Compute() const {
     L.quarter            = presentation_.quarter & 3;
     L.surface_w          = static_cast<int>(SurfaceWidth());
     L.surface_h          = static_cast<int>(SurfaceHeight());
-    const ContentBox box = presentation_.PresentedBox(SurfaceWidth(), SurfaceHeight());
-    const double     bw  = pw * box.Width();
-    const double     bh  = ph * box.Height();
+    const BoxExtent   extent = PresentedExtent();
+    const ContentBox& box    = extent.box;
+    const double      bw     = extent.width;
+    const double      bh     = extent.height;
 
     if (mode_ == ViewportMode::Stretch) {
         const double sx = cw / bw;
@@ -134,7 +153,7 @@ ViewportLayout::Layout ViewportLayout::Compute() const {
         return L;
     }
     if (mode_ == ViewportMode::Aspect) {
-        const double scale = std::min(cw / bw, ch / bh);
+        const double scale = FitScale(extent);
         L.dst_x            = Round((cw - bw * scale) / 2.0 - box.left * pw * scale);
         L.dst_y            = Round((ch - bh * scale) / 2.0 - box.top * ph * scale);
         L.dst_w            = std::max(1, Round(pw * scale));

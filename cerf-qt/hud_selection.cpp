@@ -58,6 +58,11 @@ HudInsets HudSelection::InsideInsets(double area_w, double area_h, int quarter, 
     return HudCanvasInsets(HudInsideInsets(frame), quarter);
 }
 
+double HudSelection::PanelReach(const ViewportLayout::Layout& frame) const {
+    const cerfcore::DbHud* hud = Shown() ? active_ : Resolve(restore_setting_);
+    return hud == nullptr ? 0.0 : emu_.Get<HudControls>().PanelReach(*hud, frame);
+}
+
 void HudSelection::Apply() {
     const std::string& setting = emu_.Get<cerfcore::DeviceConfig>().hud;
     if (setting != kHudNone) restore_setting_ = setting;

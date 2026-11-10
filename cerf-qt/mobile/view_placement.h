@@ -39,6 +39,7 @@ public:
     double    SurfaceWidth() const { return surface_w_; }
     double    SurfaceHeight() const { return surface_h_; }
     QRectF    ScreenRegion() const;
+    double    FitZoom() const;
 
     void BeginPinch(QPointF centroid, double distance);
     void UpdatePinch(QPointF centroid, double distance);

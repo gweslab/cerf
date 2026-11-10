@@ -31,8 +31,6 @@ public:
                          cerffrontend::Rgb rim) override;
     void FillRoundRectAlphaAA(const cerffrontend::Rect& r, int radius, cerffrontend::Rgb fill,
                               uint8_t alpha) override;
-    void FillGradient(const cerffrontend::Rect& r, cerffrontend::Point from, cerffrontend::Point to,
-                      const cerffrontend::GradientStop* stops, int count) override;
 
     void DrawTextBox(const cerffrontend::Rect& r, std::string_view utf8,
                      const cerffrontend::Font& font, cerffrontend::Rgb color,

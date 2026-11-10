@@ -58,12 +58,6 @@ struct FontMetrics {
 
 enum class PainterImage : uint8_t { kCerfLogo };
 
-struct GradientStop {
-    double  at = 0.0;
-    Rgb     color;
-    uint8_t alpha = 255;
-};
-
 class Painter {
 public:
     virtual ~Painter() = default;
@@ -79,7 +73,6 @@ public:
     virtual void FillPolygonAA(const Point* points, int count, Rgb fill, Rgb rim) = 0;
     virtual void FillRoundRectAA(const Rect& r, int radius, Rgb fill, Rgb rim) = 0;
     virtual void FillRoundRectAlphaAA(const Rect& r, int radius, Rgb fill, uint8_t alpha) = 0;
-    virtual void FillGradient(const Rect& r, Point from, Point to, const GradientStop* stops, int count) = 0;
 
     virtual void DrawTextBox(const Rect& r, std::string_view utf8, const Font& font, Rgb color,
                              uint32_t flags) = 0;

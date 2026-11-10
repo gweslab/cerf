@@ -45,6 +45,7 @@ struct FrameRect {
     double w = 0.0;
     double h = 0.0;
 
+    bool Overlaps(const FrameRect& o) const { return x < o.x + o.w && o.x < x + w && y < o.y + o.h && o.y < y + h; }
     bool operator==(const FrameRect&) const = default;
 };
 

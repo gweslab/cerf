@@ -20,7 +20,8 @@ public:
         int surface_w = 0;
         int surface_h = 0;
 
-        FramePlacement Placement() const { return FramePlacement(FrameRect{double(dst_x), double(dst_y), double(dst_w), double(dst_h)}, quarter); }
+        FrameRect      Rect() const { return FrameRect{double(dst_x), double(dst_y), double(dst_w), double(dst_h)}; }
+        FramePlacement Placement() const { return FramePlacement(Rect(), quarter); }
     };
 
     struct Scroll {
@@ -59,8 +60,9 @@ public:
     bool                    SetMode(ViewportMode m);
     bool                    SetAntialias(bool on);
     bool                    SetIntegerScale(int factor);
-    bool                    SetPlacement(double scale, double x, double y);
+    bool                    SetPlacement(double scale, double x, double y, double fit_zoom);
     bool                    SetPresentation(const ViewPresentation& presentation);
+    double                  FitZoom() const;
 
     bool Active() const { return active_; }
     bool SetActive(bool active);
@@ -76,7 +78,15 @@ public:
     void   ResetScroll() { scroll_x_ = scroll_y_ = 0; }
 
 private:
-    int ScaleFactor() const { return mode_ == ViewportMode::Integer ? integer_factor_ : 1; }
+    struct BoxExtent {
+        ContentBox box;
+        double     width  = 0.0;
+        double     height = 0.0;
+    };
+
+    int       ScaleFactor() const { return mode_ == ViewportMode::Integer ? integer_factor_ : 1; }
+    BoxExtent PresentedExtent() const;
+    double    FitScale(const BoxExtent& extent) const;
 
     std::atomic<uint32_t> surface_w_{0};
     std::atomic<uint32_t> surface_h_{0};
@@ -92,9 +102,10 @@ private:
     int scroll_x_ = 0;
     int scroll_y_ = 0;
 
-    double placed_scale_ = 1.0;
-    double placed_x_     = 0.0;
-    double placed_y_     = 0.0;
+    double placed_scale_    = 1.0;
+    double placed_x_        = 0.0;
+    double placed_y_        = 0.0;
+    double placed_fit_zoom_ = 1.0;
 };
 
 }

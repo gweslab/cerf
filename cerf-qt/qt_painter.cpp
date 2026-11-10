@@ -5,7 +5,6 @@
 #include "resource_paths_text.h"
 
 #include <QFontMetrics>
-#include <QLinearGradient>
 #include <QPainter>
 #include <QPainterPath>
 #include <QPolygon>
@@ -152,16 +151,6 @@ void QtPainter::FillRoundRectAlphaAA(const cerffrontend::Rect& r, int radius, ce
     p_.save();
     p_.setRenderHint(QPainter::Antialiasing, true);
     p_.fillPath(path, ToQColor(fill, alpha));
-    p_.restore();
-}
-
-void QtPainter::FillGradient(const cerffrontend::Rect& r, cerffrontend::Point from, cerffrontend::Point to,
-                             const cerffrontend::GradientStop* stops, int count) {
-    QLinearGradient gradient(QPointF(from.x, from.y), QPointF(to.x, to.y));
-    for (int i = 0; i < count; ++i) gradient.setColorAt(stops[i].at, ToQColor(stops[i].color, stops[i].alpha));
-    p_.save();
-    p_.setCompositionMode(QPainter::CompositionMode_SourceOver);
-    p_.fillRect(FillArea(r), gradient);
     p_.restore();
 }
 

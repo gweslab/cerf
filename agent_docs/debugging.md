@@ -339,7 +339,7 @@ The target will now fire within it.
 ## Crash shape #1 - guest hits an undecodable instruction
 
 The JIT decoder was not able to translate an instruction at some guest PC.
-The two engines diverge here. The **ARM engine** does not halt CERF.
+The engines diverge here. The **ARM engine** does not halt CERF.
 `ArmCpu::RaiseUndefinedException` vectors the guest into its own
 Undefined-mode handler at vector 0x4, and the guest decides what to do
 (most CE kernels fault the offending thread). The symptom is therefore a
@@ -348,7 +348,9 @@ catch it early, hook `OnPc` at the entry of
 `ArmCpu::RaiseUndefinedExceptionHelper` and log the offending PC + insn
 bytes. The **MIPS engine** instead halts the run through its
 `UnimplementedHelper` with the opcode and the PC. As a result, an
-undecodable or unimplemented MIPS opcode surfaces as a `[FATAL]` directly. Either way the instruction bytes at `pc` are not the bytes the
+undecodable or unimplemented MIPS opcode surfaces as a `[FATAL]` directly.
+The **SH engine** halts the run when it compiles the block. The halt
+names the opcode and the PC. Either way the instruction bytes at `pc` are not the bytes the
 kernel or driver expects. **Almost always not a JIT bug** - the bytes at
 that PA in DRAM are wrong because something corrupted them.
 

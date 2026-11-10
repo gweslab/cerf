@@ -22,17 +22,13 @@
 > **Expect bugs, crashes, and breaking changes.** CERF stays beta permanently
 
 > [!WARNING]
-> Project is under [CE Runtime Foundation License](LICENSE) since 8.0.4. All the prior code is permanently under MIT. For 8.0.4+ code:
-> - If you are using code heavily - write "Based on CE Runtime Foundation - https://cerf.cx" in its UI
-> - Non-commercial use only. The goal of the project is historical preservation rather than earning money. If you want to use the project to do business - contact cerf.commercial@yaroslavkibysh.com for enterprise license.
-> - Barter and common goals are welcome. If you want to use CERF in commercial for the sake of historical showcase; you contribute to the project or want any other exceptions - I'm open to discussions anytime.
-> - The license is experimental, and we might drop it later if circumstances prove it
+> [Non-commercial use only](https://cerf.cx/license-details)
 
 ## Downloads
 
 Visit [the website](https://cerf.cx/download) to learn how to download a stable or an unstable build.
 
-8.1.2 [![build](https://github.com/gweslab/cerf/actions/workflows/build.yml/badge.svg)](https://github.com/gweslab/cerf/actions/workflows/build.yml)
+8.2 [![build](https://github.com/gweslab/cerf/actions/workflows/build.yml/badge.svg)](https://github.com/gweslab/cerf/actions/workflows/build.yml)
 
 ## [Contribution Guidelines](.github/CONTRIBUTING.md)
 
@@ -469,6 +465,17 @@ python run_claude.py
   </thead>
   <tbody>
     <tr>
+      <td>v8.2</td>
+      <td>TBA</td>
+      <td>
+        <p><b>📱 Devices</b><br/>
+          🆕 HP Jornada 680, HP 620LX support (thx @Gadgetoid/sh3-emu)</p>
+        <p><b>💿 Emulator</b><br/>
+          🆕 SH3 guest CPU emulation<br/>
+          ✅ PS/2 mouse lost double clicks on Android</p>
+      </td>
+    </tr>
+    <tr>
       <td>v8.1</td>
       <td>10 Nov 2026</td>
       <td>
@@ -486,40 +493,9 @@ python run_claude.py
         <p><b>✨ Guest Additions</b><br/>
           🆕 Indexed palettes rework and configuration</p>
         <p><b>🚑 Patches</b><br/>
-          ✅ Patch 1: Compaq Aero - fixed in-guest reset crash; Philips Velo 1 - proper Windows CE 2.0 ROM support (thx @Gadgetoid)<br/>
-          ✅ Patch 2: Guest Additions are working again on Mobilon family</p>
-      </td>
-    </tr>
-    <tr>
-      <td>v8.0</td>
-      <td>31 Oct 2026</td>
-      <td>
-        <p><b>📱 Devices</b><br/>
-          🆕 DevEmu 2003: Added board type, keyboard layout and screen configuration support<br/>
-          🆕 iPAQ 1st gen: keypad support<br/>
-          🆕 iPAQ 1st gen: battery support<br/>
-          🆕 iPAQ 1st gen: alarm/charge LED<br/>
-          ✅ Fixed WM2003SE touch crash regression</p>
-        <p><b>💿 Emulator</b><br/>
-          🆕 Support for Linux (x86-64 and ARM64)<br/>
-          🆕 Support for macOS (ARM64)<br/>
-          🆕 Support for Android (ARM64)<br/>
-          🆕 Startup screen scale configuration and dynamic mode for retina screen<br/>
-          🆕 Device HUDs - simplified hardware buttons in a canvas<br/>
-          🆕 Rotation of any device screen<br/>
-          ✅ Serial connection regression on some MIPS boards</p>
-        <p><b>🚀 Launcher</b><br/>
-          ❌ Replaced with Devices Manager</p>
-        <p><b>✨ Guest Additions</b><br/>
-          🆕 Screen rotation support<br/>
-          ✅ Moved &quot;untrusted apps hack&quot; for WM into optional switch since it broke WM6<br/>
-          ✅ Fixed miniport driver causing hangs at soft resets</p>
-        <p><b>🚑 Patches</b><br/>
-          ✅ Patch 1: Added DevEmu 2003 screen configuration support<br/>
-          ✅ Patch 2: Fixed emulator startup race crash<br/>
-          ✅ Patch 3: Linux build now bundles many libraries instead of using system ones<br/>
-          ✅ Patch 4: Live theme change bug fixed; Linux ARM64 support<br/>
-          ✅ Patch 5: Crash fixes on non-Windows systems; styling fixes</p>
+          ✅ Patch 1: Compaq Aero - fixed in-guest reset crash; Philips Velo 1 - proper Windows CE 2.0 ROM support (thx @Gadgetoid); Added NE2000 3.3V PC Card<br/>
+          ✅ Patch 2: Guest Additions are working again on Mobilon family<br/>
+          ✅ Patch 3: Fixed broken glow effects (especially on Android)</p>
       </td>
     </tr>
     <tr>

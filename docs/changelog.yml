@@ -1,3 +1,14 @@
+- version: v8.2
+  date: TBA
+  devices:
+    new: |
+      HP Jornada 680, HP 620LX support (thx @Gadgetoid/sh3-emu)
+  emulator:
+    new: |
+      SH3 guest CPU emulation
+    fixed: |
+      PS/2 mouse lost double clicks on Android
+
 - version: v8.1
   date: 10 Nov 2026
   devices:
@@ -20,8 +31,9 @@
       Board parts editor in Board Settings dialog
   patches:
     fixed: |
-      Patch 1: Compaq Aero - fixed in-guest reset crash; Philips Velo 1 - proper Windows CE 2.0 ROM support (thx @Gadgetoid)
+      Patch 1: Compaq Aero - fixed in-guest reset crash; Philips Velo 1 - proper Windows CE 2.0 ROM support (thx @Gadgetoid); Added NE2000 3.3V PC Card
       Patch 2: Guest Additions are working again on Mobilon family
+      Patch 3: Fixed broken glow effects (especially on Android)
 
 - version: v8.0
   date: 31 Oct 2026

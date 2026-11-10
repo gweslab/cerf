@@ -8,60 +8,54 @@ hide:
 <div class="cerf-download" markdown>
 
 === ":fontawesome-brands-windows: Windows"
+    !!! question "**Windows 7 x86 and newer** is required."
 
-    Open PowerShell and paste this command:
+    1. Open **PowerShell**
+    2. Paste this command:
 
-    ```powershell
-    [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor 3072
-    iex ((New-Object Net.WebClient).DownloadString('https://cerf.cx/win_installer.ps1'))
-    ```
-    !!! warning "Supported platforms"
-
-        **Windows 7 x86 and newer** is required.
-
-    [:fontawesome-solid-code: Installer Source Code](https://github.com/gweslab/cerf/blob/main/installers/windows_installer.ps1)
+        ```powershell
+        [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor 3072
+        iex ((New-Object Net.WebClient).DownloadString('https://cerf.cx/win_installer.ps1'))
+        ```
+    3. Press **Enter**
+    4. Follow on-screen instructions
 
 === ":fontawesome-brands-linux: Linux"
+    !!! question "Supported CPUs: **x86-64, ARM64**"
 
-    Open a terminal and paste this command:
+    1. Open **a terminal**
+    2. Paste the following command:
 
-    ```sh
-    curl -fsSL https://cerf.cx/unix_installer.sh | sh
-    ```
-
-    !!! warning "Supported platforms"
-
-        Known supported platforms: Ubuntu 26.04, Debian testing, Arch, Fedora 44, openSUSE Tumbleweed
-
-        x86-64 and ARM64 only.
-
-    [:fontawesome-solid-code: Installer Source Code](https://github.com/gweslab/cerf/blob/main/installers/linux_macos_installer.sh)
+        ```sh
+        curl -fsSL https://cerf.cx/unix_installer.sh | sh
+        ```
+    3. Press **Enter**
+    4. Follow on-screen instructions
 
 === ":fontawesome-brands-apple: macOS"
+    !!! question "Supported CPUs: **ARM64**"
 
-    Open Terminal and paste this command:
+    1. Open **Terminal**
+    2. Paste this command:
 
-    ```sh
-    curl -fsSL https://cerf.cx/unix_installer.sh | sh
-    ```
-    !!! warning "Supported platforms"
-
-        Only modern ARM64 CPUs are supported.
-
-    [:fontawesome-solid-code: Installer Source Code](https://github.com/gweslab/cerf/blob/main/installers/linux_macos_installer.sh)
+        ```sh
+        curl -fsSL https://cerf.cx/unix_installer.sh | sh
+        ```
+    3. Press **Enter**
+    4. Follow on-screen instructions
 
 === ":fontawesome-brands-android: Android"
+    !!! question "**Android 10 (ARM64) and newer** is required."
 
-    [:fontawesome-solid-download: Download APK](/cerf_latest_arm64.apk){ .md-button .md-button--primary }
-
-    !!! warning "Supported platforms"
-
-        Only for ARM64.
+    1. [:fontawesome-solid-download: Download APK](/cerf_latest_arm64.apk){ .md-button .md-button--primary }
+    2. Open it on your phone
+    3. Follow on-screen instructions
 
 </div>
 
-!!! warning
-    Non commercial use only. Read the [license](/license). Contact cerf.commercial@yaroslavkibysh.com for enterprise license details.
+!!! abstract "[Non commercial use only](/license-details)"
+
+[:fontawesome-solid-code: Installers Source Code](https://github.com/gweslab/cerf/tree/main/installers)
 
 
 ## Manual download

@@ -22,11 +22,7 @@
 > **Expect bugs, crashes, and breaking changes.** CERF stays beta permanently
 
 > [!WARNING]
-> Project is under [CE Runtime Foundation License](LICENSE) since 8.0.4. All the prior code is permanently under MIT. For 8.0.4+ code:
-> - If you are using code heavily - write "Based on CE Runtime Foundation - https://cerf.cx" in its UI
-> - Non-commercial use only. The goal of the project is historical preservation rather than earning money. If you want to use the project to do business - contact cerf.commercial@yaroslavkibysh.com for enterprise license.
-> - Barter and common goals are welcome. If you want to use CERF in commercial for the sake of historical showcase; you contribute to the project or want any other exceptions - I'm open to discussions anytime.
-> - The license is experimental, and we might drop it later if circumstances prove it
+> [Non-commercial use only](https://cerf.cx/license-details)
 
 ## Downloads
 

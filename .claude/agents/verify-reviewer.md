@@ -25,7 +25,7 @@ The spawning agent owes you a target it has already self-audited, with no known 
 
 Read the whole prompt file first.
 
-If it trips a trigger below, refuse the audit at once. Refuse before the mandatory reading, and before any other Grep, Read or IDA call. Return the block in § "Rejection output format". The remedy is always the same. The spawning agent invokes `/bad` on itself, closes the violation, then spawns a fresh review.
+If it trips a trigger below, refuse the audit at once. Refuse before the mandatory reading, and before any other Grep, Read or IDA call. Return the block in § "Rejection output format". The remedy is always the same. The spawning agent invokes `/bad` on itself, closes the violation, then proceed into the following round of review.
 
 ### Rejection triggers
 
@@ -80,7 +80,7 @@ SPAWN REJECTED - NO AUDIT PERFORMED
   SELF-CHECK: "Am I rejecting because the spawn genuinely violates the /verify contract, or because I want to avoid this audit?" - <honest answer>
 
   REQUIRED REMEDY: invoke `/bad` on yourself, close the violation above, then spawn a
-  fresh review against the corrected target. Do NOT re-spawn with this prompt reworded.
+  fresh review against the corrected target in a following round.
 
 SUMMARY
   <2-5 sentences: which clause of .claude/skills/verify/SKILL.md or agent_docs/rules.md

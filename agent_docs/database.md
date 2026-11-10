@@ -33,6 +33,11 @@ where the board differs, and the value of the board wins. `device_features`
 merge by `feature_id`, `board_config` merges by parameter, and the `notes` of a
 board add to the notes of the family.
 
+The code of a family serves every member. It reads a fact that differs
+between members, for example the SoC or the RAM size, from the row of the
+member. A member with no ROM image is still a member, so the code never limits
+itself to the members that have a ROM image.
+
 The board sets `support_level`. The values are:
 
 - `bootable_full` - a ROM of this board runs in CERF.
@@ -62,6 +67,13 @@ its board, for example the RAM size or a memory card. Its default choice is
 Auto. Auto takes the value that the family or board row gives. A real model
 stays a member of its own. Its row sets the Auto value for that model. A part
 that the user plugs in is never a member of its own.
+
+A parameter is a part that a user can change on the real device. The user
+solders it, plugs it in or connects it. The `values` list of the row holds every
+part that a user can fit to the board. A value can break the guest, for example a
+compatible panel that the ROM does not drive. A RAM size belongs in the list
+when the board can take it. A size that the vendor never fitted also belongs in
+the list when the guest supports it.
 
 The order of `board_config_params` is the display order.
 
@@ -125,7 +137,8 @@ names:
 - `libCerfCore/src/boards/<family>/<family_id>_family_id.h` declares
   `namespace BoardFamilyId { inline constexpr std::string_view <Name> = "<id>"; }`
 - `libCerfCore/src/boards/<family>/<board_id>_id.h` declares the same in
-  `namespace BoardId`. This header exists only when a gate must name one
+  `namespace BoardId`. This header exists only when one member's hardware
+  differs from its family and the code for that difference must name the
   member.
 - `libCerfCore/src/socs/<chip>/<soc_id>_id.h` declares the same in `namespace SocId`.
   A SoC whose only tree is its core strategy keeps the header under

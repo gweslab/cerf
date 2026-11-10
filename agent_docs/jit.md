@@ -2,8 +2,9 @@
 
 The JIT translates guest code to native host code at the first
 execution of each block, and caches the translation. CERF implements
-the ARM (ARM-mode + Thumb) and MIPS (MIPS IV, 64-bit) guest ISAs. A
-board runs exactly one of them, chosen by `BoardContext::GetCpuArch()`.
+the ARM (ARM-mode + Thumb), MIPS (MIPS IV, 64-bit) and SH (SH-3 and
+SH3-DSP) guest ISAs. A board runs exactly one of them, chosen by
+`BoardContext::GetCpuArch()`.
 
 ## Where the parts live
 
@@ -18,21 +19,23 @@ board runs exactly one of them, chosen by `BoardContext::GetCpuArch()`.
 | `libCerfEngine/src/x86_emit*.h` | host x86 encoding helpers, from Intel SDM Vol. 2 |
 | `libCerfEngine/src/a64_emit*.h` | AArch64 encoding helpers for the host, from ARM DDI 0487 |
 | `libCerfEngine/src/host_fp_env.h` | the host layer that runs a guest floating-point operation and reads its exception flags |
-| `libCerfEngine/src/arm/`, `libCerfEngine/src/mips/` | the two engines |
-| `libCerfEngine/include/cerfengine/arm/arm_insn_kind.h`, `include/cerfengine/mips/mips_insn_kind.h` | the instruction kinds that the decoders produce |
+| `libCerfEngine/src/jit_block_emitter.{h,cpp}` | the loop that places, indexes and generates a block, for every engine |
+| `libCerfEngine/src/guarded_block_entry.{h,cpp}` | the guarded entry into a block on hosts other than Windows x86, and the host-fault report, for every engine |
+| `libCerfEngine/src/arm/`, `libCerfEngine/src/mips/`, `libCerfEngine/src/sh/` | the guest engines |
+| `libCerfEngine/include/cerfengine/arm/arm_insn_kind.h`, `include/cerfengine/mips/mips_insn_kind.h`, `include/cerfengine/sh/sh_insn_kind.h` | the instruction kinds that the decoders produce |
 | `libCerfEngine/src/cerfir/` | CerfIR, the guest-neutral block IR |
 | `libCerfEngine/src/cerfir/cerfir_guest_model.h` | the guest data that a lowering reads |
 | `libCerfEngine/src/cerfir/cerfir_host_lowering.h` | the file that selects the host lowering |
 | `libCerfEngine/src/cerfir/x86/` | the x86-32 and x86-64 lowering of CerfIR |
 | `libCerfEngine/src/cerfir/a64/` | the AArch64 lowering of CerfIR |
-| `libCerfEngine/src/arm/cerfir/`, `libCerfEngine/src/mips/cerfir/` | the ARM and MIPS frontends of CerfIR |
+| `libCerfEngine/src/arm/cerfir/`, `libCerfEngine/src/mips/cerfir/`, `libCerfEngine/src/sh/cerfir/` | the ARM, MIPS and SH frontends of CerfIR |
 | `libCerfCore/src/cpu/arm/`, `libCerfCore/src/cpu/mips/`, `libCerfCore/src/cpu/<core>/` | the page-walk, coprocessor, TLB and exception models that CERF gives the engine, for each ISA and for each core |
 
 ## The `GuestEngine` seam
 
 `JitRunner` drives an abstract `GuestEngine` service and never names a
-concrete engine. `ArmJit` and `MipsJit` each register as that base
-inside the engine, and `Setup::isa` selects which one wins the slot.
+concrete engine. Each concrete engine registers as that base inside the
+engine, and `Setup::isa` selects which one wins the slot.
 CERF sets `Setup::isa` from the `CpuArch` of the board.
 
 The seam is ISA-neutral throughout. Hibernation, reset, deep sleep and
@@ -118,7 +121,7 @@ the next block through the jump cache. The guest PC must be live in
 CPU state before that exit, because the dispatcher reads the next PC
 from there.
 
-Both engines chain a direct branch whose target lies in the same page
+Each engine chains a direct branch whose target lies in the same page
 as the block. A branch to the start of its own block jumps to that
 entry and does not return. An exit to another page goes through the
 jump cache in emitted code.
@@ -250,6 +253,9 @@ None of these is visible from any single file.
   transitional MMU states. Two such states are a TLB-cached mapping
   the fresh walk cannot see, and a partially-built page table. The
   walk then mis-keys the block, or faults it spuriously.
+- **On Windows x86, each dispatcher keeps its own `__try` frame around
+  the block entry.** MSVC does not inline a function that contains
+  `__try`, so a shared entry function adds a call to every dispatch.
 - **Short jumps silently truncate.** `Jcc rel8` / `JMP rel8` carry a
   signed-byte displacement. When the emit between a jump and its
   target grows past that range, the back-patch truncates and the CPU

@@ -14,6 +14,7 @@ CE Runtime Foundation has no accounts, no ads and no analytics. It does not coll
 - **Devices.** The ROM images that you add, the settings of each device, its saved state and its storage images stay in the app storage.
 - **Files that you pick.** When you create a device, the app copies the ROM files that you pick into the folder of that device. If you turn off "Copy files to device directory", the app uses them where they are. Other files that you pick, for example a shared folder, stay where they are.
 - **Microphone audio.** When an emulated device uses its sound input, the app gives it the audio of your microphone. The app does not record the audio and does not send it anywhere. On Android, the app asks for the microphone permission when you start a device.
+- **Screenshots.** On a phone, a screenshot that you save from the emulator menu goes to your gallery, in Pictures/CERF. Other apps that can read your photos can read it.
 - **Logs and crash reports.** The app writes them into its app storage. They leave your device only when you share them, to the app that you pick, or in an Android backup.
 - **Android backup.** Android can include the app's data in the backup of your phone. When the data is 25 MB or less, Android uploads it to your Google Drive, where your Google account protects it. Android can also copy the data to a new phone when you move to it. The backup settings of your phone control both.
 
@@ -35,10 +36,10 @@ On a computer, you can turn on Discord Rich Presence in the settings. It is off 
 
 ## Deleting your data
 
-The app keeps no data about you on a server. To remove a device and its files, delete the device in the app. On a phone, uninstall the app to remove its data from the phone. A copy in your Google Drive backup can remain, and Android restores it when you install the app again. On a computer, the app keeps your devices, saved states and settings in its installation folder. To remove them, delete that folder.
+The app keeps no data about you on a server. To remove a device and its files, delete the device in the app. On a phone, uninstall the app to remove its data from the phone. The screenshots in your gallery stay. Delete them in your gallery app. A copy in your Google Drive backup can remain, and Android restores it when you install the app again. On a computer, the app keeps your devices, saved states and settings in its installation folder. To remove them, delete that folder.
 
 ## Contact
 
 For a question about privacy, write to [cerf.commercial@yaroslavkibysh.com](mailto:cerf.commercial@yaroslavkibysh.com).
 
-Last updated: November 2, 2026.
+Last updated: November 10, 2026.

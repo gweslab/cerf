@@ -702,10 +702,11 @@ per-SoC/per-board concretes (strategy pattern, selected by `BoardContext`).
   - `libCerfCore/include/cerfcore/host/host_widget*.h`, `libCerfCore/src/host/host_widget_registry.cpp`
 
 - **`Screenshots`** - screenshot + clipboard capture of the live guest
-  surface (via `FrontendWindow::CaptureGuestSurface`, 1:1). The
-  `ImageExporter` seam of the frontend writes the PNG and fills the
-  clipboard.
-  - `cerf-qt/screenshots.{h,cpp}`
+  surface (via `FrontendWindow::CaptureGuestSurface`, 1:1). The desktop
+  saves a screenshot in the `screenshots` folder of CERF. Android saves
+  it in the gallery, in Pictures/CERF.
+  - `cerf-qt/screenshots.{h,cpp}`, `cerf-qt/screenshot_store.h`,
+    `cerf-qt/desktop/screenshot_folder_store.cpp`, `cerf-qt/mobile/android_gallery_store.cpp`
 
 ## TraceManager
 

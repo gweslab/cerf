@@ -1,20 +1,16 @@
 #include "screenshots.h"
 
-#include "cerfman/filesystem_path.h"
 #include "frontend_window.h"
 #include "image_exporter.h"
-#include "install_root_files.h"
+#include "screenshot_store.h"
 
 #include <cerfcore/core/cerf_emulator.h>
-#include <cerfcore/core/cerf_paths.h>
 #include <cerfcore/core/device_config.h>
 #include <cerfcore/core/log.h>
-#include <cerfcore/core/utf16.h>
 #include <cerfcore/platform/host_local_time.h>
 
 #include <cstdio>
 #include <ctime>
-#include <filesystem>
 
 namespace cerffrontend {
 
@@ -43,14 +39,14 @@ std::string TimestampNow() {
 
 }
 
-void Screenshots::Save() {
+bool Screenshots::Save() {
     std::vector<uint32_t> px;
     uint32_t              w = 0, h = 0;
     if (!emu_.Get<FrontendWindow>().CaptureGuestSurface(px, w, h)) {
         LOG(Lcd, "Screenshots::Save: no guest frame to capture\n");
-        return;
+        return false;
     }
-    SavePixels(px, w, h, emu_.Get<cerfcore::DeviceConfig>().device_name);
+    return SavePixels(px, w, h, emu_.Get<cerfcore::DeviceConfig>().device_name);
 }
 
 void Screenshots::Copy() {
@@ -79,19 +75,14 @@ void Screenshots::SaveGuestSurfaceTo(const std::string& path) {
         LOG(Lcd, "Screenshots::SaveGuestSurfaceTo: wrote %ux%u\n", w, h);
 }
 
-void Screenshots::SavePixels(const std::vector<uint32_t>& pixels, uint32_t w, uint32_t h,
+bool Screenshots::SavePixels(const std::vector<uint32_t>& pixels, uint32_t w, uint32_t h,
                              const std::string& name_hint) {
-    const std::filesystem::path dir = std::filesystem::path(cerfcore::Utf8ToUtf16(cerfcore::GetCerfDir())) /
-                                      cerfcore::Utf8ToUtf16(kScreenshotsDirName);
-    QString error;
-    if (!MakeDirectory(PathText(dir), error)) {
-        LOG(Lcd, "Screenshots::SavePixels: %s\n", qUtf8Printable(error));
-        return;
-    }
-    const std::filesystem::path file =
-        dir / cerfcore::Utf8ToUtf16(SanitizeForFilename(name_hint) + "_" + TimestampNow() + ".png");
-    if (emu_.Get<ImageExporter>().WritePng(pixels, w, h, PathText(file).toStdString()))
-        LOG(Lcd, "Screenshots::SavePixels: wrote %ux%u screenshot\n", w, h);
+    std::vector<uint8_t> png;
+    if (!emu_.Get<ImageExporter>().EncodePng(pixels, w, h, png)) return false;
+    const std::string file_name = SanitizeForFilename(name_hint) + "_" + TimestampNow() + ".png";
+    if (!emu_.Get<ScreenshotStore>().Store(png, file_name)) return false;
+    LOG(Lcd, "Screenshots::SavePixels: stored %ux%u screenshot %s\n", w, h, file_name.c_str());
+    return true;
 }
 
 }

@@ -36,6 +36,7 @@ public:
     void                                OpenWindow();
     void                                Raise();
     void                                ReturnToManager();
+    void                                SaveScreenshot();
     std::vector<cerffrontend::MenuItem> GearMenu();
     std::vector<cerffrontend::MenuItem> PointerMenu();
     QQuickWindow*                       Window() const;

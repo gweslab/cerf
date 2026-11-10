@@ -10,6 +10,8 @@
 #include "qml_dialog_waiter.h"
 #include "view_placement.h"
 
+#include "../balloon_hint.h"
+#include "../screenshots.h"
 #include "../tab_menu.h"
 #include "../view_rotation.h"
 #include "../widget_menu_builder.h"
@@ -29,6 +31,12 @@
 #include <utility>
 
 REGISTER_SERVICE(MobileEmulatorWindow);
+
+namespace {
+
+constexpr uint32_t kScreenshotHintMs = 2000;
+
+}
 
 MobileEmulatorWindow::~MobileEmulatorWindow() = default;
 
@@ -133,6 +141,7 @@ std::vector<cerffrontend::MenuItem> MobileEmulatorWindow::GearMenu() {
     std::vector<MenuItem> items;
     items.push_back(MenuItem::Row(
         "Device", {MenuItem::IconAction("Return to my devices", "home", [this] { ReturnToManager(); }),
+                   MenuItem::IconAction("Save screenshot", "photo_camera", [this] { SaveScreenshot(); }),
                    MenuItem::IconAction("Power off/reset", "power_settings_new", [this] { CloseRequested(); })}));
     items.push_back(MenuItem{});
     items.push_back(tabs.Item(Tab::Hw));
@@ -186,6 +195,12 @@ QQuickItem* MobileEmulatorWindow::CreateExternalDisplay() {
     QVariant created;
     QMetaObject::invokeMethod(window_.data(), "createExternalDisplay", Q_RETURN_ARG(QVariant, created));
     return qobject_cast<QQuickItem*>(created.value<QObject*>());
+}
+
+void MobileEmulatorWindow::SaveScreenshot() {
+    const bool saved = emu_.Get<cerffrontend::Screenshots>().Save();
+    ShowHint(saved ? QStringLiteral("Screenshot saved to Pictures/CERF") : QStringLiteral("Screenshot not saved"),
+             kScreenshotHintMs, cerffrontend::BalloonHint::kCanvasBottomGap);
 }
 
 void MobileEmulatorWindow::ShowHint(const QString& text, uint32_t hold_ms, int bottom_gap) {

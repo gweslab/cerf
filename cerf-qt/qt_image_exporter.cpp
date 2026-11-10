@@ -26,18 +26,28 @@ class QtImageExporter : public cerffrontend::ImageExporter {
 public:
     using cerffrontend::ImageExporter::ImageExporter;
 
-    bool WritePng(const std::vector<uint32_t>& pixels, uint32_t w, uint32_t h,
-                  const std::string& path) override {
-        QByteArray png;
-        QBuffer    buffer(&png);
+    bool EncodePng(const std::vector<uint32_t>& pixels, uint32_t w, uint32_t h, std::vector<uint8_t>& png) override {
+        QByteArray encoded;
+        QBuffer    buffer(&encoded);
         buffer.open(QIODevice::WriteOnly);
         if (!Wrap(pixels, w, h).save(&buffer, "PNG")) {
-            LOG(Caution, "QtImageExporter: PNG %s not encoded\n", path.c_str());
+            LOG(Caution, "QtImageExporter: %ux%u image not encoded as PNG\n", w, h);
             return false;
         }
+        png.assign(encoded.cbegin(), encoded.cend());
+        return true;
+    }
+
+    bool WritePng(const std::vector<uint32_t>& pixels, uint32_t w, uint32_t h,
+                  const std::string& path) override {
+        std::vector<uint8_t> png;
+        return EncodePng(pixels, w, h, png) && WriteEncodedPng(png, path);
+    }
+
+    bool WriteEncodedPng(const std::vector<uint8_t>& png, const std::string& path) override {
         uint32_t error = 0;
         if (cerfcore::host_platform::ReplaceHostFileContents(
-                path, std::string_view(png.constData(), static_cast<size_t>(png.size())), false, error))
+                path, std::string_view(reinterpret_cast<const char*>(png.data()), png.size()), false, error))
             return true;
         LOG(Caution, "QtImageExporter: PNG %s not written: %s\n", path.c_str(),
             cerfcore::host_platform::ErrorText(error).c_str());

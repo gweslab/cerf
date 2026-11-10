@@ -12,10 +12,10 @@ class Screenshots : public cerfcore::Service {
 public:
     using cerfcore::Service::Service;
 
-    void Save();
+    bool Save();
     void Copy();
     void SaveGuestSurfaceTo(const std::string& path);
-    void SavePixels(const std::vector<uint32_t>& pixels, uint32_t w, uint32_t h,
+    bool SavePixels(const std::vector<uint32_t>& pixels, uint32_t w, uint32_t h,
                     const std::string& name_hint);
     void CopyPixels(const std::vector<uint32_t>& pixels, uint32_t w, uint32_t h);
 };

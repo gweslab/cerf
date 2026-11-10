@@ -10,7 +10,8 @@ public:
     using cerfcore::Service::Service;
 
     cerfcore::ShutdownChoice Show(cerfcore::ShutdownTrigger trigger);
-    void DismissAsCancel();
+    bool IsOpen() const { return open_ != nullptr; }
+    void DismissPrompt();
 
 private:
     void OfferAc(cerfcore::ShutdownTrigger trigger, cerfcore::ShutdownChoice choice);

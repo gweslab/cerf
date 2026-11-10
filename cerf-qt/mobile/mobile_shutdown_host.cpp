@@ -56,13 +56,19 @@ public:
         dismissed_            = false;
         const QVariant result = emu_.Get<MobileEmulatorWindow>().RunDialog(
             QStringLiteral("EmulatorShutdownDialog"), QVariantMap{{QStringLiteral("texts"), texts}});
+        if (dismissed_) {
+            open_ = false;
+            return cerfcore::ShutdownChoice::Dismissed;
+        }
         const cerfcore::ShutdownChoice choice = Choice(result);
-        if (!dismissed_) OfferAc(trigger, choice);
+        OfferAc(trigger, choice);
         open_ = false;
         return choice;
     }
 
-    void DismissAsCancel() override {
+    bool PromptOpen() override { return open_; }
+
+    void DismissPrompt() override {
         if (open_) dismissed_ = true;
         emu_.Get<MobileEmulatorWindow>().CloseDialogs();
     }

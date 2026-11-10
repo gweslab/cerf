@@ -20,7 +20,9 @@ public:
         return emu_.Get<QtShutdownDialog>().Show(trigger);
     }
 
-    void DismissAsCancel() override { emu_.Get<QtShutdownDialog>().DismissAsCancel(); }
+    bool PromptOpen() override { return emu_.Get<QtShutdownDialog>().IsOpen(); }
+
+    void DismissPrompt() override { emu_.Get<QtShutdownDialog>().DismissPrompt(); }
 
     void BeginTeardown() override { emu_.Get<QtMainWindow>().BeginShutdownTeardown(); }
 

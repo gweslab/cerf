@@ -240,13 +240,17 @@ cerfcore::ShutdownChoice QtShutdownDialog::Show(cerfcore::ShutdownTrigger trigge
     open_      = &dialog;
     dismissed_ = false;
     dialog.exec();
+    if (dismissed_) {
+        open_ = nullptr;
+        return cerfcore::ShutdownChoice::Dismissed;
+    }
     const cerfcore::ShutdownChoice choice = dialog.Choice();
-    if (!dismissed_) OfferAc(trigger, choice);
+    OfferAc(trigger, choice);
     open_ = nullptr;
     return choice;
 }
 
-void QtShutdownDialog::DismissAsCancel() {
+void QtShutdownDialog::DismissPrompt() {
     if (open_ == nullptr) return;
     dismissed_ = true;
     open_->reject();

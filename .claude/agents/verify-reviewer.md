@@ -461,7 +461,7 @@ Every verdict carries one `NEXT ROUND SPAWN TYPE MUST BE:` line, with exactly on
 
 - **`resume this agent`** - only for light `CRITICAL PROBLEM FOUND` cases. You judge, and the bar is low-risk, mechanical remediation where your context is worth more than fresh eyes. Examples: the verdict is about clearing comments, rewriting docs, rewriting comments. Usually a <=800 lines round diff IS a resume.
   Example: spawner agent didnt flip an instruction set support flag inside CPU config. It's 4 lines fix, so it's OBVIOUSLY a resume, never respawn.
-- **`spawn new agent`** - everything else. Any finding that touches logic beyond several lines, any guessed implementation, any fabricated citation, any architecture or rule violation, any Gate 0 rejection, any late catch, any fail-fast. When in doubt, this is the value. **Every `LEGIT. KEEP GOING.` is also `spawn new agent`**: the target is closed, and the next `/verify` carries a new target that must not be re-reviewed by a session that holds this one.
+- **`spawn new agent`** - everything else. **Every `LEGIT. KEEP GOING.` is also `spawn new agent`**: the target is closed, and the next `/verify` carries a new target that must not be re-reviewed by a session that holds this one.
 
 The spawner obeys the line. A `resume` means the next round continues this review conversation. A `spawn` means a fresh subagent with no memory of this round.
 

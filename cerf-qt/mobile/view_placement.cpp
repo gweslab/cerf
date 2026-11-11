@@ -52,6 +52,11 @@ QRectF ViewPlacement::ScreenRegion() const { return ScreenOf(area_); }
 
 double ViewPlacement::FitZoom() const { return Current().scale / Fit(SafeOf(area_)).scale; }
 
+double ViewPlacement::CoverZoom() const {
+    const QRectF region = SafeOf(area_);
+    return Current().scale / std::max(region.width() / surface_w_, region.height() / surface_h_);
+}
+
 Placement ViewPlacement::Fit(const QRectF& region) const {
     Placement p;
     if (surface_w_ <= 0.0 || surface_h_ <= 0.0 || region.width() <= 0.0 || region.height() <= 0.0) return p;

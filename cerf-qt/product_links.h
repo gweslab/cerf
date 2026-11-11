@@ -42,6 +42,7 @@ inline constexpr auto kGuestAdditionsUrl     = JoinLink(kArticlesUrl.text, "gues
 inline constexpr auto kBundleRepositoriesUrl = JoinLink(kArticlesUrl.text, "bundle-repositories/");
 inline constexpr auto kHibernationWarningUrl = JoinLink(kWebsiteUrl, "/hibernation-warning");
 inline constexpr auto kFeedbackUrl           = JoinLink(kWebsiteUrl, "/feedback");
+inline constexpr auto kLicenseUrl            = JoinLink(kWebsiteUrl, "/license-details/");
 inline constexpr auto kPrivacyUrl            = JoinLink(kWebsiteUrl, "/privacy/");
 
 inline constexpr char kGitHubUrl[]          = "https://github.com/";

@@ -36,6 +36,7 @@ QString AboutModel::LinksHtml() const {
         {"Website", cerffrontend::kWebsiteUrl},
         {"Discord", cerffrontend::kDiscordUrl},
         {"Patreon", cerffrontend::kPatreonUrl},
+        {"License", cerffrontend::kLicenseUrl.text},
         {"Privacy policy", cerffrontend::kPrivacyUrl.text},
     };
     for (const auto& [label, url] : entries) {

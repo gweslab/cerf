@@ -38,6 +38,22 @@ between members, for example the SoC or the RAM size, from the row of the
 member. A member with no ROM image is still a member, so the code never limits
 itself to the members that have a ROM image.
 
+A member can differ in a part that CERF does not model yet. The member then
+runs the family code for that part, and its support level records the
+difference.
+
+For example, a regional member has another keyboard layout. Its keys sit on
+the same matrix pins as the keys of the baseline, so the family keyboard works
+on it. Only some key labels or host key bindings are wrong for that member.
+Another member has a part that the baseline lacks, such as a built-in modem.
+The family code runs on that member, and the member has no modem in CERF.
+
+Running the family code on such a member is not a guessed implementation.
+Code never takes a family service away from a member. A board id check in
+`ShouldRegister` that skips the member, or a halt on that member, is such a
+removal. A member is `bootable_full` only when CERF models every difference
+of that member.
+
 The board sets `support_level`. The values are:
 
 - `bootable_full` - a ROM of this board runs in CERF.

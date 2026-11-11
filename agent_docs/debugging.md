@@ -80,6 +80,12 @@ or bit it polls, the dead branch. Then ground the part's register map
 and bit semantics in its datasheet, the Linux driver, and QEMU. Do not
 reverse-engineer the whole part from the guest.
 
+A pin meaning from the Linux or NetBSD source of a board family is a
+lead, not a fact. It holds only when the routine in this ROM that reads or
+drives the pin treats it the same way. Read the body of that routine, not
+only its bit test. One member of a family can use a pin for something
+other than what that source names.
+
 **The dead branch is always a CERF defect** - a JIT, MMU, or peripheral
 bug, or (rarely) a ROM-placement bug. It is never "the real device would
 fail here too" or "the app is buggy". The ROM shipped and worked on
@@ -350,7 +356,10 @@ bytes. The **MIPS engine** instead halts the run through its
 `UnimplementedHelper` with the opcode and the PC. As a result, an
 undecodable or unimplemented MIPS opcode surfaces as a `[FATAL]` directly.
 The **SH engine** halts the run when it compiles the block. The halt
-names the opcode and the PC. Either way the instruction bytes at `pc` are not the bytes the
+names the opcode and the PC. H'Fxxx on a core without the DSP unit goes
+to the guest handler at VBR + H'100 instead. EXPEVT is H'180, or H'1A0 in
+a delay slot. With SR.BL set, or in the delay slot of RTE, that exception
+halts the run. Either way the instruction bytes at `pc` are not the bytes the
 kernel or driver expects. **Almost always not a JIT bug** - the bytes at
 that PA in DRAM are wrong because something corrupted them.
 
@@ -678,6 +687,17 @@ produce the PE you need, make it produce it (fix the extractor, add the
 container format, extract the inner XIP first) - a disassembly heuristic
 over compressed / packed ROM bytes is always worse than the work you
 avoided, and its output is not evidence.
+
+A claim that guest code never touches a register, or that only one
+routine does, needs a listed sweep. Search every module of the ROM, not
+only the kernel. Search every address form that the guest can use:
+
+- The literal address and its cached and uncached aliases.
+- A mapped base plus an offset.
+- A GBR-relative access.
+- A shared helper routine that takes the address as an argument.
+
+List every hit with its address. A claim without that list is a guess.
 
 Never run IDA from `build/` or `bundled/`. A rebuild wipes `build/`, and
 IDA holds locks there. `bundled/` is CERF's runtime input - an `.i64`

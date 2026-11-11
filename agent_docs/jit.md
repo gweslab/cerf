@@ -21,6 +21,7 @@ SH3-DSP) guest ISAs. A board runs exactly one of them, chosen by
 | `libCerfEngine/src/host_fp_env.h` | the host layer that runs a guest floating-point operation and reads its exception flags |
 | `libCerfEngine/src/jit_block_emitter.{h,cpp}` | the loop that places, indexes and generates a block, for every engine |
 | `libCerfEngine/src/guarded_block_entry.{h,cpp}` | the guarded entry into a block on hosts other than Windows x86, and the host-fault report, for every engine |
+| `libCerfEngine/src/dram_host_regions.{h,cpp}` | the cached DRAM regions of the host, which give the index key of a block in RAM |
 | `libCerfEngine/src/arm/`, `libCerfEngine/src/mips/`, `libCerfEngine/src/sh/` | the guest engines |
 | `libCerfEngine/include/cerfengine/arm/arm_insn_kind.h`, `include/cerfengine/mips/mips_insn_kind.h`, `include/cerfengine/sh/sh_insn_kind.h` | the instruction kinds that the decoders produce |
 | `libCerfEngine/src/cerfir/` | CerfIR, the guest-neutral block IR |
@@ -128,10 +129,15 @@ jump cache in emitted code.
 
 A block whose code continues on another page is never a chain target.
 When the mapping of that page changes, the engine must not enter the
-old translation again. The MIPS dispatcher examines that page each time
-it enters such a block. On ARM, a TLB invalidation of that page removes
-the block from the jump cache. The compiler also examines the page
-before it reuses the block. A chained jump does neither.
+old translation again. The MIPS and SH dispatchers examine that page each
+time they enter such a block. On ARM, a TLB invalidation of that page
+removes the block from the jump cache. The compiler also examines the
+page before it reuses the block. A chained jump does neither.
+
+Each examination compares the current physical address of the other
+page with the address that the block was translated from. It never
+compares the key of the page in the index of blocks by memory. That key
+does not identify the page on every engine.
 
 An ARM block continues on another page only when its first instruction
 is a wide Thumb instruction that crosses into a new 4 KB page. A core

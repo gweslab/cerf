@@ -41,9 +41,11 @@ rate of the SoC.
   once. An instant result shows the guest no host lag. A datasheet duration
   makes a guest that polls for the result spin on an emulated register. Each
   poll costs far more host time than the guest cycles that it advances. A part
-  takes the duration of an operation only with evidence. A log must show a
-  guest that fails or corrupts its state while the operation completes at
-  once. The change that adds the duration cites that log.
+  takes the duration of an operation only with evidence. A state that the
+  datasheet gives the part during the operation belongs to that duration, for
+  example a busy bit or a cleared register. A log must show a guest that fails
+  or corrupts its state while the operation completes at once. The change that
+  adds the duration cites that log.
 - **While guest time runs, a host clock, a host thread and a list of host
   deadlines are never the time base of a guest-visible state.**
 - **When the guest reads a polled state, the part computes that state from

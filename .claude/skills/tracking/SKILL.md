@@ -344,6 +344,16 @@ The archive is **read-only to you, always.** Every rule in this skill against ed
 
 ---
 
+## Every tracking document - search them all before you derive
+
+**The documents of other tasks under `docs/ai_checklists/` hold facts that their investigations already established.** A fact that the current task needs often lives in the document of a different task. That document can cover the same board, ROM, display depth, driver or peripheral. The restored document and its archive do not carry it, because that work was never part of this task.
+
+**Before you decompile, hook, probe or run a test to establish a fact, grep the whole `docs/ai_checklists/` folder for its tokens.** This is the mandatory prior step of § The obligation, applied to every document and not to one archive. The rules of § How to grep it apply unchanged.
+
+**Every other tracking document is read-only to you.** § The boundary applies to it exactly as to the archive.
+
+---
+
 ## Document structure
 
 Free-form in detail, but **structured by intent** - the next agent must be able to read it as a timeline and instantly find "what's already known, what not to repeat, what to read first." Concretely:
@@ -473,6 +483,7 @@ The instinct to produce a tidy, confident, accomplishment-shaped document is the
 - **Letting `COMPACTION LOG` accumulate a per-compaction narration paragraph.** The log is pure meta and stays at its fixed shape (pointer + grep directive + one `State:` line) forever; it is overwritten each compaction, never appended-to. A log that grew one fat paragraph per compaction is itself a bloat source and must be collapsed (step 3).
 - **Re-narrating a ban's full back-story inline in `TASK & WHY` on UPDATE.** The bloat-prevention failure: writing the new ban as a multi-paragraph essay in the global section instead of a one-line rule + count + `see S#` with the rationale left in the session block. This is what forces a step-7 compression pass later; write the one-liner from the start.
 - **Re-deriving something the pre-compact archive already holds.** You hit a question the live doc does not answer. You then go straight to a decompile, a hook, or a probe, with no grep of the archive. The archive holds the full verbatim record of every collapsed session, so that a recurring question gets an ANSWER instead of a new investigation. The digest one-liner is a pointer at that record, never a tombstone. The grep is a mandatory prior step, not a judgment call. (See § The pre-compact archive.)
+- **Re-deriving a fact that the document of another task holds.** You grep only the restored document and its archive, then decompile, hook or probe something that another document under `docs/ai_checklists/` already records. (See § Every tracking document.)
 - **Reading a digest one-liner or a `see S#` ban pointer as "all that survives".** Both *"Session #4 - mapped the mmc polling path"* and *"❌ <rule> - /bad'd ×2 (S3, S7), see S7"* are instructions to open the archive at that session. If you read them as the complete record, you map the path a second time. Or you plan an "alternative" that is the banned approach under a new label, because you never read why it was banned. That is the exact loss compaction must make impossible.
 - **Claiming "no record of this" / "never investigated" without an archive grep.** Do not write either sentence, and do not act on it, until you grep the archive for the concrete tokens and report the miss. An empty search is a real result, and it is what permits you to derive the fact yourself. A skipped grep fabricates that permission.
 - **Reading the pre-compact archive top-to-bottom.** The archive is unbounded by design and only grows. A full read burns the exact budget that compaction recovered. Grep for your tokens. Then read the full session block around the hit.

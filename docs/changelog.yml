@@ -1,13 +1,19 @@
 - version: v8.2
   date: TBA
-  devices:
-    new: |
-      HP Jornada 680, HP 620LX support (thx @Gadgetoid/sh3-emu)
+#  devices:
+#    new: |
+#      HP Jornada 680, HP 620LX support (thx @Gadgetoid/sh3-emu)
   emulator:
-    new: |
-      SH3 guest CPU emulation
+#    new: |
+#      SH3 guest CPU emulation
     fixed: |
       PS/2 mouse lost double clicks on Android
+      PS/2 mouse incorrect behaviour fixed
+      Android's HUD is now fully adaptive - saves your screen space
+      Desktop emulator window rewritten in QtQuick/CerfStyle
+  guest_additions:
+    fixed: |
+      Various crash fixes
 
 - version: v8.1
   date: 10 Nov 2026

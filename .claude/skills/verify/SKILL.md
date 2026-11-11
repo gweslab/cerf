@@ -63,7 +63,7 @@ Everywhere below, "the prompt" means the contents of that file.
 The prompt file carries these items, in this order, and nothing else:
 
 1. **The target from step 1.** Write the claim verbatim, or the file paths, the commit or the range. When the target also holds the work of somebody else, add the boundary in words. Do not add a preface that softens the target, such as "I think this is probably fine".
-2. **Every piece of context that cuts against your own claim.** State your doubts, your counter-evidence and the weak links in your reasoning plainly. If prior reasoning led you to the claim, include that chain, so the reviewer can spot the rationalization.
+2. **Every piece of context that cuts against your own claim.** State your doubts, your counter-evidence and the weak links in your reasoning plainly. If prior reasoning led you to the claim, include that chain, so the reviewer can spot the rationalization. This item holds only doubts that no tool call can settle.
 
 That is the whole prompt. The operating manual already holds the role explainer, the category list, the verification-tools section and the output format, so add none of them. When you feel the urge to add "and also, remember to check X", that urge is the bias entering. Resist it. The body of `.claude/agents/verify-reviewer.md` is the single source of truth for the subagent's work. Your job is to hand over the target and step aside.
 
@@ -100,6 +100,8 @@ Each round appends its own entry and edits nothing above that entry. The block g
 The prompt file carries the base across a compaction and a session boundary. Carry the path of the file into your compaction summary.
 
 Never do anything about the file a reviewer verifies. Prefer ending the turn until results is here.
+
+If the prompt of a running reviewer holds an error, send the correction to that reviewer at once. Fix the prompt file the same way. A fix to what the reviewer reads is not work on the target.
 
 - Do NOT presuppose the answer. No "please confirm this is fine". No "I think this is legit, just double-check". No "this should pass".
 - Do NOT cherry-pick context. Include the context that cuts against your own claim.

@@ -468,11 +468,13 @@ python run_claude.py
       <td>v8.2</td>
       <td>TBA</td>
       <td>
-        <p><b>📱 Devices</b><br/>
-          🆕 HP Jornada 680, HP 620LX support (thx @Gadgetoid/sh3-emu)</p>
         <p><b>💿 Emulator</b><br/>
-          🆕 SH3 guest CPU emulation<br/>
-          ✅ PS/2 mouse lost double clicks on Android</p>
+          ✅ PS/2 mouse lost double clicks on Android<br/>
+          ✅ PS/2 mouse incorrect behaviour fixed<br/>
+          ✅ Android&#x27;s HUD is now fully adaptive - saves your screen space<br/>
+          ✅ Desktop emulator window rewritten in QtQuick/CerfStyle</p>
+        <p><b>✨ Guest Additions</b><br/>
+          ✅ Various crash fixes</p>
       </td>
     </tr>
     <tr>

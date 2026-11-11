@@ -26,6 +26,13 @@ QSize RealSize(const QJniObject& display) {
     return QSize(size.getField<jint>("x"), size.getField<jint>("y"));
 }
 
+QMargins CutoutOf(const QJniObject& display) {
+    const QJniObject cutout = display.callObjectMethod("getCutout", "()Landroid/view/DisplayCutout;");
+    if (!cutout.isValid()) return {};
+    return QMargins(cutout.callMethod<jint>("getSafeInsetLeft"), cutout.callMethod<jint>("getSafeInsetTop"),
+                    cutout.callMethod<jint>("getSafeInsetRight"), cutout.callMethod<jint>("getSafeInsetBottom"));
+}
+
 }
 
 QSize ScreenPixels(const QScreen& screen) {
@@ -36,11 +43,16 @@ QSize ScreenPixels(const QScreen& screen) {
 QSize ScreenSafeZonePixels(const QScreen& screen) {
     const QJniObject display = DisplayOf(screen);
     if (!display.isValid()) return kNoScreenPixels;
-    QSize            size    = RealSize(display);
-    const QJniObject cutout  = display.callObjectMethod("getCutout", "()Landroid/view/DisplayCutout;");
-    if (cutout.isValid()) {
-        size.rwidth() -= cutout.callMethod<jint>("getSafeInsetLeft") + cutout.callMethod<jint>("getSafeInsetRight");
-        size.rheight() -= cutout.callMethod<jint>("getSafeInsetTop") + cutout.callMethod<jint>("getSafeInsetBottom");
-    }
-    return size;
+    const QSize    size   = RealSize(display);
+    const QMargins cutout = CutoutOf(display);
+    return QSize(size.width() - cutout.left() - cutout.right(), size.height() - cutout.top() - cutout.bottom());
+}
+
+QMarginsF ScreenCutoutMargins(const QScreen& screen) {
+    const QJniObject display = DisplayOf(screen);
+    if (!display.isValid()) return {};
+    const QMargins cutout     = CutoutOf(display);
+    const qreal    to_logical = qreal(1) / screen.devicePixelRatio();
+    return QMarginsF(qRound(cutout.left() * to_logical), qRound(cutout.top() * to_logical),
+                     qRound(cutout.right() * to_logical), qRound(cutout.bottom() * to_logical));
 }

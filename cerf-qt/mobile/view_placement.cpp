@@ -23,6 +23,8 @@ QRectF SafeOf(const ViewArea& a) {
     return QRectF(left, top, a.width - left - right, a.height - top - bottom);
 }
 
+QRectF RegionOf(ViewMode mode, const ViewArea& a) { return mode == ViewMode::FitSafeZone ? SafeOf(a) : ScreenOf(a); }
+
 double MovedAxis(double position, double extent, double old_start, double old_length, double new_start,
                  double new_length) {
     if (extent <= new_length) return new_start + (new_length - extent) / 2.0;
@@ -50,6 +52,8 @@ Placement ViewPlacement::Current() const { return mode_ == ViewMode::FreeForm ? 
 
 QRectF ViewPlacement::ScreenRegion() const { return ScreenOf(area_); }
 
+QRectF ViewPlacement::RegionFor(const ViewArea& area) const { return RegionOf(mode_, area); }
+
 double ViewPlacement::FitZoom() const { return Current().scale / Fit(SafeOf(area_)).scale; }
 
 double ViewPlacement::CoverZoom() const {
@@ -69,11 +73,10 @@ Placement ViewPlacement::Fit(const QRectF& region) const {
 Placement ViewPlacement::ForMode(ViewMode mode) const {
     switch (mode) {
         case ViewMode::FitScreen:
-            return Fit(ScreenOf(area_));
         case ViewMode::FitSafeZone:
-            return Fit(SafeOf(area_));
+            return Fit(RegionOf(mode, area_));
         case ViewMode::OriginalScale: {
-            const QRectF region = ScreenOf(area_);
+            const QRectF region = RegionOf(mode, area_);
             return Placement{1.0, region.left() + (region.width() - surface_w_) / 2.0,
                              region.top() + (region.height() - surface_h_) / 2.0};
         }

@@ -160,13 +160,18 @@ std::vector<cerffrontend::MenuItem> MobileEmulatorWindow::GearMenu() {
 
 void MobileEmulatorWindow::AdoptResolutionToScreen() {
     if (!AdoptsHostResolution()) return;
-    const QSize region = surface_->ScreenRegionFor(ScreenPixels(*window_->screen()));
-    uint32_t    w      = 0;
-    uint32_t    h      = 0;
+    const QScreen&  screen  = *window_->screen();
+    const QSize     logical = screen.geometry().size();
+    const QMarginsF cutout  = ScreenCutoutMargins(screen);
+    const QSize     region  = surface_->ScreenRegionFor(logical, cutout);
+    uint32_t        w       = 0;
+    uint32_t        h       = 0;
     surface_->Layout().SurfaceFor(region.width(), region.height(), w, h);
     if (w == 0 || h == 0) return;
     SetGuestResolution(w, h);
-    LOG(Lcd, "MobileEmulatorWindow: adopt screen -> guest surface %ux%u\n", w, h);
+    LOG(Lcd, "MobileEmulatorWindow: adopt screen %dx%d cutout %g,%g,%g,%g -> region %dx%d, guest surface %ux%u\n",
+        logical.width(), logical.height(), cutout.left(), cutout.top(), cutout.right(), cutout.bottom(), region.width(),
+        region.height(), w, h);
 }
 
 QObject* MobileEmulatorWindow::CreateDialog(const QString& type_name, const QVariantMap& properties) {

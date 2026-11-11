@@ -2,7 +2,7 @@
 
 #include "frontend_window.h"
 #include "hud_controls.h"
-#include "hud_layout.h"
+#include "hud_screen_layout.h"
 
 #include <cerfcore/boards/board_context.h>
 #include <cerfcore/core/cerf_emulator.h>
@@ -50,12 +50,10 @@ void HudSelection::Toggle() { SetShown(!Shown()); }
 
 ContentFrame HudSelection::Frame() const { return ContentFrame{active_}; }
 
-HudInsets HudSelection::InsideInsets(double area_w, double area_h, int quarter, double fb_w, double fb_h) const {
+HudInsets HudSelection::InsideInsets(double area_w, double area_h, int quarter, double fb_w, double fb_h,
+                                     const HudScreenMetrics& metrics) const {
     if (active_ == nullptr) return {};
-    const bool     turned = (quarter & 1) != 0;
-    const HudFrame frame  = HudInside(*active_, turned ? area_h : area_w, turned ? area_w : area_h,
-                                      active_->ScreenFor(fb_w, fb_h));
-    return HudCanvasInsets(HudInsideInsets(frame), quarter);
+    return HudInsideInsets(HudInside(*active_, area_w, area_h, quarter, fb_w, fb_h, metrics));
 }
 
 double HudSelection::PanelReach(const ViewportLayout::Layout& frame) const {

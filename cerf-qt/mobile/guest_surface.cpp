@@ -16,6 +16,7 @@
 
 #include <cerfcore/core/cerf_emulator.h>
 #include <cerfcore/core/device_config.h>
+#include <cerfcore/core/log.h>
 #include <cerfcore/host/frame_renderer.h>
 #include <cerfcore/host/pointer_router.h>
 #include <cerfcore/host/pointer_source.h>
@@ -163,30 +164,40 @@ bool GuestSurface::CaptureSurface(std::vector<uint32_t>& out, uint32_t& w, uint3
 
 void GuestSurface::Relayout() {
     if (!presenter_) return;
-    const QSize canvas = DeviceCanvasSize(width(), height(), Dpr());
-    presenter_->SetCanvasSize(canvas.width(), canvas.height());
-    const ViewArea a = AreaFor(canvas.width(), canvas.height());
+    const ViewArea a = AreaFor(QSizeF(width(), height()), safe_margins_);
+    presenter_->SetCanvasSize(a.width, a.height);
+    LOG(Lcd, "GuestSurface: area %dx%d safe %d,%d,%d,%d hud %d,%d,%d,%d\n", a.width, a.height, a.left, a.top, a.right,
+        a.bottom, a.hud_left, a.hud_top, a.hud_right, a.hud_bottom);
     placement_.SetArea(a);
-    gate_.Run([&a](cerfcore::CerfEmulator& emu) {
+    gate_.Run([this, &a](cerfcore::CerfEmulator& emu) {
         emu.Get<cerffrontend::HwScreenRenderer>().SetTextInsets(a.left, a.top, a.right, a.bottom);
-        emu.Get<cerffrontend::HudControls>().SetCanvasArea(cerffrontend::FrameRect{
-            double(a.left), double(a.top), double(a.width - a.left - a.right), double(a.height - a.top - a.bottom)});
+        emu.Get<cerffrontend::HudControls>().SetCanvasArea(
+            cerffrontend::FrameRect{double(a.left), double(a.top), double(a.width - a.left - a.right),
+                                    double(a.height - a.top - a.bottom)},
+            HudMetrics(emu));
     });
     ApplyPlacement();
 }
 
-ViewArea GuestSurface::AreaFor(int canvas_w, int canvas_h) const {
-    const qreal dpr = Dpr();
-    ViewArea    a{canvas_w, canvas_h, DeviceExtent(safe_margins_.left(), dpr), DeviceExtent(safe_margins_.top(), dpr),
-               DeviceExtent(safe_margins_.right(), dpr), DeviceExtent(safe_margins_.bottom(), dpr)};
+cerffrontend::HudScreenMetrics GuestSurface::HudMetrics(cerfcore::CerfEmulator& emu) const {
+    if (!emu.Get<MobileEmulatorWindow>().AdoptsHostResolution()) return {Dpr(), std::nullopt};
+    const auto& dc = emu.Get<cerfcore::DeviceConfig>();
+    return {Dpr(), cerfcore::DbLcdPanelSize{dc.board_configurable_screen_width, dc.board_configurable_screen_height}};
+}
+
+ViewArea GuestSurface::AreaFor(QSizeF logical, const QMarginsF& safe) const {
+    const qreal dpr    = Dpr();
+    const QSize canvas = DeviceCanvasSize(logical.width(), logical.height(), dpr);
+    ViewArea    a{canvas.width(),           canvas.height(),         DeviceExtent(safe.left(), dpr),
+               DeviceExtent(safe.top(), dpr), DeviceExtent(safe.right(), dpr), DeviceExtent(safe.bottom(), dpr)};
     const cerffrontend::ViewportLayout& layout = presenter_->Layout();
     cerffrontend::HudInsets             hud;
     gate_.Run([&](cerfcore::CerfEmulator& emu) {
         hud = emu.Get<cerffrontend::HudSelection>().InsideInsets(
             a.width - a.left - a.right, a.height - a.top - a.bottom, layout.Presentation().quarter,
-            layout.SurfaceWidth(), layout.SurfaceHeight());
+            layout.SurfaceWidth(), layout.SurfaceHeight(), HudMetrics(emu));
     });
-    const auto edge = [](int safe, double depth) { return depth > 0.0 ? safe + static_cast<int>(std::ceil(depth)) : 0; };
+    const auto edge = [](int inset, double depth) { return depth > 0.0 ? inset + static_cast<int>(std::ceil(depth)) : 0; };
     a.hud_left   = edge(a.left, hud.left);
     a.hud_top    = edge(a.top, hud.top);
     a.hud_right  = edge(a.right, hud.right);
@@ -194,9 +205,8 @@ ViewArea GuestSurface::AreaFor(int canvas_w, int canvas_h) const {
     return a;
 }
 
-QSize GuestSurface::ScreenRegionFor(QSize canvas) const {
-    const ViewArea a = AreaFor(canvas.width(), canvas.height());
-    return QSize(a.width - a.hud_left - a.hud_right, a.height - a.hud_top - a.hud_bottom);
+QSize GuestSurface::ScreenRegionFor(QSizeF logical, const QMarginsF& safe) const {
+    return placement_.RegionFor(AreaFor(logical, safe)).size().toSize();
 }
 
 void GuestSurface::SetSafeMargins(const QMarginsF& margins) {

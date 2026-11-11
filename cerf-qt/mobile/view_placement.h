@@ -39,6 +39,7 @@ public:
     double    SurfaceWidth() const { return surface_w_; }
     double    SurfaceHeight() const { return surface_h_; }
     QRectF    ScreenRegion() const;
+    QRectF    RegionFor(const ViewArea& area) const;
     double    FitZoom() const;
     double    CoverZoom() const;
 

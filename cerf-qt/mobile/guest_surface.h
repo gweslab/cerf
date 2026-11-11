@@ -10,11 +10,13 @@
 #include "view_placement.h"
 
 #include "../canvas_input.h"
+#include "../hud_screen_layout.h"
 
 #include <cerfcore/core/instance_gate.h>
 
 #include <QMarginsF>
 #include <QPointF>
+#include <QSizeF>
 #include <QQuickPaintedItem>
 #include <QtQml/qqmlregistration.h>
 
@@ -61,7 +63,7 @@ public:
     void                          Repaint() override { update(); }
     bool CaptureSurface(std::vector<uint32_t>& out, uint32_t& w, uint32_t& h) override;
     qreal                         Dpr() const override;
-    QSize                         ScreenRegionFor(QSize canvas) const;
+    QSize                         ScreenRegionFor(QSizeF logical, const QMarginsF& safe) const;
 
     bool      CursorMode() const { return cursor_mode_; }
     void      SetCursorMode(bool on);
@@ -132,7 +134,8 @@ private:
     void                  RefreshRelativePointer();
     void                  RefreshPointerMenu();
     void                  Relayout();
-    ViewArea              AreaFor(int canvas_w, int canvas_h) const;
+    ViewArea              AreaFor(QSizeF logical, const QMarginsF& safe) const;
+    cerffrontend::HudScreenMetrics HudMetrics(cerfcore::CerfEmulator& emu) const;
     void                  ApplyPlacement();
     void                  SyncPlacementSurface();
     void                  RouteMouse(QMouseEvent* event, cerffrontend::CanvasMouse::Kind kind);

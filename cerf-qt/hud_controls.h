@@ -1,6 +1,7 @@
 #pragma once
 
 #include "hud_layout.h"
+#include "hud_screen_layout.h"
 #include "viewport_layout.h"
 
 #include <cerfcore/core/service.h>
@@ -33,7 +34,9 @@ class HudControls : public cerfcore::Service {
 public:
     using cerfcore::Service::Service;
 
-    void SetCanvasArea(const std::optional<FrameRect>& area) { canvas_area_ = area; }
+    void SetCanvasArea(const FrameRect& area, const HudScreenMetrics& metrics) {
+        canvas_area_ = CanvasArea{area, metrics};
+    }
     void   Place(const cerfcore::DbHud& hud, const ViewportLayout::Layout& frame);
     double PanelReach(const cerfcore::DbHud& hud, const ViewportLayout::Layout& frame) const;
     void   Clear();
@@ -75,8 +78,15 @@ private:
         double         sy = 1.0;
     };
 
+    struct CanvasArea {
+        FrameRect        rect;
+        HudScreenMetrics metrics;
+
+        bool operator==(const CanvasArea&) const = default;
+    };
+
     HudFit          FitFor(const cerfcore::DbHud& hud, const ViewportLayout::Layout& frame) const;
-    void            Publish(const cerfcore::DbHud& hud, const HudFrame& frame, double sx, double sy);
+    void            Publish(const HudFrame& frame, double sx, double sy);
     const HudShown* At(int x, int y) const;
     const HudShown* Of(const cerfcore::HudNode* node) const;
     void            PressKeys(const std::vector<uint8_t>& keys);
@@ -85,8 +95,8 @@ private:
 
     const cerfcore::DbHud*                         hud_ = nullptr;
     ViewportLayout::Layout                         frame_;
-    std::optional<FrameRect>                       canvas_area_;
-    std::optional<FrameRect>                       placed_area_;
+    std::optional<CanvasArea>                      canvas_area_;
+    std::optional<CanvasArea>                      placed_area_;
     FramePlacement                                 placement_{FrameRect{}, 0};
     std::vector<HudShown>                          shown_;
     std::vector<FrameRect>                         bands_;

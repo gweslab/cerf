@@ -38,6 +38,7 @@ public:
 
     void CloseRequested();
     void BeginShutdownTeardown();
+    bool AdoptsHostResolution() const;
 
     virtual void OnTeardownWedged() = 0;
 
@@ -46,7 +47,6 @@ protected:
     void ReleaseHeldJobs();
     void PublishNativeHandle(uint64_t handle);
     void DetachView();
-    bool AdoptsHostResolution() const;
 
     virtual void RefitForPresentation() { RefitIfFollowingGuest(); }
 

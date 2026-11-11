@@ -2,7 +2,7 @@ import QtQuick
 import QtQuick.Controls.Material as M
 
 M.ComboBox {
-    id: control
+    id: comboBox
 
     WindowInsets.gap: Theme.spaceXL
     popup.leftMargin: WindowInsets.left
@@ -11,7 +11,7 @@ M.ComboBox {
     popup.bottomMargin: WindowInsets.bottomMargin
 
     background: FieldBackground {
-        control: control
-        visible: !control.flat
+        control: comboBox
+        visible: !comboBox.flat
     }
 }

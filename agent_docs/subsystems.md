@@ -600,17 +600,51 @@ per-SoC/per-board concretes (strategy pattern, selected by `BoardContext`).
   the box does not fit the screen. Then a Guest Additions live resize fits the
   guest to the canvas, if the guest supports it.
 
-  **On Android, the HUD sits at the sides of the safe zone.** While the canvas,
-  seen from the turned framebuffer, is taller than wide, a panel uses its portrait
-  form. While the canvas is wider than tall, or square, it uses its landscape form.
-  A panel without the form for that shape uses its desktop form. The desktop always
-  uses the desktop form.
+  **On the desktop, the HUD is the hardware layout of the device.** It sits around
+  the framebuffer as the preset sets it, and it turns with the framebuffer.
 
-  A panel names a side of the framebuffer. The panel goes to the canvas side that
-  this framebuffer side faces after the rotation. Each panel spans its whole side.
-  When that makes a panel longer than the length that its form sets, the panel also
-  gets deeper by the same factor. It never takes more than the space that the
-  framebuffer leaves free.
+  **On Android, the HUD is a control surface of the screen.** It sits at the sides
+  of the safe zone and is always upright. A framebuffer rotation never turns it. The
+  rotation can only change where a panel goes, because it changes which space the
+  framebuffer needs.
+
+  **On Android, the content of a panel decides how it can move.** A panel whose
+  content is a column of two or more rows is a key matrix, for example a keyboard or
+  a phone keypad. It keeps its layout. It moves to the other axis only when it has at
+  least as many rows as cells in its longest row. Every other panel turns its rows
+  into columns when it moves to the other axis. A panel that turns onto the top or
+  bottom gets deep enough for each rocker to be as tall as it is wide.
+
+  The main panel is the first panel with a full d-pad.
+
+  While the safe zone is taller than wide, a top or bottom panel stays where it is.
+  A side panel that can move goes to the bottom when it holds a d-pad or a rocker,
+  and to the top when it does not. The main panel goes to the bottom when it can move
+  there.
+
+  While the safe zone is wider than tall, or square, a side panel stays on its side.
+  A top panel can move to the left and a bottom panel to the right. CERF keeps the
+  moves that give the framebuffer the largest fit. Of two sets of moves with an equal
+  fit, it keeps the set with fewer moves.
+
+  On each side, the panels stack outward in list order, and the main panel is at the
+  edge of the screen. CERF centers every panel on its side.
+
+  **On Android, the HUD uses the real size of the guest surface.** A Guest Additions
+  resolution changes the space that the framebuffer needs, so the panels follow it.
+  When Guest Additions take the resolution from the screen, the surface follows the
+  HUD instead. The HUD then takes the bound screen that is closest to the configured
+  screen size, not to the size of the framebuffer. When the window opens, the guest
+  takes the size of the area in which the view mode shows the guest. As a result, the
+  guest shows at 1:1. A later rotation or a later change of the view mode keeps that
+  guest size.
+
+  **On Android, the whole HUD has one scale.** The HUD grows until its smallest
+  control has the size of a fingertip, or until a panel fills its side. It never
+  takes space that the framebuffer needs at the scale at which the HUD and the
+  framebuffer together fit the safe zone. As a result, a small key panel beside a
+  large screen grows into the space that the framebuffer cannot use. On a large
+  screen, the HUD stays at the size of a fingertip, and the framebuffer gets the rest.
 
   The framebuffer fits, pans and zooms in the rest of the canvas. A touch inside the
   HUD band never reaches the guest.
@@ -618,8 +652,9 @@ per-SoC/per-board concretes (strategy pattern, selected by `BoardContext`).
     `cerf-qt/view_presentation.h`, `libCerfCore/include/cerfcore/host/device_buttons.h`
 
 - **`ViewRotation`** - turns the presented framebuffer by quarter turns. The guest
-  sees no change. The HUD panels, the host-to-guest point map and the relative
-  mouse deltas turn with the frame. The rotation lasts for the session only.
+  sees no change. The host-to-guest point map and the relative mouse deltas turn
+  with the frame. The desktop HUD turns with the frame too. The rotation lasts for
+  the session only.
   - `cerf-qt/view_rotation.h`
 
 - **`KeyboardInput`** (abstract) - one keyboard source: `OnHostKey(vk, key_up)`

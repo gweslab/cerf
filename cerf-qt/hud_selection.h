@@ -1,6 +1,7 @@
 #pragma once
 
 #include "hud_layout.h"
+#include "hud_screen_layout.h"
 #include "view_presentation.h"
 #include "viewport_layout.h"
 
@@ -26,7 +27,8 @@ public:
     void                   SetShown(bool shown);
     void                   Toggle();
     ContentFrame           Frame() const;
-    HudInsets              InsideInsets(double area_w, double area_h, int quarter, double fb_w, double fb_h) const;
+    HudInsets              InsideInsets(double area_w, double area_h, int quarter, double fb_w, double fb_h,
+                                        const HudScreenMetrics& metrics) const;
     double                 PanelReach(const ViewportLayout::Layout& frame) const;
 
 private:

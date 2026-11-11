@@ -3,12 +3,12 @@ import QtQuick.Controls.Material
 import QtQuick.Controls.Material as M
 
 M.TextField {
-    id: control
+    id: textField
 
     topPadding: Material.textFieldVerticalPadding
 
     background: FieldBackground {
-        control: control
+        control: textField
     }
 
     TextMenuTap {}

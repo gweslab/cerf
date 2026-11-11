@@ -34,8 +34,6 @@ bool Contains(const FrameRect& r, double x, double y) {
 
 void Append(std::vector<uint8_t>& out, const std::vector<uint8_t>& keys) { out.insert(out.end(), keys.begin(), keys.end()); }
 
-bool AlongX(HudSide side) { return side == HudSide::kTop || side == HudSide::kBottom; }
-
 double Outward(HudSide side) { return side == HudSide::kBottom || side == HudSide::kRight ? 1.0 : -1.0; }
 
 struct SideReach {
@@ -48,11 +46,11 @@ struct SideReach {
 void MeasureSides(const HudFrame& frame, double width, double height, double sx, double sy,
                   SideReach (&sides)[kSideCount]) {
     const auto scaled = [sx, sy](const FrameRect& r) { return FrameRect{r.x * sx, r.y * sy, r.w * sx, r.h * sy}; };
-    const std::vector<HudPanelPlace> places = HudPanelPlaces(frame);
+    const std::vector<HudPanelPlace>& places = frame.places;
     for (size_t i = 0; i < places.size(); ++i) {
-        const HudSide   side     = (*frame.panels)[i].side;
+        const HudSide   side     = places[i].side;
         const FrameRect r        = scaled(places[i].rect);
-        const bool      along    = AlongX(side);
+        const bool      along    = HudAlongX(side);
         const double    slot_s   = along ? sx : sy;
         const double    out      = Outward(side);
         const double    edge     = out > 0 ? (along ? height : width) : 0.0;
@@ -78,7 +76,7 @@ std::vector<FrameRect> BandRects(const HudFrame& frame, const FramePlacement& pl
         const SideReach& s = sides[i];
         if (!s.used) continue;
         const HudSide side  = static_cast<HudSide>(i);
-        const bool    along = AlongX(side);
+        const bool    along = HudAlongX(side);
         const double  out   = Outward(side);
         const double  edge  = out > 0 ? (along ? height : width) : 0.0;
         const double  inner = frame.inside ? edge - out * s.reach : edge;
@@ -109,7 +107,7 @@ void HudControls::Place(const cerfcore::DbHud& hud, const ViewportLayout::Layout
     separators_.clear();
     const HudFit fit = FitFor(hud, frame);
     placement_       = fit.placement;
-    Publish(hud, fit.frame, fit.sx, fit.sy);
+    Publish(fit.frame, fit.sx, fit.sy);
 }
 
 double HudControls::PanelReach(const cerfcore::DbHud& hud, const ViewportLayout::Layout& frame) const {
@@ -122,20 +120,22 @@ double HudControls::PanelReach(const cerfcore::DbHud& hud, const ViewportLayout:
 }
 
 HudControls::HudFit HudControls::FitFor(const cerfcore::DbHud& hud, const ViewportLayout::Layout& frame) const {
-    const cerfcore::DbLcdPanelSize& units = hud.ScreenFor(frame.surface_w, frame.surface_h);
+    const double fb_w = frame.surface_w;
+    const double fb_h = frame.surface_h;
     if (canvas_area_) {
-        const FramePlacement placement(*canvas_area_, frame.quarter);
-        return {placement, HudInside(hud, placement.DeviceWidth(), placement.DeviceHeight(), units), 1.0, 1.0};
+        const FrameRect& area = canvas_area_->rect;
+        return {FramePlacement(area, 0), HudInside(hud, area.w, area.h, frame.quarter, fb_w, fb_h, canvas_area_->metrics),
+                1.0, 1.0};
     }
     const FramePlacement placement = frame.Placement();
-    return {placement, HudOutside(hud, frame.surface_w, frame.surface_h, units),
-            placement.DeviceWidth() / frame.surface_w, placement.DeviceHeight() / frame.surface_h};
+    return {placement, HudOutside(hud, fb_w, fb_h, hud.ScreenFor(fb_w, fb_h)), placement.DeviceWidth() / fb_w,
+            placement.DeviceHeight() / fb_h};
 }
 
-void HudControls::Publish(const cerfcore::DbHud& hud, const HudFrame& frame, double sx, double sy) {
+void HudControls::Publish(const HudFrame& frame, double sx, double sy) {
     const auto scaled = [sx, sy](const FrameRect& r) { return FrameRect{r.x * sx, r.y * sy, r.w * sx, r.h * sy}; };
     const auto turned = [this, sx, sy](FramePoint p) { return placement_.ToCanvas(FramePoint{p.x * sx, p.y * sy}); };
-    const HudArrangement arrangement = HudArrange(hud, frame);
+    const HudArrangement arrangement = HudArrange(frame);
     for (const HudPlaced& e : arrangement.elements) {
         const FrameRect device = scaled(e.rect);
         shown_.push_back({e.node, device, placement_.ToCanvas(device)});

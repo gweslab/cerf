@@ -131,8 +131,10 @@ cell, and it takes no press. An example is the icon that the device prints above
 key.
 
 A `rocker` is a device rocker or dial: `up`, `down` and an optional `center` press,
-with no left and right. It is one cell, so it keeps up above down when a portrait form
-turns its column into a row. A device control that is not a d-pad is never a `dpad`.
+with no left and right. It is one cell, so it keeps up above down when Android turns
+its column into a row. A device control that is not a d-pad is never a `dpad`.
+
+A preset holds the layout that the device has.
 
 Panels on one side stack outward in list order.
 

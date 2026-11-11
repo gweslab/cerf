@@ -23,19 +23,21 @@ struct HudArrangement {
     std::vector<HudSeparator> separators;
 };
 
-struct HudFrame {
-    double                                  width  = 0.0;
-    double                                  height = 0.0;
-    double                                  base_x = 0.0;
-    double                                  base_y = 0.0;
-    bool                                    inside = false;
-    const std::vector<cerfcore::HudPanel>*  panels = nullptr;
+struct HudPanelPlace {
+    FrameRect         rect;
+    double            slot_lo = 0.0;
+    double            slot_hi = 0.0;
+    cerfcore::HudSide side    = cerfcore::HudSide::kBottom;
+    bool              turned  = false;
+    double            gap     = 0.0;
 };
 
-struct HudPanelPlace {
-    FrameRect rect;
-    double    slot_lo = 0.0;
-    double    slot_hi = 0.0;
+struct HudFrame {
+    double                                 width  = 0.0;
+    double                                 height = 0.0;
+    bool                                   inside = false;
+    const std::vector<cerfcore::HudPanel>* panels = nullptr;
+    std::vector<HudPanelPlace>             places;
 };
 
 struct HudInsets {
@@ -45,14 +47,15 @@ struct HudInsets {
     double left   = 0.0;
 };
 
-HudInsets              HudEdgeDepths(const std::vector<cerfcore::HudPanel>& panels);
-HudFrame               HudOutside(const cerfcore::DbHud& hud, double fb_w, double fb_h, const cerfcore::DbLcdPanelSize& units);
-HudFrame               HudInside(const cerfcore::DbHud& hud, double area_w, double area_h, const cerfcore::DbLcdPanelSize& units);
-HudInsets              HudInsideInsets(const HudFrame& frame);
-ContentBox             HudBox(const cerfcore::DbHud& hud, double fb_w, double fb_h);
-void HudSurfaceFor(const cerfcore::DbHud& hud, double content_w, double content_h, double& fb_w, double& fb_h);
-HudInsets              HudCanvasInsets(const HudInsets& device, int quarter);
-std::vector<HudPanelPlace> HudPanelPlaces(const HudFrame& frame);
-HudArrangement         HudArrange(const cerfcore::DbHud& hud, const HudFrame& frame);
+bool           HudAlongX(cerfcore::HudSide side);
+double         HudAligned(cerfcore::HudAlign align, double span, double extent);
+void           HudAddToSide(HudInsets& insets, cerfcore::HudSide side, double value);
+double         HudOnSide(const HudInsets& insets, cerfcore::HudSide side);
+HudInsets      HudEdgeDepths(const std::vector<cerfcore::HudPanel>& panels);
+HudFrame       HudOutside(const cerfcore::DbHud& hud, double fb_w, double fb_h, const cerfcore::DbLcdPanelSize& units);
+ContentBox     HudBox(const cerfcore::DbHud& hud, double fb_w, double fb_h);
+void           HudSurfaceFor(const cerfcore::DbHud& hud, double content_w, double content_h, double& fb_w, double& fb_h);
+HudArrangement HudArrange(const HudFrame& frame);
+HudArrangement HudArrangePanel(const cerfcore::HudNode& root, const FrameRect& rect, double gap, bool turned);
 
 }

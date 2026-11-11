@@ -86,7 +86,7 @@ ApplicationWindow {
         else if (touchPlatform)
             pushPage(newDevicePage)
         else
-            newDeviceWindow.createObject(window, {"flows": flows, "transientParent": window}).show()
+            newDeviceWindow.createObject(window, {"flows": managerFlows, "transientParent": window}).show()
     }
 
     function openSettings() {
@@ -130,10 +130,10 @@ ApplicationWindow {
             return
         const reply = DeviceActions.Launch(name, boot, confirmed)
         if (reply.confirm !== undefined) {
-            flows.ask(reply.confirm.title, reply.confirm.message, () => startDevice(name, boot, true))
+            managerFlows.ask(reply.confirm.title, reply.confirm.message, () => startDevice(name, boot, true))
             return
         }
-        if (flows.failed(reply))
+        if (managerFlows.failed(reply))
             return
         if (reply.status !== undefined)
             flash(reply.status)
@@ -143,18 +143,18 @@ ApplicationWindow {
     function remove(name) {
         if (ManagerOperations.RefuseWhileBusy())
             return
-        flows.ask(qsTr("Delete device"),
+        managerFlows.ask(qsTr("Delete device"),
                   qsTr("Remove %1/ and its files?\nThis cannot be undone.").arg(DeviceActions.RelativePath(name)),
-                  () => flows.failed(DeviceActions.Remove(name)))
+                  () => managerFlows.failed(DeviceActions.Remove(name)))
     }
 
     function discard(name) {
         if (ManagerOperations.RefuseWhileBusy())
             return
-        flows.ask(qsTr("Delete saved state"),
+        managerFlows.ask(qsTr("Delete saved state"),
                   qsTr("Delete the saved state for %1?\nThis cannot be undone.").arg(selectedRow.deviceName),
                   () => {
-            flows.failed(DeviceActions.DiscardSavedState(name))
+            managerFlows.failed(DeviceActions.DiscardSavedState(name))
             refreshAll()
         })
     }
@@ -162,32 +162,32 @@ ApplicationWindow {
     function updateDevice(name) {
         if (ManagerOperations.RefuseWhileBusy() || BundleCatalog.RefuseWhileLoading())
             return
-        flows.updateDevice(name, host())
+        managerFlows.updateDevice(name, host())
     }
 
     function updateAll() {
         if (ManagerOperations.RefuseWhileBusy() || BundleCatalog.RefuseWhileLoading())
             return
-        flows.updateAll(host())
+        managerFlows.updateAll(host())
     }
 
     function offerUpgrade() {
-        flows.offerUpgrade(host())
+        managerFlows.offerUpgrade(host())
     }
 
     function packageAction(name, pkg) {
         if (pkg.installs)
-            flows.installPackage(name, pkg, host())
+            managerFlows.installPackage(name, pkg, host())
         else
-            flows.deletePackage(name, pkg, host())
+            managerFlows.deletePackage(name, pkg, host())
     }
 
     function rename(name) {
-        flows.prompt(host(), qsTr("Rename device"), qsTr("Display name (leave empty to reset):"), Qt.ImhNone,
+        managerFlows.prompt(host(), qsTr("Rename device"), qsTr("Display name (leave empty to reset):"), Qt.ImhNone,
                      text => {
             const error = DeviceActions.Rename(name, text)
             if (error !== "")
-                flows.inform(qsTr("Rename failed"), error)
+                managerFlows.inform(qsTr("Rename failed"), error)
         }, DeviceActions.DisplayName(name))
     }
 
@@ -201,7 +201,7 @@ ApplicationWindow {
         const next = Object.assign({}, warnedStates)
         next[name] = true
         warnedStates = next
-        flows.inform(qsTr("Saved state present"),
+        managerFlows.inform(qsTr("Saved state present"),
                      qsTr("This device has a saved state.\n\nSome changes require soft/hard reset to be applied "
                           + "and some might damage your saved state image."))
     }
@@ -258,7 +258,7 @@ ApplicationWindow {
     }
 
     ManagerFlows {
-        id: flows
+        id: managerFlows
         defaultHost: window.contentItem
     }
 
@@ -271,7 +271,7 @@ ApplicationWindow {
             window.flash(text)
         }
         function onMessage(title, text) {
-            flows.inform(title, text)
+            managerFlows.inform(title, text)
         }
         function onBusyChanged() {
             window.reload()
@@ -284,7 +284,7 @@ ApplicationWindow {
             window.refreshAll()
         }
         function onMessage(title, text) {
-            flows.inform(title, text)
+            managerFlows.inform(title, text)
         }
         function onStatus(text) {
             window.flash(text)
@@ -334,7 +334,7 @@ ApplicationWindow {
         BundleCatalog.Refresh(false)
         CerfUpdates.Check()
         if (upgraded)
-            flows.inform(qsTr("Upgrade complete"),
+            managerFlows.inform(qsTr("Upgrade complete"),
                          qsTr("%1 has been upgraded to %2.").arg(ProductLinks.productName).arg(AboutModel.version))
     }
 
@@ -344,7 +344,7 @@ ApplicationWindow {
         focus: true
         initialItem: HomePage {
             id: home
-            flows: flows
+            flows: managerFlows
             commands: window
             mobile: window.mobile
             inlinePages: window.touchPlatform
@@ -433,7 +433,7 @@ ApplicationWindow {
     Component {
         id: newDevicePage
         NewDeviceWizard {
-            flows: flows
+            flows: managerFlows
             mobile: true
             closable: true
             onFinished: stack.pop()

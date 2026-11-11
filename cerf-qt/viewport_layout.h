@@ -60,9 +60,10 @@ public:
     bool                    SetMode(ViewportMode m);
     bool                    SetAntialias(bool on);
     bool                    SetIntegerScale(int factor);
-    bool                    SetPlacement(double scale, double x, double y, double fit_zoom);
+    bool                    SetPlacement(double scale, double x, double y, double fit_zoom, double cover_zoom);
     bool                    SetPresentation(const ViewPresentation& presentation);
     double                  FitZoom() const;
+    double                  CoverZoom() const;
 
     bool Active() const { return active_; }
     bool SetActive(bool active);
@@ -87,6 +88,7 @@ private:
     int       ScaleFactor() const { return mode_ == ViewportMode::Integer ? integer_factor_ : 1; }
     BoxExtent PresentedExtent() const;
     double    FitScale(const BoxExtent& extent) const;
+    double    CoverScale(const BoxExtent& extent) const;
 
     std::atomic<uint32_t> surface_w_{0};
     std::atomic<uint32_t> surface_h_{0};
@@ -105,7 +107,8 @@ private:
     double placed_scale_    = 1.0;
     double placed_x_        = 0.0;
     double placed_y_        = 0.0;
-    double placed_fit_zoom_ = 1.0;
+    double placed_fit_zoom_   = 1.0;
+    double placed_cover_zoom_ = 1.0;
 };
 
 }

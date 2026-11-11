@@ -143,7 +143,7 @@ void GuestSurface::SetViewMode(ViewMode mode) {
 void GuestSurface::ApplyPlacement() {
     if (!presenter_) return;
     const Placement p = placement_.Current();
-    presenter_->Layout().SetPlacement(p.scale, p.x, p.y, placement_.FitZoom());
+    presenter_->Layout().SetPlacement(p.scale, p.x, p.y, placement_.FitZoom(), placement_.CoverZoom());
     if (cursor_mode_ && !relative_pointer_) pointer_.Settle();
     update();
 }

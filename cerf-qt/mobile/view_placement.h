@@ -40,6 +40,7 @@ public:
     double    SurfaceHeight() const { return surface_h_; }
     QRectF    ScreenRegion() const;
     double    FitZoom() const;
+    double    CoverZoom() const;
 
     void BeginPinch(QPointF centroid, double distance);
     void UpdatePinch(QPointF centroid, double distance);

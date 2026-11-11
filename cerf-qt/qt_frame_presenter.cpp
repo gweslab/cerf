@@ -85,10 +85,10 @@ bool QtFramePresenter::ComposeInto(cerfcore::CerfEmulator& emu, cerfcore::FrameS
     const int  target_h = turned ? L.dst_w : L.dst_h;
     const int  margin   = std::max({L.dst_x, L.dst_y, present_.width() - L.dst_x - L.dst_w,
                                     present_.height() - L.dst_y - L.dst_h});
-    const double zoom     = layout_.FitZoom();
-    const bool   glowing  = margin > 0 && glow_.Shows(zoom);
+    const double strength = glow_.Strength(layout_.FitZoom(), layout_.CoverZoom());
+    const bool   glowing  = margin > 0 && strength > 0.0;
     const int    reach    = glowing ? static_cast<int>(std::lround(hooks_->GlowReach(emu, L))) : 0;
-    glow_.Compose(present_, guest_, turn, target_w, target_h, reach, zoom, background_);
+    glow_.Compose(present_, guest_, turn, target_w, target_h, reach, strength, background_);
     QPainter p(&present_);
     p.setRenderHint(QPainter::SmoothPixmapTransform, layout_.Antialias());
     p.setTransform(turn);

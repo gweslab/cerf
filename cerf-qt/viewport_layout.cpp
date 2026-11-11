@@ -87,15 +87,16 @@ bool ViewportLayout::SetIntegerScale(int factor) {
     return true;
 }
 
-bool ViewportLayout::SetPlacement(double scale, double x, double y, double fit_zoom) {
+bool ViewportLayout::SetPlacement(double scale, double x, double y, double fit_zoom, double cover_zoom) {
     if (mode_ == ViewportMode::Placed && placed_scale_ == scale && placed_x_ == x && placed_y_ == y &&
-        placed_fit_zoom_ == fit_zoom)
+        placed_fit_zoom_ == fit_zoom && placed_cover_zoom_ == cover_zoom)
         return false;
-    mode_            = ViewportMode::Placed;
-    placed_scale_    = scale;
-    placed_x_        = x;
-    placed_y_        = y;
-    placed_fit_zoom_ = fit_zoom;
+    mode_              = ViewportMode::Placed;
+    placed_scale_      = scale;
+    placed_x_          = x;
+    placed_y_          = y;
+    placed_fit_zoom_   = fit_zoom;
+    placed_cover_zoom_ = cover_zoom;
     return true;
 }
 
@@ -105,6 +106,14 @@ double ViewportLayout::FitZoom() const {
     return ScaleFactor() / FitScale(PresentedExtent());
 }
 
+double ViewportLayout::CoverZoom() const {
+    if (mode_ == ViewportMode::Placed) return placed_cover_zoom_;
+    if (mode_ == ViewportMode::Stretch) return 1.0;
+    const BoxExtent extent = PresentedExtent();
+    const double    scale  = FixedScale() ? ScaleFactor() : FitScale(extent);
+    return scale / CoverScale(extent);
+}
+
 ViewportLayout::BoxExtent ViewportLayout::PresentedExtent() const {
     const ContentBox box = presentation_.PresentedBox(SurfaceWidth(), SurfaceHeight());
     return {box, PresentedWidth() * box.Width(), PresentedHeight() * box.Height()};
@@ -112,6 +121,10 @@ ViewportLayout::BoxExtent ViewportLayout::PresentedExtent() const {
 
 double ViewportLayout::FitScale(const BoxExtent& extent) const {
     return std::min(canvas_w_ / extent.width, canvas_h_ / extent.height);
+}
+
+double ViewportLayout::CoverScale(const BoxExtent& extent) const {
+    return std::max(canvas_w_ / extent.width, canvas_h_ / extent.height);
 }
 
 bool ViewportLayout::SetPresentation(const ViewPresentation& presentation) {

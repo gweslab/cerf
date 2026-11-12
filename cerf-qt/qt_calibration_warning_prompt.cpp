@@ -16,10 +16,8 @@
 namespace {
 
 constexpr const char* kParagraphs[] = {
-    "You are running a custom Guest Additions driver, however the calibration screen NEEDS the stock input. "
-    "The stock input might freak out on a custom resolution.",
-    "You need to temporarily switch to the stock input and change your resolution if it doesn't match the "
-    "stock device one. CERF will switch you back after you complete the calibration.",
+    "The calibration can only be passed with a stock input device. The emulator will switch you back to the enhanced input mode once you complete the calibration.",
+    "If you are running on a custom resolution - switch it to a stock one - built-in input device might not accept custom resolution."
 };
 
 constexpr char kSwitchChoice[]     = "switch";

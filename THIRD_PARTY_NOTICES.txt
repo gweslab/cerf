@@ -539,6 +539,7 @@ LLVM - https://llvm.org/
 Apple libunwind - https://github.com/apple-oss-distributions/libunwind
 discord-rpc - https://github.com/discord/discord-rpc
 Qt - https://www.qt.io/
+libadwaita - https://gitlab.gnome.org/GNOME/libadwaita
 
 
 TRADEMARKS

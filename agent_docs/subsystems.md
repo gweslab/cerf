@@ -743,6 +743,20 @@ per-SoC/per-board concretes (strategy pattern, selected by `BoardContext`).
   - `cerf-qt/screenshots.{h,cpp}`, `cerf-qt/screenshot_store.h`,
     `cerf-qt/desktop/screenshot_folder_store.cpp`, `cerf-qt/mobile/android_gallery_store.cpp`
 
+- **The color scheme can switch while CERF runs.** Every window follows a switch
+  in both directions. Each window also follows a switch back to a scheme that the
+  platform reports as unknown, for example the GNOME `default` setting. Test a
+  theme change with a switch while the window is open. A fresh start does not
+  show a defect of the switch.
+
+  At each switch, the palette of the emulator window starts from the platform
+  palette, never from the palette that the previous switch set. The Material
+  accent of the Qt Quick windows comes from `SystemAccent`, which reads the
+  accent of the host system. It never reads the application palette, because the
+  Windows Vista style and `QtTheme` rewrite that palette.
+  - `cerf-qt/desktop/qt_theme.{h,cpp}`, `cerf-qt/CerfStyle/system_accent.{h,cpp}`,
+    `cerf-qt/CerfStyle/host_accent*`
+
 ## TraceManager
 
 The always-built developer facility that attaches in-host C++ handlers to guest

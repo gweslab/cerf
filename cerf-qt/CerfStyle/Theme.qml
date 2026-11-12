@@ -1,9 +1,12 @@
 pragma Singleton
 import QtQuick
+import QtQuick.Controls.Material
 
 QtObject {
     readonly property bool dark: Application.styleHints.colorScheme === Qt.ColorScheme.Dark
     readonly property bool touchPlatform: TouchFrontend.active
+    readonly property int fallbackAccent: Material.Blue
+    readonly property var controlAccent: SystemAccent.known ? SystemAccent.color : fallbackAccent
 
     readonly property color pageBg: dark ? "#141414" : "#f0f0f0"
     readonly property color barBg: dark ? "#1c1c1c" : "#fafafa"
@@ -25,7 +28,7 @@ QtObject {
     readonly property color overlayStrip: "#e0202020"
     readonly property color overlayIcon: "#ffffff"
     readonly property color overlayHandle: "#bbbbbb"
-    readonly property color overlayActive: "#90caf9"
+    readonly property color overlayActive: SystemAccent.darkKnown ? SystemAccent.darkColor : Material.color(fallbackAccent, Material.Shade200)
     readonly property color overlayLatched: "#3fb950"
     readonly property color tapBubble: "#40ffffff"
     readonly property color tapBubbleRing: "#ffffff"
@@ -49,7 +52,7 @@ QtObject {
     readonly property real chipAlpha: 0.9
     readonly property color success: "#3fb950"
     readonly property color successMark: "#ffffff"
-    readonly property color onAccent: dark ? "#000000" : "#ffffff"
+    readonly property color onAccent: SystemAccent.known ? SystemAccent.textColor : dark ? "#000000" : "#ffffff"
 
     function chipColor(text) {
         let hash = 0

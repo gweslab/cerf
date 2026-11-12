@@ -1,5 +1,5 @@
 import QtQuick
-import QtQuick.Controls
+import CerfStyle
 
 PopupDialog {
     property var texts: ({})

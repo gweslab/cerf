@@ -1,4 +1,4 @@
-import QtQuick.Controls
+import CerfStyle
 
 Switch {
     text: qsTr("Unsupported")

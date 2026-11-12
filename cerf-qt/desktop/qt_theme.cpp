@@ -39,6 +39,7 @@ void QtTheme::ApplyStyle() {
 }
 
 void QtTheme::ApplyPalette() {
+    QApplication::setPalette(QPalette());
     QPalette              palette  = QApplication::palette();
     const QPalette        standard = QApplication::style()->standardPalette();
     const Qt::ColorScheme scheme   = QGuiApplication::styleHints()->colorScheme();

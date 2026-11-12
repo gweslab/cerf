@@ -1,4 +1,4 @@
-import QtQuick.Controls
+import CerfStyle
 
 CheckBox {
     verticalPadding: 0

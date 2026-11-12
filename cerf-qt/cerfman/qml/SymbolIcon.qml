@@ -1,5 +1,5 @@
 import QtQuick
-import QtQuick.Controls.Material
+import CerfStyle
 
 Image {
     property string name

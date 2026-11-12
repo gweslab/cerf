@@ -237,9 +237,6 @@ public:
                       const RECT* prclDst, const RECT* prclSrc, ULONG solidColor,
                       ULONG bltFlags, ULONG rop4);
 
-    SCODE EmulatedBlt(GPEBltParms* pParms);
-    SCODE EmulatedLine(GPELineParms* pParms);
-
     virtual SCODE BltPrepare(GPEBltParms* p) = 0;
     virtual SCODE BltComplete(GPEBltParms* p) = 0;
     virtual SCODE Line(GPELineParms* p, EGPEPhase phase) = 0;

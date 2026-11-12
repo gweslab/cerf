@@ -25,10 +25,10 @@ static void CerfRectIntersect(cerfcore::CerfVirt::CerfBltRect* out,
 }
 
 static BOOL CerfEmitGradient(cerfcore::CerfVirt::CerfGradDescriptor& g, ULONG desc_off,
-                             const RECTL& grect_in, CLIPOBJ* pco, int W, int H) {
+                             const RECTL& grect_in, CLIPOBJ* pco, int x0, int x1, int H) {
     RECTL grect = grect_in;
     RECTL sbound;
-    sbound.left = 0; sbound.top = 0; sbound.right = W; sbound.bottom = H;
+    sbound.left = x0; sbound.top = 0; sbound.right = x1; sbound.bottom = H;
     CerfRectClamp(&grect, &sbound);
     if (grect.right <= grect.left || grect.bottom <= grect.top) return TRUE;
     if (!pco || pco->iDComplexity == DC_TRIVIAL) {
@@ -83,6 +83,65 @@ static BOOL CerfGradMeshRect(const GRADIENT_RECT* m, const TRIVERTEX* pVertex,
     return TRUE;
 }
 
+struct CerfGradJob {
+    SURFOBJ*             pso;
+    CLIPOBJ*             pco;
+    XLATEOBJ*            pxlo;
+    POINTL*              dither;
+    TRIVERTEX*           vertex;
+    ULONG                n_vertex;
+    const GRADIENT_RECT* mesh;
+    ULONG                n_mesh;
+    bool                 horiz;
+    ULONG                palette_entries;
+    int                  height;
+};
+
+static BOOL CerfGradBand(const CerfGradJob& j, int yb0, int yb1, int xb0, int xb1) {
+    if (!CerfArenaEnter()) CERF_FATAL("cerf_guest: DMA arena unavailable - halting");
+    ULONG desc_off = 0u;
+    cerfcore::CerfVirt::CerfGradDescriptor* pg = (cerfcore::CerfVirt::CerfGradDescriptor*)
+        CerfArenaAlloc((ULONG)sizeof(cerfcore::CerfVirt::CerfGradDescriptor), &desc_off);
+    if (!pg) CERF_FATAL("cerf_guest: DMA arena gradient alloc failed - halting");
+    cerfcore::CerfVirt::CerfGradDescriptor& g = *pg;
+    CerfStageWb dstwb = {0};
+    memset(&g, 0, sizeof(g));
+    g.magic = cerfcore::CerfVirt::kCerfGradMagic;
+    g.axis  = j.horiz ? cerfcore::CerfVirt::kCerfGradAxisH : cerfcore::CerfVirt::kCerfGradAxisV;
+    g.band_y_first = (uint32_t)yb0;
+    g.band_y_count = (uint32_t)(yb1 - yb0);
+    if (j.palette_entries) {
+        ULONG  pal_off = 0u;
+        ULONG* pal = (ULONG*)CerfArenaAlloc(j.palette_entries * (ULONG)sizeof(ULONG), &pal_off);
+        if (!pal) CERF_FATAL("cerf_guest: DMA arena gradient palette alloc failed - halting");
+        XLATEOBJ_cGetPalette(j.pxlo, XO_DESTPALETTE, j.palette_entries, pal);
+        g.dst_palette_off     = pal_off;
+        g.dst_palette_entries = j.palette_entries;
+        g.dither_x            = j.dither->x;
+        g.dither_y            = j.dither->y;
+    }
+    CerfFillSurfaceFromSurfobj(&g.dst, j.pso, xb0, yb0, xb1, yb1, &dstwb);
+
+    BOOL ok = TRUE;
+    for (ULONG i = 0; i < j.n_mesh; ++i) {
+        RECTL gr; const TRIVERTEX *a, *b;
+        if (!CerfGradMeshRect(&j.mesh[i], j.vertex, j.n_vertex, j.horiz, &gr, &a, &b))
+            continue;
+        if (gr.bottom <= yb0 || gr.top >= yb1) continue;
+        g.start_coord = j.horiz ? gr.left : gr.top;
+        g.end_coord   = j.horiz ? gr.right : gr.bottom;
+        g.start_color[0] = a->Red; g.start_color[1] = a->Green;
+        g.start_color[2] = a->Blue; g.start_color[3] = a->Alpha;
+        g.end_color[0]   = b->Red; g.end_color[1]   = b->Green;
+        g.end_color[2]   = b->Blue; g.end_color[3]   = b->Alpha;
+        if (!CerfEmitGradient(g, desc_off, gr, j.pco, xb0, xb1, j.height)) ok = FALSE;
+    }
+    if (dstwb.active)
+        memcpy((void*)(ULONG_PTR)dstwb.dst_va, dstwb.arena_ptr, dstwb.span);
+    CerfArenaLeave();
+    return ok;
+}
+
 extern "C" BOOL APIENTRY CerfDrvGradientFill(SURFOBJ* pso, CLIPOBJ* pco,
                                               XLATEOBJ* pxlo,
                                               TRIVERTEX* pVertex, ULONG nVertex,
@@ -135,6 +194,19 @@ extern "C" BOOL APIENTRY CerfDrvGradientFill(SURFOBJ* pso, CLIPOBJ* pco,
     const ULONG budget = cerfcore::CerfVirt::kDmaPartitionSize - cerfcore::CerfVirt::kDmaPartHdrSize
                          - (ULONG)sizeof(cerfcore::CerfVirt::CerfGradDescriptor)
                          - palette_entries * (ULONG)sizeof(ULONG) - 64u;
+    CerfGradJob job;
+    job.pso             = pso;
+    job.pco             = pco;
+    job.pxlo            = pxlo;
+    job.dither          = pptlDitherOrg;
+    job.vertex          = pVertex;
+    job.n_vertex        = nVertex;
+    job.mesh            = mesh;
+    job.n_mesh          = nMesh;
+    job.horiz           = horiz;
+    job.palette_entries = palette_entries;
+    job.height          = H;
+
     BOOL ok = TRUE;
     int yb0 = ext_lo;
     while (yb0 < ext_hi) {
@@ -142,47 +214,13 @@ extern "C" BOOL APIENTRY CerfDrvGradientFill(SURFOBJ* pso, CLIPOBJ* pco,
         while (yb1 > yb0 + 1 &&
                CerfSpanBytes(0, yb0, W, yb1, dst_stride, dst_bits) > budget)
             yb1 = yb0 + (yb1 - yb0) / 2;
-
-        if (!CerfArenaEnter()) CERF_FATAL("cerf_guest: DMA arena unavailable - halting");
-        ULONG desc_off = 0u;
-        cerfcore::CerfVirt::CerfGradDescriptor* pg = (cerfcore::CerfVirt::CerfGradDescriptor*)
-            CerfArenaAlloc((ULONG)sizeof(cerfcore::CerfVirt::CerfGradDescriptor), &desc_off);
-        if (!pg) CERF_FATAL("cerf_guest: DMA arena gradient alloc failed - halting");
-        cerfcore::CerfVirt::CerfGradDescriptor& g = *pg;
-        CerfStageWb dstwb = {0};
-        memset(&g, 0, sizeof(g));
-        g.magic = cerfcore::CerfVirt::kCerfGradMagic;
-        g.axis  = horiz ? cerfcore::CerfVirt::kCerfGradAxisH : cerfcore::CerfVirt::kCerfGradAxisV;
-        g.band_y_first = (uint32_t)yb0;
-        g.band_y_count = (uint32_t)(yb1 - yb0);
-        if (palette_entries) {
-            ULONG  pal_off = 0u;
-            ULONG* pal = (ULONG*)CerfArenaAlloc(palette_entries * (ULONG)sizeof(ULONG), &pal_off);
-            if (!pal) CERF_FATAL("cerf_guest: DMA arena gradient palette alloc failed - halting");
-            XLATEOBJ_cGetPalette(pxlo, XO_DESTPALETTE, palette_entries, pal);
-            g.dst_palette_off     = pal_off;
-            g.dst_palette_entries = palette_entries;
-            g.dither_x            = pptlDitherOrg->x;
-            g.dither_y            = pptlDitherOrg->y;
+        int xb0 = 0;
+        for (int k = 0; k < W; ++k) {
+            const int xb1 = CerfRowSplitEnd(xb0, W, yb0, yb1, dst_stride, dst_bits, budget);
+            if (!CerfGradBand(job, yb0, yb1, xb0, xb1)) ok = FALSE;
+            xb0 = xb1;
+            if (xb0 >= W) break;
         }
-        CerfFillSurfaceFromSurfobj(&g.dst, pso, yb0, yb1, &dstwb);
-
-        for (ULONG i = 0; i < nMesh; ++i) {
-            RECTL gr; const TRIVERTEX *a, *b;
-            if (!CerfGradMeshRect(&mesh[i], pVertex, nVertex, horiz, &gr, &a, &b))
-                continue;
-            if (gr.bottom <= yb0 || gr.top >= yb1) continue;
-            g.start_coord = horiz ? gr.left : gr.top;
-            g.end_coord   = horiz ? gr.right : gr.bottom;
-            g.start_color[0] = a->Red; g.start_color[1] = a->Green;
-            g.start_color[2] = a->Blue; g.start_color[3] = a->Alpha;
-            g.end_color[0]   = b->Red; g.end_color[1]   = b->Green;
-            g.end_color[2]   = b->Blue; g.end_color[3]   = b->Alpha;
-            if (!CerfEmitGradient(g, desc_off, gr, pco, W, H)) ok = FALSE;
-        }
-        if (dstwb.active)
-            memcpy((void*)(ULONG_PTR)dstwb.dst_va, dstwb.arena_ptr, dstwb.span);
-        CerfArenaLeave();
         yb0 = yb1;
     }
     return ok;

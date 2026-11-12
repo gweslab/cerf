@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import os
+import re
 import shutil
 import sys
 from pathlib import Path
@@ -71,16 +72,54 @@ def _mtime(path: Path) -> float:
     return path.stat().st_mtime
 
 
-def _newest_header(dirs: Iterable[Path]) -> Optional[float]:
-    newest = None
+_INCLUDE_RE = re.compile(rb'^[ \t]*#[ \t]*include[ \t]*([<"])([^>"\r\n]+)[>"]', re.M)
+
+
+def _includes(path: Path, memo: dict) -> List[tuple]:
+    found = memo.get(path)
+    if found is None:
+        found = [(m.group(1) == b'"', m.group(2).decode("ascii", "replace").strip())
+                 for m in _INCLUDE_RE.finditer(path.read_bytes())]
+        memo[path] = found
+    return found
+
+
+def _resolve_include(name: str, dirs: Iterable[Path]) -> Optional[Path]:
     for d in dirs:
-        if not d.is_dir():
+        candidate = d / name
+        if candidate.is_file():
+            return candidate.resolve()
+    return None
+
+
+def _newest_input(src: Path, search: Sequence[Path], forced: Sequence[str], memo: dict) -> float:
+    newest = _mtime(src)
+    seen = set()
+    pending = [(src.resolve(), [])]
+    for name in forced:
+        hit = _resolve_include(name, [src.resolve().parent] + list(search))
+        if hit is not None:
+            pending.append((hit, []))
+    while pending:
+        path, openers = pending.pop()
+        if path in seen or SDK in path.parents:
             continue
-        for h in d.glob("*.h"):
-            t = _mtime(h)
-            if newest is None or t > newest:
-                newest = t
+        seen.add(path)
+        newest = max(newest, _mtime(path))
+        here = [path.parent] + openers
+        for quoted, name in _includes(path, memo):
+            hit = _resolve_include(name, (here if quoted else []) + list(search))
+            if hit is not None:
+                pending.append((hit, here))
     return newest
+
+
+def _link_key(argv: Sequence[str], inputs: Iterable[Path]) -> str:
+    digest = hashlib.sha256("\0".join(str(a) for a in argv).encode("utf-8"))
+    for path in inputs:
+        digest.update(b"\0")
+        digest.update(path.read_bytes())
+    return digest.hexdigest().upper()
 
 
 def _filtered_def(def_path: Path, local: Sequence[str], obj_dir: Path) -> Path:
@@ -174,19 +213,14 @@ def build(type: str, target: str, sources: Sequence[str] = ("main.c",), entry: s
                 stale.unlink()
         mode_marker.write_bytes(build_key.encode("ascii"))
 
-    src_dirs = sorted({Path(s).resolve(strict=True).parent for s in sources})
-    newest_hdr = _newest_header(list(src_dirs) +
-                                [CORE_INCLUDE / "cerfcore" / "peripherals" / "cerf_virt"])
-
+    include_memo: dict = {}
     objs: List[Path] = []
     for src in sources:
         obj = objs_dir / (Path(src).stem + ".obj")
         objs.append(obj)
         need = not obj.is_file()
         if not need:
-            need = _mtime(Path(src)) > _mtime(obj)
-        if not need and newest_hdr is not None:
-            need = newest_hdr > _mtime(obj)
+            need = _newest_input(Path(src), inc_dirs, forced_include, include_memo) > _mtime(obj)
         if need:
             print("[CE] cl  {}".format(src), flush=True)
             argv = [cl, "/nologo", "/c", "/W3", "/WX", "/O2"] + arch_flags + cpu_macros + [
@@ -211,7 +245,30 @@ def build(type: str, target: str, sources: Sequence[str] = ("main.c",), entry: s
             if _run([resc, "/r", "/fo", _arg(res), _arg(rc_path)], env) != 0:
                 raise CeBuildError("Resource compile failed: {}".format(rc))
 
-    need_link = not staged.is_file()
+    argv = ["/nologo", "/subsystem:windowsce," + subsystem_version, "/entry:" + entry,
+            "/machine:" + machine, "/nodefaultlib", "/libpath:{}".format(_arg(lib_dir)),
+            "/out:{}".format(_arg(staged))]
+    if coredll_def:
+        argv = ["/libpath:{}".format(_arg(objs_dir))] + argv
+    argv += ["/libpath:{}".format(_arg(Path(p).resolve(strict=True))) for p in extra_lib_paths]
+    link_inputs: List[Path] = [def_path] if def_path else []
+    if type == "dll":
+        argv += ["/dll", "/implib:" + _arg(Path(target).with_suffix(".lib"))]
+        dll_def = def_file or str(Path(target).with_suffix(".def"))
+        if Path(dll_def).exists():
+            argv.append("/def:" + _arg(dll_def))
+            link_inputs.append(Path(dll_def))
+    argv += list(link_extras)
+    argv += [_arg(o) for o in objs]
+    if res is not None:
+        argv.append(_arg(res))
+    argv += [lib + ".lib" for lib in libs]
+    argv += [lib + ".lib" for lib in implicit_libs]
+
+    link_key = _link_key(argv, link_inputs)
+    link_key_file = objs_dir / ".link_key"
+    cached_link = link_key_file.read_text(encoding="ascii").strip() if link_key_file.is_file() else ""
+    need_link = not staged.is_file() or cached_link != link_key
     if not need_link:
         staged_time = _mtime(staged)
         need_link = any(_mtime(o) > staged_time for o in objs) or \
@@ -222,25 +279,9 @@ def build(type: str, target: str, sources: Sequence[str] = ("main.c",), entry: s
         return
 
     print("[CE] link {} -> {}".format(target, staged), flush=True)
-    argv = ["/nologo", "/subsystem:windowsce," + subsystem_version, "/entry:" + entry,
-            "/machine:" + machine, "/nodefaultlib", "/libpath:{}".format(_arg(lib_dir)),
-            "/out:{}".format(_arg(staged))]
-    if coredll_def:
-        argv = ["/libpath:{}".format(_arg(objs_dir))] + argv
-    argv += ["/libpath:{}".format(_arg(Path(p).resolve(strict=True))) for p in extra_lib_paths]
-    if type == "dll":
-        argv += ["/dll", "/implib:" + _arg(Path(target).with_suffix(".lib"))]
-        dll_def = def_file or str(Path(target).with_suffix(".def"))
-        if Path(dll_def).exists():
-            argv.append("/def:" + _arg(dll_def))
-    argv += list(link_extras)
-    argv += [_arg(o) for o in objs]
-    if res is not None:
-        argv.append(_arg(res))
-    argv += [lib + ".lib" for lib in libs]
-    argv += [lib + ".lib" for lib in implicit_libs]
     if _run([link] + argv, env) != 0:
         raise CeBuildError("Link failed: {}".format(target))
+    link_key_file.write_bytes(link_key.encode("ascii"))
     print("[CE]      {} bytes".format(staged.stat().st_size), flush=True)
 
 

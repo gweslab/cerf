@@ -252,14 +252,10 @@ Without this rule, a first offscreen paint ends the splash early.
 
 **HW means HW.** The `cerf_guest` accelerator must handle every blit class
 (copy, fill, format-convert, palette, masked text, transparency, ROP, …)
-host-side through the virtual accelerator channel. A complex, format-converting,
-masked, or transparent case is never a reason to route a blit class to the
-software render path of the guest (GPE `EmulatedBlt`). Such a route is forbidden
-and is a bailout. "Let it stay software" is never the fix. The software path is an
-extreme edge, reserved only for genuinely un-accelerable inputs (a guest page
-that CERF cannot translate). It is never a design choice for a hard blit. A
-blit shape that renders correctly under software, but that you declined to that
-path, is unaccelerated work, not a finished feature.
+host-side through the virtual accelerator channel. The guest driver has no
+software render path. A complex, format-converting, masked, or transparent case
+is never a reason to add one. Such a route is forbidden and is a bailout. "Let it
+stay software" is never the fix.
 
 **Display color model.** Direct-color on CE3+/CE2.11 (≥16bpp). But **CE2.0
 must be indexed**: its gwes creates only `PAL_INDEXED`. The other palette types

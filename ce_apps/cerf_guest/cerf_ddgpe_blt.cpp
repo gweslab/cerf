@@ -5,19 +5,25 @@
 
 #include "cerfcore/peripherals/cerf_virt/cerf_virt_addr_map.h"
 
+static LONG CerfFloorDiv8(LONG v) {
+    return (v >= 0) ? (v / 8) : -((7 - v) / 8);
+}
+
 static void CerfSpan(int x0, int y0, int x1, int y1, int stride, int bits,
-                     LONG* lo_off, ULONG* span) {
-    const LONG row_lo = ((LONG)x0 * (LONG)bits) / 8;
-    const LONG row_hi = (((LONG)x1 * (LONG)bits) + 7) / 8 - 1;
-    const LONG first  = (LONG)y0       * (LONG)stride;
-    const LONG last   = (LONG)(y1 - 1) * (LONG)stride;
-    *lo_off = ((first < last) ? first : last) + row_lo;
-    *span   = (ULONG)((((first < last) ? last : first) + row_hi) - *lo_off + 1);
+                     LONG* lo_off, ULONG* span, LONG* row_lo, ULONG* row_bytes) {
+    const LONG lo    = CerfFloorDiv8((LONG)x0 * (LONG)bits);
+    const LONG hi    = CerfFloorDiv8((LONG)x1 * (LONG)bits - 1);
+    const LONG first = (LONG)y0       * (LONG)stride;
+    const LONG last  = (LONG)(y1 - 1) * (LONG)stride;
+    *lo_off    = ((first < last) ? first : last) + lo;
+    *span      = (ULONG)((((first < last) ? last : first) + hi) - *lo_off + 1);
+    *row_lo    = lo;
+    *row_bytes = (ULONG)(hi - lo + 1);
 }
 
 ULONG CerfSpanBytes(int x0, int y0, int x1, int y1, int stride, int bits) {
-    LONG lo; ULONG sp;
-    CerfSpan(x0, y0, x1, y1, stride, bits, &lo, &sp);
+    LONG lo, row_lo; ULONG sp, row_bytes;
+    CerfSpan(x0, y0, x1, y1, stride, bits, &lo, &sp, &row_lo, &row_bytes);
     return sp;
 }
 
@@ -47,17 +53,6 @@ int CerfSrcDyAt(int dst_len, int src_len, int k) {
     return src_pos;
 }
 
-static void CerfWindowHalt(const char* what, int x0, int y0, int x1, int y1,
-                           int w, int h) {
-    CERF_LOG_X("cerf_guest: stage window x0", (ULONG)x0);
-    CERF_LOG_X("cerf_guest: stage window y0", (ULONG)y0);
-    CERF_LOG_X("cerf_guest: stage window x1", (ULONG)x1);
-    CERF_LOG_X("cerf_guest: stage window y1", (ULONG)y1);
-    CERF_LOG_X("cerf_guest: surface width", (ULONG)w);
-    CERF_LOG_X("cerf_guest: surface height", (ULONG)h);
-    CERF_FATAL(what);
-}
-
 void CerfClampWindow(int* x0, int* y0, int* x1, int* y1,
                      const RECTL* bound) {
     RECTL r;
@@ -67,45 +62,11 @@ void CerfClampWindow(int* x0, int* y0, int* x1, int* y1,
     *x1 = (int)r.right; *y1 = (int)r.bottom;
 }
 
-static void CerfNarrowToSrc(int* x0, int* y0, int* x1, int* y1, GPESurf* s) {
-    const int w = (int)s->Width(), h = (int)s->Height();
-    if (w <= 0 || h <= 0)
-        CerfWindowHalt("cerf_guest: source surface reports no extent - halting",
-                       *x0, *y0, *x1, *y1, w, h);
-    RECTL bound;
-    bound.left = 0; bound.top = 0; bound.right = w; bound.bottom = h;
-    CerfClampWindow(x0, y0, x1, y1, &bound);
-    if (*x1 <= *x0 || *y1 <= *y0)
-        CerfWindowHalt("cerf_guest: source window outside source surface - halting",
-                       *x0, *y0, *x1, *y1, w, h);
-}
-
-static void CerfNarrowToMask(int* x0, int* y0, int* x1, int* y1, GPESurf* s,
-                             const RECTL* mrect) {
-    const int w = (int)s->Width(), h = (int)s->Height();
-    RECTL bound = *mrect;
-    if (bound.right < bound.left) {
-        const LONG t = bound.right; bound.right = bound.left; bound.left = t;
-    }
-    if (bound.bottom < bound.top) {
-        const LONG t = bound.bottom; bound.bottom = bound.top; bound.top = t;
-    }
-    if (w > 0 && h > 0) {
-        RECTL extent;
-        extent.left = 0; extent.top = 0; extent.right = w; extent.bottom = h;
-        CerfRectClamp(&bound, &extent);
-    }
-    CerfClampWindow(x0, y0, x1, y1, &bound);
-    if (*x1 <= *x0 || *y1 <= *y0)
-        CerfWindowHalt("cerf_guest: mask window outside mask bounds - halting",
-                       *x0, *y0, *x1, *y1, w, h);
-}
-
 static void CerfStageSurface(cerfcore::CerfVirt::CerfBltSurface* s, ULONG buffer_va,
                              int x0, int y0, int x1, int y1,
-                             int stride, int bits, CerfStageWb* wb) {
-    LONG  lo_off;
-    ULONG span;
+                             int stride, int bits, int rows, CerfStageWb* wb) {
+    LONG  lo_off, row_lo;
+    ULONG span, row_bytes;
     if (stride == 0 || bits <= 0 || x1 <= x0 || y1 <= y0) {
         CERF_LOG_X("cerf_guest: Stage BAD GEOMETRY x0", (ULONG)x0);
         CERF_LOG_X("cerf_guest: Stage BAD GEOMETRY y0", (ULONG)y0);
@@ -116,7 +77,7 @@ static void CerfStageSurface(cerfcore::CerfVirt::CerfBltSurface* s, ULONG buffer
         CERF_FATAL("cerf_guest: Stage BAD GEOMETRY - halting");
     }
 
-    CerfSpan(x0, y0, x1, y1, stride, bits, &lo_off, &span);
+    CerfSpan(x0, y0, x1, y1, stride, bits, &lo_off, &span, &row_lo, &row_bytes);
 
     ULONG arena_off = 0u;
     void* dstp = CerfArenaAlloc(span, &arena_off);
@@ -124,7 +85,17 @@ static void CerfStageSurface(cerfcore::CerfVirt::CerfBltSurface* s, ULONG buffer
         CERF_LOG_X("cerf_guest: Stage arena alloc failed, span", span);
         CERF_FATAL("cerf_guest: DMA arena surface alloc failed - halting");
     }
-    memcpy(dstp, (const void*)(ULONG_PTR)((LONG)buffer_va + lo_off), span);
+    if (wb || rows <= 0 || (y0 >= 0 && y1 <= rows) || y1 - y0 == 1 ||
+        row_bytes >= (ULONG)(stride < 0 ? -stride : stride)) {
+        memcpy(dstp, (const void*)(ULONG_PTR)((LONG)buffer_va + lo_off), span);
+    } else {
+        int y;
+        for (y = y0; y < y1; ++y) {
+            const LONG at = (LONG)y * (LONG)stride + row_lo;
+            memcpy((BYTE*)dstp + (at - lo_off), (const void*)(ULONG_PTR)((LONG)buffer_va + at),
+                   row_bytes);
+        }
+    }
 
     s->buffer    = (uint32_t)((LONG)arena_off - lo_off);
     s->stage_off = arena_off;
@@ -174,7 +145,7 @@ void CerfDDGPE::FillSurface(cerfcore::CerfVirt::CerfBltSurface* s, GPESurf* surf
     else {
         CerfStageSurface(s, (ULONG)(ULONG_PTR)surf->Buffer(),
                          x0, y0, x1, y1, surf->Stride(),
-                         CerfFormatBpp(surf->Format()), wb);
+                         CerfFormatBpp(surf->Format()), surf->Height(), wb);
     }
     GPEFormat* gf = read_palette ? surf->FormatPtr() : NULL;
     s->pal_entries = gf ? (uint32_t)gf->m_PaletteEntries : 0u;
@@ -190,23 +161,25 @@ void CerfDDGPE::FillSurface(cerfcore::CerfVirt::CerfBltSurface* s, GPESurf* surf
 }
 
 void CerfDDGPE::FillSurfaceFromSurfobj(cerfcore::CerfVirt::CerfBltSurface* s, SURFOBJ* pso,
-                                      int y0, int y1, CerfStageWb* wb) {
+                                      int x0, int y0, int x1, int y1, CerfStageWb* wb) {
     if (!pso) return;
     if (pso->dhsurf) {
-        GPESurf* ds = (GPESurf*)pso->dhsurf;
-        FillSurface(s, ds, 0, y0, ds->Width(), y1, true, true, wb);
+        FillSurface(s, (GPESurf*)pso->dhsurf, x0, y0, x1, y1, true, true, wb);
         return;
     }
     s->format = (uint32_t)CerfIFormatToEGPE(pso->iBitmapFormat);
     s->stride = (int32_t)pso->lDelta;
-    CerfStageSurface(s, (ULONG)(ULONG_PTR)pso->pvScan0,
-                     0, y0, (int)pso->sizlBitmap.cx, y1,
-                     (int)pso->lDelta, CerfFormatBpp((EGPEFormat)s->format), wb);
+    CerfStageSurface(s, (ULONG)(ULONG_PTR)pso->pvScan0, x0, y0, x1, y1,
+                     (int)pso->lDelta, CerfFormatBpp((EGPEFormat)s->format),
+                     (int)pso->sizlBitmap.cy, wb);
 }
 
-void CerfDDGPE::EmitBltBand(const CerfBltBand& b, GPEBltParms* p, int r0, int r1) {
+void CerfDDGPE::EmitBltBand(const CerfBltBand& b, GPEBltParms* p, int r0, int r1, int x0,
+                            int x1, bool col_band) {
     RECTL eclip;
     CerfEffectiveClip(&eclip, p->prclClip, p->pDst);
+    if (eclip.left < x0)  eclip.left  = x0;
+    if (eclip.right > x1) eclip.right = x1;
     int dw = b.dr - b.dl; if (dw < 0) dw = -dw;
     int vx0 = b.dl, vx1 = b.dl + dw;
     int vy0 = b.dt + r0, vy1 = b.dt + r1;
@@ -270,18 +243,13 @@ void CerfDDGPE::EmitBltBand(const CerfBltBand& b, GPEBltParms* p, int r0, int r1
             d.dst_palette_entries = (uint32_t)df->m_PaletteEntries;
         }
         RectToDesc(&d.src_rect, p->prclSrc);
-        int sxa = b.sl + sx0,     sya = b.st + sy0;
-        int sxb = b.sl + sx1 + 1, syb = b.st + sy1 + 1;
-        CerfNarrowToSrc(&sxa, &sya, &sxb, &syb, p->pSrc);
-        FillSurface(&d.src, p->pSrc, sxa, sya, sxb, syb, false);
+        FillSurface(&d.src, p->pSrc, b.sl + sx0, b.st + sy0, b.sl + sx1 + 1, b.st + sy1 + 1,
+                    false);
     }
     if (b.has_mask) {
         d.has_mask = 1u;
         RectToDesc(&d.mask_rect, p->prclMask);
-        int mxa = b.ml + c0,   mya = b.mt + rr0;
-        int mxb = b.ml + c1,   myb = b.mt + rr1;
-        CerfNarrowToMask(&mxa, &mya, &mxb, &myb, p->pMask, p->prclMask);
-        FillSurface(&d.mask, p->pMask, mxa, mya, mxb, myb, false);
+        FillSurface(&d.mask, p->pMask, b.ml + c0, b.mt + rr0, b.ml + c1, b.mt + rr1, false);
         if (b.mask_bits == 8)
             d.cleartype_indices = (g_OsMajor >= 4u)
                 ? cerfcore::CerfVirt::kCerfClearTypeLevelIndices
@@ -291,9 +259,11 @@ void CerfDDGPE::EmitBltBand(const CerfBltBand& b, GPEBltParms* p, int r0, int r1
         d.has_brush    = 1u;
         d.brush_width  = (uint32_t)p->pBrush->Width();
         d.brush_height = (uint32_t)p->pBrush->Height();
-        int by0 = 0, by1 = b.bh;
+        int by0 = 0, by1 = b.bh, bx0 = 0, bx1 = b.bw;
         if (b.brush_banded) CerfBrushBandRows(b, rr0, rr1, &by0, &by1);
-        FillSurface(&d.brush, p->pBrush, 0, by0, b.bw, by1, false, false);
+        if (b.brush_banded && col_band)
+            CerfBrushBandCols(b, CerfBrushIndent(b, p), vx0, vx1, &bx0, &bx1);
+        FillSurface(&d.brush, p->pBrush, bx0, by0, bx1, by1, false, false);
         if (p->pptlBrush) {
             d.brush_has_ptl = 1u;
             d.brush_ptl_x   = p->pptlBrush->x;

@@ -168,20 +168,6 @@ GPE::~GPE() {
     }
 }
 
-SCODE GPE::EmulatedBlt(GPEBltParms* pParms) {
-    CERF_LOG_X("cerf_guest: EmulatedBlt (software raster) reached, rop4",
-               pParms ? pParms->rop4 : 0);
-    CERF_FATAL("cerf_guest: software raster is not a supported path - halting");
-    return E_FAIL;
-}
-
-SCODE GPE::EmulatedLine(GPELineParms* pParms) {
-    CERF_LOG_X("cerf_guest: EmulatedLine (software raster) reached, mix",
-               pParms ? pParms->mix : 0);
-    CERF_FATAL("cerf_guest: software raster is not a supported path - halting");
-    return E_FAIL;
-}
-
 void CerfRequireExtent(int v, int who) {
     if (v > 0) return;
     CERF_LOG_X("cerf_guest: extent owner", (ULONG)who);

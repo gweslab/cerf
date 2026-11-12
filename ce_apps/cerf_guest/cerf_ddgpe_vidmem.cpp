@@ -227,9 +227,9 @@ extern "C" void CerfSetVidBackingByOsMajor(unsigned long os_major) {
 }
 
 extern "C" void CerfFillSurfaceFromSurfobj(cerfcore::CerfVirt::CerfBltSurface* s,
-                                           SURFOBJ* pso, int y0, int y1,
+                                           SURFOBJ* pso, int x0, int y0, int x1, int y1,
                                            CerfStageWb* wb) {
-    ((CerfDDGPE*)GetGPE())->FillSurfaceFromSurfobj(s, pso, y0, y1, wb);
+    ((CerfDDGPE*)GetGPE())->FillSurfaceFromSurfobj(s, pso, x0, y0, x1, y1, wb);
 }
 
 void CerfDDGPE::SurfaceLayout(void* lcl, GPESurf* s, CerfPrimaryLayout* out) {

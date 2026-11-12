@@ -55,58 +55,64 @@ SCODE CerfDDGPE::HostLine(GPELineParms* p) {
     const ULONG budget = cerfcore::CerfVirt::kDmaPartitionSize - cerfcore::CerfVirt::kDmaPartHdrSize
                          - (ULONG)sizeof(cerfcore::CerfVirt::CerfLineDescriptor) - 64u;
 
+    if (dst_fb) {
+        EmitLineBand(p, true, 0, (int)p->pDst->Height(), 0, W);
+        return S_OK;
+    }
     int yb0 = ymin;
     for (;;) {
-        int yb1 = dst_fb ? 0 : (ymax + 1);
-        if (!dst_fb) {
-            while (yb1 > yb0 + 1 &&
-                   CerfSpanBytes(0, yb0, W, yb1, dst_stride, dst_bits) > budget)
-                yb1 = yb0 + (yb1 - yb0) / 2;
+        int yb1 = ymax + 1;
+        while (yb1 > yb0 + 1 &&
+               CerfSpanBytes(0, yb0, W, yb1, dst_stride, dst_bits) > budget)
+            yb1 = yb0 + (yb1 - yb0) / 2;
+        int xb0 = 0;
+        for (int k = 0; k < W; ++k) {
+            const int xb1 = CerfRowSplitEnd(xb0, W, yb0, yb1, dst_stride, dst_bits, budget);
+            EmitLineBand(p, false, yb0, yb1, xb0, xb1);
+            xb0 = xb1;
+            if (xb0 >= W) break;
         }
-
-        if (!CerfArenaEnter()) CERF_FATAL("cerf_guest: DMA arena unavailable - halting");
-        ULONG desc_off = 0u;
-        cerfcore::CerfVirt::CerfLineDescriptor* pd = (cerfcore::CerfVirt::CerfLineDescriptor*)
-            CerfArenaAlloc((ULONG)sizeof(cerfcore::CerfVirt::CerfLineDescriptor), &desc_off);
-        if (!pd) CERF_FATAL("cerf_guest: DMA arena line alloc failed - halting");
-        cerfcore::CerfVirt::CerfLineDescriptor& d = *pd;
-        memset(&d, 0, sizeof(d));
-        d.magic       = cerfcore::CerfVirt::kCerfLineMagic;
-        d.x_start     = p->xStart;
-        d.y_start     = p->yStart;
-        d.c_pels      = p->cPels;
-        d.d_m         = p->dM;
-        d.d_n         = p->dN;
-        d.ll_gamma    = p->llGamma;
-        d.i_dir       = p->iDir;
-        d.style       = p->style;
-        d.style_state = p->styleState;
-        d.solid_color = (uint32_t)p->solidColor;
-        d.mix         = p->mix;
-        RECTL lclip;
-        CerfEffectiveClip(&lclip, p->prclClip, p->pDst);
-        d.has_clip = 1u;
-        RectToDesc(&d.clip_rect, &lclip);
-        CerfStageWb dstwb = {0};
-        if (dst_fb) {
-            d.band_y_first = 0u;
-            d.band_y_count = 0u;
-            FillSurface(&d.dst, p->pDst, 0, 0, W, (int)p->pDst->Height(),
-                        true, false, &dstwb);
-        } else {
-            d.band_y_first = (uint32_t)yb0;
-            d.band_y_count = (uint32_t)(yb1 - yb0);
-            FillSurface(&d.dst, p->pDst, 0, yb0, W, yb1, true, false, &dstwb);
-        }
-        const ULONG cgl = CerfGpeLine(desc_off);
-        if (cgl == 2u && dstwb.active)
-            memcpy((void*)(ULONG_PTR)dstwb.dst_va, dstwb.arena_ptr, dstwb.span);
-        CerfArenaLeave();
-        if (cgl != 2u) CERF_FATAL("cerf_guest: host line did not complete - halting");
-
-        if (dst_fb) break;
         yb0 = yb1;
         if (yb0 > ymax) break;
     }
     return S_OK;
+}
+
+void CerfDDGPE::EmitLineBand(GPELineParms* p, bool dst_fb, int y0, int y1, int x0, int x1) {
+    RECTL lclip;
+    CerfEffectiveClip(&lclip, p->prclClip, p->pDst);
+    if (lclip.left < x0)  lclip.left  = x0;
+    if (lclip.right > x1) lclip.right = x1;
+    if (lclip.right <= lclip.left) return;
+
+    if (!CerfArenaEnter()) CERF_FATAL("cerf_guest: DMA arena unavailable - halting");
+    ULONG desc_off = 0u;
+    cerfcore::CerfVirt::CerfLineDescriptor* pd = (cerfcore::CerfVirt::CerfLineDescriptor*)
+        CerfArenaAlloc((ULONG)sizeof(cerfcore::CerfVirt::CerfLineDescriptor), &desc_off);
+    if (!pd) CERF_FATAL("cerf_guest: DMA arena line alloc failed - halting");
+    cerfcore::CerfVirt::CerfLineDescriptor& d = *pd;
+    memset(&d, 0, sizeof(d));
+    d.magic       = cerfcore::CerfVirt::kCerfLineMagic;
+    d.x_start     = p->xStart;
+    d.y_start     = p->yStart;
+    d.c_pels      = p->cPels;
+    d.d_m         = p->dM;
+    d.d_n         = p->dN;
+    d.ll_gamma    = p->llGamma;
+    d.i_dir       = p->iDir;
+    d.style       = p->style;
+    d.style_state = p->styleState;
+    d.solid_color = (uint32_t)p->solidColor;
+    d.mix         = p->mix;
+    d.has_clip    = 1u;
+    RectToDesc(&d.clip_rect, &lclip);
+    d.band_y_first = dst_fb ? 0u : (uint32_t)y0;
+    d.band_y_count = dst_fb ? 0u : (uint32_t)(y1 - y0);
+    CerfStageWb dstwb = {0};
+    FillSurface(&d.dst, p->pDst, x0, y0, x1, y1, true, false, &dstwb);
+    const ULONG cgl = CerfGpeLine(desc_off);
+    if (cgl == 2u && dstwb.active)
+        memcpy((void*)(ULONG_PTR)dstwb.dst_va, dstwb.arena_ptr, dstwb.span);
+    CerfArenaLeave();
+    if (cgl != 2u) CERF_FATAL("cerf_guest: host line did not complete - halting");
 }

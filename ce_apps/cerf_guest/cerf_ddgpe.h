@@ -18,7 +18,7 @@ extern "C" void  CerfGetVideoRegion(unsigned long* base, unsigned long* size);
 extern "C" BOOL  CerfDDSurfFbLock(void* lcl, int x, int y, void** va);
 extern "C" unsigned long CerfDDGPESurfBufferVa(unsigned long surf);
 extern "C" void  CerfFillSurfaceFromSurfobj(cerfcore::CerfVirt::CerfBltSurface* s, SURFOBJ* pso,
-                                            int y0, int y1, CerfStageWb* wb);
+                                            int x0, int y0, int x1, int y1, CerfStageWb* wb);
 extern "C" int   CerfDDrawBlt(void* dstLcl, void* srcLcl, const RECTL* rDest,
                               const RECTL* rSrc, unsigned long ddFlags,
                               unsigned long ropArg, unsigned long fillColor,
@@ -42,6 +42,10 @@ int  CerfBrushRowAt(const CerfBltBand& b, int row);
 void CerfBrushBandRows(const CerfBltBand& b, int r0, int r1, int* by0, int* by1);
 int  CerfBrushClampEnd(const CerfBltBand& b, int r0, int r1);
 int  CerfBrushClampStart(const CerfBltBand& b, int r0, int r1);
+int  CerfBrushIndent(const CerfBltBand& b, const GPEBltParms* p);
+void CerfBrushBandCols(const CerfBltBand& b, int lind, int x0, int x1, int* bx0, int* bx1);
+int  CerfBrushColClampEnd(const CerfBltBand& b, int lind, int x0, int x1);
+int  CerfBrushColClampStart(const CerfBltBand& b, int lind, int x0, int x1);
 
 enum CerfBandOrder { kCerfBandDown, kCerfBandUp };
 
@@ -54,6 +58,12 @@ ULONG CerfBandSpanBytes(const CerfBltBand& b, int cl, int cr, int r0, int r1);
 bool  CerfBandClip(const CerfBltBand& b, GPEBltParms* p, int* cl, int* cr);
 int   CerfBandEnd(const CerfBltBand& b, int cl, int cr, ULONG budget, int r0);
 int   CerfBandStart(const CerfBltBand& b, int cl, int cr, ULONG budget, int r1);
+ULONG CerfBandColSpanBytes(const CerfBltBand& b, int lind, int x0, int x1, int r0, int r1);
+int   CerfColBandEnd(const CerfBltBand& b, int lind, ULONG budget, int r0, int r1, int x0,
+                     int cr);
+int   CerfColBandStart(const CerfBltBand& b, int lind, ULONG budget, int r0, int r1, int cl,
+                       int x1);
+int   CerfRowSplitEnd(int x0, int x1, int y0, int y1, int stride, int bits, ULONG budget);
 
 inline bool CerfConvertibleFmt(EGPEFormat f) {
     return f == gpe1Bpp  || f == gpe2Bpp  || f == gpe4Bpp || f == gpe8Bpp ||
@@ -101,9 +111,10 @@ public:
                      int x0, int y0, int x1, int y1, bool host_writes,
                      bool read_palette = true, CerfStageWb* wb = NULL);
     void FillSurfaceFromSurfobj(cerfcore::CerfVirt::CerfBltSurface* s, SURFOBJ* pso,
-                                int y0, int y1, CerfStageWb* wb = NULL);
+                                int x0, int y0, int x1, int y1, CerfStageWb* wb = NULL);
     SCODE HwBlt(GPEBltParms* p);
     SCODE HostLine(GPELineParms* p);
+    void  EmitLineBand(GPELineParms* p, bool dst_fb, int y0, int y1, int x0, int x1);
 
     virtual SCODE BltComplete(GPEBltParms* p);
     virtual SCODE Line(GPELineParms* pLineParms, EGPEPhase phase);
@@ -137,7 +148,10 @@ private:
     ULONG           m_vidSize;
     CerfVidBacking  m_vidBacking;
     GPESurf*        m_pScanout;
-    void EmitBltBand(const CerfBltBand& b, GPEBltParms* p, int r0, int r1);
+    void EmitBltBand(const CerfBltBand& b, GPEBltParms* p, int r0, int r1, int x0, int x1,
+                     bool col_band);
+    void EmitBltRow(const CerfBltBand& b, GPEBltParms* p, ULONG budget, int r0, int r1,
+                    int cl, int cr);
     void EmitBltBands(const CerfBltBand& b, GPEBltParms* p, ULONG budget,
                       CerfBandOrder order);
     void EmitBltBandsUp(const CerfBltBand& b, GPEBltParms* p, ULONG budget,

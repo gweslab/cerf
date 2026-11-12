@@ -1,6 +1,7 @@
 *.stackdump
 
 ce_apps/**/.build_mode
+ce_apps/**/.link_key
 ce_apps/**/*.res
 
 # Device bundles are downloaded cache data.

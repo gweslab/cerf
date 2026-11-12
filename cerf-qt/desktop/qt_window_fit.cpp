@@ -2,20 +2,29 @@
 
 #include "../qt_device_pixels.h"
 
+#include <QQuickWindow>
 #include <QRect>
 #include <QScreen>
-#include <QWidget>
+#include <QtMath>
 
 #include <algorithm>
 
-QSize WindowChrome(const QWidget& window, const QWidget& content) {
-    return window.frameGeometry().size() - content.size();
+namespace {
+
+constexpr char kChromeHeight[] = "chromeHeight";
+
+QSize FrameSize(const QQuickWindow& window) { return window.frameGeometry().size() - window.geometry().size(); }
+
 }
 
-WindowFit FitAroundContent(const QWidget& window, const QWidget& content, uint32_t content_w, uint32_t content_h) {
-    const qreal dpr     = window.devicePixelRatioF();
-    const QSize frame   = window.frameGeometry().size() - window.geometry().size();
-    const QSize chrome  = WindowChrome(window, content);
+QSize WindowChrome(const QQuickWindow& window) {
+    return FrameSize(window) + QSize(0, qCeil(window.property(kChromeHeight).toReal()));
+}
+
+WindowFit FitAroundContent(const QQuickWindow& window, uint32_t content_w, uint32_t content_h) {
+    const qreal dpr     = window.devicePixelRatio();
+    const QSize frame   = FrameSize(window);
+    const QSize chrome  = WindowChrome(window);
     const QRect work    = window.screen()->availableGeometry();
     const int   need_w  = LogicalExtentCovering(static_cast<int>(content_w), dpr) + chrome.width();
     const int   need_h  = LogicalExtentCovering(static_cast<int>(content_h), dpr) + chrome.height();

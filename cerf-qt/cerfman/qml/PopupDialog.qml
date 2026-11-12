@@ -11,10 +11,10 @@ Dialog {
     anchors.centerIn: parent
     modal: true
     WindowInsets.gap: Theme.spaceXXXL
-    leftMargin: WindowInsets.leftMargin
-    topMargin: WindowInsets.topMargin
-    rightMargin: WindowInsets.rightMargin
-    bottomMargin: WindowInsets.bottomMargin
+    leftMargin: Theme.touchPlatform ? WindowInsets.leftMargin : undefined
+    topMargin: Theme.touchPlatform ? WindowInsets.topMargin : undefined
+    rightMargin: Theme.touchPlatform ? WindowInsets.rightMargin : undefined
+    bottomMargin: Theme.touchPlatform ? WindowInsets.bottomMargin : undefined
     implicitWidth: preferredWidth
 
     footer: ColumnLayout {

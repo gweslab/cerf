@@ -14,7 +14,6 @@ constexpr char kPath[]      = "/org/freedesktop/portal/desktop";
 constexpr char kInterface[] = "org.freedesktop.portal.Settings";
 constexpr char kNamespace[] = "org.freedesktop.appearance";
 constexpr char kKey[]       = "accent-color";
-constexpr QColor kTextOnAccent(0xFF, 0xFF, 0xFF);
 
 bool InUnitRange(double value) { return value >= 0.0 && value <= 1.0; }
 
@@ -50,7 +49,7 @@ protected:
         connect(watcher, &QDBusPendingCallWatcher::finished, this, [this](QDBusPendingCallWatcher* finished) {
             const QColor color = ParsePortalColor(finished->reply());
             finished->deleteLater();
-            Publish(AccentShade{color, kTextOnAccent}, AccentShade{color, kTextOnAccent});
+            Publish(color, color);
         });
     }
 };

@@ -4,8 +4,10 @@ import CerfStyle
 PopupDialog {
     id: dialog
     property string message: ""
+    property string level: ""
     property bool rich: false
     property var buttons: [qsTr("OK")]
+    property string enterChoice: buttons[0]
     property string defaultChoice: buttons[buttons.length - 1]
     property string chosen: ""
     signal choice(string text)
@@ -25,7 +27,7 @@ PopupDialog {
 
     DialogEnterShortcut {
         popup: dialog
-        onActivated: dialog.finish(dialog.buttons[0])
+        onActivated: dialog.finish(dialog.enterChoice)
     }
 
     rightToLeftButtons: Repeater {
@@ -33,9 +35,8 @@ PopupDialog {
 
         Button {
             required property string modelData
-            required property int index
             text: modelData
-            highlighted: index === dialog.buttons.length - 1
+            highlighted: modelData === dialog.enterChoice
             onClicked: dialog.finish(modelData)
         }
     }
@@ -44,10 +45,11 @@ PopupDialog {
         anchors.fill: parent
         contentWidth: availableWidth
 
-        MessageText {
+        SymbolMessage {
             id: body
             width: dialog.availableWidth
             text: dialog.message
+            level: dialog.level
             textFormat: dialog.rich ? TextEdit.RichText : TextEdit.PlainText
         }
     }

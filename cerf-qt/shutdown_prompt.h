@@ -19,18 +19,16 @@ public:
     static constexpr uint32_t kCountdownMs = 15000u;
 
     const char* Title() const;
+    const char* Heading() const;
     const char* Intro(cerfcore::ShutdownTrigger trigger) const;
-    const char* Question() const;
     const char* ActionLabel(ShutdownPromptAction action) const;
     const char* ResetDescription(ShutdownPromptAction action) const;
     const char* CancelLabel(cerfcore::ShutdownTrigger trigger) const;
     const char* RememberLabel() const;
     const char* SaveTitle() const;
     std::string SaveDetail() const;
-    std::string SaveLabel() const;
     const char* SaveLinkUrl() const;
     const char* SaveLinkText() const;
-    const char* SaveTail() const;
     bool        CountsDown(cerfcore::ShutdownTrigger trigger) const;
     bool        SaveByDefault() const;
     const char* PlugInAcQuestion() const;

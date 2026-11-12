@@ -4,11 +4,7 @@ project(cerfqt LANGUAGES CXX)
 if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
     set(OpenGL_GL_PREFERENCE LEGACY)
 endif()
-if(ANDROID)
-    find_package(Qt6 6.8 REQUIRED COMPONENTS Svg Network Qml Quick QuickControls2)
-else()
-    find_package(Qt6 6.8 REQUIRED COMPONENTS Widgets Svg Network Qml Quick QuickControls2)
-endif()
+find_package(Qt6 6.8 REQUIRED COMPONENTS Svg Network Qml Quick QuickControls2)
 find_package(libzip CONFIG REQUIRED)
 qt_standard_project_setup(REQUIRES 6.8)
 if(APPLE)
@@ -32,14 +28,15 @@ set_target_properties(cerfqt_resvg PROPERTIES
     INTERFACE_LINK_LIBRARIES "${cerfqt_resvg_link_libraries}")
 
 if(ANDROID)
-    set(cerfqt_frontend_dir mobile)
+    set(cerfqt_host_dir android)
 else()
-    set(cerfqt_frontend_dir desktop)
+    set(cerfqt_host_dir desktop)
 endif()
 file(GLOB cerfqt_sources CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/*.cpp"
-     "${CMAKE_CURRENT_SOURCE_DIR}/cerfman/*.cpp" "${CMAKE_CURRENT_SOURCE_DIR}/${cerfqt_frontend_dir}/*.cpp")
+     "${CMAKE_CURRENT_SOURCE_DIR}/cerfman/*.cpp" "${CMAKE_CURRENT_SOURCE_DIR}/${cerfqt_host_dir}/*.cpp")
 if(APPLE)
-    file(GLOB cerfqt_objcxx_sources CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/*_macos.mm")
+    file(GLOB cerfqt_objcxx_sources CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/*_macos.mm"
+         "${CMAKE_CURRENT_SOURCE_DIR}/${cerfqt_host_dir}/*_macos.mm")
     list(APPEND cerfqt_sources ${cerfqt_objcxx_sources})
 endif()
 cerfcore_select_host_sources(cerfqt_sources)
@@ -47,7 +44,7 @@ cerfcore_select_host_sources(cerfqt_sources)
 qt_add_executable(cerf-qt ${cerfqt_sources})
 target_compile_features(cerf-qt PRIVATE cxx_std_20)
 target_include_directories(cerf-qt PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/cerfman"
-                                           "${CMAKE_CURRENT_SOURCE_DIR}/${cerfqt_frontend_dir}")
+                                           "${CMAKE_CURRENT_SOURCE_DIR}/${cerfqt_host_dir}")
 target_link_libraries(cerf-qt PRIVATE
     "$<LINK_LIBRARY:WHOLE_ARCHIVE,cerfcore::cerfcore>"
     Qt6::Svg
@@ -58,12 +55,9 @@ target_link_libraries(cerf-qt PRIVATE
     cerfqt_resvg
     cerfqt_style
     cerfqt_styleplugin)
-if(NOT ANDROID)
-    target_link_libraries(cerf-qt PRIVATE Qt6::Widgets)
-endif()
 
 file(GLOB cerfman_qml CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/cerfman/qml/*.qml"
-     "${CMAKE_CURRENT_SOURCE_DIR}/${cerfqt_frontend_dir}/qml/*.qml")
+     "${CMAKE_CURRENT_SOURCE_DIR}/qml/*.qml")
 foreach(cerfman_file IN LISTS cerfman_qml)
     get_filename_component(cerfman_alias "${cerfman_file}" NAME)
     set_source_files_properties("${cerfman_file}" PROPERTIES QT_RESOURCE_ALIAS "${cerfman_alias}")
@@ -95,7 +89,7 @@ qt_add_resources(cerf-qt "cerfman_icons"
     BASE "${cerfman_symbols}"
     FILES ${cerfman_icons})
 if(APPLE)
-    target_link_libraries(cerf-qt PRIVATE "-framework Foundation")
+    target_link_libraries(cerf-qt PRIVATE "-framework Foundation" "-framework AppKit" "-framework CoreGraphics")
 endif()
 if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
     find_package(Qt6 REQUIRED COMPONENTS DBus)
@@ -275,7 +269,7 @@ if(ANDROID)
     set_target_properties(cerf-qt PROPERTIES
         QT_ANDROID_PACKAGE_NAME "${cerfqt_android_package}"
         QT_ANDROID_APP_NAME "${cerfqt_product_name}"
-        QT_ANDROID_PACKAGE_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/mobile/android"
+        QT_ANDROID_PACKAGE_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/android/package"
         QT_ANDROID_APP_ICON "@mipmap/ic_launcher"
         QT_ANDROID_VERSION_NAME "${cerfqt_version}"
         QT_ANDROID_MIN_SDK_VERSION ${CERFQT_ANDROID_MIN_SDK}

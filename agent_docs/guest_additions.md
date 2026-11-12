@@ -474,8 +474,8 @@ executables. It has three pieces:
   `_regs.h` contract. The host publishes one command at a time through a gen
   bump. The guest answers with response regs plus a kick. LIST rows stream
   guest→host one record at a time through a register window.
-- The host window (`cerf-qt/desktop/qt_task_manager_window.cpp`), which
-  implements the `TaskManagerView` seam. The Guest Additions widget
+- The host window (`cerf-qt/desktop/qt_task_manager_window.cpp`,
+  `cerf-qt/qml/TaskManagerWindow.qml`), which implements the `TaskManagerView` seam. The Guest Additions widget
   (`libCerfCore/src/host/guest_additions_widget.{h,cpp}`, pinned in the terminal
   range of the status bar) opens it.
 - The guest-side pump `ce_apps/cerf_guest/cerf_task_manager_pump.cpp`.

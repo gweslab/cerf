@@ -6,9 +6,12 @@
 
 namespace cerffrontend {
 
+enum class MenuRole { kNone, kAbout, kSettings };
+
 struct MenuItem {
     std::string           label;
     std::string           icon;
+    MenuRole              role      = MenuRole::kNone;
     bool                  enabled   = true;
     bool                  checkable = false;
     bool                  checked   = false;

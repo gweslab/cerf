@@ -1,5 +1,5 @@
 #include "../guest_additions_ui_policy.h"
-#include "qt_main_window.h"
+#include "../qt_emulator_window.h"
 
 #include <cerfcore/core/cerf_emulator.h>
 #include <cerfcore/core/device_config.h>
@@ -37,7 +37,7 @@ public:
 
     void OnUserResizeEnd(uint32_t canvas_w, uint32_t canvas_h) override {
         if (!Enabled()) return;
-        const auto& window = emu_.Get<QtMainWindow>();
+        const auto& window = emu_.Get<QtEmulatorWindow>();
         uint32_t    w      = 0;
         uint32_t    h      = 0;
         window.SurfaceForCanvas(canvas_w, canvas_h, w, h);

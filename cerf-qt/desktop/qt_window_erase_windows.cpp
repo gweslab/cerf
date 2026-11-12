@@ -16,6 +16,7 @@ bool QtWindowErase::nativeEventFilter(const QByteArray& type, void* message, qin
         auto* quick = qobject_cast<QQuickWindow*>(window);
         if (!quick || !quick->handle() || reinterpret_cast<HWND>(quick->winId()) != msg->hwnd) continue;
         const QColor color = quick->color();
+        if (color.alpha() < 255) return false;
         RECT         client;
         GetClientRect(msg->hwnd, &client);
         HBRUSH brush = CreateSolidBrush(RGB(color.red(), color.green(), color.blue()));

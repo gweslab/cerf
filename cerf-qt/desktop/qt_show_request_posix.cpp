@@ -1,4 +1,4 @@
-#include "qt_main_window.h"
+#include "../qt_emulator_window.h"
 #include "qt_show_socket.h"
 
 #include <cerfcore/core/cerf_emulator.h>
@@ -40,7 +40,7 @@ private:
         while (recv(fd_, buf, sizeof(buf), 0) >= 0) any = true;
         if (!any) return;
         LOG(Lcd, "QtShowRequest: show request, raising the window\n");
-        emu_.Get<QtMainWindow>().Raise();
+        emu_.Get<QtEmulatorWindow>().Raise();
     }
 
     void Close() {

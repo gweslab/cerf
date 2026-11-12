@@ -4,4 +4,5 @@
 
 #include <QColor>
 
-QColor ToQColor(cerffrontend::Rgb color, int alpha = 255);
+QColor            ToQColor(cerffrontend::Rgb color, int alpha = 255);
+cerffrontend::Rgb FromQColor(const QColor& color);

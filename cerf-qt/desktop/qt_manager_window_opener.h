@@ -2,20 +2,21 @@
 
 #include "../manager_windows.h"
 
+#include <cerfcore/core/service.h>
+
 #include <QVariantMap>
 
 #include <optional>
 #include <string>
 
-class QtManagerWindowOpener : public cerffrontend::ManagerWindows {
+class QtManagerWindowOpener : public cerfcore::Service {
 public:
-    using cerffrontend::ManagerWindows::ManagerWindows;
+    using cerfcore::Service::Service;
 
     void OpenAbout(const std::string& device_line);
     void OpenSettings();
     void OpenTutorial();
-    bool EditLiveCustomizations(bool force_reboot, std::optional<int> ce_major,
-                                cerffrontend::GuestReset& reset) override;
+    bool EditLiveCustomizations(bool force_reboot, std::optional<int> ce_major, cerffrontend::GuestReset& reset);
 
 private:
     QVariantMap Placement() const;

@@ -8,8 +8,7 @@ from host_branch import WIN32_X86
 
 LIBRARY_INCLUDES = ("libservicelocator/include", "libCerfEngine/include", "libCerfCore/include",
                     "cerf-qt", "cerf-qt/cerfman")
-QT_MODULES = ("QtCore", "QtGui", "QtWidgets", "QtSvg", "QtNetwork", "QtQml", "QtQuick",
-              "QtQuickControls2")
+QT_MODULES = ("QtCore", "QtGui", "QtSvg", "QtNetwork", "QtQml", "QtQuick", "QtQuickControls2")
 
 FIXED_FLAGS = ('"--target=i686-pc-windows-msvc"', '"/std:c++20"', '"/EHsc"', '"/permissive-"',
                '"-DWIN32"', '"-DNDEBUG"', '"-DUNICODE"', '"-D_UNICODE"', '"-DCERF_DEV_MODE=1"')

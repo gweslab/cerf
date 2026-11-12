@@ -26,6 +26,7 @@ public:
     virtual ~QtPresentHooks() = default;
 
     virtual void OnPresentTick(cerfcore::CerfEmulator&, bool) {}
+    virtual void OnUiTick(cerfcore::CerfEmulator&) {}
     virtual bool RenderAlt(cerfcore::CerfEmulator&, uint32_t*, int, int, qreal) { return false; }
     virtual bool   ShouldDesaturate(cerfcore::CerfEmulator&) { return false; }
     virtual double GlowReach(cerfcore::CerfEmulator&, const cerffrontend::ViewportLayout::Layout&) { return 0.0; }
@@ -41,13 +42,13 @@ public:
     cerffrontend::ViewportLayout&       Layout() { return layout_; }
     const cerffrontend::ViewportLayout& Layout() const { return layout_; }
 
-    void SetHooks(std::unique_ptr<QtPresentHooks> hooks) { hooks_ = std::move(hooks); }
     bool SetGuestSurfaceSize(uint32_t w, uint32_t h);
     void SetCanvasSize(int w, int h);
     bool Capture(cerfcore::FrameSource& source, std::vector<uint32_t>& out, uint32_t& w, uint32_t& h);
     void DrawTo(cerfcore::CerfEmulator& emu, cerfcore::FrameSource& source, QPainter& painter, int visible_w,
                 int visible_h, qreal dpr);
     void StartRepaints(int interval_ms, std::function<void()> repaint);
+    void UiTick(cerfcore::CerfEmulator& emu);
 
 private:
     const QImage& Present(cerfcore::CerfEmulator& emu, cerfcore::FrameSource& source, int visible_w,

@@ -15,11 +15,6 @@ QColor ColorIn(NSColor* color, NSAppearanceName name) {
     return resolved;
 }
 
-AccentShade ShadeIn(NSAppearanceName name) {
-    return AccentShade{ColorIn([NSColor controlAccentColor], name),
-                       ColorIn([NSColor alternateSelectedControlTextColor], name)};
-}
-
 class ControlAccent : public HostAccent {
 public:
     explicit ControlAccent(QObject* parent) : HostAccent(parent) {
@@ -35,7 +30,10 @@ public:
     ~ControlAccent() override { [[NSNotificationCenter defaultCenter] removeObserver:observer_]; }
 
 protected:
-    void Reload() override { Publish(ShadeIn(NSAppearanceNameAqua), ShadeIn(NSAppearanceNameDarkAqua)); }
+    void Reload() override {
+        Publish(ColorIn([NSColor controlAccentColor], NSAppearanceNameAqua),
+                ColorIn([NSColor controlAccentColor], NSAppearanceNameDarkAqua));
+    }
 
 private:
     id observer_ = nil;

@@ -34,6 +34,12 @@ public:
         std::vector<size_t> tooltips_changed;
     };
 
+    struct Colors {
+        Rgb background;
+        Rgb separator;
+        Rgb hover;
+    };
+
     using WidgetFilter = std::function<bool(const cerfcore::HostWidget*)>;
 
     void       SetFilter(WidgetFilter shown) { filter_ = std::move(shown); }
@@ -42,7 +48,7 @@ public:
     bool       SetHover(int x);
     bool       ClearHover();
     TickResult Tick(int width, int height);
-    void       Paint(Painter& p, const Rect& client, bool dark);
+    void       Paint(Painter& p, const Rect& client, const Colors& colors);
     void       PaintWidgets(Painter& p, Rgb backdrop);
 
     std::vector<cerfcore::HostWidget*> ShownWidgets() const;

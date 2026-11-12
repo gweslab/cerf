@@ -17,10 +17,14 @@
 
 int QtEmulatorPresent::Dpi(qreal dpr) { return DeviceExtent(cerffrontend::kDefaultDpi, dpr); }
 
-void QtEmulatorPresent::OnPresentTick(cerfcore::CerfEmulator& emu, bool source_has_frame) {
-    const bool activate = emu.Get<cerffrontend::CanvasTabs>().OnPresentTick(source_has_frame);
+void QtEmulatorPresent::OnPresentTick(cerfcore::CerfEmulator&, bool source_has_frame) {
+    source_has_frame_.store(source_has_frame, std::memory_order_release);
+}
+
+void QtEmulatorPresent::OnUiTick(cerfcore::CerfEmulator& emu) {
+    if (emu.Get<cerffrontend::CanvasTabs>().OnPresentTick(source_has_frame_.load(std::memory_order_acquire)))
+        view_.SetFramebufferActive(true);
     emu.Get<cerffrontend::CanvasInput>().RefreshLock();
-    if (activate) view_.SetFramebufferActive(true);
 }
 
 bool QtEmulatorPresent::RenderAlt(cerfcore::CerfEmulator& emu, uint32_t* bits, int w, int h, qreal dpr) {

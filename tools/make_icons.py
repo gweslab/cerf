@@ -24,7 +24,7 @@ CE2_ICO_SIZES = (16, 32)
 CE2_ICO_BPP = 4
 CE2_ICO_DITHER = False
 
-ANDROID_RES_DIR = REPO / "cerf-qt" / "mobile" / "android" / "res"
+ANDROID_RES_DIR = REPO / "cerf-qt" / "android" / "package" / "res"
 ANDROID_ICON_STEM = LOGO_ASSET
 ANDROID_ICON_DENSITIES = (("mdpi", 48), ("hdpi", 72), ("xhdpi", 96), ("xxhdpi", 144), ("xxxhdpi", 192))
 

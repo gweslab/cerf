@@ -1,7 +1,5 @@
 #pragma once
 
-#include "../painter.h"
-
 #include <cerfcore/core/service.h>
 #include <cerfcore/peripherals/cerf_virt/cerf_virt_task_manager.h>
 
@@ -28,22 +26,11 @@ public:
         uint32_t                 key = 0;
     };
 
-    static constexpr unsigned kRefreshMs  = 500;
-    static constexpr int      kClientW    = 560;
-    static constexpr int      kClientH    = 420;
-    static constexpr int      kMinTrackW  = 480;
-    static constexpr int      kMinTrackH  = 320;
-    static constexpr int      kMargin     = 8;
-    static constexpr int      kBottomBarH = 76;
-    static constexpr int      kRowH       = 26;
-    static constexpr int      kBtnW       = 90;
-    static constexpr int      kLabelW     = 34;
-    static constexpr int      kStatusW    = 164;
-    static constexpr int      kEditReserve = 170;
-    static constexpr int      kEditMinW   = 80;
-    static constexpr Rgb      kOkColor{0, 140, 0};
-    static constexpr Rgb      kFailColor{190, 0, 0};
-    static constexpr Rgb      kInfoColor{96, 96, 96};
+    static constexpr unsigned kRefreshMs = 500;
+    static constexpr int      kClientW   = 560;
+    static constexpr int      kClientH   = 420;
+    static constexpr int      kMinTrackW = 480;
+    static constexpr int      kMinTrackH = 320;
 
     void Open();
     void SetMode(Mode m);

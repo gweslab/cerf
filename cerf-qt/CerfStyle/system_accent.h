@@ -11,7 +11,6 @@ class SystemAccent : public QObject {
     QML_ELEMENT
     QML_SINGLETON
     Q_PROPERTY(QColor color READ Color NOTIFY changed FINAL)
-    Q_PROPERTY(QColor textColor READ TextColor NOTIFY changed FINAL)
     Q_PROPERTY(bool known READ Known NOTIFY changed FINAL)
     Q_PROPERTY(QColor darkColor READ DarkColor NOTIFY changed FINAL)
     Q_PROPERTY(bool darkKnown READ DarkKnown NOTIFY changed FINAL)
@@ -20,10 +19,11 @@ public:
     explicit SystemAccent(QObject* parent = nullptr);
 
     QColor Color() const;
-    QColor TextColor() const;
     bool   Known() const;
     QColor DarkColor() const;
     bool   DarkKnown() const;
+
+    Q_INVOKABLE QColor TextOn(const QColor& fill, const QColor& dark_text, const QColor& light_text) const;
 
 signals:
     void changed();
@@ -32,6 +32,6 @@ private:
     void Refresh();
 
     HostAccent* host_ = nullptr;
-    AccentShade shade_;
+    QColor      fill_;
     QColor      dark_fill_;
 };

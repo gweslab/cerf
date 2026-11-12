@@ -10,6 +10,9 @@ QtObject {
 
     readonly property color pageBg: dark ? "#141414" : "#f0f0f0"
     readonly property color barBg: dark ? "#1c1c1c" : "#fafafa"
+    readonly property color windowBarBg: dark ? "#202020" : "#f0f0f0"
+    readonly property color windowBarLine: dark ? "#3c3c3c" : "#c8c8c8"
+    readonly property color windowBarHover: dark ? "#343434" : "#dadada"
     readonly property color cardBg: dark ? "#1c1c1c" : "#fafafa"
     readonly property color divider: dark ? "#2f2f2f" : "#e0e0e0"
     readonly property color dim: dark ? "#808080" : "#6b6b6b"
@@ -52,7 +55,11 @@ QtObject {
     readonly property real chipAlpha: 0.9
     readonly property color success: "#3fb950"
     readonly property color successMark: "#ffffff"
-    readonly property color onAccent: SystemAccent.known ? SystemAccent.textColor : dark ? "#000000" : "#ffffff"
+    readonly property color accentFill: SystemAccent.known ? SystemAccent.color
+                                                           : Material.color(fallbackAccent, dark ? Material.Shade200 : Material.Shade500)
+    readonly property color accentTextDark: "#000000"
+    readonly property color accentTextLight: "#ffffff"
+    readonly property color onAccent: SystemAccent.TextOn(accentFill, accentTextDark, accentTextLight)
 
     function chipColor(text) {
         let hash = 0
@@ -98,6 +105,7 @@ QtObject {
     readonly property int deviceCardMinWidth: 320
     readonly property int hairline: 1
     readonly property int focusLine: 2
+    readonly property int dialogSymbolSize: 32
     readonly property int radioSize: 20
     readonly property int radioDotSize: 10
     readonly property int fieldHeight: 36
@@ -114,4 +122,5 @@ QtObject {
     readonly property int searchWidth: 260
 
     readonly property int morphMs: 180
+    readonly property int tipDelayMs: 400
 }

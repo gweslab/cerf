@@ -1,6 +1,6 @@
 #include "picked_document.h"
 
-#include "../mobile/android_content.h"
+#include "../android/android_content.h"
 
 #include <cerfcore/core/log.h>
 

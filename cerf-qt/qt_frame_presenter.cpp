@@ -19,6 +19,8 @@ void QtFramePresenter::StartRepaints(int interval_ms, std::function<void()> repa
     repaint_timer_.start(interval_ms);
 }
 
+void QtFramePresenter::UiTick(cerfcore::CerfEmulator& emu) { hooks_->OnUiTick(emu); }
+
 void QtFramePresenter::DrawTo(cerfcore::CerfEmulator& emu, cerfcore::FrameSource& source, QPainter& painter,
                               int visible_w, int visible_h, qreal dpr) {
     const QImage& image = Present(emu, source, visible_w, visible_h, dpr);

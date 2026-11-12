@@ -5,11 +5,15 @@
 #include "svg_icon_provider.h"
 #include "../CerfStyle/legacy_windows.h"
 #include "../CerfStyle/touch_frontend.h"
+#include "../qt_paint_resources.h"
 #include "../resource_paths_text.h"
 
 #include <cerfcore/core/cerf_emulator.h>
 #include <cerfcore/core/fatal.h>
 
+#include <QGuiApplication>
+#include <QIcon>
+#include <QPixmap>
 #include <QQmlComponent>
 #include <QQuickWindow>
 #include <QSGRendererInterface>
@@ -40,9 +44,17 @@ void ManagerEngine::OnShutdown() {
     engine_.reset();
 }
 
+void ManagerEngine::SetApplicationIcon() {
+    QIcon icon;
+    for (int px : {16, 20, 24, 32, 48, 64, 256})
+        icon.addPixmap(QPixmap::fromImage(emu_.Get<QtPaintResources>().SvgImage(CERF_LOGO_ASSET, px, px, 1.0)));
+    QGuiApplication::setWindowIcon(icon);
+}
+
 ManagerQmlEngine& ManagerEngine::Engine() {
     if (!engine_) {
         ConfigureQuick();
+        SetApplicationIcon();
         engine_ = std::make_unique<ManagerQmlEngine>(emu_);
         engine_->addImageProvider(QStringLiteral(CERF_SYMBOL_IMAGE_PROVIDER), new SvgIconProvider);
         engine_->addImageProvider(QStringLiteral(CERF_ASSET_IMAGE_PROVIDER), new AssetImageProvider);

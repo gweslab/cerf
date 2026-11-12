@@ -3,7 +3,7 @@
 #include "../input_capture.h"
 #include "low_level_keyboard_hook.h"
 
-#include "qt_main_window.h"
+#include "../qt_emulator_window.h"
 
 #include <cerfcore/core/cerf_emulator.h>
 #include <cerfcore/core/instance_gate.h>
@@ -17,7 +17,7 @@ public:
     using cerffrontend::InputCapture::InputCapture;
 
     void OnReady() override {
-        auto& window = emu_.Get<QtMainWindow>();
+        auto& window = emu_.Get<QtEmulatorWindow>();
         window.RunOnUiThread([this, &window] {
             hook_.Install([this, &window](uint32_t vk, bool key_up) {
                 if (!IsCaptured()) return false;

@@ -24,11 +24,10 @@ public:
 protected:
     void Reload() override {
         if (QNativeInterface::QAndroidApplication::sdkVersion() < kDynamicColorSdk) {
-            Publish(AccentShade(), AccentShade());
+            Publish(QColor(), QColor());
             return;
         }
-        Publish(AccentShade{SystemColor("system_accent1_600"), SystemColor("system_accent1_0")},
-                AccentShade{SystemColor("system_accent1_200"), SystemColor("system_accent1_800")});
+        Publish(SystemColor("system_accent1_600"), SystemColor("system_accent1_200"));
     }
 };
 

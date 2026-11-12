@@ -27,8 +27,6 @@ using WindowsCreateStringReferenceFn = decltype(&WindowsCreateStringReference);
 
 constexpr char    kWindowMessageType[] = "windows_generic_MSG";
 constexpr wchar_t kImmersiveColorSet[] = L"ImmersiveColorSet";
-constexpr QColor  kLightTextOnAccent(0xFF, 0xFF, 0xFF);
-constexpr QColor  kDarkTextOnAccent(0x00, 0x00, 0x00);
 
 ComPtr<IUISettings3> OpenUiSettings() {
     const HMODULE combase = GetModuleHandleW(L"combase.dll");
@@ -76,11 +74,11 @@ protected:
     void Reload() override {
         const ComPtr<IUISettings3> settings = OpenUiSettings();
         if (!settings) {
-            Publish(AccentShade(), AccentShade());
+            Publish(QColor(), QColor());
             return;
         }
-        Publish(AccentShade{ColorValue(settings.Get(), UIColorType::UIColorType_AccentDark1), kLightTextOnAccent},
-                AccentShade{ColorValue(settings.Get(), UIColorType::UIColorType_AccentLight2), kDarkTextOnAccent});
+        Publish(ColorValue(settings.Get(), UIColorType::UIColorType_AccentDark1),
+                ColorValue(settings.Get(), UIColorType::UIColorType_AccentLight2));
     }
 };
 

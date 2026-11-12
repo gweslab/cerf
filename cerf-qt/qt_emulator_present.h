@@ -5,6 +5,7 @@
 #include <QImage>
 #include <QtGlobal>
 
+#include <atomic>
 #include <cstdint>
 
 class QtEmulatorView;
@@ -14,6 +15,7 @@ public:
     explicit QtEmulatorPresent(QtEmulatorView& view) : view_(view) {}
 
     void OnPresentTick(cerfcore::CerfEmulator& emu, bool source_has_frame) override;
+    void OnUiTick(cerfcore::CerfEmulator& emu) override;
     bool RenderAlt(cerfcore::CerfEmulator& emu, uint32_t* bits, int w, int h, qreal dpr) override;
     bool   ShouldDesaturate(cerfcore::CerfEmulator& emu) override;
     double GlowReach(cerfcore::CerfEmulator& emu, const cerffrontend::ViewportLayout::Layout& frame) override;
@@ -24,5 +26,6 @@ public:
 private:
     static int Dpi(qreal dpr);
 
-    QtEmulatorView& view_;
+    QtEmulatorView&   view_;
+    std::atomic<bool> source_has_frame_{false};
 };

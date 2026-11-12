@@ -1,37 +1,38 @@
 #include "qt_focus_policy.h"
 
+#include "show_without_activating.h"
+
 #include <cerfcore/core/cerf_emulator.h>
 #include <cerfcore/core/device_config.h>
 #include <cerfcore/core/log.h>
 
-#include <QApplication>
-#include <QWidget>
+#include <QGuiApplication>
+#include <QQuickItem>
+#include <QWindow>
 
 REGISTER_SERVICE(QtFocusPolicy);
 
 bool QtFocusPolicy::MayActivate() const {
     if (!emu_.Get<cerfcore::DeviceConfig>().no_focus) return true;
-    return QApplication::activeWindow() != nullptr;
+    return QGuiApplication::focusWindow() != nullptr;
 }
 
-void QtFocusPolicy::Show(QWidget* window) const {
+void QtFocusPolicy::Show(QWindow& window) const {
     if (MayActivate()) {
-        window->show();
+        window.show();
         return;
     }
-    LOG(Lcd, "QtFocusPolicy: showing %p at the bottom of the stack, not activated\n",
-        static_cast<void*>(window));
-    window->setAttribute(Qt::WA_ShowWithoutActivating);
-    window->show();
-    window->lower();
+    LOG(Lcd, "QtFocusPolicy: showing %p at the bottom of the stack, not activated\n", static_cast<void*>(&window));
+    ShowWithoutActivating(window);
+    window.lower();
 }
 
-void QtFocusPolicy::Raise(QWidget* window) const {
+void QtFocusPolicy::Raise(QWindow& window) const {
     if (!MayActivate()) return;
-    window->raise();
-    window->activateWindow();
+    window.raise();
+    window.requestActivate();
 }
 
-void QtFocusPolicy::Focus(QWidget* widget) const {
-    if (MayActivate()) widget->setFocus();
+void QtFocusPolicy::Focus(QQuickItem& item) const {
+    if (MayActivate()) item.forceActiveFocus(Qt::OtherFocusReason);
 }

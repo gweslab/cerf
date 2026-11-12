@@ -5,7 +5,7 @@
 
 #include <cstdint>
 
-class QWidget;
+class QQuickWindow;
 
 struct WindowFit {
     QSize  client;
@@ -13,5 +13,5 @@ struct WindowFit {
     bool   whole = true;
 };
 
-QSize     WindowChrome(const QWidget& window, const QWidget& content);
-WindowFit FitAroundContent(const QWidget& window, const QWidget& content, uint32_t content_w, uint32_t content_h);
+QSize     WindowChrome(const QQuickWindow& window);
+WindowFit FitAroundContent(const QQuickWindow& window, uint32_t content_w, uint32_t content_h);

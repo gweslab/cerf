@@ -1,6 +1,6 @@
 #include "../input_capture.h"
 
-#include "qt_main_window.h"
+#include "../qt_emulator_window.h"
 
 #include <cerfcore/core/cerf_emulator.h>
 
@@ -11,7 +11,7 @@ public:
     using cerffrontend::InputCapture::InputCapture;
 
 protected:
-    void OnCaptureChanged(bool on) override { emu_.Get<QtMainWindow>().SetKeyboardGrab(on); }
+    void OnCaptureChanged(bool on) override { emu_.Get<QtEmulatorWindow>().SetKeyboardGrab(on); }
 };
 
 }

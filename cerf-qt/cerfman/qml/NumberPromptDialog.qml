@@ -10,6 +10,7 @@ OkCancelDialog {
     property string error: ""
     property alias tools: toolRow.data
     readonly property int fieldWidth: 110
+    readonly property int narrowestWidth: 320
     signal done(var values)
 
     function valueAt(index) {
@@ -36,7 +37,7 @@ OkCancelDialog {
         close()
     }
 
-    preferredWidth: 320
+    preferredWidth: Math.max(narrowestWidth, grid.implicitWidth + leftPadding + rightPadding)
 
     onOpened: inputs.itemAt(0).forceActiveFocus()
     onOk: submit()
@@ -47,6 +48,7 @@ OkCancelDialog {
         spacing: Theme.spaceL
 
         GridLayout {
+            id: grid
             Layout.fillWidth: true
             columns: 3
             columnSpacing: Theme.spaceXL
@@ -75,7 +77,9 @@ OkCancelDialog {
                     required property int index
                     Layout.row: index
                     Layout.column: 0
+                    Layout.fillWidth: true
                     text: modelData.label
+                    wrapMode: Text.Wrap
                 }
             }
             Repeater {

@@ -8,14 +8,14 @@
 #include "../qt_app_defaults.h"
 #include "../qt_back_gesture.h"
 #include "../qt_emulator_run.h"
+#include "../qt_emulator_window.h"
 #include "../qt_message_log.h"
 #include "host_diagnostics.h"
 #include "host_timer_resolution.h"
 #include "qt_arguments.h"
-#include "qt_main_window.h"
 #include "qt_window_erase.h"
 
-#include <QApplication>
+#include <QGuiApplication>
 
 namespace {
 
@@ -30,8 +30,8 @@ int RunEmulator(int argc, char** argv) {
     std::string        crash_log_path;
     {
         QtEmulatorRun run(cfg, argc, argv, [] { QCoreApplication::exit(0); },
-                          [](cerfcore::CerfEmulator& emu) { emu.Get<QtMainWindow>().OnTeardownWedged(); });
-        if (run.Boot([](cerfcore::CerfEmulator& emu) { emu.Get<QtMainWindow>().Open(); }))
+                          [](cerfcore::CerfEmulator& emu) { emu.Get<QtEmulatorWindow>().OnTeardownWedged(); });
+        if (run.Boot([](cerfcore::CerfEmulator& emu) { emu.Get<QtEmulatorWindow>().OpenWindow(); }))
             QCoreApplication::exec();
         halt = run.Halt();
         if (halt) crash_log_path = run.CrashLogPath();
@@ -62,7 +62,7 @@ int main(int argc, char* argv[]) {
     QtArguments       args(argc, argv);
     const ProcessMode mode = DetectProcessMode(args.Count(), args.Values());
     ApplyPlatformAppDefaults();
-    QApplication   app(args.QtCount(), args.QtValues());
+    QGuiApplication app(args.QtCount(), args.QtValues());
     args.KeepWhatQtLeft();
     QtBackGesture  back_gesture(app);
     QtWindowErase  window_erase(app);

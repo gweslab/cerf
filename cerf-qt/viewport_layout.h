@@ -75,7 +75,6 @@ public:
 
     Scroll UpdateScroll();
     void   ScrollTo(bool horizontal, int pos);
-    int    ScrollPos(bool horizontal) const { return horizontal ? scroll_x_ : scroll_y_; }
     void   ResetScroll() { scroll_x_ = scroll_y_ = 0; }
 
 private:

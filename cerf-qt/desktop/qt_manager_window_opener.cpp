@@ -3,17 +3,17 @@
 #include "../cerfman/manager_engine.h"
 #include "../cerfman/property_sheets.h"
 #include "../cerfman/settings_pages.h"
-#include "qt_main_window.h"
+#include "../qt_emulator_window.h"
 
 #include <cerfcore/core/cerf_emulator.h>
 #include <cerfcore/core/cerf_paths.h>
 #include <cerfcore/core/device_config.h>
 
+#include <QQuickWindow>
 #include <QVariant>
-#include <QWidget>
 #include <QWindow>
 
-REGISTER_SERVICE_AS(QtManagerWindowOpener, cerffrontend::ManagerWindows);
+REGISTER_SERVICE(QtManagerWindowOpener);
 
 namespace {
 
@@ -46,6 +46,6 @@ bool QtManagerWindowOpener::EditLiveCustomizations(bool force_reboot, std::optio
 
 QVariantMap QtManagerWindowOpener::Placement() const {
     return {{QStringLiteral("transientParent"),
-             QVariant::fromValue(emu_.Get<QtMainWindow>().Window()->windowHandle())},
+             QVariant::fromValue(static_cast<QWindow*>(emu_.Get<QtEmulatorWindow>().Window()))},
             {QStringLiteral("visible"), true}};
 }

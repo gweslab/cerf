@@ -23,6 +23,7 @@ public:
 
 private:
     ManagerQmlEngine& Engine();
+    void              SetApplicationIcon();
 
     std::unique_ptr<ManagerQmlEngine> engine_;
     std::vector<QPointer<QObject>>    opened_;

@@ -11,9 +11,10 @@ CERF splits into libraries and a frontend:
 - **libCerfEngine** (submodule) - the JIT.
 - **libCerfCore** (submodule) - the emulation core and the seams that a
   frontend implements.
-- **cerf-qt** - the frontend, one Qt application. It has a desktop form and an
-  Android form. The root of `cerf-qt/` holds the code that both forms compile.
-  `desktop/` and `mobile/` hold the code of one form.
+- **cerf-qt** - the frontend, one Qt Quick application. Every host shows the
+  same windows. The root of `cerf-qt/` holds the code that every host compiles.
+  `desktop/` holds the code of the desktop hosts, and `android/` holds the code
+  of Android.
 
 The core never includes frontend code. A frontend includes only public core
 headers. When the core needs an action or an answer from the frontend, it
@@ -73,7 +74,10 @@ state are forbidden.
   before it opens runs after it opens.
 
   On Android, a start-up alert before a user-error halt opens the window during
-  the sweep. Its items read no services during the sweep.
+  the sweep. Its items read no services during the sweep. On the desktop, such
+  an alert opens a window of its own and never the emulator window. The alert
+  can come while the device configuration loads. The emulator window reads that
+  configuration, so it cannot open during the load.
 - **The Android frontend boots the emulator on a boot thread.** Qt binds a
   `QObject` service to the thread that creates it. As a result, the GUI thread
   creates the services. A boot thread runs the resolution sweep and the
@@ -285,6 +289,20 @@ serial driver of the board. Never guess them.
 
 - `libCerfCore/src/peripherals/serial/`
 
+## PS/2 mouse
+
+`Ps2Mouse` is the PS/2 pointing device that every board with a PS/2 port
+shares.
+
+**A PS/2 packet carries at most ±127 on each axis.** The PS/2 format allows
+±255, with the ninth bit in byte 0. The CE mouse drivers read each delta byte
+as a signed 8-bit value. They ignore the sign and overflow bits of byte 0. As a
+result, a larger value moves the guest cursor the wrong way. In stream mode,
+CERF sends a report with more motion than one packet carries as several packets
+in the same sample. Because of this, stream mode loses no host motion.
+
+- `libCerfCore/src/peripherals/ps2_mouse/`
+
 ## CPU reset & cold boot
 
 **`GuestCpuReset`** is the funnel for every CERF-initiated CPU reset
@@ -365,13 +383,38 @@ per-SoC/per-board concretes (strategy pattern, selected by `BoardContext`).
   The call carries no dimensions. The call tells the frontend to read the
   new size from `FrameRenderer::PresentedSize`.
 
-  The window of each frontend form is a service of its own type. Code of
-  that form resolves the window by that type. A private subclass of
-  `FrontendWindowAdapter` fills the `FrontendWindow` slot. That subclass
-  forwards each call to the window service.
-  - `cerf-qt/frontend_window.h`, `cerf-qt/frontend_window_adapter.{h,cpp}`;
-    desktop `cerf-qt/desktop/qt_main_window.{h,cpp}`, Android
-    `cerf-qt/mobile/mobile_emulator_window.{h,cpp}`
+  The emulator window is a service of its own type. Frontend code resolves the
+  window by that type. A private subclass of `FrontendWindowAdapter` fills
+  the `FrontendWindow` slot. That subclass forwards each call to the window
+  service.
+
+  `EmulatorWindowHost` holds what the host decides about the emulator window.
+  The desktop shows a normal window and sizes it to the guest. Android shows the
+  window in full screen.
+
+  The chrome of a window is the frame and the bars around its content. **A fit
+  takes the chrome from the frame margins and from the bar height that the window
+  reports.** The sizes of the window and of its items cannot give the chrome.
+  After a resize request, `QWindow::geometry()` can have the new size at once.
+  The items get the new size only when the resize event arrives. On Wayland, the
+  items have no size until the first configure event.
+
+  **A window event that CERF caused never counts as a user resize.** Qt Quick
+  marks every window state change as spontaneous, that is, as an event from the
+  window system. As a result, the event alone cannot show its cause. A platform
+  can deliver the event inside the call that requests
+  the change, or after the next request. The desktop host records each window
+  size and window state that it requests before it calls Qt. An event inside
+  that call, or an event that matches a recorded request, is CERF's. A change of
+  the bars inside such a call starts no refit, for example when full screen ends.
+
+  On macOS, a window sends the size of its new platform window as a resize event
+  when it shows for the first time. A resize event before CERF places the window
+  never counts as a user resize.
+  - `cerf-qt/frontend_window.h`, `cerf-qt/frontend_window_adapter.{h,cpp}`,
+    `cerf-qt/qt_frontend_window.cpp`, `cerf-qt/qt_emulator_window.{h,cpp}`,
+    `cerf-qt/emulator_window_host.h`, `cerf-qt/desktop/desktop_emulator_window_host.cpp`,
+    `cerf-qt/android/android_emulator_window_host.cpp`
 
 - **The panel code is the only authority on the guest resolution. Two
   states sit outside it, and one board fact serves both.** The guest signals
@@ -399,16 +442,32 @@ per-SoC/per-board concretes (strategy pattern, selected by `BoardContext`).
 
   **Qt hides the bars in the mode that reports no swipe to the app.**
   `AndroidSystemBars` switches the hidden bars to the mode that reports the swipe.
-  - `cerf-qt/mobile/android_system_bars.{h,cpp}`,
-    `cerf-qt/mobile/android/src/cx/cerf/SystemBarsWatch.java`
+  - `cerf-qt/android/android_system_bars.{h,cpp}`,
+    `cerf-qt/android/package/src/cx/cerf/SystemBarsWatch.java`
 
 - **The canvas** - the drawable area of the emulator window. It implements
   `CanvasInputHost` and owns the one transform from host pixels to
   guest-surface coordinates (`HostToGuest`). As a result, taps land on the
   rendered image. On the first presented guest frame, `CanvasTabs` switches
   to the framebuffer tab, unless the user already picked a tab.
-  - desktop `cerf-qt/desktop/qt_canvas.{h,cpp}`, Android
-    `cerf-qt/mobile/guest_surface.{h,cpp}`
+
+  On Android, the canvas turns touch into pen and pointer gestures. On the
+  desktop, touch reaches the canvas as mouse input.
+
+  **A locked relative mouse takes relative motion from the host where the host
+  offers it.** On Windows the canvas reads raw mouse input and keeps the cursor on one
+  point of the canvas. On macOS it detaches the cursor from the mouse and reads
+  the deltas of the mouse events. On Wayland it uses the relative pointer and the
+  pointer lock of the compositor.
+
+  On X11 the canvas warps the pointer back to its center and computes each delta
+  from two event positions. A mouse capture of the canvas grabs the pointer of
+  the window system, so the canvas also gets the moves outside the window. Every
+  warp drops the stored position of the last event, also when the pointer
+  already rests at the center. Windows and macOS deliver no move outside the
+  window. On these hosts, a fast move can leave the window between two events and
+  escape this lock.
+  - `cerf-qt/guest_surface.{h,cpp}`, `cerf-qt/qt_pointer_lock*`
 
 - **`FrameRenderer`** (abstract) - one producer of guest frames.
   `RenderInto(dib_bgra32, w, h)` fills a BGRA32 surface. `PresentedSize(w, h)`
@@ -522,7 +581,7 @@ per-SoC/per-board concretes (strategy pattern, selected by `BoardContext`).
   a producer of this service, and a pointer id has a meaning only inside its
   producer. A new overlay is a layer of this service, never a check in another
   overlay or in a guest input route.
-  - `cerf-qt/overlay_input.{h,cpp}`, `cerf-qt/mobile/overlay_touch_area.{h,cpp}`
+  - `cerf-qt/overlay_input.{h,cpp}`, `cerf-qt/overlay_touch_area.{h,cpp}`
 
 - **`BootScreen`** - the CERF-logo boot animation behind the `Tab::Boot` tab,
   plus the `BootBar`. The 60 Hz present loop drives it in time, with no
@@ -719,7 +778,82 @@ per-SoC/per-board concretes (strategy pattern, selected by `BoardContext`).
   sends each mouse click to its widget. The capture/lock indicator is itself
   one such host-owned widget. The window, the tooltips and the timer of the
   bar belong to the frontend.
-  - `cerf-qt/status_bar.{h,cpp}`, `cerf-qt/desktop/qt_status_bar.{h,cpp}`, `cerf-qt/mobile/mobile_widget_bar.{h,cpp}`
+  - `cerf-qt/status_bar.{h,cpp}`, `cerf-qt/status_bar_item.{h,cpp}`, `cerf-qt/strip_widget_bar.{h,cpp}`
+
+- **Menus and dialogs** - on the desktop, every menu and every dialog is a
+  top-level window. The CerfStyle style draws them, except the file dialogs and
+  the macOS menu bar, which are native to the host. CERF never shows a Win32
+  menu, and never shows a desktop menu or dialog inside the emulator window.
+  Many guests are QCIF or QVGA sized, so a popup inside the window does not
+  fit. On Android, menus and dialogs stay inside the window. The menu bar that
+  CerfStyle draws has the look of the status bar.
+
+  **A dialog window has the size of its content.** Qt gives the window of a
+  popup no size limits. Without its own limits, the user can resize or maximize
+  a dialog window.
+
+  **A menu of the drawn menu bar gets its items while it is closed.** Qt shows
+  the popup window before it emits `aboutToShow`, so a menu that builds its
+  items there changes while it is already on screen.
+
+  **On macOS, CERF builds the menus of the menu bar in AppKit.** A menu row is
+  one menu item with a view that holds the buttons of the row. A native menu
+  item of Qt Quick cannot hold a view. Qt replaces the main menu while a Qt menu
+  bar exists, so no window on macOS has a Qt menu bar. When a window with menus
+  becomes active, its menus replace the menus of the other window. The About
+  and Settings items go to the application menu, where macOS has them.
+
+  **An item of the application menu gets its action after it enters the
+  menu.** Qt keeps a hidden Preferences item with the Command-comma key in the
+  application menu. A CERF item with the same key loses that key when it enters
+  the menu with its action already set. Command-comma then opens nothing.
+
+  **A menu popup window is translucent.** Qt clears it with a transparent
+  color. On Windows, the filter that paints a window background on
+  `WM_ERASEBKGND` paints opaque windows only. A fill under a translucent window
+  shows as black corners and a black fade.
+
+  **On Wayland, a menu has no exit transition.** The menu bar opens the next
+  menu before the old menu closes. Wayland closes a new popup together with the
+  old popup that still holds the grab. As a result, a fading old menu closes the
+  next menu.
+
+  **The press that closes a menu never reaches the guest.** On the desktop, Qt
+  forwards a press outside a popup window to the window under it.
+  `MenuDismissFilter` swallows that press. Qt can deliver the release of the
+  press to the popup that closes, in place of the window. As a result, the
+  filter stops at the first later event that shows the button up, not only at a
+  release. On Android, a menu over the guest is a modal popup with no dim, so Qt
+  keeps the press that closes it.
+
+  **The release of the press that opens a menu clicks nothing.** A menu can
+  open under a still pointer, for example a bar menu that slides over its bar
+  item near the edge of the screen. On a release, Qt clicks the item that hover
+  highlighted. When a menu opens, it takes the pointer position from the item
+  or the point that opens it. Its items take hover only after the pointer moves
+  more than the drag distance of the platform from that position. A new press
+  on an item still clicks it.
+
+  **A press on the item that opens a menu, a drag and a release click the menu
+  item under the release.** The item that takes the press keeps the press
+  grab, so it gets every move until the release. Qt can then deliver the drag
+  moves to that item and no hover to the menu window. On the desktop, the menu
+  window therefore drops a press grab that an item of another window holds.
+
+  On every host, a URL that a file dialog returns becomes a path only through
+  `FileAccess::LocalPath`.
+  - `cerf-qt/qml/HostMenuBar.qml`, `cerf-qt/qml/EmulatorMenu.qml`,
+    `cerf-qt/menu_dismiss_filter.{h,cpp}`, `cerf-qt/CerfStyle/{Menu,MenuItem}.qml`,
+    `cerf-qt/CerfStyle/menu_drag.{h,cpp}`,
+    `cerf-qt/CerfStyle/Dialog.qml`, `cerf-qt/cerfman/file_access.{h,cpp}`,
+    `cerf-qt/desktop/qt_window_erase_windows.cpp`, `cerf-qt/desktop/global_menu_bar{.h,_macos.mm}`,
+    `cerf-qt/menu_source.h`
+
+- **`DevicePixelItem`** - a Qt Quick item that paints with `QPainter` derives
+  from `DevicePixelItem`, never from `QQuickPaintedItem`. `QQuickPaintedItem`
+  rounds the item to whole logical pixels and stretches its texture with linear
+  filtering, which blurs the framebuffer at a fractional scale.
+  - `cerf-qt/device_pixel_item.{h,cpp}`
 
 - **`HostWidget` / `HostWidgetRegistry`** - the live configuration surface of
   a peripheral or a board feature. `HostWidget` is an abstract,
@@ -741,7 +875,7 @@ per-SoC/per-board concretes (strategy pattern, selected by `BoardContext`).
   saves a screenshot in the `screenshots` folder of CERF. Android saves
   it in the gallery, in Pictures/CERF.
   - `cerf-qt/screenshots.{h,cpp}`, `cerf-qt/screenshot_store.h`,
-    `cerf-qt/desktop/screenshot_folder_store.cpp`, `cerf-qt/mobile/android_gallery_store.cpp`
+    `cerf-qt/desktop/screenshot_folder_store.cpp`, `cerf-qt/android/android_gallery_store.cpp`
 
 - **The color scheme can switch while CERF runs.** Every window follows a switch
   in both directions. Each window also follows a switch back to a scheme that the
@@ -749,13 +883,11 @@ per-SoC/per-board concretes (strategy pattern, selected by `BoardContext`).
   theme change with a switch while the window is open. A fresh start does not
   show a defect of the switch.
 
-  At each switch, the palette of the emulator window starts from the platform
-  palette, never from the palette that the previous switch set. The Material
-  accent of the Qt Quick windows comes from `SystemAccent`, which reads the
-  accent of the host system. It never reads the application palette, because the
-  Windows Vista style and `QtTheme` rewrite that palette.
-  - `cerf-qt/desktop/qt_theme.{h,cpp}`, `cerf-qt/CerfStyle/system_accent.{h,cpp}`,
-    `cerf-qt/CerfStyle/host_accent*`
+  The Material accent of the Qt Quick windows comes from `SystemAccent`, which
+  reads the accent of the host system. A host gives the accent color only.
+  `SystemAccent` calculates black or white text from the brightness of the
+  accent. This calculation is the same on every host.
+  - `cerf-qt/CerfStyle/system_accent.{h,cpp}`, `cerf-qt/CerfStyle/host_accent*`
 
 ## TraceManager
 

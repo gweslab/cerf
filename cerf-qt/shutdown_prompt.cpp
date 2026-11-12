@@ -41,14 +41,12 @@ const cerfcore::ToggleControl* FindToggle(const std::vector<cerfcore::WidgetCont
 
 const char* ShutdownPrompt::Title() const { return "Shut down - " CERF_PRODUCT_NAME; }
 
+const char* ShutdownPrompt::Heading() const { return "Shut down"; }
+
 const char* ShutdownPrompt::Intro(cerfcore::ShutdownTrigger trigger) const {
     return trigger == cerfcore::ShutdownTrigger::DeepSleep
                ? "The guest OS has requested a shut down."
                : "You have requested a shut down.";
-}
-
-const char* ShutdownPrompt::Question() const {
-    return "What do you want to do?";
 }
 
 const char* ShutdownPrompt::ActionLabel(ShutdownPromptAction action) const {
@@ -90,22 +88,12 @@ std::string ShutdownPrompt::SaveDetail() const {
     return text;
 }
 
-std::string ShutdownPrompt::SaveLabel() const {
-    char text[64];
-    std::snprintf(text, sizeof(text), "Save the state (%llu MB, ", SaveMegabytes());
-    return text;
-}
-
 const char* ShutdownPrompt::SaveLinkUrl() const {
     return kHibernationWarningUrl.text;
 }
 
 const char* ShutdownPrompt::SaveLinkText() const {
     return "only for CERF " CERF_VERSION_LABEL;
-}
-
-const char* ShutdownPrompt::SaveTail() const {
-    return ")";
 }
 
 bool ShutdownPrompt::CountsDown(cerfcore::ShutdownTrigger trigger) const {

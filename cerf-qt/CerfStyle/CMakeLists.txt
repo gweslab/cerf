@@ -15,6 +15,8 @@ qt_add_qml_module(cerfqt_style
         Dialog.qml
         FieldBackground.qml
         Menu.qml
+        MenuBar.qml
+        MenuBarItem.qml
         MenuItem.qml
         MenuSeparator.qml
         Page.qml
@@ -32,6 +34,8 @@ qt_add_qml_module(cerfqt_style
         host_accent.cpp
         legacy_windows.h
         legacy_windows.cpp
+        menu_drag.h
+        menu_drag.cpp
         symbol_tint.h
         symbol_tint.cpp
         system_accent.h

@@ -15,15 +15,9 @@ REGISTER_SERVICE(StatusBar);
 
 namespace {
 
-constexpr Rgb     kBg{32, 32, 32};
-constexpr Rgb     kSep{60, 60, 60};
-constexpr Rgb     kBgLight{240, 240, 240};
-constexpr Rgb     kSepLight{200, 200, 200};
 constexpr Rgb     kRx{229, 80, 80};
 constexpr Rgb     kTx{78, 201, 90};
 constexpr Rgb     kDotRim{20, 20, 20};
-constexpr Rgb     kHover{52, 52, 52};
-constexpr Rgb     kHoverLight{218, 218, 218};
 constexpr int     kGlowTicks     = 3;
 constexpr int     kDotR          = 3;
 constexpr uint8_t kDisabledAlpha = 150;
@@ -132,15 +126,13 @@ void StatusBar::DrawComposited(Painter& p, cerfcore::HostWidget* w, const Rect& 
     if (g.tx > 0) dot(kTx, box.right - kDotR - 2, box.bottom - kDotR - 2);
 }
 
-void StatusBar::Paint(Painter& p, const Rect& client, bool dark) {
-    const Rgb bar_bg = dark ? kBg : kBgLight;
-    p.FillRect(client, bar_bg);
+void StatusBar::Paint(Painter& p, const Rect& client, const Colors& colors) {
+    p.FillRect(client, colors.background);
     const Point separator[] = {{client.left, client.top}, {client.right, client.top}};
-    p.Polyline(separator, 2, dark ? kSep : kSepLight, 1);
+    p.Polyline(separator, 2, colors.separator, 1);
     for (const Entry& e : layout_)
-        if (Hovered(e.box)) p.FillRect(Rect{e.box.left, e.box.top + 1, e.box.right, e.box.bottom},
-                                       dark ? kHover : kHoverLight);
-    PaintWidgets(p, bar_bg);
+        if (Hovered(e.box)) p.FillRect(Rect{e.box.left, e.box.top + 1, e.box.right, e.box.bottom}, colors.hover);
+    PaintWidgets(p, colors.background);
 }
 
 void StatusBar::PaintWidgets(Painter& p, Rgb backdrop) {

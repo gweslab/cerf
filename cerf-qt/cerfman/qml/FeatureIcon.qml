@@ -61,5 +61,5 @@ Item {
     }
     ToolTip.visible: hover.hovered
     ToolTip.text: feature.tip
-    ToolTip.delay: 400
+    ToolTip.delay: Theme.tipDelayMs
 }

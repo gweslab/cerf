@@ -11,7 +11,9 @@
 #include "../tab_menu.h"
 #include "../view_rotation.h"
 #include "../widget_menu_builder.h"
-#include "qt_main_window.h"
+#include "../qt_emulator_window.h"
+#include "../native_menu_bar.h"
+#include "desktop_guest_follow.h"
 #include "qt_manager_window_opener.h"
 
 #include <cerfcore/boards/board_context.h>
@@ -84,42 +86,43 @@ std::vector<MenuItem> HostMenuModel::Actions() {
     }));
     items.push_back(MenuItem::Action("Hard reset…", [this] { ConfirmHardReset(); }));
     items.push_back(MenuItem{});
-    items.push_back(MenuItem::Action("Settings…",
-                                     [this] { emu_.Get<QtManagerWindowOpener>().OpenSettings(); }));
+    MenuItem settings = MenuItem::Action("Settings…", [this] { emu_.Get<QtManagerWindowOpener>().OpenSettings(); });
+    settings.role     = MenuRole::kSettings;
+    items.push_back(std::move(settings));
     items.push_back(MenuItem{});
     for (MenuItem& widget : emu_.Get<WidgetMenuBuilder>().BuildAllWidgets())
         items.push_back(std::move(widget));
     return items;
 }
 
-ViewportMode HostMenuModel::MainViewport::Mode() const { return emu_.Get<QtMainWindow>().Mode(); }
+ViewportMode HostMenuModel::MainViewport::Mode() const { return emu_.Get<QtEmulatorWindow>().Mode(); }
 
 int HostMenuModel::MainViewport::IntegerFactor() const {
-    return emu_.Get<QtMainWindow>().IntegerFactor();
+    return emu_.Get<QtEmulatorWindow>().IntegerFactor();
 }
 
 bool HostMenuModel::MainViewport::Antialias() const {
-    return emu_.Get<QtMainWindow>().Antialias();
+    return emu_.Get<QtEmulatorWindow>().Antialias();
 }
 
 void HostMenuModel::MainViewport::SetViewportMode(ViewportMode m) {
-    emu_.Get<QtMainWindow>().SetViewportMode(m);
+    emu_.Get<QtEmulatorWindow>().SetViewportMode(m);
 }
 
 void HostMenuModel::MainViewport::SetIntegerScale(int factor) {
-    emu_.Get<QtMainWindow>().SetIntegerScale(factor);
+    emu_.Get<QtEmulatorWindow>().SetIntegerScale(factor);
 }
 
 void HostMenuModel::MainViewport::SetAntialias(bool on) {
-    emu_.Get<QtMainWindow>().SetAntialias(on);
+    emu_.Get<QtEmulatorWindow>().SetAntialias(on);
 }
 
 bool HostMenuModel::MainViewport::IsFullscreen() const {
-    return emu_.Get<QtMainWindow>().IsFullscreen();
+    return emu_.Get<QtEmulatorWindow>().IsFullscreen();
 }
 
 void HostMenuModel::MainViewport::ToggleFullscreen() {
-    emu_.Get<QtMainWindow>().ToggleFullscreen();
+    emu_.Get<QtEmulatorWindow>().ToggleFullscreen();
 }
 
 void HostMenuModel::MainViewport::SaveScreenshot() { emu_.Get<Screenshots>().Save(); }
@@ -127,11 +130,10 @@ void HostMenuModel::MainViewport::SaveScreenshot() { emu_.Get<Screenshots>().Sav
 void HostMenuModel::MainViewport::CopyScreenshot() { emu_.Get<Screenshots>().Copy(); }
 
 void HostMenuModel::MainViewport::AfterModeChange(bool) {
-    emu_.Get<QtMainWindow>().RefitIfFollowingGuest();
+    emu_.Get<QtEmulatorWindow>().RefitIfFollowingGuest();
 }
 
 std::vector<MenuItem> HostMenuModel::View() {
-    auto& win  = emu_.Get<QtMainWindow>();
     auto& tabs = emu_.Get<TabMenu>();
 
     std::vector<MenuItem> items;
@@ -140,7 +142,7 @@ std::vector<MenuItem> HostMenuModel::View() {
     items.push_back(MenuItem{});
     emu_.Get<ViewportMenu>().Append(items, main_viewport_);
     items.push_back(MenuItem{});
-    if (win.MenuBarIsNative()) {
+    if (NativeMenuBar::Active()) {
         const auto& hud  = emu_.Get<HudSelection>();
         MenuItem    show = MenuItem::Check("Show HUD", hud.Shown(), [this] { emu_.Get<HudSelection>().Toggle(); });
         show.enabled     = hud.CanShow();
@@ -148,8 +150,8 @@ std::vector<MenuItem> HostMenuModel::View() {
     }
     items.push_back(emu_.Get<ViewRotation>().MenuRow());
     items.push_back(MenuItem{});
-    items.push_back(MenuItem::Check("Match guest size", win.FollowGuest(),
-                                    [this] { emu_.Get<QtMainWindow>().MatchGuestSize(); }));
+    items.push_back(MenuItem::Check("Match guest size", emu_.Get<DesktopGuestFollow>().FollowsGuest(),
+                                    [this] { emu_.Get<QtEmulatorWindow>().MatchGuestSize(); }));
     return items;
 }
 
@@ -160,9 +162,10 @@ std::vector<MenuItem> HostMenuModel::Help() {
     items.push_back(MenuItem::Action("Articles (opens in browser)",
                                      [this] { emu_.Get<LinkOpener>().Open(kArticlesUrl.text); }));
     items.push_back(MenuItem{});
-    items.push_back(
-        MenuItem::Action("About",
-                         [this] { emu_.Get<QtManagerWindowOpener>().OpenAbout(EmulatedDeviceLine()); }));
+    MenuItem about =
+        MenuItem::Action("About", [this] { emu_.Get<QtManagerWindowOpener>().OpenAbout(EmulatedDeviceLine()); });
+    about.role = MenuRole::kAbout;
+    items.push_back(std::move(about));
     return items;
 }
 

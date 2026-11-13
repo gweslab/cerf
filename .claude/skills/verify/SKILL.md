@@ -5,6 +5,8 @@ description: Spawn a hostile reviewer that checks a claim or a diff against the 
 
 # Verify - Reality Check
 
+If the arguments start with `void`, follow only § "Variant - `/verify void [reason]`".
+
 ## Self-audit gate - mandatory before spawning
 
 You can name a specific, bounded rule violation in what you wrote or are about to hand back. Examples: a reader-side guard that masks a writer bug. A stub that returns fake success. A peripheral-register handler you wrote without reading its reference, so the prompt can carry no grounding for it. A hex or decimal value you computed in your head instead of through a tool. A free function that takes services as parameters. A static or global that holds service state. A comment that names a checklist filename or a `§` reference. A `LOG` site that fires per-clock and belongs in a trace file. A `x ? f(x) : 0` null-guard around a callee that already handles null.
@@ -97,7 +99,7 @@ ROUND HISTORY - this is round <N>. Rounds 1-<N-1> returned CRITICAL.
 
 Each round appends its own entry and edits nothing above that entry. The block grows, and the base stays frozen. A `CLEARED` line can also state where you are unsure that the fix is right. The frozen base carries only the doubts of round 1. The reviewer is a fresh subagent with no memory of any earlier round. A prompt that shrinks to the last fix leaves the rest of the work unreviewed. Fixes also regress. A change in round 4 can reintroduce the defect of round 1. Only a reviewer that holds the whole target and the whole history finds that regression.
 
-The prompt file carries the base across a compaction and a session boundary. Carry the path of the file into your compaction summary.
+The prompt file carries the base across a compaction and a session boundary. Carry the path of the file and the agent ID of the last reviewer into your compaction summary.
 
 Never do anything about the file a reviewer verifies. Prefer ending the turn until results is here.
 
@@ -126,6 +128,24 @@ The subagent's reply ends with exactly one of these lines:
   4. Assume the reviewer caught real damage, and assume the gap-closing research is the right next step. The user redirects you only for a different shape entirely.
 - **Never go passive after a CRITICAL verdict.** 
 - **A later re-spawn keeps the prompt file of round 1.** stuff is appended to frozen file.
+
+## Variant - `/verify void [reason]`
+
+The user disagrees with the last verdict, and says that the documents already handle its case in a different way. Then a part of the documents failed. The reviewer and you each report where.
+
+The reason is the text after `void`, verbatim. If that text is empty, the reason is the words with which the user objected to the verdict, verbatim. Do not summarize the reason.
+
+1. Resume the reviewer that returned the verdict. Send this message to its agent ID through `SendMessage`, with nothing added:
+
+   *"The user voids your verdict. The reason of the user, verbatim: "<reason>". Invoke `/session-feedback`. Give your perspective on how agent_docs must change."*
+2. In the same turn, invoke `Skill(session-feedback)` yourself.
+3. Before the reviewer returns, write your own entries to `tmp/verify/<slug>.void.md`, with the slug of the prompt file. The reply of the reviewer then cannot shape your entries.
+4. Do not show your entries to the user yet. End the turn.
+5. When the reviewer returns, run the protocol of `/session-feedback` once, for both sets of entries.
+6. In that protocol, give the entries of the reviewer first, verbatim.
+7. Then give each entry of your file that the reviewer does not already make. Mark each such entry as yours.
+
+A voided verdict binds nothing.
 
 ## Anti-patterns (forbidden)
 

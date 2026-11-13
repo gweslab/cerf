@@ -986,6 +986,15 @@ is `Nkdbg`.
 libCerfEngine hold the only code that reads and writes multi-byte values in a
 byte buffer. Do not write a local shift-and-or or a local `Put32`.
 
+## Callback lists
+
+`CallbackList` in the `cerfengine/callback_list.h` header of libCerfEngine holds
+the callbacks of a unit. It calls all of them in the order in which it received
+them. Each callback gets the same arguments. The list uses no result of a
+callback. libCerfCore code includes it as `cerfcore/core/callback_list.h`. A unit
+that calls a list of callbacks only in this way keeps the list in a
+`CallbackList`.
+
 ## Bundled device tree
 
 `bundled/devices/<name>/` is the input that CERF reads at boot:

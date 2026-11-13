@@ -10,7 +10,36 @@ M.MenuItem {
     readonly property int tabAt: text.indexOf("\t")
     readonly property string label: tabAt < 0 ? text : text.substring(0, tabAt)
     readonly property string shortcutText: tabAt < 0 ? "" : text.substring(tabAt + 1)
+    readonly property int desktopHeight: 24
     height: visible ? implicitHeight : 0
+
+    Binding {
+        target: control
+        property: "padding"
+        value: Theme.spaceXL
+        when: !Theme.touchPlatform
+    }
+
+    Binding {
+        target: control
+        property: "verticalPadding"
+        value: Theme.spaceXXS
+        when: !Theme.touchPlatform
+    }
+
+    Binding {
+        target: control
+        property: "spacing"
+        value: Theme.spaceM
+        when: !Theme.touchPlatform
+    }
+
+    Binding {
+        target: control.background
+        property: "implicitHeight"
+        value: control.desktopHeight
+        when: !Theme.touchPlatform
+    }
 
     Binding {
         target: control

@@ -95,6 +95,7 @@ Menu {
         RowLayout {
             id: buttonRow
             property var buttons: []
+            readonly property int desktopHeight: 32
             spacing: 0
 
             Repeater {
@@ -102,6 +103,7 @@ Menu {
                 ToolButton {
                     required property var modelData
                     Layout.fillWidth: true
+                    Layout.preferredHeight: Theme.touchPlatform ? -1 : buttonRow.desktopHeight
                     icon.source: IconSources.Icon(modelData.icon)
                     enabled: modelData.enabled && modelData.id >= 0
                     Accessible.name: modelData.text

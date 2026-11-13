@@ -17,6 +17,13 @@ M.Menu {
     rightMargin: WindowInsets.rightMargin
     bottomMargin: WindowInsets.bottomMargin
 
+    Binding {
+        target: control
+        property: "verticalPadding"
+        value: Theme.spaceXS
+        when: !Theme.touchPlatform
+    }
+
     function noteOpenerPointer(globalPoint) {
         openerPointer = globalPoint
         openerPointerKnown = true

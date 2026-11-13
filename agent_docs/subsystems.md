@@ -279,8 +279,10 @@ dial-up through one interface. The stack splits into line and personality:
   It is not a Service.
 - **`SerialEndpointPort`** (`libCerfCore/src/peripherals/serial/serial_endpoint_port.{h,cpp}`) -
   the one owner of the endpoint side of a serial line. It holds the endpoint
-  and its callbacks, the endpoint timer, the cradle, and their save and
-  restore. Every `SerialLine` that holds an endpoint uses it.
+  and its callbacks, the cradle, and their save and restore. Every
+  `SerialLine` that holds an endpoint uses it. The port arms the endpoint
+  timer of its line through `SerialLineTimer`. `SerialDeviceClockTimer` is that timer
+  on `ExternalDeviceClock`. A PC card takes the card timer of its slot.
 - `libCerfCore/src/peripherals/serial_pccard/` holds ONLY the PC-card consumer. The
   framework named here is board-neutral and lives in
   `libCerfCore/src/peripherals/serial/`.

@@ -1,11 +1,12 @@
 - version: v8.2
   date: TBA
-#  devices:
-#    new: |
-#      HP Jornada 680, HP 620LX support (thx @Gadgetoid/sh3-emu)
+  devices:
+    new: |
+      HP Jornada 680, HP 620LX support (thx @Gadgetoid/sh3-emu)
   emulator:
-#    new: |
-#      SH3 guest CPU emulation
+    new: |
+      SH3 guest CPU emulation
+      RetroArch shaders support (librashader)
     fixed: |
       PS/2 mouse lost double clicks on Android
       PS/2 mouse incorrect behaviour fixed

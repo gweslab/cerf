@@ -275,15 +275,20 @@ dial-up through one interface. The stack splits into line and personality:
 - **`SerialCradle`** (`serial_cradle.{h,cpp}`) - the HostWidget for an
   on-SoC UART. It mirrors the insert/eject flow of `PcmciaSlot` and shares
   its insert entries. A modem attached to the serial port of a board therefore
-  looks like an inserted card. The UART peripheral owns it. It is not a
-  Service.
+  looks like an inserted card. The `SerialEndpointPort` of the line owns it.
+  It is not a Service.
+- **`SerialEndpointPort`** (`libCerfCore/src/peripherals/serial/serial_endpoint_port.{h,cpp}`) -
+  the one owner of the endpoint side of a serial line. It holds the endpoint
+  and its callbacks, the endpoint timer, the cradle, and their save and
+  restore. Every `SerialLine` that holds an endpoint uses it.
 - `libCerfCore/src/peripherals/serial_pccard/` holds ONLY the PC-card consumer. The
   framework named here is board-neutral and lives in
   `libCerfCore/src/peripherals/serial/`.
 
 To wire the stock UART of a board, implement `SerialLine` on the UART
 peripheral (RX path + an RX interrupt + baud from its divisor + modem
-status on whatever pins the board wires). Own a `SerialCradle`. Supply a
+status on whatever pins the board wires). Attach the endpoint and the cradle
+through `SerialEndpointPort`. Supply a
 per-board seam that names the modem pins. Take those pin numbers from the
 serial driver of the board. Never guess them.
 

@@ -1,47 +1,34 @@
 #include "qt_manager_window_opener.h"
 
-#include "../cerfman/manager_engine.h"
 #include "../cerfman/property_sheets.h"
-#include "../cerfman/settings_pages.h"
 #include "../qt_emulator_window.h"
 
 #include <cerfcore/core/cerf_emulator.h>
-#include <cerfcore/core/cerf_paths.h>
-#include <cerfcore/core/device_config.h>
 
+#include <QMetaObject>
 #include <QQuickWindow>
+#include <QString>
 #include <QVariant>
 #include <QWindow>
 
+#include <utility>
+
 REGISTER_SERVICE(QtManagerWindowOpener);
 
-namespace {
-
-constexpr char kSettingsWindow[] = "SettingsWindow";
-constexpr char kTutorialWindow[] = "TutorialWindow";
-
-}
-
-void QtManagerWindowOpener::OpenAbout(const std::string& device_line) {
-    QVariantMap properties = Placement();
-    properties.insert(QStringLiteral("initialPage"), QString::fromLatin1(settings_page::kAbout));
-    properties.insert(QStringLiteral("deviceLine"), QString::fromStdString(device_line));
-    emu_.Get<ManagerEngine>().Open(QString::fromLatin1(kSettingsWindow), properties);
-}
-
-void QtManagerWindowOpener::OpenSettings() {
-    emu_.Get<ManagerEngine>().Open(QString::fromLatin1(kSettingsWindow), Placement());
+void QtManagerWindowOpener::OpenSettings(const char* page, const std::string& device_line) {
+    QMetaObject::invokeMethod(emu_.Get<QtEmulatorWindow>().Window(), "openSettings",
+                              Q_ARG(QVariant, QString::fromLatin1(page)),
+                              Q_ARG(QVariant, QString::fromStdString(device_line)));
 }
 
 void QtManagerWindowOpener::OpenTutorial() {
-    emu_.Get<ManagerEngine>().Open(QString::fromLatin1(kTutorialWindow), Placement());
+    QMetaObject::invokeMethod(emu_.Get<QtEmulatorWindow>().Window(), "openTutorial");
 }
 
-bool QtManagerWindowOpener::EditLiveProperties(const char* page, bool force_reboot, std::optional<int> ce_major,
-                                               cerffrontend::GuestReset& reset) {
-    const std::string dir = cerfcore::GetDeviceDir(emu_.Get<cerfcore::DeviceConfig>().device_name);
-    return emu_.Get<PropertySheets>().EditLive(Placement(), QString::fromStdString(dir), QString::fromLatin1(page),
-                                               force_reboot, ce_major, reset);
+void QtManagerWindowOpener::EditLiveProperties(const char* page, bool force_reboot, std::optional<int> ce_major,
+                                               cerffrontend::LiveSheetFinished finished) {
+    emu_.Get<PropertySheets>().EditLive(Placement(), QString::fromLatin1(page), force_reboot, ce_major,
+                                        std::move(finished));
 }
 
 QVariantMap QtManagerWindowOpener::Placement() const {

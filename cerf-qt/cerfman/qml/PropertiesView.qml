@@ -64,7 +64,13 @@ Page {
             stack.push(shaderPicker, {"mobile": true})
             return
         }
-        shaderPickerWindow.createObject(view, {"transientParent": view.Window.window}).show()
+        Dialogs.openWindow("ShaderPickerWindow", shaderPickerWindow, view, {"transientParent": view.Window.window})
+    }
+
+    function showPage(key) {
+        if (stack.depth > 1)
+            stack.pop(null)
+        sheetView.show(key)
     }
 
     function bppHelp() {
@@ -96,6 +102,13 @@ Page {
         ShaderPickerWindow {
             chosen: view.sheet.shaderPresets.map(p => p.path)
             onToggled: (path, on) => shadersPage.setPreset(path, on)
+        }
+    }
+
+    Connections {
+        target: view.sheet
+        function onPageRequested(key) {
+            view.showPage(key)
         }
     }
 

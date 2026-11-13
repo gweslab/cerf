@@ -4,15 +4,17 @@
 
 #include <cerfcore/core/cerf_emulator.h>
 
+#include <utility>
+
 namespace {
 
 class DesktopLiveCustomizations final : public cerffrontend::ManagerWindows {
 public:
     using cerffrontend::ManagerWindows::ManagerWindows;
 
-    bool EditLiveProperties(const char* page, bool force_reboot, std::optional<int> ce_major,
-                            cerffrontend::GuestReset& reset) override {
-        return emu_.Get<QtManagerWindowOpener>().EditLiveProperties(page, force_reboot, ce_major, reset);
+    void EditLiveProperties(const char* page, bool force_reboot, std::optional<int> ce_major,
+                            cerffrontend::LiveSheetFinished finished) override {
+        emu_.Get<QtManagerWindowOpener>().EditLiveProperties(page, force_reboot, ce_major, std::move(finished));
     }
 };
 

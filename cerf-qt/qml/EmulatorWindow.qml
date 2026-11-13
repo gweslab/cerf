@@ -12,6 +12,7 @@ ScreenWindow {
     property var openDialogs: []
     property var menuTree: null
     property bool chromeShown: true
+    readonly property bool modalChildren: false
     readonly property bool touch: Theme.touchPlatform
     readonly property int stripSlideMs: 150
     readonly property int stripDismissPull: 24
@@ -421,6 +422,14 @@ ScreenWindow {
     function showHintAt(text, ms, anchor) {
         anchoredHint.anchor = anchor
         anchoredHint.show(text, ms)
+    }
+
+    function openSettings(page, deviceLine) {
+        Dialogs.openSettings(root, page, deviceLine)
+    }
+
+    function openTutorial() {
+        Dialogs.openTutorial(root)
     }
 
     function createDialog(name, properties) {

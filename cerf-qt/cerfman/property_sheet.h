@@ -39,7 +39,7 @@ class PropertySheet : public QObject {
     Q_PROPERTY(bool locked READ Locked CONSTANT)
     Q_PROPERTY(QString initialPage READ InitialPage CONSTANT)
     Q_PROPERTY(QString deviceDirectory READ DeviceDirectoryPath CONSTANT)
-    Q_PROPERTY(bool forceReboot READ ForceReboot CONSTANT)
+    Q_PROPERTY(bool forceReboot READ ForceReboot NOTIFY forceRebootChanged)
     Q_PROPERTY(bool fullScreenSetting READ FullScreenSetting CONSTANT)
     Q_PROPERTY(bool doubleTapHelperSetting READ DoubleTapHelperSetting CONSTANT)
     Q_PROPERTY(QString mountPointDefault READ MountPointDefault CONSTANT)
@@ -144,9 +144,12 @@ public:
     Q_INVOKABLE QString      Save();
     Q_INVOKABLE void         Finish(const QString& reboot);
     Q_INVOKABLE void         Cancel();
+    void                     Request(const QString& page, bool force_reboot);
 
 signals:
     void valuesChanged();
+    void forceRebootChanged();
+    void pageRequested(const QString& page);
     void finished(bool accepted, const QString& reboot);
 
 private:

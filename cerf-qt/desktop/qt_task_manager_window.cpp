@@ -22,9 +22,7 @@ public:
 
     void Show() override {
         if (window_) {
-            if (window_->windowStates().testFlag(Qt::WindowMinimized)) window_->showNormal();
-            window_->raise();
-            window_->requestActivate();
+            emu_.Get<QtFocusPolicy>().Raise(*window_);
             return;
         }
         auto* controller = new TaskManagerController(emu_);

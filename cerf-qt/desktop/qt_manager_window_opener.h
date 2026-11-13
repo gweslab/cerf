@@ -13,11 +13,10 @@ class QtManagerWindowOpener : public cerfcore::Service {
 public:
     using cerfcore::Service::Service;
 
-    void OpenAbout(const std::string& device_line);
-    void OpenSettings();
+    void OpenSettings(const char* page, const std::string& device_line);
     void OpenTutorial();
-    bool EditLiveProperties(const char* page, bool force_reboot, std::optional<int> ce_major,
-                            cerffrontend::GuestReset& reset);
+    void EditLiveProperties(const char* page, bool force_reboot, std::optional<int> ce_major,
+                            cerffrontend::LiveSheetFinished finished);
 
 private:
     QVariantMap Placement() const;

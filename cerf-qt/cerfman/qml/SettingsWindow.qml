@@ -3,8 +3,11 @@ import CerfStyle
 
 PageWindow {
     id: host
-    property alias initialPage: view.initialPage
     property alias deviceLine: view.deviceLine
+
+    function showPage(key) {
+        view.show(key)
+    }
 
     title: view.title
     width: 820

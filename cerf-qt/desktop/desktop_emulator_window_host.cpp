@@ -103,14 +103,10 @@ public:
 
     void Raise() override {
         QQuickWindow* window = emu_.Get<QtEmulatorWindow>().Window();
-        if (window->windowStates().testFlag(Qt::WindowMinimized)) {
-            auto& follow = emu_.Get<DesktopGuestFollow>();
-            follow.ExpectStates(Qt::WindowNoState);
-            const DesktopGuestFollow::Request request(follow);
-            window->showNormal();
-        }
-        window->raise();
-        window->requestActivate();
+        auto&         follow = emu_.Get<DesktopGuestFollow>();
+        if (window->windowStates().testFlag(Qt::WindowMinimized)) follow.ExpectStates(Qt::WindowNoState);
+        const DesktopGuestFollow::Request request(follow);
+        emu_.Get<QtFocusPolicy>().Raise(*window);
     }
 
     bool IsFullscreen() const override { return chrome_.IsFullscreen(); }

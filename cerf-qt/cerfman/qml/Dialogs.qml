@@ -49,17 +49,28 @@ QtObject {
             inform(host, qsTr("Open device directory"), error)
     }
 
-    function openSettings(parentWindow, initialPage) {
+    function openWindow(key, component, owner, props) {
+        const shown = WindowRegistry.Raise(key)
+        if (shown !== null)
+            return shown
+        const window = component.createObject(owner, props)
+        WindowRegistry.Track(key, window)
+        window.show()
+        return window
+    }
+
+    function openSettings(parentWindow, initialPage, deviceLine) {
         const props = {"transientParent": parentWindow}
+        if (deviceLine !== undefined)
+            props.deviceLine = deviceLine
+        const window = openWindow("SettingsWindow", settingsWindow, parentWindow, props)
         if (initialPage !== undefined)
-            props.initialPage = initialPage
-        settingsWindow.createObject(parentWindow, props).show()
+            window.showPage(initialPage)
     }
 
     function openTutorial(parentWindow, done) {
-        const window = tutorialWindow.createObject(parentWindow, {"transientParent": parentWindow})
+        const window = openWindow("TutorialWindow", tutorialWindow, parentWindow, {"transientParent": parentWindow})
         if (done)
             window.finished.connect(done)
-        window.show()
     }
 }

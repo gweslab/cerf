@@ -3,7 +3,6 @@ import CerfStyle
 
 SheetView {
     id: view
-    property string initialPage: SheetIds.settingsEmulatorPage
     property string deviceLine: ""
     signal closed()
 
@@ -33,7 +32,7 @@ SheetView {
     onLaunched: Dialogs.openTutorial(view.Window.window)
 
     Component.onCompleted: {
-        current = initialPage
+        current = SheetIds.settingsEmulatorPage
         if (!mobile)
             menuShown = false
     }

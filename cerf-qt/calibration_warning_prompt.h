@@ -4,7 +4,7 @@
 
 namespace cerffrontend {
 
-enum class CalibWarningChoice { kDismissed, kSwitchToStock };
+enum class CalibWarningChoice { kDismissed, kSwitchToStock, kChangeResolution };
 
 class CalibrationWarningPrompt : public cerfcore::Service {
 public:

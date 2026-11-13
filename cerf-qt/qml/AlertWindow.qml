@@ -10,6 +10,7 @@ PageWindow {
     readonly property int fixedWidth: 400
     signal finished(var result)
 
+    modal: true
     flags: Qt.Dialog | (topmost ? Qt.WindowStaysOnTopHint : 0)
     width: fixedWidth
     height: column.implicitHeight

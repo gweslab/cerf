@@ -11,6 +11,18 @@ namespace {
 constexpr std::array<const char*, 3> kExplicitKeys = {persist_field::kWidth, persist_field::kHeight,
                                                       persist_field::kBpp};
 
+namespace pf = persist_field;
+
+constexpr std::array<std::array<const char*, 3>, 9> kLiveSettings = {{{pf::kShareFolder},
+                                                                      {pf::kMountPoint},
+                                                                      {pf::kWidth, pf::kHeight},
+                                                                      {pf::kBpp, pf::kPalette},
+                                                                      {pf::kDpi, pf::kFontSize, pf::kClearType},
+                                                                      {pf::kColorScheme},
+                                                                      {pf::kAllowUntrustedApps},
+                                                                      {pf::kHud},
+                                                                      {pf::kShaders}}};
+
 Json ValueOr(const Json& object, const char* key, const Json& fallback) {
     const auto it = object.find(key);
     return it != object.end() ? *it : fallback;
@@ -64,6 +76,21 @@ bool PersistSubset(const DeviceDirectory& device, const Json& baseline,
             merged[key] = current[key];
     }
     return device.WritePersistOverrides(merged, error);
+}
+
+bool ValueChanged(const Json& before, const Json& after, const char* key) {
+    return ValueOrNull(before, key) != ValueOrNull(after, key);
+}
+
+std::vector<const char*> ChangedLiveSettingKeys(const Json& before, const Json& after) {
+    std::vector<const char*> keys;
+    for (const auto& setting : kLiveSettings) {
+        const auto changed = [&](const char* key) { return key != nullptr && ValueChanged(before, after, key); };
+        if (!std::any_of(setting.begin(), setting.end(), changed)) continue;
+        for (const char* key : setting)
+            if (key != nullptr) keys.push_back(key);
+    }
+    return keys;
 }
 
 QSize AutoResolution(std::optional<int> default_width, std::optional<int> default_height,

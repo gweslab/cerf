@@ -9,6 +9,7 @@
 
 #include <optional>
 #include <span>
+#include <vector>
 
 struct PersistedValues {
     Json baseline;
@@ -21,5 +22,7 @@ PersistedValues ReadPersistedValues(const DeviceDirectory& device, const QString
 bool            PersistSubset(const DeviceDirectory& device, const Json& baseline,
                               std::span<const char* const> owned_keys, const Json& current,
                               QString& error);
+bool            ValueChanged(const Json& before, const Json& after, const char* key);
+std::vector<const char*> ChangedLiveSettingKeys(const Json& before, const Json& after);
 QSize AutoResolution(std::optional<int> default_width, std::optional<int> default_height,
                      std::optional<QSize> panel);

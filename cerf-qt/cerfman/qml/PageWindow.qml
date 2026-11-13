@@ -3,7 +3,12 @@ import CerfStyle
 
 ApplicationWindow {
     id: win
-    property bool modal: true
+    readonly property bool modalChildren: modalOver(transientParent)
+    property bool modal: modalChildren
+
+    function modalOver(owner) {
+        return owner === null || owner.modalChildren !== false
+    }
 
     function center() {
         if (transientParent !== null) {

@@ -35,10 +35,6 @@ namespace pf = persist_field;
 namespace sf = sheet_field;
 namespace sp = sheet_page;
 
-constexpr std::array<const char*, 14> kLiveKeys = {
-    pf::kGuestAdditions, pf::kShareFolder, pf::kMountPoint, pf::kWidth,       pf::kHeight,      pf::kBpp,
-    pf::kPalette,        pf::kDpi,         pf::kFontSize,   pf::kClearType,   pf::kColorScheme,
-    pf::kAllowUntrustedApps, pf::kHud,     pf::kShaders};
 constexpr std::array<const char*, 5> kRebootKeys = {pf::kBpp, pf::kPalette, pf::kDpi, pf::kFontSize,
                                                     pf::kColorScheme};
 constexpr std::array<const char*, 2> kLiveResizeKeys  = {pf::kWidth, pf::kHeight};
@@ -297,14 +293,11 @@ void PropertySheet::SetBpp(const QVariant& value) {
 
 bool PropertySheet::RebootRequired() const {
     if (!Live()) return false;
-    const auto changed = [this](const char* key) {
-        return ValueOrNull(values_, key) != ValueOrNull(initial_, key);
-    };
     for (const char* key : kRebootKeys)
-        if (changed(key)) return true;
+        if (ValueChanged(initial_, values_, key)) return true;
     if (ce_major_ && *ce_major_ >= kLiveResizeMinCe) return false;
     for (const char* key : kLiveResizeKeys)
-        if (changed(key)) return true;
+        if (ValueChanged(initial_, values_, key)) return true;
     return false;
 }
 
@@ -392,7 +385,9 @@ QString PropertySheet::SaveOwned(bool all) {
         if (!PersistSubset(subject_.device, baseline_, kPersistKeys, values, error)) return error;
         return QString();
     }
-    if (!PersistSubset(subject_.device, baseline_, kLiveKeys, values, error)) return error;
+    std::vector<const char*> owned = ChangedLiveSettingKeys(initial_, values);
+    owned.push_back(pf::kGuestAdditions);
+    if (!PersistSubset(subject_.device, baseline_, owned, values, error)) return error;
     return QString();
 }
 
@@ -406,6 +401,14 @@ void PropertySheet::Finish(const QString& reboot) {
 void PropertySheet::Cancel() {
     EndShaderPreview(true);
     emit finished(false, QString());
+}
+
+void PropertySheet::Request(const QString& page, bool force_reboot) {
+    if (force_reboot && !force_reboot_) {
+        force_reboot_ = true;
+        emit forceRebootChanged();
+    }
+    emit pageRequested(page);
 }
 
 Json PropertySheet::ShaderObject() const {

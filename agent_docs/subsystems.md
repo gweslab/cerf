@@ -863,6 +863,14 @@ per-SoC/per-board concretes (strategy pattern, selected by `BoardContext`).
   popup no size limits. Without its own limits, the user can resize or maximize
   a dialog window.
 
+  **On the desktop, a window that opens over the emulator window does not block
+  the device.** The user can use the device while the window is open. A window
+  that opens over such a window does not block either. A prompt or an alert that
+  waits for an answer stays modal, for example the shutdown prompt.
+
+  **Only one window of each kind is open.** A second request for an open window
+  brings that window to the front, and shows the page that the request names.
+
   **A menu of the drawn menu bar gets its items while it is closed.** Qt shows
   the popup window before it emits `aboutToShow`, so a menu that builds its
   items there changes while it is already on screen.

@@ -15,9 +15,7 @@ public:
 
     bool ShouldRegister() override { return emu_.Get<cerfcore::DeviceConfig>().guest_additions; }
 
-    bool Open(bool force_reboot) override {
-        return emu_.Get<LivePropertySheet>().Open(sheet_page::kGuestAdditions, force_reboot);
-    }
+    void Open() override { emu_.Get<LivePropertySheet>().Open(sheet_page::kGuestAdditions, false); }
 };
 
 }

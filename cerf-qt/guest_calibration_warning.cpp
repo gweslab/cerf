@@ -2,7 +2,9 @@
 
 #include "balloon_hint.h"
 #include "calibration_warning_prompt.h"
+#include "cerfman/property_fields.h"
 #include "frontend_window.h"
+#include "live_property_sheet.h"
 
 #include <cerfcore/core/cerf_emulator.h>
 #include <cerfcore/core/device_config.h>
@@ -56,8 +58,18 @@ private:
     }
 
     void ShowWarning() {
-        if (emu_.Get<CalibrationWarningPrompt>().Show() != CalibWarningChoice::kSwitchToStock)
-            return;
+        switch (emu_.Get<CalibrationWarningPrompt>().Show()) {
+            case CalibWarningChoice::kSwitchToStock: SwitchToStock(); return;
+            case CalibWarningChoice::kChangeResolution:
+                emu_.Get<LivePropertySheet>().Open(sheet_page::kGuestAdditions, true, [this](bool accepted) {
+                    if (!accepted && present_.load()) ShowWarning();
+                });
+                return;
+            case CalibWarningChoice::kDismissed: return;
+        }
+    }
+
+    void SwitchToStock() {
         cerfcore::PointerSource* stock = StockSource();
         if (!stock) {
             LOG(Caution, "[CALIB] no stock pointing device to switch to\n");

@@ -2,6 +2,8 @@
 
 #include "show_without_activating.h"
 
+#include "../bring_window_to_front.h"
+
 #include <cerfcore/core/cerf_emulator.h>
 #include <cerfcore/core/device_config.h>
 #include <cerfcore/core/log.h>
@@ -28,9 +30,7 @@ void QtFocusPolicy::Show(QWindow& window) const {
 }
 
 void QtFocusPolicy::Raise(QWindow& window) const {
-    if (!MayActivate()) return;
-    window.raise();
-    window.requestActivate();
+    if (MayActivate()) BringWindowToFront(window);
 }
 
 void QtFocusPolicy::Focus(QQuickItem& item) const {

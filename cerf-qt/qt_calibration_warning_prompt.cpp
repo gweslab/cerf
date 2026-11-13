@@ -5,7 +5,6 @@
 #include <cerfcore/core/cerf_emulator.h>
 #include <cerfcore/core/device_config.h>
 #include <cerfcore/core/log.h>
-#include <cerfcore/host/customizations_editor.h>
 
 #include <QMetaObject>
 #include <QPointer>
@@ -31,27 +30,21 @@ public:
 
     cerffrontend::CalibWarningChoice Show() override {
         if (showing_) return cerffrontend::CalibWarningChoice::kDismissed;
-        showing_    = true;
-        dismissed_  = false;
-        auto choice = cerffrontend::CalibWarningChoice::kDismissed;
-        while (!dismissed_) {
-            const QString picked =
-                emu_.Get<QtEmulatorWindow>()
-                    .RunDialog(QStringLiteral("EmulatorCalibrationDialog"),
-                               QVariantMap{{QStringLiteral("texts"), Texts()}}, [this](QObject* d) { dialog_ = d; })
-                    .toString();
-            dialog_ = nullptr;
-            LOG(GuestAdditions, "[CALIB] warning answer '%s'%s\n", qUtf8Printable(picked),
-                dismissed_ ? " after dismiss" : "");
-            if (picked == QLatin1String(kSwitchChoice)) {
-                choice = cerffrontend::CalibWarningChoice::kSwitchToStock;
-                break;
-            }
-            if (picked != QLatin1String(kResolutionChoice) || dismissed_) break;
-            if (emu_.Get<cerfcore::CustomizationsEditor>().Open(true)) break;
-        }
+        showing_   = true;
+        dismissed_ = false;
+        const QString picked =
+            emu_.Get<QtEmulatorWindow>()
+                .RunDialog(QStringLiteral("EmulatorCalibrationDialog"), QVariantMap{{QStringLiteral("texts"), Texts()}},
+                           [this](QObject* d) { dialog_ = d; })
+                .toString();
+        dialog_  = nullptr;
         showing_ = false;
-        return choice;
+        LOG(GuestAdditions, "[CALIB] warning answer '%s'%s\n", qUtf8Printable(picked),
+            dismissed_ ? " after dismiss" : "");
+        if (picked == QLatin1String(kSwitchChoice)) return cerffrontend::CalibWarningChoice::kSwitchToStock;
+        if (picked == QLatin1String(kResolutionChoice) && !dismissed_)
+            return cerffrontend::CalibWarningChoice::kChangeResolution;
+        return cerffrontend::CalibWarningChoice::kDismissed;
     }
 
     void Dismiss() override {

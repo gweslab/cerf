@@ -87,6 +87,9 @@ guest reset. When the user changes one, OK asks which reset to run.
 In the emulator process, a change on the RetroArch Shaders page shows on the running device at
 once. That preview writes no file. Cancel shows the saved shaders again.
 
+In the emulator process, OK writes each setting that the user changed in the sheet, and the
+Guest Additions state of the running device.
+
 After OK in the emulator process, the emulator reads `cerf.json` and then
 `cerf-user.json` again. It never applies its command line again, because a
 command-line value replaces the value that the sheet just wrote. A service that keeps

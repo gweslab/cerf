@@ -9,6 +9,7 @@
 #include "../live_property_sheet.h"
 #include "../product_links.h"
 #include "../cerfman/property_fields.h"
+#include "../cerfman/settings_pages.h"
 #include "../screenshots.h"
 #include "../tab_menu.h"
 #include "../view_rotation.h"
@@ -88,7 +89,9 @@ std::vector<MenuItem> HostMenuModel::Actions() {
     }));
     items.push_back(MenuItem::Action("Hard reset…", [this] { ConfirmHardReset(); }));
     items.push_back(MenuItem{});
-    MenuItem settings = MenuItem::Action("Settings…", [this] { emu_.Get<QtManagerWindowOpener>().OpenSettings(); });
+    MenuItem settings = MenuItem::Action("Settings…", [this] {
+        emu_.Get<QtManagerWindowOpener>().OpenSettings(settings_page::kEmulator, EmulatedDeviceLine());
+    });
     settings.role     = MenuRole::kSettings;
     items.push_back(std::move(settings));
     items.push_back(MenuItem{});
@@ -157,8 +160,9 @@ std::vector<MenuItem> HostMenuModel::Help() {
     items.push_back(MenuItem::Action("Articles (opens in browser)",
                                      [this] { emu_.Get<LinkOpener>().Open(kArticlesUrl.text); }));
     items.push_back(MenuItem{});
-    MenuItem about =
-        MenuItem::Action("About", [this] { emu_.Get<QtManagerWindowOpener>().OpenAbout(EmulatedDeviceLine()); });
+    MenuItem about = MenuItem::Action("About", [this] {
+        emu_.Get<QtManagerWindowOpener>().OpenSettings(settings_page::kAbout, EmulatedDeviceLine());
+    });
     about.role = MenuRole::kAbout;
     items.push_back(std::move(about));
     return items;

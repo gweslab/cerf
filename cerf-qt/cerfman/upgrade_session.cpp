@@ -28,11 +28,11 @@ void UpgradeSession::SetHeading(const QString& heading) {
     emit headingChanged();
 }
 
-void UpgradeSession::AnswerRetry(bool retry) {
+void UpgradeSession::Answer(bool yes) {
     {
         std::lock_guard<std::mutex> lock(mutex_);
         if (!waiting_) return;
-        retry_   = retry;
+        answer_  = yes;
         waiting_ = false;
     }
     answered_.notify_all();
@@ -43,7 +43,7 @@ void UpgradeSession::StopWaiting() {
         std::lock_guard<std::mutex> lock(mutex_);
         stopping_ = true;
         waiting_  = false;
-        retry_    = false;
+        answer_   = false;
     }
     answered_.notify_all();
 }
@@ -69,12 +69,19 @@ void UpgradeSession::PostFailure(const QString& title, const QString& error, con
 }
 
 bool UpgradeSession::AskRetry(const QString& title, const QString& message) {
+    return Ask([this, title, message] { emit retryRequested(title, message); });
+}
+
+bool UpgradeSession::AskEndProcess(const QString& title, const QString& message) {
+    return Ask([this, title, message] { emit endProcessRequested(title, message); });
+}
+
+bool UpgradeSession::Ask(const std::function<void()>& request) {
     std::unique_lock<std::mutex> lock(mutex_);
     if (stopping_) return false;
     waiting_ = true;
-    retry_   = false;
-    QMetaObject::invokeMethod(this, [this, title, message] { emit retryRequested(title, message); },
-                              Qt::QueuedConnection);
+    answer_  = false;
+    QMetaObject::invokeMethod(this, request, Qt::QueuedConnection);
     answered_.wait(lock, [this] { return !waiting_; });
-    return retry_;
+    return answer_;
 }

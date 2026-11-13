@@ -39,8 +39,11 @@ QtObject {
     }
 
     function retry(host, title, message, answer) {
-        const again = qsTr("Retry")
-        choose(host, {"title": title, "message": message}, [again], choice => answer(choice === again))
+        confirm(host, title, message, qsTr("Retry"), answer)
+    }
+
+    function confirm(host, title, message, action, answer) {
+        choose(host, {"title": title, "message": message}, [action], choice => answer(choice === action))
     }
 
     function openDirectory(host, path) {

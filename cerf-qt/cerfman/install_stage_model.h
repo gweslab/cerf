@@ -29,6 +29,7 @@ private:
 
     void Work();
     bool Install(QString& error, InstallProgress& progress);
+    bool WaitForPreviousProcess(const QString& frontend, QString& error);
     bool WaitForPid(QString& error) const;
     void Fail(const QString& title, const QString& message) const;
 

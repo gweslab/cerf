@@ -6,6 +6,7 @@
 #include <cerfcore/core/service.h>
 
 #include <QObject>
+#include <QPointer>
 #include <QString>
 #include <QVariantMap>
 #include <QtQml/qqmlregistration.h>
@@ -43,11 +44,12 @@ signals:
 
 private:
     void SetStatus(const QString& status);
-    void Apply(const std::optional<CerfRelease>& release, bool unstable);
+    void Apply(const std::optional<CerfRelease>& release);
+    void CloseSession();
 
     QString                             status_;
     std::optional<CerfRelease>          release_;
-    bool                                release_unstable_ = false;
     int                                 generation_ = 0;
     std::unique_ptr<CerfUpgradeSession> session_;
+    QPointer<QObject>                   window_;
 };

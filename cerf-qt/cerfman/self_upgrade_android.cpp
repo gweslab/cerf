@@ -5,7 +5,6 @@
 
 bool SelfUpgradeSupported() { return false; }
 
-const char* ManualDownloadUrl(bool unstable) {
-    if (unstable) return "";
+const char* ManualDownloadUrl() {
     return PlayStoreCopy() ? cerffrontend::kPlayStoreUrl.text : cerffrontend::kAndroidDownloadUrl.text;
 }

@@ -140,7 +140,7 @@ void BundleCatalog::Apply(const Fetch& fetch) {
                                         "devices remain available to launch.")
                              .arg(remote)
                              .arg(kSupportedManifestVersion)
-                             .arg(QString::fromUtf8(ManualDownloadUrl(false))));
+                             .arg(QString::fromUtf8(ManualDownloadUrl())));
         else
             emit message(QStringLiteral("Remote manifest outdated"),
                          QStringLiteral("The server's catalog (manifest version %1) is older than this build expects "

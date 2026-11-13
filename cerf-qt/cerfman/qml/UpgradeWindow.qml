@@ -31,7 +31,10 @@ PageWindow {
             progress.total = total
         }
         function onRetryRequested(title, message) {
-            Dialogs.retry(host.contentItem, title, message, again => host.model.AnswerRetry(again))
+            Dialogs.retry(host.contentItem, title, message, again => host.model.Answer(again))
+        }
+        function onEndProcessRequested(title, message) {
+            Dialogs.confirm(host.contentItem, title, message, qsTr("End process"), yes => host.model.Answer(yes))
         }
         function onFailed(title, message) {
             progress.running = false

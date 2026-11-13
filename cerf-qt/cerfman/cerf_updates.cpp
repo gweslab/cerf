@@ -27,7 +27,12 @@ CerfUpdates::CerfUpdates(cerfcore::CerfEmulator& emu) : cerfcore::Service(emu) {
 
 CerfUpdates::~CerfUpdates() = default;
 
-void CerfUpdates::OnShutdown() { session_.reset(); }
+void CerfUpdates::OnShutdown() { CloseSession(); }
+
+void CerfUpdates::CloseSession() {
+    delete window_.data();
+    session_.reset();
+}
 
 void CerfUpdates::SetStatus(const QString& status) {
     status_ = status;
@@ -64,17 +69,16 @@ void CerfUpdates::Check() {
                                                 : ParseStableRelease(body, branch, parse_error);
                                    if (!parse_error.isEmpty())
                                        LOG(Manager, "update check: %s\n", qUtf8Printable(parse_error));
-                                   Apply(release, unstable);
+                                   Apply(release);
                                });
 }
 
-void CerfUpdates::Apply(const std::optional<CerfRelease>& release, bool unstable) {
+void CerfUpdates::Apply(const std::optional<CerfRelease>& release) {
     if (!release || !IsNewerVersion(release->tag)) {
         SetStatus(QString());
         return;
     }
-    release_          = release;
-    release_unstable_ = unstable;
+    release_ = release;
     SetStatus(QStringLiteral("CERF %1 is available").arg(release->tag));
     if (SelfUpgradeSupported()) emit offerReady();
 }
@@ -91,7 +95,7 @@ QVariantMap CerfUpdates::Offer() const {
         {QStringLiteral("tag"), release_->tag},
         {QStringLiteral("body"), release_->body},
         {QStringLiteral("htmlUrl"), release_->html_url},
-        {QStringLiteral("downloadUrl"), QString::fromUtf8(ManualDownloadUrl(release_unstable_))},
+        {QStringLiteral("downloadUrl"), QString::fromUtf8(ManualDownloadUrl())},
         {QStringLiteral("warningUrl"), QString::fromUtf8(cerffrontend::kHibernationWarningUrl.text)}};
 }
 
@@ -117,10 +121,11 @@ QVariantMap CerfUpdates::Upgrade() {
     if (session_ && !session_->Closed())
         return FlowError(QStringLiteral("Upgrade in progress"),
                          QStringLiteral("An upgrade is already running. Wait until its window closes."));
-    session_.reset();
+    CloseSession();
     session_ = std::make_unique<CerfUpgradeSession>(*release_, emu_.Get<HttpClient>().UserAgent());
     emu_.Get<cerfcore::Fatal>().Guard([this] {
-        emu_.Get<ManagerEngine>().Open(QString::fromLatin1(UpgradeSession::kWindowType), session_->WindowProperties());
+        window_ = emu_.Get<ManagerEngine>().Open(QString::fromLatin1(UpgradeSession::kWindowType),
+                                                 session_->WindowProperties());
         session_->Start(emu_.Get<cerfcore::InstanceThreads>());
     });
     return {};

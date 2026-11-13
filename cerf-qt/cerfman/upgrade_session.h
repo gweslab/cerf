@@ -6,6 +6,7 @@
 #include <QVariantMap>
 
 #include <condition_variable>
+#include <functional>
 #include <mutex>
 
 class UpgradeSession : public QObject {
@@ -20,7 +21,7 @@ public:
     QString     Heading() const { return heading_; }
     QVariantMap WindowProperties();
 
-    Q_INVOKABLE void         AnswerRetry(bool retry);
+    Q_INVOKABLE void         Answer(bool yes);
     Q_INVOKABLE virtual void Close() = 0;
 
 signals:
@@ -28,6 +29,7 @@ signals:
     void logLine(const QString& line);
     void progress(double done, double total);
     void retryRequested(const QString& title, const QString& message);
+    void endProcessRequested(const QString& title, const QString& message);
     void failed(const QString& title, const QString& message);
 
 protected:
@@ -37,15 +39,18 @@ protected:
     void PostFailure(const QString& title, const QString& error, const QString& consequence);
     static void LogFailure(const QString& title, const QString& message);
     bool AskRetry(const QString& title, const QString& message);
+    bool AskEndProcess(const QString& title, const QString& message);
     void StopWaiting();
     bool StartStage(const QString& executable, const QString& folder, const QStringList& stage_args,
                     QString& error) const;
 
 private:
+    bool Ask(const std::function<void()>& request);
+
     QString                 heading_;
     std::mutex              mutex_;
     std::condition_variable answered_;
     bool                    waiting_  = false;
-    bool                    retry_    = false;
+    bool                    answer_   = false;
     bool                    stopping_ = false;
 };

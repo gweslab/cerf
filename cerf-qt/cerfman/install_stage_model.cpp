@@ -6,6 +6,7 @@
 #include "install_retry_gate.h"
 #include "launcher_executables.h"
 #include "manager_engine.h"
+#include "process_end.h"
 #include "process_watch.h"
 #include "install_directories.h"
 
@@ -20,7 +21,21 @@
 #include <QFileInfo>
 #include <QMetaObject>
 
+#include <algorithm>
+#include <vector>
+
 REGISTER_SERVICE(InstallStageModel);
+
+namespace {
+
+QString StillRunningText(uint32_t pid) {
+    return QStringLiteral("the previous CERF process (pid %1) is still running after %2 s; its files cannot be "
+                          "replaced")
+        .arg(pid)
+        .arg(kWaitForPidTimeoutMs / 1000);
+}
+
+}
 
 void InstallStageModel::OnShutdown() {
     StopWaiting();
@@ -84,10 +99,7 @@ bool InstallStageModel::Install(QString& error, InstallProgress& progress) {
     const QString self        = QString::fromStdString(cerfcore::host_platform::ExecutablePath());
     const QString frontend    = QDir(install_dir).filePath(QDir(upgrade_dir).relativeFilePath(self));
 
-    if (options_.wait_pid) {
-        PostLog(QStringLiteral("Waiting for the previous CERF process (pid %1)").arg(*options_.wait_pid));
-        if (!WaitForPid(error)) return false;
-    }
+    if (!WaitForPreviousProcess(frontend, error)) return false;
     std::vector<QString> images{frontend};
     for (const char* name : LauncherExecutables()) images.push_back(QDir(install_dir).filePath(QString::fromUtf8(name)));
     for (const QString& image : images) {
@@ -122,14 +134,45 @@ bool InstallStageModel::Install(QString& error, InstallProgress& progress) {
     return StartStage(frontend, install_dir, args, error);
 }
 
+bool InstallStageModel::WaitForPreviousProcess(const QString& frontend, QString& error) {
+    if (!options_.wait_pid) return true;
+    const uint32_t pid     = *options_.wait_pid;
+    const QString  product = QString::fromUtf8(cerffrontend::kProductName);
+    const auto runs_frontend = [&frontend, pid](bool& runs, QString& failure) {
+        std::vector<uint32_t> pids;
+        if (!ProcessesRunningImage(frontend, pids, failure)) return false;
+        runs = std::find(pids.begin(), pids.end(), pid) != pids.end();
+        return true;
+    };
+    PostLog(QStringLiteral("Waiting for the previous CERF process (pid %1)").arg(pid));
+    while (!WaitForProcessExit(pid, int(kWaitForPidTimeoutMs), error)) {
+        if (!error.isEmpty()) return false;
+        bool runs = false;
+        if (!runs_frontend(runs, error)) return false;
+        if (!runs) {
+            error = StillRunningText(pid);
+            return false;
+        }
+        if (!AskEndProcess(QStringLiteral("%1 did not close").arg(product),
+                           QStringLiteral("The previous %1 (process %2) is still running, and its files cannot be "
+                                          "replaced while it runs.\n\nEnd that process and continue the upgrade?")
+                               .arg(product)
+                               .arg(pid))) {
+            error = QStringLiteral("cancelled while the previous CERF process (pid %1) was running").arg(pid);
+            return false;
+        }
+        if (!runs_frontend(runs, error)) return false;
+        if (!runs) continue;
+        PostLog(QStringLiteral("Ending the previous CERF process (pid %1)").arg(pid));
+        if (!EndProcess(pid, error)) return false;
+    }
+    return true;
+}
+
 bool InstallStageModel::WaitForPid(QString& error) const {
     const uint32_t pid = *options_.wait_pid;
     if (WaitForProcessExit(pid, int(kWaitForPidTimeoutMs), error)) return true;
-    if (error.isEmpty())
-        error = QStringLiteral("the previous CERF process (pid %1) is still running after %2 s; its files cannot "
-                               "be replaced")
-                    .arg(pid)
-                    .arg(kWaitForPidTimeoutMs / 1000);
+    if (error.isEmpty()) error = StillRunningText(pid);
     return false;
 }
 

@@ -81,7 +81,7 @@ void CerfUpgradeSession::Work() {
     QString error;
     if (Stage(staged, error) &&
         StartStage(staged, StagingDirectory(InstallRoot()), {QString::fromLatin1(kUpgradeArg)}, error)) {
-        QMetaObject::invokeMethod(QCoreApplication::instance(), [] { QCoreApplication::quit(); },
+        QMetaObject::invokeMethod(QCoreApplication::instance(), [] { QCoreApplication::exit(0); },
                                   Qt::QueuedConnection);
         return;
     }

@@ -8,9 +8,12 @@ PopupDialog {
     readonly property int changelogHeight: 280
     signal upgrade()
 
-    function startUpgrade() {
+    function proceed() {
         close()
-        upgrade()
+        if (offer.upgradable)
+            upgrade()
+        else
+            DesktopShell.OpenLink(offer.downloadUrl)
     }
 
     function openInBrowser() {
@@ -26,7 +29,7 @@ PopupDialog {
 
     DialogEnterShortcut {
         popup: dialog
-        onActivated: dialog.startUpgrade()
+        onActivated: dialog.proceed()
     }
 
     rightToLeftButtons: [
@@ -35,13 +38,14 @@ PopupDialog {
             onClicked: dialog.close()
         },
         Button {
-            text: qsTr("Open in browser")
+            visible: dialog.offer.upgradable
+            text: qsTr("Manual download")
             onClicked: dialog.openInBrowser()
         },
         Button {
-            text: qsTr("Upgrade")
+            text: dialog.offer.upgradable ? qsTr("Upgrade") : qsTr("Download")
             highlighted: true
-            onClicked: dialog.startUpgrade()
+            onClicked: dialog.proceed()
         }
     ]
 

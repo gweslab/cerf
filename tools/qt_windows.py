@@ -29,6 +29,11 @@ PATCH_COMMIT = "3df3aac758177b28843c4d1511a2bd7751fe82b6"
 PATCH_URL = "https://github.com/crystalidea/qt6windows7/archive/{}.zip".format(PATCH_COMMIT)
 PATCH_TREE = "e3bc950c394f42a73eb493d82b0004bbe9e89b6c0623d5e70e1eb7a655b7da7d"
 PATCH_MODULE = "qtbase"
+UPSTREAM_FIX_URL = "https://github.com/qt/{}/commit/{}.patch?full_index=1"
+UPSTREAM_FIXES = (
+    ("qtdeclarative", "0e45b15f10ffc4898fe3f0f233dc1a25e46af00d", "src/quick/util/qquickdeliveryagent.cpp",
+     "4a10e1ccca4ea06c5e51c48999a25825da8660eece91e1d58470d7207794e9c5"),
+)
 CONFIGURE = ("-release", "-opensource", "-confirm-license", "-opengl", "desktop", "-no-openssl",
              "-no-feature-sql", "-nomake", "tests", "-nomake", "examples")
 
@@ -42,7 +47,8 @@ def prefix_dir(root: Path) -> Path:
 
 def _wanted_stamp() -> dict:
     return {"version": QT_VERSION, "modules": dict(QT_MODULES), "patch_commit": PATCH_COMMIT,
-            "patch_tree": PATCH_TREE, "configure": list(CONFIGURE)}
+            "patch_tree": PATCH_TREE, "upstream_fixes": [list(fix) for fix in UPSTREAM_FIXES],
+            "configure": list(CONFIGURE)}
 
 
 def _patch_entries(archive: zipfile.ZipFile) -> List[tuple]:
@@ -66,6 +72,18 @@ def _patch_tree(path: Path) -> str:
     return total.hexdigest()
 
 
+def _fix_section(patch: bytes, path: str) -> bytes:
+    start = patch.find("diff --git a/{0} b/{0}\n".format(path).encode("utf-8"))
+    if start < 0:
+        return b""
+    end = patch.find(b"\ndiff --git ", start)
+    return patch[start:] if end < 0 else patch[start:end + 1]
+
+
+def _fix_digest(path: str) -> Callable[[Path], str]:
+    return lambda patch: hashlib.sha256(_fix_section(patch.read_bytes(), path)).hexdigest()
+
+
 def _curl_download(url: str, destination: Path, report: Say) -> None:
     destination.parent.mkdir(parents=True, exist_ok=True)
     partial = partial_path(destination)
@@ -83,6 +101,10 @@ def _fetch_sources(downloads: Path) -> Dict[str, Path]:
                                           _curl_download)
     archives["patches"] = fetch_verified(PATCH_URL, downloads / "qt6windows7-{}.zip".format(PATCH_COMMIT),
                                          PATCH_TREE, say, _curl_download, _patch_tree)
+    for module, commit, path, digest in UPSTREAM_FIXES:
+        archives[commit] = fetch_verified(UPSTREAM_FIX_URL.format(module, commit),
+                                          downloads / "{}-{}.patch".format(module, commit), digest, say,
+                                          _curl_download, _fix_digest(path))
     return archives
 
 
@@ -97,6 +119,11 @@ def _unpack(archives: Dict[str, Path], src: Path) -> None:
             (src / relative).write_bytes(archive.read(name))
             count += 1
     say("Applied {} qt6windows7 files to {}".format(count, PATCH_MODULE))
+    apply_env = dict(os.environ, GIT_CEILING_DIRECTORIES=str(src))
+    for module, commit, path, _digest in UPSTREAM_FIXES:
+        run_or_raise(["git", "-c", "core.autocrlf=false", "apply", "--include=" + path, str(archives[commit])],
+                     QtBuildError, "git apply of Qt commit {} to {}".format(commit, path), src / module, apply_env)
+        say("Applied Qt commit {} to {}/{}".format(commit, module, path))
 
 
 def _vcvars_environment(toolchain) -> Dict[str, str]:

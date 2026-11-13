@@ -87,6 +87,10 @@ jobs:
         shell: pwsh
         run: python tools/third_party_sources.py list $env:HOST_BRANCH "${{ steps.version.outputs.out }}"
 
+      - name: List the files of the build
+        shell: pwsh
+        run: python tools/release_file_list.py "${{ steps.version.outputs.out }}"
+
       - name: Upload Artifacts
         uses: actions/upload-artifact@v4
         with:

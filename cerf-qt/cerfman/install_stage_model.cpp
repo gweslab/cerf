@@ -4,6 +4,7 @@
 #include "install_copier.h"
 #include "install_finalize.h"
 #include "install_retry_gate.h"
+#include "launcher_executables.h"
 #include "manager_engine.h"
 #include "process_watch.h"
 #include "install_directories.h"
@@ -88,7 +89,7 @@ bool InstallStageModel::Install(QString& error, InstallProgress& progress) {
         if (!WaitForPid(error)) return false;
     }
     std::vector<QString> images{frontend};
-    for (const char* name : kRetiredExecutables) images.push_back(QDir(install_dir).filePath(QString::fromUtf8(name)));
+    for (const char* name : LauncherExecutables()) images.push_back(QDir(install_dir).filePath(QString::fromUtf8(name)));
     for (const QString& image : images) {
         for (;;) {
             std::vector<uint32_t> pids;

@@ -833,6 +833,17 @@ per-SoC/per-board concretes (strategy pattern, selected by `BoardContext`).
   release. On Android, a menu over the guest is a modal popup with no dim, so Qt
   keeps the press that closes it.
 
+  **A press inside an open menu never reaches the guest.** On the desktop, Qt
+  gives each press to the menu window first. The window under the menu gets the
+  press only when no menu window accepts it. No menu window accepts a press on a
+  parent menu while its submenu is open. `MenuDismissFilter` swallows a press
+  that reaches the emulator window when the press lies inside a visible popup
+  window.
+
+  **Qt 6.8.4 reports a press that a menu item accepts as not accepted.** The
+  window under the menu then gets the press too. For that reason, the Windows
+  build of Qt carries the upstream fix for QTBUG-139342.
+
   **The release of the press that opens a menu clicks nothing.** A menu can
   open under a still pointer, for example a bar menu that slides over its bar
   item near the edge of the screen. On a release, Qt clicks the item that hover

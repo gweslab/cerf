@@ -1,6 +1,7 @@
 #pragma once
 
 #include <QObject>
+#include <QPointF>
 
 class QMouseEvent;
 
@@ -12,7 +13,8 @@ protected:
     bool eventFilter(QObject* watched, QEvent* event) override;
 
 private:
-    bool SwallowMouse(const QMouseEvent& event);
+    static bool OnPopup(const QPointF& global);
+    bool        SwallowMouse(const QMouseEvent& event);
 
     bool            armed_      = false;
     Qt::MouseButton swallowed_  = Qt::NoButton;

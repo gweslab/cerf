@@ -1,18 +1,30 @@
 #include "menu_dismiss_filter.h"
 
 #include <QEvent>
+#include <QGuiApplication>
 #include <QMouseEvent>
 #include <QTimer>
+#include <QTouchEvent>
+#include <QWindow>
+
+#include <algorithm>
 
 void MenuDismissFilter::Arm() {
     armed_ = true;
     QTimer::singleShot(0, this, [this] { armed_ = false; });
 }
 
+bool MenuDismissFilter::OnPopup(const QPointF& global) {
+    const QWindowList windows = QGuiApplication::topLevelWindows();
+    return std::any_of(windows.cbegin(), windows.cend(), [&global](const QWindow* window) {
+        return window->isVisible() && window->type() == Qt::Popup && window->geometry().contains(global.toPoint());
+    });
+}
+
 bool MenuDismissFilter::SwallowMouse(const QMouseEvent& event) {
     const bool begins =
         event.type() == QEvent::MouseButtonPress || event.type() == QEvent::MouseButtonDblClick;
-    if (begins && armed_) {
+    if (begins && (armed_ || OnPopup(event.globalPosition()))) {
         armed_     = false;
         swallowed_ = event.button();
         return true;
@@ -37,7 +49,7 @@ bool MenuDismissFilter::eventFilter(QObject* watched, QEvent* event) {
             if (SwallowMouse(*static_cast<QMouseEvent*>(event))) return true;
             break;
         case QEvent::TouchBegin:
-            touch_held_ = armed_;
+            touch_held_ = armed_ || OnPopup(static_cast<QTouchEvent*>(event)->points().first().globalPosition());
             armed_      = false;
             if (touch_held_) return true;
             break;

@@ -140,9 +140,16 @@ frontend with `--wait-for-pid=<pid> --upgrade`. The install stage then does thes
 
 1. It waits for that process to exit. It does not continue while a frontend of the
    installation runs.
-2. It copies the staged build over the installation. On macOS it replaces each
-   application bundle whole, symbolic links included.
-3. It removes the retired entries of earlier builds that the new build does not ship.
+2. It removes each file that the list of the earlier build names and the list of the new
+   build does not name. It compares the names of the two lists without regard to letter
+   case on every host. It removes nothing when one of the two lists is missing. It keeps
+   and logs an entry that is not a relative path inside the install root. It never removes
+   a folder that holds files, or a file behind a symbolic link. The removal comes before
+   the copy, because a new build can ship a folder where the earlier build had a file.
+3. It copies the staged build over the installation. On macOS it replaces each
+   application bundle whole, with its symbolic links. A file or a folder whose name
+   differs from a new name only in letter case is the same entry. The copy writes into
+   that entry. The installation then holds one entry for that name on every host.
 4. It merges the global `cerf.json`, so user keys survive.
 5. On Windows, it creates the shortcuts that the options name. On an upgrade, it also
    rewrites the shortcuts and the Programs and Features entry that point into this
@@ -150,9 +157,15 @@ frontend with `--wait-for-pid=<pid> --upgrade`. The install stage then does thes
 6. It starts the installed frontend with `--wait-for-pid=<pid> --post-upgrade`. That
    process deletes `upgrade/`.
 
+Each CI build of a desktop host lists its own files in `installed_files.json` in its
+release folder (`tools/release_file_list.py`). That list is the only record of what a
+build placed.
+
 On Android, the app places its bundled files into the install root at the first start
-of each installed package. It merges `cerf.json` as the install stage does. It also
-deletes each file that the previous package placed and the new package does not ship.
+of each installed package. It merges `cerf.json` as the install stage does. It records
+the files that it placed in `installed_files.json`. Before it places the files, it removes
+each file of the previous record that the new package does not ship, with the rules of
+step 2.
 
 ## Installing and uninstalling
 

@@ -118,6 +118,8 @@ def qt_win7_components() -> List[Component]:
                             [Download(qt_windows.QT_SOURCE_URL.format(qt_windows.QT_VERSION, module), sha256)])
                   for module, sha256 in qt_windows.QT_MODULES]
     components.append(Component("qt6windows7", qt_windows.PATCH_COMMIT, [Download(qt_windows.PATCH_URL)]))
+    components += [Component(module, commit, [Download(qt_windows.UPSTREAM_FIX_URL.format(module, commit))])
+                   for module, commit, _path, _digest in qt_windows.UPSTREAM_FIXES]
     return components
 
 

@@ -83,7 +83,8 @@ void DetachedPointerLock::OnMotion(NSEvent* event) {
 }
 
 void DetachedPointerLock::Recenter() {
-    const QPointF want    = window_->mapToGlobal(sink_.RestInWindow());
+    const QPointF rest    = window_->mapToGlobal(sink_.RestInWindow());
+    const QPointF want(std::round(rest.x()), std::round(rest.y()));
     const NSPoint mouse   = [NSEvent mouseLocation];
     const double  primary = NSScreen.screens.firstObject.frame.size.height;
     const double  now_x   = mouse.x;

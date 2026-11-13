@@ -4,8 +4,8 @@
 #include "../cerfman/filesystem_path.h"
 #include "../cerfman/global_config_migration.h"
 #include "../cerfman/install_directories.h"
+#include "../cerfman/installed_files.h"
 #include "../cerfman/json_file.h"
-#include "../cerfman/path_containment.h"
 
 #include <cerfcore/core/cerf_paths.h>
 #include <cerfcore/core/log.h>
@@ -19,7 +19,6 @@
 #include <QFileInfo>
 #include <QJniObject>
 #include <QResource>
-#include <QSet>
 #include <QStandardPaths>
 #include <QString>
 #include <QStringList>
@@ -28,9 +27,7 @@
 
 namespace {
 
-constexpr char kRecordName[]    = "installed_files.json";
 constexpr char kUpdateTimeKey[] = "package_update_time";
-constexpr char kFilesKey[]      = "files";
 
 qint64 PackageUpdateTime() {
     const QJniObject manager = AndroidPackageManager();
@@ -46,50 +43,48 @@ bool Place(const QString& source, const QString& target, QString& error) {
     return out.Open(error) && out.Write(QResource(source).uncompressedData(), error) && out.Close(error);
 }
 
-QStringList RecordedFiles(const Json& record) {
-    QStringList files;
-    for (const Json& entry : record.value(kFilesKey, Json::array()))
-        files.append(JsonString(entry));
+QStringList BundledFiles(const QDir& resources) {
+    QStringList  files;
+    QDirIterator it(resources.path(), QDir::Files, QDirIterator::Subdirectories);
+    while (it.hasNext()) {
+        const QString relative = resources.relativeFilePath(it.next());
+        if (relative != QLatin1String(cerffrontend::kGlobalConfigFileName)) files.append(relative);
+    }
     return files;
 }
 
-bool PlaceBundledFiles(const QString& root, QStringList& placed) {
-    const QDir   resources(InstallResourceRoot());
-    QDirIterator it(resources.path(), QDir::Files, QDirIterator::Subdirectories);
-    while (it.hasNext()) {
-        const QString source   = it.next();
-        const QString relative = resources.relativeFilePath(source);
-        const QString target   = root + QLatin1Char('/') + relative;
-        QString error;
-        if (relative == QLatin1String(cerffrontend::kGlobalConfigFileName)) {
-            const QByteArray staged = QResource(source).uncompressedData();
-            if (!MigrateGlobalConfig(Json::parse(staged.cbegin(), staged.cend()), target, error)) {
-                LOG(Caution, "cannot migrate the global configuration (%s)\n", qUtf8Printable(error));
-                return false;
-            }
-            continue;
-        }
-        if (!Place(source, target, error)) {
+bool PlaceBundledFiles(const QString& root, const QDir& resources, const QStringList& files) {
+    QString          error;
+    const QByteArray staged = QResource(resources.filePath(QLatin1String(cerffrontend::kGlobalConfigFileName)))
+                                  .uncompressedData();
+    if (!MigrateGlobalConfig(Json::parse(staged.cbegin(), staged.cend()),
+                             root + QLatin1Char('/') + QLatin1String(cerffrontend::kGlobalConfigFileName), error)) {
+        LOG(Caution, "cannot migrate the global configuration (%s)\n", qUtf8Printable(error));
+        return false;
+    }
+    for (const QString& relative : files) {
+        if (!AdoptInstalledName(PathOf(root), PathOf(relative), error) ||
+            !Place(resources.filePath(relative), root + QLatin1Char('/') + relative, error)) {
             LOG(Caution, "%s\n", qUtf8Printable(error));
             return false;
         }
-        placed.append(relative);
     }
     return true;
 }
 
-bool RemoveDroppedFiles(const QString& root, const QStringList& before, const QStringList& now) {
-    const QSet<QString> kept(now.cbegin(), now.cend());
-    for (const QString& relative : before) {
-        if (kept.contains(relative)) continue;
-        const QString path = root + QLatin1Char('/') + relative;
-        QString       error;
-        if (!RemoveEntry(PathOf(path), error)) {
+bool RemoveDroppedFiles(const QString& root, const Json& record, const QStringList& bundled) {
+    const std::filesystem::path base = PathOf(root);
+    for (const QString& relative : DroppedFiles(InstalledFileList(record).value_or(QStringList()), bundled)) {
+        const std::optional<std::filesystem::path> entry = InstalledFileEntry(relative);
+        if (!entry) {
+            LOG(Manager, "%s is not a path inside the installation; it is kept\n", qUtf8Printable(relative));
+            continue;
+        }
+        QString error;
+        if (RemoveInstalledFile(base, *entry, error) == InstalledFileRemoval::kFailed) {
             LOG(Caution, "%s\n", qUtf8Printable(error));
             return false;
         }
-        for (QString dir = QFileInfo(path).absolutePath(); PathBelow(root, dir) && QDir().rmdir(dir);)
-            dir = QFileInfo(dir).absolutePath();
     }
     return true;
 }
@@ -109,7 +104,7 @@ bool ProvisionInstallation() {
         return false;
     }
     const qint64        update_time = PackageUpdateTime();
-    const QString       record_path = root + QLatin1Char('/') + QLatin1String(kRecordName);
+    const QString       record_path = root + QLatin1Char('/') + QLatin1String(cerffrontend::kInstalledFilesName);
     std::optional<Json> record      = ReadJsonObjectIfPresent(record_path, error);
     if (!record) {
         LOG(Manager, "%s Every bundled file is placed again.\n", qUtf8Printable(error));
@@ -117,12 +112,13 @@ bool ProvisionInstallation() {
     }
     if (record->contains(kUpdateTimeKey) && record->at(kUpdateTimeKey).get<qint64>() == update_time) return true;
 
-    QStringList placed;
-    if (!PlaceBundledFiles(root, placed) || !RemoveDroppedFiles(root, RecordedFiles(*record), placed)) return false;
+    const QDir        resources(InstallResourceRoot());
+    const QStringList bundled = BundledFiles(resources);
+    if (!RemoveDroppedFiles(root, *record, bundled) || !PlaceBundledFiles(root, resources, bundled)) return false;
 
-    Json files = Json::array();
-    for (const QString& relative : placed) files.push_back(relative.toStdString());
-    if (!WriteJsonFile(record_path, Json{{kUpdateTimeKey, update_time}, {kFilesKey, files}}, error)) {
+    Json installed            = InstalledFileRecord(bundled);
+    installed[kUpdateTimeKey] = update_time;
+    if (!WriteJsonFile(record_path, installed, error)) {
         LOG(Caution, "%s\n", qUtf8Printable(error));
         return false;
     }

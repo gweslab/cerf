@@ -2,6 +2,6 @@
 
 namespace cerffrontend {
 
-inline constexpr int kIntegerScales[] = {2, 3, 5};
+inline constexpr int kIntegerScales[] = {2, 3, 4, 5};
 
 }

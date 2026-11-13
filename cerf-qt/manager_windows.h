@@ -12,8 +12,8 @@ class ManagerWindows : public cerfcore::Service {
 public:
     using cerfcore::Service::Service;
 
-    virtual bool EditLiveCustomizations(bool force_reboot, std::optional<int> ce_major,
-                                        GuestReset& reset) = 0;
+    virtual bool EditLiveProperties(const char* page, bool force_reboot, std::optional<int> ce_major,
+                                    GuestReset& reset) = 0;
 };
 
 }

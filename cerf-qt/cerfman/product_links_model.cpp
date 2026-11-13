@@ -17,3 +17,7 @@ QString ProductLinksModel::DiscordUrl() const { return QString::fromUtf8(cerffro
 QString ProductLinksModel::DonateUrl() const { return QString::fromUtf8(cerffrontend::kDonateUrl.text); }
 
 bool ProductLinksModel::DonateShown() const { return !LinkTarget(DonateUrl()).isEmpty(); }
+
+QString ProductLinksModel::SlangShadersUrl() const { return QString::fromUtf8(cerffrontend::kSlangShadersUrl.text); }
+
+QString ProductLinksModel::LibrashaderUrl() const { return QString::fromUtf8(cerffrontend::kLibrashaderUrl.text); }

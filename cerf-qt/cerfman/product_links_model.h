@@ -19,6 +19,8 @@ class ProductLinksModel : public QObject, public cerfcore::Service {
     Q_PROPERTY(QString discordUrl READ DiscordUrl CONSTANT)
     Q_PROPERTY(QString donateUrl READ DonateUrl CONSTANT)
     Q_PROPERTY(bool donateShown READ DonateShown CONSTANT)
+    Q_PROPERTY(QString slangShadersUrl READ SlangShadersUrl CONSTANT)
+    Q_PROPERTY(QString librashaderUrl READ LibrashaderUrl CONSTANT)
 
 public:
     explicit ProductLinksModel(cerfcore::CerfEmulator& emu) : cerfcore::Service(emu) {}
@@ -32,4 +34,6 @@ public:
     QString DiscordUrl() const;
     QString DonateUrl() const;
     bool    DonateShown() const;
+    QString SlangShadersUrl() const;
+    QString LibrashaderUrl() const;
 };

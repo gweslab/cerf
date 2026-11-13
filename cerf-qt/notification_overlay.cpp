@@ -59,6 +59,10 @@ void NotificationOverlay::Render(Painter& p, int width, int height, int dpi) {
     if (!placed_.empty()) Draw(p);
 }
 
+bool NotificationOverlay::Showing() const {
+    return emu_.Get<cerfcore::NotificationStack>().Generation() != gen_ || !cards_.empty();
+}
+
 bool NotificationOverlay::HitTest(int x, int y, uint32_t& id) const {
     for (const Placed& placed : placed_) {
         if (!placed.box.Contains(x, y)) continue;

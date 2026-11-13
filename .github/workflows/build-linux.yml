@@ -79,9 +79,16 @@ jobs:
           stage: restore
           host-branch: ${{ env.HOST_BRANCH }}
 
-      - uses: ./.github/actions/resvg-cache
+      - uses: ./.github/actions/rust-library-cache
         with:
           stage: restore
+          library: resvg
+          host-branch: ${{ env.HOST_BRANCH }}
+
+      - uses: ./.github/actions/rust-library-cache
+        with:
+          stage: restore
+          library: librashader
           host-branch: ${{ env.HOST_BRANCH }}
 
       - name: Build
@@ -102,10 +109,18 @@ jobs:
           path: ${{ steps.qt.outputs.path }}
           key: qt-${{ env.HOST_BRANCH }}-${{ steps.qt.outputs.key }}
 
-      - uses: ./.github/actions/resvg-cache
+      - uses: ./.github/actions/rust-library-cache
         if: ${{ !cancelled() }}
         with:
           stage: save
+          library: resvg
+          host-branch: ${{ env.HOST_BRANCH }}
+
+      - uses: ./.github/actions/rust-library-cache
+        if: ${{ !cancelled() }}
+        with:
+          stage: save
+          library: librashader
           host-branch: ${{ env.HOST_BRANCH }}
 
       - uses: ./.github/actions/compiler-cache

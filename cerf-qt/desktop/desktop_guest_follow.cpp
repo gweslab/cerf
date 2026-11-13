@@ -38,10 +38,10 @@ void DesktopGuestFollow::ArmLiveResize() {
 
 void DesktopGuestFollow::FireLiveResize() {
     const GuestSurface& surface = *emu_.Get<QtEmulatorWindow>().Surface();
-    const qreal         dpr     = surface.Dpr();
+    const QPointF       scale   = surface.PixelScale();
     if (auto* policy = emu_.TryGet<cerfcore::GuestResizePolicy>())
-        policy->OnUserResizeEnd(static_cast<uint32_t>(DeviceExtent(surface.width(), dpr)),
-                                static_cast<uint32_t>(DeviceExtent(surface.height(), dpr)));
+        policy->OnUserResizeEnd(static_cast<uint32_t>(DeviceExtent(surface.width(), scale.x())),
+                                static_cast<uint32_t>(DeviceExtent(surface.height(), scale.y())));
 }
 
 void DesktopGuestFollow::OnStateChange(Qt::WindowStates before, Qt::WindowStates now) {

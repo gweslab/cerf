@@ -4,14 +4,14 @@
 
 #include <cerfcore/core/instance_gate.h>
 
-#include "device_pixel_item.h"
+#include "frame_view_item.h"
 #include <QtQml/qqmlregistration.h>
 
 #include <cstdint>
 #include <memory>
 #include <vector>
 
-class ExternalDisplayView : public DevicePixelItem {
+class ExternalDisplayView : public FrameViewItem {
     Q_OBJECT
     QML_ELEMENT
     Q_PROPERTY(int surfaceWidth READ SurfaceWidth NOTIFY surfaceSizeChanged)
@@ -31,12 +31,12 @@ public:
     int SurfaceWidth() const;
     int SurfaceHeight() const;
 
-    void Paint(QPainter* painter) override;
-
 signals:
     void surfaceSizeChanged();
 
 private:
+    const FrameLayers* PresentLayers() override;
+
     std::unique_ptr<QtFramePresenter> presenter_;
     cerfcore::InstanceGate            gate_;
     int                               source_id_ = 0;

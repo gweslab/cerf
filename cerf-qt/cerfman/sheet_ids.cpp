@@ -28,6 +28,7 @@ QString SheetIds::BoardPage() const { return QString::fromLatin1(sheet_page::kBo
 QString SheetIds::GuestAdditionsPage() const { return QString::fromLatin1(sheet_page::kGuestAdditions); }
 QString SheetIds::DisplayPage() const { return QString::fromLatin1(sheet_page::kDisplay); }
 QString SheetIds::CpuConfigPage() const { return QString::fromLatin1(sheet_page::kCpuConfig); }
+QString SheetIds::ShadersPage() const { return QString::fromLatin1(sheet_page::kShaders); }
 QString SheetIds::EmulatorPage() const { return QString::fromLatin1(sheet_page::kEmulator); }
 QString SheetIds::SettingsEmulatorPage() const { return QString::fromLatin1(settings_page::kEmulator); }
 QString SheetIds::SettingsTutorialPage() const { return QString::fromLatin1(settings_page::kTutorial); }

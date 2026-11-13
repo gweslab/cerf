@@ -20,7 +20,7 @@ Column {
         visible: header.mobile
         title: header.title
         searchable: header.searchable
-        actionVisible: true
+        actionVisible: header.actionName !== ""
         actionName: header.actionName
         actionEnabled: header.actionEnabled
         onBack: header.back()

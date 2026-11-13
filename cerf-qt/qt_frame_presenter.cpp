@@ -2,10 +2,9 @@
 
 #include "present_effects.h"
 
-#include <QPainter>
-
 #include <algorithm>
 #include <cmath>
+#include <cstring>
 
 QtFramePresenter::QtFramePresenter(std::unique_ptr<QtPresentHooks> hooks, uint32_t surf_w, uint32_t surf_h,
                                    QColor background)
@@ -19,12 +18,18 @@ void QtFramePresenter::StartRepaints(int interval_ms, std::function<void()> repa
     repaint_timer_.start(interval_ms);
 }
 
-void QtFramePresenter::UiTick(cerfcore::CerfEmulator& emu) { hooks_->OnUiTick(emu); }
+void QtFramePresenter::UiTick(cerfcore::CerfEmulator& emu) {
+    hooks_->OnUiTick(emu);
+    if (!capture_) return;
+    ShadedFrame                frame;
+    const ShaderCapture::State state = capture_->Take(frame);
+    if (state == ShaderCapture::State::kPending) return;
+    capture_.reset();
+    hooks_->ShadedCaptured(emu, state == ShaderCapture::State::kCaptured ? &frame : nullptr);
+}
 
-void QtFramePresenter::DrawTo(cerfcore::CerfEmulator& emu, cerfcore::FrameSource& source, QPainter& painter,
-                              int visible_w, int visible_h, qreal dpr) {
-    const QImage& image = Present(emu, source, visible_w, visible_h, dpr);
-    painter.drawImage(QRectF(0, 0, image.width() / dpr, image.height() / dpr), image);
+void QtFramePresenter::RequestShadedCapture() {
+    if (!capture_) capture_ = std::make_shared<ShaderCapture>();
 }
 
 bool QtFramePresenter::SetGuestSurfaceSize(uint32_t w, uint32_t h) {
@@ -38,13 +43,7 @@ bool QtFramePresenter::SetGuestSurfaceSize(uint32_t w, uint32_t h) {
     return true;
 }
 
-void QtFramePresenter::SetCanvasSize(int w, int h) {
-    if (present_.width() != w || present_.height() != h) {
-        present_ = QImage(w, h, QImage::Format_RGB32);
-        present_.fill(background_);
-    }
-    layout_.SetCanvasSize(w, h);
-}
+void QtFramePresenter::SetCanvasSize(int w, int h) { layout_.SetCanvasSize(w, h); }
 
 bool QtFramePresenter::Capture(cerfcore::FrameSource& source, std::vector<uint32_t>& out, uint32_t& w,
                                uint32_t& h) {
@@ -60,20 +59,62 @@ bool QtFramePresenter::Capture(cerfcore::FrameSource& source, std::vector<uint32
     return true;
 }
 
-bool QtFramePresenter::ComposeInto(cerfcore::CerfEmulator& emu, cerfcore::FrameSource& source) {
-    if (!source.HasFrame() || guest_.isNull()) {
-        present_.fill(background_);
-        return false;
+const FrameLayers& QtFramePresenter::Present(cerfcore::CerfEmulator& emu, cerfcore::FrameSource& source,
+                                             int visible_w, int visible_h, qreal dpr) {
+    hooks_->OnPresentTick(emu, source.HasFrame());
+    if (shader_result_.generation != reported_shader_.generation ||
+        shader_result_.applied != reported_shader_.applied) {
+        reported_shader_ = shader_result_;
+        hooks_->ShadersApplied(emu, shader_result_);
     }
-    auto* guest_bits = reinterpret_cast<uint32_t*>(guest_.bits());
+    layers_               = FrameLayers{};
+    layers_.shaders       = CopyShaders(hooks_->Shaders(emu));
+    layers_.shader_result = &shader_result_;
+    layers_.capture       = capture_;
+    layers_.canvas_w      = layout_.CanvasWidth();
+    layers_.canvas_h = layout_.CanvasHeight();
+    if (layers_.canvas_w <= 0 || layers_.canvas_h <= 0) return layers_;
+    const bool desaturate = hooks_->ShouldDesaturate(emu);
+    uint32_t   background = background_.rgb();
+    if (desaturate) cerffrontend::PresentEffects::DesaturateAndDim(&background, 1);
+    layers_.background = QColor::fromRgb(background);
+
+    FitCanvasImage(alt_, layers_.canvas_w, layers_.canvas_h, QImage::Format_RGB32);
+    auto*     bits  = reinterpret_cast<uint32_t*>(alt_.bits());
+    const int count = layers_.canvas_w * layers_.canvas_h;
+    if (hooks_->RenderAlt(emu, bits, layers_.canvas_w, layers_.canvas_h, dpr)) {
+        ForceOpaque(bits, static_cast<size_t>(count));
+        if (desaturate) cerffrontend::PresentEffects::DesaturateAndDim(bits, count);
+        layers_.alt = &alt_;
+    } else {
+        PresentGuest(emu, source, desaturate);
+    }
+    PresentOverlay(emu, visible_w, visible_h, dpr, desaturate);
+    return layers_;
+}
+
+const ShaderChainSpec* QtFramePresenter::CopyShaders(const ShaderChainSpec* spec) {
+    if (spec == nullptr) return nullptr;
+    if (spec->generation != shaders_.generation || spec->parameter_generation != shaders_.parameter_generation)
+        shaders_ = *spec;
+    return &shaders_;
+}
+
+void QtFramePresenter::PresentGuest(cerfcore::CerfEmulator& emu, cerfcore::FrameSource& source, bool desaturate) {
+    if (!source.HasFrame() || guest_.isNull()) return;
+    auto*     guest_bits = reinterpret_cast<uint32_t*>(guest_.bits());
+    const int count      = static_cast<int>(layout_.SurfaceWidth() * layout_.SurfaceHeight());
     source.RenderInto(guest_bits, layout_.SurfaceWidth(), layout_.SurfaceHeight());
-    ForceOpaque(guest_bits, static_cast<size_t>(layout_.SurfaceWidth()) * layout_.SurfaceHeight());
+    ForceOpaque(guest_bits, static_cast<size_t>(count));
+    if (desaturate) {
+        if (dimmed_.size() != guest_.size()) dimmed_ = QImage(guest_.size(), guest_.format());
+        std::memcpy(dimmed_.bits(), guest_.constBits(), static_cast<size_t>(guest_.sizeInBytes()));
+        cerffrontend::PresentEffects::DesaturateAndDim(reinterpret_cast<uint32_t*>(dimmed_.bits()), count);
+    }
+    const QImage& shown = desaturate ? dimmed_ : guest_;
 
     const cerffrontend::ViewportLayout::Layout L = layout_.Compute();
-    if (L.dst_w <= 0 || L.dst_h <= 0) {
-        present_.fill(background_);
-        return true;
-    }
+    if (L.dst_w <= 0 || L.dst_h <= 0) return;
     QTransform turn;
     switch (L.quarter) {
         case 1:  turn.translate(L.dst_x + L.dst_w, L.dst_y); break;
@@ -82,38 +123,41 @@ bool QtFramePresenter::ComposeInto(cerfcore::CerfEmulator& emu, cerfcore::FrameS
         default: turn.translate(L.dst_x, L.dst_y); break;
     }
     turn.rotate(90.0 * L.quarter);
-    const bool turned   = (L.quarter & 1) != 0;
-    const int  target_w = turned ? L.dst_h : L.dst_w;
-    const int  target_h = turned ? L.dst_w : L.dst_h;
-    const int  margin   = std::max({L.dst_x, L.dst_y, present_.width() - L.dst_x - L.dst_w,
-                                    present_.height() - L.dst_y - L.dst_h});
+    const bool turned     = (L.quarter & 1) != 0;
+    layers_.guest         = &guest_;
+    layers_.dimmed        = desaturate ? &dimmed_ : nullptr;
+    layers_.turn          = turn;
+    layers_.target_w      = turned ? L.dst_h : L.dst_w;
+    layers_.target_h      = turned ? L.dst_w : L.dst_h;
+    const int    margin   = std::max({L.dst_x, L.dst_y, layers_.canvas_w - L.dst_x - L.dst_w,
+                                       layers_.canvas_h - L.dst_y - L.dst_h});
     const double strength = glow_.Strength(layout_.FitZoom(), layout_.CoverZoom());
     const bool   glowing  = margin > 0 && strength > 0.0;
     const int    reach    = glowing ? static_cast<int>(std::lround(hooks_->GlowReach(emu, L))) : 0;
-    glow_.Compose(present_, guest_, turn, target_w, target_h, reach, strength, background_);
-    QPainter p(&present_);
-    p.setRenderHint(QPainter::SmoothPixmapTransform, layout_.Antialias());
-    p.setTransform(turn);
-    p.drawImage(QRect(0, 0, target_w, target_h), guest_);
-    return true;
+    if (!glow_.Update(shown, layers_.target_w, layers_.target_h, reach, strength, layers_.background)) return;
+    layers_.glow            = &glow_.Image();
+    layers_.glow_rect       = glow_.Rect(layers_.target_w, layers_.target_h);
+    layers_.glow_generation = glow_.Generation();
 }
 
-const QImage& QtFramePresenter::Present(cerfcore::CerfEmulator& emu, cerfcore::FrameSource& source,
-                                        int visible_w, int visible_h, qreal dpr) {
-    hooks_->OnPresentTick(emu, source.HasFrame());
-    if (present_.isNull()) return present_;
-    auto*     bits = reinterpret_cast<uint32_t*>(present_.bits());
-    const int w    = present_.width();
-    const int h    = present_.height();
-    if (hooks_->RenderAlt(emu, bits, w, h, dpr)) {
-        ForceOpaque(bits, static_cast<size_t>(w) * h);
-    } else {
-        ComposeInto(emu, source);
-        hooks_->RenderFrameOverlay(emu, present_, layout_.Compute(), dpr);
+void QtFramePresenter::PresentOverlay(cerfcore::CerfEmulator& emu, int visible_w, int visible_h, qreal dpr,
+                                      bool desaturate) {
+    if (!hooks_->OverlayShown(emu)) return;
+    FitCanvasImage(overlay_, layers_.canvas_w, layers_.canvas_h, QImage::Format_ARGB32_Premultiplied);
+    overlay_.fill(Qt::transparent);
+    if (layers_.alt == nullptr) {
+        hooks_->RenderFrameOverlay(emu, overlay_, layout_.Compute(), dpr);
+        if (desaturate)
+            cerffrontend::PresentEffects::DesaturateAndDim(reinterpret_cast<uint32_t*>(overlay_.bits()),
+                                                           layers_.canvas_w * layers_.canvas_h);
     }
-    if (hooks_->ShouldDesaturate(emu)) cerffrontend::PresentEffects::DesaturateAndDim(bits, w * h);
-    hooks_->RenderOverlay(emu, present_, std::min(w, visible_w), std::min(h, visible_h), dpr);
-    return present_;
+    hooks_->RenderOverlay(emu, overlay_, std::min(layers_.canvas_w, visible_w), std::min(layers_.canvas_h, visible_h),
+                          dpr);
+    layers_.overlay = &overlay_;
+}
+
+void QtFramePresenter::FitCanvasImage(QImage& image, int w, int h, QImage::Format format) {
+    if (image.width() != w || image.height() != h || image.format() != format) image = QImage(w, h, format);
 }
 
 void QtFramePresenter::ForceOpaque(uint32_t* pixels, size_t count) {

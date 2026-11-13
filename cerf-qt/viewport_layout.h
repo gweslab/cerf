@@ -54,11 +54,9 @@ public:
 
     ViewportMode            Mode() const { return mode_; }
     bool                    FixedScale() const { return mode_ == ViewportMode::Original || mode_ == ViewportMode::Integer; }
-    bool                    Antialias() const { return antialias_; }
     int                     IntegerFactor() const { return integer_factor_; }
     const ViewPresentation& Presentation() const { return presentation_; }
     bool                    SetMode(ViewportMode m);
-    bool                    SetAntialias(bool on);
     bool                    SetIntegerScale(int factor);
     bool                    SetPlacement(double scale, double x, double y, double fit_zoom, double cover_zoom);
     bool                    SetPresentation(const ViewPresentation& presentation);
@@ -96,7 +94,6 @@ private:
 
     ViewportMode     mode_           = ViewportMode::Original;
     int              integer_factor_ = 2;
-    bool             antialias_      = false;
     bool             active_         = true;
     ViewPresentation presentation_;
 

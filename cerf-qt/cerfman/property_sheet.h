@@ -3,14 +3,18 @@
 #include "device_directory.h"
 #include "json_file.h"
 
+#include <cerfcore/core/shader_preset_entry.h>
+
 #include <QObject>
 #include <QSize>
 #include <QString>
+#include <QStringList>
 #include <QVariant>
 #include <QVariantList>
 #include <QVariantMap>
 
 #include <optional>
+#include <vector>
 
 namespace cerfcore {
 class CerfEmulator;
@@ -53,6 +57,9 @@ class PropertySheet : public QObject {
     Q_PROPERTY(QVariantMap cpuOverrides READ CpuOverrides NOTIFY valuesChanged)
     Q_PROPERTY(QVariant cpuPreset READ CpuPreset NOTIFY valuesChanged)
     Q_PROPERTY(QVariantMap boardConfig READ BoardConfigSet NOTIFY valuesChanged)
+    Q_PROPERTY(QVariantList shaderPresets READ ShaderPresets NOTIFY valuesChanged)
+    Q_PROPERTY(QVariantMap shaderParameters READ ShaderParameters NOTIFY valuesChanged)
+    Q_PROPERTY(bool shaderScreenshots READ ShaderScreenshots NOTIFY valuesChanged)
     Q_PROPERTY(QVariantList pages READ Pages NOTIFY valuesChanged)
     Q_PROPERTY(QVariantList preview READ Preview NOTIFY valuesChanged)
     Q_PROPERTY(QSize autoSize READ AutoSize NOTIFY valuesChanged)
@@ -98,6 +105,10 @@ public:
     QVariantMap  CpuOverrides() const;
     QVariant     CpuPreset() const;
     QVariantMap  BoardConfigSet() const;
+    QVariantList ShaderPresets() const;
+    QStringList  ShaderChain() const;
+    QVariantMap  ShaderParameters() const;
+    bool         ShaderScreenshots() const;
     QVariantList Pages() const;
     QVariantList Preview() const;
     QSize        AutoSize() const;
@@ -128,6 +139,7 @@ public:
     Q_INVOKABLE void         SetCpuOverride(const QString& param_id, const QVariant& value);
     Q_INVOKABLE void         ApplyCpuPreset(const QVariant& choice);
     Q_INVOKABLE void         SetBoardConfig(const QString& param_id, const QVariant& value);
+    Q_INVOKABLE void         SetShaders(const QVariantList& presets, const QVariantMap& parameters, bool screenshots);
     Q_INVOKABLE QVariantMap  Problem() const;
     Q_INVOKABLE QString      Save();
     Q_INVOKABLE void         Finish(const QString& reboot);
@@ -144,6 +156,9 @@ private:
     Json    BoardCpuOverrideJson() const;
     Json    BoardConfigJson() const;
     QString SaveOwned(bool all);
+    Json    ShaderObject() const;
+    std::vector<cerfcore::ShaderPresetEntry> ShaderEntries() const;
+    void    EndShaderPreview(bool apply_config);
 
     cerfcore::CerfEmulator& emu_;
     PropertySubject         subject_;
@@ -151,6 +166,7 @@ private:
     QString                 initial_page_;
     std::optional<int>      ce_major_;
     bool                    force_reboot_;
+    bool                    shader_preview_ = false;
     Json                    baseline_;
     Json                    values_;
     Json                    initial_;

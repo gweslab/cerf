@@ -6,12 +6,14 @@
 #include <cerfcore/core/cerf_emulator.h>
 
 #include <string>
+#include <utility>
 
 namespace cerffrontend {
 
 REGISTER_SERVICE(ViewportMenu);
 
-void ViewportMenu::Append(std::vector<MenuItem>& items, ViewportMenuTarget& target) {
+void ViewportMenu::Append(std::vector<MenuItem>& items, ViewportMenuTarget& target,
+                          std::function<void()> open_shaders) {
     ViewportMenuTarget* t            = &target;
     const ViewportMode  mode         = target.Mode();
     const int           n            = target.IntegerFactor();
@@ -26,19 +28,21 @@ void ViewportMenu::Append(std::vector<MenuItem>& items, ViewportMenuTarget& targ
         });
     };
     auto integer_item = [&](int factor) {
-        return MenuItem::Radio("Integer scale " + std::to_string(factor) + "x",
+        return MenuItem::Radio("x" + std::to_string(factor),
                                mode == ViewportMode::Integer && integer_pick == factor, [t, factor] {
                                    t->SetIntegerScale(factor);
                                    t->AfterModeChange(true);
                                });
     };
 
-    items.push_back(mode_item("Original view", ViewportMode::Original));
-    items.push_back(mode_item("Resize + match aspect ratio", ViewportMode::Aspect));
+    items.push_back(mode_item("Original view (x1)", ViewportMode::Original));
+    std::vector<MenuItem> scales;
+    for (const int scale : kIntegerScales) scales.push_back(integer_item(scale));
+    items.push_back(MenuItem::Submenu("Integer scale", std::move(scales)));
+    items.push_back(mode_item("Scale to window size", ViewportMode::Aspect));
     items.push_back(mode_item("Stretch", ViewportMode::Stretch));
-    for (const int scale : kIntegerScales) items.push_back(integer_item(scale));
-    items.push_back(MenuItem::Check("Apply aliasing", target.Antialias(), [t] { t->SetAntialias(!t->Antialias()); }));
     items.push_back(MenuItem{});
+    if (open_shaders) items.push_back(MenuItem::Action("RetroArch Shaders…", std::move(open_shaders)));
     items.push_back(MenuItem::Check("Full screen\t" + emu_.Get<HostKeyBinding>().LabelWith("F"), target.IsFullscreen(),
                                     [t] { t->ToggleFullscreen(); }));
     items.push_back(MenuItem{});

@@ -26,10 +26,8 @@ private:
 
         ViewportMode Mode() const override;
         int          IntegerFactor() const override;
-        bool         Antialias() const override;
         void         SetViewportMode(ViewportMode m) override;
         void         SetIntegerScale(int factor) override;
-        void         SetAntialias(bool on) override;
         bool         IsFullscreen() const override;
         void         ToggleFullscreen() override;
         void         SaveScreenshot() override;

@@ -68,7 +68,9 @@ void HudSelection::Apply() {
     if (next == active_) return;
     active_ = next;
     LOG(Lcd, "HudSelection: setting '%s' -> %s\n", setting.c_str(), active_ ? active_->id.c_str() : "none");
-    emu_.Get<HudControls>().CancelAll();
+    HudControls& controls = emu_.Get<HudControls>();
+    controls.CancelAll();
+    if (active_ == nullptr) controls.Clear();
     emu_.Get<FrontendWindow>().OnPresentationChanged();
 }
 

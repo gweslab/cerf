@@ -54,6 +54,7 @@ public:
     void     RunOnUiThread(std::function<void()> job) override;
     void     RunOnUiThreadAfter(uint32_t delay_ms, std::function<void()> job) override;
     bool     CaptureGuestSurface(std::vector<uint32_t>& out, uint32_t& w, uint32_t& h) override;
+    bool     RequestShadedCapture() override;
     uint64_t NativeHandle() const override { return native_handle_.load(std::memory_order_acquire); }
 
     void CloseRequested();
@@ -70,10 +71,8 @@ public:
     void SurfaceForCanvas(uint32_t canvas_w, uint32_t canvas_h, uint32_t& w, uint32_t& h) const;
     cerffrontend::ViewportMode          Mode() const;
     int                                 IntegerFactor() const;
-    bool                                Antialias() const;
     void                                SetViewportMode(cerffrontend::ViewportMode mode);
     void                                SetIntegerScale(int factor);
-    void                                SetAntialias(bool on);
     void                                ReturnToManager();
     void                                SaveScreenshot();
     std::vector<cerffrontend::MenuItem> GearMenu();

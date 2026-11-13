@@ -37,11 +37,11 @@ void QtManagerWindowOpener::OpenTutorial() {
     emu_.Get<ManagerEngine>().Open(QString::fromLatin1(kTutorialWindow), Placement());
 }
 
-bool QtManagerWindowOpener::EditLiveCustomizations(bool force_reboot, std::optional<int> ce_major,
-                                                   cerffrontend::GuestReset& reset) {
+bool QtManagerWindowOpener::EditLiveProperties(const char* page, bool force_reboot, std::optional<int> ce_major,
+                                               cerffrontend::GuestReset& reset) {
     const std::string dir = cerfcore::GetDeviceDir(emu_.Get<cerfcore::DeviceConfig>().device_name);
-    return emu_.Get<PropertySheets>().EditLive(Placement(), QString::fromStdString(dir), force_reboot, ce_major,
-                                               reset);
+    return emu_.Get<PropertySheets>().EditLive(Placement(), QString::fromStdString(dir), QString::fromLatin1(page),
+                                               force_reboot, ce_major, reset);
 }
 
 QVariantMap QtManagerWindowOpener::Placement() const {

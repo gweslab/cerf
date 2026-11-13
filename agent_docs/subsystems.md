@@ -476,6 +476,70 @@ per-SoC/per-board concretes (strategy pattern, selected by `BoardContext`).
   escape this lock.
   - `cerf-qt/guest_surface.{h,cpp}`, `cerf-qt/qt_pointer_lock*`
 
+- **The frame stage** - a Qt Quick scene graph draws the canvas. The GPU scales
+  and turns the guest frame. A frame never uploads the guest frame at the size of
+  the window.
+
+  **A new texture can get the sampler of a texture that CERF freed.** Qt keeps one
+  sampler table for each material shader. Qt rebuilds the table only when the
+  bound texture has another address than the texture before it, or when the filter
+  of the texture changed. A new texture can get the address of a freed texture.
+  The new texture then uses the filter of the freed texture, for example a linear
+  filter on a frame that must use the nearest filter.
+
+  Every scene-graph texture that CERF creates therefore passes through
+  `FreshSampler`. That function changes the filter of the new texture once, so Qt
+  rebuilds the sampler when it first binds the texture.
+  - `cerf-qt/qt_frame_presenter.{h,cpp}`, `cerf-qt/frame_scene_node.{h,cpp}`,
+    `cerf-qt/frame_view_item.{h,cpp}`
+
+- **Shaders** - librashader runs the shader chain of the device on the guest
+  frame. A shader chain is a list of slang presets in order. The presets load as
+  one librashader preset, through the CERF patch `libra_preset_create_chain`. The
+  presets live in the `shaders` folder of the installation. The bundled presets
+  come from `bundled/shaders/`, and an import goes into the same folder.
+
+  **A chain refuses two presets that use the same name.** librashader keeps one
+  table of names for the whole chain: pass aliases, `#pragma name` values, texture
+  names and the names that it makes from them. A second entry with the same name
+  replaces the first, so a pass of one preset reads a texture of another preset.
+  A parameter name that two presets share is one value for both. Two presets can
+  load the same image file as a texture under the same name. When the wrap mode,
+  the filter mode and the mipmap flag also match, the chain loads that texture
+  once for both presets.
+
+  librashader has one runtime for each graphics API. CERF uses the runtime of the
+  graphics API that the window uses. Each runtime is a library of its own. The
+  Direct3D 11 library needs Windows 8, so Windows 7 uses only the OpenGL library.
+
+  **The input texture of a runtime holds the guest frame in a format that
+  librashader can copy into a history texture without a change.** A history
+  texture keeps an earlier frame for the passes that read it. The OpenGL runtime
+  copies with a framebuffer copy, and a texture swizzle remaps the channels of a
+  texture fetch only. The Direct3D 11 runtime has no BGRA format, and its copy of
+  a BGRA input fails. The OpenGL and Direct3D 11 inputs therefore hold RGBA.
+
+  **The chain never receives a frame that CERF dims.** CERF dims the guest frame
+  while the emulator is paused or the guest is asleep. A chain keeps history and
+  feedback frames from one frame to the next, so a dimmed input stays in its
+  state. While CERF dims the frame, the chain renders the clean frame once and
+  stops. The screen shows that output dimmed, and Save and Copy take it without
+  the dimming.
+
+  **A preset change builds a new chain. A parameter change only sets the values on
+  the live chain.** A build compiles every shader pass of the chain. A rebuild at
+  each step of a slider therefore stalls the frame.
+
+  **Every render of the chain runs before the main pass, inside
+  `beginExternalCommands` and `endExternalCommands`.** The live chain renders in
+  `QSGRenderNode::prepare`. The frozen frame of a paused device renders while the
+  scene graph syncs. CERF drops a chain that fails to build or render, and the
+  frame shows without shaders. `ShaderSelection` logs the error and posts an error
+  card.
+  - `cerf-qt/shader_selection.{h,cpp}`, `cerf-qt/shader_runtime*`,
+    `cerf-qt/shader_chain_node.{h,cpp}`, `cerf-qt/shader_library.{h,cpp}`,
+    `tools/librashader_library.py`, `tools/librashader_patch/`
+
 - **`FrameRenderer`** (abstract) - one producer of guest frames.
   `RenderInto(dib_bgra32, w, h)` fills a BGRA32 surface. `PresentedSize(w, h)`
   gives the extent of the image that this producer renders. The extent is
@@ -871,7 +935,25 @@ per-SoC/per-board concretes (strategy pattern, selected by `BoardContext`).
   from `DevicePixelItem`, never from `QQuickPaintedItem`. `QQuickPaintedItem`
   rounds the item to whole logical pixels and stretches its texture with linear
   filtering, which blurs the framebuffer at a fractional scale.
-  - `cerf-qt/device_pixel_item.{h,cpp}`
+
+  **The content of these items sits on whole device pixels.** At a fractional
+  scale, an item can start between two device pixels. For example, 26 logical
+  pixels at a scale of 1.25 are 32.5 device pixels. Nearest sampling then reads
+  each texel (a pixel of the texture) at its edge, and rows or columns shift from
+  frame to frame. `FillColorItem`, the base of `DevicePixelItem` and of the frame
+  view, moves the content to the nearest whole device pixel.
+
+  **The device pixel ratio is not the scale at which Qt draws.** Qt divides the
+  pixel size of the render target by the device pixel ratio and rounds the result
+  to whole logical pixels. Then it maps that logical size onto the full pixel size.
+  For example, 813 device pixels at 1.25 become 650 logical pixels, so one logical
+  pixel spans 1.25077 device pixels. Content then moves off whole device pixels, by
+  up to half the ratio at the far edge of the window.
+
+  `WindowPixelScale` measures the viewport after each render pass and gives the
+  real scale on each axis. Every conversion between logical pixels and canvas
+  pixels uses that scale, never the device pixel ratio.
+  - `cerf-qt/device_pixel_item.{h,cpp}`, `cerf-qt/fill_color_item.{h,cpp}`
 
 - **`HostWidget` / `HostWidgetRegistry`** - the live configuration surface of
   a peripheral or a board feature. `HostWidget` is an abstract,
@@ -892,6 +974,17 @@ per-SoC/per-board concretes (strategy pattern, selected by `BoardContext`).
   surface (via `FrontendWindow::CaptureGuestSurface`, 1:1). The desktop
   saves a screenshot in the `screenshots` folder of CERF. Android saves
   it in the gallery, in Pictures/CERF.
+
+  If the device has a shader chain, Save and Copy take the output of the chain at
+  the size that the screen shows. The `screenshots` key of the `shaders`
+  configuration turns this off. If the chain does not shade a frame, Save and Copy
+  take the 1:1 capture. The live thumbnail and the core screenshot seam always take
+  the 1:1 capture.
+
+  **A shaded capture waits for the next frame that the window renders.** A window
+  that the window system does not expose (does not show on a screen) renders no
+  frame. A minimized window is one example. Save and Copy then take the 1:1
+  capture at once.
   - `cerf-qt/screenshots.{h,cpp}`, `cerf-qt/screenshot_store.h`,
     `cerf-qt/desktop/screenshot_folder_store.cpp`, `cerf-qt/android/android_gallery_store.cpp`
 

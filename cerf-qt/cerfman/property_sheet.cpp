@@ -13,15 +13,21 @@
 
 #include "../guest_reset_text.h"
 #include "../qt_qml_value.h"
+#include "../shader_selection.h"
 
 #include <cerfcore/core/board_database.h>
 #include <cerfcore/core/cerf_emulator.h>
 #include <cerfcore/core/cpu_config_database.h>
+#include <cerfcore/core/device_config.h>
+#include <cerfcore/core/device_config_keys.h>
 #include <cerfcore/core/product_name.h>
 #include <cerfcore/peripherals/cerf_virt/cerf_virt_framebuffer.h>
 
 #include <array>
 #include <optional>
+#include <string>
+#include <utility>
+#include <vector>
 
 namespace {
 
@@ -29,10 +35,10 @@ namespace pf = persist_field;
 namespace sf = sheet_field;
 namespace sp = sheet_page;
 
-constexpr std::array<const char*, 13> kLiveKeys = {
+constexpr std::array<const char*, 14> kLiveKeys = {
     pf::kGuestAdditions, pf::kShareFolder, pf::kMountPoint, pf::kWidth,       pf::kHeight,      pf::kBpp,
     pf::kPalette,        pf::kDpi,         pf::kFontSize,   pf::kClearType,   pf::kColorScheme,
-    pf::kAllowUntrustedApps, pf::kHud};
+    pf::kAllowUntrustedApps, pf::kHud,     pf::kShaders};
 constexpr std::array<const char*, 5> kRebootKeys = {pf::kBpp, pf::kPalette, pf::kDpi, pf::kFontSize,
                                                     pf::kColorScheme};
 constexpr std::array<const char*, 2> kLiveResizeKeys  = {pf::kWidth, pf::kHeight};
@@ -87,7 +93,7 @@ PropertySheet::PropertySheet(cerfcore::CerfEmulator& emu, PropertySubject subjec
     values_[sf::kStorage]   = FilesToJson(files.storage);
     values_[sf::kName]      = subject_.display_name.toStdString();
     initial_                = values_;
-    if (Live()) values_[pf::kGuestAdditions] = true;
+    if (Live()) values_[pf::kGuestAdditions] = emu_.Get<cerfcore::DeviceConfig>().guest_additions;
 }
 
 bool PropertySheet::FullScreenSetting() const { return !TouchFrontend::Active(); }
@@ -241,6 +247,7 @@ QVariantList PropertySheet::Pages() const {
     add(sp::kBoard, QStringLiteral("Board Settings"));
     if (GuestAdditionsAvailable(board_id)) add(sp::kGuestAdditions, QStringLiteral("Guest Additions"));
     if (catalog.ConfigurableScreen(board_id) && !GuestAdditionsOn()) add(sp::kDisplay, QStringLiteral("Display"));
+    add(sp::kShaders, QStringLiteral("RetroArch Shaders"));
     if (catalog.Find(board_id)) add(sp::kCpuConfig, QStringLiteral("CPU Configuration"));
     add(sp::kEmulator, QStringLiteral("Emulator Settings"));
     return pages;
@@ -391,6 +398,88 @@ QString PropertySheet::SaveOwned(bool all) {
 
 QString PropertySheet::Save() { return SaveOwned(Editable()); }
 
-void PropertySheet::Finish(const QString& reboot) { emit finished(true, reboot); }
+void PropertySheet::Finish(const QString& reboot) {
+    EndShaderPreview(false);
+    emit finished(true, reboot);
+}
 
-void PropertySheet::Cancel() { emit finished(false, QString()); }
+void PropertySheet::Cancel() {
+    EndShaderPreview(true);
+    emit finished(false, QString());
+}
+
+Json PropertySheet::ShaderObject() const {
+    const auto it = values_.find(pf::kShaders);
+    return it != values_.end() && it->is_object() ? *it : Json::object();
+}
+
+std::vector<cerfcore::ShaderPresetEntry> PropertySheet::ShaderEntries() const {
+    std::vector<cerfcore::ShaderPresetEntry> entries;
+    const Json                               shaders = ShaderObject();
+    const auto                               it      = shaders.find(cerfcore::config_key::kShaderPresets);
+    if (it == shaders.end() || !it->is_array()) return entries;
+    for (const Json& preset : *it) {
+        if (!preset.is_object()) continue;
+        const auto enabled = preset.find(cerfcore::config_key::kShaderEnabled);
+        entries.push_back(cerfcore::ShaderPresetEntry{
+            JsonText(preset, cerfcore::config_key::kShaderPath).toStdString(),
+            enabled != preset.end() && enabled->is_boolean() ? enabled->get<bool>()
+                                                             : cerfcore::kDefaultShaderPresetEnabled});
+    }
+    return entries;
+}
+
+QVariantList PropertySheet::ShaderPresets() const {
+    QVariantList presets;
+    for (const cerfcore::ShaderPresetEntry& entry : ShaderEntries())
+        presets.append(QVariantMap{{QStringLiteral("path"), QString::fromStdString(entry.path)},
+                                   {QStringLiteral("enabled"), entry.enabled}});
+    return presets;
+}
+
+QStringList PropertySheet::ShaderChain() const {
+    QStringList chain;
+    for (const std::string& path : cerfcore::EnabledShaderPresets(ShaderEntries()))
+        chain.append(QString::fromStdString(path));
+    return chain;
+}
+
+QVariantMap PropertySheet::ShaderParameters() const {
+    return ObjectAt(ShaderObject(), cerfcore::config_key::kShaderParameters);
+}
+
+bool PropertySheet::ShaderScreenshots() const {
+    const Json shaders = ShaderObject();
+    const auto it      = shaders.find(cerfcore::config_key::kShaderScreenshots);
+    return it != shaders.end() && it->is_boolean() ? it->get<bool>() : cerfcore::kDefaultShaderScreenshots;
+}
+
+void PropertySheet::SetShaders(const QVariantList& list, const QVariantMap& parameters, bool screenshots) {
+    namespace cfg                                      = cerfcore::config_key;
+    Json                                       shaders = Json::object();
+    std::vector<std::pair<std::string, float>> values;
+    for (const QVariant& preset : list) {
+        const QVariantMap entry = PlainQmlValue(preset).toMap();
+        shaders[cfg::kShaderPresets].push_back(
+            Json{{cfg::kShaderPath, entry.value(QStringLiteral("path")).toString().toStdString()},
+                 {cfg::kShaderEnabled, entry.value(QStringLiteral("enabled")).toBool()}});
+    }
+    for (auto it = parameters.constBegin(); it != parameters.constEnd(); ++it) {
+        values.emplace_back(it.key().toStdString(), it.value().toFloat());
+        shaders[cfg::kShaderParameters][it.key().toStdString()] = it.value().toDouble();
+    }
+    if (screenshots != cerfcore::kDefaultShaderScreenshots) shaders[cfg::kShaderScreenshots] = screenshots;
+    if (shaders.empty()) values_.erase(pf::kShaders);
+    else                 values_[pf::kShaders] = shaders;
+    if (Live()) {
+        emu_.Get<cerffrontend::ShaderSelection>().Preview(cerfcore::EnabledShaderPresets(ShaderEntries()), values);
+        shader_preview_ = true;
+    }
+    emit valuesChanged();
+}
+
+void PropertySheet::EndShaderPreview(bool apply_config) {
+    if (!shader_preview_) return;
+    shader_preview_ = false;
+    emu_.Get<cerffrontend::ShaderSelection>().EndPreview(apply_config);
+}

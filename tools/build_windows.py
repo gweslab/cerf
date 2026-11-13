@@ -110,7 +110,7 @@ class WindowsBuild(_MsvcBuild):
             qt_prefix = qt_windows.ensure(self.root, self.toolchain, self.heartbeat)
         except (qt_windows.QtBuildError, verified_download.DownloadError, OSError) as exc:
             raise BuildAbort("Qt: {}".format(exc))
-        resvg = self.resvg_options(dict(os.environ))
+        rust_libraries = self.rust_library_options(dict(os.environ))
         out_dirs =["-DCMAKE_RUNTIME_OUTPUT_DIRECTORY_{}={}".format(
             config.upper(), output_dir(self.root, config, self.branch))
             for config in ("Release", "Debug")]
@@ -118,7 +118,7 @@ class WindowsBuild(_MsvcBuild):
         self._configure(build_dir, [
             "-DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreadedDLL",
             "-DCMAKE_MAP_IMPORTED_CONFIG_DEBUG=Release",
-            "-DCMAKE_PREFIX_PATH={};{}".format(qt_prefix, installed)] + resvg + out_dirs)
+            "-DCMAKE_PREFIX_PATH={};{}".format(qt_prefix, installed)] + rust_libraries + out_dirs)
         if not self.compile([self.toolchain.cmake, "--build", build_dir, "--config", self.config,
                              "--parallel", "--", "/v:minimal", "/nologo", "/nodeReuse:false"]):
             return False

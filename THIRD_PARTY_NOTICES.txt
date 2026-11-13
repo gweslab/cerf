@@ -282,6 +282,521 @@ zune-core 0.5.1, zune-jpeg 0.5.15 - https://github.com/etemesi254/zune-image
     License:   MIT
     Copyright: (c) zune-image developers
 
+librashader 0.12.1 - https://github.com/SnowflakePowered/librashader
+    License:   MPL-2.0
+    Copyright: (c) Ronny Chan
+    Text:      licenses/MPL-2.0.txt
+    Changes:   CERF adds the files presets_chain.rs and parameter_order.rs, and one module
+               line for each in lib.rs. The changed files are under MPL-2.0, in the CERF
+               source at tools/librashader_patch.
+
+glslang (in the librashader libraries) - https://github.com/KhronosGroup/glslang
+    License:   BSD-3-Clause, BSD-2-Clause, MIT, Apache-2.0, and GPL-3.0 with the Bison
+               special exception for the generated parser
+    Copyright: (c) The Khronos Group Inc. and the glslang authors
+    Text:      licenses/glslang.txt
+
+SPIRV-Cross (in the librashader libraries) - https://github.com/KhronosGroup/SPIRV-Cross
+    License:   Apache-2.0
+    Copyright: (c) 2015-2021 Arm Limited and the SPIRV-Cross authors
+    Text:      licenses/Apache-2.0.txt
+
+Mesa spirv-to-dxil (in the Direct3D 11 librashader library) - https://gitlab.freedesktop.org/mesa/mesa
+    License:   MIT
+    Copyright: (c) Microsoft Corporation, Intel Corporation, VMware, Inc., Brian Paul
+               and the other Mesa authors
+
+aho-corasick 1.1.4 - https://github.com/BurntSushi/aho-corasick
+    License:   MIT
+    Copyright: (c) 2015 Andrew Gallant
+
+allocator-api2 0.2.21 - https://github.com/zakarumych/allocator-api2
+    License:   MIT
+    Copyright: (c) Zakarum
+
+arc-swap 1.9.1 - https://github.com/vorner/arc-swap
+    License:   MIT
+    Copyright: (c) 2017 arc-swap developers
+
+array-concat 0.5.5 - https://github.com/inspier/array-concat
+    License:   MIT
+    Copyright: (c) 2021 inspier
+
+array-init 2.1.0 - https://github.com/Manishearth/array-init/
+    License:   MIT
+    Copyright: (c) 2017-2020 The array-init developers
+
+arrayvec 0.7.6 - https://github.com/bluss/arrayvec
+    License:   MIT
+    Copyright: (c) Ulrik Sverdrup "bluss" 2015-2023
+
+bincode 2.0.1 - https://github.com/bincode-org/bincode
+    License:   MIT
+    Copyright: (c) 2014 Ty Overby
+
+bit-set 0.10.1 - https://github.com/contain-rs/bit-set
+    License:   MIT
+    Copyright: (c) 2023 The Rust Project Developers
+
+bit-set 0.8.0 - https://github.com/contain-rs/bit-set
+    License:   MIT
+    Copyright: (c) 2023 The Rust Project Developers
+
+bit-vec 0.10.0 - https://github.com/contain-rs/bit-vec
+    License:   MIT
+    Copyright: (c) 2023 The Rust Project Developers
+
+bit-vec 0.8.0 - https://github.com/contain-rs/bit-vec
+    License:   MIT
+    Copyright: (c) 2023 The Rust Project Developers
+
+bitflags 2.12.1 - https://github.com/bitflags/bitflags
+    License:   MIT
+    Copyright: (c) 2014 The Rust Project Developers
+
+blake3 1.8.5 - https://github.com/BLAKE3-team/BLAKE3
+    License:   Apache-2.0
+    Copyright: (c) 2019 Jack O'Connor and Samuel Neves
+    Text:      licenses/Apache-2.0.txt
+
+block2 0.6.2 - https://github.com/madsmtm/objc2
+    License:   MIT
+    Copyright: (c) Mads Marquart
+
+bytecount 0.6.9 - https://github.com/llogiq/bytecount
+    License:   MIT
+    Copyright: (c) 2017 The bytecount Developers
+
+bytemuck 1.25.0 - https://github.com/Lokathor/bytemuck
+    License:   MIT
+    Copyright: (c) 2019 Daniel "Lokathor" Gee.
+
+codespan-reporting 0.13.1 - https://github.com/brendanzab/codespan
+    License:   Apache-2.0
+    Copyright: (c) Brendan Zabarauskas
+    Text:      licenses/Apache-2.0.txt
+
+constant_time_eq 0.4.2 - https://github.com/cesarb/constant_time_eq
+    License:   Apache-2.0
+    Copyright: (c) Cesar Eduardo Barros
+    Text:      licenses/Apache-2.0.txt
+
+cpufeatures 0.3.0 - https://github.com/RustCrypto/utils
+    License:   MIT
+    Copyright: (c) 2020-2025 The RustCrypto Project Developers
+
+crc 3.4.0 - https://github.com/mrhooray/crc-rs.git
+    License:   MIT
+    Copyright: (c) 2017 crc-rs Developers
+
+crc-catalog 2.5.0 - https://github.com/akhilles/crc-catalog.git
+    License:   MIT
+    Copyright: (c) 2019 Akhil Velagapudi
+
+crossbeam-deque 0.8.6 - https://github.com/crossbeam-rs/crossbeam
+    License:   MIT
+    Copyright: (c) 2019 The Crossbeam Project Developers
+
+crossbeam-epoch 0.9.18 - https://github.com/crossbeam-rs/crossbeam
+    License:   MIT
+    Copyright: (c) 2019 The Crossbeam Project Developers
+
+crossbeam-utils 0.8.21 - https://github.com/crossbeam-rs/crossbeam
+    License:   MIT
+    Copyright: (c) 2019 The Crossbeam Project Developers
+
+data-encoding 2.11.0 - https://github.com/ia0/data-encoding
+    License:   MIT
+    Copyright: (c) 2015-2020 Julien Cretin; 2017-2020 Google Inc.
+
+dirs-next 1.0.2 - https://github.com/xdg-rs/dirs
+    License:   MIT
+    Copyright: (c) 2018-2019 dirs-rs contributors
+
+dirs-sys-next 0.1.2 - https://github.com/xdg-rs/dirs/tree/master/dirs-sys
+    License:   MIT
+    Copyright: (c) 2018-2019 dirs-rs contributors
+
+dispatch2 0.3.1 - https://github.com/madsmtm/objc2
+    License:   MIT
+    Copyright: (c) Mads Marquart, Mary
+
+either 1.16.0 - https://github.com/rayon-rs/either
+    License:   MIT
+    Copyright: (c) 2015
+
+encoding_rs 0.8.35 - https://github.com/hsivonen/encoding_rs
+    License:   MIT AND BSD-3-Clause
+    Copyright: (c) WHATWG (Apple, Google, Mozilla, Microsoft).
+    Text:      licenses/encoding_rs-WHATWG.txt
+
+equivalent 1.0.2 - https://github.com/indexmap-rs/equivalent
+    License:   MIT
+    Copyright: (c) 2016--2023
+
+fixedbitset 0.5.7 - https://github.com/petgraph/fixedbitset
+    License:   MIT
+    Copyright: (c) 2015-2017
+
+foldhash 0.1.5 - https://github.com/orlp/foldhash
+    License:   Zlib
+    Copyright: (c) 2024 Orson Peters
+
+foldhash 0.2.0 - https://github.com/orlp/foldhash
+    License:   Zlib
+    Copyright: (c) 2024 Orson Peters
+
+fs2 0.4.3 - https://github.com/danburkert/fs2-rs
+    License:   MIT
+    Copyright: (c) 2015 The Rust Project Developers
+
+getrandom 0.3.4 - https://github.com/rust-random/getrandom
+    License:   MIT
+    Copyright: (c) 2018-2025 The rust-random Project Developers; 2014 The Rust Project Developers
+
+glow 0.17.0 - https://github.com/grovesNL/glow
+    License:   MIT
+    Copyright: (c) Joshua Groves, Dzmitry Malyshau
+
+glslang 0.8.1 - https://github.com/SnowflakePowered/glslang-rs
+    License:   MIT
+    Copyright: (c) Ronny Chan
+
+glslang-sys 0.8.1+275822a - https://github.com/SnowflakePowered/glslang-rs
+    License:   MIT
+    Copyright: (c) Ronny Chan
+
+half 2.7.1 - https://github.com/VoidStarKat/half-rs
+    License:   MIT
+    Copyright: (c) Kathryn Long
+
+halfbrown 0.4.0 - https://github.com/Licenser/halfbrown
+    License:   MIT
+    Copyright: (c) Heinz N. Gies
+
+hashbrown 0.15.5 - https://github.com/rust-lang/hashbrown
+    License:   MIT
+    Copyright: (c) 2016 Amanieu d'Antras
+
+hashbrown 0.16.1 - https://github.com/rust-lang/hashbrown
+    License:   MIT
+    Copyright: (c) 2016 Amanieu d'Antras
+
+hashbrown 0.17.1 - https://github.com/rust-lang/hashbrown
+    License:   MIT
+    Copyright: (c) 2016 Amanieu d'Antras
+
+image 0.25.10 - https://github.com/image-rs/image
+    License:   MIT
+    Copyright: (c) The image-rs Developers
+
+indexmap 2.14.0 - https://github.com/indexmap-rs/indexmap
+    License:   MIT
+    Copyright: (c) 2016--2017
+
+libc 0.2.186 - https://github.com/rust-lang/libc
+    License:   MIT
+    Copyright: (c) The Rust Project Developers
+
+libm 0.2.16 - https://github.com/rust-lang/compiler-builtins
+    License:   MIT
+    Copyright: (c) 2018 Jorge Aparicio; 2005-2020 Rich Felker, et al.; 1993,2004 Sun Microsystems or; 2003-2011 David Schultz or; 2003-2009 Steven G. Kargl or; 2003-2009 Bruce D. Evans or; 2008 Stephen L. Moshier or; 2017-2018 Arm Limited
+
+linked-hash-map 0.5.6 - https://github.com/contain-rs/linked-hash-map
+    License:   MIT
+    Copyright: (c) 2015 The Rust Project Developers
+
+lock_api 0.4.14 - https://github.com/Amanieu/parking_lot
+    License:   MIT
+    Copyright: (c) 2016 The Rust Project Developers
+
+log 0.4.32 - https://github.com/rust-lang/log
+    License:   MIT
+    Copyright: (c) 2014 The Rust Project Developers
+
+mach-siegbert-vogt-dxcsa 0.1.3 - https://github.com/SnowflakePowered/spirv-to-dxil-rs
+    License:   MIT
+    Copyright: the authors of https://github.com/SnowflakePowered/spirv-to-dxil-rs
+
+memchr 2.8.1 - https://github.com/BurntSushi/memchr
+    License:   MIT
+    Copyright: (c) 2015 Andrew Gallant
+
+microseh 1.2.0 - https://github.com/sonodima/microseh
+    License:   MIT
+    Copyright: (c) 2022 sonodima
+
+moxcms 0.8.1 - https://github.com/awxkee/moxcms.git
+    License:   Apache-2.0
+    Copyright: (c) 2024 Radzivon Bartoshyk; Radzivon Bartoshyk. All rights reserved.
+    Text:      licenses/Apache-2.0.txt
+
+naga 30.0.0 - https://github.com/gfx-rs/wgpu
+    License:   MIT
+    Copyright: (c) 2025 The gfx-rs developers
+
+naga-types 30.0.0 - https://github.com/gfx-rs/wgpu
+    License:   MIT
+    Copyright: (c) 2025 The gfx-rs developers
+
+nom 8.0.0 - https://github.com/rust-bakery/nom
+    License:   MIT
+    Copyright: (c) 2014-2019 Geoffroy Couprie
+
+nom_locate 5.0.0 - https://github.com/fflorent/nom_locate
+    License:   MIT
+    Copyright: (c) 2017-2019 Florent Fayolle, Valentin Lorentz
+
+num-traits 0.2.19 - https://github.com/rust-num/num-traits
+    License:   MIT
+    Copyright: (c) 2014 The Rust Project Developers
+
+objc2 0.6.4 - https://github.com/madsmtm/objc2
+    License:   MIT
+    Copyright: (c) Mads Marquart
+
+objc2-core-foundation 0.3.2 - https://github.com/madsmtm/objc2
+    License:   MIT
+    Copyright: the authors of https://github.com/madsmtm/objc2
+
+objc2-encode 4.1.0 - https://github.com/madsmtm/objc2
+    License:   MIT
+    Copyright: (c) Mads Marquart
+
+objc2-foundation 0.3.2 - https://github.com/madsmtm/objc2
+    License:   MIT
+    Copyright: the authors of https://github.com/madsmtm/objc2
+
+objc2-metal 0.3.2 - https://github.com/madsmtm/objc2
+    License:   MIT
+    Copyright: the authors of https://github.com/madsmtm/objc2
+
+parking_lot 0.12.5 - https://github.com/Amanieu/parking_lot
+    License:   MIT
+    Copyright: (c) 2016 The Rust Project Developers
+
+parking_lot_core 0.9.12 - https://github.com/Amanieu/parking_lot
+    License:   MIT
+    Copyright: (c) 2016 The Rust Project Developers
+
+persy 1.7.1 - https://gitlab.com/persy/persy
+    License:   MPL-2.0
+    Copyright: (c) Tglman
+    Text:      licenses/MPL-2.0.txt
+
+petgraph 0.8.3 - https://github.com/petgraph/petgraph
+    License:   MIT
+    Copyright: (c) 2015
+
+platform-dirs 0.3.0 - https://github.com/cjbassi/platform-dirs-rs
+    License:   MIT
+    Copyright: (c) 2019 Caleb Bassi
+
+ppv-lite86 0.2.21 - https://github.com/cryptocorrosion/cryptocorrosion
+    License:   MIT
+    Copyright: (c) 2019 The CryptoCorrosion Contributors
+
+pxfm 0.1.29 - https://github.com/awxkee/pxfm
+    License:   Apache-2.0
+    Copyright: (c) 2024 Radzivon Bartoshyk; Radzivon Bartoshyk. All rights reserved.
+    Text:      licenses/Apache-2.0.txt
+
+rand 0.9.4 - https://github.com/rust-random/rand
+    License:   MIT
+    Copyright: (c) 2018 Developers of the Rand project; 2014 The Rust Project Developers
+
+rand_chacha 0.9.0 - https://github.com/rust-random/rand
+    License:   MIT
+    Copyright: (c) 2018 Developers of the Rand project; 2014 The Rust Project Developers
+
+rand_core 0.9.5 - https://github.com/rust-random/rand
+    License:   MIT
+    Copyright: (c) 2018 Developers of the Rand project; 2014 The Rust Project Developers
+
+rayon 1.12.0 - https://github.com/rayon-rs/rayon
+    License:   MIT
+    Copyright: (c) 2010 The Rust Project Developers
+
+rayon-core 1.13.0 - https://github.com/rayon-rs/rayon
+    License:   MIT
+    Copyright: (c) 2010 The Rust Project Developers
+
+regex 1.12.3 - https://github.com/rust-lang/regex
+    License:   MIT
+    Copyright: (c) 2014 The Rust Project Developers
+
+regex-automata 0.4.14 - https://github.com/rust-lang/regex
+    License:   MIT
+    Copyright: (c) 2014 The Rust Project Developers
+
+regex-syntax 0.8.10 - https://github.com/rust-lang/regex
+    License:   MIT
+    Copyright: (c) 2014 The Rust Project Developers
+
+rspirv 0.13.0+sdk-1.4.341.0 - https://github.com/gfx-rs/rspirv
+    License:   Apache-2.0
+    Copyright: (c) Lei Zhang
+    Text:      licenses/Apache-2.0.txt
+
+rustc-hash 1.1.0 - https://github.com/rust-lang-nursery/rustc-hash
+    License:   MIT
+    Copyright: (c) The Rust Project Developers
+
+rustc-hash 2.1.2 - https://github.com/rust-lang/rustc-hash
+    License:   MIT
+    Copyright: (c) The Rust Project Developers
+
+scopeguard 1.2.0 - https://github.com/bluss/scopeguard
+    License:   MIT
+    Copyright: (c) 2016-2019 Ulrik Sverdrup "bluss" and scopeguard developers
+
+serde 1.0.228 - https://github.com/serde-rs/serde
+    License:   MIT
+    Copyright: (c) Erick Tryzelaar, David Tolnay
+
+serde_core 1.0.228 - https://github.com/serde-rs/serde
+    License:   MIT
+    Copyright: (c) Erick Tryzelaar, David Tolnay
+
+simd-adler32 0.3.9 - https://github.com/mcountryman/simd-adler32
+    License:   MIT
+    Copyright: (c) 2021 Marvin Countryman
+
+smallvec 1.15.1 - https://github.com/servo/rust-smallvec
+    License:   MIT
+    Copyright: (c) 2018 The Servo Project Developers
+
+smartstring 1.0.1 - https://github.com/bodil/smartstring
+    License:   MPL-2.0
+    Copyright: (c) Bodil Stokke
+    Text:      licenses/MPL-2.0.txt
+
+spirv 0.4.0+sdk-1.4.341.0 - https://github.com/gfx-rs/rspirv
+    License:   Apache-2.0
+    Copyright: (c) Lei Zhang
+    Text:      licenses/Apache-2.0.txt
+
+spirv-cross-sys 0.7.2+38681a3 - https://github.com/SnowflakePowered/spirv-cross2
+    License:   MIT
+    Copyright: (c) Ronny Chan
+
+spirv-cross2 0.7.1 - https://github.com/SnowflakePowered/spirv-cross2
+    License:   MIT
+    Copyright: (c) Ronny Chan
+
+spirv-to-dxil 0.4.7 - https://github.com/SnowflakePowered/spirv-to-dxil-rs
+    License:   MIT
+    Copyright: the authors of https://github.com/SnowflakePowered/spirv-to-dxil-rs
+
+spirv-to-dxil-sys 0.4.7 - https://github.com/SnowflakePowered/spirv-to-dxil-rs
+    License:   MIT
+    Copyright: the authors of https://github.com/SnowflakePowered/spirv-to-dxil-rs
+
+sptr 0.3.2 - https://github.com/Gankra/sptr
+    License:   MIT
+    Copyright: the authors of https://github.com/Gankra/sptr
+
+static_assertions 1.1.0 - https://github.com/nvzqz/static-assertions-rs
+    License:   MIT
+    Copyright: (c) 2017 Nikolai Vazquez
+
+strumbra 0.6.0 - https://gitlab.com/ltungv/strumbra
+    License:   MIT
+    Copyright: (c) 2024 Vo Le Tung
+
+thiserror 1.0.69 - https://github.com/dtolnay/thiserror
+    License:   MIT
+    Copyright: (c) David Tolnay
+
+thiserror 2.0.18 - https://github.com/dtolnay/thiserror
+    License:   MIT
+    Copyright: (c) David Tolnay
+
+unicode-ident 1.0.24 - https://github.com/dtolnay/unicode-ident
+    License:   MIT AND Unicode-3.0
+    Copyright: (c) 1991-2023 Unicode, Inc.
+    Text:      licenses/Unicode-3.0.txt
+
+unicode-width 0.2.2 - https://github.com/unicode-rs/unicode-width
+    License:   MIT
+    Copyright: (c) 2015 The Rust Project Developers
+
+unsigned-varint 0.8.0 - https://github.com/paritytech/unsigned-varint
+    License:   MIT
+    Copyright: (c) 2018 Parity Technologies (UK) Ltd.
+
+unty 0.0.4 - https://github.com/bincode-org/unty
+    License:   MIT
+    Copyright: (c) 2023 Bincode
+
+vec_extract_if_polyfill 0.1.0 - https://github.com/chyyran/vec_extract_if_polyfill
+    License:   MIT
+    Copyright: the authors of https://github.com/chyyran/vec_extract_if_polyfill
+
+winapi 0.3.9 - https://github.com/retep998/winapi-rs
+    License:   MIT
+    Copyright: (c) 2015-2018 The winapi-rs Developers
+
+windows 0.62.2 - https://github.com/microsoft/windows-rs
+    License:   MIT
+    Copyright: (c) Microsoft Corporation.
+
+windows-collections 0.3.2 - https://github.com/microsoft/windows-rs
+    License:   MIT
+    Copyright: (c) Microsoft Corporation.
+
+windows-core 0.62.2 - https://github.com/microsoft/windows-rs
+    License:   MIT
+    Copyright: (c) Microsoft Corporation.
+
+windows-future 0.3.2 - https://github.com/microsoft/windows-rs
+    License:   MIT
+    Copyright: (c) Microsoft Corporation.
+
+windows-link 0.2.1 - https://github.com/microsoft/windows-rs
+    License:   MIT
+    Copyright: (c) Microsoft Corporation.
+
+windows-numerics 0.3.1 - https://github.com/microsoft/windows-rs
+    License:   MIT
+    Copyright: (c) Microsoft Corporation.
+
+windows-result 0.4.1 - https://github.com/microsoft/windows-rs
+    License:   MIT
+    Copyright: (c) Microsoft Corporation.
+
+windows-strings 0.5.1 - https://github.com/microsoft/windows-rs
+    License:   MIT
+    Copyright: (c) Microsoft Corporation.
+
+windows-threading 0.2.1 - https://github.com/microsoft/windows-rs
+    License:   MIT
+    Copyright: (c) Microsoft Corporation.
+
+zerocopy 0.8.50 - https://github.com/google/zerocopy
+    License:   MIT
+    Copyright: (c) 2023 The Fuchsia Authors; 2019 The Fuchsia Authors.
+
+zigzag 0.1.0 - https://github.com/That3Percent/zigzag
+    License:   MIT
+    Copyright: (c) 2020 Zachary Burns
+
+zune-core 0.5.1 - https://github.com/etemesi254/zune-image
+    License:   MIT
+    Copyright: (c) zune-image developers
+
+zune-jpeg 0.5.15 - https://github.com/etemesi254/zune-image/tree/dev/crates/zune-jpeg
+    License:   MIT
+    Copyright: (c) zune-image developers
+
+slang-shaders (presets in the shaders folder) - https://github.com/libretro/slang-shaders
+    sharp-bilinear, dot - public domain, by Themaister
+    sharp-bilinear-simple - public domain, by rsn8887
+    lcd3x - public domain, by Gigaherz
+    palm-color - public domain, by hunterk
+    b-spline, retro-tiles, xbr-lv2 - MIT, (c) 2011-2025 Hyllian
+    sameboy-lcd - MIT, (c) 2015-2016 Lior Halphon
+
 
 RUNTIME LIBRARIES IN THE RELEASE PACKAGES
 -----------------------------------------
@@ -450,8 +965,8 @@ IBM Plex Sans Regular, IBM Plex Sans Bold, IBM Plex Mono Bold - https://github.c
     Text:      licenses/OFL-1.1.txt
 
 
-MIT (nlohmann-json, resvg, the Rust standard library, the MIT Rust crates)
---------------------------------------------------------------------------
+MIT (nlohmann-json, resvg, Mesa, the Rust standard library, the MIT Rust crates, the MIT slang shaders)
+-----------------------------------------------------------------------------------------------------
 
     Permission is hereby granted, free of charge, to any person obtaining a copy of this
     software and associated documentation files (the "Software"), to deal in the Software
@@ -540,6 +1055,7 @@ Apple libunwind - https://github.com/apple-oss-distributions/libunwind
 discord-rpc - https://github.com/discord/discord-rpc
 Qt - https://www.qt.io/
 GLFW - https://www.glfw.org/
+RetroArch - https://github.com/libretro/RetroArch
 
 
 TRADEMARKS

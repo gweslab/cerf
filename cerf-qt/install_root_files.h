@@ -10,6 +10,7 @@ inline constexpr char kNoticesFileName[]      = CERF_NOTICES_NAME;
 inline constexpr char kInstalledFilesName[]   = CERF_INSTALLED_FILES_NAME;
 inline constexpr char kInstalledFilesKey[]    = CERF_INSTALLED_FILES_KEY;
 inline constexpr char kScreenshotsDirName[]   = "screenshots";
+inline constexpr char kShadersDirName[]       = CERF_SHADERS_DIR_NAME;
 inline constexpr char kManagerLogFileName[]   = "manager.log";
 inline constexpr char kUninstallerFileName[]  = CERF_UNINSTALLER_NAME ".exe";
 

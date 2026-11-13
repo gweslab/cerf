@@ -42,6 +42,8 @@ bool FrontendWindowAdapter::CaptureGuestSurface(std::vector<uint32_t>& out, uint
     return PlatformWindow().CaptureGuestSurface(out, w, h);
 }
 
+bool FrontendWindowAdapter::RequestShadedCapture() { return PlatformWindow().RequestShadedCapture(); }
+
 uint64_t FrontendWindowAdapter::NativeHandle() const { return PlatformWindow().NativeHandle(); }
 
 }

@@ -12,6 +12,7 @@ Page {
     property alias filters: top.filters
     property alias footerLeading: bottom.leading
     property alias footerStacked: bottom.stacked
+    property alias footerBack: bottom.backShown
     readonly property alias searchText: top.searchText
     signal back()
     signal action()

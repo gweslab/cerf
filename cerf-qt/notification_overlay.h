@@ -16,6 +16,7 @@ public:
     using cerfcore::Service::Service;
 
     void Render(Painter& p, int width, int height, int dpi);
+    bool Showing() const;
     bool HitTest(int x, int y, uint32_t& id) const;
 
 private:

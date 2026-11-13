@@ -21,7 +21,7 @@
 #include <QMarginsF>
 #include <QPointF>
 #include <QSizeF>
-#include "device_pixel_item.h"
+#include "frame_view_item.h"
 #include <QtQml/qqmlregistration.h>
 
 #include <cstdint>
@@ -32,7 +32,7 @@ namespace cerfcore {
 enum class PointerKind;
 }
 
-class GuestSurface : public DevicePixelItem,
+class GuestSurface : public FrameViewItem,
                      public cerffrontend::CanvasInputHost,
                      public GesturePointerHost,
                      public QtEmulatorView {
@@ -55,8 +55,8 @@ public:
     void Attach(cerfcore::CerfEmulator& emu, uint32_t surf_w, uint32_t surf_h);
     void Detach();
 
-    void Paint(QPainter* painter) override;
-
+    bool                          CursorShown(cerfcore::CerfEmulator& emu) override;
+    void                          PaintCursor(cerfcore::CerfEmulator& emu, QPainter& painter) override;
     void                          SetGuestSurfaceSize(uint32_t w, uint32_t h) override;
     void                          SetPresentation(const cerffrontend::ViewPresentation& presentation) override;
     uint32_t                      GuestSurfaceWidth() const override;
@@ -67,13 +67,12 @@ public:
     void                          SetViewMode(ViewMode mode);
     cerffrontend::ViewportMode    ViewportMode() const { return presenter_->Layout().Mode(); }
     int                           IntegerFactor() const { return presenter_->Layout().IntegerFactor(); }
-    bool                          Antialias() const { return presenter_->Layout().Antialias(); }
     void                          SetViewportMode(cerffrontend::ViewportMode mode);
     void                          SetIntegerScale(int factor);
-    void                          SetAntialias(bool on);
     void                          SetFramebufferActive(bool active) override;
     void                          Repaint() override { update(); }
     bool CaptureSurface(std::vector<uint32_t>& out, uint32_t& w, uint32_t& h) override;
+    void RequestShadedCapture() override;
     qreal                         Dpr() const;
     QSize                         ScreenRegionFor(QSizeF logical, const QMarginsF& safe) const;
     void                          ApplyPlacement();
@@ -140,6 +139,7 @@ protected:
     QVariant inputMethodQuery(Qt::InputMethodQuery query) const override;
     void     inputMethodEvent(QInputMethodEvent* event) override;
     bool     eventFilter(QObject* watched, QEvent* event) override;
+    void     PixelScaleChanged() override { Relayout(); }
 
 private:
     void                  HoldPointer(bool on);
@@ -156,7 +156,7 @@ private:
     QRectF                VisibleImage() const override;
     double                GuestScale() const override;
     void                  SendRelative(int dx, int dy, uint32_t buttons) override;
-    void                  PaintFrame(cerfcore::CerfEmulator& emu, QPainter* painter);
+    const FrameLayers*    PresentLayers() override;
 
     enum class MouseRoute : uint8_t { kNone, kRelative, kCanvas };
 

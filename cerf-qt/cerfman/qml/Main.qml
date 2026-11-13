@@ -32,39 +32,12 @@ ApplicationWindow {
         selectedName = selectedRow !== null ? selectedRow.name : ""
         home.bundleUpdates = reply.bundleUpdates
         home.installed = reply.installed
-        applyRows(list)
+        rows.apply(list)
     }
 
     function refreshAll() {
         ++revision
         reload()
-    }
-
-    function applyRows(list) {
-        const keys = new Set(list.map(r => r.key))
-        for (let i = rows.count - 1; i >= 0; --i) {
-            if (!keys.has(rows.get(i).key))
-                rows.remove(i)
-        }
-        for (let i = 0; i < list.length; ++i) {
-            if (i < rows.count && rows.get(i).key === list[i].key) {
-                rows.set(i, list[i])
-                continue
-            }
-            let found = -1
-            for (let k = i + 1; k < rows.count; ++k) {
-                if (rows.get(k).key === list[i].key) {
-                    found = k
-                    break
-                }
-            }
-            if (found >= 0) {
-                rows.move(found, i, 1)
-                rows.set(i, list[i])
-            } else {
-                rows.insert(i, list[i])
-            }
-        }
     }
 
     function flash(text) {
@@ -252,7 +225,7 @@ ApplicationWindow {
         return home.goBack()
     }
 
-    ListModel {
+    KeyedListModel {
         id: rows
     }
 

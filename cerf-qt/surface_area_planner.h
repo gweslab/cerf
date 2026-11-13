@@ -6,6 +6,7 @@
 #include <cerfcore/core/service.h>
 
 #include <QMarginsF>
+#include <QPointF>
 #include <QSizeF>
 
 namespace cerffrontend {
@@ -16,7 +17,7 @@ class SurfaceAreaPlanner : public cerfcore::Service {
 public:
     using cerfcore::Service::Service;
 
-    ViewArea                       AreaFor(QSizeF logical, const QMarginsF& safe, qreal dpr,
+    ViewArea                       AreaFor(QSizeF logical, const QMarginsF& safe, QPointF scale, qreal dpr,
                                            const cerffrontend::ViewportLayout& layout);
     cerffrontend::HudScreenMetrics HudMetrics(qreal dpr);
 };

@@ -32,7 +32,8 @@ public:
     QPointF RestInWindow() const override;
 
 private:
-    qreal Dpr() const;
+    qreal   Dpr() const;
+    QPointF PixelScale() const;
 
     QQuickItem&                    item_;
     const cerfcore::InstanceGate&  gate_;

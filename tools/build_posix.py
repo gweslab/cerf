@@ -78,12 +78,12 @@ class PosixBuild(FrontendBuild):
         self.clear_for_rebuild(cmake_dir)
         if sys.platform.startswith("linux"):
             self.prefix_path = self._linux_prefix_path()
-        resvg = self.resvg_options(dict(os.environ))
+        rust_libraries = self.rust_library_options(dict(os.environ))
         configure: List = [self.cmake, "-S", self.root, "-B", cmake_dir, "-G", "Ninja",
                            "-DCMAKE_BUILD_TYPE=" + self.config, "-DCMAKE_CXX_COMPILER=" + self.compiler,
                            "-DCMAKE_RUNTIME_OUTPUT_DIRECTORY={}".format(out),
                            "-DCMAKE_EXPORT_COMPILE_COMMANDS=ON"] + \
-            self.cmake_options() + self.compiler_cache_options() + resvg
+            self.cmake_options() + self.compiler_cache_options() + rust_libraries
         if self.prefix_path:
             configure.append("-DCMAKE_PREFIX_PATH=" + self.prefix_path)
         if sys.platform.startswith("linux"):

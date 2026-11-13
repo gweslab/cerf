@@ -79,6 +79,8 @@ Json ExtractPersistFields(const Json& object) {
     }
     if (auto v = object.find(cfg::kCpuConfig); v != object.end() && v->is_object())
         out[pf::kCpuConfig] = *v;
+    if (auto v = object.find(cfg::kShaders); v != object.end() && v->is_object())
+        out[pf::kShaders] = *v;
     if (auto board = object.find(cfg::kBoard); board != object.end() && board->is_object()) {
         for (const ScreenFieldKey& screen : kScreenFieldKeys)
             if (auto v = board->find(screen.config_key); v != board->end() && IsPositiveInt(*v))
@@ -254,6 +256,10 @@ bool DeviceDirectory::WritePersistOverrides(const Json& fields, QString& error) 
                 object[cfg::kCpuConfig] = *cpu;
             else
                 object.erase(cfg::kCpuConfig);
+            if (auto shaders = fields.find(pf::kShaders); shaders != fields.end() && !shaders->empty())
+                object[cfg::kShaders] = *shaders;
+            else
+                object.erase(cfg::kShaders);
 
             Json  board_scratch;
             Json& board = SubObject(object, cfg::kBoard, board_scratch);

@@ -16,7 +16,8 @@ public:
     void OpenAbout(const std::string& device_line);
     void OpenSettings();
     void OpenTutorial();
-    bool EditLiveCustomizations(bool force_reboot, std::optional<int> ce_major, cerffrontend::GuestReset& reset);
+    bool EditLiveProperties(const char* page, bool force_reboot, std::optional<int> ce_major,
+                            cerffrontend::GuestReset& reset);
 
 private:
     QVariantMap Placement() const;

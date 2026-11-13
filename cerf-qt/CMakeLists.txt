@@ -27,6 +27,13 @@ set_target_properties(cerfqt_resvg PROPERTIES
     INTERFACE_INCLUDE_DIRECTORIES "${cerfqt_resvg_prefix}/include"
     INTERFACE_LINK_LIBRARIES "${cerfqt_resvg_link_libraries}")
 
+file(TO_CMAKE_PATH "${CERFQT_LIBRASHADER_INCLUDE_DIR}" cerfqt_librashader_include_dir)
+set(cerfqt_librashader_libraries "")
+foreach(cerfqt_library IN LISTS CERFQT_LIBRASHADER_LIBRARIES)
+    file(TO_CMAKE_PATH "${cerfqt_library}" cerfqt_library_path)
+    list(APPEND cerfqt_librashader_libraries "${cerfqt_library_path}")
+endforeach()
+
 if(ANDROID)
     set(cerfqt_host_dir android)
 else()
@@ -38,13 +45,15 @@ if(APPLE)
     file(GLOB cerfqt_objcxx_sources CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/*_macos.mm"
          "${CMAKE_CURRENT_SOURCE_DIR}/${cerfqt_host_dir}/*_macos.mm")
     list(APPEND cerfqt_sources ${cerfqt_objcxx_sources})
+    list(REMOVE_ITEM cerfqt_sources "${CMAKE_CURRENT_SOURCE_DIR}/shader_runtime_gl.cpp")
 endif()
 cerfcore_select_host_sources(cerfqt_sources)
 
 qt_add_executable(cerf-qt ${cerfqt_sources})
 target_compile_features(cerf-qt PRIVATE cxx_std_20)
 target_include_directories(cerf-qt PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/cerfman"
-                                           "${CMAKE_CURRENT_SOURCE_DIR}/${cerfqt_host_dir}")
+                                           "${CMAKE_CURRENT_SOURCE_DIR}/${cerfqt_host_dir}"
+                                           "${cerfqt_librashader_include_dir}")
 target_link_libraries(cerf-qt PRIVATE
     "$<LINK_LIBRARY:WHOLE_ARCHIVE,cerfcore::cerfcore>"
     Qt6::Svg
@@ -118,6 +127,7 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
     target_link_options(cerf-qt PRIVATE
         "LINKER:--exclude-libs,$<TARGET_LINKER_FILE_NAME:libzip::zip>:$<TARGET_LINKER_FILE_NAME:ZLIB::ZLIB>")
     install(TARGETS cerf-qt RUNTIME DESTINATION .)
+    install(FILES ${cerfqt_librashader_libraries} DESTINATION lib)
     find_program(cerfqt_patchelf patchelf REQUIRED)
     find_library(cerfqt_libssl NAMES libssl.so.3 REQUIRED)
     qt6_generate_deploy_script(TARGET cerf-qt OUTPUT_SCRIPT cerfqt_deploy_script CONTENT "
@@ -165,6 +175,9 @@ if(WIN32)
                                    "${CMAKE_CURRENT_SOURCE_DIR}/../uninstaller-win32/shell_integration_windows.cpp")
     set_target_properties(cerf-qt PROPERTIES WIN32_EXECUTABLE TRUE)
     target_link_libraries(cerf-qt PRIVATE ole32 shell32 advapi32 uuid)
+    add_custom_command(TARGET cerf-qt POST_BUILD
+        COMMAND "${CMAKE_COMMAND}" -E copy_if_different ${cerfqt_librashader_libraries} "$<TARGET_FILE_DIR:cerf-qt>"
+        VERBATIM)
 endif()
 
 if(MSVC)
@@ -198,8 +211,9 @@ if(APPLE)
         DEPENDS "${cerfqt_logo_png}"
                 "${CMAKE_CURRENT_SOURCE_DIR}/../tools/macos_icns.py"
         VERBATIM)
-    target_sources(cerf-qt PRIVATE "${cerfqt_icns}")
+    target_sources(cerf-qt PRIVATE "${cerfqt_icns}" ${cerfqt_librashader_libraries})
     set_source_files_properties("${cerfqt_icns}" PROPERTIES MACOSX_PACKAGE_LOCATION Resources)
+    set_source_files_properties(${cerfqt_librashader_libraries} PROPERTIES MACOSX_PACKAGE_LOCATION Frameworks)
     set_target_properties(cerf-qt PROPERTIES
         MACOSX_BUNDLE TRUE
         OUTPUT_NAME "${cerfqt_product_name}"
@@ -258,12 +272,20 @@ if(ANDROID)
         PREFIX "${cerfqt_install_prefix}/${cerfqt_ce_apps_name}"
         BASE "${cerfqt_ce_apps_dir}"
         FILES ${cerfqt_ce_apps})
+    cerf_read_string_define(cerfqt_shaders_dir_name "${CERF_INSTALL_ROOT_HEADER}" CERF_SHADERS_DIR_NAME)
+    set(cerfqt_bundled_shaders_dir "${cerfqt_repo_dir}/bundled/${cerfqt_shaders_dir_name}")
+    file(GLOB_RECURSE cerfqt_bundled_shaders CONFIGURE_DEPENDS "${cerfqt_bundled_shaders_dir}/*")
+    qt_add_resources(cerf-qt "cerfqt_shaders"
+        PREFIX "${cerfqt_install_prefix}/${cerfqt_shaders_dir_name}"
+        BASE "${cerfqt_bundled_shaders_dir}"
+        FILES ${cerfqt_bundled_shaders})
     file(GLOB cerfqt_licenses CONFIGURE_DEPENDS "${cerfqt_repo_dir}/${cerfqt_licenses_dir_name}/*")
     qt_add_resources(cerf-qt "cerfqt_notices"
         PREFIX "${cerfqt_install_prefix}"
         BASE "${cerfqt_repo_dir}"
         FILES "${cerfqt_repo_dir}/${cerfqt_license_name}" ${cerfqt_licenses})
-    set_property(TARGET cerf-qt APPEND PROPERTY QT_ANDROID_EXTRA_LIBS ${CERFQT_ANDROID_EXTRA_LIBS})
+    set_property(TARGET cerf-qt APPEND PROPERTY QT_ANDROID_EXTRA_LIBS ${CERFQT_ANDROID_EXTRA_LIBS}
+                 ${cerfqt_librashader_libraries})
     cerf_read_string_define(cerfqt_android_package "${CMAKE_CURRENT_SOURCE_DIR}/android_package_text.h"
                             CERF_ANDROID_PACKAGE_NAME)
     set_target_properties(cerf-qt PROPERTIES

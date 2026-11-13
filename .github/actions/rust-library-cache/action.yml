@@ -1,0 +1,55 @@
+name: Rust library cache
+description: Restore or save a Rust library that tools/<library>_library.py builds for one host branch.
+
+inputs:
+  stage:
+    description: restore before the build, save after it.
+    required: true
+  library:
+    description: The library name, resvg or librashader.
+    required: true
+  host-branch:
+    description: The host branch whose library the build uses.
+    required: true
+  python:
+    description: The Python command of the runner.
+    required: false
+    default: python3
+
+runs:
+  using: composite
+  steps:
+    - name: Name the ${{ inputs.library }} library
+      id: library
+      shell: bash
+      run: ${{ inputs.python }} tools/${{ inputs.library }}_library.py --cache-outputs "${{ inputs.host-branch }}" >> "$GITHUB_OUTPUT"
+
+    - name: Restore the ${{ inputs.library }} library
+      if: inputs.stage == 'restore'
+      id: restore
+      uses: actions/cache/restore@v4
+      with:
+        path: ${{ steps.library.outputs.path }}
+        key: ${{ inputs.library }}-${{ inputs.host-branch }}-${{ steps.library.outputs.key }}
+
+    - name: Record the ${{ inputs.library }} cache hit
+      if: inputs.stage == 'restore'
+      shell: bash
+      run: echo "CERF_${{ inputs.library }}_HIT=${{ steps.restore.outputs.cache-hit }}" >> "$GITHUB_ENV"
+
+    - name: Decide whether to save the ${{ inputs.library }} library
+      if: inputs.stage == 'save'
+      id: decide
+      shell: bash
+      run: |
+        hit_name="CERF_${{ inputs.library }}_HIT"
+        if [ "${!hit_name}" != "true" ] && [ -f "${{ steps.library.outputs.stamp }}" ]; then
+          echo "save=true" >> "$GITHUB_OUTPUT"
+        fi
+
+    - name: Save the ${{ inputs.library }} library
+      if: steps.decide.outputs.save == 'true'
+      uses: actions/cache/save@v4
+      with:
+        path: ${{ steps.library.outputs.path }}
+        key: ${{ inputs.library }}-${{ inputs.host-branch }}-${{ steps.library.outputs.key }}

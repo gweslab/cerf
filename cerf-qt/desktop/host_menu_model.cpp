@@ -6,7 +6,9 @@
 #include "../hud_selection.h"
 #include "../input_capture.h"
 #include "../link_opener.h"
+#include "../live_property_sheet.h"
 #include "../product_links.h"
+#include "../cerfman/property_fields.h"
 #include "../screenshots.h"
 #include "../tab_menu.h"
 #include "../view_rotation.h"
@@ -101,20 +103,12 @@ int HostMenuModel::MainViewport::IntegerFactor() const {
     return emu_.Get<QtEmulatorWindow>().IntegerFactor();
 }
 
-bool HostMenuModel::MainViewport::Antialias() const {
-    return emu_.Get<QtEmulatorWindow>().Antialias();
-}
-
 void HostMenuModel::MainViewport::SetViewportMode(ViewportMode m) {
     emu_.Get<QtEmulatorWindow>().SetViewportMode(m);
 }
 
 void HostMenuModel::MainViewport::SetIntegerScale(int factor) {
     emu_.Get<QtEmulatorWindow>().SetIntegerScale(factor);
-}
-
-void HostMenuModel::MainViewport::SetAntialias(bool on) {
-    emu_.Get<QtEmulatorWindow>().SetAntialias(on);
 }
 
 bool HostMenuModel::MainViewport::IsFullscreen() const {
@@ -125,7 +119,7 @@ void HostMenuModel::MainViewport::ToggleFullscreen() {
     emu_.Get<QtEmulatorWindow>().ToggleFullscreen();
 }
 
-void HostMenuModel::MainViewport::SaveScreenshot() { emu_.Get<Screenshots>().Save(); }
+void HostMenuModel::MainViewport::SaveScreenshot() { emu_.Get<Screenshots>().Save(nullptr); }
 
 void HostMenuModel::MainViewport::CopyScreenshot() { emu_.Get<Screenshots>().Copy(); }
 
@@ -140,7 +134,8 @@ std::vector<MenuItem> HostMenuModel::View() {
     items.push_back(tabs.Item(FrontendWindow::Tab::Hw));
     items.push_back(tabs.Item(FrontendWindow::Tab::Framebuffer));
     items.push_back(MenuItem{});
-    emu_.Get<ViewportMenu>().Append(items, main_viewport_);
+    emu_.Get<ViewportMenu>().Append(items, main_viewport_,
+                                    [this] { emu_.Get<LivePropertySheet>().Open(sheet_page::kShaders, false); });
     items.push_back(MenuItem{});
     if (NativeMenuBar::Active()) {
         const auto& hud  = emu_.Get<HudSelection>();

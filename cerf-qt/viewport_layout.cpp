@@ -72,12 +72,6 @@ bool ViewportLayout::SetMode(ViewportMode m) {
     return true;
 }
 
-bool ViewportLayout::SetAntialias(bool on) {
-    if (antialias_ == on) return false;
-    antialias_ = on;
-    return true;
-}
-
 bool ViewportLayout::SetIntegerScale(int factor) {
     factor = std::max(factor, 1);
     if (mode_ == ViewportMode::Integer && integer_factor_ == factor) return false;

@@ -10,7 +10,7 @@ Page {
     readonly property bool editable: sheet.editable
     readonly property bool live: sheet.live
     readonly property var pageKeys: [SheetIds.boardPage, SheetIds.guestAdditionsPage, SheetIds.displayPage,
-                                     SheetIds.cpuConfigPage, SheetIds.emulatorPage]
+                                     SheetIds.shadersPage, SheetIds.cpuConfigPage, SheetIds.emulatorPage]
     signal done()
 
     function accept() {
@@ -35,7 +35,7 @@ Page {
     function save(reboot) {
         const error = sheet.Save()
         if (error !== "") {
-            Dialogs.inform(view, live ? qsTr("Guest Additions") : qsTr("Properties"), qsTr("Could not save:\n%1").arg(error))
+            Dialogs.inform(view, qsTr("Properties"), qsTr("Could not save:\n%1").arg(error))
             return
         }
         sheet.Finish(reboot)
@@ -59,6 +59,14 @@ Page {
         stack.push(boardPicker, {"current": currentBoard, "mobile": view.mobile})
     }
 
+    function manageShaders() {
+        if (view.mobile) {
+            stack.push(shaderPicker, {"mobile": true})
+            return
+        }
+        shaderPickerWindow.createObject(view, {"transientParent": view.Window.window}).show()
+    }
+
     function bppHelp() {
         Dialogs.inform(view, qsTr("Color depth"), PropertyOptions.BppHelpText())
     }
@@ -71,6 +79,32 @@ Page {
     Component {
         id: resetQuestion
         ResetQuestionDialog {}
+    }
+
+    Component {
+        id: shaderPicker
+        ShaderPickerPage {
+            chosen: view.sheet.shaderPresets.map(p => p.path)
+            onToggled: (path, on) => shadersPage.setPreset(path, on)
+            onBack: stack.pop()
+            onCancel: stack.pop()
+        }
+    }
+
+    Component {
+        id: shaderPickerWindow
+        ShaderPickerWindow {
+            chosen: view.sheet.shaderPresets.map(p => p.path)
+            onToggled: (path, on) => shadersPage.setPreset(path, on)
+        }
+    }
+
+    Connections {
+        target: ManagerOperations
+        enabled: view.live
+        function onMessage(title, text) {
+            Dialogs.inform(view, title, text)
+        }
     }
 
     Component {
@@ -139,6 +173,15 @@ Page {
                     sheet: view.sheet
                     editable: view.editable
                     onBppHelp: view.bppHelp()
+                }
+            }
+            ScrollPage {
+                ShadersPage {
+                    id: shadersPage
+                    Layout.fillWidth: true
+                    sheet: view.sheet
+                    editable: !view.sheet.locked
+                    onManage: view.manageShaders()
                 }
             }
             ScrollPage {

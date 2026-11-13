@@ -35,6 +35,7 @@ public:
     virtual void RunOnUiThread(std::function<void()> job) = 0;
     virtual void RunOnUiThreadAfter(uint32_t delay_ms, std::function<void()> job) = 0;
     virtual bool CaptureGuestSurface(std::vector<uint32_t>& out, uint32_t& w, uint32_t& h) = 0;
+    virtual bool RequestShadedCapture()                                                    = 0;
     virtual uint64_t NativeHandle() const = 0;
 };
 

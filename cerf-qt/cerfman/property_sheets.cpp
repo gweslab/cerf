@@ -27,11 +27,10 @@ QObject* PropertySheets::CreateForDevice(const QString& name, bool running, cons
     return sheet;
 }
 
-bool PropertySheets::EditLive(const QVariantMap& window, const QString& device_dir, bool force_reboot,
-                              std::optional<int> ce_major, cerffrontend::GuestReset& reset) {
+bool PropertySheets::EditLive(const QVariantMap& window, const QString& device_dir, const QString& initial_page,
+                              bool force_reboot, std::optional<int> ce_major, cerffrontend::GuestReset& reset) {
     auto* sheet = new PropertySheet(emu_, PropertySubject::OfDirectory(device_dir),
-                                    QString::fromLatin1(PropertySheet::kModeLive),
-                                    QString::fromLatin1(sheet_page::kGuestAdditions), ce_major, force_reboot);
+                                    QString::fromLatin1(PropertySheet::kModeLive), initial_page, ce_major, force_reboot);
     QQmlEngine::setObjectOwnership(sheet, QQmlEngine::CppOwnership);
 
     bool       accepted = false;

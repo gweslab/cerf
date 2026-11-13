@@ -96,6 +96,9 @@ Identical conception as above but for writable persistant user storage.
 | `throttle_multiplier` | number | - |
 | `cpu_rate_multiplier` | number | - |
 | `hud` | string | `none`, or a HUD id from `huds.json`. Absent: the HUD of the board. |
+| `shaders.presets` | array of `{ path, enabled }` | - |
+| `shaders.parameters` | object of numbers | - |
+| `shaders.screenshots` | boolean | Save and copy screenshots with the shaders. Absent: `true`. |
 | `additional_packages.compact_flash_cards` | array of `{ file, name, insert_on_launch }` | CF cards from a ROM bundle that are displayed in UI and might be auto-attached at launch |
 | `meta` | object | Who the device is: `name`, `device_name`, and `os` (`name`, `ver_major`, `ver_minor`). Pure metadata. |
 

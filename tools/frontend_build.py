@@ -6,8 +6,10 @@ from pathlib import Path
 from typing import Callable, Dict, List, Optional
 
 import build_report
+import librashader_library
 import local_config
 import resvg_library
+import rust_library_build
 import verified_download
 from host_branch import HostBranch
 from tool_process import exit_code, failure_text
@@ -47,10 +49,11 @@ class FrontendBuild:
         ccache = self.compiler_cache()
         return [] if ccache is None else ["-DCMAKE_CXX_COMPILER_LAUNCHER=" + ccache]
 
-    def resvg_options(self, env: Dict[str, str]) -> List[str]:
+    def rust_library_options(self, env: Dict[str, str]) -> List[str]:
         try:
-            return resvg_library.cmake_options(self.root, self.branch.name, env, self.heartbeat)
-        except (resvg_library.ResvgError, verified_download.DownloadError, OSError) as exc:
+            return (resvg_library.cmake_options(self.root, self.branch.name, env, self.heartbeat) +
+                    librashader_library.cmake_options(self.root, self.branch.name, env, self.heartbeat))
+        except (rust_library_build.RustBuildError, verified_download.DownloadError, OSError) as exc:
             raise BuildAbort(exc)
 
     def build_dir(self, config: Optional[str]) -> Path:

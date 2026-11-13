@@ -1,5 +1,6 @@
 #include "device_pixel_item.h"
 
+#include "fresh_sampler_texture.h"
 #include "qt_device_pixels.h"
 
 #include <QPainter>
@@ -7,24 +8,12 @@
 #include <QSGImageNode>
 #include <QSGTexture>
 
-DevicePixelItem::DevicePixelItem(QQuickItem* parent) : QQuickItem(parent) { setFlag(ItemHasContents, true); }
-
-void DevicePixelItem::SetFillColor(const QColor& color) {
-    if (fill_ == color) return;
-    fill_ = color;
-    emit fillColorChanged();
-    update();
-}
-
-QSGNode* DevicePixelItem::updatePaintNode(QSGNode* old_node, UpdatePaintNodeData*) {
-    if (width() <= 0 || height() <= 0) {
-        delete old_node;
-        return nullptr;
-    }
-    const qreal dpr  = window()->effectiveDevicePixelRatio();
-    const QSize size = DeviceCanvasSize(width(), height(), dpr);
+QSGNode* DevicePixelItem::UpdateNode(QSGNode* old_node) {
+    const qreal   dpr   = window()->effectiveDevicePixelRatio();
+    const QPointF scale = PixelScale();
+    const QSize   size  = DeviceCanvasSize(width(), height(), scale);
     if (image_.size() != size) image_ = QImage(size, QImage::Format_RGBA8888_Premultiplied);
-    image_.fill(fill_);
+    image_.fill(FillColor());
     QPainter painter(&image_);
     painter.scale(dpr, dpr);
     Paint(&painter);
@@ -36,8 +25,8 @@ QSGNode* DevicePixelItem::updatePaintNode(QSGNode* old_node, UpdatePaintNodeData
         node->setOwnsTexture(true);
         node->setFiltering(QSGTexture::Nearest);
     }
-    node->setTexture(window()->createTextureFromImage(
-        image_, opaque_ ? QQuickWindow::TextureIsOpaque : QQuickWindow::CreateTextureOptions()));
-    node->setRect(QRectF(0, 0, size.width() / dpr, size.height() / dpr));
+    node->setTexture(CreateFreshSamplerTexture(
+        window(), image_, opaque_ ? QQuickWindow::TextureIsOpaque : QQuickWindow::CreateTextureOptions()));
+    node->setRect(QRectF(0, 0, size.width() / scale.x(), size.height() / scale.y()));
     return node;
 }

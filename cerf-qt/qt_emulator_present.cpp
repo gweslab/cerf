@@ -10,6 +10,8 @@
 #include "hud_renderer.h"
 #include "hud_selection.h"
 #include "notification_overlay.h"
+#include "screenshots.h"
+#include "shader_selection.h"
 
 #include <cerfcore/core/cerf_emulator.h>
 
@@ -39,6 +41,23 @@ double QtEmulatorPresent::GlowReach(cerfcore::CerfEmulator& emu, const cerffront
     return emu.Get<cerffrontend::HudSelection>().PanelReach(frame);
 }
 
+const ShaderChainSpec* QtEmulatorPresent::Shaders(cerfcore::CerfEmulator& emu) {
+    return &emu.Get<cerffrontend::ShaderSelection>().Spec();
+}
+
+void QtEmulatorPresent::ShadersApplied(cerfcore::CerfEmulator& emu, const ShaderChainResult& result) {
+    emu.Get<cerffrontend::ShaderSelection>().Report(result);
+}
+
+void QtEmulatorPresent::ShadedCaptured(cerfcore::CerfEmulator& emu, const ShadedFrame* frame) {
+    emu.Get<cerffrontend::Screenshots>().ShadedCaptured(frame);
+}
+
+bool QtEmulatorPresent::OverlayShown(cerfcore::CerfEmulator& emu) {
+    return emu.Get<cerffrontend::HudSelection>().Shown() || emu.Get<cerffrontend::NotificationOverlay>().Showing() ||
+           view_.CursorShown(emu);
+}
+
 void QtEmulatorPresent::RenderFrameOverlay(cerfcore::CerfEmulator& emu, QImage& present,
                                            const cerffrontend::ViewportLayout::Layout& frame, qreal dpr) {
     QPainter  p(&present);
@@ -47,7 +66,13 @@ void QtEmulatorPresent::RenderFrameOverlay(cerfcore::CerfEmulator& emu, QImage& 
 }
 
 void QtEmulatorPresent::RenderOverlay(cerfcore::CerfEmulator& emu, QImage& present, int w, int h, qreal dpr) {
-    QPainter  p(&present);
-    QtPainter painter(emu, p);
-    emu.Get<cerffrontend::NotificationOverlay>().Render(painter, w, h, Dpi(dpr));
+    {
+        QPainter  p(&present);
+        QtPainter painter(emu, p);
+        emu.Get<cerffrontend::NotificationOverlay>().Render(painter, w, h, Dpi(dpr));
+    }
+    if (!view_.CursorShown(emu)) return;
+    QPainter cursor(&present);
+    cursor.scale(dpr, dpr);
+    view_.PaintCursor(emu, cursor);
 }

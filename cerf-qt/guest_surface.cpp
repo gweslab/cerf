@@ -26,21 +26,19 @@
 #include <QInputMethodEvent>
 #include <QKeyEvent>
 #include <QMouseEvent>
-#include <QPainter>
 #include <QQuickWindow>
 #include <QTouchEvent>
 #include <QWheelEvent>
 
 #include <cmath>
 
-GuestSurface::GuestSurface(QQuickItem* parent) : DevicePixelItem(parent), touch_(TouchFrontend::Active()) {
+GuestSurface::GuestSurface(QQuickItem* parent) : FrameViewItem(parent), touch_(TouchFrontend::Active()) {
     setAcceptedMouseButtons(Qt::LeftButton | Qt::RightButton | Qt::MiddleButton);
     setAcceptTouchEvents(touch_);
     setAcceptHoverEvents(true);
     setFlag(ItemIsFocusScope, false);
     setFlag(ItemAcceptsInputMethod, touch_);
     setActiveFocusOnTab(false);
-    SetOpaquePainting(true);
     QObject::connect(&text_.Keyboard(), &SoftKeyboardRequest::requestedChanged, this,
                      &GuestSurface::keyboardRequestedChanged);
     QObject::connect(&text_.Keyboard(), &SoftKeyboardRequest::offeredChanged, this,
@@ -81,26 +79,36 @@ void GuestSurface::Detach() {
 
 qreal GuestSurface::Dpr() const { return window() ? window()->devicePixelRatio() : 1.0; }
 
-void GuestSurface::Paint(QPainter* painter) {
-    if (!presenter_) return;
-    gate_.Run([this, painter](cerfcore::CerfEmulator& emu) { PaintFrame(emu, painter); });
+const FrameLayers* GuestSurface::PresentLayers() {
+    if (!presenter_) return nullptr;
+    const FrameLayers* layers = nullptr;
+    gate_.Run([this, &layers](cerfcore::CerfEmulator& emu) {
+        const qreal dpr    = Dpr();
+        const QSize canvas =
+            DeviceCanvasSize(width() - bar_insets_.width(), height() - bar_insets_.height(), PixelScale());
+        layers = &presenter_->Present(emu, emu.Get<cerfcore::FrameRenderer>(), canvas.width(), canvas.height(), dpr);
+    });
+    return layers;
 }
 
-void GuestSurface::PaintFrame(cerfcore::CerfEmulator& emu, QPainter* painter) {
-    const qreal dpr    = Dpr();
-    const QSize canvas = DeviceCanvasSize(width() - bar_insets_.width(), height() - bar_insets_.height(), dpr);
-    presenter_->DrawTo(emu, emu.Get<cerfcore::FrameRenderer>(), *painter, canvas.width(), canvas.height(), dpr);
-    if (!cursor_mode_ || relative_pointer_ || !presenter_->Layout().Active()) return;
+bool GuestSurface::CursorShown(cerfcore::CerfEmulator& emu) {
+    if (!cursor_mode_ || relative_pointer_ || !presenter_->Layout().Active()) return false;
     auto& guest = emu.Get<QtGuestCursorCache>();
+    return ActiveKind() != cerfcore::PointerKind::Absolute || !guest.Refresh() || guest.Drawable();
+}
+
+void GuestSurface::PaintCursor(cerfcore::CerfEmulator& emu, QPainter& painter) {
+    const qreal dpr   = Dpr();
+    auto&       guest = emu.Get<QtGuestCursorCache>();
     if (ActiveKind() == cerfcore::PointerKind::Absolute && guest.Refresh()) {
         if (guest.Drawable())
             overlay_.PaintGuest(
-                *painter, guest.Image(), guest.Hotspot(),
+                painter, guest.Image(), guest.Hotspot(),
                 emu.Get<cerffrontend::GuestCanvasTurn>().LogicalQuarter(presenter_->Layout().Presentation().quarter),
                 pointer_.Position(), dpr, GuestScale());
         return;
     }
-    overlay_.PaintArrow(*painter, pointer_.Position(), dpr);
+    overlay_.PaintArrow(painter, pointer_.Position(), dpr);
 }
 
 void GuestSurface::SetGuestSurfaceSize(uint32_t w, uint32_t h) {
@@ -150,10 +158,6 @@ void GuestSurface::SetIntegerScale(int factor) {
     if (presenter_->Layout().SetIntegerScale(factor)) RefreshViewport();
 }
 
-void GuestSurface::SetAntialias(bool on) {
-    if (presenter_->Layout().SetAntialias(on)) update();
-}
-
 void GuestSurface::SetFramebufferActive(bool active) {
     if (presenter_ && presenter_->Layout().SetActive(active)) RefreshViewport();
 }
@@ -170,6 +174,11 @@ bool GuestSurface::CaptureSurface(std::vector<uint32_t>& out, uint32_t& w, uint3
             captured = presenter_->Capture(emu.Get<cerfcore::FrameRenderer>(), out, w, h);
         });
     return captured;
+}
+
+void GuestSurface::RequestShadedCapture() {
+    presenter_->RequestShadedCapture();
+    update();
 }
 
 void GuestSurface::Relayout() {
@@ -192,12 +201,12 @@ void GuestSurface::Relayout() {
 
 ViewArea GuestSurface::AreaFor(QSizeF logical, const QMarginsF& safe) const {
     if (!touch_) {
-        const QSize canvas = DeviceCanvasSize(logical.width(), logical.height(), Dpr());
+        const QSize canvas = DeviceCanvasSize(logical.width(), logical.height(), PixelScale());
         return ViewArea{canvas.width(), canvas.height()};
     }
     ViewArea a;
     gate_.Run([&](cerfcore::CerfEmulator& emu) {
-        a = emu.Get<SurfaceAreaPlanner>().AreaFor(logical, safe, Dpr(), presenter_->Layout());
+        a = emu.Get<SurfaceAreaPlanner>().AreaFor(logical, safe, PixelScale(), Dpr(), presenter_->Layout());
     });
     return a;
 }
@@ -214,12 +223,12 @@ void GuestSurface::SetSafeMargins(const QMarginsF& margins) {
 }
 
 void GuestSurface::geometryChange(const QRectF& new_geometry, const QRectF& old_geometry) {
-    DevicePixelItem::geometryChange(new_geometry, old_geometry);
+    FrameViewItem::geometryChange(new_geometry, old_geometry);
     Relayout();
 }
 
 void GuestSurface::itemChange(ItemChange change, const ItemChangeData& value) {
-    DevicePixelItem::itemChange(change, value);
+    FrameViewItem::itemChange(change, value);
     if (change == ItemDevicePixelRatioHasChanged || change == ItemSceneChange) Relayout();
 }
 
@@ -274,9 +283,9 @@ void GuestSurface::HoldPointer(bool on) {
 }
 
 bool GuestSurface::eventFilter(QObject* watched, QEvent* event) {
-    if (!grabbing_ || event->type() != QEvent::MouseMove) return DevicePixelItem::eventFilter(watched, event);
+    if (!grabbing_ || event->type() != QEvent::MouseMove) return FrameViewItem::eventFilter(watched, event);
     const auto* move = static_cast<const QMouseEvent*>(event);
-    if (move->buttons() != Qt::NoButton) return DevicePixelItem::eventFilter(watched, event);
+    if (move->buttons() != Qt::NoButton) return FrameViewItem::eventFilter(watched, event);
     gate_.Run([this, move](cerfcore::CerfEmulator& emu) {
         host_pointer_.Hover(emu, mapFromScene(move->scenePosition()), presenter_->Layout());
     });
@@ -294,9 +303,9 @@ bool GuestSurface::LockPointer() { return host_pointer_.Lock(); }
 void GuestSurface::UnlockPointer() { host_pointer_.Unlock(); }
 
 void GuestSurface::ClientSize(int& width_out, int& height_out) const {
-    const qreal dpr = Dpr();
-    width_out       = DeviceExtent(width() - bar_insets_.width(), dpr);
-    height_out      = DeviceExtent(height() - bar_insets_.height(), dpr);
+    const QPointF scale = PixelScale();
+    width_out           = DeviceExtent(width() - bar_insets_.width(), scale.x());
+    height_out          = DeviceExtent(height() - bar_insets_.height(), scale.y());
 }
 
 void GuestSurface::SetBarInsets(const QSizeF& insets) {
@@ -355,7 +364,7 @@ void GuestSurface::RouteMouse(QMouseEvent* event, cerffrontend::CanvasMouse::Kin
     const cerffrontend::MouseButton button =
         kind == cerffrontend::CanvasMouse::Kind::kMove ? cerffrontend::MouseButton::kNone
                                                        : CanvasMouseButton(event->button());
-    const QPointF at = QPointF(DevicePoint(event->position(), Dpr()));
+    const QPointF at = QPointF(DevicePoint(event->position(), PixelScale()));
     if (kind != cerffrontend::CanvasMouse::Kind::kUp) ApplyHostCursor(at);
     from_touch_ = false;
     SendCanvasMouse(kind, button, at, HeldMouseButtons(event->buttons()));
@@ -469,7 +478,7 @@ QVariant GuestSurface::inputMethodQuery(Qt::InputMethodQuery query) const {
         case Qt::ImCursorPosition:   return 0;
         case Qt::ImAnchorPosition:   return 0;
         case Qt::ImCursorRectangle:  return QRectF();
-        default:                     return DevicePixelItem::inputMethodQuery(query);
+        default:                     return FrameViewItem::inputMethodQuery(query);
     }
 }
 

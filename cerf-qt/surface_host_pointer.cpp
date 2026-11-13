@@ -6,6 +6,7 @@
 #include "qt_device_pixels.h"
 #include "qt_guest_cursor.h"
 #include "viewport_layout.h"
+#include "window_pixel_scale.h"
 
 #include <cerfcore/core/cerf_emulator.h>
 
@@ -27,6 +28,8 @@ SurfaceHostPointer::SurfaceHostPointer(QQuickItem& item, const cerfcore::Instanc
     : item_(item), gate_(gate), lock_(MakeQtPointerLock(*this)) {}
 
 qreal SurfaceHostPointer::Dpr() const { return item_.window()->devicePixelRatio(); }
+
+QPointF SurfaceHostPointer::PixelScale() const { return WindowPixelScale::Of(item_.window())->Scale(); }
 
 void SurfaceHostPointer::ApplyCursor(cerfcore::CerfEmulator& emu, int x, int y,
                                      const cerffrontend::ViewportLayout& layout) {
@@ -56,7 +59,7 @@ void SurfaceHostPointer::ApplyCursor(cerfcore::CerfEmulator& emu, int x, int y,
 
 void SurfaceHostPointer::Hover(cerfcore::CerfEmulator& emu, QPointF logical_at,
                                const cerffrontend::ViewportLayout& layout) {
-    const QPoint at = DevicePoint(logical_at, Dpr());
+    const QPoint at = DevicePoint(logical_at, PixelScale());
     ApplyCursor(emu, at.x(), at.y(), layout);
     cerffrontend::CanvasMouse m;
     m.kind = cerffrontend::CanvasMouse::Kind::kMove;
@@ -66,7 +69,7 @@ void SurfaceHostPointer::Hover(cerfcore::CerfEmulator& emu, QPointF logical_at,
 }
 
 void SurfaceHostPointer::Wheel(cerfcore::CerfEmulator& emu, const QWheelEvent& event) {
-    const QPoint              at = DevicePoint(event.position(), Dpr());
+    const QPoint              at = DevicePoint(event.position(), PixelScale());
     cerffrontend::CanvasMouse m;
     m.kind  = cerffrontend::CanvasMouse::Kind::kWheel;
     m.x     = at.x();
@@ -85,7 +88,7 @@ void SurfaceHostPointer::SetHidden(bool hidden) {
 
 bool SurfaceHostPointer::WarpTo(int x, int y) {
     if (!lock_->CanWarp()) return false;
-    QCursor::setPos(item_.mapToGlobal(QPointF(LogicalPoint(x, y, Dpr()))).toPoint());
+    QCursor::setPos(item_.mapToGlobal(QPointF(LogicalPoint(x, y, PixelScale()))).toPoint());
     return true;
 }
 

@@ -79,9 +79,13 @@ of the device. A page loads its values from that model when the sheet shows it a
 stores them back when the user leaves it. OK writes the model. Cancel writes nothing.
 No control writes on change.
 
-In the emulator process, the sheet opens on its Guest Additions page, with every
-control that needs a restart of the emulator disabled. Some fields take effect only
-after a guest reset. When the user changes one, OK asks which reset to run.
+In the emulator process, the sheet opens on the page that the action names, with every
+control that needs a restart of the emulator disabled. The sheet takes the Guest
+Additions state from the running device. Some fields take effect only after a
+guest reset. When the user changes one, OK asks which reset to run.
+
+In the emulator process, a change on the RetroArch Shaders page shows on the running device at
+once. That preview writes no file. Cancel shows the saved shaders again.
 
 After OK in the emulator process, the emulator reads `cerf.json` and then
 `cerf-user.json` again. It never applies its command line again, because a

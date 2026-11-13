@@ -80,7 +80,7 @@ QVariantList ExternalDisplayWindow::Menu(int, QObject* menu) {
 
 std::vector<cerffrontend::MenuItem> ExternalDisplayWindow::ViewItems(cerfcore::CerfEmulator& emu) {
     std::vector<cerffrontend::MenuItem> items;
-    emu.Get<cerffrontend::ViewportMenu>().Append(items, *this);
+    emu.Get<cerffrontend::ViewportMenu>().Append(items, *this, nullptr);
     return items;
 }
 
@@ -99,18 +99,12 @@ cerffrontend::ViewportMode ExternalDisplayWindow::Mode() const { return view_->L
 
 int ExternalDisplayWindow::IntegerFactor() const { return view_->Layout().IntegerFactor(); }
 
-bool ExternalDisplayWindow::Antialias() const { return view_->Layout().Antialias(); }
-
 void ExternalDisplayWindow::SetViewportMode(cerffrontend::ViewportMode m) {
     if (view_->Layout().SetMode(m)) view_->update();
 }
 
 void ExternalDisplayWindow::SetIntegerScale(int factor) {
     if (view_->Layout().SetIntegerScale(factor)) view_->update();
-}
-
-void ExternalDisplayWindow::SetAntialias(bool on) {
-    if (view_->Layout().SetAntialias(on)) view_->update();
 }
 
 void ExternalDisplayWindow::ToggleFullscreen() {

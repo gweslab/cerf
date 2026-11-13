@@ -1,6 +1,7 @@
 #include "qt_emulator_window.h"
 
 #include "cerfman/manager_engine.h"
+#include "cerfman/property_fields.h"
 #include "emulator_controller.h"
 #include "emulator_window_host.h"
 #include "guest_surface.h"
@@ -13,6 +14,7 @@
 #include "balloon_hint.h"
 #include "canvas_tabs.h"
 #include "hud_selection.h"
+#include "live_property_sheet.h"
 #include "screenshots.h"
 #include "shutdown_prompt.h"
 #include "shutdown_teardown.h"
@@ -189,6 +191,12 @@ bool QtEmulatorWindow::CaptureGuestSurface(std::vector<uint32_t>& out, uint32_t&
     return surface_->CaptureSurface(out, w, h);
 }
 
+bool QtEmulatorWindow::RequestShadedCapture() {
+    if (!window_ || !window_->isExposed()) return false;
+    surface_->RequestShadedCapture();
+    return true;
+}
+
 void QtEmulatorWindow::CloseRequested() {
     const bool begun = emu_.Get<cerffrontend::ShutdownPrompt>().BeginCloseRequest();
     LOG(Manager, "QtEmulatorWindow: close requested, prompt %s\n", begun ? "queued" : "already pending");
@@ -249,13 +257,9 @@ cerffrontend::ViewportMode QtEmulatorWindow::Mode() const { return surface_->Vie
 
 int QtEmulatorWindow::IntegerFactor() const { return surface_->IntegerFactor(); }
 
-bool QtEmulatorWindow::Antialias() const { return surface_->Antialias(); }
-
 void QtEmulatorWindow::SetViewportMode(cerffrontend::ViewportMode mode) { surface_->SetViewportMode(mode); }
 
 void QtEmulatorWindow::SetIntegerScale(int factor) { surface_->SetIntegerScale(factor); }
-
-void QtEmulatorWindow::SetAntialias(bool on) { surface_->SetAntialias(on); }
 
 void QtEmulatorWindow::ReturnToManager() { window_->hide(); }
 
@@ -303,6 +307,9 @@ std::vector<cerffrontend::MenuItem> QtEmulatorWindow::GearMenu() {
                                     [this] { surface_->SetViewMode(ViewMode::FitSafeZone); }));
     items.push_back(MenuItem::Radio("Original scale", view == ViewMode::OriginalScale,
                                     [this] { surface_->SetViewMode(ViewMode::OriginalScale); }));
+    items.push_back(MenuItem::Action("RetroArch Shaders…", [this] {
+        emu_.Get<cerffrontend::LivePropertySheet>().Open(sheet_page::kShaders, false);
+    }));
     items.push_back(MenuItem{});
     items.push_back(emu_.Get<cerffrontend::ViewRotation>().MenuRow());
     return items;
@@ -337,9 +344,10 @@ QObject* QtEmulatorWindow::CreateExternalDisplay() {
 }
 
 void QtEmulatorWindow::SaveScreenshot() {
-    const bool saved = emu_.Get<cerffrontend::Screenshots>().Save();
-    ShowHint(saved ? QStringLiteral("Screenshot saved to Pictures/CERF") : QStringLiteral("Screenshot not saved"),
-             kScreenshotHintMs, cerffrontend::BalloonHint::kCanvasBottomGap);
+    emu_.Get<cerffrontend::Screenshots>().Save([this](bool saved) {
+        ShowHint(saved ? QStringLiteral("Screenshot saved to Pictures/CERF") : QStringLiteral("Screenshot not saved"),
+                 kScreenshotHintMs, cerffrontend::BalloonHint::kCanvasBottomGap);
+    });
 }
 
 void QtEmulatorWindow::ShowHint(const QString& text, uint32_t hold_ms, int bottom_gap) {

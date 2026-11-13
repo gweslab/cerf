@@ -1,11 +1,7 @@
 #include "qt_frame_glow.h"
 
-#include <QPainter>
-#include <QRegion>
-
 #include <algorithm>
 #include <cmath>
-#include <cstring>
 #include <utility>
 
 namespace {
@@ -32,26 +28,24 @@ double QtFrameGlow::Strength(double fit_zoom, double cover_zoom) const {
     return std::min(Ramp(fit_zoom, kFadedZoom, 1.0), Ramp(cover_zoom, kFadedCover, kFullCover));
 }
 
-void QtFrameGlow::Compose(QImage& target, const QImage& guest, const QTransform& turn, int target_w, int target_h,
-                          int reach_px, double strength, QColor background) {
-    if (!Spread(guest, target_w, target_h, reach_px, strength, background)) {
-        target.fill(background);
-        return;
-    }
-    if (layer_.size() != target.size() || spread_ != shown_spread_ || turn != shown_turn_ || target_w != shown_w_ ||
-        target_h != shown_h_) {
-        std::swap(spread_, shown_spread_);
-        shown_turn_ = turn;
-        shown_w_    = target_w;
-        shown_h_    = target_h;
-        Paint(target, turn, target_w, target_h, background);
-    }
-    std::memcpy(target.bits(), layer_.constBits(), static_cast<size_t>(layer_.sizeInBytes()));
-}
-
-bool QtFrameGlow::Spread(const QImage& guest, int target_w, int target_h, int reach_px, double strength,
+bool QtFrameGlow::Update(const QImage& guest, int target_w, int target_h, int reach_px, double strength,
                          QColor background) {
     if (reach_px <= 0) return false;
+    Spread(guest, target_w, target_h, reach_px, strength, background);
+    if (spread_ != shown_) {
+        std::swap(spread_, shown_);
+        ++generation_;
+    }
+    return true;
+}
+
+QRectF QtFrameGlow::Rect(int target_w, int target_h) const {
+    return QRectF(-reach_cells_ * cell_w_, -reach_cells_ * cell_h_, target_w + 2 * reach_cells_ * cell_w_,
+                  target_h + 2 * reach_cells_ * cell_h_);
+}
+
+void QtFrameGlow::Spread(const QImage& guest, int target_w, int target_h, int reach_px, double strength,
+                         QColor background) {
     const double cell = std::min(target_w, target_h) / static_cast<double>(kCellsShort);
     const int    gw   = static_cast<int>(std::lround(target_w / cell));
     const int    gh   = static_cast<int>(std::lround(target_h / cell));
@@ -84,7 +78,6 @@ bool QtFrameGlow::Spread(const QImage& guest, int target_w, int target_h, int re
     reach_cells_ = reach;
     cell_w_      = static_cast<double>(target_w) / gw;
     cell_h_      = static_cast<double>(target_h) / gh;
-    return true;
 }
 
 void QtFrameGlow::Extend(int reach, int gw, int gh) {
@@ -141,16 +134,4 @@ void QtFrameGlow::BlurLine(int radius) {
         line_[static_cast<size_t>(i)] = {(top.r - base.r + count / 2) / count, (top.g - base.g + count / 2) / count,
                                          (top.b - base.b + count / 2) / count};
     }
-}
-
-void QtFrameGlow::Paint(const QImage& target, const QTransform& turn, int target_w, int target_h, QColor background) {
-    if (layer_.size() != target.size()) layer_ = QImage(target.size(), QImage::Format_RGB32);
-    layer_.fill(background);
-    const QRectF outer(-reach_cells_ * cell_w_, -reach_cells_ * cell_h_, target_w + 2 * reach_cells_ * cell_w_,
-                       target_h + 2 * reach_cells_ * cell_h_);
-    QPainter p(&layer_);
-    p.setTransform(turn);
-    p.setRenderHint(QPainter::SmoothPixmapTransform, true);
-    p.setClipRegion(QRegion(outer.toAlignedRect()) - QRegion(0, 0, target_w, target_h));
-    p.drawImage(outer, shown_spread_);
 }

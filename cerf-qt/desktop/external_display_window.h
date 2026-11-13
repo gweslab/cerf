@@ -41,10 +41,8 @@ public:
 
     cerffrontend::ViewportMode Mode() const override;
     int                        IntegerFactor() const override;
-    bool                       Antialias() const override;
     void                       SetViewportMode(cerffrontend::ViewportMode m) override;
     void                       SetIntegerScale(int factor) override;
-    void                       SetAntialias(bool on) override;
     bool                       IsFullscreen() const override { return chrome_.IsFullscreen(); }
     void                       ToggleFullscreen() override;
     void                       SaveScreenshot() override;

@@ -25,6 +25,6 @@ public:
 
     Q_INVOKABLE QObject* CreateForDevice(const QString& name, bool running, const QString& initial_page);
 
-    bool EditLive(const QVariantMap& window, const QString& device_dir, bool force_reboot,
-                  std::optional<int> ce_major, cerffrontend::GuestReset& reset);
+    bool EditLive(const QVariantMap& window, const QString& device_dir, const QString& initial_page,
+                  bool force_reboot, std::optional<int> ce_major, cerffrontend::GuestReset& reset);
 };

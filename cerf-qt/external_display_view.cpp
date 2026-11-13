@@ -7,14 +7,11 @@
 
 #include <cerfcore/core/cerf_emulator.h>
 
-#include <QPainter>
 #include <QQuickWindow>
 
 #include <algorithm>
 
-ExternalDisplayView::ExternalDisplayView(QQuickItem* parent) : DevicePixelItem(parent) {
-    SetOpaquePainting(true);
-}
+ExternalDisplayView::ExternalDisplayView(QQuickItem* parent) : FrameViewItem(parent) {}
 
 ExternalDisplayView::~ExternalDisplayView() { Detach(); }
 
@@ -54,14 +51,16 @@ int ExternalDisplayView::SurfaceHeight() const {
     return presenter_ ? static_cast<int>(presenter_->Layout().SurfaceHeight()) : 0;
 }
 
-void ExternalDisplayView::Paint(QPainter* painter) {
-    if (!presenter_) return;
-    gate_.Run([this, painter](cerfcore::CerfEmulator& emu) {
+const FrameLayers* ExternalDisplayView::PresentLayers() {
+    if (!presenter_) return nullptr;
+    const FrameLayers* layers = nullptr;
+    gate_.Run([this, &layers](cerfcore::CerfEmulator& emu) {
         const qreal dpr    = window()->devicePixelRatio();
-        const QSize canvas = DeviceCanvasSize(width(), height(), dpr);
+        const QSize canvas = DeviceCanvasSize(width(), height(), PixelScale());
         presenter_->SetCanvasSize(canvas.width(), canvas.height());
         emu.Get<ExternalDisplaySources>().UseSource(source_id_, [&](cerfcore::FrameSource& source) {
-            presenter_->DrawTo(emu, source, *painter, canvas.width(), canvas.height(), dpr);
+            layers = &presenter_->Present(emu, source, canvas.width(), canvas.height(), dpr);
         });
     });
+    return layers;
 }

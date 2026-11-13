@@ -17,5 +17,6 @@ private:
     QVariantList GuestAdditionsRows(const PropertySheet& sheet) const;
     QVariantList DisplayRows(const PropertySheet& sheet) const;
     QVariantList CpuRows(const PropertySheet& sheet) const;
+    QVariantList ShaderRows(const PropertySheet& sheet) const;
     QVariantList EmulatorRows(const PropertySheet& sheet) const;
 };

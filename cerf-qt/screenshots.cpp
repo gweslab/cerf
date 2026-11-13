@@ -3,6 +3,7 @@
 #include "frontend_window.h"
 #include "image_exporter.h"
 #include "screenshot_store.h"
+#include "shader_selection.h"
 
 #include <cerfcore/core/cerf_emulator.h>
 #include <cerfcore/core/device_config.h>
@@ -39,24 +40,49 @@ std::string TimestampNow() {
 
 }
 
-bool Screenshots::Save() {
-    std::vector<uint32_t> px;
-    uint32_t              w = 0, h = 0;
-    if (!emu_.Get<FrontendWindow>().CaptureGuestSurface(px, w, h)) {
-        LOG(Lcd, "Screenshots::Save: no guest frame to capture\n");
-        return false;
-    }
-    return SavePixels(px, w, h, emu_.Get<cerfcore::DeviceConfig>().device_name);
+void Screenshots::Save(std::function<void(bool saved)> done) {
+    CaptureShown([this, done = std::move(done)](const std::vector<uint32_t>* pixels, uint32_t w, uint32_t h) {
+        if (pixels == nullptr) LOG(Lcd, "Screenshots::Save: no guest frame to capture\n");
+        const bool saved =
+            pixels != nullptr && SavePixels(*pixels, w, h, emu_.Get<cerfcore::DeviceConfig>().device_name);
+        if (done) done(saved);
+    });
 }
 
 void Screenshots::Copy() {
-    std::vector<uint32_t> px;
-    uint32_t              w = 0, h = 0;
-    if (!emu_.Get<FrontendWindow>().CaptureGuestSurface(px, w, h)) {
-        LOG(Lcd, "Screenshots::Copy: no guest frame to capture\n");
+    CaptureShown([this](const std::vector<uint32_t>* pixels, uint32_t w, uint32_t h) {
+        if (pixels == nullptr) {
+            LOG(Lcd, "Screenshots::Copy: no guest frame to capture\n");
+            return;
+        }
+        CopyPixels(*pixels, w, h);
+    });
+}
+
+void Screenshots::CaptureShown(Shot shot) {
+    if (!emu_.Get<cerfcore::DeviceConfig>().shader_screenshots || emu_.Get<ShaderSelection>().Spec().presets.empty() ||
+        !emu_.Get<FrontendWindow>().RequestShadedCapture()) {
+        CaptureUnshaded(shot);
         return;
     }
-    CopyPixels(px, w, h);
+    waiting_.push_back(std::move(shot));
+}
+
+void Screenshots::ShadedCaptured(const ShadedFrame* frame) {
+    std::vector<Shot> waiting = std::move(waiting_);
+    waiting_.clear();
+    if (frame == nullptr) LOG(Lcd, "Screenshots: the frame is not shaded, taking the guest surface\n");
+    for (const Shot& shot : waiting) {
+        if (frame != nullptr) shot(&frame->pixels, frame->width, frame->height);
+        else                  CaptureUnshaded(shot);
+    }
+}
+
+void Screenshots::CaptureUnshaded(const Shot& shot) {
+    std::vector<uint32_t> px;
+    uint32_t              w = 0, h = 0;
+    if (emu_.Get<FrontendWindow>().CaptureGuestSurface(px, w, h)) shot(&px, w, h);
+    else                                                          shot(nullptr, 0, 0);
 }
 
 void Screenshots::CopyPixels(const std::vector<uint32_t>& pixels, uint32_t w, uint32_t h) {

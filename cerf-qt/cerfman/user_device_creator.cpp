@@ -5,17 +5,14 @@
 #include "device_directory.h"
 #include "device_file_value.h"
 #include "device_form_rules.h"
-#include "file_writer.h"
 #include "filesystem_path.h"
-#include "host_error_text.h"
+#include "host_file_copy.h"
 #include "json_file.h"
 #include "local_manifest_store.h"
 #include "manager_operations.h"
 
 #include <cerfcore/core/cerf_emulator.h>
 #include <cerfcore/core/device_config_keys.h>
-#include <cerfcore/platform/host_error.h>
-#include <cerfcore/platform/host_file.h>
 
 #include <QDir>
 #include <QSet>
@@ -27,46 +24,12 @@ REGISTER_SERVICE(UserDeviceCreator);
 namespace {
 
 namespace cfg = cerfcore::config_key;
-namespace hp  = cerfcore::host_platform;
 
 struct RomFile {
     QString id;
     QString name;
     QString path;
 };
-
-OperationResult CopyWithProgress(const QString& source, const QString& destination, const OperationProgress& progress,
-                                 QString& error) {
-    hp::HostFile in;
-    FileWriter   out(destination);
-    uint64_t     total = 0;
-    if (!in.Open(source.toStdString(), hp::FileMode::kReadExisting) || !in.Size(total)) {
-        error = QStringLiteral("%1: %2").arg(QDir::toNativeSeparators(source), HostErrorText(hp::LastErrorCode()));
-        return OperationResult::kFailed;
-    }
-    if (!out.Open(error)) return OperationResult::kFailed;
-    const QString     name  = PathDisplayName(source);
-    const QString     label = QStringLiteral("Copying %1…").arg(name);
-    qint64            done  = 0;
-    std::vector<char> buffer(static_cast<size_t>(FileWriter::kChunkBytes));
-    progress.Report(label, 0, qint64(total));
-    for (;;) {
-        if (progress.Cancelled()) {
-            error = QStringLiteral("Copying %1: cancelled").arg(name);
-            return OperationResult::kCancelled;
-        }
-        uint32_t got = 0;
-        if (!in.Read(buffer.data(), uint32_t(buffer.size()), got)) {
-            error = QStringLiteral("%1: %2").arg(QDir::toNativeSeparators(source), HostErrorText(hp::LastErrorCode()));
-            return OperationResult::kFailed;
-        }
-        if (got == 0) break;
-        if (!out.Write(buffer.data(), got, error)) return OperationResult::kFailed;
-        done += got;
-        progress.Report(label, done, qint64(total));
-    }
-    return out.Close(error) ? OperationResult::kDone : OperationResult::kFailed;
-}
 
 QString ExistingDeviceProblem(const QString& name) {
     if (!EntryExists(PathOf(LocalManifestStore::DevicePath(name)))) return QString();
@@ -126,7 +89,7 @@ void UserDeviceCreator::Start(const QString& name, const QString& board_id, cons
                 continue;
             }
             const QString file = PathDisplayName(rom.path);
-            result             = CopyWithProgress(rom.path, QDir(target).filePath(file), progress, error);
+            result             = CopyHostFile(rom.path, QDir(target).filePath(file), progress, error);
             if (result != OperationResult::kDone) break;
             rom_block[rom.id.toStdString()] = file.toStdString();
         }

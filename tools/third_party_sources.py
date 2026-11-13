@@ -14,6 +14,7 @@ from typing import Dict, List, Optional, Tuple
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import host_branch
 import http_request
+import librashader_library
 import qt_online_repository
 import vcpkg_install
 from product_facts import NOTICES_NAME
@@ -224,14 +225,23 @@ def homebrew_components() -> List[Component]:
     return components
 
 
+def librashader_components(root: Path, branch: str) -> List[Component]:
+    components = [Component("librashader", librashader_library.LIBRASHADER_VERSION,
+                            [Download(librashader_library.ARCHIVE_URL, librashader_library.ARCHIVE_SHA256)])]
+    for name, version, checksum in librashader_library.mpl_crate_sources(root, branch):
+        components.append(Component(name, version, [Download(librashader_library.CRATE_URL.format(name, version),
+                                                              checksum)]))
+    return components
+
+
 def branch_components(root: Path, branch: host_branch.HostBranch, release: Path) -> List[Component]:
     if branch.name == host_branch.MACOS_ARM64:
-        return homebrew_components()
+        return homebrew_components() + librashader_components(root, branch.name)
     components = qt_win7_components() if branch.name == host_branch.WIN32_X86 else qt_components(branch.name)
     components += vcpkg_components(root, branch.name)
     if branch.name in (host_branch.LINUX_AMD64, host_branch.LINUX_ARM64):
         components += almalinux_components(release)
-    return components
+    return components + librashader_components(root, branch.name)
 
 
 def listing(components: List[Component]) -> str:

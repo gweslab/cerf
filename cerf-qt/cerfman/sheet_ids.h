@@ -30,6 +30,7 @@ class SheetIds : public QObject {
     Q_PROPERTY(QString guestAdditionsPage READ GuestAdditionsPage CONSTANT)
     Q_PROPERTY(QString displayPage READ DisplayPage CONSTANT)
     Q_PROPERTY(QString cpuConfigPage READ CpuConfigPage CONSTANT)
+    Q_PROPERTY(QString shadersPage READ ShadersPage CONSTANT)
     Q_PROPERTY(QString emulatorPage READ EmulatorPage CONSTANT)
     Q_PROPERTY(QString settingsEmulatorPage READ SettingsEmulatorPage CONSTANT)
     Q_PROPERTY(QString settingsTutorialPage READ SettingsTutorialPage CONSTANT)
@@ -61,6 +62,7 @@ public:
     QString GuestAdditionsPage() const;
     QString DisplayPage() const;
     QString CpuConfigPage() const;
+    QString ShadersPage() const;
     QString EmulatorPage() const;
     QString SettingsEmulatorPage() const;
     QString SettingsTutorialPage() const;

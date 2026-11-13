@@ -12,6 +12,8 @@
 #include <cerfcore/core/cerf_emulator.h>
 #include <cerfcore/core/device_config_keys.h>
 
+#include <QFileInfo>
+#include <QStringList>
 #include <QVariantMap>
 
 REGISTER_SERVICE(PropertyPreview);
@@ -49,6 +51,7 @@ QVariantList PropertyPreview::Blocks(const PropertySheet& sheet) const {
         else if (key == QLatin1String(sp::kGuestAdditions)) rows = GuestAdditionsRows(sheet);
         else if (key == QLatin1String(sp::kDisplay))        rows = DisplayRows(sheet);
         else if (key == QLatin1String(sp::kCpuConfig))      rows = CpuRows(sheet);
+        else if (key == QLatin1String(sp::kShaders))        rows = ShaderRows(sheet);
         else if (key == QLatin1String(sp::kEmulator))       rows = EmulatorRows(sheet);
         out.append(QVariantMap{
             {QStringLiteral("key"), key},
@@ -122,6 +125,13 @@ QVariantList PropertyPreview::CpuRows(const PropertySheet& sheet) const {
         Row(QStringLiteral("Preset"), cpu.PresetLabel(board_id, overrides))};
     for (const auto& [name, value] : cpu.OverrideRows(board_id, overrides)) rows.append(Row(name, value));
     return rows;
+}
+
+QVariantList PropertyPreview::ShaderRows(const PropertySheet& sheet) const {
+    QStringList names;
+    for (const QString& preset : sheet.ShaderChain()) names.append(QFileInfo(preset).completeBaseName());
+    return {Row(QStringLiteral("Shaders"), names.isEmpty() ? QStringLiteral("None") : names.join(QStringLiteral(", "))),
+            Row(QStringLiteral("Shaders on screenshots"), OnText(sheet.ShaderScreenshots()))};
 }
 
 QVariantList PropertyPreview::EmulatorRows(const PropertySheet& sheet) const {

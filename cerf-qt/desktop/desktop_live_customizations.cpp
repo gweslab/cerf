@@ -10,9 +10,9 @@ class DesktopLiveCustomizations final : public cerffrontend::ManagerWindows {
 public:
     using cerffrontend::ManagerWindows::ManagerWindows;
 
-    bool EditLiveCustomizations(bool force_reboot, std::optional<int> ce_major,
-                                cerffrontend::GuestReset& reset) override {
-        return emu_.Get<QtManagerWindowOpener>().EditLiveCustomizations(force_reboot, ce_major, reset);
+    bool EditLiveProperties(const char* page, bool force_reboot, std::optional<int> ce_major,
+                            cerffrontend::GuestReset& reset) override {
+        return emu_.Get<QtManagerWindowOpener>().EditLiveProperties(page, force_reboot, ce_major, reset);
     }
 };
 

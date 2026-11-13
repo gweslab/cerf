@@ -58,7 +58,8 @@ Point ToPoint(FramePoint p) { return {Round(p.x), Round(p.y)}; }
 void HudRenderer::Render(Painter& p, const ViewportLayout::Layout& frame, int dpi) {
     auto&                  controls = emu_.Get<HudControls>();
     const cerfcore::DbHud* hud      = emu_.Get<HudSelection>().Active();
-    if (hud == nullptr || frame.dst_w <= 0 || frame.dst_h <= 0) {
+    if (hud == nullptr) return;
+    if (frame.dst_w <= 0 || frame.dst_h <= 0) {
         controls.Clear();
         return;
     }

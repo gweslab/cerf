@@ -118,7 +118,7 @@ class AndroidBuild(FrontendBuild):
         except (vcpkg_install.VcpkgError, qt_online_repository.QtFetchError, verified_download.DownloadError,
                 OSError) as exc:
             raise BuildAbort(exc)
-        resvg = self.resvg_options(env)
+        rust_libraries = self.rust_library_options(env)
         out = output_dir(self.root, self.config, self.branch)
         build_dir = self.build_dir(self.config)
         self.clear_for_rebuild(build_dir)
@@ -143,7 +143,7 @@ class AndroidBuild(FrontendBuild):
             "-DCERFQT_HOST_BRANCH=" + self.branch.name,
             "-DCERFQT_GLOBAL_CONFIG_OVERLAY={}".format(overlay.as_posix() if overlay else ""),
             "-DQT_ANDROID_SIGN_APK=" + ("ON" if signed else "OFF")] + self.cmake_options() +
-            self.compiler_cache_options() + resvg, env)
+            self.compiler_cache_options() + rust_libraries, env)
         if not self.compile([self.cmake, "--build", build_dir, "--target", "apk"], env):
             return False
         kind = self.config.lower()

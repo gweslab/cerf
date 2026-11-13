@@ -5,6 +5,7 @@
 #include "overlay_input.h"
 #include "qt_canvas_mouse_buttons.h"
 #include "qt_device_pixels.h"
+#include "window_pixel_scale.h"
 
 #include <cerfcore/core/cerf_emulator.h>
 
@@ -36,7 +37,9 @@ void OverlayTouchArea::Detach() {
     gate_ = cerfcore::InstanceGate();
 }
 
-QPoint OverlayTouchArea::DevicePoint(QPointF at) const { return ::DevicePoint(at, window()->devicePixelRatio()); }
+QPoint OverlayTouchArea::DevicePoint(QPointF at) const {
+    return ::DevicePoint(at, WindowPixelScale::Of(window())->Scale());
+}
 
 bool OverlayTouchArea::contains(const QPointF& point) const {
     bool         hit = false;

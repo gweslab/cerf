@@ -1,34 +1,27 @@
 #pragma once
 
-#include <QColor>
+#include "fill_color_item.h"
+
 #include <QImage>
-#include <QQuickItem>
 #include <QtQml/qqmlregistration.h>
 
 class QPainter;
 
-class DevicePixelItem : public QQuickItem {
+class DevicePixelItem : public FillColorItem {
     Q_OBJECT
     QML_ANONYMOUS
-    Q_PROPERTY(QColor fillColor READ FillColor WRITE SetFillColor NOTIFY fillColorChanged)
 
 public:
-    explicit DevicePixelItem(QQuickItem* parent = nullptr);
+    using FillColorItem::FillColorItem;
 
     virtual void Paint(QPainter* painter) = 0;
 
-    QColor FillColor() const { return fill_; }
-    void   SetFillColor(const QColor& color);
-    void   SetOpaquePainting(bool opaque) { opaque_ = opaque; }
-
-signals:
-    void fillColorChanged();
+    void SetOpaquePainting(bool opaque) { opaque_ = opaque; }
 
 protected:
-    QSGNode* updatePaintNode(QSGNode* old_node, UpdatePaintNodeData* data) override;
+    QSGNode* UpdateNode(QSGNode* old_node) override;
 
 private:
     QImage image_;
-    QColor fill_   = Qt::transparent;
     bool   opaque_ = false;
 };

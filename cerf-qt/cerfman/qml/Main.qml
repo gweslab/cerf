@@ -50,15 +50,8 @@ ApplicationWindow {
         return window.contentItem
     }
 
-    function newDevice() {
-        if (ManagerOperations.RefuseWhileBusy())
-            return
-        if (touchPlatform && mobile)
-            home.showNewTab()
-        else if (touchPlatform)
-            pushPage(newDevicePage)
-        else
-            newDeviceWindow.createObject(window, {"flows": managerFlows, "transientParent": window}).show()
+    function newDevice(anchor) {
+        newFlows.open(anchor)
     }
 
     function openSettings() {
@@ -70,10 +63,15 @@ ApplicationWindow {
             Dialogs.openSettings(window)
     }
 
-    function pushPage(component) {
-        const item = stack.push(component)
+    function pushPage(component, props) {
+        const item = stack.push(component, props !== undefined ? props : {})
         if (item.closed !== undefined)
             item.closed.connect(() => stack.pop())
+    }
+
+    function selectDevice(name) {
+        selectedName = name
+        refreshAll()
     }
 
     function openTutorial(done) {
@@ -269,9 +267,20 @@ ApplicationWindow {
     Connections {
         target: UserDeviceCreator
         function onCreated(name) {
-            window.selectedName = name
-            window.refreshAll()
+            window.selectDevice(name)
         }
+    }
+
+    DeviceTransferFlows {
+        id: transferFlows
+        flows: managerFlows
+        commands: window
+    }
+
+    NewDeviceFlows {
+        id: newFlows
+        flows: managerFlows
+        commands: window
     }
 
     Connections {
@@ -316,7 +325,6 @@ ApplicationWindow {
         focus: true
         initialItem: HomePage {
             id: home
-            flows: managerFlows
             commands: window
             mobile: window.mobile
             inlinePages: window.touchPlatform
@@ -368,12 +376,9 @@ ApplicationWindow {
         onOpenDirectoryRequested: name => window.openDirectory(name)
         onRemoveRequested: name => window.remove(name)
         onRenameRequested: name => window.rename(name)
+        onCloneRequested: name => transferFlows.cloneDevice(name)
+        onExportRequested: name => transferFlows.exportDevice(name)
         onPropertiesRequested: name => window.openProperties(name, SheetIds.boardPage)
-    }
-
-    Component {
-        id: newDeviceWindow
-        NewDeviceWindow {}
     }
 
     Component {
@@ -399,16 +404,6 @@ ApplicationWindow {
         PropertiesView {
             mobile: true
             split: !window.mobile
-        }
-    }
-
-    Component {
-        id: newDevicePage
-        NewDeviceWizard {
-            flows: managerFlows
-            mobile: true
-            closable: true
-            onFinished: stack.pop()
         }
     }
 

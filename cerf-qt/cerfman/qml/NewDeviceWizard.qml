@@ -1,24 +1,24 @@
+pragma ComponentBehavior: Bound
 import QtQuick
 import CerfStyle
 
 StackView {
     id: wizard
     required property QtObject flows
+    required property string start
     property bool mobile: false
-    property bool closable: false
-    readonly property bool atStart: depth <= 1
-    signal finished()
-
-    function restart() {
-        clear()
-        push(chooseStep)
-    }
+    signal closed()
 
     function goBack() {
-        if (atStart)
-            return false
-        pop()
+        back()
         return true
+    }
+
+    function back() {
+        if (depth > 1)
+            pop()
+        else
+            closed()
     }
 
     function sourcesApplied() {
@@ -26,18 +26,7 @@ StackView {
         BundleCatalog.Refresh(true)
     }
 
-    initialItem: chooseStep
-
-    Component {
-        id: chooseStep
-        WizardChoose {
-            mobile: wizard.mobile
-            closable: wizard.closable
-            onLocalRom: wizard.push(formStep)
-            onDownload: wizard.push(downloadStep)
-            onCancel: wizard.finished()
-        }
-    }
+    initialItem: start === "download" ? downloadStep : formStep
 
     Component {
         id: formStep
@@ -45,9 +34,10 @@ StackView {
             id: form
             flows: wizard.flows
             mobile: wizard.mobile
-            onBack: wizard.pop()
-            onCancel: wizard.finished()
-            onCreated: wizard.finished()
+            footerBack: false
+            onBack: wizard.back()
+            onCancel: wizard.closed()
+            onCreated: wizard.closed()
             onPickBoard: current => wizard.push(pickerStep, {"current": current, "form": form})
         }
     }
@@ -63,7 +53,7 @@ StackView {
                 wizard.pop()
             }
             onBack: wizard.pop()
-            onCancel: wizard.finished()
+            onCancel: wizard.closed()
         }
     }
 
@@ -72,9 +62,10 @@ StackView {
         DownloadRomsPage {
             flows: wizard.flows
             mobile: wizard.mobile
-            onBack: wizard.pop()
-            onCancel: wizard.finished()
-            onStarted: wizard.finished()
+            footerBack: false
+            onBack: wizard.back()
+            onCancel: wizard.closed()
+            onStarted: wizard.closed()
             onSources: wizard.push(sourcesStep)
         }
     }
@@ -86,7 +77,7 @@ StackView {
             mobile: wizard.mobile
             onApplied: wizard.sourcesApplied()
             onBack: wizard.pop()
-            onCancel: wizard.finished()
+            onCancel: wizard.closed()
         }
     }
 }

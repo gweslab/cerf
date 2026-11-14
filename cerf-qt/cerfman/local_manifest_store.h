@@ -18,6 +18,7 @@ public:
     static QString                DevicePath(const QString& name);
     static QString                RelativeDevicePath(const QString& name);
     static std::optional<QString> SafeDevicePath(const QString& name, QString& error);
+    static QString                UnusedDeviceName(const QString& base);
 
     void          Reload();
     LocalManifest Snapshot() const;

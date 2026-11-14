@@ -4,7 +4,6 @@ import QtQuick.Layouts
 
 Page {
     id: home
-    required property QtObject flows
     required property QtObject commands
     property bool mobile: false
     property bool inlinePages: false
@@ -22,10 +21,6 @@ Page {
     property bool cerfAvailable: false
     property bool busy: false
 
-    function showNewTab() {
-        mobileNav.show(mobileNav.newPage)
-    }
-
     function showSettingsTab() {
         mobileNav.show(mobileNav.settingsPage)
     }
@@ -33,8 +28,6 @@ Page {
     function goBack() {
         if (page === mobileNav.devicesPage)
             return false
-        if (page === mobileNav.newPage && wizard.item.goBack())
-            return true
         if (page === mobileNav.settingsPage && settingsTab.item.goBack())
             return true
         mobileNav.show(mobileNav.devicesPage)
@@ -57,13 +50,13 @@ Page {
         id: mobileNav
         visible: home.mobile
         inlinePages: home.inlinePages
-        onNewRequested: home.commands.newDevice()
+        onNewRequested: home.commands.newDevice(null)
         onSettingsRequested: home.commands.openSettings()
     }
 
     StackLayout {
         anchors.fill: parent
-        currentIndex: home.page
+        currentIndex: home.page === mobileNav.settingsPage ? 1 : 0
 
         DevicesScreen {
             id: devicesScreen
@@ -72,18 +65,6 @@ Page {
             bundleUpdates: home.bundleUpdates
             cerfStatus: home.cerfStatus
             cerfAvailable: home.cerfAvailable
-        }
-        Loader {
-            id: wizard
-            active: home.inlinePages
-            sourceComponent: NewDeviceWizard {
-                flows: home.flows
-                mobile: true
-                onFinished: {
-                    mobileNav.show(mobileNav.devicesPage)
-                    restart()
-                }
-            }
         }
         Loader {
             id: settingsTab

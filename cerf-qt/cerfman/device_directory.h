@@ -5,6 +5,7 @@
 
 #include <QMap>
 #include <QString>
+#include <QStringList>
 
 #include <functional>
 #include <optional>
@@ -25,8 +26,9 @@ class DeviceDirectory {
 public:
     explicit DeviceDirectory(QString path) : path_(std::move(path)) {}
 
-    static QString BaseConfigName();
-    static QString UserConfigName();
+    static QString     BaseConfigName();
+    static QString     UserConfigName();
+    static QStringList SavedStateNames();
     static QString StorageDefaultFile(const QString& storage_id);
     static QString StorageFile(const QString& value, const QString& storage_id);
 

@@ -14,7 +14,7 @@ constexpr char kFileManager1[] = "org.freedesktop.FileManager1";
 
 }
 
-bool OfferFile(const QString& absolute_path) {
+bool OfferFile(const QString& absolute_path, const QString&) {
     QDBusMessage call = QDBusMessage::createMethodCall(
         QString::fromLatin1(kFileManager1), QStringLiteral("/org/freedesktop/FileManager1"),
         QString::fromLatin1(kFileManager1), QStringLiteral("ShowItems"));

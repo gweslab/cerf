@@ -1,9 +1,7 @@
 #include "shader_import.h"
 
-#include "device_file_value.h"
 #include "file_access.h"
 #include "filesystem_path.h"
-#include "host_file_copy.h"
 #include "manager_operations.h"
 #include "path_containment.h"
 #include "shader_catalog.h"
@@ -19,7 +17,6 @@
 #include <QTemporaryDir>
 
 #include <filesystem>
-#include <optional>
 #include <system_error>
 
 REGISTER_SERVICE(ShaderImport);
@@ -27,8 +24,6 @@ REGISTER_SERVICE(ShaderImport);
 namespace {
 
 namespace fs = std::filesystem;
-
-constexpr char kArchiveCopyName[] = "import.zip";
 
 QString CleanPath(const QString& path) { return QDir::cleanPath(QFileInfo(QDir::fromNativeSeparators(path)).absoluteFilePath()); }
 
@@ -48,19 +43,14 @@ OperationResult Finish(bool done, bool existed, const QString& name, const QStri
 OperationResult ExtractArchive(const QString& source, const QString& name, const QString& target,
                                const OperationProgress& progress, QString& error) {
     QTemporaryDir staging;
-    QString       archive = source;
-    if (IsDocumentFileValue(source)) {
-        if (!staging.isValid()) {
-            error = QStringLiteral("cannot create a temporary folder (%1)").arg(staging.errorString());
-            return OperationResult::kFailed;
-        }
-        archive                       = staging.filePath(QString::fromLatin1(kArchiveCopyName));
-        const OperationResult copied = CopyHostFile(source, archive, progress, error);
-        if (copied != OperationResult::kDone) return copied;
+    if (!staging.isValid()) {
+        error = QStringLiteral("cannot create a temporary folder (%1)").arg(staging.errorString());
+        return OperationResult::kFailed;
     }
-    progress.Report(QStringLiteral("Extracting %1…").arg(name), 0, std::nullopt);
-    const bool existed = EntryExists(PathOf(target));
-    return Finish(SafeExtract(archive, target, error), existed, name, target, error);
+    const bool            existed   = EntryExists(PathOf(target));
+    const OperationResult extracted = ExtractPickedArchive(source, staging.path(), target, name, progress, error);
+    if (extracted == OperationResult::kCancelled) return extracted;
+    return Finish(extracted == OperationResult::kDone, existed, name, target, error);
 }
 
 OperationResult CopyFolder(const QString& source, const QString& name, const QString& target, QString& error) {

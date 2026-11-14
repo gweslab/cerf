@@ -13,7 +13,7 @@ internet for some other device will not.
 ## Adding a device ROM through the device list
 
 1. Click **New** on the toolbar.
-2. Pick **New device** - the option that says *"Create a device from your local ROM"*.
+2. Click **New device from local files**.
 3. Follow the wizard: choose the board, name the device, and point it at your ROM file.
 
 That is it. The device shows up ready to boot.

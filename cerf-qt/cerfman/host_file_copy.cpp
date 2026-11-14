@@ -13,16 +13,27 @@
 
 namespace hp = cerfcore::host_platform;
 
+namespace {
+
+QString HostFailure(const QString& path) {
+    return QStringLiteral("%1: %2").arg(QDir::toNativeSeparators(path), HostErrorText(hp::LastErrorCode()));
+}
+
+}
+
 OperationResult CopyHostFile(const QString& source, const QString& destination, const OperationProgress& progress,
                              QString& error) {
     hp::HostFile in;
-    FileWriter   out(destination);
+    hp::HostFile out;
     uint64_t     total = 0;
     if (!in.Open(source.toStdString(), hp::FileMode::kReadExisting) || !in.Size(total)) {
-        error = QStringLiteral("%1: %2").arg(QDir::toNativeSeparators(source), HostErrorText(hp::LastErrorCode()));
+        error = HostFailure(source);
         return OperationResult::kFailed;
     }
-    if (!out.Open(error)) return OperationResult::kFailed;
+    if (!out.Open(destination.toStdString(), hp::FileMode::kWriteNew)) {
+        error = HostFailure(destination);
+        return OperationResult::kFailed;
+    }
     const QString     name  = PathDisplayName(source);
     const QString     label = QStringLiteral("Copying %1…").arg(name);
     qint64            done  = 0;
@@ -35,13 +46,21 @@ OperationResult CopyHostFile(const QString& source, const QString& destination, 
         }
         uint32_t got = 0;
         if (!in.Read(buffer.data(), uint32_t(buffer.size()), got)) {
-            error = QStringLiteral("%1: %2").arg(QDir::toNativeSeparators(source), HostErrorText(hp::LastErrorCode()));
+            error = HostFailure(source);
             return OperationResult::kFailed;
         }
         if (got == 0) break;
-        if (!out.Write(buffer.data(), got, error)) return OperationResult::kFailed;
+        uint32_t written = 0;
+        if (!out.Write(buffer.data(), got, written) || written != got) {
+            error = HostFailure(destination);
+            return OperationResult::kFailed;
+        }
         done += got;
         progress.Report(label, done, qint64(total));
     }
-    return out.Close(error) ? OperationResult::kDone : OperationResult::kFailed;
+    if (!out.Close()) {
+        error = HostFailure(destination);
+        return OperationResult::kFailed;
+    }
+    return OperationResult::kDone;
 }

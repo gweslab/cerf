@@ -9,8 +9,9 @@
 
 namespace {
 
-constexpr char kDocument[]    = "android/provider/DocumentsContract$Document";
-constexpr char kOctetStream[] = "application/octet-stream";
+constexpr char kDocument[]       = "android/provider/DocumentsContract$Document";
+constexpr char kOctetStream[]    = "application/octet-stream";
+constexpr char kParcelFdClass[]  = "android/os/ParcelFileDescriptor";
 
 enum ColumnSlot { kIdColumn, kNameColumn, kMimeColumn, kSizeColumn, kModifiedColumn, kFlagsColumn };
 
@@ -111,7 +112,7 @@ namespace cerfcore {
 
 namespace host {
 
-int OpenHostDocument(const std::string& uri, const char* mode) {
+HostDocumentDescriptor OpenHostDocument(const std::string& uri, const char* mode) {
     QJniEnvironment  env;
     const QJniObject resolver  = AndroidContentResolver();
     const QJniObject target    = DocumentUriOf(uri);
@@ -119,8 +120,18 @@ int OpenHostDocument(const std::string& uri, const char* mode) {
     const jmethodID  open      = env.findMethod(env.findClass(kContentResolverClass), "openFileDescriptor",
                                                 "(Landroid/net/Uri;Ljava/lang/String;)Landroid/os/ParcelFileDescriptor;");
     jobject descriptor = env->CallObjectMethod(resolver.object(), open, target.object(), mode_text.object<jstring>());
-    if (!JavaCallSucceeded(env, descriptor != nullptr)) return -1;
-    return QJniObject::fromLocalRef(descriptor).callMethod<jint>("detachFd");
+    if (!JavaCallSucceeded(env, descriptor != nullptr)) return HostDocumentDescriptor{};
+    auto* parcel = new QJniObject(QJniObject::fromLocalRef(descriptor));
+    return HostDocumentDescriptor{parcel->callMethod<jint>("getFd"), parcel};
+}
+
+bool CloseHostDocument(const HostDocumentDescriptor& descriptor) {
+    auto*           parcel = static_cast<QJniObject*>(descriptor.owner);
+    QJniEnvironment env;
+    env->CallVoidMethod(parcel->object(), env.findMethod(env.findClass(kParcelFdClass), "close", "()V"));
+    const bool closed = JavaCallSucceeded(env, true);
+    delete parcel;
+    return closed;
 }
 
 bool QueryHostDocument(const std::string& uri, HostDocumentInfo& info) {

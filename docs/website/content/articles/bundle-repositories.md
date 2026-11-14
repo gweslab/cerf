@@ -17,7 +17,7 @@ The Device Manager lets you also to update ROMs if they have anything new in the
 
 To add a repository:
 
-1. Click **New**, then click **Download ROMs**.
+1. Click **New**, then click **Download from bundle repository**.
 2. Click **Sources…**.
 3. Click **Add…**.
 4. Type the base URL of the repository, for example `https://example.com/bundles`, and click **OK**.

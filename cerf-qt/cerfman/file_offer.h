@@ -2,4 +2,4 @@
 
 #include <QString>
 
-bool OfferFile(const QString& absolute_path);
+bool OfferFile(const QString& path, const QString& mime_type);

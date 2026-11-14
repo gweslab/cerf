@@ -13,7 +13,6 @@
 
 #include <QDir>
 #include <QFileInfo>
-#include <QRandomGenerator>
 #include <QTemporaryDir>
 
 #include <filesystem>
@@ -29,14 +28,6 @@ namespace {
 
 QString PreviousPath(const QTemporaryDir& temp) { return QDir(temp.path()).filePath(QStringLiteral("previous")); }
 
-bool MovePath(const QString& from, const QString& to, QString& error) {
-    std::error_code ec;
-    fs::rename(PathOf(from), PathOf(to), ec);
-    if (!ec) return true;
-    error = QStringLiteral("%1: %2").arg(QDir::toNativeSeparators(from), ErrorCodeText(ec));
-    return false;
-}
-
 bool ListsEntry(const QString& dir, const QStringList& entries, const QString& entry) {
     for (const QString& listed : entries) {
         std::error_code ec;
@@ -48,14 +39,14 @@ bool ListsEntry(const QString& dir, const QStringList& entries, const QString& e
 class MoveLog {
 public:
     bool Run(const QString& from, const QString& to, QString& error) {
-        if (!MovePath(from, to, error)) return false;
+        if (!MoveEntry(from, to, error)) return false;
         done_.push_back({from, to});
         return true;
     }
 
     bool Undo(QString& error) {
         while (!done_.empty()) {
-            if (!MovePath(done_.back().second, done_.back().first, error)) return false;
+            if (!MoveEntry(done_.back().second, done_.back().first, error)) return false;
             done_.pop_back();
         }
         return true;
@@ -72,18 +63,6 @@ OperationResult KeepForRecovery(QTemporaryDir& temp, const QString& failure, QSt
     return OperationResult::kFailed;
 }
 
-}
-
-QString BundleInstaller::AllocateDirName(const QString& base) const {
-    if (!EntryExists(PathOf(LocalManifestStore::DevicePath(base)))) return base;
-    static constexpr char kAlphabet[] = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
-    for (;;) {
-        QString suffix;
-        for (int i = 0; i < 8; ++i)
-            suffix.append(QLatin1Char(kAlphabet[QRandomGenerator::global()->bounded(int(sizeof(kAlphabet) - 1))]));
-        const QString candidate = base + QLatin1Char('_') + suffix;
-        if (!EntryExists(PathOf(LocalManifestStore::DevicePath(candidate)))) return candidate;
-    }
 }
 
 OperationResult BundleInstaller::DownloadExtract(const QString& url, const QString& label, const QString& temp_dir,
@@ -131,7 +110,7 @@ bool BundleInstaller::WriteBundleConfig(const QString& target, const RemoteBundl
 
 OperationResult BundleInstaller::RunInstall(const RemoteBundle& bundle, std::optional<QString> dir_name,
                                             const OperationProgress& progress, QString& error) {
-    const QString                name   = dir_name ? *dir_name : AllocateDirName(bundle.name);
+    const QString                name   = dir_name ? *dir_name : LocalManifestStore::UnusedDeviceName(bundle.name);
     const std::optional<QString> target = LocalManifestStore::SafeDevicePath(name, error);
     if (!target) return OperationResult::kFailed;
 
@@ -157,7 +136,7 @@ OperationResult BundleInstaller::RunInstall(const RemoteBundle& bundle, std::opt
     const bool                      replacing = EntryExists(PathOf(*target));
     auto                            fail_back = [&](bool target_moved) {
         QString failure;
-        if ((!target_moved || MovePath(previous, *target, failure)) && carried.Undo(failure))
+        if ((!target_moved || MoveEntry(previous, *target, failure)) && carried.Undo(failure))
             return OperationResult::kFailed;
         return KeepForRecovery(temp, failure, error);
     };
@@ -187,8 +166,8 @@ OperationResult BundleInstaller::RunInstall(const RemoteBundle& bundle, std::opt
             return fail_back(false);
     }
     if (!WriteBundleConfig(prepared, bundle, error)) return fail_back(false);
-    if (replacing && !MovePath(*target, previous, error)) return fail_back(false);
-    if (!MovePath(prepared, *target, error)) return fail_back(replacing);
+    if (replacing && !MoveEntry(*target, previous, error)) return fail_back(false);
+    if (!MoveEntry(prepared, *target, error)) return fail_back(replacing);
 
     const bool saved = emu_.Get<LocalManifestStore>().Update(
         [&](LocalManifest& manifest) {
@@ -202,7 +181,7 @@ OperationResult BundleInstaller::RunInstall(const RemoteBundle& bundle, std::opt
         error);
     if (saved) return OperationResult::kDone;
     QString failure;
-    if (!MovePath(*target, prepared, failure)) return KeepForRecovery(temp, failure, error);
+    if (!MoveEntry(*target, prepared, failure)) return KeepForRecovery(temp, failure, error);
     return fail_back(replacing);
 }
 
@@ -257,14 +236,14 @@ OperationResult BundleInstaller::RunInstallPackage(const QString& name, const Re
     }
     const QString previous  = PreviousPath(temp);
     const bool    replacing = EntryExists(PathOf(destination));
-    if (replacing && !MovePath(destination, previous, error)) return OperationResult::kFailed;
+    if (replacing && !MoveEntry(destination, previous, error)) return OperationResult::kFailed;
     QString failure;
-    if (!MovePath(source, destination, error)) {
-        if (replacing && !MovePath(previous, destination, failure)) return KeepForRecovery(temp, failure, error);
+    if (!MoveEntry(source, destination, error)) {
+        if (replacing && !MoveEntry(previous, destination, failure)) return KeepForRecovery(temp, failure, error);
         return OperationResult::kFailed;
     }
     if (RecordPackage(name, package, error)) return OperationResult::kDone;
-    if (!MovePath(destination, source, failure) || (replacing && !MovePath(previous, destination, failure)))
+    if (!MoveEntry(destination, source, failure) || (replacing && !MoveEntry(previous, destination, failure)))
         return KeepForRecovery(temp, failure, error);
     return OperationResult::kFailed;
 }

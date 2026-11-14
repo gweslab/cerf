@@ -24,7 +24,7 @@ Item {
         text: qsTr("New")
         icon.source: IconSources.newIcon
         enabled: !screen.busy
-        onTriggered: screen.commands.newDevice()
+        onTriggered: source => screen.commands.newDevice(source)
     }
 
     RowLayout {

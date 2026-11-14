@@ -924,6 +924,12 @@ per-SoC/per-board concretes (strategy pattern, selected by `BoardContext`).
   more than the drag distance of the platform from that position. A new press
   on an item still clicks it.
 
+  **A menu takes no pointer position until it is open.** On Wayland the menu
+  window can move while it opens. Qt then reports the still pointer at the same
+  point of the moved window, which is a new global position. When no item or
+  point opens the menu, the first pointer position after the menu opens is the
+  position that the drag distance counts from.
+
   **A press on the item that opens a menu, a drag and a release click the menu
   item under the release.** The item that takes the press keeps the press
   grab, so it gets every move until the release. Qt can then deliver the drag

@@ -1,5 +1,6 @@
 #pragma once
 
+#include "bundle_repositories.h"
 #include "manager_qml_engine.h"
 
 #include <cerfcore/core/service.h>
@@ -35,7 +36,11 @@ public:
     Q_INVOKABLE void         Probe(const QString& url);
     Q_INVOKABLE QVariantMap  Check(const QString& url, const QStringList& existing) const;
     Q_INVOKABLE QString      Apply(const QVariantList& repositories);
+    Q_INVOKABLE QVariantMap  Add(const QString& url);
 
 signals:
     void probed(const QString& url, const QString& status);
+
+private:
+    QString Store(const std::vector<BundleRepository>& repositories) const;
 };

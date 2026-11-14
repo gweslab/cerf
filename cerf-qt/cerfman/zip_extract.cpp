@@ -1,7 +1,9 @@
 #include "zip_extract.h"
 
+#include "device_file_value.h"
 #include "file_writer.h"
 #include "filesystem_path.h"
+#include "host_file_copy.h"
 #include "path_containment.h"
 #include "zip_extract_host.h"
 
@@ -10,10 +12,12 @@
 
 #include <functional>
 #include <memory>
+#include <optional>
 #include <vector>
 
 namespace {
 
+constexpr char     kPickedArchiveName[] = "picked.zip";
 constexpr uint32_t kFileTypeMask = 0170000;
 constexpr uint32_t kSymlinkType  = 0120000;
 
@@ -137,6 +141,18 @@ bool SafeExtract(const QString& zip_path, const QString& destination, QString& e
         if (entry.unix_mode && (entry.mode & 0777) != 0) modes.push_back({entry.path, entry.mode & 0777});
     }
     return FinishUnixEntries(root, modes, links, error);
+}
+
+OperationResult ExtractPickedArchive(const QString& source, const QString& staging_dir, const QString& destination,
+                                     const QString& label, const OperationProgress& progress, QString& error) {
+    QString archive = source;
+    if (IsDocumentFileValue(source)) {
+        archive                      = QDir(staging_dir).filePath(QString::fromLatin1(kPickedArchiveName));
+        const OperationResult copied = CopyHostFile(source, archive, progress, error);
+        if (copied != OperationResult::kDone) return copied;
+    }
+    progress.Report(QStringLiteral("Extracting %1…").arg(label), 0, std::nullopt);
+    return SafeExtract(archive, destination, error) ? OperationResult::kDone : OperationResult::kFailed;
 }
 
 QString PreparedBundleRoot(const QString& extract_dir) {

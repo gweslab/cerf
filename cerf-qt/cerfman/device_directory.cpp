@@ -8,6 +8,7 @@
 #include <cerfcore/core/config_json.h>
 #include <cerfcore/core/device_config.h>
 #include <cerfcore/core/device_config_keys.h>
+#include <cerfcore/state/state_image_format.h>
 
 #include <QDir>
 #include <QFileInfo>
@@ -96,6 +97,10 @@ Json ExtractPersistFields(const Json& object) {
 QString DeviceDirectory::BaseConfigName() { return QString::fromLatin1(cerfcore::kDeviceConfigFileName); }
 
 QString DeviceDirectory::UserConfigName() { return QString::fromLatin1(cerfcore::kUserConfigFileName); }
+
+QStringList DeviceDirectory::SavedStateNames() {
+    return {QString::fromLatin1(cerfcore::kDefaultStateFile), QString::fromLatin1(cerfcore::kSavedStateScreenshotFile)};
+}
 
 QString DeviceDirectory::StorageDefaultFile(const QString& storage_id) {
     return QString::fromStdString(cerfcore::DefaultStorageFileName(storage_id.toStdString()));

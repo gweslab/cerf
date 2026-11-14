@@ -37,7 +37,7 @@ bool CrashReportModel::Exists(const QString& path) const { return QFileInfo(path
 
 QString CrashReportModel::ShowFile(const QString& path) const {
     const QString target = QFileInfo(path).absoluteFilePath();
-    return OfferFile(target) ? QString()
+    return OfferFile(target, QStringLiteral("text/plain")) ? QString()
                              : QStringLiteral("%1 cannot be opened.").arg(QDir::toNativeSeparators(target));
 }
 

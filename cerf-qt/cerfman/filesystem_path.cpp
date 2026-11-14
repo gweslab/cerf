@@ -54,3 +54,11 @@ bool CopyFileTo(const fs::path& from, const fs::path& to, QString& error) {
     error = QStringLiteral("%1: %2").arg(QDir::toNativeSeparators(PathText(to)), ErrorCodeText(ec));
     return false;
 }
+
+bool MoveEntry(const QString& from, const QString& to, QString& error) {
+    std::error_code ec;
+    fs::rename(PathOf(from), PathOf(to), ec);
+    if (!ec) return true;
+    error = QStringLiteral("%1: %2").arg(QDir::toNativeSeparators(from), ErrorCodeText(ec));
+    return false;
+}

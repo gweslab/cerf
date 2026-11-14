@@ -53,13 +53,28 @@ QVariantMap SourceRepositories::Check(const QString& url, const QStringList& exi
     return {};
 }
 
+QString SourceRepositories::Store(const std::vector<BundleRepository>& repositories) const {
+    std::string error;
+    if (!emu_.Get<BundleRepositories>().Write(repositories, error)) return QString::fromStdString(error);
+    return QString();
+}
+
 QString SourceRepositories::Apply(const QVariantList& repositories) {
     std::vector<BundleRepository> out;
     for (const QVariant& item : repositories) {
         const QVariantMap repo = item.toMap();
         out.push_back({repo.value(QStringLiteral("url")).toString(), repo.value(QStringLiteral("enabled")).toBool()});
     }
-    std::string error;
-    if (!emu_.Get<BundleRepositories>().Write(out, error)) return QString::fromStdString(error);
-    return QString();
+    return Store(out);
+}
+
+QVariantMap SourceRepositories::Add(const QString& url) {
+    std::vector<BundleRepository> repositories = emu_.Get<BundleRepositories>().Read();
+    QStringList                   existing;
+    for (const BundleRepository& repository : repositories) existing.append(repository.url);
+    const QVariantMap problem = Check(url, existing);
+    if (!problem.isEmpty()) return problem;
+    repositories.push_back({url, true});
+    const QString error = Store(repositories);
+    return error.isEmpty() ? QVariantMap() : FlowError(AddTitle(), error);
 }

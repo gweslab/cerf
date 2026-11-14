@@ -3,6 +3,7 @@
 #include "../android/android_content.h"
 
 #include <cerfcore/core/log.h>
+#include <cerfcore/platform/host_documents.h>
 
 namespace {
 
@@ -28,4 +29,10 @@ QString AdoptPickedDocument(const QUrl& url) {
         LOG(Caution, "FileAccess: %s has no persistable grant; it opens only until CERF restarts\n",
             qUtf8Printable(text));
     return text;
+}
+
+bool DeletePickedDocument(const QString& uri) {
+    if (cerfcore::host::DeleteHostDocument(uri.toStdString())) return true;
+    LOG(Caution, "FileAccess: cannot delete %s\n", qUtf8Printable(uri));
+    return false;
 }

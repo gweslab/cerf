@@ -31,7 +31,6 @@ private:
                                     const OperationProgress& progress, QString& prepared, QString& error);
     bool            KeptStorageEntries(const QString& name, const QString& target, const QString& prepared,
                                        QStringList& kept, QString& error) const;
-    QString         AllocateDirName(const QString& base) const;
     bool            RecordPackage(const QString& name, const RemotePackage& package, QString& error);
     bool            WriteBundleConfig(const QString& target, const RemoteBundle& bundle, QString& error) const;
 };

@@ -117,6 +117,19 @@ The manager makes sure that the size and the SHA-256 of each archive match the
 manifest. During extraction it rejects each file in the archive whose path is outside
 the target directory.
 
+## Export, import and clone
+
+A device archive is a zip of one device directory. Its files are at the root of the archive, and it always holds `cerf.json`. Import also accepts an archive whose files are in one top-level folder.
+
+Export and Clone copy each file that a `rom` or `storage` value names, in `cerf.json` and in `cerf-user.json`. A value is a string or an array of strings, under any key. The default storage image of the board counts when no value names its key. The copy rewrites each value in the file that holds it.
+
+These rules apply to each copy:
+
+- Export does not change the value of a file that it leaves out. Clone points that value at the file of the original device, so the two devices share the file. A value that names no existing file does not change.
+- When the user does not keep the personal configuration, `cerf-user.json` keeps only `meta`, `rom`, `storage` and `board.id`. The `launcher` block stays only when the user keeps the repository link.
+- A clone that keeps the repository link gets a copy of the `devices/manifest.json` record of the original, with no packages in the copy.
+- The saved state is `state.img` and its screenshot. The copy keeps their names.
+
 ## Running devices
 
 A running emulator writes `devices/<name>/cerf-status.json` with its pid, window handle

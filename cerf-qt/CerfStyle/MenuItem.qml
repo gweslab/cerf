@@ -67,10 +67,19 @@ M.MenuItem {
         spacing: Theme.spaceL
         layoutDirection: control.mirrored ? Qt.RightToLeft : Qt.LeftToRight
 
+        ControlIcon {
+            id: iconImage
+            Layout.leftMargin: control.leadingRoom
+            symbol: control.icon.source
+            tint: labelText.color
+            iconSize: Qt.size(control.icon.width, control.icon.height)
+        }
         Text {
+            id: labelText
+            readonly property real leadRoom: iconImage.visible ? 0 : control.leadingRoom
             Layout.fillWidth: true
-            leftPadding: control.mirrored ? (control.shortcutText === "" ? control.trailingRoom : 0) : control.leadingRoom
-            rightPadding: control.mirrored ? control.leadingRoom : (control.shortcutText === "" ? control.trailingRoom : 0)
+            leftPadding: control.mirrored ? (control.shortcutText === "" ? control.trailingRoom : 0) : leadRoom
+            rightPadding: control.mirrored ? leadRoom : (control.shortcutText === "" ? control.trailingRoom : 0)
             text: control.label
             font: control.font
             color: enabled ? control.Material.foreground : control.Material.hintTextColor

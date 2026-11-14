@@ -11,6 +11,8 @@ Menu {
     signal openDirectoryRequested(string name)
     signal removeRequested(string name)
     signal renameRequested(string name)
+    signal cloneRequested(string name)
+    signal exportRequested(string name)
     signal propertiesRequested(string name)
 
     MenuItem {
@@ -42,12 +44,22 @@ Menu {
         onTriggered: menu.removeRequested(menu.name)
     }
     MenuItem {
-        text: qsTr("Rename…")
+        text: qsTr("Rename")
         onTriggered: menu.renameRequested(menu.name)
+    }
+    MenuItem {
+        enabled: menu.row !== null && menu.row.removable
+        text: qsTr("Clone")
+        onTriggered: menu.cloneRequested(menu.name)
+    }
+    MenuItem {
+        enabled: menu.row !== null && menu.row.removable
+        text: qsTr("Export")
+        onTriggered: menu.exportRequested(menu.name)
     }
     MenuSeparator {}
     MenuItem {
-        text: qsTr("Properties…")
+        text: qsTr("Properties")
         onTriggered: menu.propertiesRequested(menu.name)
     }
 }

@@ -8,7 +8,9 @@ M.Menu {
     property point openerPointer
     property bool openerPointerKnown: false
     property point pointerAtOpen
+    property bool pointerAtOpenKnown: false
     property bool pointerMoved: true
+    property bool placed: false
 
     popupType: Theme.touchPlatform ? T.Popup.Item : T.Popup.Window
     delegate: MenuItem {}
@@ -34,15 +36,23 @@ M.Menu {
     }
 
     function notePointer(globalPoint) {
-        if (pointerMoved)
+        if (pointerMoved || !placed)
             return
+        if (!pointerAtOpenKnown) {
+            pointerAtOpen = globalPoint
+            pointerAtOpenKnown = true
+            return
+        }
         pointerMoved = Math.abs(globalPoint.x - pointerAtOpen.x) + Math.abs(globalPoint.y - pointerAtOpen.y)
                 > Application.styleHints.startDragDistance
     }
 
+    onOpened: placed = true
     onAboutToShow: {
         pointerAtOpen = openerPointer
-        pointerMoved = !openerPointerKnown
+        pointerAtOpenKnown = openerPointerKnown
+        pointerMoved = false
+        placed = false
         if (!Theme.touchPlatform)
             MenuDrag.Track(contentItem.Window.window)
     }

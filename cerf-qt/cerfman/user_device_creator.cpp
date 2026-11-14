@@ -3,19 +3,19 @@
 #include "board_config_catalog.h"
 #include "bundle_name.h"
 #include "device_directory.h"
+#include "device_file_copy.h"
 #include "device_file_value.h"
 #include "device_form_rules.h"
 #include "filesystem_path.h"
-#include "host_file_copy.h"
 #include "json_file.h"
 #include "local_manifest_store.h"
 #include "manager_operations.h"
 
 #include <cerfcore/core/cerf_emulator.h>
+#include <cerfcore/core/cerf_paths.h>
 #include <cerfcore/core/device_config_keys.h>
 
 #include <QDir>
-#include <QSet>
 
 #include <vector>
 
@@ -54,45 +54,33 @@ void UserDeviceCreator::Start(const QString& name, const QString& board_id, cons
     if (!config.empty()) board[cfg::kConfig] = config;
 
     std::vector<RomFile> roms;
+    std::vector<QString> storage_names;
     Json                 storage = Json::object();
     for (const FormFile& file : emu_.Get<DeviceFormRules>().FormFiles(board_id, files)) {
         if (file.storage) {
             if (file.value != file.default_value) storage[file.id.toStdString()] = file.value.toStdString();
+            if (!cerfcore::IsAbsoluteHostPath(file.value.toStdString())) storage_names.push_back(file.value);
         } else if (!file.value.isEmpty()) {
             roms.push_back({file.id, file.name, ResolveDeviceFileValue(file.value, QDir::currentPath())});
         }
     }
 
-    auto job = [name, board, roms, storage, copy](const OperationProgress& progress, QString& error) {
+    auto job = [name, board, roms, storage_names, storage, copy](const OperationProgress& progress, QString& error) {
         error = ExistingDeviceProblem(name);
         if (!error.isEmpty()) return OperationResult::kFailed;
         for (const RomFile& rom : roms) {
             error = DeviceFormRules::MissingFileProblem(rom.name, rom.path);
             if (!error.isEmpty()) return OperationResult::kFailed;
         }
-        if (copy) {
-            QSet<QString> names;
-            for (const RomFile& rom : roms) names.insert(PathDisplayName(rom.path).toCaseFolded());
-            if (names.size() != int(roms.size())) {
-                error = QStringLiteral("Two ROM files have the same name, so both cannot be copied to the device "
-                                       "directory.");
-                return OperationResult::kFailed;
-            }
-        }
         const QString target = LocalManifestStore::DevicePath(name);
         if (!MakeDirectory(target, error)) return OperationResult::kFailed;
-        Json            rom_block = Json::object();
-        OperationResult result    = OperationResult::kDone;
-        for (const RomFile& rom : roms) {
-            if (!copy) {
-                rom_block[rom.id.toStdString()] = QDir::toNativeSeparators(rom.path).toStdString();
-                continue;
-            }
-            const QString file = PathDisplayName(rom.path);
-            result             = CopyHostFile(rom.path, QDir(target).filePath(file), progress, error);
-            if (result != OperationResult::kDone) break;
-            rom_block[rom.id.toStdString()] = file.toStdString();
-        }
+        DeviceFileCopy files;
+        for (const QString& storage_name : storage_names) files.Reserve(storage_name);
+        Json rom_block = Json::object();
+        for (const RomFile& rom : roms)
+            rom_block[rom.id.toStdString()] =
+                (copy ? files.Add(rom.path) : QDir::toNativeSeparators(rom.path)).toStdString();
+        OperationResult result = files.Run(target, progress, error);
         if (result == OperationResult::kDone) {
             Json config = {{cfg::kMeta, {{cfg::kName, name.toStdString()}}},
                            {cfg::kRom, rom_block},

@@ -38,10 +38,8 @@ public:
     Q_INVOKABLE QString     DisplayName(const QString& name) const;
     Q_INVOKABLE QString     RelativePath(const QString& name) const;
     Q_INVOKABLE QString     Rename(const QString& name, const QString& display_name);
+    Q_INVOKABLE QVariantMap RefuseRunning(const QString& name) const;
 
 signals:
     void verboseLogsChanged();
-
-private:
-    QVariantMap RunningError(const QString& name) const;
 };

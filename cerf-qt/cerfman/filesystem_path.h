@@ -14,3 +14,4 @@ QString               PathDisplayName(const QString& path);
 QString               LocationName(const QString& path);
 bool                  MakeDirectory(const QString& path, QString& error);
 bool                  CopyFileTo(const std::filesystem::path& from, const std::filesystem::path& to, QString& error);
+bool                  MoveEntry(const QString& from, const QString& to, QString& error);

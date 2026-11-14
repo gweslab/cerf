@@ -12,6 +12,7 @@ qt_add_qml_module(cerfqt_style
         ApplicationWindow.qml
         Button.qml
         ComboBox.qml
+        ControlIcon.qml
         Dialog.qml
         FieldBackground.qml
         Menu.qml

@@ -14,7 +14,6 @@
 #include <cerfcore/core/cerf_config.h>
 #include <cerfcore/core/cerf_emulator.h>
 #include <cerfcore/core/log.h>
-#include <cerfcore/state/state_image_format.h>
 #include "../main_config.h"
 
 #include <QDir>
@@ -53,18 +52,19 @@ QVariantMap DeviceActions::Launch(const QString& name, const QString& boot, bool
     return emu_.Get<EmulatorLauncher>().Launch(name, args, confirmed);
 }
 
-QVariantMap DeviceActions::RunningError(const QString& name) const {
+QVariantMap DeviceActions::RefuseRunning(const QString& name) const {
+    if (!Running(name)) return {};
     return FlowError(QStringLiteral("Device is running"),
                      QStringLiteral("%1 is running. Close it and try again.").arg(DisplayName(name)));
 }
 
 QVariantMap DeviceActions::DiscardSavedState(const QString& name) {
-    if (Running(name)) return RunningError(name);
+    if (QVariantMap refusal = RefuseRunning(name); !refusal.isEmpty()) return refusal;
     const QString path = LocalManifestStore::DevicePath(name);
     if (!ReadSavedState(path)) return {};
-    for (const char* file : {cerfcore::kDefaultStateFile, cerfcore::kSavedStateScreenshotFile}) {
+    for (const QString& file : DeviceDirectory::SavedStateNames()) {
         QString error;
-        if (!RemoveEntry(PathOf(QDir(path).filePath(QString::fromLatin1(file))), error))
+        if (!RemoveEntry(PathOf(QDir(path).filePath(file)), error))
             return FlowError(QStringLiteral("Delete failed"),
                              QStringLiteral("Could not delete the saved state:\n%1").arg(error));
     }
@@ -72,7 +72,7 @@ QVariantMap DeviceActions::DiscardSavedState(const QString& name) {
 }
 
 QVariantMap DeviceActions::Remove(const QString& name) {
-    if (Running(name)) return RunningError(name);
+    if (QVariantMap refusal = RefuseRunning(name); !refusal.isEmpty()) return refusal;
     emu_.Get<ManagerOperations>().RunDeletion(name, emu_.Get<BundleInstaller>().Delete(name));
     return {};
 }

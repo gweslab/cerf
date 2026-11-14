@@ -1,6 +1,7 @@
 #include "local_manifest_store.h"
 
 #include "bundle_name.h"
+#include "filesystem_path.h"
 #include "path_containment.h"
 
 #include <cerfcore/core/cerf_emulator.h>
@@ -9,6 +10,7 @@
 
 #include <QDir>
 #include <QFileInfo>
+#include <QRandomGenerator>
 
 REGISTER_SERVICE(LocalManifestStore);
 
@@ -39,6 +41,18 @@ std::optional<QString> LocalManifestStore::SafeDevicePath(const QString& name, Q
         return std::nullopt;
     }
     return path;
+}
+
+QString LocalManifestStore::UnusedDeviceName(const QString& base) {
+    if (!EntryExists(PathOf(DevicePath(base)))) return base;
+    static constexpr char kAlphabet[] = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+    for (;;) {
+        QString suffix;
+        for (int i = 0; i < 8; ++i)
+            suffix.append(QLatin1Char(kAlphabet[QRandomGenerator::global()->bounded(int(sizeof(kAlphabet) - 1))]));
+        const QString candidate = base + QLatin1Char('_') + suffix;
+        if (!EntryExists(PathOf(DevicePath(candidate)))) return candidate;
+    }
 }
 
 QString LocalManifestStore::Path() const { return QDir(DevicesDir()).filePath(QStringLiteral("manifest.json")); }

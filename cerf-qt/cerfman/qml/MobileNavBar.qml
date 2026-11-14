@@ -22,7 +22,7 @@ TabBar {
     onCurrentIndexChanged: {
         if (currentIndex === page)
             return
-        if (currentIndex !== devicesPage && !inlinePages) {
+        if (currentIndex === newPage || (currentIndex !== devicesPage && !inlinePages)) {
             const requested = currentIndex
             currentIndex = page
             if (requested === newPage)

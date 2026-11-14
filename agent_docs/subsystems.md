@@ -6,12 +6,12 @@ subsystems. This page lists what CERF itself owns.
 
 ## Libraries and frontends
 
-CERF splits into libraries and a frontend:
+CERF splits into libraries and frontends:
 
 - **libCerfEngine** (submodule) - the JIT.
 - **libCerfCore** (submodule) - the emulation core and the seams that a
   frontend implements.
-- **cerf-qt** - the frontend, one Qt Quick application. Every host shows the
+- **cerf-qt** - one frontend, a Qt Quick application. Every host shows the
   same windows. The root of `cerf-qt/` holds the code that every host compiles.
   `desktop/` holds the code of the desktop hosts, and `android/` holds the code
   of Android.
@@ -20,6 +20,13 @@ The core never includes frontend code. A frontend includes only public core
 headers. When the core needs an action or an answer from the frontend, it
 declares a seam service, for example `UserAlert` or `DeviceSelection`. A seam
 is required unless the core resolves it with `TryGet<T>()`.
+
+**A frontend is one interaction seam among many. libCerfCore owns every behavior
+that reads or drives the guest.** Examples are an analysis of the guest
+framebuffer, a sequence of guest input, and the timers and the state of such a
+feature. A frontend starts that behavior, shows it, and answers the questions
+that the core asks through a seam. When another frontend must copy code to offer
+the same feature, that code belongs in a library.
 
 The core receives host input as events with their real timing and order. Some
 host platforms, input devices or UI toolkits do not report the full timing. For

@@ -4,6 +4,7 @@
 
 #include "html_link.h"
 #include "shutdown_prompt.h"
+#include "yes_no_prompt.h"
 
 #include <cerfcore/core/cerf_emulator.h>
 
@@ -92,13 +93,10 @@ private:
         auto&                       prompt     = emu_.Get<ShutdownPrompt>();
         const std::function<void()> plug_in_ac = prompt.AcOffer(trigger, choice);
         if (!plug_in_ac) return;
-        const QString  yes    = QStringLiteral("Yes");
-        const QVariant answer = emu_.Get<QtEmulatorWindow>().RunDialog(
-            QStringLiteral("FlowDialog"),
-            QVariantMap{{QStringLiteral("title"), QString::fromUtf8(prompt.PlugInAcQuestion())},
-                        {QStringLiteral("message"), QString::fromUtf8(prompt.PlugInAcReason())},
-                        {QStringLiteral("buttons"), QVariantList{yes, QStringLiteral("No")}}});
-        if (answer.toString() == yes) plug_in_ac();
+        if (emu_.Get<cerffrontend::YesNoPrompt>().Ask(prompt.PlugInAcQuestion(), prompt.PlugInAcReason(),
+                                                      cerffrontend::YesNoLevel::kPlain, cerffrontend::YesNoEnter::kYes) ==
+            cerfcore::PromptAnswer::kYes)
+            plug_in_ac();
     }
 
     bool open_      = false;

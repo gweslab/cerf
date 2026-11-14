@@ -23,6 +23,7 @@
 #include <cerfcore/core/cerf_emulator.h>
 #include <cerfcore/core/instance_gate.h>
 #include <cerfcore/core/log.h>
+#include <cerfcore/peripherals/cerf_virt/cerf_virt_framebuffer.h>
 #include <cerfcore/platform/host_process.h>
 
 #include <QEvent>
@@ -192,7 +193,7 @@ private:
         surface.Layout().SurfaceFor(work.width() - DeviceExtent(chrome.width(), dpr),
                                     work.height() - DeviceExtent(chrome.height(), dpr), surf_w, surf_h);
         if (surf_w < 1 || surf_h < 1) return;
-        win.SetGuestResolution(surf_w, surf_h);
+        emu_.Get<cerfcore::CerfVirtFramebuffer>().SetHostMode(surf_w, surf_h);
         LOG(Lcd, "DesktopEmulatorWindowHost: adopt fit monitor work=%dx%d -> guest surface %ux%u\n", work.width(),
             work.height(), surf_w, surf_h);
     }

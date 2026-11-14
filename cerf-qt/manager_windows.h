@@ -1,13 +1,14 @@
 #pragma once
 
 #include <cerfcore/core/service.h>
+#include <cerfcore/state/guest_reset.h>
 
 #include <functional>
 #include <optional>
 
 namespace cerffrontend {
 
-enum class GuestReset { kNone, kSoft, kHard };
+using GuestReset = cerfcore::GuestReset;
 
 using LiveSheetFinished = std::function<void(bool accepted, GuestReset reset)>;
 

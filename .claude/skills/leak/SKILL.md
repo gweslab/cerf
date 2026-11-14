@@ -26,42 +26,35 @@ Every one of these is a leak, regardless of how technically-dressed it looks:
 - **Self-narration** - comments that describe what the author DID ("added for the fix", "moved here from", "refactored to") instead of what the code IS.
 - **Chat-shaped prose** - any comment/doc line that reads like a message to a person rather than a note about the code immediately below it.
 - **Source-of-truth duplication / rotting restatement** - copying rules, definitions, or behavior that already live in a durable source (CLAUDE.md, an `agent_docs/` page, a datasheet, ANOTHER skill or subsystem) into this artifact instead of leaving it where it lives. It rots the moment the source is edited, and bloats the artifact with content it does not own. **Tell:** the line would have to be re-edited every time the source changes - and it often describes a DIFFERENT artifact's responsibility (a board skill restating the tracking skill's rules). Fix: delete it. A pointer is not a safe fallback here: documents that load together are already in front of the reader, so "see `<other page>`" spends a line to say nothing. Reach for a pointer only when the source is something the reader does not already have open, and even then one clause is the whole budget.
-- **Source-code restatement** - prose that re-describes the code it documents: accessor and method lists, field or schema enumerations, call-order narration ("X looks up its row at `OnReady`, then answers…"), module-responsibility summaries ("`foo.py` loads it, `bar.py` queries it"). This is the most common way a document rots, because the source changes constantly and the prose silently stops being true. **Test:** would this need an edit if someone renamed a method, added a field, or moved a call - while the behavior stayed identical? If yes, it is restatement. A document earns its place by holding what the code cannot say: the admission rule, the invariant that spans files, the constraint a reader would otherwise violate.
+- **Source-code restatement** - prose that re-describes the code it documents: accessor and method lists, field or schema enumerations, call-order narration ("X looks up its row at `OnReady`, then answers…"), module-responsibility summaries ("`foo.py` loads it, `bar.py` queries it"). This is the most common way a document rots, because the source changes constantly and the prose silently stops being true. **Test:** can a reader learn this sentence from the code that the document points to? If yes, it is restatement. Behavior counts the same as names: "the boot scan starts after a cold boot" copies the code exactly as much as "`Foo` calls `Bar`". A document earns its place only with what the code cannot say: why a rule exists, the invariant that spans files, the mistake that a reader of the code still makes.
 - **Counts and code-artifact enumerations** - "the file holds five arrays", "the two dialogs", a table cell listing config keys. Each is a copy of something a source file owns, and it is wrong the moment anyone adds one. When you find a stale count, delete it rather than incrementing it - a bumped number resets the clock and reads as diligence.
 - **Unrelated contrast** - defining the subject by what it is not, where the other thing has no relationship to it ("this is the opposite of `<unrelated file>`, which does…"). The contrast feels clarifying to the author, who has both things in mind. The reader has only the subject, so the sentence introduces a second topic to explain the first.
 - **Fabricated neighbor behavior** - asserting what another component does with this thing ("the launcher grays the icon when this is false"). Two failures at once: it is a consumer's behavior living in the wrong artifact, and nothing verified it, so it is often simply untrue. Describe the thing; let each consumer document itself.
 
-## Step 0 - Judge the artifact before you judge its lines
+## Step 0 - Judge every sentence of the target
 
-Line-level enumeration cannot find a leak that has no bad line. A document
-that restates the code it documents reads cleanly sentence by sentence and is
-still worthless, because every sentence is a copy. Starting at Step 1 makes
-that outcome unreachable: you go hunting for phrases, find a few, fix them,
-and hand back an artifact whose real defect you never had a way to name.
+A document that restates code reads cleanly sentence by sentence, so a hunt
+for bad phrases never finds its defect. You wrote the text, so you are the
+reader most likely to keep it. Keeping a sentence needs evidence. Deleting it
+needs none.
 
-So look at the artifact whole first, and answer these four:
+1. **The target is the whole section that holds the edit**, or the whole file
+   when the file is new. It is never only the lines you added. A section grows
+   one accepted paragraph at a time.
+2. **Name the genre of the document from its own opening.** A pointer page,
+   such as `agent_docs/subsystems.md`, says what a subsystem is, where it
+   lives, and which rule across files a reader must keep. Every other sentence
+   on a pointer page is a copy of code.
+3. **Write one verdict for each sentence of the target:**
+   - `delete - <the file or document that already states it>`
+   - `keep - <the mistake that a reader makes after reading that code>`
 
-1. **Would this need an edit when the code changes but the behavior does
-   not?** Whatever answers yes is restatement. A document that tracks the
-   source is a second copy of the source, and it is the copy that goes stale.
-2. **What does this artifact uniquely own?** Name it in one sentence. Content
-   owned by a source file, or by a document that loads alongside this one,
-   gets deleted rather than reworded.
-3. **Is any section sized by what you were working on rather than by its
-   weight in the subject?** A topic that happened to be live while you wrote
-   gets a disproportionate section, and the imbalance tells the reader the
-   wrong thing about what matters.
-4. **If you delete a section entirely, which fact is lost that no source file
-   and no co-loaded document states?** Nothing lost means the section goes.
-
-When Step 0 finds the artifact is mostly restatement, say so plainly and
-rewrite it around what it uniquely owns. Enumerating its lines afterward is
-still worth doing, but do not let a tidy Step 1 list stand in for the
-structural answer.
-
-Scope note: for a new artifact the target is the whole file, not the lines of
-your most recent edit. Reviewing only what you last touched is how a document
-survives several passes of this skill with its central defect intact.
+   A sentence with no named mistake is a delete. A mistake that the code
+   already stops, with a compile error, a halt or a type, is no reason to keep
+   it. A section sized by what you happened to work on, not by its weight in
+   the subject, loses its excess.
+4. **Never give a verdict for a whole section**, such as "the section holds
+   rules that span files". Such a verdict hides every sentence that it covers.
 
 ## Step 1 - Enumerate every leak
 
@@ -70,7 +63,7 @@ Exhaustively, no aggregation, no softening:
 > "Narration-leak disclosure under `/leak`:
 > 1. `<file:line>` - leaked phrase: `<the exact text>` - shape: `<backstory | model-ref | conversation-echo | alternatives-history | decision-defense | self-narration | chat-prose | source-duplication | source-code-restatement | code-artifact-count | unrelated-contrast | fabricated-neighbor>`.
 > 2. `<file:line>` - leaked phrase: `<…>` - shape: `<…>`.
-> 3. … (continue until every leaking line in your recent stretch is named)
+> 3. … (continue until every leaking line in the target is named)
 > Total: N leaks."
 
 The bar is items with file + line + the exact leaked phrase, not categories. *"Some comments are too chatty"* is not a valid Step 1 output. Re-read every artifact you wrote or edited in your recent stretch - code comments, docstrings, hook `reason`/message strings, doc `.md` files, config-file comments, any commit bodies you authored. Read each one whole, not as a diff: a leak sits just as often in a line you left untouched beside your edit as in the line you added.
@@ -82,7 +75,7 @@ Test EVERY line against EVERY shape - most misses are not a missing shape but un
 For each Step 1 item, apply the default and the exception:
 
 - **DEFAULT - delete the excess.** Most leaks are pure narration with no technical substance; the line goes entirely. A comment that said *"this has shipped broken 10 times so we verify here"* becomes either nothing (if the code is self-explanatory) or a one-line technical note (*"<X> must be checked before <Y> or <Z> happens"*).
-- **EXCEPTION - rewrite to self-contained.** If the leaking line wraps a real technical fact, keep the fact, strip the narration. *"opus-4.8 keeps masking the exit code by piping to Select-Object, so we block it"* → *"piping build output to a filter masks the build's exit code"*. The mechanism stays; the who/when/how-many-times goes.
+- **EXCEPTION - rewrite to self-contained.** If the leaking line wraps a real technical fact, keep the fact, strip the narration. *"opus-4.8 keeps masking the exit code by piping to Select-Object, so we block it"* → *"piping build output to a filter masks the build's exit code"*. The mechanism stays; the who/when/how-many-times goes. The exception never applies to restatement or source duplication: those lines go whole, never reworded.
 
 Apply via `Edit` / `Write` in this same reply. Do not ask which leaks to fix - all of them go.
 
@@ -105,6 +98,8 @@ No asking. No *"should I keep this one?"*. The invocation IS the authorization t
 - **Apology instead of fixing.** *"I see, I'll be more careful"* without the enumeration + edits is the leak continuing. The fixes are required.
 - **Skipping artifacts.** Hook `reason` strings, docstrings, `.md` docs, config comments, and commit bodies are all in scope - not just `.cpp`/`.h` comments. A leak in a hook message reaches every future agent; a leak in a doc reaches every reader.
 - **Treating a clean Step 1 as a clean artifact.** A document can pass line enumeration twice and still be mostly a restatement of the code, because no single line is the defect. When Step 0 and Step 1 disagree, Step 0 is the one that decided something.
+- **Shrinking the target.** Running the skill on "the new paragraph" of a section leaves every earlier paragraph of that section unjudged.
+- **Dressing behavior as an invariant.** Calling a description of what the code does "a rule a reader would break" names no mistake. It is restatement.
 
 ## Why this skill exists
 

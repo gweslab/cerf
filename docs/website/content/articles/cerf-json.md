@@ -93,6 +93,7 @@ Identical conception as above but for writable persistant user storage.
 | --- | --- | --- |
 | `full_screen` | boolean | - |
 | `double_tap_helper` | boolean | A double tap at single coordinate helper for Android |
+| `automatic_calibration` | boolean | `false` turns off the search for the touch calibration screen. Absent: on. |
 | `throttle_multiplier` | number | - |
 | `cpu_rate_multiplier` | number | - |
 | `hud` | string | `none`, or a HUD id from `huds.json`. Absent: the HUD of the board. |

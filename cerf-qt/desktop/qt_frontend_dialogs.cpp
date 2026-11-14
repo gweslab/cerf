@@ -29,19 +29,6 @@ public:
         if (chosen.isEmpty()) return {};
         return emu_.Get<FileAccess>().LocalPath(QUrl(chosen.front().toString())).toStdString();
     }
-
-    bool ConfirmWarning(const std::string& title, const std::string& text) override {
-        const QString  yes    = QStringLiteral("Yes");
-        const QString  no     = QStringLiteral("No");
-        const QVariant result = emu_.Get<QtEmulatorWindow>().RunDialog(
-            QStringLiteral("FlowDialog"),
-            QVariantMap{{QStringLiteral("title"), QString::fromStdString(title)},
-                        {QStringLiteral("message"), QString::fromStdString(text)},
-                        {QStringLiteral("level"), QStringLiteral("warning")},
-                        {QStringLiteral("buttons"), QVariantList{yes, no}},
-                        {QStringLiteral("enterChoice"), no}});
-        return result.toString() == yes;
-    }
 };
 
 }

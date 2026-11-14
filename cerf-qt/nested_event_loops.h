@@ -13,6 +13,7 @@ public:
 
     void Run(QEventLoop& loop);
     bool Running() const { return !loops_.empty(); }
+    bool Quitting() const { return quitting_; }
     void QuitAll(std::function<void()> after);
 
 private:

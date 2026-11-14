@@ -47,7 +47,7 @@ inline constexpr char kEmulator[]       = "emulator";
 
 }
 
-inline constexpr std::array<const char*, 21> kPersistKeys = {
+inline constexpr std::array<const char*, 22> kPersistKeys = {
     persist_field::kNetworkEnabled, persist_field::kGuestAdditions, persist_field::kColorScheme,
     persist_field::kFullScreen,     persist_field::kWidth,          persist_field::kHeight,
     persist_field::kDpi,            persist_field::kFontSize,       persist_field::kClearType,
@@ -55,7 +55,7 @@ inline constexpr std::array<const char*, 21> kPersistKeys = {
     persist_field::kShareFolder,
     persist_field::kMountPoint,     persist_field::kCpuConfig,      cerfcore::config_key::kThrottleMultiplier,
     cerfcore::config_key::kCpuRateMultiplier, cerfcore::config_key::kDoubleTapHelper, persist_field::kHud,
-    persist_field::kBoardConfig,    persist_field::kShaders};
+    persist_field::kBoardConfig,    persist_field::kShaders,        cerfcore::config_key::kAutomaticCalibration};
 
 struct ScreenFieldKey {
     const char* field;

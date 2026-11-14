@@ -2,6 +2,7 @@
 
 #include "balloon_hint.h"
 #include "canvas_tabs.h"
+#include "frontend_window.h"
 #include "host_key_binding.h"
 #include "input_capture.h"
 #include "overlay_input.h"
@@ -12,6 +13,7 @@
 
 #include <cerfcore/core/cerf_emulator.h>
 #include <cerfcore/core/fatal.h>
+#include <cerfcore/host/host_pointer_input_lock.h>
 #include <cerfcore/host/keyboard_router.h>
 #include <cerfcore/host/pointer_input.h>
 #include <cerfcore/host/pointer_router.h>
@@ -32,6 +34,11 @@ constexpr int      kMousePointer   = 0;
 using Kind = CanvasMouse::Kind;
 using Tab  = cerfcore::CanvasTab;
 
+}
+
+void CanvasInput::OnReady() {
+    emu_.Get<cerfcore::HostPointerInputLock>().RegisterAcquireListener(
+        [this] { emu_.Get<FrontendWindow>().RunOnUiThread([this] { ReleaseGuestInput(); }); });
 }
 
 uint32_t CanvasInput::ButtonBit(MouseButton b) {
@@ -210,8 +217,7 @@ bool CanvasInput::RoutePointer(const CanvasMouse& m, bool framebuffer) {
         return true;
     }
     if (m.kind == Kind::kCaptureLost) {
-        if (pointer_buttons_ != 0) pi->OnCaptureLost();
-        pointer_buttons_ = 0;
+        ReleasePointerButtons();
         return true;
     }
 
@@ -309,7 +315,27 @@ void CanvasInput::OnRelativeMotion(int dx, int dy) {
     SendRelative(dx, dy, relative_buttons_);
 }
 
+bool CanvasInput::GuestInputHeld() const { return emu_.Get<cerfcore::HostPointerInputLock>().Held(); }
+
+void CanvasInput::ReleasePointerButtons() {
+    if (pointer_buttons_ == 0) return;
+    pointer_buttons_ = 0;
+    emu_.Get<cerfcore::PointerInput>().OnCaptureLost();
+}
+
+void CanvasInput::ReleaseGuestInput() {
+    ReleasePenIfDown();
+    ReleasePointerButtons();
+    Unlock();
+    CanvasInputHost& h = Host();
+    if (h.HasMouseCapture()) h.SetMouseCapture(false);
+}
+
 bool CanvasInput::OnMouse(const CanvasMouse& event) {
+    if (GuestInputHeld()) {
+        RouteOverlay(event);
+        return true;
+    }
     const Tab  tab         = emu_.Get<CanvasTabs>().Current();
     const bool framebuffer = tab == Tab::Framebuffer;
     cerfcore::PointerKind kind = cerfcore::PointerKind::Absolute;

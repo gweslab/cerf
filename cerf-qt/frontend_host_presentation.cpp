@@ -51,6 +51,10 @@ public:
         });
     }
 
+    void FitGuestResolution(uint32_t w, uint32_t h) override {
+        emu_.Get<FrontendWindow>().RunOnUiThread([this, w, h] { emu_.Get<FrontendWindow>().FitToResolution(w, h); });
+    }
+
     void SaveScreenshot(const std::string& path) override {
         emu_.Get<FrontendWindow>().RunOnUiThread(
             [this, path] { emu_.Get<Screenshots>().SaveGuestSurfaceTo(path); });

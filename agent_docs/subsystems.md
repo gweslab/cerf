@@ -1021,6 +1021,33 @@ per-SoC/per-board concretes (strategy pattern, selected by `BoardContext`).
   accent. This calculation is the same on every host.
   - `cerf-qt/CerfStyle/system_accent.{h,cpp}`, `cerf-qt/CerfStyle/host_accent*`
 
+## Automatic touch calibration
+
+`AutoCalibration` finds the touch calibration screen of the guest and presses its
+targets with the stock touch input. It runs in libCerfCore, and a frontend
+answers its questions through the `CalibrationHost` seam.
+
+Do not loosen the target match to find more calibration screens. A wrong press
+touches a real guest window.
+
+The presses go through the stock `TouchInput`, also when guest additions run.
+Calibration reads raw touch samples below GWES. The guest-additions pointer
+enters above GWES, so it cannot reach the calibration.
+
+The press cursor of a frontend is an overlay on the canvas, never a part of the
+guest surface that the scan reads. A `CalibrationHost` call that blocks returns
+its closed answer when the frontend shuts down.
+
+While CERF presses the targets, it holds `HostPointerInputLock`. Every core
+entry that takes host pointer input drops that input while CERF holds the lock.
+
+- `libCerfCore/include/cerfcore/host/auto_calibration.h`,
+  `libCerfCore/include/cerfcore/host/calibration_*.h`,
+  `libCerfCore/include/cerfcore/host/host_pointer_input_lock.h`,
+  `libCerfCore/src/host/auto_calibration.cpp`, `libCerfCore/src/host/calibration_*`,
+  `cerf-qt/qt_calibration_host.cpp`, `cerf-qt/guest_calibration_fallback.{h,cpp}`,
+  `cerf-qt/surface_cursor.{h,cpp}`
+
 ## TraceManager
 
 The always-built developer facility that attaches in-host C++ handlers to guest

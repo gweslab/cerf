@@ -151,6 +151,8 @@ bool PropertySheet::NetworkEnabled() const { return Flag(pf::kNetworkEnabled); }
 
 bool PropertySheet::DoubleTapHelper() const { return Flag(cerfcore::config_key::kDoubleTapHelper); }
 
+bool PropertySheet::AutomaticCalibration() const { return Flag(cerfcore::config_key::kAutomaticCalibration); }
+
 QVariant PropertySheet::Hud() const { return values_.contains(pf::kHud) ? QVariant(JsonText(values_, pf::kHud)) : NullVariant(); }
 
 bool PropertySheet::AllowUntrustedApps() const { return Flag(pf::kAllowUntrustedApps); }

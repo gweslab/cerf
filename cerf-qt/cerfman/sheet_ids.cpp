@@ -22,6 +22,9 @@ QString SheetIds::ShareFolder() const { return QString::fromLatin1(persist_field
 QString SheetIds::ThrottleMultiplier() const { return QString::fromLatin1(cerfcore::config_key::kThrottleMultiplier); }
 QString SheetIds::CpuRateMultiplier() const { return QString::fromLatin1(cerfcore::config_key::kCpuRateMultiplier); }
 QString SheetIds::DoubleTapHelper() const { return QString::fromLatin1(cerfcore::config_key::kDoubleTapHelper); }
+QString SheetIds::AutomaticCalibration() const {
+    return QString::fromLatin1(cerfcore::config_key::kAutomaticCalibration);
+}
 
 QString SheetIds::Hud() const { return QString::fromLatin1(cerfcore::config_key::kHud); }
 QString SheetIds::BoardPage() const { return QString::fromLatin1(sheet_page::kBoard); }

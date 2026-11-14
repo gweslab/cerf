@@ -2,9 +2,7 @@
 
 #include "qt_canvas_mouse_buttons.h"
 #include "qt_device_pixels.h"
-#include "guest_canvas_turn.h"
 #include "qt_emulator_present.h"
-#include "qt_guest_cursor_cache.h"
 #include "qt_key_input.h"
 #include "qt_emulator_window.h"
 #include "surface_area_planner.h"
@@ -91,24 +89,15 @@ const FrameLayers* GuestSurface::PresentLayers() {
     return layers;
 }
 
-bool GuestSurface::CursorShown(cerfcore::CerfEmulator& emu) {
-    if (!cursor_mode_ || relative_pointer_ || !presenter_->Layout().Active()) return false;
-    auto& guest = emu.Get<QtGuestCursorCache>();
-    return ActiveKind() != cerfcore::PointerKind::Absolute || !guest.Refresh() || guest.Drawable();
+SurfaceCursor::View GuestSurface::CursorView() const {
+    return {presenter_->Layout(), cursor_mode_, relative_pointer_, ActiveKind(), pointer_.Position(), Dpr(),
+            GuestScale()};
 }
 
+bool GuestSurface::CursorShown(cerfcore::CerfEmulator& emu) { return cursor_.Shown(emu, CursorView()); }
+
 void GuestSurface::PaintCursor(cerfcore::CerfEmulator& emu, QPainter& painter) {
-    const qreal dpr   = Dpr();
-    auto&       guest = emu.Get<QtGuestCursorCache>();
-    if (ActiveKind() == cerfcore::PointerKind::Absolute && guest.Refresh()) {
-        if (guest.Drawable())
-            overlay_.PaintGuest(
-                painter, guest.Image(), guest.Hotspot(),
-                emu.Get<cerffrontend::GuestCanvasTurn>().LogicalQuarter(presenter_->Layout().Presentation().quarter),
-                pointer_.Position(), dpr, GuestScale());
-        return;
-    }
-    overlay_.PaintArrow(painter, pointer_.Position(), dpr);
+    cursor_.Paint(emu, painter, CursorView());
 }
 
 void GuestSurface::SetGuestSurfaceSize(uint32_t w, uint32_t h) {

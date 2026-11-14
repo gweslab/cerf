@@ -2,6 +2,8 @@
 
 #include "hud_layout.h"
 
+#include <cerfcore/host/quarter_turn.h>
+
 #include <algorithm>
 #include <cmath>
 
@@ -28,14 +30,8 @@ ContentBox ViewPresentation::PresentedBox(double surface_w, double surface_h) co
 }
 
 FramePoint FramePlacement::ToCanvas(FramePoint d) const {
-    const double x = presented_.x;
-    const double y = presented_.y;
-    switch (quarter_) {
-        case 1:  return {x + DeviceHeight() - d.y, y + d.x};
-        case 2:  return {x + DeviceWidth() - d.x, y + DeviceHeight() - d.y};
-        case 3:  return {x + d.y, y + DeviceWidth() - d.x};
-        default: return {x + d.x, y + d.y};
-    }
+    const cerfcore::UprightPoint u = cerfcore::UprightFromTurned(d.x, d.y, DeviceWidth(), DeviceHeight(), quarter_);
+    return {presented_.x + u.x, presented_.y + u.y};
 }
 
 FramePoint FramePlacement::ToDevice(FramePoint c) const {

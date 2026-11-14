@@ -14,6 +14,7 @@
 #include "../tab_menu.h"
 #include "../view_rotation.h"
 #include "../widget_menu_builder.h"
+#include "../yes_no_prompt.h"
 #include "../qt_emulator_window.h"
 #include "../native_menu_bar.h"
 #include "desktop_guest_follow.h"
@@ -22,6 +23,7 @@
 #include <cerfcore/boards/board_context.h>
 #include <cerfcore/core/cerf_emulator.h>
 #include <cerfcore/core/product_name.h>
+#include <cerfcore/host/auto_calibration.h>
 #include <cerfcore/host/emulation_pause.h>
 #include <cerfcore/state/hibernation.h>
 #include <cerfcore/state/shutdown_action.h>
@@ -62,10 +64,10 @@ void HostMenuModel::PickStateFile(bool save) {
 }
 
 void HostMenuModel::ConfirmHardReset() {
-    if (emu_.Get<FrontendDialogs>().ConfirmWarning(
-            "Hard reset - " CERF_PRODUCT_NAME,
-            "Hard reset clears all guest RAM.\nUnsaved guest data and the object store are "
-            "lost.\n\nContinue?"))
+    if (emu_.Get<YesNoPrompt>().Ask("Hard reset - " CERF_PRODUCT_NAME,
+                                    "Hard reset clears all guest RAM.\nUnsaved guest data and the object store are "
+                                    "lost.\n\nContinue?",
+                                    YesNoLevel::kWarning, YesNoEnter::kNo) == cerfcore::PromptAnswer::kYes)
         emu_.Get<cerfcore::ShutdownAction>().Perform(cerfcore::ShutdownChoice::HardReset);
 }
 
@@ -83,6 +85,10 @@ std::vector<MenuItem> HostMenuModel::Actions() {
     items.push_back(std::move(toggle));
     items.push_back(MenuItem::Action("Send Ctrl+Alt+Del\t" + key.LabelWith("Del"),
                                      [this] { emu_.Get<InputCapture>().SendCtrlAltDel(); }));
+    if (emu_.Get<cerfcore::AutoCalibration>().CanPress())
+        items.push_back(MenuItem::Action("Calibrate screen", [this] {
+            emu_.Get<cerfcore::AutoCalibration>().Request(cerfcore::CalibrationTrigger::kMenu);
+        }));
     items.push_back(MenuItem{});
     items.push_back(MenuItem::Action("Soft reset", [this] {
         emu_.Get<cerfcore::ShutdownAction>().Perform(cerfcore::ShutdownChoice::SoftReset);

@@ -67,9 +67,10 @@ CERF does not read a broken `cerf-user.json`. It does not report the broken file
 write overwrites a configuration file that it cannot read or parse.
 
 The emulator writes `board.configurable_screen_width` and `_height` into
-`cerf-user.json` when the user resizes the window. It writes `hud` when the user hides or
-shows the HUD. No other emulator path writes the file outside the property
-sheet.
+`cerf-user.json` when the user resizes the window. It also writes them when the user
+accepts the panel size for the touch calibration of a guest-additions run. It writes
+`hud` when the user hides or shows the HUD. No other emulator path writes the file
+outside the property sheet.
 
 ## The property sheet
 

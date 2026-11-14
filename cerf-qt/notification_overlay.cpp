@@ -41,7 +41,17 @@ struct Palette {
 };
 constexpr Palette kWarning = {{242, 201, 76}, {191, 149, 30}, {30, 30, 30}};
 constexpr Palette kError   = {{204, 60, 60}, {150, 35, 35}, {255, 255, 255}};
+constexpr Palette kSuccess = {{56, 142, 60}, {36, 100, 40}, {255, 255, 255}};
 constexpr Palette kMore    = {{64, 64, 64}, {40, 40, 40}, {230, 230, 230}};
+
+const Palette& KindPalette(cerfcore::NotificationKind kind) {
+    switch (kind) {
+        case cerfcore::NotificationKind::Error:   return kError;
+        case cerfcore::NotificationKind::Success: return kSuccess;
+        case cerfcore::NotificationKind::Warning: return kWarning;
+    }
+    return kWarning;
+}
 
 }
 
@@ -159,9 +169,7 @@ void NotificationOverlay::Draw(Painter& p) {
     const Font regular{FontFace::kUi, font_px_, false};
     for (auto it = placed_.rbegin(); it != placed_.rend(); ++it) {
         const Placed&  placed = *it;
-        const Palette& pal    = placed.more ? kMore
-                                : placed.kind == cerfcore::NotificationKind::Error ? kError
-                                                                                   : kWarning;
+        const Palette& pal    = placed.more ? kMore : KindPalette(placed.kind);
         p.FillRoundRectAlphaAA(placed.box.Offset(0, shadow_), radius_, Rgb{0, 0, 0}, kShadowAlpha);
         p.FillRoundRectAA(placed.box, radius_, pal.fill, pal.rim);
         p.DrawTextBox(placed.title_rc, placed.title, placed.more ? regular : bold, pal.text,

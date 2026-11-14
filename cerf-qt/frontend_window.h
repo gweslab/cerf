@@ -23,8 +23,7 @@ public:
     virtual void RefitIfFollowingGuest() = 0;
     virtual void OnPresentationChanged() = 0;
 
-    virtual void SetGuestResolution(uint32_t w, uint32_t h) = 0;
-    virtual void FitToResolution(uint32_t w, uint32_t h)    = 0;
+    virtual void FitToResolution(uint32_t w, uint32_t h) = 0;
 
     virtual void     OnLcdEnabled()                                    = 0;
     virtual void     NotifyGuestRemoded(uint32_t w, uint32_t h)        = 0;

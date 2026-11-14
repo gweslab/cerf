@@ -69,6 +69,7 @@ public:
     Layout Compute() const;
     void   GuestPixelScale(double& sx, double& sy) const;
     bool   HostToGuest(int cx, int cy, int& sx, int& sy) const;
+    bool   GuestToHost(int sx, int sy, FramePoint& canvas) const;
     void   ClampGuest(int& sx, int& sy) const;
 
     Scroll UpdateScroll();

@@ -8,6 +8,7 @@
 #include "nested_event_loops.h"
 #include "overlay_touch_area.h"
 #include "qml_dialog_waiter.h"
+#include "qt_ui_thread.h"
 #include "status_bar_item.h"
 #include "strip_widget_bar.h"
 
@@ -25,10 +26,10 @@
 #include <cerfcore/core/cerf_emulator.h>
 #include <cerfcore/core/device_config.h>
 #include <cerfcore/core/log.h>
+#include <cerfcore/host/auto_calibration.h>
 #include <cerfcore/host/frame_renderer.h>
 #include <cerfcore/host/pointer_widget.h>
 #include <cerfcore/host/shutdown_host.h>
-#include <cerfcore/peripherals/cerf_virt/cerf_virt_framebuffer.h>
 
 #include <QMetaObject>
 #include <QQuickWindow>
@@ -130,12 +131,6 @@ void QtEmulatorWindow::SetGuestSurfaceSize(uint32_t w, uint32_t h) {
     surface_h_.store(surface_->GuestSurfaceHeight(), std::memory_order_release);
 }
 
-void QtEmulatorWindow::SetGuestResolution(uint32_t w, uint32_t h) {
-    if (w == 0 || h == 0) return;
-    if (!emu_.Get<cerfcore::CerfVirtFramebuffer>().SetHostMode(w, h)) return;
-    SetGuestSurfaceSize(w, h);
-}
-
 void QtEmulatorWindow::OnLcdEnabled() {
     RunOnUiThread([this] {
         uint32_t w = 0, h = 0;
@@ -162,6 +157,10 @@ void QtEmulatorWindow::OnPresentationChanged() {
 }
 
 void QtEmulatorWindow::NotifyGuestRemoded(uint32_t w, uint32_t h) {
+    if (OnUiThread()) {
+        SetGuestSurfaceSize(w, h);
+        return;
+    }
     RunOnUiThread([this, w, h] { SetGuestSurfaceSize(w, h); });
 }
 
@@ -297,6 +296,10 @@ std::vector<cerffrontend::MenuItem> QtEmulatorWindow::GearMenu() {
         "Device", {MenuItem::IconAction("Return to my devices", "home", [this] { ReturnToManager(); }),
                    MenuItem::IconAction("Save screenshot", "photo_camera", [this] { SaveScreenshot(); }),
                    MenuItem::IconAction("Power off/reset", "power_settings_new", [this] { CloseRequested(); })}));
+    if (emu_.Get<cerfcore::AutoCalibration>().CanPress())
+        items.push_back(MenuItem::Action("Calibrate screen", [this] {
+            emu_.Get<cerfcore::AutoCalibration>().Request(cerfcore::CalibrationTrigger::kMenu);
+        }));
     items.push_back(MenuItem{});
     items.push_back(tabs.Item(Tab::Hw));
     items.push_back(tabs.Item(Tab::Framebuffer));

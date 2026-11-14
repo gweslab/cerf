@@ -15,7 +15,6 @@ public:
     void     MatchGuestSize() override;
     void     RefitIfFollowingGuest() override;
     void     OnPresentationChanged() override;
-    void     SetGuestResolution(uint32_t w, uint32_t h) override;
     void     FitToResolution(uint32_t w, uint32_t h) override;
     void     OnLcdEnabled() override;
     void     NotifyGuestRemoded(uint32_t w, uint32_t h) override;

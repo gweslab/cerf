@@ -48,6 +48,7 @@ class PropertySheet : public QObject {
     Q_PROPERTY(bool fullScreen READ FullScreen NOTIFY valuesChanged)
     Q_PROPERTY(bool networkEnabled READ NetworkEnabled NOTIFY valuesChanged)
     Q_PROPERTY(bool doubleTapHelper READ DoubleTapHelper NOTIFY valuesChanged)
+    Q_PROPERTY(bool automaticCalibration READ AutomaticCalibration NOTIFY valuesChanged)
     Q_PROPERTY(QVariant hud READ Hud NOTIFY valuesChanged)
     Q_PROPERTY(bool allowUntrustedApps READ AllowUntrustedApps NOTIFY valuesChanged)
     Q_PROPERTY(QString boardId READ BoardId NOTIFY valuesChanged)
@@ -96,6 +97,7 @@ public:
     bool         FullScreen() const;
     bool         NetworkEnabled() const;
     bool         DoubleTapHelper() const;
+    bool         AutomaticCalibration() const;
     QVariant     Hud() const;
     bool         AllowUntrustedApps() const;
     QString      BoardId() const;

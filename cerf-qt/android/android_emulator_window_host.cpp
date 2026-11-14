@@ -7,6 +7,7 @@
 #include <cerfcore/core/cerf_emulator.h>
 #include <cerfcore/core/fatal.h>
 #include <cerfcore/core/log.h>
+#include <cerfcore/peripherals/cerf_virt/cerf_virt_framebuffer.h>
 
 #include <QPointer>
 #include <QQuickWindow>
@@ -99,7 +100,7 @@ private:
         uint32_t        h       = 0;
         surface.Layout().SurfaceFor(region.width(), region.height(), w, h);
         if (w == 0 || h == 0) return;
-        window.SetGuestResolution(w, h);
+        emu_.Get<cerfcore::CerfVirtFramebuffer>().SetHostMode(w, h);
         LOG(Lcd, "QtEmulatorWindow: adopt screen %dx%d cutout %g,%g,%g,%g -> region %dx%d, guest surface %ux%u\n",
             logical.width(), logical.height(), cutout.left(), cutout.top(), cutout.right(), cutout.bottom(),
             region.width(), region.height(), w, h);

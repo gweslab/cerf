@@ -73,6 +73,8 @@ Json ExtractPersistFields(const Json& object) {
         out[pf::kFullScreen] = *v;
     if (auto v = object.find(cfg::kDoubleTapHelper); v != object.end() && v->is_boolean())
         out[cfg::kDoubleTapHelper] = *v;
+    if (auto v = object.find(cfg::kAutomaticCalibration); v != object.end() && v->is_boolean())
+        out[cfg::kAutomaticCalibration] = *v;
     if (auto v = object.find(cfg::kHud); v != object.end() && v->is_string() && !v->get<std::string>().empty())
         out[pf::kHud] = *v;
     for (const char* name : kMultiplierKeys) {
@@ -251,6 +253,10 @@ bool DeviceDirectory::WritePersistOverrides(const Json& fields, QString& error) 
             else                                  object.erase(cfg::kFullScreen);
             if (fields.contains(cfg::kDoubleTapHelper)) object[cfg::kDoubleTapHelper] = fields[cfg::kDoubleTapHelper];
             else                                        object.erase(cfg::kDoubleTapHelper);
+            if (fields.contains(cfg::kAutomaticCalibration))
+                object[cfg::kAutomaticCalibration] = fields[cfg::kAutomaticCalibration];
+            else
+                object.erase(cfg::kAutomaticCalibration);
             if (fields.contains(pf::kHud)) object[cfg::kHud] = fields[pf::kHud];
             else                           object.erase(cfg::kHud);
             for (const char* name : kMultiplierKeys) {

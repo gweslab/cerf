@@ -45,6 +45,7 @@ class CanvasInput : public cerfcore::Service {
 public:
     using cerfcore::Service::Service;
 
+    void OnReady() override;
     void Attach(CanvasInputHost* host) { host_ = host; }
 
     bool         OnMouse(const CanvasMouse& m);
@@ -56,17 +57,20 @@ public:
     void         OnKey(uint32_t vk, bool key_up);
     void         ReleasePenIfDown();
     void         RefreshLock();
+    void         ReleaseGuestInput();
 
     static uint32_t ButtonBit(MouseButton b);
 
 private:
     CanvasInputHost& Host();
+    bool             GuestInputHeld() const;
     bool             Locked(bool framebuffer) const;
     void             EnsureLocked();
     void             Unlock();
     void             ShowLockHintOnce();
     void             GuestPoint(const CanvasMouse& m, int& sx, int& sy);
     void             LiftPen(const CanvasMouse& m, bool release_capture);
+    void             ReleasePointerButtons();
     void             ReleaseLostButtons(const CanvasMouse& m);
     static uint32_t  RelativeMask(uint32_t held);
     static uint32_t  PointerMask(uint32_t held);

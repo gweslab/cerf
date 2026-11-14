@@ -24,7 +24,6 @@ private:
     using Waiters = std::vector<Done>;
 
     void Finish(bool accepted, GuestReset reset, const Waiters& waiters);
-    void ApplyGuestAdditions(GuestReset reset, uint32_t prev_w, uint32_t prev_h);
 
     std::shared_ptr<Waiters>     waiters_;
     const cerfcore::InstanceGate gate_{emu_};

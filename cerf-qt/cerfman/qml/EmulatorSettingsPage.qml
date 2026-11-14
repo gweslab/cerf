@@ -59,5 +59,11 @@ SheetPage {
             checked: page.sheet.doubleTapHelper
             onToggled: page.sheet.SetValue(SheetIds.doubleTapHelper, checked)
         }
+        SwitchRow {
+            title: qsTr("Automatic calibration")
+            editable: page.editable
+            checked: page.sheet.automaticCalibration
+            onToggled: page.sheet.SetValue(SheetIds.automaticCalibration, checked)
+        }
     }
 }

@@ -50,6 +50,8 @@ void CliUsage::Print(const char* prog) {
     printf("  --full-screen            Enter borderless fullscreen (host key + F) once the window is shown\n");
     printf("  --no-focus               Never take the foreground from another application; windows\n");
     printf("                           open at the bottom of the Z order until you switch to them\n");
+    printf("  --auto-calibration       Pass the guest touch calibration screen without asking\n");
+    printf("                           (answers every calibration prompt with Yes)\n");
     printf("  --help                   Show this help\n");
     printf("\n");
     std::string board_ids;

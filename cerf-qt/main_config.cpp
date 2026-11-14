@@ -18,7 +18,7 @@ constexpr const char* kDeviceConfigOptions[] = {
 
 constexpr const char* kDeviceConfigFlags[] = {cerfcore::kArgDisableNetwork, cerfcore::kArgGuestAdditions,
                                               cerfcore::kArgFullScreen, cerfcore::kArgNoFocus,
-                                              cerfcore::kArgRecovery};
+                                              cerfcore::kArgRecovery, cerfcore::kArgAutoCalibration};
 
 bool IsDeviceConfigArgument(const char* argument) {
     const char* value = nullptr;

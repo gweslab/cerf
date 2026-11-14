@@ -3,8 +3,8 @@
 #include "qt_emulator_view.h"
 #include "qt_frame_presenter.h"
 #include "gesture_pointer.h"
-#include "pointer_overlay.h"
 #include "relative_mouse_relay.h"
+#include "surface_cursor.h"
 #include "surface_host_pointer.h"
 #include "surface_scroll.h"
 #include "surface_text_input.h"
@@ -151,6 +151,7 @@ private:
     void                  SyncPlacementSurface();
     void                  RouteMouse(QMouseEvent* event, cerffrontend::CanvasMouse::Kind kind);
     void                  ApplyHostCursor(QPointF device_at);
+    SurfaceCursor::View   CursorView() const;
     void                  RouteKey(QKeyEvent* event, bool key_up);
     bool                  RelativeGuestPointer() const override;
     QRectF                VisibleImage() const override;
@@ -171,7 +172,7 @@ private:
     RelativeMouseRelay                 relative_mouse_{touch_host_};
     SurfaceTextInput                   text_{*this, gate_};
     ViewPlacement                      placement_;
-    PointerOverlay                     overlay_;
+    SurfaceCursor                      cursor_;
     QMarginsF                          safe_margins_;
     QSizeF                             bar_insets_;
     bool                               cursor_mode_      = false;

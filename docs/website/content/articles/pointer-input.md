@@ -31,7 +31,12 @@ The clearest case is the **first-boot welcome wizard's screen calibration** - th
 step. It reads the raw touch panel on purpose, so the Guest Additions pointer flows right past it
 and nothing happens.
 
-The fix is to hand those apps the panel they expect:
+CERF can complete this calibration itself. When it finds the calibration targets on the screen, it
+asks whether it can press them for you. **Calibrate screen** in the Actions menu (the gear menu on
+Android) runs the same search.
+
+If CERF cannot find the targets, or for any other app that reads the panel directly, hand those
+apps the panel they expect:
 
 1. Open the **pointer source** switch in the status bar.
 2. Switch from the Guest Additions pointer to the board's **stock touch** source.

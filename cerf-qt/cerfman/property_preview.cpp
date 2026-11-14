@@ -145,5 +145,6 @@ QVariantList PropertyPreview::EmulatorRows(const PropertySheet& sheet) const {
     rows.append(Row(QStringLiteral("Detach internet connection"), OnText(!sheet.NetworkEnabled())));
     if (sheet.DoubleTapHelperSetting())
         rows.append(Row(QStringLiteral("Double-tap helper"), OnText(sheet.DoubleTapHelper())));
+    rows.append(Row(QStringLiteral("Automatic calibration"), OnText(sheet.AutomaticCalibration())));
     return rows;
 }

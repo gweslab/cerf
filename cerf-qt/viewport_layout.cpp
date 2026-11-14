@@ -208,6 +208,15 @@ bool ViewportLayout::HostToGuest(int cx, int cy, int& sx, int& sy) const {
     return device.x >= 0.0 && device.x < dw && device.y >= 0.0 && device.y < dh;
 }
 
+bool ViewportLayout::GuestToHost(int sx, int sy, FramePoint& canvas) const {
+    const Layout L = Compute();
+    if (L.dst_w <= 0 || L.dst_h <= 0) return false;
+    const FramePlacement place = L.Placement();
+    canvas = place.ToCanvas(FramePoint{(sx + 0.5) * place.DeviceWidth() / SurfaceWidth(),
+                                       (sy + 0.5) * place.DeviceHeight() / SurfaceHeight()});
+    return true;
+}
+
 void ViewportLayout::ClampGuest(int& sx, int& sy) const {
     const int sw = static_cast<int>(SurfaceWidth());
     const int sh = static_cast<int>(SurfaceHeight());

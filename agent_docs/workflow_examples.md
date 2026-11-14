@@ -52,6 +52,9 @@ Delete such temporary code when you no longer need it.
   runs. A graceful shutdown deletes it.
 - If you need own files to be accessible inside guest OS, you can boot GA with `--ga-share-folder=...` (spawned as ``\CERF Storage\*``) or
   generate FAT16/FAT32 CF PCCard and insert it the same temp scaffolding (usually visible as ``\Storage Card\*``).
+- If a cold boot stops at the touch calibration screen of the guest, add `--auto-calibration` to the
+  run. A welcome page before the calibration screen still needs a tap. On a Guest Additions run above
+  the panel size, the flag also writes the panel size into the `cerf-user.json` of the device.
 
 ## Env-variable gate for temporary scaffolding
 

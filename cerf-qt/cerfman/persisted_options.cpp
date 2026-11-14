@@ -43,6 +43,8 @@ Json ResolvePersistBaseline(const Json& base, const QString& mount_default) {
     out[kFullScreen]         = ValueOr(base, kFullScreen, cerfcore::kDefaultStartFullscreen);
     out[cerfcore::config_key::kDoubleTapHelper] =
         ValueOr(base, cerfcore::config_key::kDoubleTapHelper, cerfcore::kDefaultDoubleTapHelper);
+    out[cerfcore::config_key::kAutomaticCalibration] =
+        ValueOr(base, cerfcore::config_key::kAutomaticCalibration, cerfcore::kDefaultAutomaticCalibration);
     out[kAllowUntrustedApps] = ValueOr(base, kAllowUntrustedApps, cerfcore::kDefaultAllowUntrustedApps);
     out[kMountPoint]         = EffectiveMountPoint(JsonText(base, kMountPoint), mount_default).toStdString();
     for (const char* key : kMultiplierKeys) out[key] = ValueOr(base, key, kDefaultMultiplier);

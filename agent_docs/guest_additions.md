@@ -270,6 +270,9 @@ The indexed depths are 1, 2, 4 and 8 bpp. A row of the framebuffer holds
 than a byte is MSB-first: the leftmost pixel uses the high bits of the byte.
 
 **Guest Additions** supports 4K resolution on any device at max of supported bpp.
+(Windows CE 2.0 usually supports indexed palettes only, if a device has only CE2.0
+(a condition is that it's a known fact a device never received CE >= 2.11 ROM) this means
+CERF supports at max 4K 8bpp for this device. for others 32bpp)
 We decrease size only when it's required by a device specifics.
 
 The host owns the default palette. At startup and at every reset that is

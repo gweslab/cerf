@@ -468,15 +468,20 @@ python run_claude.py
       <td>v8.2</td>
       <td>TBA</td>
       <td>
+        <p><b>❗ Important</b><br/>
+          [macOS] We&#x27;ve fixed an upgrade system bug, however: this time you need to wait 30 seconds during upgrade and let CERF kill the old process.</p>
         <p><b>📱 Devices</b><br/>
-          🆕 HP Jornada 680, HP 620LX support (thx @Gadgetoid/sh3-emu)</p>
+          🆕 NEC Rockhopper: Improved CE.NET OAL support</p>
         <p><b>💿 Emulator</b><br/>
           🆕 SH3 guest CPU emulation<br/>
           🆕 RetroArch shaders support (librashader)<br/>
+          🆕 Automatical calibration helper<br/>
           ✅ PS/2 mouse lost double clicks on Android<br/>
           ✅ PS/2 mouse incorrect behaviour fixed<br/>
           ✅ Android&#x27;s HUD is now fully adaptive - saves your screen space<br/>
           ✅ Desktop emulator window rewritten in QtQuick/CerfStyle</p>
+        <p><b>🗂️ Devices Manager</b><br/>
+          🆕 Import, export, clone your devices</p>
         <p><b>✨ Guest Additions</b><br/>
           ✅ Various crash fixes</p>
       </td>

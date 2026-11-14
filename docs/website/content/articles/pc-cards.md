@@ -31,7 +31,7 @@ pass through. The insert menu lists the ports it finds on your machine.
 With a virtual COM port pair, the guest can reach a desktop that runs ActiveSync. That path has its
 own guide: [Connecting to ActiveSync](activesync.md).
 
-## HP Palmtop VGA (F1252A)
+## HP VGA out PC Card (F1252A)
 
 An external display card. Its monitor output arrives as a window on the host.
 

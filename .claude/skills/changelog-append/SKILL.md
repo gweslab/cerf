@@ -30,6 +30,8 @@ When the user asks to bump the CERF version, follow § Bump mode instead.
 
 Each change goes under one **component group** and one **subcategory**. Order and emoji are applied by `tools/changelog.py`; the YAML only names the keys.
 
+**`important`** is the one exception. It is a plain block with no subcategory, and it renders first in the entry. Put a line there only when the user asks for it. It holds a plain message for users about this release, for example a required action or a known limitation, not a change to one component.
+
 Component groups:
 
 - **`devices`** - a board/device: new board support, per-board fixes (touch, sound, screen), on-board silicon (SoC RTC, suspend, battery, reset), PC cards / PCMCIA (NE2000, CompactFlash, modem), sleeves.
@@ -52,7 +54,7 @@ Subcategories:
 `docs/changelog.yml` is the source; the README table and the website changelog page are generated from it.
 
 1. **Open `docs/changelog.yml`.** The **latest version is the topmost list entry** (currently `TBA` at the top).
-2. **Pick the group + subcategory** from the legend above. If that `group:` / `subcat:` key already exists in the top entry, append your line to its `|` block; otherwise add the key (a `|` literal block) in any order. If the top entry still has the `changes: |` / `-` placeholder from § Bump mode, delete it. Do not create a new version entry. Do not touch older entries.
+2. **Pick the group + subcategory** from the legend above. If that `group:` / `subcat:` key already exists in the top entry, append your line to its `|` block; otherwise add the key (a `|` literal block) in any order. An `important:` line goes directly in an `important: |` block of the entry, with no subcategory key. If the top entry still has the `changes: |` / `-` placeholder from § Bump mode, delete it. Do not create a new version entry. Do not touch older entries.
 3. **Write one raw line.** Plain string - no escaping; colons and `<`, `&`, quotes are fine. `**text**` renders bold. Strip a prefix that just repeats the group (`Guest Additions:`, `Launcher:`), but keep a board name that says which device (`NEC MP700:`, `Zune 30:`).
 4. **Run `python compile_readme.py`** (from repo root). Confirm it prints `README.md compiled (vX.Y)`.
 
@@ -62,11 +64,13 @@ Subcategories:
 - **One line per change.** If the work spans clearly separate user-visible changes, add one line each - but do not pad; prefer a single tight line.
 - **No conversation echoes**, no session history, no model/agent references, no "as you asked".
 
-Example top entry after adding a device fix and a guest-additions feature:
+Example top entry after adding an important message, a device fix and a guest-additions feature:
 
 ```yaml
 - version: v6.6
   date: TBA
+  important: |
+    Save states from v6.5 do not load in this version
   devices:
     fixed: |
       Fixed Device Emulator crash booting Windows Mobile 5.2 ROMs

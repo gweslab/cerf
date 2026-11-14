@@ -1,12 +1,20 @@
 - version: v8.2
   date: TBA
+  important: |
+    [macOS] We've fixed an upgrade system bug, however: this time you need to wait 30 seconds during upgrade and let CERF kill the old process.
   devices:
     new: |
       HP Jornada 680, HP 620LX support (thx @Gadgetoid/sh3-emu)
+    new: |
+      NEC Rockhopper: Improved CE.NET OAL support
+  cerfman:
+    new: |
+      Import, export, clone your devices
   emulator:
     new: |
       SH3 guest CPU emulation
       RetroArch shaders support (librashader)
+      Automatical calibration helper
     fixed: |
       PS/2 mouse lost double clicks on Android
       PS/2 mouse incorrect behaviour fixed

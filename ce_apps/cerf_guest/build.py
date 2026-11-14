@@ -6,7 +6,7 @@ sys.path.insert(0, str(HERE.parent.parent / "tools"))
 from build_ce_app import run_app
 
 SOURCES = ["main.cpp", "cerf_virt_base.cpp", "cerf_regs_map.cpp", "cerf_debug_log.cpp",
-           "cerf_ce2_crt.cpp", "cerf_rt_div_arm.cpp",
+           "cerf_ce2_crt.cpp", "cerf_rt_div_arm.cpp", "cerf_rt_sh.cpp",
            "cerf_eng_callbacks.cpp",
            "cerf_gpe.cpp", "cerf_ddi_pdev.cpp", "cerf_ddi_blt.cpp", "cerf_ddi_device.cpp",
            "cerf_ddi_stroke.cpp", "cerf_ddi_fill.cpp",
@@ -54,6 +54,8 @@ VARIANTS = [
     dict(COMMON, arch="mips", mips_isa="mips4", obj_dir="obj_mips4", def_file="cerf_guest.def",
          coredll_def=BYNAME),
     dict(COMMON, arch="mips", mips_isa="mips1", obj_dir="obj_mips1", def_file="cerf_guest.def",
+         coredll_def=str(HERE / "coredll_ce2.def")),
+    dict(COMMON, arch="sh3", obj_dir="obj_sh3", def_file="cerf_guest.def",
          coredll_def=str(HERE / "coredll_ce2.def")),
 ]
 

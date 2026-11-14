@@ -21,6 +21,7 @@ VARIANTS = [
          def_file="cerf_guest_stub.def"),
     dict(COMMON, arch="mips", mips_isa="mips1", obj_dir="obj_mips1",
          def_file="cerf_guest_stub.def"),
+    dict(COMMON, arch="sh3", obj_dir="obj_sh3", def_file="cerf_guest_stub.def"),
 ]
 
 if __name__ == "__main__":

@@ -10,7 +10,6 @@
 #include "frontend_config.h"
 #include "product_links.h"
 #include "shutdown_teardown.h"
-#include "version.h"
 
 #include <cstdio>
 #include <string_view>
@@ -93,7 +92,7 @@ const char* ShutdownPrompt::SaveLinkUrl() const {
 }
 
 const char* ShutdownPrompt::SaveLinkText() const {
-    return "only for CERF " CERF_VERSION_LABEL;
+    return "data might be lost";
 }
 
 bool ShutdownPrompt::CountsDown(cerfcore::ShutdownTrigger trigger) const {

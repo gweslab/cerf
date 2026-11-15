@@ -152,9 +152,7 @@ it with `r.Reject`, never with `Fatal::Die`.
 A buffer whose size this build fixes is read at that size, with no saved count.
 The byte-block tag then refuses an image that saved another size.
 
-A frame with no owner in this build refuses the image. The one exception is a
-part that the machine does not need, for example a host widget. The caller
-skips that frame with `SkipFrame`.
+A frame with no owner in this build refuses the image.
 
 ## Sections - what each captures
 
@@ -169,10 +167,12 @@ skips that frame with `SkipFrame`.
 - **Periph** - every registered peripheral.
 - **Presentation** - the guest-surface dimensions, so a custom resolution
   restores its window size.
-- **Widget** - the host-widget state that drives guest-visible hardware (for
-  example the charge level / AC of the battery widget, which a board service
-  feeds into GPIO/MCU lines). Only a full restore applies it. On a warm boot the board service
-  re-asserts it when it re-drives at startup.
+- **Objects** - the state of the machine objects that drives guest-visible
+  hardware. An example is the charge level / AC of the battery, which a board
+  service feeds into GPIO/MCU lines. The saved state of each object uses its id
+  path as its key, so a renamed object id is a layout change. Only a full restore
+  applies it. On a warm boot the board service re-asserts it when it re-drives at
+  startup.
 - **Reset** - the reset cause and the registered boot-time guest-RAM write
   replays.
 
@@ -181,31 +181,36 @@ engine re-reads the live interrupt line on every iteration. The `PostRestore` of
 the INTC re-drives that line from the restored state. An INTC without that
 re-drive silently drops a restored-pending IRQ.
 
-## The two-thread freeze model - read before touching ANY peripheral
+## The two-thread freeze model - read before touching any peripheral
 
-A safe snapshot requires a quiescent guest. Two things execute guest-visible
-state, and a pause of one does NOT pause the other:
+A safe snapshot requires a quiescent guest. Two kinds of thread change
+guest-visible state, and a pause of one does not pause the other:
 
 1. **The JIT (guest CPU) thread.** `JitRunner::Pause()` parks it between translated
-   blocks. `Resume()` releases it. `Pause()` is **host-thread only**. A call from
-   the JIT thread self-deadlocks. Hibernation runs `Pause() → work → Resume()`.
+   blocks. Only a host thread can call `Pause()`. A call from the JIT thread
+   deadlocks on itself.
 
 2. **Peripheral worker threads.** A peripheral that owns a `std::thread` continues
-   to mutate guest-visible state, whatever the JIT pause does. **`EmulationFreeze`**
+   to change guest-visible state, whatever the JIT pause does. `EmulationFreeze`
    (`libCerfCore/include/cerfcore/state/emulation_freeze.h`) freezes them:
-   - A worker holds `WorkerSection()` (a `shared_lock`) **around the part of each
-     iteration that reads or writes guest state**.
+   - A worker holds `WorkerSection()` (a `shared_lock`) around the part of each
+     iteration that reads or writes guest state.
    - Hibernation holds `SnapshotSection()` (a `unique_lock`) across the whole
      save or restore. The memory load of a warm boot runs on the JIT thread
      during the reset, and it holds `SnapshotSection()` itself.
    - **Lock-order invariant (a violation deadlocks):** take the freeze lock
-     BEFORE any peripheral mutex. A worker **never** holds `WorkerSection`
-     across a cv wait / sleep / thread join. Acquire it, do the state touch,
-     release it, then wait.
+     before any peripheral mutex. A worker never holds `WorkerSection` across a
+     condition-variable wait, a sleep or a thread join. Acquire it, do the state
+     touch, release it, then wait.
 
-Every peripheral that owns a worker thread wraps its state touch in a worker
-section. A peripheral whose state advances only on the JIT thread - every timer
-on the guest cycle clock is one - has no worker and needs no `WorkerSection`.
+A peripheral whose state advances only on the JIT thread has no worker and needs
+no `WorkerSection`. Every timer on the guest cycle clock is such a peripheral.
+
+**A frontend thread that calls a lever is a host thread too.** A reset, a card
+insert or a battery change from a menu writes guest state while a save can run. The core function that the frontend calls takes the worker
+section, so a frontend never takes it. `EmulationFreeze` is not recursive. Code
+that already holds the section calls the function that takes none, for example
+`GuestCpuReset::WarmReset` in place of `WarmResetFromHost`.
 
 ## The peripheral contract - MANDATORY when you create or modify a peripheral
 

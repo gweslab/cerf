@@ -1,10 +1,10 @@
 #include "surface_host_pointer.h"
 
 #include "canvas_input.h"
-#include "guest_canvas_turn.h"
 #include "qt_canvas_mouse_buttons.h"
 #include "qt_device_pixels.h"
 #include "qt_guest_cursor.h"
+#include "view_rotation.h"
 #include "viewport_layout.h"
 #include "window_pixel_scale.h"
 
@@ -48,7 +48,7 @@ void SurfaceHostPointer::ApplyCursor(cerfcore::CerfEmulator& emu, int x, int y,
             layout.GuestPixelScale(sx, sy);
             const QtGuestCursorLook look{
                 WholeScale(sx), WholeScale(sy),
-                emu.Get<cerffrontend::GuestCanvasTurn>().LogicalQuarter(layout.Presentation().quarter & 3), Dpr()};
+                emu.Get<cerffrontend::ViewRotation>().Quarter(), Dpr()};
             bool          active = false;
             const QCursor cursor = emu.Get<QtGuestCursor>().Resolve(look, active);
             item_.setCursor(active ? cursor : QCursor(Qt::ArrowCursor));

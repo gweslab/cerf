@@ -14,8 +14,8 @@ REGISTER_SERVICE(SurfaceAreaPlanner);
 
 cerffrontend::HudScreenMetrics SurfaceAreaPlanner::HudMetrics(qreal dpr) {
     if (!emu_.Get<QtEmulatorWindow>().AdoptsHostResolution()) return {dpr, std::nullopt};
-    const auto& dc = emu_.Get<cerfcore::DeviceConfig>();
-    return {dpr, cerfcore::DbLcdPanelSize{dc.board_configurable_screen_width, dc.board_configurable_screen_height}};
+    const auto live = emu_.Get<cerfcore::DeviceConfig>().Live();
+    return {dpr, cerfcore::DbLcdPanelSize{live->board_configurable_screen_width, live->board_configurable_screen_height}};
 }
 
 ViewArea SurfaceAreaPlanner::AreaFor(QSizeF logical, const QMarginsF& safe, QPointF scale, qreal dpr,

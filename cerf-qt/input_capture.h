@@ -15,7 +15,6 @@ public:
     void Toggle() { SetCaptured(!IsCaptured()); }
     void SetCaptured(bool on);
     void OnFocusLost();
-    void SendCtrlAltDel();
     bool OnHostKey(uint32_t vk, bool key_up);
 
 protected:

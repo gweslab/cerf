@@ -3,8 +3,6 @@
 #include <cerfcore/core/device_config.h>
 #include <cerfcore/core/service.h>
 
-#include <cstdint>
-
 namespace cerffrontend {
 
 class CanvasTabs : public cerfcore::Service {
@@ -17,9 +15,7 @@ public:
     Tab  Current() const { return tab_; }
     bool Set(Tab tab, bool user_initiated);
     void RearmAutoSwitch();
-    bool OnPresentTick(bool has_frame);
-
-    bool RenderAlt(uint32_t* bits, int width, int height, int dpi);
+    bool OnPresentTick(bool content_latched);
     bool ShouldDesaturate();
 
 private:

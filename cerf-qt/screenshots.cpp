@@ -60,7 +60,8 @@ void Screenshots::Copy() {
 }
 
 void Screenshots::CaptureShown(Shot shot) {
-    if (!emu_.Get<cerfcore::DeviceConfig>().shader_screenshots || emu_.Get<ShaderSelection>().Spec().presets.empty() ||
+    if (!emu_.Get<cerfcore::DeviceConfig>().Live()->shader_screenshots ||
+        emu_.Get<ShaderSelection>().Spec().presets.empty() ||
         !emu_.Get<FrontendWindow>().RequestShadedCapture()) {
         CaptureUnshaded(shot);
         return;

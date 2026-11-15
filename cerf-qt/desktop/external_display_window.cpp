@@ -4,11 +4,11 @@
 #include "qt_focus_policy.h"
 
 #include "../cerfman/manager_engine.h"
-#include "../external_display_sources.h"
+#include <cerfcore/host/external_displays.h>
 #include "../external_display_view.h"
 #include "../frontend_window.h"
 #include "../host_key_binding.h"
-#include "../host_virtual_keys.h"
+#include <cerfcore/host/virtual_keys.h>
 #include "../native_menu_bar.h"
 #include "../qt_menu_presenter.h"
 #include "../qt_key_input.h"
@@ -91,7 +91,7 @@ void ExternalDisplayWindow::MenuPicked(QObject* menu, int id) {
 void ExternalDisplayWindow::Eject() {
     gate_.Run([this](cerfcore::CerfEmulator& emu) {
         emu.Get<cerffrontend::FrontendWindow>().RunOnUiThread(
-            [&sources = emu.Get<ExternalDisplaySources>(), id = source_id_] { sources.Eject(id); });
+            [&sources = emu.Get<cerfcore::ExternalDisplays>(), id = source_id_] { sources.Eject(id); });
     });
 }
 
@@ -161,7 +161,7 @@ void ExternalDisplayWindow::RouteKey(cerfcore::CerfEmulator& emu, const QKeyEven
     if (!keys.Translate(&event, key)) return;
     keys.ForEachTransition(key, key_up, [&](bool up) {
         keys.Note(key, up);
-        if (!up && key.vk == cerffrontend::kVkF && emu.Get<cerffrontend::HostKeyBinding>().AllMembersDownNow())
+        if (!up && key.vk == cerfcore::kVkF && emu.Get<cerffrontend::HostKeyBinding>().AllMembersDownNow())
             ToggleFullscreen();
     });
 }

@@ -1,6 +1,6 @@
 #include "external_display_view.h"
 
-#include "external_display_sources.h"
+#include <cerfcore/host/external_displays.h>
 #include "qt_device_pixels.h"
 
 #include "present_timing.h"
@@ -36,7 +36,7 @@ void ExternalDisplayView::SetSurfaceSize(uint32_t w, uint32_t h) {
 bool ExternalDisplayView::Capture(std::vector<uint32_t>& out, uint32_t& w, uint32_t& h) {
     bool captured = false;
     gate_.Run([&](cerfcore::CerfEmulator& emu) {
-        emu.Get<ExternalDisplaySources>().UseSource(source_id_, [&](cerfcore::FrameSource& source) {
+        emu.Get<cerfcore::ExternalDisplays>().UseSource(source_id_, [&](cerfcore::FrameSource& source) {
             captured = presenter_->Capture(source, out, w, h);
         });
     });
@@ -55,11 +55,10 @@ const FrameLayers* ExternalDisplayView::PresentLayers() {
     if (!presenter_) return nullptr;
     const FrameLayers* layers = nullptr;
     gate_.Run([this, &layers](cerfcore::CerfEmulator& emu) {
-        const qreal dpr    = window()->devicePixelRatio();
         const QSize canvas = DeviceCanvasSize(width(), height(), PixelScale());
         presenter_->SetCanvasSize(canvas.width(), canvas.height());
-        emu.Get<ExternalDisplaySources>().UseSource(source_id_, [&](cerfcore::FrameSource& source) {
-            layers = &presenter_->Present(emu, source, canvas.width(), canvas.height(), dpr);
+        emu.Get<cerfcore::ExternalDisplays>().UseSource(source_id_, [&](cerfcore::FrameSource& source) {
+            layers = &presenter_->Present(emu, source);
         });
     });
     return layers;

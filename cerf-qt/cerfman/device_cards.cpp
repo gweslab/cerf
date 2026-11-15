@@ -1,6 +1,7 @@
 #include "device_cards.h"
 
 #include "../device_status_files.h"
+#include "../saved_state_preview.h"
 #include "board_catalog.h"
 #include "bundle_catalog.h"
 #include "device_inventory.h"
@@ -13,7 +14,6 @@
 #include "text_compare.h"
 
 #include <cerfcore/core/cerf_emulator.h>
-#include <cerfcore/state/state_image_format.h>
 
 #include <QDateTime>
 #include <QDir>
@@ -54,7 +54,7 @@ QString CardStatus(const RunState& state) {
 
 QString PreviewUrl(const QString& device_path, const RunState& state) {
     const char* name = state.kind == RunStateKind::kRunning ? cerffrontend::kLiveScreenshotFileName
-                       : state.kind == RunStateKind::kSaved ? cerfcore::kSavedStateScreenshotFile
+                       : state.kind == RunStateKind::kSaved ? cerffrontend::kSavedStatePreviewFile
                                                             : nullptr;
     if (name == nullptr) return QString();
     const QFileInfo info(QDir(device_path).filePath(QString::fromLatin1(name)));

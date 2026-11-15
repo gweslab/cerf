@@ -1,6 +1,6 @@
 #pragma once
 
-#include "host_virtual_keys.h"
+#include <cerfcore/host/virtual_keys.h>
 
 #include <cerfcore/core/service.h>
 
@@ -14,7 +14,7 @@ class HostKeyBinding : public cerfcore::Service {
 public:
     using cerfcore::Service::Service;
 
-    static constexpr uint8_t kDefaultVk = kVkRControl;
+    static constexpr uint8_t kDefaultVk = cerfcore::kVkRControl;
 
     static std::vector<uint8_t> OrDefault(std::vector<uint8_t> vks);
 

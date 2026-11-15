@@ -6,8 +6,6 @@
 #include "host_key_binding.h"
 #include "input_capture.h"
 #include "overlay_input.h"
-#include "pointer_stylus_simulation.h"
-#include "stylus_alt_tap.h"
 #include "view_presentation.h"
 #include "view_rotation.h"
 
@@ -15,11 +13,9 @@
 #include <cerfcore/core/fatal.h>
 #include <cerfcore/host/host_pointer_input_lock.h>
 #include <cerfcore/host/keyboard_router.h>
-#include <cerfcore/host/pointer_input.h>
 #include <cerfcore/host/pointer_router.h>
 #include <cerfcore/host/pointer_source.h>
 #include <cerfcore/host/relative_mouse_input.h>
-#include <cerfcore/host/touch_input.h>
 
 namespace cerffrontend {
 
@@ -39,16 +35,6 @@ using Tab  = cerfcore::CanvasTab;
 void CanvasInput::OnReady() {
     emu_.Get<cerfcore::HostPointerInputLock>().RegisterAcquireListener(
         [this] { emu_.Get<FrontendWindow>().RunOnUiThread([this] { ReleaseGuestInput(); }); });
-}
-
-uint32_t CanvasInput::ButtonBit(MouseButton b) {
-    switch (b) {
-        case MouseButton::kLeft:   return kHeldLeft;
-        case MouseButton::kRight:  return kHeldRight;
-        case MouseButton::kMiddle: return kHeldMiddle;
-        case MouseButton::kNone:   return 0;
-    }
-    return 0;
 }
 
 CanvasInputHost& CanvasInput::Host() {
@@ -80,11 +66,8 @@ void CanvasInput::RecenterLockedPointer() {
 }
 
 void CanvasInput::Unlock() {
-    if (relative_buttons_ != 0) {
-        relative_buttons_ = 0;
-        emu_.Get<cerfcore::RelativeMouseInput>().OnRelativeMove(0, 0, 0);
-    }
     if (!mouse_locked_active_) return;
+    emu_.Get<cerfcore::PointerRouter>().ReleaseRelative();
     mouse_locked_active_ = false;
     CanvasInputHost& h   = Host();
     if (native_lock_) {
@@ -104,12 +87,18 @@ void CanvasInput::ShowLockHintOnce() {
 }
 
 void CanvasInput::ReleasePenIfDown() {
-    emu_.Get<StylusAltTap>().Cancel();
-    if (!pen_down_) return;
-    pen_down_ = false;
+    auto&      router = emu_.Get<cerfcore::PointerRouter>();
+    const bool held   = router.PressHeld();
+    router.ReleasePen();
+    FollowPress(held, false);
+}
+
+void CanvasInput::FollowPress(bool held_before, bool pressing) {
+    const bool held = emu_.Get<cerfcore::PointerRouter>().PressHeld();
+    if (held == held_before) return;
     CanvasInputHost& h = Host();
-    if (h.HasMouseCapture()) h.SetMouseCapture(false);
-    if (auto* t = emu_.TryGet<cerfcore::TouchInput>()) t->OnCaptureLost();
+    if (held) h.SetMouseCapture(true);
+    else if (!pressing && h.HasMouseCapture()) h.SetMouseCapture(false);
 }
 
 bool CanvasInput::RouteOverlay(const CanvasMouse& m) {
@@ -117,81 +106,51 @@ bool CanvasInput::RouteOverlay(const CanvasMouse& m) {
 }
 
 void CanvasInput::SendRelative(int dx, int dy, uint32_t buttons) {
-    const FramePoint turned = FramePlacement(FrameRect{}, emu_.Get<ViewRotation>().Quarter())
+    const FramePoint turned = FramePlacement(FrameRect{}, emu_.Get<ViewRotation>().PresentedQuarter())
                                   .TurnDelta(FramePoint{double(dx), double(dy)});
-    emu_.Get<cerfcore::RelativeMouseInput>().OnRelativeMove(static_cast<int>(turned.x), static_cast<int>(turned.y),
-                                                           buttons);
+    emu_.Get<cerfcore::PointerRouter>().OnRelativeMove(static_cast<int>(turned.x), static_cast<int>(turned.y),
+                                                       buttons);
 }
 
-uint32_t CanvasInput::RelativeMask(uint32_t held) {
-    uint32_t mask = 0;
-    if (held & kHeldLeft) mask |= cerfcore::kRelMouseLeft;
-    if (held & kHeldRight) mask |= cerfcore::kRelMouseRight;
-    return mask;
-}
-
-uint32_t CanvasInput::PointerMask(uint32_t held) {
-    uint32_t mask = 0;
-    if (held & kHeldLeft) mask |= cerfcore::kPointerLeft;
-    if (held & kHeldRight) mask |= cerfcore::kPointerRight;
-    if (held & kHeldMiddle) mask |= cerfcore::kPointerMiddle;
-    return mask;
-}
-
-void CanvasInput::GuestPoint(const CanvasMouse& m, int& sx, int& sy) {
+cerfcore::HostPointerEvent CanvasInput::GuestEvent(const CanvasMouse& m) {
+    cerfcore::HostPointerEvent event;
+    event.kind         = m.kind;
+    event.button       = m.button;
+    event.held         = m.held;
+    event.wheel        = m.wheel;
     CanvasInputHost& h = Host();
-    h.HostToGuest(m.x, m.y, sx, sy);
-    h.ClampGuest(sx, sy);
+    event.inside       = h.HostToGuest(m.x, m.y, event.x, event.y);
+    h.ClampGuest(event.x, event.y);
+    return event;
 }
 
-void CanvasInput::LiftPen(const CanvasMouse& m, bool release_capture) {
-    pen_down_ = false;
-    if (release_capture) Host().SetMouseCapture(false);
-    int sx = 0, sy = 0;
-    GuestPoint(m, sx, sy);
-    if (auto* touch = emu_.TryGet<cerfcore::TouchInput>()) touch->OnPenUp(sx, sy);
+bool CanvasInput::RouteGuest(const CanvasMouse& m) {
+    return FocusOnPress(m, emu_.Get<cerfcore::PointerRouter>().Route(GuestEvent(m)));
 }
 
-void CanvasInput::ReleaseLostButtons(const CanvasMouse& m) {
-    if (m.kind == Kind::kCaptureLost) return;
-    const bool pressing = m.kind == Kind::kDown;
-    uint32_t   held     = m.held;
-    if (pressing) held &= ~ButtonBit(m.button);
-    if (m.kind == Kind::kUp) held |= ButtonBit(m.button);
-    if (pen_down_ && !(held & kHeldLeft)) LiftPen(m, !pressing);
-    const uint32_t pointer_held = PointerMask(held);
-    if (pointer_buttons_ & ~pointer_held) {
-        pointer_buttons_ &= pointer_held;
-        int sx = 0, sy = 0;
-        GuestPoint(m, sx, sy);
-        emu_.Get<cerfcore::PointerInput>().OnMove(sx, sy, pointer_buttons_);
-        if (pointer_buttons_ == 0 && !pressing) Host().SetMouseCapture(false);
-    }
-    const uint32_t relative_held = RelativeMask(held);
-    if (relative_buttons_ & ~relative_held) {
-        relative_buttons_ &= relative_held;
-        emu_.Get<cerfcore::RelativeMouseInput>().OnRelativeMove(0, 0, relative_buttons_);
-    }
+bool CanvasInput::KeepOutsideFramebuffer(const CanvasMouse& m, cerfcore::PointerKind kind) {
+    return FocusOnPress(m, kind == cerfcore::PointerKind::Stylus);
+}
+
+bool CanvasInput::FocusOnPress(const CanvasMouse& m, bool handled) {
+    if (handled && m.kind == Kind::kDown && m.button != MouseButton::kNone) Host().FocusCanvas();
+    return handled;
 }
 
 bool CanvasInput::RouteLocked(const CanvasMouse& m) {
     const bool lr = (m.kind == Kind::kDown || m.kind == Kind::kUp) &&
                     (m.button == MouseButton::kLeft || m.button == MouseButton::kRight);
     if (m.kind != Kind::kMove && !lr) return false;
-    auto* rm = emu_.TryGet<cerfcore::RelativeMouseInput>();
-    if (!rm) return false;
+    if (!emu_.TryGet<cerfcore::RelativeMouseInput>()) return false;
     EnsureLocked();
 
-    const uint32_t mask = RelativeMask(m.held);
+    const uint32_t mask = cerfcore::PointerRouter::RelativeButtonsOf(m.held);
 
     if (m.kind == Kind::kMove) {
         if (native_lock_) return true;
         const int dx = m.x - relative_last_x_;
         const int dy = m.y - relative_last_y_;
-        if (relative_anchored_ && (dx != 0 || dy != 0)) {
-            SendRelative(dx, dy, mask);
-            relative_buttons_ = mask;
-        }
+        if (relative_anchored_ && (dx != 0 || dy != 0)) SendRelative(dx, dy, mask);
         AnchorAt(m);
         int w = 0, h = 0;
         Host().ClientSize(w, h);
@@ -200,92 +159,8 @@ bool CanvasInput::RouteLocked(const CanvasMouse& m) {
             RecenterLockedPointer();
         return true;
     }
-    rm->OnRelativeMove(0, 0, mask);
-    relative_buttons_ = mask;
+    emu_.Get<cerfcore::PointerRouter>().OnRelativeMove(0, 0, mask);
     return true;
-}
-
-bool CanvasInput::RoutePointer(const CanvasMouse& m, bool framebuffer) {
-    auto* pi = emu_.TryGet<cerfcore::PointerInput>();
-    if (!pi || !framebuffer) return false;
-    CanvasInputHost& h = Host();
-
-    if (m.kind == Kind::kWheel) {
-        int sx = 0, sy = 0;
-        GuestPoint(m, sx, sy);
-        pi->OnWheel(sx, sy, m.wheel);
-        return true;
-    }
-    if (m.kind == Kind::kCaptureLost) {
-        ReleasePointerButtons();
-        return true;
-    }
-
-    const bool down = m.kind == Kind::kDown && m.button != MouseButton::kNone;
-    const bool up   = m.kind == Kind::kUp && m.button != MouseButton::kNone;
-    if (!down && !up && m.kind != Kind::kMove) return false;
-
-    if (down) {
-        h.FocusCanvas();
-        h.SetMouseCapture(true);
-    }
-
-    int sx = 0, sy = 0;
-    GuestPoint(m, sx, sy);
-
-    const uint32_t mask = PointerMask(m.held);
-
-    const bool held   = (mask & (cerfcore::kPointerLeft | cerfcore::kPointerRight)) != 0;
-    const bool report = down || up || held || !emu_.Get<PointerStylusSimulation>().Enabled();
-    if (report) {
-        pi->OnMove(sx, sy, mask);
-        pointer_buttons_ = mask;
-    }
-
-    if (up && mask == 0) h.SetMouseCapture(false);
-    return true;
-}
-
-bool CanvasInput::RouteStylus(const CanvasMouse& m, bool framebuffer) {
-    CanvasInputHost& h     = Host();
-    auto*            touch = emu_.TryGet<cerfcore::TouchInput>();
-    int              sx = 0, sy = 0;
-
-    if (m.kind == Kind::kDown && m.button == MouseButton::kRight) {
-        h.FocusCanvas();
-        if (!framebuffer || pen_down_) return true;
-        if (!h.HostToGuest(m.x, m.y, sx, sy)) return true;
-        emu_.Get<StylusAltTap>().Begin(sx, sy);
-        return true;
-    }
-    if (m.kind == Kind::kUp && m.button == MouseButton::kRight) return true;
-    if (m.kind == Kind::kDown && m.button == MouseButton::kLeft) {
-        h.FocusCanvas();
-        if (!framebuffer || emu_.Get<StylusAltTap>().Running()) return true;
-        if (!h.HostToGuest(m.x, m.y, sx, sy)) return true;
-        pen_down_ = true;
-        h.SetMouseCapture(true);
-        if (touch) touch->OnPenDown(sx, sy);
-        return true;
-    }
-    if (m.kind == Kind::kMove) {
-        if (!pen_down_) return true;
-        GuestPoint(m, sx, sy);
-        if (touch) touch->OnPenMove(sx, sy);
-        return true;
-    }
-    if (m.kind == Kind::kUp && m.button == MouseButton::kLeft) {
-        if (pen_down_) LiftPen(m, true);
-        return true;
-    }
-    if (m.kind == Kind::kCaptureLost) {
-        if (pen_down_) {
-            pen_down_ = false;
-            if (touch) touch->OnCaptureLost();
-        }
-        return true;
-    }
-    return false;
 }
 
 bool CanvasInput::OnCaptureLost() {
@@ -312,44 +187,44 @@ void CanvasInput::AnchorAt(const CanvasMouse& m) {
 void CanvasInput::OnRelativeMotion(int dx, int dy) {
     RefreshLock();
     if (!mouse_locked_active_) return;
-    SendRelative(dx, dy, relative_buttons_);
+    SendRelative(dx, dy, emu_.Get<cerfcore::PointerRouter>().RelativeButtons());
 }
 
 bool CanvasInput::GuestInputHeld() const { return emu_.Get<cerfcore::HostPointerInputLock>().Held(); }
 
-void CanvasInput::ReleasePointerButtons() {
-    if (pointer_buttons_ == 0) return;
-    pointer_buttons_ = 0;
-    emu_.Get<cerfcore::PointerInput>().OnCaptureLost();
-}
-
 void CanvasInput::ReleaseGuestInput() {
     ReleasePenIfDown();
-    ReleasePointerButtons();
+    emu_.Get<cerfcore::PointerRouter>().ReleasePointerButtons();
     Unlock();
     CanvasInputHost& h = Host();
     if (h.HasMouseCapture()) h.SetMouseCapture(false);
 }
 
 bool CanvasInput::OnMouse(const CanvasMouse& event) {
+    const bool held    = emu_.Get<cerfcore::PointerRouter>().PressHeld();
+    const bool handled = Dispatch(event);
+    FollowPress(held, event.kind == Kind::kDown);
+    return handled;
+}
+
+bool CanvasInput::Dispatch(const CanvasMouse& event) {
     if (GuestInputHeld()) {
         RouteOverlay(event);
         return true;
     }
-    const Tab  tab         = emu_.Get<CanvasTabs>().Current();
-    const bool framebuffer = tab == Tab::Framebuffer;
-    cerfcore::PointerKind kind = cerfcore::PointerKind::Absolute;
-    if (auto* a = emu_.Get<cerfcore::PointerRouter>().Active()) kind = a->Kind();
+    auto&                 router      = emu_.Get<cerfcore::PointerRouter>();
+    const bool            framebuffer = emu_.Get<CanvasTabs>().Current() == Tab::Framebuffer;
+    cerfcore::PointerKind kind        = cerfcore::PointerKind::Absolute;
+    if (auto* a = router.Active()) kind = a->Kind();
     const bool locked = Locked(framebuffer);
 
     CanvasMouse m = event;
     m.held &= ~emu_.Get<OverlayInput>().OwnedHeld(OverlayInput::Producer::kCanvasMouse, kMousePointer);
     if (!locked && (m.kind == Kind::kMove || m.kind == Kind::kDown || m.kind == Kind::kUp)) AnchorAt(m);
-    ReleaseLostButtons(m);
+    router.ReleaseLost(GuestEvent(m));
     if ((!locked || m.kind != Kind::kDown) && RouteOverlay(event)) return true;
 
-    if (pen_down_) return RouteStylus(m, framebuffer);
-    if (pointer_buttons_ != 0) return RoutePointer(m, true);
+    if (router.PressHeld()) return RouteGuest(m);
 
     if (locked) {
         if (RouteLocked(m)) return true;
@@ -363,10 +238,8 @@ bool CanvasInput::OnMouse(const CanvasMouse& event) {
             return true;
         }
     }
-
-    if (kind == cerfcore::PointerKind::Absolute && RoutePointer(m, framebuffer)) return true;
-    if (kind == cerfcore::PointerKind::Stylus) return RouteStylus(m, framebuffer);
-    return false;
+    if (!framebuffer) return KeepOutsideFramebuffer(m, kind);
+    return RouteGuest(m);
 }
 
 CanvasCursor CanvasInput::CursorAt(int x, int y) {

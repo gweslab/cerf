@@ -3,7 +3,7 @@
 #include "qt_key_position.h"
 
 #include "canvas_input.h"
-#include "host_virtual_keys.h"
+#include <cerfcore/host/virtual_keys.h>
 #include "input_capture.h"
 
 #include <cerfcore/core/cerf_emulator.h>
@@ -53,7 +53,7 @@ bool QtKeyInput::Deliver(const QtHostKey& key, bool key_up, bool host_owns_syste
     Note(key, key_up);
     if (emu_.Get<cerffrontend::InputCapture>().OnHostKey(key.sided_vk, key_up)) return true;
     const bool system_key =
-        key.vk == cerffrontend::kVkF10 || key.vk == cerffrontend::kVkMenu || Down(cerffrontend::kVkMenu);
+        key.vk == cerfcore::kVkF10 || key.vk == cerfcore::kVkMenu || Down(cerfcore::kVkMenu);
     if (host_owns_system_keys && system_key) return false;
     emu_.Get<cerffrontend::CanvasInput>().OnKey(key.vk, key_up);
     return true;

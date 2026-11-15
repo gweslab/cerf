@@ -47,8 +47,8 @@ void ShaderSelection::Report(const ShaderChainResult& result) {
 }
 
 void ShaderSelection::ApplyConfig() {
-    const auto& config = emu_.Get<cerfcore::DeviceConfig>();
-    Apply(cerfcore::EnabledShaderPresets(config.shader_presets), config.shader_parameters);
+    const auto live = emu_.Get<cerfcore::DeviceConfig>().Live();
+    Apply(cerfcore::EnabledShaderPresets(live->shader_presets), live->shader_parameters);
 }
 
 void ShaderSelection::Apply(const std::vector<std::string>&                  chain,

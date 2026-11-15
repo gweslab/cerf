@@ -8,9 +8,9 @@
 #include "nested_event_loops.h"
 #include "overlay_touch_area.h"
 #include "qml_dialog_waiter.h"
+#include "qt_shutdown_dialog.h"
 #include "qt_ui_thread.h"
-#include "status_bar_item.h"
-#include "strip_widget_bar.h"
+#include "bar_widget_list.h"
 
 #include "balloon_hint.h"
 #include "canvas_tabs.h"
@@ -20,16 +20,15 @@
 #include "shutdown_prompt.h"
 #include "shutdown_teardown.h"
 #include "tab_menu.h"
+#include "bar_widgets.h"
 #include "view_rotation.h"
-#include "widget_menu_builder.h"
 
 #include <cerfcore/core/cerf_emulator.h>
 #include <cerfcore/core/device_config.h>
 #include <cerfcore/core/log.h>
 #include <cerfcore/host/auto_calibration.h>
 #include <cerfcore/host/frame_renderer.h>
-#include <cerfcore/host/pointer_widget.h>
-#include <cerfcore/host/shutdown_host.h>
+#include <cerfcore/host/pointer_router.h>
 
 #include <QMetaObject>
 #include <QQuickWindow>
@@ -48,9 +47,9 @@ constexpr uint32_t kScreenshotHintMs = 2000;
 QtEmulatorWindow::~QtEmulatorWindow() = default;
 
 void QtEmulatorWindow::OpenWindow() {
-    const auto& dc = emu_.Get<cerfcore::DeviceConfig>();
+    const auto live = emu_.Get<cerfcore::DeviceConfig>().Live();
     MakeWindow();
-    surface_->Attach(emu_, dc.board_configurable_screen_width, dc.board_configurable_screen_height);
+    surface_->Attach(emu_, live->board_configurable_screen_width, live->board_configurable_screen_height);
     emu_.Get<cerffrontend::CanvasInput>().Attach(surface_);
     input_attached_ = true;
     controller_->Attach(emu_);
@@ -64,8 +63,8 @@ void QtEmulatorWindow::OpenWindow() {
     teardown_timer_ = std::make_unique<QTimer>();
     teardown_timer_->setInterval(static_cast<int>(cerffrontend::ShutdownTeardown::kPollMs));
     teardown_timer_->callOnTimeout(gate_.Bind([this] { PollTeardown(); }));
-    LOG(Lcd, "QtEmulatorWindow: opening at %ux%u\n", dc.board_configurable_screen_width,
-        dc.board_configurable_screen_height);
+    LOG(Lcd, "QtEmulatorWindow: opening at %ux%u\n", live->board_configurable_screen_width,
+        live->board_configurable_screen_height);
 
     auto& host = emu_.Get<EmulatorWindowHost>();
     host.ShowWindow();
@@ -79,8 +78,8 @@ void QtEmulatorWindow::MakeWindow() {
     window_       = qobject_cast<QQuickWindow*>(emu_.Get<ManagerEngine>().Open(QStringLiteral("EmulatorWindow"), {}));
     surface_      = window_->property("surface").value<GuestSurface*>();
     controller_   = window_->property("controller").value<EmulatorController*>();
-    widget_bar_   = window_->property("widgetBar").value<StripWidgetBar*>();
-    status_bar_   = window_->property("statusBar").value<StatusBarItem*>();
+    widget_bar_   = window_->property("widgetBar").value<BarWidgetList*>();
+    status_bar_   = window_->property("statusBar").value<BarWidgetList*>();
     overlay_area_ = window_->property("overlayArea").value<OverlayTouchArea*>();
     window_->installEventFilter(&menu_dismiss_);
 }
@@ -144,7 +143,7 @@ void QtEmulatorWindow::OnLcdEnabled() {
 
 void QtEmulatorWindow::ApplyPresentation() {
     surface_->SetPresentation(cerffrontend::ViewPresentation{emu_.Get<cerffrontend::HudSelection>().Frame(),
-                                                          emu_.Get<cerffrontend::ViewRotation>().Quarter()});
+                                                          emu_.Get<cerffrontend::ViewRotation>().PresentedQuarter()});
 }
 
 void QtEmulatorWindow::OnPresentationChanged() {
@@ -204,8 +203,7 @@ void QtEmulatorWindow::CloseRequested() {
 }
 
 void QtEmulatorWindow::RunShutdownPrompt() {
-    emu_.Get<cerffrontend::ShutdownPrompt>().FinishCloseRequest(
-        emu_.Get<cerfcore::ShutdownHost>().Ask(cerfcore::ShutdownTrigger::WindowClose));
+    emu_.Get<QtShutdownDialog>().Show(cerffrontend::ShutdownTrigger::WindowClose);
 }
 
 void QtEmulatorWindow::BeginShutdownTeardown() {
@@ -268,7 +266,7 @@ GuestSurface* QtEmulatorWindow::Surface() const { return surface_.data(); }
 
 EmulatorController* QtEmulatorWindow::Controller() const { return controller_.data(); }
 
-StatusBarItem* QtEmulatorWindow::StatusBar() const { return status_bar_.data(); }
+BarWidgetList* QtEmulatorWindow::StatusBar() const { return status_bar_.data(); }
 
 std::vector<cerffrontend::MenuItem> QtEmulatorWindow::PointerMenu() {
     using cerffrontend::MenuItem;
@@ -278,9 +276,8 @@ std::vector<cerffrontend::MenuItem> QtEmulatorWindow::PointerMenu() {
         items.push_back(MenuItem::Radio("Stylus", !cursor, [this] { surface_->SetCursorMode(false); }));
         items.push_back(MenuItem::Radio("Cursor", cursor, [this] { surface_->SetCursorMode(true); }));
     }
-    if (auto* widget = emu_.TryGet<cerfcore::PointerWidget>()) {
-        std::vector<cerffrontend::MenuItem> controls =
-            emu_.Get<cerffrontend::WidgetMenuBuilder>().Build(widget->Controls());
+    if (auto* widget = emu_.Get<cerffrontend::BarWidgets>().ForObject(&emu_.Get<cerfcore::PointerRouter>())) {
+        std::vector<cerffrontend::MenuItem> controls = widget->Menu();
         if (!controls.empty() && !items.empty()) items.push_back(cerffrontend::MenuItem{});
         for (cerffrontend::MenuItem& entry : controls) items.push_back(std::move(entry));
     }

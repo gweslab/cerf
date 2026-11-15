@@ -5,9 +5,9 @@
 #include <cstdint>
 #include <string>
 
-namespace cerfcore { class HostWidget; }
-
 namespace cerffrontend {
+
+class BarWidget;
 
 class BalloonHint : public cerfcore::Service {
 public:
@@ -15,9 +15,8 @@ public:
 
     static constexpr int kCanvasBottomGap = 20;
 
-    virtual void ShowUnderWidget(const cerfcore::HostWidget* anchor, const std::string& text,
-                                 uint32_t hold_ms)                                   = 0;
-    virtual void ShowUnderCaptureWidget(const std::string& text, uint32_t hold_ms) = 0;
+    virtual void ShowUnderWidget(const BarWidget* anchor, const std::string& text, uint32_t hold_ms) = 0;
+    virtual void ShowUnderCaptureWidget(const std::string& text, uint32_t hold_ms)               = 0;
 };
 
 }

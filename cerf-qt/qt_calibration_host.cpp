@@ -5,10 +5,18 @@
 
 #include <cerfcore/core/cerf_emulator.h>
 #include <cerfcore/host/calibration_host.h>
+#include <cerfcore/host/notification_stack.h>
+#include <cerfcore/host/user_alert.h>
+
+#include <chrono>
+#include <string>
 
 namespace cerffrontend {
 
 namespace {
+
+constexpr char                 kTitle[] = "Screen calibration";
+constexpr std::chrono::seconds kFinishedCardTimeout{5};
 
 class QtCalibrationHost : public cerfcore::CalibrationHost {
 public:
@@ -19,31 +27,41 @@ public:
         window_   = &emu_.Get<FrontendWindow>();
     }
 
-    cerfcore::FrameGrab CaptureSurface(cerfcore::CalibrationFrame& frame) override {
-        bool captured = false;
-        if (!ui_calls_->Run([&] { captured = window_->CaptureGuestSurface(frame.pixels, frame.width, frame.height); }))
-            return cerfcore::FrameGrab::kClosed;
-        return captured ? cerfcore::FrameGrab::kCaptured : cerfcore::FrameGrab::kNoFrame;
+    bool ApprovesCalibration() override { return AskYes("Calibrate the screen for you?"); }
+
+    bool ApprovesPanelResolution(uint32_t, uint32_t) override {
+        return AskYes("You need a stock resolution to pass the calibration screen. Switch and soft reset now?");
     }
 
-    cerfcore::PromptAnswer Confirm(const std::string& title, const std::string& message) override {
-        cerfcore::PromptAnswer answer = cerfcore::PromptAnswer::kClosed;
-        ui_calls_->Run([&] { answer = emu_.Get<YesNoPrompt>().Ask(title, message, YesNoLevel::kPlain, YesNoEnter::kYes); });
-        return answer;
+
+    void CalibrationFinished() override {
+        emu_.Get<cerfcore::NotificationStack>().Post(cerfcore::NotificationKind::Success,
+                                                     "Calibration attempt finished", kFinishedCardTimeout);
     }
 
-    bool RunConfigurationJob(const std::function<void()>& job) override { return ui_calls_->Run(job); }
+    void CalibrationFailed() override {
+        emu_.Get<cerfcore::UserAlert>().Show(cerfcore::AlertLevel::kError, cerfcore::AlertPlacement::kOverWindow,
+                                             kTitle,
+                                             "Automatic calibration was unable to find the calibration data on screen");
+    }
 
-    void ShowFallback() override {
+    void GuestCalibrationUnhandled() override {
         window_->RunOnUiThread([this] { emu_.Get<GuestCalibrationFallback>().Show(); });
     }
 
-    void EndFallback(bool pointer_switched_back) override {
+    void GuestCalibrationEnded(bool guest_pointer_restored) override {
         window_->RunOnUiThread(
-            [this, pointer_switched_back] { emu_.Get<GuestCalibrationFallback>().EndCycle(pointer_switched_back); });
+            [this, guest_pointer_restored] { emu_.Get<GuestCalibrationFallback>().EndCycle(guest_pointer_restored); });
     }
 
 private:
+    bool AskYes(const std::string& message) {
+        PromptAnswer answer = PromptAnswer::kClosed;
+        ui_calls_->Run(
+            [&] { answer = emu_.Get<YesNoPrompt>().Ask(kTitle, message, YesNoLevel::kPlain, YesNoEnter::kYes); });
+        return answer == PromptAnswer::kYes;
+    }
+
     QtUiThreadCalls* ui_calls_ = nullptr;
     FrontendWindow*  window_   = nullptr;
 };

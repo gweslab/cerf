@@ -6,7 +6,7 @@
 #include "../frontend_config.h"
 #include "../host_key_binding.h"
 #include "../host_key_label.h"
-#include "../host_virtual_keys.h"
+#include <cerfcore/host/virtual_keys.h>
 
 #include <QKeyEvent>
 
@@ -66,7 +66,7 @@ void HostKeyCapture::Reset() {
 void HostKeyCapture::End(bool commit) {
     if (!capturing_) return;
     if (commit && !pending_.empty() &&
-        !(pending_.size() == 1 && pending_.front() == cerffrontend::kVkEscape))
+        !(pending_.size() == 1 && pending_.front() == cerfcore::kVkEscape))
         vks_ = pending_;
     capturing_ = false;
     pending_.clear();

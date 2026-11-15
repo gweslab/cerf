@@ -1,4 +1,5 @@
 import QtQuick
+import QtQuick.Effects
 import CerfStyle
 import Cerfman
 
@@ -6,8 +7,8 @@ ScreenWindow {
     id: root
     property alias surface: guestSurface
     property alias controller: controller
-    readonly property QtObject widgetBar: root.touch ? stripWidgets : null
-    readonly property QtObject statusBar: footerLoader.item
+    readonly property QtObject widgetBar: root.touch ? stripWidgets.list : null
+    readonly property QtObject statusBar: footerLoader.item ? footerLoader.item.list : null
     readonly property QtObject overlayArea: root.touch ? overlayTouch : null
     property var openDialogs: []
     property var menuTree: null
@@ -21,6 +22,7 @@ ScreenWindow {
     readonly property int bubbleMs: 600
     readonly property real bubbleStartScale: 0.5
     readonly property real bubbleEndScale: 1.4
+    readonly property real stripUnit: 2
 
     title: ProductLinks.productName
 
@@ -58,19 +60,9 @@ ScreenWindow {
         id: footerLoader
         active: !root.touch
         visible: root.chromeShown
-        sourceComponent: StatusBarItem {
-            id: hostBar
-            background: Theme.windowBarBg
-            separator: Theme.windowBarLine
-            hover: Theme.windowBarHover
-
-            ToolTip {
-                visible: hostBar.tip !== ""
-                text: hostBar.tip
-                delay: Theme.tipDelayMs
-                x: hostBar.tipRect.x + (hostBar.tipRect.width - width) / 2
-                y: -height - Theme.spaceS
-            }
+        sourceComponent: WidgetBar {
+            chrome: true
+            backdrop: Theme.windowBarBg
         }
     }
 
@@ -95,6 +87,71 @@ ScreenWindow {
         barInsets: Qt.size(verticalBar.visible ? verticalBar.width : 0, horizontalBar.visible ? horizontalBar.height : 0)
         fillColor: Theme.screenBg
         safeMargins: root.touch ? SafeArea.margins : undefined
+        layer.enabled: guestSurface.overlays.dimmed
+        layer.effect: MultiEffect {
+            saturation: Theme.pausedSaturation
+        }
+    }
+
+    Item {
+        x: guestSurface.x + guestSurface.overlays.canvas.x
+        y: guestSurface.y + guestSurface.overlays.canvas.y
+        width: guestSurface.overlays.canvas.width
+        height: guestSurface.overlays.canvas.height
+        clip: true
+
+        BootScreenLayer {
+            anchors.fill: parent
+            visible: guestSurface.tabView.bootShown
+            view: guestSurface.tabView
+            uiFamily: guestSurface.overlays.uiFamily
+            monoFamily: guestSurface.overlays.monoFamily
+        }
+
+        HardwareConsole {
+            anchors.fill: parent
+            visible: guestSurface.tabView.consoleShown
+            view: guestSurface.tabView
+            monoFamily: guestSurface.overlays.monoFamily
+            pixelScale: guestSurface.overlays.pixelScale
+            insetLeft: root.touch ? guestSurface.safeMargins.left : 0
+            insetTop: root.touch ? guestSurface.safeMargins.top : 0
+            insetRight: root.touch ? guestSurface.safeMargins.right : 0
+            insetBottom: root.touch ? guestSurface.safeMargins.bottom : 0
+        }
+
+        Rectangle {
+            anchors.fill: parent
+            visible: guestSurface.overlays.dimmed
+            color: Theme.pausedVeil
+            opacity: Theme.pausedVeilOpacity
+        }
+
+        HudLayer {
+            anchors.fill: parent
+            model: guestSurface.overlays.hud
+            uiFamily: guestSurface.overlays.uiFamily
+            pixelScale: guestSurface.overlays.pixelScale.y
+        }
+
+        NotificationCards {
+            width: Math.min(parent.width, guestSurface.width - guestSurface.barInsets.width)
+            height: Math.min(parent.height, guestSurface.height - guestSurface.barInsets.height)
+            model: guestSurface.overlays.cards
+            overlays: guestSurface.overlays
+            uiFamily: guestSurface.overlays.uiFamily
+            pixelScale: guestSurface.overlays.pixelScale.y
+        }
+
+        SurfaceCursorItem {
+            anchors.fill: parent
+            overlays: guestSurface.overlays
+        }
+
+        ArrowCursor {
+            visible: guestSurface.overlays.arrowShown
+            at: guestSurface.overlays.arrowAt
+        }
     }
 
     ScrollBar {
@@ -228,21 +285,14 @@ ScreenWindow {
                     width: leadingInset + stripWidgets.width + trailingInset
                     height: stripWidgets.height
 
-                    function activate(at, menu) {
-                        const x = Math.max(0, Math.min(stripWidgets.width - 1, at.x - leadingInset))
-                        stripWidgets.Activate(x, at.y, menu)
-                    }
-
-                    StripWidgetBar {
+                    WidgetBar {
                         id: stripWidgets
+                        strip: true
+                        unit: root.stripUnit
                         backdrop: Theme.overlayStrip
                         x: widgetArea.leadingInset
                         width: implicitWidth
                         height: implicitHeight
-                    }
-                    TapHandler {
-                        onTapped: eventPoint => widgetArea.activate(eventPoint.position, false)
-                        onLongPressed: widgetArea.activate(point.position, true)
                     }
                 }
             }

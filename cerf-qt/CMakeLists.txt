@@ -98,13 +98,18 @@ qt_add_resources(cerf-qt "cerfman_icons"
     BASE "${cerfman_symbols}"
     FILES ${cerfman_icons})
 if(APPLE)
-    target_link_libraries(cerf-qt PRIVATE "-framework Foundation" "-framework AppKit" "-framework CoreGraphics")
+    target_link_libraries(cerf-qt PRIVATE "-framework Foundation" "-framework AppKit" "-framework CoreGraphics"
+                                          "-framework AudioToolbox" "-framework CoreAudio")
+endif()
+if(ANDROID)
+    target_link_libraries(cerf-qt PRIVATE aaudio)
 endif()
 if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
     find_package(Qt6 REQUIRED COMPONENTS DBus)
     find_package(PkgConfig REQUIRED)
+    find_package(ALSA REQUIRED)
     pkg_check_modules(cerfqt_screen REQUIRED IMPORTED_TARGET xcb xcb-randr wayland-client)
-    target_link_libraries(cerf-qt PRIVATE Qt6::DBus PkgConfig::cerfqt_screen)
+    target_link_libraries(cerf-qt PRIVATE Qt6::DBus PkgConfig::cerfqt_screen ALSA::ALSA)
     enable_language(C)
     find_program(cerfqt_wayland_scanner wayland-scanner REQUIRED)
     set(cerfqt_wayland_dir "${CMAKE_CURRENT_BINARY_DIR}/wayland")
@@ -174,7 +179,7 @@ if(WIN32)
                                    "${CMAKE_CURRENT_SOURCE_DIR}/../uninstaller-win32/process_wait.cpp"
                                    "${CMAKE_CURRENT_SOURCE_DIR}/../uninstaller-win32/shell_integration_windows.cpp")
     set_target_properties(cerf-qt PROPERTIES WIN32_EXECUTABLE TRUE)
-    target_link_libraries(cerf-qt PRIVATE ole32 shell32 advapi32 uuid)
+    target_link_libraries(cerf-qt PRIVATE ole32 shell32 advapi32 uuid winmm)
     add_custom_command(TARGET cerf-qt POST_BUILD
         COMMAND "${CMAKE_COMMAND}" -E copy_if_different ${cerfqt_librashader_libraries} "$<TARGET_FILE_DIR:cerf-qt>"
         VERBATIM)

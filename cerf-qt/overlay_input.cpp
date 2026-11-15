@@ -38,12 +38,12 @@ bool OverlayInput::Takes(int x, int y) const {
 uint32_t OverlayInput::OwnedHeld(Producer producer, int pointer) const {
     uint32_t held = 0;
     for (const Key& key : owned_)
-        if (key.producer == producer && key.pointer == pointer) held |= CanvasInput::ButtonBit(key.button);
+        if (key.producer == producer && key.pointer == pointer) held |= cerfcore::HostButtonBit(key.button);
     return held;
 }
 
 OverlayInput::Press OverlayInput::OnPress(Producer producer, int pointer, MouseButton button, int x, int y) {
-    if (CanvasInput::ButtonBit(button) == 0) return Press::kNone;
+    if (cerfcore::HostButtonBit(button) == 0) return Press::kNone;
     const Key key{producer, pointer, button};
     uint32_t  card = 0;
     if (CardAt(x, y, card)) {

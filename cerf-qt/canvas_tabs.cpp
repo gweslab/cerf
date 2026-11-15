@@ -3,7 +3,6 @@
 #include "boot_screen.h"
 #include "canvas_input.h"
 #include "frontend_window.h"
-#include "hw_screen_renderer.h"
 
 #include <cerfcore/core/cerf_emulator.h>
 #include <cerfcore/host/emulation_pause.h>
@@ -37,24 +36,12 @@ void CanvasTabs::RearmAutoSwitch() {
     user_picked_view_ = false;
 }
 
-bool CanvasTabs::OnPresentTick(bool has_frame) {
-    if (!has_frame || latched_once_) return false;
+bool CanvasTabs::OnPresentTick(bool content_latched) {
+    if (!content_latched || latched_once_) return false;
     latched_once_ = true;
     emu_.Get<BootScreen>().OnFramebufferLatched();
     if (user_picked_view_) return false;
     tab_ = Tab::Framebuffer;
-    return true;
-}
-
-bool CanvasTabs::RenderAlt(uint32_t* bits, int width, int height, int dpi) {
-    if (tab_ == Tab::Framebuffer) return false;
-    if (tab_ == Tab::Boot) {
-        emu_.Get<BootScreen>().RenderInto(bits, static_cast<uint32_t>(width),
-                                          static_cast<uint32_t>(height), dpi);
-        return true;
-    }
-    emu_.Get<HwScreenRenderer>().RenderInto(bits, static_cast<uint32_t>(width),
-                                            static_cast<uint32_t>(height), dpi);
     return true;
 }
 

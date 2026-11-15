@@ -1,11 +1,11 @@
 #include "desktop_guest_follow.h"
 
+#include "../guest_resize_policy.h"
 #include "../guest_surface.h"
 #include "../qt_device_pixels.h"
 #include "../qt_emulator_window.h"
 
 #include <cerfcore/core/cerf_emulator.h>
-#include <cerfcore/host/guest_resize_policy.h>
 
 #include <QQuickWindow>
 
@@ -26,7 +26,7 @@ void DesktopGuestFollow::OnReady() {
 }
 
 bool DesktopGuestFollow::LiveResizeOn() const {
-    const auto* policy = emu_.TryGet<cerfcore::GuestResizePolicy>();
+    const auto* policy = emu_.TryGet<cerffrontend::GuestResizePolicy>();
     return policy != nullptr && policy->Enabled();
 }
 
@@ -39,7 +39,7 @@ void DesktopGuestFollow::ArmLiveResize() {
 void DesktopGuestFollow::FireLiveResize() {
     const GuestSurface& surface = *emu_.Get<QtEmulatorWindow>().Surface();
     const QPointF       scale   = surface.PixelScale();
-    if (auto* policy = emu_.TryGet<cerfcore::GuestResizePolicy>())
+    if (auto* policy = emu_.TryGet<cerffrontend::GuestResizePolicy>())
         policy->OnUserResizeEnd(static_cast<uint32_t>(DeviceExtent(surface.width(), scale.x())),
                                 static_cast<uint32_t>(DeviceExtent(surface.height(), scale.y())));
 }

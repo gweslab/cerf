@@ -2,8 +2,8 @@
 
 #include "cerfman/property_sheets.h"
 #include "frontend_window.h"
-#include "guest_additions_ui_policy.h"
 
+#include <cerfcore/boot/rom_parser_queries.h>
 #include <cerfcore/core/cerf_emulator.h>
 #include <cerfcore/core/device_config.h>
 #include <cerfcore/core/device_config_refresh.h>
@@ -25,7 +25,8 @@ void LivePropertySheet::Open(const char* page, bool force_reboot, Done done) {
     }
     std::optional<int> ce_major;
     uint16_t           major = 0, minor = 0;
-    if (emu_.Get<GuestAdditionsUiPolicy>().CeVersion(major, minor)) ce_major = major;
+    auto*              rom   = emu_.TryGet<cerfcore::RomParserQueries>();
+    if (rom && rom->KernelSubsystemVersion(major, minor)) ce_major = major;
 
     waiters_ = std::make_shared<Waiters>();
     if (done) waiters_->push_back(std::move(done));
@@ -38,11 +39,12 @@ void LivePropertySheet::Open(const char* page, bool force_reboot, Done done) {
 
 void LivePropertySheet::Finish(bool accepted, GuestReset reset, const Waiters& waiters) {
     if (accepted) {
-        const auto&    cfg    = emu_.Get<cerfcore::DeviceConfig>();
-        const uint32_t prev_w = cfg.board_configurable_screen_width;
-        const uint32_t prev_h = cfg.board_configurable_screen_height;
+        const auto& cfg      = emu_.Get<cerfcore::DeviceConfig>();
+        const auto  previous = cfg.Live();
         emu_.Get<cerfcore::DeviceConfigRefresh>().Refresh();
-        if (cfg.guest_additions) emu_.Get<cerfcore::CerfVirtConfigApply>().Apply(reset, prev_w, prev_h);
+        if (cfg.guest_additions)
+            emu_.Get<cerfcore::CerfVirtConfigApply>().Apply(reset, previous->board_configurable_screen_width,
+                                                            previous->board_configurable_screen_height);
     }
     for (const Done& done : waiters) done(accepted);
 }

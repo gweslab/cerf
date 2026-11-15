@@ -20,6 +20,9 @@ Put each core library at the repository root. Put third-party code in
 - A library calls no facility of a consumer, for example the log or the fatal
   path of the consumer. When a library must report a condition, it calls an
   interface that its consumer implements.
+- A library gives its consumers objects, levers, typed state and events, and it
+  never tells a consumer how to present them. When a consumer cannot build its
+  own presentation from what the library gives, the library is incomplete.
 - Each library has a CMake target, its own tests and its own CI.
 - A library lists the third-party components that it links and the projects that the authors studied for its code in its own `THIRD_PARTY_NOTICES.md`. The root `THIRD_PARTY_NOTICES.txt` repeats every entry of every library, because the CERF binaries contain the libraries.
 - `.gitmodules` records the public HTTPS URL of each library, so a clone needs

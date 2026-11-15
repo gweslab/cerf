@@ -3,15 +3,15 @@
 
 #include <cerfcore/core/cerf_emulator.h>
 #include <cerfcore/core/device_config.h>
-#include <cerfcore/host/customizations_editor.h>
+#include "customizations_editor.h"
 
 namespace cerffrontend {
 
 namespace {
 
-class LiveCustomizationsEditor : public cerfcore::CustomizationsEditor {
+class LiveCustomizationsEditor : public CustomizationsEditor {
 public:
-    using cerfcore::CustomizationsEditor::CustomizationsEditor;
+    using CustomizationsEditor::CustomizationsEditor;
 
     bool ShouldRegister() override { return emu_.Get<cerfcore::DeviceConfig>().guest_additions; }
 
@@ -20,6 +20,6 @@ public:
 
 }
 
-REGISTER_SERVICE_AS(LiveCustomizationsEditor, cerfcore::CustomizationsEditor);
+REGISTER_SERVICE_AS(LiveCustomizationsEditor, CustomizationsEditor);
 
 }

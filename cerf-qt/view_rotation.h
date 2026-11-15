@@ -10,11 +10,15 @@ class ViewRotation : public cerfcore::Service {
 public:
     using cerfcore::Service::Service;
 
-    int  Quarter() const { return quarter_; }
+    int      Quarter() const { return quarter_; }
+    int      PresentedQuarter();
     void     Rotate(int quarters);
+    void     OnFrameTurned();
     MenuItem MenuRow();
 
 private:
+    void Reapply();
+
     int quarter_ = 0;
 };
 

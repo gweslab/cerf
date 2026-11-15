@@ -2,7 +2,6 @@
 
 #include "boot_screen.h"
 #include "frontend_window.h"
-#include "screenshots.h"
 #include "view_rotation.h"
 
 #include <cerfcore/core/cerf_emulator.h>
@@ -30,9 +29,8 @@ public:
         emu_.Get<FrontendWindow>().NotifyGuestRemoded(guest_w, guest_h);
     }
 
-    void GuestTurned(uint32_t quarters) override {
-        emu_.Get<FrontendWindow>().RunOnUiThread(
-            [this, quarters] { emu_.Get<ViewRotation>().Rotate(static_cast<int>(quarters)); });
+    void FrameTurned() override {
+        emu_.Get<FrontendWindow>().RunOnUiThread([this] { emu_.Get<ViewRotation>().OnFrameTurned(); });
     }
 
     uint32_t SurfaceWidth() const override {
@@ -51,16 +49,11 @@ public:
         });
     }
 
-    void FitGuestResolution(uint32_t w, uint32_t h) override {
+    void HostModeSet(uint32_t w, uint32_t h) override {
         emu_.Get<FrontendWindow>().RunOnUiThread([this, w, h] { emu_.Get<FrontendWindow>().FitToResolution(w, h); });
     }
 
-    void SaveScreenshot(const std::string& path) override {
-        emu_.Get<FrontendWindow>().RunOnUiThread(
-            [this, path] { emu_.Get<Screenshots>().SaveGuestSurfaceTo(path); });
-    }
-
-    void ShowCustomizationsRestart() override {
+    void CustomizationsReset() override {
         emu_.Get<BootScreen>().SetRestartLabel("Applying customizations...");
     }
 };

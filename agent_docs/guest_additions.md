@@ -234,21 +234,13 @@ transport.
 
 **Guest additions replaces the display driver. It does not switch off the
 panel of the board.** The board display controller keeps its full emulation,
-and the guest continues to drive it. Only the display driver changes. The
-bootloader and the OAL therefore program the panel and paint their splash into
-it. This occurs many seconds before the guest-additions driver starts.
+and the guest continues to drive it. The bootloader and the OAL therefore
+program the panel and paint their splash into it. This occurs many seconds
+before the guest-additions driver starts.
 
-The host presents both layers. `PresentedFrameRenderer` (see
-[subsystems.md](subsystems.md) § Host window & presentation) composes the
-panel layer under the guest-additions layer. That splash therefore stays
-visible until the guest-additions driver renders its first frame.
-
-The content latch of each layer switches between them. As a result, the
-guest-additions layer must not report content until it paints the surface at
-its scanout offset. Its region also holds the offscreen surfaces. Its `MarkDirty` fires
-for a write anywhere in that region (the framebuffer write path, the blitter,
-the gradient and line drawers, and the palette).
-Without this rule, a first offscreen paint ends the splash early.
+The region of the guest-additions framebuffer also holds the offscreen surfaces.
+A write to an offscreen surface is not a write to the displayed frame. Without
+this rule, a first offscreen paint ends the splash early.
 
 **HW means HW.** The `cerf_guest` accelerator must handle every blit class
 (copy, fill, format-convert, palette, masked text, transparency, ROP, …)
@@ -327,9 +319,9 @@ The primary surface therefore keeps its object and changes its size in place.
 
 The framebuffer keeps the size and the orientation of the panel. The primary
 becomes a rotated surface with the logical size, and GDIINFO reports that
-size. The guest reports the angle to the host, and the host turns only its
-view, with the regular view rotation. The host does not save that view
-rotation, so after a restore the user turns the view again.
+size. The guest reports the angle to the host, and the presented frame
+carries that angle in `FrameRenderer::DisplayQuarter`. A frontend adds it to
+the view turns of the user.
 
 `DRVESC_GETSCREENROTATION` returns the supported angles in the high byte and
 the current angle in the low byte. Some gwes builds receive this value in a
@@ -421,35 +413,26 @@ guest-installed driver.
   `libCerfCore/include/cerfcore/peripherals/cerf_virt/cerf_virt_keyboard_regs.h`.
   Keys are edges (down/up) that must arrive once and in order. As a result, the
   channel is a ring buffer. The host appends one entry per host-key transition
-  and increments the write sequence after the entry store. The guest drains
-  entries by index.
+  and increments the write sequence after the entry store.
 - Pointer channel: `libCerfCore/src/peripherals/cerf_virt/cerf_virt_pointer.{h,cpp}` +
   `libCerfCore/include/cerfcore/peripherals/cerf_virt/cerf_virt_pointer_regs.h`.
   It holds each button change until the guest reads the buttons. Between two
   button changes, it keeps only the last position. The guest pump attaches with
   one read before its loop starts. That read keeps only the newest state, so
   input from before the pump runs never reaches the guest.
-- Guest pump: `ce_apps/cerf_guest/cerf_input_pump.cpp`. It carries the keyboard
-  and the pointer on one thread. It resolves `keybd_event` through
-  `GetProcAddressW` and replays each ring entry. GWES routes each entry to the
-  focused window. GWES then runs the active keyboard layout to produce
+- Guest pump: `ce_apps/cerf_guest/cerf_input_pump.cpp`. GWES routes each key
+  from the ring to the focused window. GWES then runs the active keyboard layout to produce
   WM_KEYDOWN / WM_KEYUP + WM_CHAR.
 
 The guest-additions keyboard registers as one source in the host
 `KeyboardRouter` (`libCerfCore/include/cerfcore/host/keyboard_router.h`, `libCerfCore/src/host/keyboard_router.cpp`) with the highest source
 priority. It becomes the active source only after it reports `SourceReady`.
-The router is board-agnostic host input and is not itself part of guest
-additions - see `subsystems.md`.
 
 **Both guest-additions input sources report `SourceReady` from
 `CerfGuestLiveness`.** That liveness turns true when the guest first reads the
 `CerfVirtGuestBody` window. Until then the routers keep the stock devices,
 which board firmware reads directly. The Jornada 820 OEM cold-boot
 confirmation screen needs them.
-
-A guest reset clears the liveness and re-arms both routers. A deep-sleep resume
-does not. The liveness is hibernation state and round-trips through
-`CerfVirtGuestBody`.
 
 A guest reset clears the liveness and re-arms both routers, so the next
 firmware phase gets the stock devices again. A deep-sleep resume does not,
@@ -458,13 +441,9 @@ round-trips through `CerfVirtGuestBody`.
 
 The guest-additions mouse registers the same way: one source in the host
 `PointerRouter` (`libCerfCore/include/cerfcore/host/pointer_router.h`, `libCerfCore/src/host/pointer_router.cpp`) at the highest source
-priority, gated by the same readiness. The `PointerWidget` switches it for the
-stock pointer or pointers of the board. That switch is necessary because some
-apps (for example calibrators) read the stock touch/mouse stream directly. On a
-board whose stock
-pointer is a relative mouse, the host-capture mouse lock engages only while
-that source is active. Router and widget are board-agnostic host input, not
-part of guest additions - see `subsystems.md`.
+priority, gated by the same readiness. The user can switch it for the stock
+pointer or pointers of the board. That switch is necessary because some apps
+(for example calibrators) read the stock touch/mouse stream directly.
 
 ## Task manager - host UI + cerf_virt channel + guest pump
 
@@ -478,9 +457,8 @@ executables. It has three pieces:
   bump. The guest answers with response regs plus a kick. LIST rows stream
   guest→host one record at a time through a register window.
 - The host window (`cerf-qt/desktop/qt_task_manager_window.cpp`,
-  `cerf-qt/qml/TaskManagerWindow.qml`), which implements the `TaskManagerView` seam. The Guest Additions widget
-  (`libCerfCore/src/host/guest_additions_widget.{h,cpp}`, pinned in the terminal
-  range of the status bar) opens it.
+  `cerf-qt/qml/TaskManagerWindow.qml`). The Guest Additions bar widget of cerf-qt
+  (`cerf-qt/guest_additions_bar_widgets.cpp`) opens it.
 - The guest-side pump `ce_apps/cerf_guest/cerf_task_manager_pump.cpp`.
 
 Channel-design rules that bind every future `cerf_virt` channel:

@@ -4,7 +4,6 @@
 #include "../frontend_window.h"
 #include "../host_key_binding.h"
 #include "../hud_selection.h"
-#include "../input_capture.h"
 #include "../link_opener.h"
 #include "../live_property_sheet.h"
 #include "../product_links.h"
@@ -13,7 +12,7 @@
 #include "../screenshots.h"
 #include "../tab_menu.h"
 #include "../view_rotation.h"
-#include "../widget_menu_builder.h"
+#include "../bar_widgets_menu.h"
 #include "../yes_no_prompt.h"
 #include "../qt_emulator_window.h"
 #include "../native_menu_bar.h"
@@ -21,12 +20,14 @@
 #include "qt_manager_window_opener.h"
 
 #include <cerfcore/boards/board_context.h>
+#include <cerfcore/boot/guest_cold_boot.h>
 #include <cerfcore/core/cerf_emulator.h>
 #include <cerfcore/core/product_name.h>
 #include <cerfcore/host/auto_calibration.h>
 #include <cerfcore/host/emulation_pause.h>
+#include <cerfcore/host/keyboard_router.h>
+#include <cerfcore/socs/guest_cpu_reset.h>
 #include <cerfcore/state/hibernation.h>
-#include <cerfcore/state/shutdown_action.h>
 
 #include <functional>
 #include <string>
@@ -67,8 +68,8 @@ void HostMenuModel::ConfirmHardReset() {
     if (emu_.Get<YesNoPrompt>().Ask("Hard reset - " CERF_PRODUCT_NAME,
                                     "Hard reset clears all guest RAM.\nUnsaved guest data and the object store are "
                                     "lost.\n\nContinue?",
-                                    YesNoLevel::kWarning, YesNoEnter::kNo) == cerfcore::PromptAnswer::kYes)
-        emu_.Get<cerfcore::ShutdownAction>().Perform(cerfcore::ShutdownChoice::HardReset);
+                                    YesNoLevel::kWarning, YesNoEnter::kNo) == PromptAnswer::kYes)
+        emu_.Get<cerfcore::GuestColdBoot>().RequestHardResetFromHost();
 }
 
 std::vector<MenuItem> HostMenuModel::Actions() {
@@ -84,15 +85,14 @@ std::vector<MenuItem> HostMenuModel::Actions() {
     toggle.enabled = pause.UserCanToggle();
     items.push_back(std::move(toggle));
     items.push_back(MenuItem::Action("Send Ctrl+Alt+Del\t" + key.LabelWith("Del"),
-                                     [this] { emu_.Get<InputCapture>().SendCtrlAltDel(); }));
+                                     [this] { emu_.Get<cerfcore::KeyboardRouter>().SendCtrlAltDel(); }));
     if (emu_.Get<cerfcore::AutoCalibration>().CanPress())
         items.push_back(MenuItem::Action("Calibrate screen", [this] {
             emu_.Get<cerfcore::AutoCalibration>().Request(cerfcore::CalibrationTrigger::kMenu);
         }));
     items.push_back(MenuItem{});
-    items.push_back(MenuItem::Action("Soft reset", [this] {
-        emu_.Get<cerfcore::ShutdownAction>().Perform(cerfcore::ShutdownChoice::SoftReset);
-    }));
+    items.push_back(
+        MenuItem::Action("Soft reset", [this] { emu_.Get<cerfcore::GuestCpuReset>().WarmResetFromHost(); }));
     items.push_back(MenuItem::Action("Hard reset…", [this] { ConfirmHardReset(); }));
     items.push_back(MenuItem{});
     MenuItem settings = MenuItem::Action("Settings…", [this] {
@@ -101,7 +101,7 @@ std::vector<MenuItem> HostMenuModel::Actions() {
     settings.role     = MenuRole::kSettings;
     items.push_back(std::move(settings));
     items.push_back(MenuItem{});
-    for (MenuItem& widget : emu_.Get<WidgetMenuBuilder>().BuildAllWidgets())
+    for (MenuItem& widget : emu_.Get<BarWidgetsMenu>().Build())
         items.push_back(std::move(widget));
     return items;
 }

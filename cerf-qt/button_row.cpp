@@ -2,7 +2,7 @@
 
 #include "canvas_input.h"
 #include "host_key_name.h"
-#include "host_virtual_keys.h"
+#include <cerfcore/host/virtual_keys.h>
 #include "pc_key_legend.h"
 
 #include <cerfcore/core/cerf_emulator.h>
@@ -15,12 +15,12 @@ REGISTER_SERVICE(ButtonRow);
 
 namespace {
 
-bool IsArrow(uint8_t vk) { return vk == kVkLeft || vk == kVkUp || vk == kVkRight || vk == kVkDown; }
+bool IsArrow(uint8_t vk) { return vk == cerfcore::kVkLeft || vk == cerfcore::kVkUp || vk == cerfcore::kVkRight || vk == cerfcore::kVkDown; }
 
 }
 
 bool ButtonRow::Shown(const cerfcore::SpecialKey& key) const {
-    if (!keys_shown_ || key.vk == kVkReturn) return false;
+    if (!keys_shown_ || key.vk == cerfcore::kVkReturn) return false;
     if (key.guest_label == nullptr) return true;
     const char* legend = PcKeyLegend(key.vk);
     if (legend != nullptr && SameKeyName(key.guest_label, legend)) return true;

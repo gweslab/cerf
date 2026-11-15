@@ -1,11 +1,11 @@
+#include "bar_widgets.h"
 #include "host_key_binding.h"
 #include "input_capture.h"
 
 #include <cerfcore/core/cerf_emulator.h>
 #include <cerfcore/core/service.h>
-#include <cerfcore/host/host_widget.h>
-#include <cerfcore/host/host_widget_registry.h>
 
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -13,14 +13,12 @@ namespace cerffrontend {
 
 namespace {
 
-class CaptureLockWidget : public cerfcore::Service, public cerfcore::HostWidget {
+class CaptureLockWidget final : public BarWidget {
 public:
-    using cerfcore::Service::Service;
+    explicit CaptureLockWidget(cerfcore::CerfEmulator& emu) : emu_(emu) {}
 
-    void OnReady() override { emu_.Get<cerfcore::HostWidgetRegistry>().Register(this); }
-
-    std::string           WidgetName() const override { return "Input Capture"; }
-    cerfcore::WidgetGroup Group() const override { return cerfcore::WidgetGroup::InputCapture; }
+    std::string Name() const override { return "Input Capture"; }
+    BarGroup    Group() const override { return BarGroup::InputCapture; }
 
     std::string Tooltip() const override {
         const std::string key = emu_.Get<HostKeyBinding>().Label();
@@ -29,38 +27,33 @@ public:
                    : "Input free - " + key + " (or click) to capture (Alt+Tab etc. -> guest)";
     }
 
-    bool TryPrimaryAction() override {
+    bool PrimaryClick() override {
         emu_.Get<InputCapture>().Toggle();
         return true;
     }
 
-    std::vector<cerfcore::WidgetControl> Controls() override {
-        const std::string     key = emu_.Get<HostKeyBinding>().Label();
-        cerfcore::ActionControl it;
-        it.id    = "toggle_capture";
-        it.label = emu_.Get<InputCapture>().IsCaptured() ? "Release input capture\t" + key
-                                                         : "Capture input\t" + key;
-        it.press = [this] { emu_.Get<InputCapture>().Toggle(); };
-        return {cerfcore::WidgetControl{std::move(it)}};
+    std::vector<MenuItem> Menu() override {
+        const std::string key = emu_.Get<HostKeyBinding>().Label();
+        return {MenuItem::Action(emu_.Get<InputCapture>().IsCaptured() ? "Release input capture\t" + key
+                                                                       : "Capture input\t" + key,
+                                 [this] { emu_.Get<InputCapture>().Toggle(); })};
     }
 
-    cerfcore::WidgetIcon Icon() const override {
-        return cerfcore::ResourceIcon{emu_.Get<InputCapture>().IsCaptured() ? "lock_on" : "lock_off"};
-    }
-
-    bool PollDirty() override {
-        const bool cap = emu_.Get<InputCapture>().IsCaptured();
-        if (cap == last_drawn_cap_) return false;
-        last_drawn_cap_ = cap;
-        return true;
-    }
+    BarIcon Icon() const override { return ResourceIcon{emu_.Get<InputCapture>().IsCaptured() ? "lock_on" : "lock_off"}; }
 
 private:
-    bool last_drawn_cap_ = false;
+    cerfcore::CerfEmulator& emu_;
+};
+
+class CaptureLockWidgetSource : public cerfcore::Service {
+public:
+    using cerfcore::Service::Service;
+
+    void OnReady() override { emu_.Get<BarWidgets>().Add(std::make_unique<CaptureLockWidget>(emu_)); }
 };
 
 }
 
-REGISTER_SERVICE(CaptureLockWidget);
+REGISTER_SERVICE(CaptureLockWidgetSource);
 
 }

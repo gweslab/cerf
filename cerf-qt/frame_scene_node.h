@@ -45,12 +45,10 @@ private:
     QSGRectangleNode* fill_       = nullptr;
     QSGClipNode*      clip_       = nullptr;
     QSGRectangleNode* background_ = nullptr;
-    QSGNode*          alt_slot_   = nullptr;
     QSGTransformNode* turn_       = nullptr;
     QSGNode*          shader_slot_ = nullptr;
     QSGNode*          glow_slot_  = nullptr;
     QSGNode*          frame_slot_ = nullptr;
-    QSGNode*          overlay_slot_ = nullptr;
     ShaderChainNode*  shader_      = nullptr;
     uint64_t          glow_generation_   = 0;
     uint64_t          shader_generation_ = 0;

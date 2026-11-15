@@ -1,7 +1,7 @@
 #include "surface_cursor.h"
 
-#include "guest_canvas_turn.h"
 #include "qt_guest_cursor_cache.h"
+#include "view_rotation.h"
 #include "viewport_layout.h"
 
 #include <cerfcore/core/cerf_emulator.h>
@@ -17,21 +17,19 @@ bool SurfaceCursor::Shown(cerfcore::CerfEmulator& emu, const View& view) {
     return view.active_kind != cerfcore::PointerKind::Absolute || !guest.Refresh() || guest.Drawable();
 }
 
-void SurfaceCursor::Paint(cerfcore::CerfEmulator& emu, QPainter& painter, const View& view) {
+CursorPicture SurfaceCursor::Picture(cerfcore::CerfEmulator& emu, const View& view) {
+    if (!Shown(emu, view)) return {};
     int press_x = 0, press_y = 0;
     if (emu.Get<cerfcore::CalibrationPressCursor>().Point(press_x, press_y)) {
         cerffrontend::FramePoint at;
-        if (view.layout.GuestToHost(press_x, press_y, at)) overlay_.PaintArrow(painter, QPointF(at.x, at.y), view.dpr);
-        return;
+        if (!view.layout.GuestToHost(press_x, press_y, at)) return {};
+        return overlay_.Arrow(QPointF(at.x, at.y));
     }
     auto& guest = emu.Get<QtGuestCursorCache>();
     if (view.active_kind == cerfcore::PointerKind::Absolute && guest.Refresh()) {
-        if (guest.Drawable())
-            overlay_.PaintGuest(
-                painter, guest.Image(), guest.Hotspot(),
-                emu.Get<cerffrontend::GuestCanvasTurn>().LogicalQuarter(view.layout.Presentation().quarter),
-                view.pointer_at, view.dpr, view.guest_scale);
-        return;
+        if (!guest.Drawable()) return {};
+        return overlay_.Guest(guest.Image(), guest.Hotspot(), emu.Get<cerffrontend::ViewRotation>().Quarter(),
+                              view.pointer_at, view.guest_scale);
     }
-    overlay_.PaintArrow(painter, view.pointer_at, view.dpr);
+    return overlay_.Arrow(view.pointer_at);
 }

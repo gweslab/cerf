@@ -6,7 +6,7 @@
 #include "qt_menu_presenter.h"
 
 #include "button_row.h"
-#include "host_virtual_keys.h"
+#include <cerfcore/host/virtual_keys.h>
 #include "hud_selection.h"
 
 #include <cerfcore/core/cerf_emulator.h>
@@ -19,10 +19,10 @@ namespace {
 QString ArrowSymbol(const cerffrontend::RowButton& b) {
     if (b.named) return {};
     switch (b.vk) {
-        case cerffrontend::kVkLeft:  return QStringLiteral("arrow_back");
-        case cerffrontend::kVkUp:    return QStringLiteral("arrow_upward");
-        case cerffrontend::kVkRight: return QStringLiteral("arrow_forward");
-        case cerffrontend::kVkDown:  return QStringLiteral("arrow_downward");
+        case cerfcore::kVkLeft:  return QStringLiteral("arrow_back");
+        case cerfcore::kVkUp:    return QStringLiteral("arrow_upward");
+        case cerfcore::kVkRight: return QStringLiteral("arrow_forward");
+        case cerfcore::kVkDown:  return QStringLiteral("arrow_downward");
         default:                     return {};
     }
 }

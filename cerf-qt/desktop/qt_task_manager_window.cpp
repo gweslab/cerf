@@ -1,4 +1,4 @@
-#include <cerfcore/host/task_manager_view.h>
+#include "../task_manager_view.h"
 
 #include "qt_focus_policy.h"
 #include "task_manager_controller.h"
@@ -14,9 +14,9 @@
 
 namespace {
 
-class QtTaskManagerWindow : public cerfcore::TaskManagerView {
+class QtTaskManagerWindow : public cerffrontend::TaskManagerView {
 public:
-    using cerfcore::TaskManagerView::TaskManagerView;
+    using cerffrontend::TaskManagerView::TaskManagerView;
 
     bool ShouldRegister() override { return emu_.Get<cerfcore::DeviceConfig>().guest_additions; }
 
@@ -39,4 +39,4 @@ private:
 
 }
 
-REGISTER_SERVICE_AS(QtTaskManagerWindow, cerfcore::TaskManagerView);
+REGISTER_SERVICE_AS(QtTaskManagerWindow, cerffrontend::TaskManagerView);

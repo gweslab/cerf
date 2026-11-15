@@ -7,8 +7,8 @@
 #include "qt_emulator_window.h"
 #include "surface_area_planner.h"
 
+#include "cursor_icon.h"
 #include "hud_controls.h"
-#include "hw_screen_renderer.h"
 #include "qt_resource_paths.h"
 #include "CerfStyle/touch_frontend.h"
 
@@ -18,7 +18,6 @@
 #include <cerfcore/host/pointer_router.h>
 #include <cerfcore/host/pointer_source.h>
 #include <cerfcore/host/refresh_rate_service.h>
-#include <cerfcore/host/relative_mouse_input.h>
 
 #include <QHoverEvent>
 #include <QInputMethodEvent>
@@ -58,6 +57,8 @@ void GuestSurface::Attach(cerfcore::CerfEmulator& emu, uint32_t surf_w, uint32_t
             RefreshRelativePointer();
             text_.RefreshOffer();
             presenter_->UiTick(emu);
+            overlays_.Refresh(emu, presenter_->Layout(), PixelScale(), cursor_.Picture(emu, CursorView()));
+            tab_view_.Refresh(emu, PixelScale());
         });
         update();
     });
@@ -81,23 +82,13 @@ const FrameLayers* GuestSurface::PresentLayers() {
     if (!presenter_) return nullptr;
     const FrameLayers* layers = nullptr;
     gate_.Run([this, &layers](cerfcore::CerfEmulator& emu) {
-        const qreal dpr    = Dpr();
-        const QSize canvas =
-            DeviceCanvasSize(width() - bar_insets_.width(), height() - bar_insets_.height(), PixelScale());
-        layers = &presenter_->Present(emu, emu.Get<cerfcore::FrameRenderer>(), canvas.width(), canvas.height(), dpr);
+        layers = &presenter_->Present(emu, emu.Get<cerfcore::FrameRenderer>());
     });
     return layers;
 }
 
 SurfaceCursor::View GuestSurface::CursorView() const {
-    return {presenter_->Layout(), cursor_mode_, relative_pointer_, ActiveKind(), pointer_.Position(), Dpr(),
-            GuestScale()};
-}
-
-bool GuestSurface::CursorShown(cerfcore::CerfEmulator& emu) { return cursor_.Shown(emu, CursorView()); }
-
-void GuestSurface::PaintCursor(cerfcore::CerfEmulator& emu, QPainter& painter) {
-    cursor_.Paint(emu, painter, CursorView());
+    return {presenter_->Layout(), cursor_mode_, relative_pointer_, ActiveKind(), pointer_.Position(), GuestScale()};
 }
 
 void GuestSurface::SetGuestSurfaceSize(uint32_t w, uint32_t h) {
@@ -179,7 +170,6 @@ void GuestSurface::Relayout() {
     placement_.SetArea(a);
     if (touch_)
         gate_.Run([this, &a](cerfcore::CerfEmulator& emu) {
-            emu.Get<cerffrontend::HwScreenRenderer>().SetTextInsets(a.left, a.top, a.right, a.bottom);
             emu.Get<cerffrontend::HudControls>().SetCanvasArea(
                 cerffrontend::FrameRect{double(a.left), double(a.top), double(a.width - a.left - a.right),
                                         double(a.height - a.top - a.bottom)},
@@ -453,7 +443,7 @@ void GuestSurface::SendRelative(int dx, int dy, uint32_t buttons) {
     const int gx = static_cast<int>(turned.x);
     const int gy = static_cast<int>(turned.y);
     gate_.Run([gx, gy, buttons](cerfcore::CerfEmulator& emu) {
-        emu.Get<cerfcore::RelativeMouseInput>().OnRelativeMove(gx, gy, buttons);
+        emu.Get<cerfcore::PointerRouter>().OnRelativeMove(gx, gy, buttons);
     });
 }
 

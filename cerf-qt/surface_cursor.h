@@ -3,9 +3,6 @@
 #include "pointer_overlay.h"
 
 #include <QPointF>
-#include <QtGlobal>
-
-class QPainter;
 
 namespace cerfcore {
 class CerfEmulator;
@@ -24,13 +21,13 @@ public:
         bool                                relative_pointer;
         cerfcore::PointerKind               active_kind;
         QPointF                             pointer_at;
-        qreal                               dpr;
         double                              guest_scale;
     };
 
-    bool Shown(cerfcore::CerfEmulator& emu, const View& view);
-    void Paint(cerfcore::CerfEmulator& emu, QPainter& painter, const View& view);
+    CursorPicture Picture(cerfcore::CerfEmulator& emu, const View& view);
 
 private:
+    bool Shown(cerfcore::CerfEmulator& emu, const View& view);
+
     PointerOverlay overlay_;
 };

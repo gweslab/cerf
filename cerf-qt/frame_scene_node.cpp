@@ -1,7 +1,6 @@
 #include "frame_scene_node.h"
 
 #include "fresh_sampler_texture.h"
-#include "present_effects.h"
 #include "shader_chain_node.h"
 
 #include <QMatrix4x4>
@@ -25,8 +24,6 @@ FrameSceneNode::FrameSceneNode(QQuickWindow* window) : window_(window) {
     appendChildNode(clip_);
     background_ = window->createRectangleNode();
     clip_->appendChildNode(background_);
-    alt_slot_ = new QSGNode;
-    clip_->appendChildNode(alt_slot_);
     turn_ = new QSGTransformNode;
     clip_->appendChildNode(turn_);
     shader_slot_ = new QSGNode;
@@ -35,8 +32,6 @@ FrameSceneNode::FrameSceneNode(QQuickWindow* window) : window_(window) {
     turn_->appendChildNode(glow_slot_);
     frame_slot_ = new QSGNode;
     turn_->appendChildNode(frame_slot_);
-    overlay_slot_ = new QSGNode;
-    clip_->appendChildNode(overlay_slot_);
 }
 
 void FrameSceneNode::Update(const FrameLayers& layers, const QSizeF& item_size, const QColor& fill, QPointF scale) {
@@ -46,7 +41,6 @@ void FrameSceneNode::Update(const FrameLayers& layers, const QSizeF& item_size, 
     clip_->setClipRect(canvas);
     background_->setRect(canvas);
     background_->setColor(layers.background);
-    ShowImage(alt_slot_, layers.alt, canvas, QSGTexture::Nearest, true);
 
     QMatrix4x4 matrix;
     matrix.scale(1.0 / scale.x(), 1.0 / scale.y());
@@ -65,10 +59,9 @@ void FrameSceneNode::Update(const FrameLayers& layers, const QSizeF& item_size, 
     if (!ShowShaded(layers)) {
         if (layers.capture && layers.capture->Pending()) layers.capture->Finish(ShaderCapture::State::kUnshaded, {});
         SetFrameKind(FrameKind::kImage);
-        ShowImage(frame_slot_, layers.dimmed != nullptr ? layers.dimmed : layers.guest,
-                  QRectF(0, 0, layers.target_w, layers.target_h), QSGTexture::Nearest, true);
+        ShowImage(frame_slot_, layers.guest, QRectF(0, 0, layers.target_w, layers.target_h), QSGTexture::Nearest,
+                  true);
     }
-    ShowImage(overlay_slot_, layers.overlay, canvas, QSGTexture::Nearest, false);
 }
 
 bool FrameSceneNode::ShowShaded(const FrameLayers& layers) {
@@ -92,7 +85,7 @@ bool FrameSceneNode::ShowShaded(const FrameLayers& layers) {
         FailShader(layers, std::move(error));
         return false;
     }
-    if (layers.dimmed != nullptr) return ShowFrozen(layers, target, size);
+    if (layers.frozen) return ShowFrozen(layers, target, size);
     frozen_valid_ = false;
     shader_->SetFrame(*layers.guest);
     if (layers.capture && layers.capture->Pending()) shader_->RequestCapture(layers.capture);
@@ -116,8 +109,6 @@ bool FrameSceneNode::ShowFrozen(const FrameLayers& layers, QSize target, QSize s
         }
         frozen_image_ = QImage(static_cast<int>(frozen_.width), static_cast<int>(frozen_.height), QImage::Format_RGB32);
         std::memcpy(frozen_image_.bits(), frozen_.pixels.data(), frozen_.pixels.size() * sizeof(uint32_t));
-        cerffrontend::PresentEffects::DesaturateAndDim(reinterpret_cast<uint32_t*>(frozen_image_.bits()),
-                                                       static_cast<int>(frozen_.pixels.size()));
         frozen_valid_      = true;
         frozen_size_       = size;
         frozen_parameters_ = shader_parameters_;

@@ -2,7 +2,7 @@
 
 #include "frontend_window.h"
 #include "host_key_binding.h"
-#include "host_virtual_keys.h"
+#include <cerfcore/host/virtual_keys.h>
 
 #include <cerfcore/core/cerf_emulator.h>
 #include <cerfcore/host/emulation_pause.h>
@@ -14,12 +14,12 @@ namespace {
 
 uint32_t NormalizeVk(uint32_t vk) {
     switch (vk) {
-        case kVkLShift:
-        case kVkRShift:   return kVkShift;
-        case kVkLControl:
-        case kVkRControl: return kVkControl;
-        case kVkLMenu:
-        case kVkRMenu:    return kVkMenu;
+        case cerfcore::kVkLShift:
+        case cerfcore::kVkRShift:   return cerfcore::kVkShift;
+        case cerfcore::kVkLControl:
+        case cerfcore::kVkRControl: return cerfcore::kVkControl;
+        case cerfcore::kVkLMenu:
+        case cerfcore::kVkRMenu:    return cerfcore::kVkMenu;
         default:          return vk;
     }
 }
@@ -41,16 +41,6 @@ void InputCapture::OnFocusLost() {
 
 void InputCapture::ForwardToGuest(uint32_t vk, bool key_up) {
     emu_.Get<cerfcore::KeyboardRouter>().OnHostKey(static_cast<uint8_t>(NormalizeVk(vk)), key_up);
-}
-
-void InputCapture::SendCtrlAltDel() {
-    auto& k = emu_.Get<cerfcore::KeyboardRouter>();
-    k.OnHostKey(kVkControl, false);
-    k.OnHostKey(kVkMenu, false);
-    k.OnHostKey(kVkDelete, false);
-    k.OnHostKey(kVkDelete, true);
-    k.OnHostKey(kVkMenu, true);
-    k.OnHostKey(kVkControl, true);
 }
 
 bool InputCapture::OnHostKey(uint32_t vk, bool key_up) {
@@ -86,15 +76,15 @@ bool InputCapture::OnHostKey(uint32_t vk, bool key_up) {
 
     if (host_key_held_ && !key_up) host_key_used_ = true;
 
-    if (host_key_held_ && vk == kVkDelete) {
-        if (!key_up) SendCtrlAltDel();
+    if (host_key_held_ && vk == cerfcore::kVkDelete) {
+        if (!key_up) emu_.Get<cerfcore::KeyboardRouter>().SendCtrlAltDel();
         return true;
     }
-    if (host_key_held_ && vk == kVkP) {
+    if (host_key_held_ && vk == cerfcore::kVkP) {
         if (!key_up) emu_.Get<cerfcore::EmulationPause>().Toggle();
         return true;
     }
-    if (host_key_held_ && vk == kVkF) {
+    if (host_key_held_ && vk == cerfcore::kVkF) {
         if (!key_up) emu_.Get<FrontendWindow>().ToggleFullscreen();
         return true;
     }

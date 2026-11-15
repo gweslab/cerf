@@ -1,20 +1,22 @@
 #pragma once
 
 #include <cerfcore/core/service.h>
+#include <cerfcore/host/host_pointer_event.h>
+#include <cerfcore/host/pointer_source.h>
 
 #include <cstdint>
 
 namespace cerffrontend {
 
 enum class CanvasCursor : uint8_t { kDefault, kHand, kNone, kGuest };
-enum class MouseButton : uint8_t { kNone, kLeft, kRight, kMiddle };
 
-inline constexpr uint32_t kHeldLeft   = 1u << 0;
-inline constexpr uint32_t kHeldRight  = 1u << 1;
-inline constexpr uint32_t kHeldMiddle = 1u << 2;
+using MouseButton = cerfcore::HostButton;
+using cerfcore::kHeldLeft;
+using cerfcore::kHeldMiddle;
+using cerfcore::kHeldRight;
 
 struct CanvasMouse {
-    enum class Kind : uint8_t { kDown, kUp, kMove, kWheel, kCaptureLost };
+    using Kind = cerfcore::HostPointerEvent::Kind;
 
     Kind        kind   = Kind::kMove;
     MouseButton button = MouseButton::kNone;
@@ -59,37 +61,30 @@ public:
     void         RefreshLock();
     void         ReleaseGuestInput();
 
-    static uint32_t ButtonBit(MouseButton b);
-
 private:
-    CanvasInputHost& Host();
-    bool             GuestInputHeld() const;
-    bool             Locked(bool framebuffer) const;
-    void             EnsureLocked();
-    void             Unlock();
-    void             ShowLockHintOnce();
-    void             GuestPoint(const CanvasMouse& m, int& sx, int& sy);
-    void             LiftPen(const CanvasMouse& m, bool release_capture);
-    void             ReleasePointerButtons();
-    void             ReleaseLostButtons(const CanvasMouse& m);
-    static uint32_t  RelativeMask(uint32_t held);
-    static uint32_t  PointerMask(uint32_t held);
+    CanvasInputHost&           Host();
+    bool                       GuestInputHeld() const;
+    bool                       Locked(bool framebuffer) const;
+    void                       EnsureLocked();
+    void                       Unlock();
+    void                       ShowLockHintOnce();
+    cerfcore::HostPointerEvent GuestEvent(const CanvasMouse& m);
+    bool                       Dispatch(const CanvasMouse& event);
+    bool                       RouteGuest(const CanvasMouse& m);
+    bool                       KeepOutsideFramebuffer(const CanvasMouse& m, cerfcore::PointerKind kind);
+    bool                       FocusOnPress(const CanvasMouse& m, bool handled);
+    void                       FollowPress(bool held_before, bool pressing);
 
     bool RouteOverlay(const CanvasMouse& m);
     bool RouteLocked(const CanvasMouse& m);
     void SendRelative(int dx, int dy, uint32_t buttons);
     void RecenterLockedPointer();
     void AnchorAt(const CanvasMouse& m);
-    bool RoutePointer(const CanvasMouse& m, bool framebuffer);
-    bool RouteStylus(const CanvasMouse& m, bool framebuffer);
 
     CanvasInputHost* host_                = nullptr;
-    bool             pen_down_            = false;
     bool             mouse_locked_active_ = false;
     bool             native_lock_         = false;
     bool             lock_hint_shown_     = false;
-    uint32_t         pointer_buttons_     = 0;
-    uint32_t         relative_buttons_    = 0;
     bool             relative_anchored_   = false;
     int              relative_last_x_     = 0;
     int              relative_last_y_     = 0;

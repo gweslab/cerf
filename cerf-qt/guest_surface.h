@@ -1,11 +1,13 @@
 #pragma once
 
+#include "canvas_tab_view.h"
 #include "qt_emulator_view.h"
 #include "qt_frame_presenter.h"
 #include "gesture_pointer.h"
 #include "relative_mouse_relay.h"
 #include "surface_cursor.h"
 #include "surface_host_pointer.h"
+#include "surface_overlays.h"
 #include "surface_scroll.h"
 #include "surface_text_input.h"
 #include "surface_touch_host.h"
@@ -47,6 +49,8 @@ class GuestSurface : public FrameViewItem,
     Q_PROPERTY(bool keyboardRequested READ KeyboardRequested NOTIFY keyboardRequestedChanged)
     Q_PROPERTY(SurfaceScroll* scroll READ Scroll CONSTANT)
     Q_PROPERTY(QSizeF barInsets READ BarInsets WRITE SetBarInsets NOTIFY barInsetsChanged)
+    Q_PROPERTY(SurfaceOverlays* overlays READ Overlays CONSTANT)
+    Q_PROPERTY(CanvasTabView* tabView READ TabView CONSTANT)
 
 public:
     explicit GuestSurface(QQuickItem* parent = nullptr);
@@ -55,8 +59,8 @@ public:
     void Attach(cerfcore::CerfEmulator& emu, uint32_t surf_w, uint32_t surf_h);
     void Detach();
 
-    bool                          CursorShown(cerfcore::CerfEmulator& emu) override;
-    void                          PaintCursor(cerfcore::CerfEmulator& emu, QPainter& painter) override;
+    SurfaceOverlays*              Overlays() { return &overlays_; }
+    CanvasTabView*                TabView() { return &tab_view_; }
     void                          SetGuestSurfaceSize(uint32_t w, uint32_t h) override;
     void                          SetPresentation(const cerffrontend::ViewPresentation& presentation) override;
     uint32_t                      GuestSurfaceWidth() const override;
@@ -173,6 +177,8 @@ private:
     SurfaceTextInput                   text_{*this, gate_};
     ViewPlacement                      placement_;
     SurfaceCursor                      cursor_;
+    SurfaceOverlays                    overlays_;
+    CanvasTabView                      tab_view_;
     QMarginsF                          safe_margins_;
     QSizeF                             bar_insets_;
     bool                               cursor_mode_      = false;

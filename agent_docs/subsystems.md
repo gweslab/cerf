@@ -18,15 +18,34 @@ CERF splits into libraries and frontends:
 
 The core never includes frontend code. A frontend includes only public core
 headers. When the core needs an action or an answer from the frontend, it
-declares a seam service, for example `UserAlert` or `DeviceSelection`. A seam
-is required unless the core resolves it with `TryGet<T>()`.
+declares a seam service, for example `UserAlert` or `DeviceSelection`.
 
 **A frontend is one interaction seam among many. libCerfCore owns every behavior
 that reads or drives the guest.** Examples are an analysis of the guest
 framebuffer, a sequence of guest input, and the timers and the state of such a
-feature. A frontend starts that behavior, shows it, and answers the questions
-that the core asks through a seam. When another frontend must copy code to offer
-the same feature, that code belongs in a library.
+feature. A frontend starts that behavior and shows it. When another frontend must
+copy code to offer the same feature, that code belongs in a library.
+
+**libCerfCore gives levers, typed state and events. A frontend decides how it
+presents them.** The core never gives a menu, the label of a control, an icon, a
+tooltip, a dialog or a layout.
+
+**A guest event goes to the frontend as an event, never as a question.** The
+frontend decides what it shows. It acts through core functions that work at any
+time.
+
+A core procedure that needs the decision of a person calls an abstract function of
+its seam, for example `CalibrationHost::ApprovesCalibration`. The frontend owns the
+words and the form of that decision. A question object that carries texts or text
+ids is not such a function.
+
+**Check every output of the core against three frontends:** cerf-qt, a 3D game,
+and a factory automation with no screen. Each one must react to the output
+without parsing English text.
+
+**Text from the core to a person goes only through `NotificationStack` and
+`UserAlert`.** The names of machine objects, input sources and card types are the
+only other texts that the core gives a frontend.
 
 The core receives host input as events with their real timing and order. Some
 host platforms, input devices or UI toolkits do not report the full timing. For
@@ -44,32 +63,26 @@ state are forbidden.
 
 ### Service locator mechanics
 
-- **Registration is one macro line per `.cpp`**: `REGISTER_SERVICE(Foo)`
-  (resolvable only as `Foo`), `REGISTER_SERVICE_AS(Foo, Base)` (a candidate
-  for the `Base` slot, also resolvable as `Foo` - the strategy pattern),
-  `REGISTER_SERVICE_AS_FALLBACK(Foo, Base)` (wins only if `ShouldRegister`
-  returned true for no non-fallback candidate). Boot then constructs every
-  candidate. Boot runs the `ShouldRegister` of each slot to pick the single
+- **Registration is one macro line per `.cpp`.** `REGISTER_SERVICE(Foo)`
+  makes `Foo` resolvable only as `Foo`. `REGISTER_SERVICE_AS(Foo, Base)` makes
+  `Foo` a candidate for the `Base` slot, also resolvable as `Foo` (the strategy
+  pattern). `REGISTER_SERVICE_AS_FALLBACK(Foo, Base)` wins only if
+  `ShouldRegister` returned true for no non-fallback candidate. Boot then
+  constructs every candidate. Boot runs the `ShouldRegister` of each slot to pick the single
   winner. Boot then calls `EnsureReady` on **every** winner.
 - **The `OnReady` of every winning service runs exactly once**, at boot. It
-  runs whether or not anything ever calls `Get<>` for it. The boot sweep
-  calls `EnsureReady` on all winners. A service that only connects itself
-  (registers MMIO, starts a worker) still initializes with no external
-  caller. `OnReady` is also lazy. A first `Get<Dep>()` from inside your
-  `OnReady` runs `Dep::OnReady` before it returns, so the graph self-orders
-  on demand. Both paths guard with a mutex, so `OnReady` never runs twice.
-  There is no init phase, no declared order, and no pre-warm step. A bare
-  `(void)emu_.Get<X>()` to force materialization is forbidden (`rules.md`).
+  runs whether or not anything ever calls `Get<>` for it. `OnReady` is also
+  lazy. A first `Get<Dep>()` from inside your `OnReady` runs `Dep::OnReady`
+  before it returns, so the graph self-orders on demand. Both paths guard
+  with a mutex, so `OnReady` never runs twice. There is no init phase, no
+  declared order, and no pre-warm step.
 - **If no candidate won the slot, `Get<T>()` is fatal.** **`TryGet<T>()`**
-  returns `nullptr` for an optional dependency. Both resolve lazily and call
-  `EnsureReady`.
+  returns `nullptr` for an optional dependency.
 - **Misuse halts the instance with the types named**: two `ShouldRegister`
   true for one Base, a required slot with no winner, or a
   `ShouldRegister`↔`Get` cycle. You need no defensive check around `Get<>`.
-  A derived locator handles the misuse in its `RaiseLocatorError`, at the
-  failing call, so the crash report holds the stack of that call.
 - **`ShouldRegister()`** can call `Get<>`/`TryGet<>` through the same lazy
-  path. The idiom is `emu_.Get<BoardContext>().GetSocId() == SocId::X`.
+  path.
 - **`Get<Foo>()` resolves the `Base` slot first when
   `REGISTER_SERVICE_AS(Foo, Base)` registers `Foo`.**
 - **Any thread can call `Get<>` at any time.** A thread that needs a slot
@@ -99,6 +112,8 @@ state are forbidden.
   on the boot thread. A thread that asks for a service that is not ready yet
   runs its setup beside the boot sweep. Two setups that touch the same state
   then race. Resolve every service that the thread uses before you start it.
+  A thread that a `JitRunner` pre-start hook starts runs after the readiness
+  sweep, so it finds every service ready.
 - **The locator is the `libservicelocator` submodule.**
 
 - `libCerfCore/include/cerfcore/core/cerf_emulator.h`, `libCerfCore/include/cerfcore/core/service.h`,
@@ -209,6 +224,40 @@ carve-out do not change that.
 
 - `libCerfCore/src/socs/`, `libCerfCore/src/boards/`, `libCerfCore/src/peripherals/`
 
+## Machine objects
+
+libCerfCore describes the devices of the machine as machine objects. A frontend
+discovers them in `MachineObjectTree`.
+
+**A machine object describes what the device is and what a person can do with
+it.** It has no primary click, no grayed state, no order on a bar and no group.
+
+**An object id is a fixed name, never the display name of the object.** The
+saved state of the object uses the ids of the object and of its parents as its
+key.
+
+**A machine object enters `MachineObjectTree` at setup, never on a guest
+event.** A restore refuses a saved state whose objects differ from the live
+tree.
+
+**A command that needs input from a person asks for it through
+`MachineRequests`.**
+
+**A device failure is a failure event with a reason id, never a message box or a
+notification.**
+
+**A machine object publishes `kChanged` when its state changes.** The code that
+changes the state publishes the event.
+
+**The owner of a device is its machine object.** A wrapper class that only
+forwards to the owner is a middle man.
+
+**A card that drives a display gives a frame source to `ExternalDisplays` and
+opens no window.**
+
+- `libCerfCore/include/cerfcore/host/machine_object*.h`, `machine_socket.h`,
+  `machine_requests.h`, `external_displays.h`, `libCerfCore/src/host/machine_object_tree.cpp`
+
 ## PCMCIA
 
 16-bit PC Card emulation, split framework/controller/card:
@@ -216,11 +265,7 @@ carve-out do not change that.
 - **`PcmciaCard`** (`libCerfCore/src/peripherals/pcmcia/pcmcia_card.h`) - the abstract
   card. Cards are plain objects (NOT Services).
   `PcmciaCardCatalog::Create()` creates a card, and its slot owns it. One
-  type can occupy two slots at once. Concretes:
-  `libCerfCore/src/peripherals/realtek_rtl8019/` (NE2000 NIC),
-  `libCerfCore/src/peripherals/compactflash/` (PC Card ATA + FAT32 image builder +
-  insert entry), `libCerfCore/src/peripherals/serial_pccard/` (16550 serial /
-  modem card - the PC-card consumer of the Serial stack on this page).
+  type can occupy two slots at once.
 
   **A card releases its pins in `PowerOff` / `OnShutdown`, NEVER in a
   destructor.** Nothing ejects a card at shutdown. The card dies inside the
@@ -231,10 +276,8 @@ carve-out do not change that.
   host or network thread gates its interrupt on power. If it does not, it
   strands a line on a socket that it already left.
 - **`PcmciaSlot`** (`pcmcia_slot.{h,cpp}`) - one physical socket. It owns
-  card lifetime and bus serialization. It IS the HostWidget, and it exposes
-  the socket as one slot control. The controller that owns the
-  slot implements **`PcmciaSlotHost`** (card-detect / IRQ callbacks) and
-  routes guest accesses to the Read/Write surface of the slot.
+  card lifetime and bus serialization. It IS the `MachineSocket` of the
+  socket.
 
   **Card-detect and Vcc (`HasCard` / `IsPowered`) are lock-free reads of
   an atomic pin word, published under the bus lock - keep them that way.**
@@ -243,6 +286,12 @@ carve-out do not change that.
   accessor that took the bus lock closes an AB-BA against the UI thread.
   Every other slot entry point is a bus transaction, and a host calls it
   with its own lock released.
+
+  **A card that a host inserts after an eject goes in only after 1500 ms of
+  guest time.** A guest that compares card-detect states misses a card change
+  when it never reads the empty socket. The empty socket must therefore last
+  in guest time, also through a pause. `PcmciaSwapGap` holds the card until
+  then.
 - **`PcmciaCardCatalog`** (`pcmcia_card_catalog.{h,cpp}`) - the
   registry of insertable card types. A new card type is one `PcmciaCard`
   subclass plus one catalog entry.
@@ -253,50 +302,39 @@ carve-out do not change that.
 
 To wire a new board, write a socket controller in the proper tree
 (chip/board/vendor-part). That controller owns `PcmciaSlot` instances,
-implements `PcmciaSlotHost`, registers the slots with `HostWidgetRegistry`,
-and drives `SetPowered` from its power register. For examples, see
-`cirrus_pd6710/` (DevEmu), `intel_sa1111/sa1111_pcmcia.cpp` (Jornada),
-`compaq_ipaq_h3000_pcmcia_sleeve.cpp`, `askey_pc3xx_pcmcia.cpp`.
+implements `PcmciaSlotHost` (card-detect / IRQ callbacks), adds the slots to
+`MachineObjectTree`, and drives `SetPowered` from its power register.
 
 - `libCerfCore/src/peripherals/pcmcia/`
 
 ## Serial
 
-The serial stack that any UART can use. The same endpoints serve an
-on-SoC UART and a serial PC card. A board therefore gains ActiveSync /
-dial-up through one interface. The stack splits into line and personality:
+Any UART can use the serial stack. The same endpoints serve an
+on-SoC UART and a serial PC card. The stack splits into line and personality:
 
 - **`SerialLine`** (`libCerfCore/src/peripherals/serial/serial_line.h`) - the abstract
-  UART surface that an endpoint drives: push RX, read the line configuration
-  of the guest (baud/framing), raise modem-status inputs, drain callbacks.
-  Concretes: **`Serial16550`** (the PC16550D model that the `ser16550`
-  MDD/PDD of the ROM drives unmodified) and any SoC UART peripheral that
-  implements it.
+  UART surface that an endpoint drives.
 - **`SerialEndpoint`** (`serial_endpoint.h`) - the "personality" behind a
-  line. It consumes guest TX, reacts to DTR/RTS, and pushes RX and modem
-  status back. Concretes: **`HostSerialForward`** (bridges to a real host
-  COM port - overlapped I/O, baud-faithful TX pacing) and
-  **`ModemPersonality`** (AT command set -> **`PppTerminator`** ->
-  libslirp). There is one endpoint per attach point, owned by whatever
-  holds the line.
-- **`SerialCradle`** (`serial_cradle.{h,cpp}`) - the HostWidget for an
-  on-SoC UART. It mirrors the insert/eject flow of `PcmciaSlot` and shares
-  its insert entries. A modem attached to the serial port of a board therefore
-  looks like an inserted card. The `SerialEndpointPort` of the line owns it.
-  It is not a Service.
+  line.
+- **`SerialCradle`** (`serial_cradle.{h,cpp}`) - the `MachineSocket` of an
+  on-SoC UART, the same socket type as `PcmciaSlot` with other insertable
+  types.
+
+  **A failed host port ejects its attachment through `DeferredJobs`.** The
+  failure of `HostSerialForward` can arrive under the lock of the cradle or of
+  the slot bus, so a direct eject deadlocks. `DeferredJobs::Post` runs the
+  eject on a host thread, also during a pause. Such a job
+  changes guest state only inside `EmulationFreeze::WorkerSection`.
 - **`SerialEndpointPort`** (`libCerfCore/src/peripherals/serial/serial_endpoint_port.{h,cpp}`) -
-  the one owner of the endpoint side of a serial line. It holds the endpoint
-  and its callbacks, the cradle, and their save and restore. Every
-  `SerialLine` that holds an endpoint uses it. The port arms the endpoint
-  timer of its line through `SerialLineTimer`. `SerialDeviceClockTimer` is that timer
-  on `ExternalDeviceClock`. A PC card takes the card timer of its slot.
+  the one owner of the endpoint side of a serial line.
 - `libCerfCore/src/peripherals/serial_pccard/` holds ONLY the PC-card consumer. The
   framework named here is board-neutral and lives in
   `libCerfCore/src/peripherals/serial/`.
 
 To wire the stock UART of a board, implement `SerialLine` on the UART
-peripheral (RX path + an RX interrupt + baud from its divisor + modem
-status on whatever pins the board wires). Attach the endpoint and the cradle
+peripheral. The implementation needs the RX path, an RX interrupt, the baud
+from the divisor, and the modem status on the pins that the board wires.
+Attach the endpoint and the cradle
 through `SerialEndpointPort`. Supply a
 per-board seam that names the modem pins. Take those pin numbers from the
 serial driver of the board. Never guess them.
@@ -316,6 +354,27 @@ CERF sends a report with more motion than one packet carries as several packets
 in the same sample. Because of this, stream mode loses no host motion.
 
 - `libCerfCore/src/peripherals/ps2_mouse/`
+
+## Audio
+
+A consumer receives each guest audio stream through an `AudioOutputs` service. It
+feeds each guest microphone through an `AudioInputs` service.
+
+**An `AudioOutputDevice` reports each submitted block as consumed exactly once,
+also when it closes or drops its blocks.** The bytes of a block stay valid until
+that report. `Submit` returns false on a device that lost its stream. The device
+does not keep that block. The core then closes the device.
+
+**An `AudioInputDevice` calls `Captured` only between `Open` and the return of
+`Close`.**
+
+The core never calls two methods of one device at the same time. The core never
+calls `Open` on the guest CPU thread, so `Open` can block.
+
+- `libCerfCore/include/cerfcore/host/audio_outputs.h`, `audio_inputs.h`,
+  `libCerfCore/src/host/wave_out_sink.cpp`, `wave_in_fifo.cpp`,
+  `cerf-qt/desktop/host_audio_outputs_*`, `host_audio_inputs_*`,
+  `cerf-qt/android/android_audio_outputs.cpp`, `android_audio_inputs.cpp`
 
 ## CPU reset & cold boot
 
@@ -381,21 +440,9 @@ same ROM, from the image in place of the wipe.
 ## Host window & presentation
 
 This section covers the emulator window of a frontend, its drawable area, and
-the render and input plumbing that connects the host UI to the guest. All are
-`Service`s. The
-renderer, touch, and keyboard pieces are abstract bases with
-per-SoC/per-board concretes (strategy pattern, selected by `BoardContext`).
+the render and input plumbing that connects the host UI to the guest.
 
-- **`FrontendWindow`** - the emulator window seam of cerf-qt. It
-  switches the canvas tab, follows the guest size, and runs jobs on the UI
-  thread. `Tab` is an alias of the core `CanvasTab` enum,
-  so core configuration can name the startup tab with no dependency on the
-  host layer. Its guest-surface dimensions are atomic, so any thread can read
-  them. The SoC LCD service calls
-  `HostPresentation::PanelEnabled()` on the guest panel-enable edge, and
-  `FrontendHostPresentation` forwards it to `FrontendWindow::OnLcdEnabled()`.
-  The call carries no dimensions. The call tells the frontend to read the
-  new size from `FrameRenderer::PresentedSize`.
+- **`FrontendWindow`** - the emulator window seam of cerf-qt.
 
   The emulator window is a service of its own type. Frontend code resolves the
   window by that type. A private subclass of `FrontendWindowAdapter` fills
@@ -403,8 +450,6 @@ per-SoC/per-board concretes (strategy pattern, selected by `BoardContext`).
   service.
 
   `EmulatorWindowHost` holds what the host decides about the emulator window.
-  The desktop shows a normal window and sizes it to the guest. Android shows the
-  window in full screen.
 
   The chrome of a window is the frame and the bars around its content. **A fit
   takes the chrome from the frame margins and from the bar height that the window
@@ -462,8 +507,7 @@ per-SoC/per-board concretes (strategy pattern, selected by `BoardContext`).
 - **The canvas** - the drawable area of the emulator window. It implements
   `CanvasInputHost` and owns the one transform from host pixels to
   guest-surface coordinates (`HostToGuest`). As a result, taps land on the
-  rendered image. On the first presented guest frame, `CanvasTabs` switches
-  to the framebuffer tab, unless the user already picked a tab.
+  rendered image.
 
   On Android, the canvas turns touch into pen and pointer gestures. On the
   desktop, touch reaches the canvas as mouse input.
@@ -541,104 +585,76 @@ per-SoC/per-board concretes (strategy pattern, selected by `BoardContext`).
   `beginExternalCommands` and `endExternalCommands`.** The live chain renders in
   `QSGRenderNode::prepare`. The frozen frame of a paused device renders while the
   scene graph syncs. CERF drops a chain that fails to build or render, and the
-  frame shows without shaders. `ShaderSelection` logs the error and posts an error
-  card.
+  frame shows without shaders.
   - `cerf-qt/shader_selection.{h,cpp}`, `cerf-qt/shader_runtime*`,
     `cerf-qt/shader_chain_node.{h,cpp}`, `cerf-qt/shader_library.{h,cpp}`,
     `tools/librashader_library.py`, `tools/librashader_patch/`
 
-- **`FrameRenderer`** (abstract) - one producer of guest frames.
-  `RenderInto(dib_bgra32, w, h)` fills a BGRA32 surface. `PresentedSize(w, h)`
-  gives the extent of the image that this producer renders. The extent is
-  already in presented orientation, so a renderer that rotates the image
-  reports the swapped extent.
+- **`FrameRenderer`** (abstract) - one producer of guest frames. The extent
+  that `PresentedSize` gives is already in presented orientation, so a renderer
+  that rotates the image reports the swapped extent.
 
-  **`PresentedSize` is the only authority on the panel-enable edge.**
-  `HostPresentation::PanelEnabled()` carries no dimensions. The frontend posts
-  it to the UI thread, and the UI thread reads the size through `PresentedSize`. A
-  peripheral must never pass its own dimensions to the host. A renderer can
-  draw at a different extent than the panel timing. If a peripheral passes its
-  own dimensions, the window size disagrees with the image.
+  **`PresentedSize` is the only authority on the panel-enable edge.** The
+  frontend posts the edge to the UI thread, and the UI thread reads the size
+  through `PresentedSize`. A peripheral must never pass its own dimensions to
+  the host. A renderer can draw at a different extent than the panel timing. If
+  a peripheral passes its own dimensions, the window size disagrees with the
+  image.
 
   The size read stays on the UI thread by construction. A publisher usually
   reaches `PanelEnabled()` with its own peripheral lock held, and
   `PresentedSize` goes back into that same peripheral. A read on the
-  publishing thread therefore re-locks a non-recursive mutex. That wedges the
-  JIT thread and the UI thread together.
+  publishing thread therefore re-locks a non-recursive mutex. The JIT thread
+  and the UI thread then block each other.
 
   `PresentedSize` is not the only source of the guest-surface size.
-  `FrontendWindow::SetGuestSurfaceSize` is the single entry point, and the
-  panel-enable edge is only one of its callers. A guest re-mode, the
-  resolution dialog and a state restore also set the size. A restore installs
-  the size from the state image, which `PresentedSize` never produced.
+  `FrontendWindow::SetGuestSurfaceSize` is the single entry point. A restore
+  installs the size from the state image, which `PresentedSize` never produced.
 
-  Three slots build on this base:
+  These slots build on this base:
 
   - **`PanelFrameRenderer`** - the physical panel scanout of the board. Every
     hardware renderer registers here. Its `ShouldRegister` gates on hardware
     presence only (board, SoC or part). It never gates on guest additions.
-    Concretes live with the hardware that produces the frame: per-SoC
-    LCD/DSS/IPU renderers under `libCerfCore/src/socs/<chip>/`, board renderers under
-    `libCerfCore/src/boards/<family>/`, off-chip display parts under
-    `libCerfCore/src/peripherals/<vendor>_<part>/`.
   - **`GuestAdditionsFrameRenderer`** - the guest-additions virtual
-    framebuffer under `libCerfCore/src/peripherals/cerf_virt/`. It wins only on a
-    `--guest-additions` run.
-  - **`FrameRenderer`** itself - the presented surface. It has one candidate,
-    **`PresentedFrameRenderer`**, and the canvas of each frontend binds it.
+    framebuffer under `libCerfCore/src/peripherals/cerf_virt/`.
+  - **`FrameRenderer`** itself - the presented surface,
+    **`PresentedFrameRenderer`**. A frontend binds this slot, never a layer
+    slot.
+
+  **libCerfCore composes the presented frame. A frontend only draws the frame
+  that `FrameRenderer` gives it.**
+
+  **The angle of the frame is an attribute of the emulated device,
+  `FrameRenderer::DisplayQuarter`.** A frontend adds the turns of the user to
+  it, and it never turns the frame for the guest itself.
 
   **`PresentedFrameRenderer`** is an ordered stack of the two layers above.
   The panel layer renders under the guest-additions layer. A splash that the
   bootloader or the kernel draws therefore stays visible until the
-  guest-additions display driver renders its first frame. The boot animation
-  of CERF is only the placeholder while the guest renders nothing.
-
-  The compositor fits a layer of another size to the surface, keeps its aspect
-  ratio, and centers it. It never crops a layer. The compositor enlarges a
-  smaller layer by the largest integer factor that fits, with nearest-neighbor
-  sampling. It reduces a layer that is larger on either axis. Each output
-  pixel is then the average of the source pixels under it.
+  guest-additions driver writes to the frame that it displays.
 
   The layers are opaque, and the compositor skips each covered layer. The
   compositor must not blend the layers per pixel. The guest-additions surface
   has areas that are legitimately black, and a blend makes the panel layer
   visible through them.
 
-  The layer that covers the surface renders directly into the target DIB, so
-  it costs no copy. The scratch buffer and the scaled copy occur only while
-  the compositor presents a layer of another size.
-
-  The compositor sends `RearmContentLatch` to every layer, so a guest reset
-  rearms all of them.
-
-  **A frame that a layer shows when a reset releases the CPU is stale.** Each
-  layer has a content latch, a one-way flag that marks the first guest frame.
-  The canvas switches from the boot screen to the framebuffer on that frame.
-  A reset rearms the latch when the reset is requested. Until the reset
-  releases the CPU, the latch takes no baseline and latches nothing. A
-  baseline is the content that a later frame must differ from.
-
-  At the release, after the release listeners, the compositor sends
-  `CaptureResetBaseline` to every layer. A layer that still shows a frame
-  takes that frame as its baseline. It latches when its content differs from
-  the baseline. A layer that shows nothing latches the next frame that the
-  guest shows. A baseline taken after the release can be a screen that the
-  guest drew. If the guest keeps that screen static, the canvas never leaves
-  the boot screen.
+  **`HasFrame` reports the state of the display hardware, never the content of
+  the frame.** A frame that is black or unchanged is still the frame that the
+  hardware shows. A frontend that has its own boot screen decides by itself
+  when it leaves that screen.
 
   To add a layer, register it on its own role slot. Then put the layer in the
   order of the compositor.
   - `libCerfCore/include/cerfcore/host/frame_renderer.h`, `panel_frame_renderer.h`,
-    `guest_additions_frame_renderer.h`, `cerf-qt/presented_frame_renderer.cpp`
+    `guest_additions_frame_renderer.h`, `libCerfCore/src/host/presented_frame_renderer.cpp`
 
-- **`HwScreen`** - the hardware text console behind the `Tab::Hw` tab. It is
-  the bounded text-mode RX/TX line buffer for guest UART / OEM-debug output
-  and for the notices of CERF itself (power events, save/restore progress).
-  `AddLine` appends a line, and `Snapshot` copies the lines for a frontend.
-  `HwScreenRenderer` draws the scrolled log over the `BootBar` through the
-  `Painter` of the frontend.
+- **`HwScreen`** - the hardware text console behind the `Tab::Hw` tab. It
+  holds the RX/TX text of the guest UART /
+  OEM-debug output and the notices of CERF itself (power events, save/restore
+  progress).
   - `libCerfCore/include/cerfcore/host/hw_screen.h`, `libCerfCore/src/host/hw_screen.cpp`,
-    `cerf-qt/hw_screen_renderer.{h,cpp}`
+    `cerf-qt/hw_screen_log.{h,cpp}`, `cerf-qt/qml/HardwareConsole.qml`
 
 - **`NotificationStack`** is the card stack over every canvas tab, and it takes
   only notices that interrupt the user's workflow, never routine events.
@@ -661,20 +677,11 @@ per-SoC/per-board concretes (strategy pattern, selected by `BoardContext`).
   overlay or in a guest input route.
   - `cerf-qt/overlay_input.{h,cpp}`, `cerf-qt/overlay_touch_area.{h,cpp}`
 
-- **`BootScreen`** - the CERF-logo boot animation behind the `Tab::Boot` tab,
-  plus the `BootBar`. The 60 Hz present loop drives it in time, with no
-  thread. `Restart` (guest reboot / deep-sleep wake) and
-  `OnFramebufferLatched` are its cross-thread control hooks.
-  - `cerf-qt/boot_screen.{h,cpp}`
-
-- **`BootBar`** - the bottom CPU-activity bar shared by the Boot Screen and
-  Hardware Screen tabs. It is a strip that scrolls. The host animation clock
-  advances it, so it freezes when emulation is paused.
-  - `cerf-qt/boot_bar.{h,cpp}`
+- **`BootScreen`** - the CERF-logo boot animation behind the `Tab::Boot` tab.
+  - `cerf-qt/boot_screen.{h,cpp}`, `cerf-qt/canvas_tab_view.{h,cpp}`, `cerf-qt/qml/BootScreenLayer.qml`
 
 - **`TouchInput`** (abstract) - takes host pen events in guest-surface
-  coordinates. The touch peripheral concrete of the board converts them into
-  guest pen samples. The concretes live under `libCerfCore/src/boards/<family>/`.
+  coordinates.
   - `libCerfCore/include/cerfcore/host/touch_input.h`
 
 - **Off-screen bezel touch buttons are physical, never framebuffer-drawn.**
@@ -785,25 +792,18 @@ per-SoC/per-board concretes (strategy pattern, selected by `BoardContext`).
 
   The framebuffer fits, pans and zooms in the rest of the canvas. A touch inside the
   HUD band never reaches the guest.
-  - `cerf-qt/hud_selection.h`, `cerf-qt/hud_controls.h`, `cerf-qt/hud_renderer.h`,
+  - `cerf-qt/hud_selection.h`, `cerf-qt/hud_controls.h`, `cerf-qt/hud_nodes.h`, `cerf-qt/qml/HudLayer.qml`,
     `cerf-qt/view_presentation.h`, `libCerfCore/include/cerfcore/host/device_buttons.h`
 
-- **`ViewRotation`** - turns the presented framebuffer by quarter turns. The guest
-  sees no change. The host-to-guest point map and the relative mouse deltas turn
-  with the frame. The desktop HUD turns with the frame too. The rotation lasts for
-  the session only.
+- **`ViewRotation`** - the quarter turns of the user, on top of the angle of the
+  frame. The host-to-guest point map and the relative mouse deltas turn with the
+  frame. The rotation lasts for the session only.
   - `cerf-qt/view_rotation.h`
 
-- **`KeyboardInput`** (abstract) - one keyboard source: `OnHostKey(vk, key_up)`
-  plus `SourceName` / `SourcePriority` / `SourceReady`. Concretes self-register
-  with `KeyboardRouter`. They are the keyboard of a board under
-  `libCerfCore/src/boards/<family>/` and the guest-additions keyboard under
-  `libCerfCore/src/peripherals/cerf_virt/`.
+- **`KeyboardInput`** (abstract) - one keyboard source.
   - `libCerfCore/include/cerfcore/host/keyboard_input.h`
 
 - **`KeyboardRouter`** - the keyboard-source registry and host-key funnel.
-  `KeyboardInput` concretes self-register from `OnReady`. The router forwards
-  host keys to the single active source.
 
   **A key belongs to the source that receives its key-down.** That source
   receives the key-up of the key, also after the active source changes. A
@@ -814,49 +814,33 @@ per-SoC/per-board concretes (strategy pattern, selected by `BoardContext`).
   `SourceReady`.** When no source is ready, the router selects the highest
   priority overall. A board with no stock keyboard must not have dead input.
 
-  `RearmAutoSelect` re-runs that selection and drops any manual choice. A guest
-  reset calls it, so the stock keyboard is active again until a source reports
-  `SourceReady`. `ReevaluateAuto` re-runs the selection and keeps a manual
-  choice.
+  A guest reset re-runs that selection, so the stock keyboard is active again
+  until a source reports `SourceReady`.
 
-  When more than one source is registered, the `KeyboardWidget` status-bar
-  widget switches the active source. That switch is a manual choice, and it
-  suppresses automatic selection until the next reset. The widget keeps the
-  choice across hibernation.
+  A manual choice of the active source suppresses automatic selection until the
+  next reset. The router keeps that choice across hibernation.
   - `libCerfCore/include/cerfcore/host/keyboard_router.h`, `libCerfCore/src/host/keyboard_router.cpp`
 
-- **`PointerRouter` / `PointerWidget`** - the pointer-source registry and
-  host-mouse funnel. It mirrors `KeyboardRouter`. Pointing-device sources
-  (the touch / mouse of a board, the guest-additions absolute pointer)
-  self-register. The frontend sends host mouse messages to the single
-  active source. The router selects by the same ready-then-priority rule as
-  `KeyboardRouter`, and it carries the same `RearmAutoSelect` /
-  `ReevaluateAuto` pair.
+- **`PointerRouter`** - the pointer-source registry and host-mouse funnel. A
+  frontend sends each host mouse event to `Route` in guest-surface coordinates,
+  and the router sends it to the active source.
 
   **A pen or a mouse button that is down stays with the source that received
   the press.** This holds also after the active source changes. A host mouse
   event that reports the button up releases it on that source.
 
-  When more than one is registered, the `PointerWidget` status-bar widget
-  switches the active source and keeps the choice across hibernation. Some
-  apps (calibrators) read the stock touch/mouse stream directly. On a board
-  whose stock pointer is a relative mouse, the host-capture mouse lock
-  engages only while that source is active.
-  - `libCerfCore/include/cerfcore/host/pointer_router.h`, `libCerfCore/src/host/pointer_router.cpp`, `libCerfCore/src/host/pointer_widget.cpp`
+  **Every relative motion and relative button goes through `OnRelativeMove`.**
+  The router keeps the relative buttons of the last call. A frontend releases
+  them only from a relative-mouse lock that is engaged. A release outside that
+  lock drops the buttons of another relative producer, for example the Android
+  gesture pointer.
+  - `libCerfCore/include/cerfcore/host/pointer_router.h`, `libCerfCore/src/host/pointer_router.cpp`,
+    `cerf-qt/canvas_input.{h,cpp}`
 
 - **`InputCapture`** - the capture toggle, so the guest receives the keys
-  that the host shell normally takes. It forwards to `KeyboardInput` and
-  synthesizes Ctrl-Alt-Del. Each frontend feeds it host keys. On Windows, the
-  desktop frontend takes them from `LowLevelKeyboardHook` and installs that
-  hook on the UI thread.
+  that the host shell normally takes. On Windows, the desktop frontend takes
+  them from `LowLevelKeyboardHook` and installs that hook on the UI thread.
   - `cerf-qt/input_capture.{h,cpp}`, `cerf-qt/desktop/qt_input_capture_windows.cpp`
-
-- **`StatusBar`** - the bottom status bar. It lays out and paints the ordered
-  widget set of `HostWidgetRegistry` (icons and per-icon tooltips), and it
-  sends each mouse click to its widget. The capture/lock indicator is itself
-  one such host-owned widget. The window, the tooltips and the timer of the
-  bar belong to the frontend.
-  - `cerf-qt/status_bar.{h,cpp}`, `cerf-qt/status_bar_item.{h,cpp}`, `cerf-qt/strip_widget_bar.{h,cpp}`
 
 - **Menus and dialogs** - on the desktop, every menu and every dialog is a
   top-level window. The CerfStyle style draws them, except the file dialogs and
@@ -952,17 +936,13 @@ per-SoC/per-board concretes (strategy pattern, selected by `BoardContext`).
     `cerf-qt/desktop/qt_window_erase_windows.cpp`, `cerf-qt/desktop/global_menu_bar{.h,_macos.mm}`,
     `cerf-qt/menu_source.h`
 
-- **`DevicePixelItem`** - a Qt Quick item that paints with `QPainter` derives
-  from `DevicePixelItem`, never from `QQuickPaintedItem`. `QQuickPaintedItem`
-  rounds the item to whole logical pixels and stretches its texture with linear
-  filtering, which blurs the framebuffer at a fractional scale.
+- **`FillColorItem`** - the base of the frame view.
 
-  **The content of these items sits on whole device pixels.** At a fractional
-  scale, an item can start between two device pixels. For example, 26 logical
-  pixels at a scale of 1.25 are 32.5 device pixels. Nearest sampling then reads
-  each texel (a pixel of the texture) at its edge, and rows or columns shift from
-  frame to frame. `FillColorItem`, the base of `DevicePixelItem` and of the frame
-  view, moves the content to the nearest whole device pixel.
+  **The guest frame sits on whole device pixels.** At a fractional scale, an item
+  can start between two device pixels. For example, 26 logical pixels at a scale
+  of 1.25 are 32.5 device pixels. Nearest sampling then reads each texel (a pixel
+  of the texture) at its edge, and rows or columns shift from frame to frame.
+  `FillColorItem` moves the content to the nearest whole device pixel.
 
   **The device pixel ratio is not the scale at which Qt draws.** Qt divides the
   pixel size of the render target by the device pixel ratio and rounds the result
@@ -974,22 +954,14 @@ per-SoC/per-board concretes (strategy pattern, selected by `BoardContext`).
   `WindowPixelScale` measures the viewport after each render pass and gives the
   real scale on each axis. Every conversion between logical pixels and canvas
   pixels uses that scale, never the device pixel ratio.
-  - `cerf-qt/device_pixel_item.{h,cpp}`, `cerf-qt/fill_color_item.{h,cpp}`
+  - `cerf-qt/fill_color_item.{h,cpp}`
 
-- **`HostWidget` / `HostWidgetRegistry`** - the live configuration surface of
-  a peripheral or a board feature. `HostWidget` is an abstract,
-  **non-`Service`** interface, so a `Peripheral`, which already derives
-  `Service`, implements it with no diamond. A widget declares typed metadata
-  only: its state and its controls. A slot control names the inserted item
-  and every insertable item by a stable id. A widget draws nothing and builds
-  no menu. Each frontend renders the metadata in its own form.
-
-  Implementers self-register with `HostWidgetRegistry` from `OnReady`, the
-  same way peripherals self-register with `PeripheralDispatcher`. Concretes
-  obey the three-tree rule (`libCerfCore/src/socs|boards|peripherals/`). Use this
-  framework whenever a peripheral or board has user-visible state (RX/TX,
-  enabled/disabled) or a configuration/toggle surface.
-  - `libCerfCore/include/cerfcore/host/host_widget*.h`, `libCerfCore/src/host/host_widget_registry.cpp`
+- **Bar widgets** - cerf-qt presents each machine object that it shows as a
+  bar widget. A bar widget is an icon, a tooltip and a menu on the status bar
+  or the Android strip. A feature of the frontend itself, such as the
+  capture/lock indicator, can be a bar widget too.
+  - `cerf-qt/bar_widget*.{h,cpp}`, `cerf-qt/*_bar_widget*.cpp`, `cerf-qt/socket_menu.{h,cpp}`,
+    `cerf-qt/qml/WidgetBar.qml`, `cerf-qt/qml/BarWidgetIcon.qml`
 
 - **`Screenshots`** - screenshot + clipboard capture of the live guest
   surface (via `FrontendWindow::CaptureGuestSurface`, 1:1). The desktop
@@ -999,7 +971,7 @@ per-SoC/per-board concretes (strategy pattern, selected by `BoardContext`).
   If the device has a shader chain, Save and Copy take the output of the chain at
   the size that the screen shows. The `screenshots` key of the `shaders`
   configuration turns this off. If the chain does not shade a frame, Save and Copy
-  take the 1:1 capture. The live thumbnail and the core screenshot seam always take
+  take the 1:1 capture. The live thumbnail and the saved-state preview always take
   the 1:1 capture.
 
   **A shaded capture waits for the next frame that the window renders.** A window
@@ -1024,8 +996,11 @@ per-SoC/per-board concretes (strategy pattern, selected by `BoardContext`).
 ## Automatic touch calibration
 
 `AutoCalibration` finds the touch calibration screen of the guest and presses its
-targets with the stock touch input. It runs in libCerfCore, and a frontend
-answers its questions through the `CalibrationHost` seam.
+targets with the stock touch input. It is a procedure in libCerfCore. A frontend
+implements its `CalibrationHost` seam.
+
+**Calibration reads the presented frame from `FrameRenderer` itself.** A frontend
+never carries a frame of the core back to the core.
 
 Do not loosen the target match to find more calibration screens. A wrong press
 touches a real guest window.
@@ -1045,6 +1020,7 @@ entry that takes host pointer input drops that input while CERF holds the lock.
   `libCerfCore/include/cerfcore/host/calibration_*.h`,
   `libCerfCore/include/cerfcore/host/host_pointer_input_lock.h`,
   `libCerfCore/src/host/auto_calibration.cpp`, `libCerfCore/src/host/calibration_*`,
+  `libCerfCore/src/peripherals/cerf_virt/cerf_virt_calib_signal.cpp`,
   `cerf-qt/qt_calibration_host.cpp`, `cerf-qt/guest_calibration_fallback.{h,cpp}`,
   `cerf-qt/surface_cursor.{h,cpp}`
 

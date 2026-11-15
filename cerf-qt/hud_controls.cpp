@@ -288,8 +288,8 @@ bool HudControls::Pressed(const HudNode* node) const {
 }
 
 void HudControls::RunAction(const std::string& id) {
-    for (const cerfcore::ActionControl& action : emu_.Get<cerfcore::DeviceButtons>().Actions())
-        if (action.id == id) action.press();
+    for (cerfcore::MachineButton* button : emu_.Get<cerfcore::DeviceButtons>().Buttons())
+        if (button->ObjectId() == id) button->Press();
 }
 
 bool HudControls::KeysDown(const std::vector<uint8_t>& keys) const {

@@ -2,17 +2,16 @@
 
 CERF models guest deep sleep / suspend. When the running guest powers down its
 CPU (a SoC power-down register write, or a CPU power-mode instruction), CERF
-halts the virtual CPU and shows a no-timeout "Shut down CERF?" recovery dialog.
-On Cancel it wakes the guest, so the guest resumes exactly where it slept - zero
-data loss. This is the GUEST's own suspend/resume on faithful virtual hardware.
-CERF only halts the CPU and drives the wake.
+halts the virtual CPU and tells the frontend that the guest sleeps. A wake from
+`GuestDeepSleep::Resume()` resumes the guest exactly where it slept, with no data
+loss. This is the GUEST's own suspend/resume on faithful virtual hardware. CERF
+only halts the CPU and drives the wake.
 
 **This is not hibernation.** See § "Suspend/resume is not hibernation" - a
 conflation of the two is the most common mistake in this subsystem.
 
 Host implementation: `libCerfCore/include/cerfcore/host/guest_deep_sleep.h`, `libCerfCore/src/host/guest_deep_sleep.cpp`,
-`libCerfCore/include/cerfcore/host/shutdown_host.h`, `cerf-qt/qt_shutdown_host.cpp`,
-`cerf-qt/qml/EmulatorShutdownDialog.qml`. CPU halt/wake: `libCerfEngine/src/arm/arm_jit.cpp`
+`cerf-qt/qt_shutdown_dialog.{h,cpp}`, `cerf-qt/qml/EmulatorShutdownDialog.qml`. CPU halt/wake: `libCerfEngine/src/arm/arm_jit.cpp`
 (`EnterDeepSleep`, `SetResetPending`, delivery), `libCerfCore/src/execution/jit_runner.cpp` (the
 park), `libCerfEngine/src/arm/arm_cpu.cpp` (`RaiseResetException`). Reset cause + reset
 line: `libCerfCore/include/cerfcore/socs/guest_cpu_reset.h`, `libCerfCore/src/socs/guest_cpu_reset.cpp`.
@@ -26,12 +25,14 @@ delivered reset clears `deep_sleep` and releases the park. No guest
 instructions run while the thread is parked, so no peripheral IRQ reaches the
 sleeping CPU.
 
-`GuestDeepSleep::Enter()` (JIT thread) prints the sleep banner, halts the CPU, and
-gives `Recover()` to `ShutdownHost::RunPromptJob`, which runs it on the UI thread of
-the frontend. `Recover()` calls `ShutdownHost::Ask(ShutdownTrigger::DeepSleep)`.
-Cancel wakes (`DeliverWake`), OK exits (with an optional save). The recovery dialog is
-**no-timeout** by design - a countdown can auto-exit and discard live guest RAM
-while the user is away.
+The listeners of `GuestDeepSleep::RegisterSleepListener` run on the JIT thread when
+the JIT thread parks for the sleep and when it leaves the park. **A guest suspend is
+an event, never a question.** The core waits for no frontend. Save state, soft reset
+and hard reset work during the sleep as at any other time. `Resume()` works from any
+thread. The park delivers the wake on the JIT thread.
+
+**A frontend never exits CERF on a timer while the guest sleeps.** A countdown can
+exit CERF and discard the live guest RAM while the user is away.
 
 On a clock-stop board, a reset that ends a sleep powers the system up before the reset
 reaches the CPU. This holds for every source of the reset. A soft reset resets only the
@@ -105,9 +106,6 @@ Because the wake re-enters through reset, two things must hold:
   its power-off value is read back and re-enters sleep, or a stale input-device
   FIFO desyncs the driver's re-init handshake.
 
-On wake the deep-sleep decider banners `GuestPowerNotifier::NotifyResume(ResumeSource)`
-(`User` = dialog Cancel, `Hardware` = a startup-factor wake). A reboot banners `NotifyReboot()`.
-
 ## Per-SoC / per-board wiring contract
 
 Do these steps to implement deep sleep on a new SoC or board. A board takes exactly one
@@ -170,7 +168,7 @@ applies to every board.
    end a state that blocks a wake source. Apply such an input on the JIT thread, for
    example in a `GuestDeepSleep::RegisterParkClock` callback. Then call
    `GuestDeepSleep::RefreshParkWakeDue()`.
-9. **Make a user wake operate the input that a user operates.** A dialog Cancel
+9. **Make a user wake operate the input that a user operates.** `GuestDeepSleep::Resume()`
    stands for a user who wakes the device. Some firmware reads the input that caused
    a wake, and puts the device back to sleep when no user input caused it. For such
    a board, register `GuestDeepSleep::RegisterUserWakeInput`. Its callback drives
@@ -238,12 +236,10 @@ Two different mechanisms. A conflation of them causes real bugs:
   which serializes nothing.
 
 The two meet at exactly one point: a machine hibernated WHILE asleep restores with
-`deep_sleep` set, so `GuestDeepSleep::OnFullRestore()` auto-wakes it (delivers the
-wake, no dialog). Consequences:
+`deep_sleep` set, so `GuestDeepSleep::OnFullRestore()` auto-wakes it. Consequences:
 
-- **Never re-post the recovery dialog on a hibernation restore.** A restore of a
-  saved-asleep machine must auto-wake. A "Shut down CERF?" prompt on restore is a
-  bug (the user reopens a restored machine and is asked to shut it down).
+- **A restore never leaves the guest asleep.** A restore of a saved-asleep machine
+  must auto-wake.
 - **A restore-into-deep-sleep IS the suspend/resume path**, and it runs the same
   `DeliverWake` - not a separate hibernation defect to chase.
 

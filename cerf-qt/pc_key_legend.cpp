@@ -37,15 +37,6 @@ const char* PcKeyLegend(uint8_t vk) {
     return nullptr;
 }
 
-bool PcLegendKey(std::string_view legend, uint8_t& vk) {
-    for (const KeyLegend& key : kPcKeys) {
-        if (legend != key.legend) continue;
-        vk = key.vk;
-        return true;
-    }
-    return false;
-}
-
 bool SameKeyName(std::string_view a, std::string_view b) {
     return a.size() == b.size() && std::equal(a.begin(), a.end(), b.begin(), [](char x, char y) {
                return std::tolower(static_cast<unsigned char>(x)) == std::tolower(static_cast<unsigned char>(y));

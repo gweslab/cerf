@@ -1,5 +1,6 @@
 #include "device_directory.h"
 
+#include "../saved_state_preview.h"
 #include "device_file_value.h"
 #include "emulation_speed.h"
 #include "property_fields.h"
@@ -101,7 +102,7 @@ QString DeviceDirectory::BaseConfigName() { return QString::fromLatin1(cerfcore:
 QString DeviceDirectory::UserConfigName() { return QString::fromLatin1(cerfcore::kUserConfigFileName); }
 
 QStringList DeviceDirectory::SavedStateNames() {
-    return {QString::fromLatin1(cerfcore::kDefaultStateFile), QString::fromLatin1(cerfcore::kSavedStateScreenshotFile)};
+    return {QString::fromLatin1(cerfcore::kDefaultStateFile), QString::fromLatin1(cerffrontend::kSavedStatePreviewFile)};
 }
 
 QString DeviceDirectory::StorageDefaultFile(const QString& storage_id) {

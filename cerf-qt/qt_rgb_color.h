@@ -1,8 +1,7 @@
 #pragma once
 
-#include "painter.h"
+#include "rgb.h"
 
 #include <QColor>
 
-QColor            ToQColor(cerffrontend::Rgb color, int alpha = 255);
-cerffrontend::Rgb FromQColor(const QColor& color);
+QColor ToQColor(cerffrontend::Rgb color, int alpha = 255);

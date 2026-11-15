@@ -52,6 +52,30 @@ and the need in the dev build. **A gate with no reason is a rule violation.**
 - **Default log mask is mode-gated.** Dev builds (`CERF_DEV_MODE=1`) enable every channel by default. Production builds (`CERF_DEV_MODE=0`) enable the always-on channels and the event/milestone channels that stay low-volume on every board. The user widens or narrows that set with `--log=...` / `--no-log=...`.
 - **Verbose LOG lines that print inputs/state are acceptable permanently - but only when low-frequency** - the log level filters them, and they aid future debugging at zero runtime cost. That holds when their fire-rate is low enough that the signal a future reader needs is not buried in their noise. For a site that fires more often than that, `agent_docs/rules.md` § "Simple LOG verbose lines" gives the frequency test and where the site must go.
 
+## Core APIs and frontends
+
+- **A core type never lists the parts of a UI.** An enum of commands, flags,
+  settings and readings is a menu under another name.
+- **An English text that the core gives a frontend is a constant.** The constant
+  is a named `constexpr char` constant or an entry of a `constexpr` table, at the
+  top of its file or in its class. A later i18n pass can then turn it into an id.
+  Each constant holds a whole sentence or a whole format string. A constant is
+  never shared between files to remove a duplicate, and no function builds
+  sentences from constants. Log lines, halt reasons and restore refusal reasons
+  are diagnostics, and they stay literals.
+- **A core function never halts on a value that its caller gives.** It refuses
+  the call and tells the caller.
+- **A core API names no part of a frontend.** No parameter, value or event names
+  a tab, a view, a window, a click or a splash.
+- **Every state that the core gives a consumer has a change event.**
+- **The core gives every guest output to a consumer seam.** It plays no sound,
+  opens no window and draws no picture on the host itself.
+- **The core implements no behavior whose only reader is a feature of one
+  frontend.** The boot splash of cerf-qt is such a feature. The frontend builds
+  it from the public state of the core.
+- **A header under `include/` has a user outside its library.** A header that
+  only the library includes lives under `src/`.
+
 ## Services
 
 A **service** is a class owned by `CerfEmulator` via `ServiceRegistry`, accessed through `emu.Get<T>()`. All stateful, device-visible host-side behavior lives in a service. Free functions that take services as parameters are technical debt (see `rules.md`).
@@ -187,7 +211,11 @@ Consumers always write `emu.Get<PageTableBuilder>()`. They do not know which con
 
 ## Qt Quick and QML
 
-These rules apply to every QML file of the Qt frontend and to the C++ that configures Qt Quick.
+These rules apply to every QML file of the Qt frontend and to the C++ that feeds or configures Qt Quick.
+
+- **QML draws the UI of the frontend, and C++ gives it data.** C++ gives text, state, colors that come from the device, and the geometry that C++ input already owns. No C++ code computes a font size, a text height, a line wrap or a shape for QML.
+- **Qt Quick items, effects and animation types draw the UI. No frontend code draws it by hand, in C++ or in QML.** The frontend uses no per-pixel loop, no `QPainter` that paints into an image, no QML `Canvas` and no animation that a frame tick steps.
+- **C++ input that needs the geometry of a QML item gets it from that item.** C++ never computes the same layout a second time.
 
 - **The CERF style owns the look of every control.** The frontend runs the custom style `CerfStyle` (`cerf-qt/CerfStyle/`). Material is the fallback of that style. The look of a control has one owner: the file of that control in the style, which every instance gets. A variant that more than one view uses is one named component in the app module, and the views use it by name. A view never sets `background`, `contentItem`, `indicator`, a color or a font on a stock control.
 - **A QML file outside the style imports `CerfStyle`, never `QtQuick.Controls` or `QtQuick.Controls.Material`.** The qmldir of the style imports Material, so the file gets the types of the style and of Material when it compiles. With `import QtQuick.Controls`, Qt selects the style at run time. Only the plugin of that module adds the style. The first import can find the copy of the module in the Qt resources. The plugin does not load from that copy. The files that Qt resolves before the plugin loads then get the Material types in place of the style types.

@@ -36,6 +36,72 @@ QtObject {
     readonly property color tapBubble: "#40ffffff"
     readonly property color tapBubbleRing: "#ffffff"
 
+    readonly property color hudBackdrop: "#80000000"
+    readonly property color hudVeil: "#1cffffff"
+    readonly property color hudVeilCenter: "#28ffffff"
+    readonly property color hudVeilDown: "#50ffffff"
+    readonly property color hudInk: "#ececec"
+    readonly property color hudArrow: "#a0a0a0"
+    readonly property color hudHint: "#969696"
+    readonly property color hudLatchRim: "#5aa0ff"
+    readonly property color hudSeparator: "#404040"
+
+    readonly property color cardWarning: "#f2c94c"
+    readonly property color cardWarningRim: "#bf951e"
+    readonly property color cardWarningText: "#1e1e1e"
+    readonly property color cardError: "#cc3c3c"
+    readonly property color cardErrorRim: "#962323"
+    readonly property color cardErrorText: "#ffffff"
+    readonly property color cardSuccess: "#388e3c"
+    readonly property color cardSuccessRim: "#246428"
+    readonly property color cardSuccessText: "#ffffff"
+    readonly property color cardMore: "#404040"
+    readonly property color cardMoreRim: "#282828"
+    readonly property color cardMoreText: "#e6e6e6"
+    readonly property color cardShadow: "#46000000"
+
+    readonly property color bootGlow: "#192028"
+    readonly property color bootLabel: "#ffffff"
+    readonly property color bootStatus: "#969696"
+    readonly property color consoleText: "#cdcdcd"
+    readonly property color consoleError: "#ff6e6e"
+    readonly property color consoleWarning: "#ebd25a"
+
+    readonly property color barChipFill: "#282c34"
+    readonly property color barOutline: "#9696a0"
+    readonly property color barDiskFill: "#30343c"
+    readonly property color barDiskHub: "#aaafb9"
+    readonly property color barVibrate: "#c8a050"
+    readonly property color barLedDark: "#222c24"
+    readonly property color barLedRim: "#96a096"
+    readonly property color barLedRimBlink: "#78e682"
+    readonly property color barGridDark: "#3c321e"
+    readonly property color barGridOutline: "#5a4b28"
+    readonly property color barPowerOk: "#9ba5af"
+    readonly property color barPowerOkFill: "#26303a"
+    readonly property color barPowerFail: "#f56969"
+    readonly property color barPowerFailFill: "#691c1c"
+    readonly property color barBatteryHigh: "#4ec95a"
+    readonly property color barBatteryLow: "#dcc83c"
+    readonly property color barBatteryCritical: "#e55050"
+    readonly property color barBatteryFrame: "#aaaab4"
+    readonly property color barBatteryBody: "#1e2026"
+    readonly property color barBolt: "#78dcff"
+    readonly property color barBoltRim: "#283c50"
+    readonly property color barFolderOn: "#e8c45c"
+    readonly property color barFolderOff: "#e0e0e0"
+    readonly property color barRx: "#e55050"
+    readonly property color barTx: "#4ec95a"
+    readonly property color barDotRim: "#141414"
+    readonly property real barDisabledOpacity: 0.588235
+
+    readonly property color cursorOutline: "#000000"
+    readonly property color cursorFill: "#ffffff"
+
+    readonly property color pausedVeil: "#000000"
+    readonly property real pausedVeilOpacity: 0.349609375
+    readonly property real pausedSaturation: -0.375375375
+
     readonly property color cardHover: dark ? "#2c2c2c" : "#f5f5f5"
     readonly property color backdrop: dark ? "#99000000" : "#99303030"
 
@@ -76,6 +142,13 @@ QtObject {
         return !touchPlatform && size < 1.0
     }
 
+    readonly property int fitMinimumPixelSize: 1
+    readonly property int hudHintMinimumSize: 8
+    readonly property int cardFontSize: 13
+    readonly property int cardCompactFontSize: 11
+    readonly property int consoleFontSize: 11
+    readonly property int bootLabelSize: 18
+    readonly property int bootStatusSize: 12
     readonly property int captionSize: 12
     readonly property int tileTitleSize: 16
     readonly property int sectionTitleSize: 17

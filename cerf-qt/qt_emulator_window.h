@@ -27,8 +27,7 @@ class GuestSurface;
 class OverlayTouchArea;
 class QQuickWindow;
 class QTimer;
-class StatusBarItem;
-class StripWidgetBar;
+class BarWidgetList;
 
 class QtEmulatorWindow : public cerffrontend::FrontendWindow {
 public:
@@ -79,7 +78,7 @@ public:
     QQuickWindow*                       Window() const;
     GuestSurface*                       Surface() const;
     EmulatorController*                 Controller() const;
-    StatusBarItem*                      StatusBar() const;
+    BarWidgetList*                      StatusBar() const;
     QVariant    RunDialog(const QString& type_name, const QVariantMap& properties,
                           const std::function<void(QObject*)>& opened = {});
     void        ShowHint(const QString& text, uint32_t hold_ms, int bottom_gap);
@@ -102,8 +101,8 @@ private:
     QPointer<QQuickWindow>       window_;
     QPointer<GuestSurface>       surface_;
     QPointer<EmulatorController> controller_;
-    QPointer<StripWidgetBar>     widget_bar_;
-    QPointer<StatusBarItem>      status_bar_;
+    QPointer<BarWidgetList>      widget_bar_;
+    QPointer<BarWidgetList>      status_bar_;
     QPointer<OverlayTouchArea>   overlay_area_;
     bool                         input_attached_ = false;
 

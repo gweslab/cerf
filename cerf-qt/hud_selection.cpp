@@ -25,7 +25,7 @@ using cerfcore::config_key::kHudNone;
 
 void HudSelection::OnReady() {
     emu_.Get<cerfcore::DeviceConfigRefresh>().RegisterListener([this] { Apply(); });
-    const std::string& setting = emu_.Get<cerfcore::DeviceConfig>().hud;
+    const std::string setting = emu_.Get<cerfcore::DeviceConfig>().Live()->hud;
     if (setting != kHudNone) restore_setting_ = setting;
     active_ = Resolve(setting);
     LOG(Lcd, "HudSelection: setting '%s' -> %s\n", setting.c_str(), active_ ? active_->id.c_str() : "none");
@@ -62,7 +62,7 @@ double HudSelection::PanelReach(const ViewportLayout::Layout& frame) const {
 }
 
 void HudSelection::Apply() {
-    const std::string& setting = emu_.Get<cerfcore::DeviceConfig>().hud;
+    const std::string setting = emu_.Get<cerfcore::DeviceConfig>().Live()->hud;
     if (setting != kHudNone) restore_setting_ = setting;
     const cerfcore::DbHud* next = Resolve(setting);
     if (next == active_) return;

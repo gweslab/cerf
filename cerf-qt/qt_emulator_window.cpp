@@ -14,8 +14,11 @@
 
 #include "balloon_hint.h"
 #include "canvas_tabs.h"
+#include "enterprise_menu.h"
 #include "hud_selection.h"
+#include "kiosk_mode.h"
 #include "live_property_sheet.h"
+#include "password_gated_actions.h"
 #include "screenshots.h"
 #include "shutdown_prompt.h"
 #include "shutdown_teardown.h"
@@ -210,10 +213,16 @@ bool QtEmulatorWindow::RequestShadedCapture() {
 }
 
 void QtEmulatorWindow::CloseRequested() {
-    const bool begun = emu_.Get<cerffrontend::ShutdownPrompt>().BeginCloseRequest();
-    LOG(Manager, "QtEmulatorWindow: close requested, prompt %s\n", begun ? "queued" : "already pending");
-    if (!begun) return;
-    RunOnUiThread([this] { RunShutdownPrompt(); });
+    const auto prompt = [this] {
+        const bool begun = emu_.Get<cerffrontend::ShutdownPrompt>().BeginCloseRequest();
+        LOG(Manager, "QtEmulatorWindow: close requested, prompt %s\n", begun ? "queued" : "already pending");
+        if (begun) RunOnUiThread([this] { RunShutdownPrompt(); });
+    };
+    if (!emu_.Get<cerffrontend::KioskMode>().Active()) {
+        prompt();
+        return;
+    }
+    RunOnUiThread([this, prompt] { emu_.Get<cerffrontend::KioskMode>().CloseRequested(prompt); });
 }
 
 void QtEmulatorWindow::RunShutdownPrompt() {
@@ -242,7 +251,10 @@ void QtEmulatorWindow::OnTeardownWedged() { emu_.Get<EmulatorWindowHost>().OnTea
 
 bool QtEmulatorWindow::IsFullscreen() const { return emu_.Get<EmulatorWindowHost>().IsFullscreen(); }
 
-void QtEmulatorWindow::ToggleFullscreen() { emu_.Get<EmulatorWindowHost>().ToggleFullscreen(); }
+void QtEmulatorWindow::ToggleFullscreen() {
+    if (IsFullscreen() && emu_.Get<cerffrontend::KioskMode>().Active()) return;
+    emu_.Get<EmulatorWindowHost>().ToggleFullscreen();
+}
 
 void QtEmulatorWindow::MatchGuestSize() { emu_.Get<EmulatorWindowHost>().MatchGuestSize(); }
 
@@ -272,7 +284,12 @@ void QtEmulatorWindow::SetViewportMode(cerffrontend::ViewportMode mode) { surfac
 
 void QtEmulatorWindow::SetIntegerScale(int factor) { surface_->SetIntegerScale(factor); }
 
-void QtEmulatorWindow::ReturnToManager() { window_->hide(); }
+void QtEmulatorWindow::ReturnToManager() {
+    auto&      actions = emu_.Get<cerffrontend::PasswordGatedActions>();
+    const auto leave   = [this] { window_->hide(); };
+    if (emu_.Get<cerffrontend::KioskMode>().Active()) actions.RunSignedIn(leave);
+    else                                              actions.OpenCerfman(leave);
+}
 
 QQuickWindow* QtEmulatorWindow::Window() const { return window_.data(); }
 
@@ -326,6 +343,7 @@ std::vector<cerffrontend::MenuItem> QtEmulatorWindow::GearMenu() {
     }));
     items.push_back(MenuItem{});
     items.push_back(emu_.Get<cerffrontend::ViewRotation>().MenuRow());
+    for (MenuItem& item : emu_.Get<cerffrontend::EnterpriseMenu>().Items()) items.push_back(std::move(item));
     return items;
 }
 

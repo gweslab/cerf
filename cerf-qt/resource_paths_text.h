@@ -11,7 +11,9 @@
 #define CERF_LOGO_ASSET "cerf"
 #define CERF_LOGO_PX 1024
 #define CERF_ERROR_ASSET "cerf_error"
+#define CERF_INLINE_LOGO_ASSET "inline_logo"
 #define CERF_ABOUT_BAND_ASSET "about_band"
 #define CERF_SYMBOL_IMAGE_PROVIDER "icon"
 #define CERF_ASSET_IMAGE_PROVIDER "asset"
+#define CERF_SVG_FILE_IMAGE_PROVIDER "svgfile"
 #define CERF_MANAGER_QML_MODULE "Cerfman"

@@ -1,29 +1,41 @@
 #pragma once
 
+#include "shutdown_policy.h"
+
 #include <cerfcore/core/service.h>
 
 #include <cstdint>
 #include <functional>
 #include <string>
+#include <vector>
 
 namespace cerffrontend {
 
-enum class ShutdownPromptAction : int { Exit = 0, SoftReset = 1, HardReset = 2 };
 enum class ShutdownTrigger { WindowClose, GuestSleep };
-enum class ShutdownChoice { Cancel, Exit, ExitSave, SoftReset, HardReset };
+enum class ShutdownChoice {
+    Cancel,
+    Exit,
+    ExitSave,
+    SoftReset,
+    HardReset,
+    SaveSuspendHost,
+    SavePoweroffHost,
+    SaveRestartHost,
+};
 
 class ShutdownPrompt : public cerfcore::Service {
 public:
     using cerfcore::Service::Service;
 
-    static constexpr int      kActionCount = 3;
     static constexpr uint32_t kCountdownMs = 15000u;
+
+    static bool Exits(ShutdownChoice choice);
 
     const char* Title() const;
     const char* Heading() const;
     const char* Intro(ShutdownTrigger trigger) const;
-    const char* ActionLabel(ShutdownPromptAction action) const;
-    const char* ResetDescription(ShutdownPromptAction action) const;
+    const char* ActionLabel(ShutdownAction action) const;
+    const char* ActionDescription(ShutdownAction action) const;
     const char* CancelLabel(ShutdownTrigger trigger) const;
     const char* RememberLabel() const;
     const char* SaveTitle() const;
@@ -35,7 +47,11 @@ public:
     const char* PlugInAcQuestion() const;
     const char* PlugInAcReason() const;
 
-    ShutdownChoice Commit(ShutdownPromptAction action, bool save, bool remember);
+    std::vector<ShutdownAction> Actions() const;
+    bool                        Unattended() const;
+
+    ShutdownChoice Commit(ShutdownAction action, bool save, bool remember);
+    ShutdownChoice CommitUnattended();
 
     std::function<void()> AcOffer(ShutdownTrigger trigger, ShutdownChoice choice);
 

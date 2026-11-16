@@ -165,7 +165,7 @@ cerf_read_string_define(cerfqt_product_name
 cerf_read_string_define(cerfqt_db_json_name "${CERF_INSTALL_LAYOUT_HEADER}" CERF_DB_JSON_NAME)
 cerf_read_string_define(cerfqt_huds_json_name "${CERF_INSTALL_LAYOUT_HEADER}" CERF_HUDS_JSON_NAME)
 cerf_read_string_define(cerfqt_ce_apps_name "${CERF_INSTALL_LAYOUT_HEADER}" CERF_CE_APPS_DIR_NAME)
-cerf_read_string_define(cerfqt_global_config_name "${CERF_INSTALL_ROOT_HEADER}" CERF_GLOBAL_CONFIG_NAME)
+cerf_read_string_define(cerfqt_global_defaults_name "${CERF_INSTALL_ROOT_HEADER}" CERF_GLOBAL_DEFAULTS_NAME)
 cerf_read_string_define(cerfqt_license_name "${CERF_INSTALL_ROOT_HEADER}" CERF_LICENSE_NAME)
 cerf_read_string_define(cerfqt_notices_name "${CERF_INSTALL_ROOT_HEADER}" CERF_NOTICES_NAME)
 cerf_read_string_define(cerfqt_licenses_dir_name "${CERF_INSTALL_ROOT_HEADER}" CERF_LICENSES_DIR_NAME)
@@ -179,7 +179,7 @@ if(WIN32)
                                    "${CMAKE_CURRENT_SOURCE_DIR}/../uninstaller-win32/process_wait.cpp"
                                    "${CMAKE_CURRENT_SOURCE_DIR}/../uninstaller-win32/shell_integration_windows.cpp")
     set_target_properties(cerf-qt PROPERTIES WIN32_EXECUTABLE TRUE)
-    target_link_libraries(cerf-qt PRIVATE ole32 shell32 advapi32 uuid winmm)
+    target_link_libraries(cerf-qt PRIVATE ole32 shell32 advapi32 uuid winmm powrprof)
     add_custom_command(TARGET cerf-qt POST_BUILD
         COMMAND "${CMAKE_COMMAND}" -E copy_if_different ${cerfqt_librashader_libraries} "$<TARGET_FILE_DIR:cerf-qt>"
         VERBATIM)
@@ -239,18 +239,18 @@ endif()
 
 if(ANDROID)
     set(cerfqt_install_dir "${CMAKE_CURRENT_BINARY_DIR}/install")
-    set(cerfqt_global_config "${cerfqt_install_dir}/${cerfqt_global_config_name}")
-    configure_file("${CMAKE_CURRENT_SOURCE_DIR}/../bundled/${cerfqt_global_config_name}" "${cerfqt_global_config}"
-                   COPYONLY)
+    set(cerfqt_global_defaults "${cerfqt_install_dir}/${cerfqt_global_defaults_name}")
+    configure_file("${CMAKE_CURRENT_SOURCE_DIR}/../bundled/${cerfqt_global_defaults_name}"
+                   "${cerfqt_global_defaults}" COPYONLY)
     execute_process(COMMAND "${Python3_EXECUTABLE}" "${CERF_HOST_BRANCH_PY}"
-                            --stamp "${cerfqt_global_config}" "${CERFQT_HOST_BRANCH}"
+                            --stamp "${cerfqt_global_defaults}" "${CERFQT_HOST_BRANCH}"
                     RESULT_VARIABLE cerfqt_stamp_rc)
     if(NOT cerfqt_stamp_rc EQUAL 0)
         message(FATAL_ERROR "tools/host_branch.py --stamp failed (${cerfqt_stamp_rc})")
     endif()
     if(CERFQT_GLOBAL_CONFIG_OVERLAY)
         execute_process(COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/../tools/local_config.py"
-                                --merge "${cerfqt_global_config}" "${CERFQT_GLOBAL_CONFIG_OVERLAY}"
+                                --merge "${cerfqt_global_defaults}" "${CERFQT_GLOBAL_CONFIG_OVERLAY}"
                         RESULT_VARIABLE cerfqt_merge_rc)
         if(NOT cerfqt_merge_rc EQUAL 0)
             message(FATAL_ERROR "tools/local_config.py --merge failed (${cerfqt_merge_rc})")
@@ -269,7 +269,7 @@ if(ANDROID)
     qt_add_resources(cerf-qt "cerfqt_install"
         PREFIX "${cerfqt_install_prefix}"
         BASE "${cerfqt_install_dir}"
-        FILES "${cerfqt_global_config}" "${cerfqt_install_dir}/${cerfqt_db_json_name}"
+        FILES "${cerfqt_global_defaults}" "${cerfqt_install_dir}/${cerfqt_db_json_name}"
               "${cerfqt_install_dir}/${cerfqt_huds_json_name}" "${cerfqt_install_dir}/${cerfqt_notices_name}")
     file(TO_CMAKE_PATH "${CERFQT_ANDROID_CE_APPS_DIR}" cerfqt_ce_apps_dir)
     file(GLOB_RECURSE cerfqt_ce_apps CONFIGURE_DEPENDS "${cerfqt_ce_apps_dir}/*")
@@ -284,6 +284,13 @@ if(ANDROID)
         PREFIX "${cerfqt_install_prefix}/${cerfqt_shaders_dir_name}"
         BASE "${cerfqt_bundled_shaders_dir}"
         FILES ${cerfqt_bundled_shaders})
+    cerf_read_string_define(cerfqt_enterprise_dir_name "${CERF_INSTALL_ROOT_HEADER}" CERF_ENTERPRISE_DIR_NAME)
+    set(cerfqt_bundled_enterprise_dir "${cerfqt_repo_dir}/bundled/${cerfqt_enterprise_dir_name}")
+    file(GLOB_RECURSE cerfqt_bundled_enterprise CONFIGURE_DEPENDS "${cerfqt_bundled_enterprise_dir}/*")
+    qt_add_resources(cerf-qt "cerfqt_enterprise"
+        PREFIX "${cerfqt_install_prefix}/${cerfqt_enterprise_dir_name}"
+        BASE "${cerfqt_bundled_enterprise_dir}"
+        FILES ${cerfqt_bundled_enterprise})
     file(GLOB cerfqt_licenses CONFIGURE_DEPENDS "${cerfqt_repo_dir}/${cerfqt_licenses_dir_name}/*")
     qt_add_resources(cerf-qt "cerfqt_notices"
         PREFIX "${cerfqt_install_prefix}"

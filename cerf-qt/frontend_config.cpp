@@ -9,8 +9,6 @@
 #include <cerfcore/core/config_reader.h>
 #include <cerfcore/core/log.h>
 
-#include <nlohmann/json.hpp>
-
 namespace cerffrontend {
 
 REGISTER_SERVICE(FrontendConfig);
@@ -39,35 +37,44 @@ std::vector<uint8_t> ReadHostKey(const json& j) {
 }
 
 void FrontendConfig::OnReady() {
-    path_ = cerfcore::GetCerfDir() + kGlobalConfigFileName;
-    emu_.Get<cerfcore::ConfigReader>().ReadLoggedJsonFile<json>(path_);
+    auto&             reader = emu_.Get<cerfcore::ConfigReader>();
+    const std::string root   = cerfcore::GetCerfDir();
+    path_                    = root + kGlobalConfigFileName;
+    defaults_                = reader.ReadLoggedJsonFile<json>(root + kGlobalDefaultsFileName);
+    reader.ReadLoggedJsonFile<json>(path_);
 }
 
-json FrontendConfig::Current() const { return LoadJsonObject(QString::fromStdString(path_)); }
+json FrontendConfig::Read() const { return FillMissingKeys(LoadJsonObject(QString::fromStdString(path_)), defaults_); }
 
-std::string FrontendConfig::HostBranch() const {
-    return Current().value(kHostBranchKey, std::string(host_branch_table::kKeyless));
+void FrontendConfig::Assign(json& root, const Key& key, const json& value) const {
+    if (!defaults_.contains(key) || defaults_.at(key) != value) {
+        root[key] = value;
+        return;
+    }
+    if (!root.contains(key)) return;
+    root.at(key.parent_pointer()).erase(key.back());
+    for (Key section = key.parent_pointer(); !section.empty() && root.at(section).empty();
+         section     = section.parent_pointer())
+        root.at(section.parent_pointer()).erase(section.back());
 }
 
-std::string FrontendConfig::Device() const { return Current().value(kDeviceKey, std::string()); }
+std::string FrontendConfig::HostBranch() const { return defaults_.at(kHostBranchKey).get<std::string>(); }
 
-bool FrontendConfig::DiscordRichPresence() const { return Current().value(kDiscordRichPresenceKey, false); }
+std::vector<uint8_t> FrontendConfig::DefaultHostKeyVks() const { return ReadHostKey(defaults_); }
 
-std::vector<uint8_t> FrontendConfig::HostKeyVks() const { return ReadHostKey(Current()); }
+std::string FrontendConfig::Device() const { return Read().at(kDeviceKey).get<std::string>(); }
 
-int FrontendConfig::DefaultScale() const { return Current().value(kDefaultScaleKey, kDynamicScale); }
+bool FrontendConfig::DiscordRichPresence() const { return Read().at(kDiscordRichPresenceKey).get<bool>(); }
 
-std::string FrontendConfig::UpdateChannel() const {
-    return Current().value(kUpdateChannelKey, std::string(kUpdateChannelStable));
-}
+std::vector<uint8_t> FrontendConfig::HostKeyVks() const { return ReadHostKey(Read()); }
 
-bool FrontendConfig::LastSaveStateMode() const { return Current().value(kLastSaveStateModeKey, false); }
+int FrontendConfig::DefaultScale() const { return Read().at(kDefaultScaleKey).get<int>(); }
 
-bool FrontendConfig::TutorialFinished() const {
-    const json config = Current();
-    const auto flag   = config.find(kTutorialFinishedKey);
-    return flag != config.end() && *flag == true;
-}
+std::string FrontendConfig::UpdateChannel() const { return Read().at(kUpdateChannelKey).get<std::string>(); }
+
+bool FrontendConfig::LastSaveStateMode() const { return Read().at(kLastSaveStateModeKey).get<bool>(); }
+
+bool FrontendConfig::TutorialFinished() const { return Read().at(kTutorialFinishedKey) == true; }
 
 bool FrontendConfig::Write(const std::function<void(json&)>& mutate, std::string& error) {
     const bool ok = cerfcore::CfgUpdateJsonFile(path_, mutate, cerfcore::CfgEmptyObject::kWrite, error);
@@ -77,7 +84,7 @@ bool FrontendConfig::Write(const std::function<void(json&)>& mutate, std::string
 
 void FrontendConfig::SaveLastSaveStateMode(bool save_state) {
     std::string error;
-    Write([save_state](json& j) { j[kLastSaveStateModeKey] = save_state; }, error);
+    Write([&](json& j) { Assign(j, Key() / kLastSaveStateModeKey, save_state); }, error);
 }
 
 }

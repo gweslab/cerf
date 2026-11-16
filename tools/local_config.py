@@ -20,7 +20,7 @@ def overlay_for(root: Path, mode: str) -> Optional[Path]:
 
 
 def merge(cerf_json: Path, overlay: Path) -> None:
-    merged = _object(cerf_json)
+    merged = _object(cerf_json) if cerf_json.is_file() else {}
     merged.update(_object(overlay))
     write_json(cerf_json, merged)
 

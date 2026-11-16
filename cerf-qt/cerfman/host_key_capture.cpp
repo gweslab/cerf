@@ -4,7 +4,6 @@
 #include "host_key_list.h"
 
 #include "../frontend_config.h"
-#include "../host_key_binding.h"
 #include "../host_key_label.h"
 #include <cerfcore/host/virtual_keys.h>
 
@@ -22,8 +21,6 @@ bool Contains(const std::vector<uint8_t>& list, uint8_t vk) {
 
 HostKeyCapture::HostKeyCapture(QQuickItem* parent) : QQuickItem(parent) {
     setFlag(ItemAcceptsInputMethod, false);
-    vks_       = cerffrontend::HostKeyBinding::OrDefault({});
-    reset_vks_ = vks_;
 }
 
 QVariantList HostKeyCapture::Vks() const { return HostKeyVariantList(vks_); }

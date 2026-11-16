@@ -2,6 +2,7 @@
 
 #include "manager_qml_engine.h"
 #include "asset_image_provider.h"
+#include "svg_file_image_provider.h"
 #include "svg_icon_provider.h"
 #include "../CerfStyle/legacy_windows.h"
 #include "../CerfStyle/touch_frontend.h"
@@ -58,6 +59,7 @@ ManagerQmlEngine& ManagerEngine::Engine() {
         engine_ = std::make_unique<ManagerQmlEngine>(emu_);
         engine_->addImageProvider(QStringLiteral(CERF_SYMBOL_IMAGE_PROVIDER), new SvgIconProvider);
         engine_->addImageProvider(QStringLiteral(CERF_ASSET_IMAGE_PROVIDER), new AssetImageProvider);
+        engine_->addImageProvider(QStringLiteral(CERF_SVG_FILE_IMAGE_PROVIDER), new SvgFileImageProvider);
     }
     return *engine_;
 }

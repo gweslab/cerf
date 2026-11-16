@@ -4,7 +4,7 @@ There are **three layers** of JSON configuration files:
 
 | # | File | Where | Meaning |
 | --- | --- | --- | --- |
-| 1 | `cerf.json` | next to `cerf.exe` | packed in the release |
+| 1 | `cerf.default.json` and `cerf.json` | next to `cerf.exe` | the values packed in the release, and your changes to them |
 | 2 | `cerf.json` | `devices/<name>/` | a configuration of your device |
 | 3 | `cerf-user.json` | `devices/<name>/` | same, but stores only overrides by user |
 

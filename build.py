@@ -16,7 +16,7 @@ import frontend_build
 import host_branch
 import local_config
 from host_branch import ANDROID_AMD64, ANDROID_ARM64, WIN32_X86
-from product_facts import GLOBAL_CONFIG_NAME
+from product_facts import GLOBAL_CONFIG_NAME, GLOBAL_DEFAULTS_NAME
 
 ANDROID_BRANCHES = {"arm64": ANDROID_ARM64, "amd64": ANDROID_AMD64}
 
@@ -99,8 +99,8 @@ def run(args, branch, lock) -> int:
     out = host_branch.output_dir(ROOT, args.config, branch)
     if frontend_ok:
         if not branch.package_file:
-            host_branch.stamp(out / GLOBAL_CONFIG_NAME, branch)
-            print("[BUILD] {} stamped into {}".format(branch.name, out / GLOBAL_CONFIG_NAME), flush=True)
+            host_branch.stamp(out / GLOBAL_DEFAULTS_NAME, branch)
+            print("[BUILD] {} stamped into {}".format(branch.name, out / GLOBAL_DEFAULTS_NAME), flush=True)
             overlay = local_config.overlay_for(ROOT, args.mode)
             if overlay is not None:
                 try:

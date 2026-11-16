@@ -4,6 +4,7 @@
 
 #include <QPointF>
 #include <QRectF>
+#include <QString>
 
 #include <atomic>
 #include <cstdint>
@@ -28,8 +29,13 @@ public:
     void SetHwLineHit(QRectF hit, QPointF scale);
     bool HitTestHwLine(int x, int y) const;
 
+    const QString& SplashLogo() const { return splash_logo_; }
+    const QString& SplashBadge() const { return splash_badge_; }
+
 private:
     std::string              short_name_;
+    QString                  splash_logo_;
+    QString                  splash_badge_;
     QRectF                   hit_;
     QPointF                  scale_{1.0, 1.0};
     std::atomic<uint64_t>    restart_serial_{0};

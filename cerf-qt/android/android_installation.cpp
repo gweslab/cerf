@@ -2,7 +2,6 @@
 
 #include "../cerfman/file_writer.h"
 #include "../cerfman/filesystem_path.h"
-#include "../cerfman/global_config_migration.h"
 #include "../cerfman/install_directories.h"
 #include "../cerfman/installed_files.h"
 #include "../cerfman/json_file.h"
@@ -46,22 +45,12 @@ bool Place(const QString& source, const QString& target, QString& error) {
 QStringList BundledFiles(const QDir& resources) {
     QStringList  files;
     QDirIterator it(resources.path(), QDir::Files, QDirIterator::Subdirectories);
-    while (it.hasNext()) {
-        const QString relative = resources.relativeFilePath(it.next());
-        if (relative != QLatin1String(cerffrontend::kGlobalConfigFileName)) files.append(relative);
-    }
+    while (it.hasNext()) files.append(resources.relativeFilePath(it.next()));
     return files;
 }
 
 bool PlaceBundledFiles(const QString& root, const QDir& resources, const QStringList& files) {
-    QString          error;
-    const QByteArray staged = QResource(resources.filePath(QLatin1String(cerffrontend::kGlobalConfigFileName)))
-                                  .uncompressedData();
-    if (!MigrateGlobalConfig(Json::parse(staged.cbegin(), staged.cend()),
-                             root + QLatin1Char('/') + QLatin1String(cerffrontend::kGlobalConfigFileName), error)) {
-        LOG(Caution, "cannot migrate the global configuration (%s)\n", qUtf8Printable(error));
-        return false;
-    }
+    QString error;
     for (const QString& relative : files) {
         if (!AdoptInstalledName(PathOf(root), PathOf(relative), error) ||
             !Place(resources.filePath(relative), root + QLatin1Char('/') + relative, error)) {

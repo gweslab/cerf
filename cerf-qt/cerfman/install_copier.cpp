@@ -1,8 +1,8 @@
 #include "install_copier.h"
 
 #include "filesystem_path.h"
-#include "global_config_migration.h"
 #include "installed_files.h"
+#include "json_file.h"
 
 #include "../install_root_files.h"
 
@@ -15,8 +15,7 @@ namespace fs = std::filesystem;
 
 namespace {
 
-constexpr char        kBundleSuffix[]   = ".app";
-constexpr const char* kGlobalConfigName = cerffrontend::kGlobalConfigFileName;
+constexpr char kBundleSuffix[] = ".app";
 
 bool IsBundle(const fs::directory_entry& entry) {
     std::error_code ec;
@@ -74,10 +73,8 @@ bool InstallCopier::ListPayload(QString& error) {
             continue;
         }
         std::error_code status_ec;
-        if (entry.is_symlink(status_ec) || !entry.is_directory(status_ec)) {
-            const fs::path relative = entry.path().lexically_relative(from_);
-            if (relative != fs::path(kGlobalConfigName)) payload_.push_back(relative);
-        }
+        if (entry.is_symlink(status_ec) || !entry.is_directory(status_ec))
+            payload_.push_back(entry.path().lexically_relative(from_));
     }
     if (ec) return Fail(from_, ec, error);
     std::sort(payload_.begin(), payload_.end());
@@ -111,9 +108,6 @@ bool InstallCopier::ListDroppedFiles(QString& error) {
 bool InstallCopier::Prepare(const QString& upgrade_dir, const QString& install_dir, QString& error) {
     from_ = PathOf(upgrade_dir);
     to_   = PathOf(install_dir);
-    const std::optional<Json> staged = ReadJsonObject(PathText(from_ / kGlobalConfigName), error);
-    if (!staged) return false;
-    staged_config_ = *staged;
     return ListBundles(error) && ListPayload(error) && ListDroppedFiles(error);
 }
 
@@ -153,14 +147,6 @@ bool InstallCopier::RemoveDroppedFiles(QString& error) {
 bool InstallCopier::Apply(QString& error) {
     gate_.Report(QStringLiteral("Installing into %1").arg(PathText(to_)));
     if (!RemoveDroppedFiles(error) || !CopyAll(bundles_, ReplaceBundle, error) || !CopyAll(payload_, CopyEntry, error))
-        return false;
-    const QString what = QStringLiteral("Migrating %1").arg(QString::fromLatin1(kGlobalConfigName));
-    gate_.Report(what);
-    if (!Step(QStringLiteral("Migration failed"), what,
-              [&](QString& failure) {
-                  return MigrateGlobalConfig(staged_config_, PathText(to_ / kGlobalConfigName), failure);
-              },
-              error))
         return false;
     gate_.Report(QStringLiteral("Installation complete"));
     return true;

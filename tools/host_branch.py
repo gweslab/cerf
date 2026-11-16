@@ -118,8 +118,7 @@ def stamp(cerf_json: Path, branch: HostBranch) -> None:
     data = json.loads(cerf_json.read_text(encoding="utf-8-sig")) if cerf_json.is_file() else {}
     stamped = dict(data)
     stamped[KEY] = branch.name
-    for key, value in branch.cerf_json_defaults.items():
-        stamped.setdefault(key, value)
+    stamped.update(branch.cerf_json_defaults)
     if stamped == data:
         return
     write_json(cerf_json, stamped)
@@ -128,11 +127,9 @@ def stamp(cerf_json: Path, branch: HostBranch) -> None:
 def cpp_header() -> str:
     branches = list(_BRANCHES.values())
     lines = ["#pragma once", "", "namespace host_branch_table {", "",
-             "struct Row {", "    const char* name;", "    const char* platform_dir;",
-             "    const unsigned char* host_key;", "};", "",
+             "struct Row {", "    const char* name;", "    const char* platform_dir;", "};", "",
              'inline constexpr char kKey[]     = "{}";'.format(KEY),
              'inline constexpr char kHostKeyKey[] = "{}";'.format(HOST_KEY_KEY),
-             'inline constexpr char kKeyless[] = "{}";'.format(KEYLESS),
              'inline constexpr char kKeylessFrontend[] = "{}";'.format(_BRANCHES[KEYLESS].frontend),
              'inline constexpr char kRootEntry[] = "{}";'.format(ROOT_ENTRY),
              'inline constexpr char kReleasePrefix[] = "{}";'.format(RELEASE_PREFIX),
@@ -145,13 +142,8 @@ def cpp_header() -> str:
              'inline constexpr char kEntryObjectSizeKey[] = "{}";'.format(ENTRY_OBJECT_SIZE_KEY),
              'inline constexpr char kEntryObjectSha256Key[] = "{}";'.format(ENTRY_OBJECT_SHA256_KEY),
              'inline constexpr char kEntryChangelogKey[] = "{}";'.format(ENTRY_CHANGELOG_KEY), ""]
-    for index, branch in enumerate(branches):
-        vks = [int(vk) for vk in branch.cerf_json_defaults.get(HOST_KEY_KEY, [])]
-        lines.append("inline constexpr unsigned char kHostKey{}[] = {{{}}};".format(
-            index, ", ".join(str(vk) for vk in vks + [0])))
-    lines += ["", "inline constexpr Row kRows[] = {"]
-    lines += ['    {{"{}", "{}", kHostKey{}}},'.format(b.name, b.platform_dir, index)
-              for index, b in enumerate(branches)]
+    lines += ["inline constexpr Row kRows[] = {"]
+    lines += ['    {{"{}", "{}"}},'.format(b.name, b.platform_dir) for b in branches]
     lines += ["};", "", "}", ""]
     return "\n".join(lines)
 

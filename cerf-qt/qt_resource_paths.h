@@ -23,6 +23,8 @@ QString SymbolIconUrl(const QString& stem);
 QString AssetImageUrl(const QString& stem);
 QString AssetRegionImageUrl(const QString& stem, const QSizeF& canvas_pixels, const QRect& region);
 AssetImageRequest ParseAssetImageRequest(const QString& id);
+QString SvgFileImageUrl(const QString& path);
+QString ParseSvgFileImageRequest(const QString& id);
 QString TintedIconUrl(const QString& stem, const QColor& color);
 QString TintedSymbolUrl(const QUrl& symbol_url, const QColor& color);
 TintedIconRequest ParseTintedIconRequest(const QString& id);

@@ -1,11 +1,9 @@
 #include "settings_model.h"
 
 #include "host_key_list.h"
-#include "installation_host_branch.h"
 #include "json_file.h"
 
 #include "../frontend_config.h"
-#include "../host_key_binding.h"
 
 #include <nlohmann/json.hpp>
 
@@ -17,18 +15,15 @@ REGISTER_SERVICE(SettingsModel);
 namespace {
 
 using cerffrontend::FrontendConfig;
-using cerffrontend::HostKeyBinding;
 
 }
 
 QVariantList SettingsModel::HostKeyVks() const {
-    return HostKeyVariantList(HostKeyBinding::OrDefault(emu_.Get<FrontendConfig>().HostKeyVks()));
+    return HostKeyVariantList(emu_.Get<FrontendConfig>().HostKeyVks());
 }
 
-QVariantList SettingsModel::ResetHostKeyVks() const { return HostKeyVariantList(ResetVks()); }
-
-std::vector<uint8_t> SettingsModel::ResetVks() const {
-    return DefaultHostKeyVks(QString::fromStdString(emu_.Get<FrontendConfig>().HostBranch()));
+QVariantList SettingsModel::ResetHostKeyVks() const {
+    return HostKeyVariantList(emu_.Get<FrontendConfig>().DefaultHostKeyVks());
 }
 
 QString SettingsModel::UpdateChannel() const {
@@ -76,17 +71,14 @@ QString SettingsModel::Save(const QVariantList& host_key, const QString& channel
     const std::string previous_channel = config.UpdateChannel();
 
     const std::vector<uint8_t> vks = ::HostKeyVks(host_key);
-    const std::vector<uint8_t> absent_default = HostKeyBinding::OrDefault({});
-    const bool                 absent = vks == absent_default && ResetVks() == absent_default;
 
     std::string error;
     const bool  written = config.Write(
         [&](Json& j) {
-            j[FrontendConfig::kDiscordRichPresenceKey] = discord;
-            if (absent) j.erase(FrontendConfig::kHostKeyKey);
-            else        j[FrontendConfig::kHostKeyKey] = vks;
-            j[FrontendConfig::kDefaultScaleKey]  = scale;
-            j[FrontendConfig::kUpdateChannelKey] = channel.toStdString();
+            config.Assign(j, FrontendConfig::Key() / FrontendConfig::kDiscordRichPresenceKey, discord);
+            config.Assign(j, FrontendConfig::Key() / FrontendConfig::kHostKeyKey, vks);
+            config.Assign(j, FrontendConfig::Key() / FrontendConfig::kDefaultScaleKey, scale);
+            config.Assign(j, FrontendConfig::Key() / FrontendConfig::kUpdateChannelKey, channel.toStdString());
         },
         error);
     if (!written) return QString::fromStdString(error);

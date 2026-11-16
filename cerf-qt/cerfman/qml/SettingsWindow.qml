@@ -6,7 +6,7 @@ PageWindow {
     property alias deviceLine: view.deviceLine
 
     function showPage(key) {
-        view.show(key)
+        view.showPage(key)
     }
 
     title: view.title

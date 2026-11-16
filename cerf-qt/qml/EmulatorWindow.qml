@@ -100,13 +100,14 @@ ScreenWindow {
         height: guestSurface.overlays.canvas.height
         clip: true
 
-        BootScreenLayer {
+        BootSplash {
             anchors.fill: parent
             visible: guestSurface.tabView.bootShown
             view: guestSurface.tabView
             uiFamily: guestSurface.overlays.uiFamily
             monoFamily: guestSurface.overlays.monoFamily
             pixelScale: guestSurface.overlays.pixelScale
+            safeMargins: guestSurface.safeMargins
         }
 
         HardwareConsole {

@@ -6,6 +6,7 @@
 #include <cerfcore/host/battery.h>
 #include <cerfcore/host/guest_deep_sleep.h>
 #include <cerfcore/host/machine_object_tree.h>
+#include "enterprise_config.h"
 #include "frontend_config.h"
 #include "product_links.h"
 #include "shutdown_teardown.h"
@@ -26,21 +27,40 @@ const char* ShutdownPrompt::Intro(ShutdownTrigger trigger) const {
                : "You have requested a shut down.";
 }
 
-const char* ShutdownPrompt::ActionLabel(ShutdownPromptAction action) const {
-    static constexpr const char* kLabels[kActionCount] = {"Exit emulator", "Soft reset", "Hard reset"};
-    return kLabels[static_cast<int>(action)];
+const char* ShutdownPrompt::ActionLabel(ShutdownAction action) const {
+    switch (action) {
+        case ShutdownAction::Exit:                  return "Exit emulator";
+        case ShutdownAction::SoftReset:             return "Soft reset";
+        case ShutdownAction::HardReset:             return "Hard reset";
+        case ShutdownAction::SaveStateExit:         return "Save state and exit";
+        case ShutdownAction::SaveStateSuspendHost:  return "Save state and suspend host";
+        case ShutdownAction::SaveStatePoweroffHost: return "Save state and power off host";
+        case ShutdownAction::SaveStateRestartHost:  return "Save state and restart host";
+    }
+    return "";
 }
 
-const char* ShutdownPrompt::ResetDescription(ShutdownPromptAction action) const {
-    if (action == ShutdownPromptAction::HardReset) {
-        return "All guest RAM is wiped and the operating system starts with no earlier "
-               "context, the same as a battery pull.\n\n"
-               "Data that lives in persistent storage - flash, NAND or a disk image - is "
-               "not touched.";
+const char* ShutdownPrompt::ActionDescription(ShutdownAction action) const {
+    switch (action) {
+        case ShutdownAction::Exit: return "";
+        case ShutdownAction::SoftReset:
+            return "The guest operating system restarts and keeps everything in RAM, so the "
+                   "object store and any open data survive.\n\n"
+                   "A ROM that does not support a warm start can still clear that data itself.";
+        case ShutdownAction::HardReset:
+            return "All guest RAM is wiped and the operating system starts with no earlier "
+                   "context, the same as a battery pull.\n\n"
+                   "Data that lives in persistent storage - flash, NAND or a disk image - is "
+                   "not touched.";
+        case ShutdownAction::SaveStateExit: return "The emulator saves the state and exits.";
+        case ShutdownAction::SaveStateSuspendHost:
+            return "The emulator saves the state and exits. Then this computer goes to sleep.";
+        case ShutdownAction::SaveStatePoweroffHost:
+            return "The emulator saves the state and exits. Then this computer powers off.";
+        case ShutdownAction::SaveStateRestartHost:
+            return "The emulator saves the state and exits. Then this computer restarts.";
     }
-    return "The guest operating system restarts and keeps everything in RAM, so the "
-           "object store and any open data survive.\n\n"
-           "A ROM that does not support a warm start can still clear that data itself.";
+    return "";
 }
 
 const char* ShutdownPrompt::CancelLabel(ShutdownTrigger trigger) const {
@@ -74,7 +94,19 @@ const char* ShutdownPrompt::SaveLinkText() const {
 }
 
 bool ShutdownPrompt::CountsDown(ShutdownTrigger trigger) const {
-    return trigger == ShutdownTrigger::WindowClose && !emu_.Get<cerfcore::GuestDeepSleep>().Asleep();
+    return trigger == ShutdownTrigger::WindowClose && !emu_.Get<cerfcore::GuestDeepSleep>().Asleep() &&
+           Actions().front() == ShutdownAction::Exit;
+}
+
+std::vector<ShutdownAction> ShutdownPrompt::Actions() const { return emu_.Get<ShutdownPolicy>().Actions(); }
+
+bool ShutdownPrompt::Unattended() const {
+    return emu_.Get<EnterpriseConfig>().Enabled() && Actions().size() == 1;
+}
+
+bool ShutdownPrompt::Exits(ShutdownChoice choice) {
+    return choice == ShutdownChoice::Exit || choice == ShutdownChoice::ExitSave ||
+           choice == ShutdownChoice::SaveSuspendHost;
 }
 
 bool ShutdownPrompt::SaveByDefault() const {
@@ -98,15 +130,21 @@ std::function<void()> ShutdownPrompt::AcOffer(ShutdownTrigger trigger, ShutdownC
     return {};
 }
 
-ShutdownChoice ShutdownPrompt::Commit(ShutdownPromptAction action, bool save, bool remember) {
+ShutdownChoice ShutdownPrompt::Commit(ShutdownAction action, bool save, bool remember) {
     switch (action) {
-        case ShutdownPromptAction::SoftReset: return ShutdownChoice::SoftReset;
-        case ShutdownPromptAction::HardReset: return ShutdownChoice::HardReset;
-        case ShutdownPromptAction::Exit:      break;
+        case ShutdownAction::SoftReset:             return ShutdownChoice::SoftReset;
+        case ShutdownAction::HardReset:             return ShutdownChoice::HardReset;
+        case ShutdownAction::SaveStateExit:         return ShutdownChoice::ExitSave;
+        case ShutdownAction::SaveStateSuspendHost:  return ShutdownChoice::SaveSuspendHost;
+        case ShutdownAction::SaveStatePoweroffHost: return ShutdownChoice::SavePoweroffHost;
+        case ShutdownAction::SaveStateRestartHost:  return ShutdownChoice::SaveRestartHost;
+        case ShutdownAction::Exit:                  break;
     }
     if (remember) emu_.Get<FrontendConfig>().SaveLastSaveStateMode(save);
     return save ? ShutdownChoice::ExitSave : ShutdownChoice::Exit;
 }
+
+ShutdownChoice ShutdownPrompt::CommitUnattended() { return Commit(Actions().front(), false, false); }
 
 bool ShutdownPrompt::BeginCloseRequest() {
     if (close_pending_ || emu_.Get<ShutdownTeardown>().Active()) return false;
@@ -115,7 +153,7 @@ bool ShutdownPrompt::BeginCloseRequest() {
 }
 
 void ShutdownPrompt::FinishCloseRequest(ShutdownChoice choice) {
-    if (choice != ShutdownChoice::Exit && choice != ShutdownChoice::ExitSave) close_pending_ = false;
+    if (!Exits(choice)) close_pending_ = false;
 }
 
 void ShutdownPrompt::CancelCloseRequest() {

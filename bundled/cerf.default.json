@@ -1,0 +1,21 @@
+{
+  "device": "",
+  "bundle_repositories": [],
+  "host_key": [163],
+  "default_scale": 0,
+  "update_channel": "stable",
+  "discord_rich_presence": false,
+  "last_save_state_mode": false,
+  "tutorial_finished": false,
+  "enterprise": {
+    "allowed": false,
+    "enabled": false,
+    "splash": "cerf",
+    "password": "admin",
+    "kiosk": false,
+    "logo_path": "./enterprise/acme.svg"
+  },
+  "policies": {
+    "shutdown": ["exit", "soft_reset", "hard_reset"]
+  }
+}

@@ -45,6 +45,5 @@ private:
         const char* hint;
     };
 
-    std::vector<uint8_t> ResetVks() const;
-    ChannelText          TextOf(const QString& channel) const;
+    ChannelText TextOf(const QString& channel) const;
 };

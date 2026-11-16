@@ -2,6 +2,7 @@
 
 #include "frontend_window.h"
 #include "host_key_binding.h"
+#include "kiosk_mode.h"
 #include <cerfcore/host/virtual_keys.h>
 
 #include <cerfcore/core/cerf_emulator.h>
@@ -69,7 +70,10 @@ bool InputCapture::OnHostKey(uint32_t vk, bool key_up) {
             const bool used = host_key_used_;
             const bool held = host_key_held_;
             host_key_held_  = false;
-            if (held && !used) Toggle();
+            if (held && !used) {
+                Toggle();
+                emu_.Get<KioskMode>().NoteHostKeyTap();
+            }
         }
         return swallow_from_host;
     }

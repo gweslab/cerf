@@ -2,6 +2,7 @@
 
 #include "cerfman/property_sheets.h"
 #include "frontend_window.h"
+#include "password_gated_actions.h"
 
 #include <cerfcore/boot/rom_parser_queries.h>
 #include <cerfcore/core/cerf_emulator.h>
@@ -12,6 +13,7 @@
 #include <QString>
 
 #include <optional>
+#include <string>
 #include <utility>
 
 namespace cerffrontend {
@@ -19,6 +21,14 @@ namespace cerffrontend {
 REGISTER_SERVICE(LivePropertySheet);
 
 void LivePropertySheet::Open(const char* page, bool force_reboot, Done done) {
+    emu_.Get<PasswordGatedActions>().OpenCerfman(
+        [this, page = std::string(page), force_reboot, done] { Show(page.c_str(), force_reboot, done); },
+        [done] {
+            if (done) done(false);
+        });
+}
+
+void LivePropertySheet::Show(const char* page, bool force_reboot, Done done) {
     if (emu_.Get<PropertySheets>().ShowLive(QString::fromLatin1(page), force_reboot)) {
         if (done) waiters_->push_back(std::move(done));
         return;

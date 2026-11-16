@@ -30,6 +30,7 @@ guest_additions
 leds
 cerfman - device manager
 database - board facts shared cerf 
+enterprise-mode
 
 When possible tell user to wrap whole work and EACH session in /tracking skill.
 

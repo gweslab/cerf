@@ -4,7 +4,7 @@
 
 #include <cerfcore/core/service.h>
 
-#include <nlohmann/json_fwd.hpp>
+#include <nlohmann/json.hpp>
 
 #include <cstdint>
 #include <functional>
@@ -16,6 +16,7 @@ namespace cerffrontend {
 class FrontendConfig : public cerfcore::Service {
 public:
     using cerfcore::Service::Service;
+    using Key = nlohmann::ordered_json::json_pointer;
 
     static constexpr char kDeviceKey[]              = "device";
     static constexpr const char* kHostBranchKey     = host_branch_table::kKey;
@@ -37,11 +38,14 @@ public:
 
     void OnReady() override;
 
-    const std::string& Path() const { return path_; }
+    const std::string&            Path() const { return path_; }
+    nlohmann::ordered_json        Read() const;
+    const nlohmann::ordered_json& Defaults() const { return defaults_; }
     std::string HostBranch() const;
     std::string Device() const;
     bool DiscordRichPresence() const;
     std::vector<uint8_t> HostKeyVks() const;
+    std::vector<uint8_t> DefaultHostKeyVks() const;
     int DefaultScale() const;
     std::string UpdateChannel() const;
 
@@ -51,11 +55,11 @@ public:
     bool TutorialFinished() const;
 
     bool Write(const std::function<void(nlohmann::ordered_json&)>& mutate, std::string& error);
+    void Assign(nlohmann::ordered_json& root, const Key& key, const nlohmann::ordered_json& value) const;
 
 private:
-    nlohmann::ordered_json Current() const;
-
-    std::string path_;
+    std::string            path_;
+    nlohmann::ordered_json defaults_;
 };
 
 }

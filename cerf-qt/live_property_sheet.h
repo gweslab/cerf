@@ -23,6 +23,7 @@ public:
 private:
     using Waiters = std::vector<Done>;
 
+    void Show(const char* page, bool force_reboot, Done done);
     void Finish(bool accepted, GuestReset reset, const Waiters& waiters);
 
     std::shared_ptr<Waiters>     waiters_;

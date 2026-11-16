@@ -7,13 +7,8 @@
 
 namespace cerffrontend {
 
-std::vector<uint8_t> HostKeyBinding::OrDefault(std::vector<uint8_t> vks) {
-    if (vks.empty()) return {kDefaultVk};
-    return vks;
-}
-
 void HostKeyBinding::OnReady() {
-    vks_   = OrDefault(emu_.Get<FrontendConfig>().HostKeyVks());
+    vks_   = emu_.Get<FrontendConfig>().HostKeyVks();
     label_ = HostKeyComboLabel(vks_);
 }
 

@@ -1,6 +1,7 @@
 #include "host_menu_model.h"
 
 #include "frontend_dialogs.h"
+#include "../enterprise_menu.h"
 #include "../frontend_window.h"
 #include "../host_key_binding.h"
 #include "../hud_selection.h"
@@ -96,10 +97,11 @@ std::vector<MenuItem> HostMenuModel::Actions() {
     items.push_back(MenuItem::Action("Hard reset…", [this] { ConfirmHardReset(); }));
     items.push_back(MenuItem{});
     MenuItem settings = MenuItem::Action("Settings…", [this] {
-        emu_.Get<QtManagerWindowOpener>().OpenSettings(settings_page::kEmulator, EmulatedDeviceLine());
+        emu_.Get<QtManagerWindowOpener>().OpenSettings(settings_page::kHome, EmulatedDeviceLine());
     });
     settings.role     = MenuRole::kSettings;
     items.push_back(std::move(settings));
+    for (MenuItem& item : emu_.Get<EnterpriseMenu>().Items()) items.push_back(std::move(item));
     items.push_back(MenuItem{});
     for (MenuItem& widget : emu_.Get<BarWidgetsMenu>().Build())
         items.push_back(std::move(widget));

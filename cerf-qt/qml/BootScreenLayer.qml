@@ -58,7 +58,7 @@ Rectangle {
     readonly property real labelGap: logoSize * labelGapPart
     readonly property real rise: (labelGap + Theme.bootLabelSize) / 2 * textOpacity
     readonly property real labelRoom: contentBottom - label.implicitHeight - (logo.y + logo.height)
-    readonly property rect hit: statusShown ? Qt.rect(0, status.y - hitSlack, width, height - stripRoom - status.y + hitSlack)
+    readonly property rect hit: statusShown && visible ? Qt.rect(0, status.y - hitSlack, width, height - stripRoom - status.y + hitSlack)
                                             : Qt.rect(0, 0, 0, 0)
 
     function glowAt(position) {

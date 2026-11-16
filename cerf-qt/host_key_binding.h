@@ -1,7 +1,5 @@
 #pragma once
 
-#include <cerfcore/host/virtual_keys.h>
-
 #include <cerfcore/core/service.h>
 
 #include <cstdint>
@@ -13,10 +11,6 @@ namespace cerffrontend {
 class HostKeyBinding : public cerfcore::Service {
 public:
     using cerfcore::Service::Service;
-
-    static constexpr uint8_t kDefaultVk = cerfcore::kVkRControl;
-
-    static std::vector<uint8_t> OrDefault(std::vector<uint8_t> vks);
 
     void OnReady() override;
 

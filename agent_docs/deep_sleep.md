@@ -32,7 +32,9 @@ and hard reset work during the sleep as at any other time. `Resume()` works from
 thread. The park delivers the wake on the JIT thread.
 
 **A frontend never exits CERF on a timer while the guest sleeps.** A countdown can
-exit CERF and discard the live guest RAM while the user is away.
+exit CERF and discard the live guest RAM while the user is away. The shutdown action
+that enterprise mode runs with no dialog is an exception, because the owner of the
+installation set it.
 
 On a clock-stop board, a reset that ends a sleep powers the system up before the reset
 reaches the CPU. This holds for every source of the reset. A soft reset resets only the

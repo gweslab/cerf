@@ -28,7 +28,8 @@ Json InstalledFileRecord(const QStringList& files) {
 QStringList DroppedFiles(const QStringList& before, const QStringList& now) {
     QStringList dropped;
     for (const QString& file : before)
-        if (!now.contains(file, Qt::CaseInsensitive) && !dropped.contains(file, Qt::CaseInsensitive))
+        if (!now.contains(file, Qt::CaseInsensitive) && !dropped.contains(file, Qt::CaseInsensitive) &&
+            file.compare(QLatin1String(cerffrontend::kGlobalConfigFileName), Qt::CaseInsensitive) != 0)
             dropped.append(file);
     return dropped;
 }

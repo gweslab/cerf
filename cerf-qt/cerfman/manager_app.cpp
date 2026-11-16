@@ -4,6 +4,7 @@
 #include "install_options.h"
 #include "install_stage_model.h"
 #include "manager_engine.h"
+#include "password_gate.h"
 
 #include <cerfcore/core/cerf_config.h>
 #include <cerfcore/core/cerf_emulator.h>
@@ -45,7 +46,11 @@ int ManagerApp::Run(int argc, char** argv, const std::function<int(cerfcore::Cer
 }
 
 int ManagerApp::RunManager(bool upgraded) {
-    emu_.Get<ManagerEngine>().Open(QStringLiteral("Main"), {{QStringLiteral("upgraded"), upgraded}});
+    emu_.Get<PasswordGate>().GuardCerfman(
+        [this, upgraded] {
+            emu_.Get<ManagerEngine>().Open(QStringLiteral("Main"), {{QStringLiteral("upgraded"), upgraded}});
+        },
+        [] { QCoreApplication::quit(); });
     return QCoreApplication::exec();
 }
 

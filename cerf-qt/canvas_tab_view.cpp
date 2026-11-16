@@ -29,6 +29,8 @@ void CanvasTabView::Refresh(cerfcore::CerfEmulator& emu, QPointF scale) {
     const QString line = boot_shown ? QString::fromStdString(emu.Get<cerfcore::HwScreen>().LastLine()) : hw_line_;
     if (auto& log = emu.Get<cerffrontend::HwScreenLog>(); console_shown && log.Rebuild()) log_.Update(log.Lines());
     boot.SetHwLineHit(boot_shown && !line.isEmpty() ? hw_line_hit_ : QRectF(), scale);
+    Publish(splash_logo_, boot.SplashLogo(), &CanvasTabView::splashChanged);
+    Publish(splash_badge_, boot.SplashBadge(), &CanvasTabView::splashChanged);
     Publish(paused_, paused, &CanvasTabView::pausedChanged);
     Publish(boot_label_, label, &CanvasTabView::bootLabelChanged);
     Publish(latched_, latched, &CanvasTabView::latchedChanged);

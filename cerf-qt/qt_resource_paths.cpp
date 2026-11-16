@@ -2,12 +2,16 @@
 
 #include "resource_paths_text.h"
 
+#include <QByteArray>
 #include <QFileInfo>
 #include <QStringList>
 
 namespace {
 
 constexpr char kAssetRegionPart[] = "/region/";
+
+constexpr QByteArray::Base64Options kSvgFilePathEncoding =
+    QByteArray::Base64UrlEncoding | QByteArray::OmitTrailingEquals;
 
 QString QrcUrl(const QString& resource) { return QStringLiteral("qrc") + resource; }
 
@@ -45,6 +49,15 @@ AssetImageRequest ParseAssetImageRequest(const QString& id) {
     const QStringList f = id.mid(at + marker.size()).split(QLatin1Char(','));
     return {id.left(at), QSizeF(f[0].toDouble(), f[1].toDouble()),
             QRect(f[2].toInt(), f[3].toInt(), f[4].toInt(), f[5].toInt())};
+}
+
+QString SvgFileImageUrl(const QString& path) {
+    return ImageProviderUrl(CERF_SVG_FILE_IMAGE_PROVIDER,
+                            QString::fromLatin1(path.toUtf8().toBase64(kSvgFilePathEncoding)));
+}
+
+QString ParseSvgFileImageRequest(const QString& id) {
+    return QString::fromUtf8(QByteArray::fromBase64(id.toLatin1(), kSvgFilePathEncoding));
 }
 
 QString TintedIconUrl(const QString& stem, const QColor& color) {

@@ -1,7 +1,6 @@
 #pragma once
 
 #include "install_retry_gate.h"
-#include "json_file.h"
 
 #include <QString>
 #include <QStringList>
@@ -31,7 +30,6 @@ private:
     const InstallRetryGate&            gate_;
     std::filesystem::path              from_;
     std::filesystem::path              to_;
-    Json                               staged_config_;
     std::vector<std::filesystem::path> bundles_;
     std::vector<std::filesystem::path> payload_;
     std::vector<std::filesystem::path> dropped_;

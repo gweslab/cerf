@@ -1,5 +1,9 @@
 #include "boot_screen.h"
 
+#include "enterprise_config.h"
+#include "qt_resource_paths.h"
+#include "resource_paths_text.h"
+
 #include <cerfcore/boards/board_context.h>
 #include <cerfcore/core/cerf_emulator.h>
 #include <cerfcore/host/guest_power_notifier.h>
@@ -11,6 +15,12 @@ REGISTER_SERVICE(BootScreen);
 void BootScreen::OnReady() {
     short_name_ = emu_.Get<cerfcore::BoardContext>().ShortBoardName();
     emu_.Get<cerfcore::GuestPowerNotifier>().RegisterRebootListener([this] { Restart(); });
+    const auto&       enterprise = emu_.Get<EnterpriseConfig>();
+    const std::string splash     = enterprise.Splash();
+    const bool        badge      = splash == EnterpriseConfig::kSplashEnterprise;
+    if (!badge && splash != EnterpriseConfig::kSplashEnterpriseNoBadge) return;
+    splash_logo_ = SvgFileImageUrl(QString::fromStdString(enterprise.LogoFile()));
+    if (badge) splash_badge_ = AssetImageUrl(QStringLiteral(CERF_INLINE_LOGO_ASSET));
 }
 
 std::string BootScreen::Label() const {

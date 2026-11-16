@@ -33,10 +33,13 @@ Json BundleRepositories::ToJson(const std::vector<BundleRepository>& repositorie
 }
 
 std::vector<BundleRepository> BundleRepositories::Read() const {
-    return Parse(LoadJsonObject(QString::fromStdString(emu_.Get<cerffrontend::FrontendConfig>().Path())));
+    return Parse(emu_.Get<cerffrontend::FrontendConfig>().Read());
 }
 
 bool BundleRepositories::Write(const std::vector<BundleRepository>& repositories, std::string& error) const {
-    return emu_.Get<cerffrontend::FrontendConfig>().Write(
-        [&](Json& root) { root[kBundleRepositoriesKey] = ToJson(repositories); }, error);
+    using cerffrontend::FrontendConfig;
+    auto& config = emu_.Get<FrontendConfig>();
+    return config.Write(
+        [&](Json& root) { config.Assign(root, FrontendConfig::Key() / kBundleRepositoriesKey, ToJson(repositories)); },
+        error);
 }

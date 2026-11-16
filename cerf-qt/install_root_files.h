@@ -6,6 +6,7 @@
 namespace cerffrontend {
 
 inline constexpr char kGlobalConfigFileName[] = CERF_GLOBAL_CONFIG_NAME;
+inline constexpr char kGlobalDefaultsFileName[] = CERF_GLOBAL_DEFAULTS_NAME;
 inline constexpr char kNoticesFileName[]      = CERF_NOTICES_NAME;
 inline constexpr char kInstalledFilesName[]   = CERF_INSTALLED_FILES_NAME;
 inline constexpr char kInstalledFilesKey[]    = CERF_INSTALLED_FILES_KEY;

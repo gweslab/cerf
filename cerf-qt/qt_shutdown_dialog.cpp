@@ -1,5 +1,6 @@
 #include "qt_shutdown_dialog.h"
 
+#include "host_power_actions.h"
 #include "html_link.h"
 #include "qt_emulator_window.h"
 #include "yes_no_prompt.h"
@@ -14,32 +15,43 @@
 #include <QString>
 #include <QVariantList>
 
-#include <cstdint>
 #include <functional>
 
 REGISTER_SERVICE(QtShutdownDialog);
 
 namespace {
 
+using cerffrontend::HostPowerActions;
+using cerffrontend::ShutdownAction;
 using cerffrontend::ShutdownChoice;
 using cerffrontend::ShutdownPrompt;
-using cerffrontend::ShutdownPromptAction;
 using cerffrontend::ShutdownTrigger;
 
-constexpr uint32_t kSleepGraceMs = 100;
+constexpr uint32_t kSleepGraceMs            = 100;
+constexpr uint32_t kUnattendedSleepSettleMs = 3000;
+constexpr int      kNoAction                = -1;
 
 }
 
 void QtShutdownDialog::OnReady() {
     window_ = &emu_.Get<QtEmulatorWindow>();
     emu_.Get<cerfcore::GuestDeepSleep>().RegisterSleepListener([this](bool asleep) {
-        if (!asleep) {
-            window_->RunOnUiThread([this] { FollowSleep(); });
-            return;
-        }
-        window_->RunOnUiThread([this] { StopCountdown(); });
-        window_->RunOnUiThreadAfter(kSleepGraceMs, [this] { FollowSleep(); });
+        window_->RunOnUiThread([this, asleep] {
+            const uint32_t change = ++sleep_changes_;
+            if (!asleep) {
+                FollowSleep();
+                return;
+            }
+            StopCountdown();
+            window_->RunOnUiThreadAfter(SleepSettleMs(), [this, change] {
+                if (change == sleep_changes_) FollowSleep();
+            });
+        });
     });
+}
+
+uint32_t QtShutdownDialog::SleepSettleMs() {
+    return emu_.Get<ShutdownPrompt>().Unattended() ? kUnattendedSleepSettleMs : kSleepGraceMs;
 }
 
 void QtShutdownDialog::StopCountdown() {
@@ -58,6 +70,17 @@ void QtShutdownDialog::FollowSleep() {
 }
 
 void QtShutdownDialog::Show(ShutdownTrigger trigger) {
+    auto& prompt = emu_.Get<ShutdownPrompt>();
+    if (open_ || !prompt.Unattended()) {
+        ShowDialog(trigger);
+        return;
+    }
+    const ShutdownChoice choice = prompt.CommitUnattended();
+    if (trigger == ShutdownTrigger::WindowClose) prompt.FinishCloseRequest(choice);
+    Perform(trigger, choice);
+}
+
+void QtShutdownDialog::ShowDialog(ShutdownTrigger trigger) {
     auto& prompt = emu_.Get<ShutdownPrompt>();
     if (open_) {
         if (trigger == ShutdownTrigger::WindowClose) prompt.CancelCloseRequest();
@@ -85,11 +108,12 @@ QVariantMap QtShutdownDialog::Texts(ShutdownTrigger trigger) {
     auto&        prompt = emu_.Get<ShutdownPrompt>();
     QVariantList actions;
     QVariantList descriptions;
-    for (int i = 0; i < ShutdownPrompt::kActionCount; ++i) {
-        const auto action = static_cast<ShutdownPromptAction>(i);
+    int          exit_action = kNoAction;
+    shown_actions_           = prompt.Actions();
+    for (ShutdownAction action : shown_actions_) {
+        if (action == ShutdownAction::Exit) exit_action = static_cast<int>(actions.size());
         actions.append(QString::fromUtf8(prompt.ActionLabel(action)));
-        descriptions.append(action == ShutdownPromptAction::Exit ? QString()
-                                                                 : QString::fromUtf8(prompt.ResetDescription(action)));
+        descriptions.append(QString::fromUtf8(prompt.ActionDescription(action)));
     }
     return QVariantMap{
         {QStringLiteral("title"), QString::fromUtf8(prompt.Title())},
@@ -98,7 +122,7 @@ QVariantMap QtShutdownDialog::Texts(ShutdownTrigger trigger) {
         {QStringLiteral("countdownMs"), static_cast<int>(ShutdownPrompt::kCountdownMs)},
         {QStringLiteral("intro"), QString::fromUtf8(prompt.Intro(trigger))},
         {QStringLiteral("actions"), actions},
-        {QStringLiteral("exitAction"), static_cast<int>(ShutdownPromptAction::Exit)},
+        {QStringLiteral("exitAction"), exit_action},
         {QStringLiteral("descriptions"), descriptions},
         {QStringLiteral("okLabel"), QStringLiteral("OK")},
         {QStringLiteral("cancelLabel"), QString::fromUtf8(prompt.CancelLabel(trigger))},
@@ -115,7 +139,7 @@ ShutdownChoice QtShutdownDialog::Choice(const QVariant& result) {
     if (result.typeId() != QMetaType::QVariantMap) return ShutdownChoice::Cancel;
     const QVariantMap chosen = result.toMap();
     return emu_.Get<ShutdownPrompt>().Commit(
-        static_cast<ShutdownPromptAction>(chosen.value(QStringLiteral("action")).toInt()),
+        shown_actions_[static_cast<size_t>(chosen.value(QStringLiteral("action")).toInt())],
         chosen.value(QStringLiteral("save")).toBool(), chosen.value(QStringLiteral("remember")).toBool());
 }
 
@@ -139,19 +163,29 @@ void QtShutdownDialog::Perform(ShutdownTrigger trigger, ShutdownChoice choice) {
         case ShutdownChoice::SoftReset: emu_.Get<cerfcore::GuestCpuReset>().WarmResetFromHost(); return;
         case ShutdownChoice::HardReset: emu_.Get<cerfcore::GuestColdBoot>().RequestHardResetFromHost(); return;
         case ShutdownChoice::Exit:      window_->BeginShutdownTeardown(); return;
-        case ShutdownChoice::ExitSave:  SaveAndExit(); return;
+        case ShutdownChoice::ExitSave:  SaveAndExit(false); return;
+        case ShutdownChoice::SaveSuspendHost:
+            emu_.Get<HostPowerActions>().RequireSuspend();
+            SaveAndExit(true);
+            return;
+        case ShutdownChoice::SavePoweroffHost: emu_.Get<HostPowerActions>().PowerOff();
+        case ShutdownChoice::SaveRestartHost:  emu_.Get<HostPowerActions>().Restart();
     }
 }
 
-void QtShutdownDialog::SaveAndExit() {
-    emu_.Get<cerfcore::Hibernation>().SaveAsync("", [this](bool saved) {
-        window_->RunOnUiThread([this, saved] {
+void QtShutdownDialog::SaveAndExit(bool suspend_host) {
+    if (saving_) return;
+    saving_ = true;
+    emu_.Get<cerfcore::Hibernation>().SaveAsync("", [this, suspend_host](bool saved) {
+        window_->RunOnUiThread([this, saved, suspend_host] {
+            saving_ = false;
             if (saved) {
-                window_->BeginShutdownTeardown();
+                if (suspend_host) emu_.Get<HostPowerActions>().Suspend([this] { window_->BeginShutdownTeardown(); });
+                else              window_->BeginShutdownTeardown();
                 return;
             }
             emu_.Get<ShutdownPrompt>().CancelCloseRequest();
-            if (emu_.Get<cerfcore::GuestDeepSleep>().Asleep()) Show(ShutdownTrigger::GuestSleep);
+            if (emu_.Get<cerfcore::GuestDeepSleep>().Asleep()) ShowDialog(ShutdownTrigger::GuestSleep);
         });
     });
 }

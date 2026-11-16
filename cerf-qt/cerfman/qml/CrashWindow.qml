@@ -7,6 +7,7 @@ PageWindow {
     property bool mobile: false
     property string crashLogPath
     readonly property bool narrow: width < Theme.compactWidth
+    readonly property bool community: !EnterpriseModel.Enabled()
     readonly property int buttonWidth: 180
 
     title: qsTr("Unexpected error - %1").arg(ProductLinks.productName)
@@ -84,6 +85,7 @@ PageWindow {
 
             LinkLabel {
                 Layout.fillWidth: true
+                visible: host.community
                 text: FeedbackModel.available
                       ? qsTr("If you think you have found an actual bug - %1.  Maybe someone has already reported "
                              + "that - you can upvote it.").arg(host.feedbackLink(qsTr("see GitHub issues")))
@@ -94,6 +96,7 @@ PageWindow {
 
             GridLayout {
                 Layout.fillWidth: true
+                visible: host.community
                 columns: host.narrow ? 1 : 2
                 columnSpacing: Theme.spaceXXL
                 rowSpacing: Theme.spaceL

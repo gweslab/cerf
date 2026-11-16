@@ -27,6 +27,8 @@ class CanvasTabView : public QObject {
     Q_PROPERTY(int restartSerial READ RestartSerial NOTIFY restartSerialChanged)
     Q_PROPERTY(bool latched READ Latched NOTIFY latchedChanged)
     Q_PROPERTY(QString hwLine READ HwLine NOTIFY hwLineChanged)
+    Q_PROPERTY(QString splashLogo READ SplashLogo NOTIFY splashChanged)
+    Q_PROPERTY(QString splashBadge READ SplashBadge NOTIFY splashChanged)
     Q_PROPERTY(QAbstractItemModel* log READ Log CONSTANT)
     Q_PROPERTY(QUrl logo READ Logo CONSTANT)
     Q_PROPERTY(BootLogoParts* bootLogo READ BootLogo CONSTANT)
@@ -41,6 +43,8 @@ public:
     int                 RestartSerial() const { return restart_serial_; }
     bool                Latched() const { return latched_; }
     QString             HwLine() const { return hw_line_; }
+    QString             SplashLogo() const { return splash_logo_; }
+    QString             SplashBadge() const { return splash_badge_; }
     QAbstractItemModel* Log() { return &log_; }
     QUrl                Logo() const;
     BootLogoParts*      BootLogo() { return &boot_logo_; }
@@ -57,6 +61,7 @@ signals:
     void restartSerialChanged();
     void latchedChanged();
     void hwLineChanged();
+    void splashChanged();
 
 private:
     template <typename T>
@@ -75,5 +80,7 @@ private:
     int              restart_serial_ = 0;
     bool             latched_        = false;
     QString          hw_line_;
+    QString          splash_logo_;
+    QString          splash_badge_;
     QRectF           hw_line_hit_;
 };

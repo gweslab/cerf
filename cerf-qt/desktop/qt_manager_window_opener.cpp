@@ -1,6 +1,7 @@
 #include "qt_manager_window_opener.h"
 
 #include "../cerfman/property_sheets.h"
+#include "../password_gated_actions.h"
 #include "../qt_emulator_window.h"
 
 #include <cerfcore/core/cerf_emulator.h>
@@ -16,13 +17,16 @@
 REGISTER_SERVICE(QtManagerWindowOpener);
 
 void QtManagerWindowOpener::OpenSettings(const char* page, const std::string& device_line) {
-    QMetaObject::invokeMethod(emu_.Get<QtEmulatorWindow>().Window(), "openSettings",
-                              Q_ARG(QVariant, QString::fromLatin1(page)),
-                              Q_ARG(QVariant, QString::fromStdString(device_line)));
+    emu_.Get<cerffrontend::PasswordGatedActions>().OpenCerfman([this, page = std::string(page), device_line] {
+        QMetaObject::invokeMethod(emu_.Get<QtEmulatorWindow>().Window(), "openSettings",
+                                  Q_ARG(QVariant, QString::fromStdString(page)),
+                                  Q_ARG(QVariant, QString::fromStdString(device_line)));
+    });
 }
 
 void QtManagerWindowOpener::OpenTutorial() {
-    QMetaObject::invokeMethod(emu_.Get<QtEmulatorWindow>().Window(), "openTutorial");
+    emu_.Get<cerffrontend::PasswordGatedActions>().OpenCerfman(
+        [this] { QMetaObject::invokeMethod(emu_.Get<QtEmulatorWindow>().Window(), "openTutorial"); });
 }
 
 void QtManagerWindowOpener::EditLiveProperties(const char* page, bool force_reboot, std::optional<int> ce_major,

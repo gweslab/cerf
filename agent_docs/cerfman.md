@@ -41,19 +41,28 @@ instance that shows the crash window halts too, the app ends at once.
 The manager writes its log to `manager.log` in the install root. The install root is the
 folder that holds the global `cerf.json`.
 
-## The three configuration files
+## The configuration files
 
 | File | Content |
 |---|---|
 | `devices/<name>/cerf.json` | The truth about the device: `meta`, `board.id`, `rom.primary`. A bundle update replaces it. Nobody edits it by hand. |
 | `devices/<name>/cerf-user.json` | Every user setting of the device and the repository link. It survives a bundle update. It wins over `cerf.json`. |
-| `<install root>/cerf.json` | The keys that belong to the installation, not to one device. |
+| `<install root>/cerf.default.json` | The standard value of every global key. Each build ships it, and an upgrade replaces it. Nobody edits it by hand. |
+| `<install root>/cerf.json` | The global keys that the user changed. No build ships it, so an upgrade never changes it. |
 
 `docs/website/content/articles/cerf-json.md` is the schema. It owns what each of these
 files can contain.
 
-When `bundled/cerf.local.json` exists, a dev build puts its top-level keys into the
-global `cerf.json` that it builds. A key in that file replaces the key of the same name.
+A global object merges key by key between the two files. An array in `cerf.json`
+replaces the whole array.
+
+A new global key gets its standard value in `bundled/cerf.default.json`, never as a
+fallback in code. A write of a global key goes through `FrontendConfig::Assign`.
+
+When `bundled/cerf.local.json` exists, a dev build writes its top-level keys into the
+`cerf.json` of the build directory. A key in that file replaces the key of the same name.
+The Android package has no build directory. Its dev build puts those keys into the
+`cerf.default.json` that it packs, so a key in the installed `cerf.json` still wins.
 
 The manager writes a device setting only when it differs from the `cerf.json` value. It
 deletes the file when the file becomes empty. The screen size and the color depth have
@@ -148,8 +157,8 @@ or a lack of memory stops every device that runs.
 ## Self-update and installation
 
 Each channel picks the build for the `host_branch` of the installation. `build.py`
-stamps that key into the global `cerf.json`. `tools/host_branch.py` is the only table
-of host branches. A file with no key is a `win32-x86` build.
+stamps that key into `cerf.default.json`. `tools/host_branch.py` is the only table
+of host branches.
 
 - The stable channel takes the release asset whose name ends with
   `-Release-<platform>.zip`.
@@ -165,17 +174,18 @@ frontend with `--wait-for-pid=<pid> --upgrade`. The install stage then does thes
    build does not name. It compares the names of the two lists without regard to letter
    case on every host. It removes nothing when one of the two lists is missing. It keeps
    and logs an entry that is not a relative path inside the install root. It never removes
-   a folder that holds files, or a file behind a symbolic link. The removal comes before
-   the copy, because a new build can ship a folder where the earlier build had a file.
+   a folder that holds files, or a file behind a symbolic link. It never removes the
+   global `cerf.json`, because the lists of earlier builds name that file. The removal
+   comes before the copy, because a new build can ship a folder where the earlier build
+   had a file.
 3. It copies the staged build over the installation. On macOS it replaces each
    application bundle whole, with its symbolic links. A file or a folder whose name
    differs from a new name only in letter case is the same entry. The copy writes into
    that entry. The installation then holds one entry for that name on every host.
-4. It merges the global `cerf.json`, so user keys survive.
-5. On Windows, it creates the shortcuts that the options name. On an upgrade, it also
+4. On Windows, it creates the shortcuts that the options name. On an upgrade, it also
    rewrites the shortcuts and the Programs and Features entry that point into this
    installation, so integration from an earlier build follows the new executable.
-6. It starts the installed frontend with `--wait-for-pid=<pid> --post-upgrade`. That
+5. It starts the installed frontend with `--wait-for-pid=<pid> --post-upgrade`. That
    process deletes `upgrade/`.
 
 Each CI build of a desktop host lists its own files in `installed_files.json` in its
@@ -183,8 +193,8 @@ release folder (`tools/release_file_list.py`). That list is the only record of w
 build placed.
 
 On Android, the app places its bundled files into the install root at the first start
-of each installed package. It merges `cerf.json` as the install stage does. It records
-the files that it placed in `installed_files.json`. Before it places the files, it removes
+of each installed package. It records the files that it placed in
+`installed_files.json`. Before it places the files, it removes
 each file of the previous record that the new package does not ship, with the rules of
 step 2.
 

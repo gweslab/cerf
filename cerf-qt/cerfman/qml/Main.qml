@@ -419,4 +419,5 @@ ApplicationWindow {
     }
 
     onMobileChanged: if (!touchPlatform && !mobile && stack.depth > 1) stack.pop(null)
+    onActiveChanged: if (active) PasswordGate.Relock(window)
 }

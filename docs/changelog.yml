@@ -1,7 +1,7 @@
 - version: v10.0
   date: TBA
   important: |
-    [macOS] Upgrade hang workaround: you need to wait 30 seconds during upgrade and let CERF kill the old process.
+    Upgrade hangs - workaround: you need to wait 30 seconds during upgrade and let CERF kill the old process.
   devices:
     new: |
       HP Jornada 680, HP 620LX support (thx @Gadgetoid/sh3-emu)

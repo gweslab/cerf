@@ -130,6 +130,18 @@ action of the board. A `sticker` is an `icon` or a short `label` in its own
 cell, and it takes no press. An example is the icon that the device prints above a
 key.
 
+A face is an icon or a label, never both. A control takes the Material Symbols icon of
+its meaning wherever one exists. The face is the same on every device, whatever its
+keycap prints. Examples are Enter, Tab, Shift, Backspace and the keys of office
+programs. When `external/material_symbols` lacks the symbol, you add it from upstream
+Material Symbols.
+
+A control keeps a label when the only symbol of its meaning is a trademark, for example
+the Windows logo. It also keeps a label when the symbol reads as another meaning, for
+example a lock for Num Lock. A symbol of another meaning never stands in for such a
+label, for example a home icon for the Windows key. A control also keeps a label when
+no Material Symbols symbol carries its meaning, for example Esc or Fn.
+
 A `rocker` is a device rocker or dial: `up`, `down` and an optional `center` press,
 with no left and right. It is one cell, so it keeps up above down when Android turns
 its column into a row. A device control that is not a d-pad is never a `dpad`.

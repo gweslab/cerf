@@ -85,7 +85,7 @@ ScreenWindow {
         id: guestSurface
         anchors.fill: parent
         barInsets: Qt.size(verticalBar.visible ? verticalBar.width : 0, horizontalBar.visible ? horizontalBar.height : 0)
-        fillColor: Theme.screenBg
+        fillColor: guestSurface.tabView.bootShown || guestSurface.tabView.consoleShown ? Theme.canvasTabBg : Theme.screenBg
         safeMargins: root.touch ? SafeArea.margins : undefined
         layer.enabled: guestSurface.overlays.dimmed
         layer.effect: MultiEffect {
@@ -106,6 +106,7 @@ ScreenWindow {
             view: guestSurface.tabView
             uiFamily: guestSurface.overlays.uiFamily
             monoFamily: guestSurface.overlays.monoFamily
+            pixelScale: guestSurface.overlays.pixelScale
         }
 
         HardwareConsole {

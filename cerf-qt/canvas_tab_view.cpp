@@ -10,7 +10,8 @@
 #include <cerfcore/host/emulation_pause.h>
 #include <cerfcore/host/hw_screen.h>
 
-CanvasTabView::CanvasTabView(QObject* parent) : QObject(parent), log_(cerffrontend::HwScreenLog::Roles(), this) {}
+CanvasTabView::CanvasTabView(QObject* parent)
+    : QObject(parent), log_(cerffrontend::HwScreenLog::Roles(), this), boot_logo_(this) {}
 
 QUrl CanvasTabView::Logo() const { return QUrl(AssetImageUrl(QStringLiteral(CERF_LOGO_ASSET))); }
 

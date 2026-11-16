@@ -22,6 +22,7 @@ QtObject {
     readonly property color noticeMark: "#ffffff"
 
     readonly property color screenBg: "#000000"
+    readonly property color canvasTabBg: dark ? "#000000" : "#f3f3f3"
     readonly property color previewStopped: "#cfcfcf"
     readonly property color previewRunning: "#3fb950"
     readonly property color previewSaved: "#e8c44a"
@@ -60,12 +61,12 @@ QtObject {
     readonly property color cardMoreText: "#e6e6e6"
     readonly property color cardShadow: "#46000000"
 
-    readonly property color bootGlow: "#192028"
-    readonly property color bootLabel: "#ffffff"
-    readonly property color bootStatus: "#969696"
-    readonly property color consoleText: "#cdcdcd"
-    readonly property color consoleError: "#ff6e6e"
-    readonly property color consoleWarning: "#ebd25a"
+    readonly property color bootGlow: dark ? "#192028" : "#dcdfe3"
+    readonly property color bootLabel: dark ? "#ffffff" : "#1e1e1e"
+    readonly property color bootStatus: dark ? "#969696" : "#6b6b6b"
+    readonly property color consoleText: dark ? "#cdcdcd" : "#2b2b2b"
+    readonly property color consoleError: dark ? "#ff6e6e" : "#c42b1c"
+    readonly property color consoleWarning: dark ? "#ebd25a" : "#8a5a00"
 
     readonly property color barChipFill: "#282c34"
     readonly property color barOutline: "#9696a0"

@@ -15,7 +15,7 @@ Rectangle {
     readonly property real watermarkOpacity: 0.15
     readonly property int edgeMargin: 1
 
-    color: Theme.screenBg
+    color: Theme.canvasTabBg
 
     Image {
         anchors.centerIn: parent

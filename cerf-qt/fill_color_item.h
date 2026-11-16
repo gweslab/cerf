@@ -1,15 +1,11 @@
 #pragma once
 
+#include "device_pixel_snap.h"
+
 #include <QColor>
-#include <QMetaObject>
 #include <QPointF>
-#include <QPointer>
 #include <QQuickItem>
 #include <QtQml/qqmlregistration.h>
-
-#include <vector>
-
-class WindowPixelScale;
 
 class FillColorItem : public QQuickItem {
     Q_OBJECT
@@ -35,11 +31,6 @@ protected:
     QSGNode* updatePaintNode(QSGNode* old_node, UpdatePaintNodeData* data) final;
 
 private:
-    void WatchWindow(QQuickWindow* window);
-    void WatchAncestors();
-
-    QColor                               fill_ = Qt::transparent;
-    QPointer<WindowPixelScale>           pixel_scale_;
-    QMetaObject::Connection              scale_watch_;
-    std::vector<QMetaObject::Connection> ancestor_watch_;
+    QColor          fill_ = Qt::transparent;
+    DevicePixelSnap snap_;
 };

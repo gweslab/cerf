@@ -1,5 +1,6 @@
 #pragma once
 
+#include "boot_logo_parts.h"
 #include "overlay_item_model.h"
 
 #include <QAbstractItemModel>
@@ -28,6 +29,7 @@ class CanvasTabView : public QObject {
     Q_PROPERTY(QString hwLine READ HwLine NOTIFY hwLineChanged)
     Q_PROPERTY(QAbstractItemModel* log READ Log CONSTANT)
     Q_PROPERTY(QUrl logo READ Logo CONSTANT)
+    Q_PROPERTY(BootLogoParts* bootLogo READ BootLogo CONSTANT)
 
 public:
     explicit CanvasTabView(QObject* parent = nullptr);
@@ -41,6 +43,7 @@ public:
     QString             HwLine() const { return hw_line_; }
     QAbstractItemModel* Log() { return &log_; }
     QUrl                Logo() const;
+    BootLogoParts*      BootLogo() { return &boot_logo_; }
 
     Q_INVOKABLE void PlaceHwLine(QRectF hit);
 
@@ -64,6 +67,7 @@ private:
     }
 
     OverlayItemModel log_;
+    BootLogoParts    boot_logo_;
     bool             boot_shown_     = false;
     bool             console_shown_  = false;
     bool             paused_         = false;

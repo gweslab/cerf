@@ -1,6 +1,7 @@
 #pragma once
 
 #include <QImage>
+#include <QRectF>
 #include <QSize>
 #include <QSizeF>
 #include <QString>
@@ -16,7 +17,9 @@ public:
     SvgDocument& operator=(const SvgDocument&) = delete;
 
     QSizeF DefaultSize() const;
+    QRectF ContentBounds() const;
     QImage Render(const QSize& size) const;
+    QImage Render(const QSize& size, const QRectF& source) const;
 
 private:
     resvg_render_tree* tree_ = nullptr;

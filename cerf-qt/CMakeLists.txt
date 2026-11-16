@@ -147,7 +147,7 @@ include(\"${CMAKE_CURRENT_SOURCE_DIR}/deploy_linux.cmake\")
 endif()
 
 set(cerfqt_assets "${CMAKE_CURRENT_SOURCE_DIR}/../assets")
-file(GLOB cerfqt_icons CONFIGURE_DEPENDS "${cerfqt_assets}/${cerfqt_asset_icons_dir}/*.svg")
+file(GLOB_RECURSE cerfqt_icons CONFIGURE_DEPENDS "${cerfqt_assets}/${cerfqt_asset_icons_dir}/*.svg")
 qt_add_resources(cerf-qt "cerfqt_assets"
     PREFIX "/"
     BASE "${cerfqt_assets}"

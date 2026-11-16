@@ -7,23 +7,47 @@ Rectangle {
     property QtObject view
     property string uiFamily
     property string monoFamily
+    property point pixelScale: Qt.point(1, 1)
 
-    readonly property int logoMinSize: 96
-    readonly property int logoMaxSize: 220
-    readonly property real logoScreenPart: 1 / 3
+    readonly property int logoMinSize: 112
+    readonly property int logoMaxSize: 256
+    readonly property real logoScreenPart: 0.4
     readonly property real labelGapPart: 0.14
     readonly property real glowRadiusPart: 1.9
-    readonly property int logoFadeMs: 350
-    readonly property int logoHoldMs: 1200
+    readonly property int frameMs: 600
+    readonly property real frameStartScale: 0.9
+    readonly property int plateMs: 450
+    readonly property int plateStaggerMs: 50
+    readonly property real plateShiftPart: 70 / 1024
+    readonly property int boxesAtMs: 150
+    readonly property int boxMs: 420
+    readonly property int boxStaggerMs: 60
+    readonly property real partFadePart: 0.55
+    readonly property real spinnerStartPart: 0.4
+    readonly property int spinnerFadeInMs: 500
+    readonly property int spinnerFadeOutMs: 450
+    readonly property int spinnerTurnMs: 1800
+    readonly property real spinnerDimOpacity: 0.35
+    readonly property int labelHoldMs: 300
     readonly property int textFadeMs: 350
+    readonly property var settleCurve: [0.16, 1, 0.3, 1, 1, 1]
+    readonly property var popCurve: [0.34, 1.56, 0.64, 1, 1, 1]
+    readonly property var fadeCurve: [0.25, 0.1, 0.25, 1, 1, 1]
+    readonly property var pulseCurve: [0.42, 0, 0.58, 1, 1, 1]
+    readonly property var linearCurve: [0, 0, 1, 1, 1, 1]
     readonly property int statusLineHeight: 16
     readonly property int statusGap: 4
     readonly property int stripRoom: 16
     readonly property int hitSlack: 2
 
-    property real logoOpacity: 0
+    readonly property QtObject parts: view.bootLogo
+    readonly property int lastWave: parts.boxes.reduce((last, box) => Math.max(last, box.row + box.column), 0)
+    readonly property int introMs: Math.max(frameMs, boxesAtMs + lastWave * boxStaggerMs + boxMs,
+                                            (parts.plates.length - 1) * plateStaggerMs + plateMs)
+
     property real textOpacity: 0
     property bool started: false
+    property bool spinning: false
 
     readonly property bool statusShown: view.hwLine !== ""
     readonly property real contentBottom: status.y - statusGap
@@ -42,6 +66,26 @@ Rectangle {
         return Qt.rgba(Theme.bootGlow.r, Theme.bootGlow.g, Theme.bootGlow.b, t * t * (3 - 2 * t))
     }
 
+    function eachPart(action) {
+        action(frame)
+        for (let i = 0; i < plates.count; ++i)
+            action(plates.itemAt(i))
+        for (let i = 0; i < boxes.count; ++i)
+            action(boxes.itemAt(i))
+    }
+
+    function showSpinner(delay) {
+        spinnerOut.stop()
+        spinnerIn.delay = delay
+        spinning = true
+        spinnerIn.restart()
+    }
+
+    function hideSpinner() {
+        spinnerIn.stop()
+        spinnerOut.restart()
+    }
+
     function begin() {
         if (started)
             return
@@ -51,24 +95,39 @@ Rectangle {
         else if (view.restartSerial !== 0)
             restart()
         else
-            intro.start()
+            playIntro()
+    }
+
+    function playIntro() {
+        textFade.stop()
+        textOpacity = 0
+        eachPart(part => part.play())
+        statusFade.restart()
+        intro.restart()
+        showSpinner(frameMs * spinnerStartPart)
     }
 
     function restart() {
         intro.stop()
-        logoOpacity = 1
+        statusFade.stop()
+        status.opacity = 1
+        eachPart(part => part.settle())
         textOpacity = 0
-        textFade.start()
+        textFade.restart()
+        showSpinner(0)
     }
 
     function finish() {
         intro.stop()
         textFade.stop()
-        logoOpacity = 1
+        statusFade.stop()
+        status.opacity = 1
+        eachPart(part => part.settle())
         textOpacity = 1
+        hideSpinner()
     }
 
-    color: Theme.screenBg
+    color: Theme.canvasTabBg
     onHitChanged: view.PlaceHwLine(hit)
     onVisibleChanged: {
         if (visible)
@@ -95,15 +154,8 @@ Rectangle {
     SequentialAnimation {
         id: intro
         paused: running && root.view.paused
-        NumberAnimation {
-            target: root
-            property: "logoOpacity"
-            from: 0
-            to: 1
-            duration: root.logoFadeMs
-        }
         PauseAnimation {
-            duration: root.logoHoldMs
+            duration: root.introMs + root.labelHoldMs
         }
         NumberAnimation {
             target: root
@@ -122,6 +174,80 @@ Rectangle {
         from: 0
         to: 1
         duration: root.textFadeMs
+    }
+
+    NumberAnimation {
+        id: statusFade
+        paused: running && root.view.paused
+        target: status
+        property: "opacity"
+        from: 0
+        to: 1
+        duration: root.frameMs
+    }
+
+    SequentialAnimation {
+        id: spinnerIn
+        property int delay
+        paused: running && root.view.paused
+        PauseAnimation {
+            duration: spinnerIn.delay
+        }
+        NumberAnimation {
+            target: spinnerFade
+            property: "opacity"
+            from: 0
+            to: 1
+            duration: root.spinnerFadeInMs
+            easing.type: Easing.BezierSpline
+            easing.bezierCurve: root.fadeCurve
+        }
+    }
+
+    NumberAnimation {
+        id: spinnerOut
+        paused: running && root.view.paused
+        target: spinnerFade
+        property: "opacity"
+        to: 0
+        duration: root.spinnerFadeOutMs
+        easing.type: Easing.BezierSpline
+        easing.bezierCurve: root.fadeCurve
+        onFinished: root.spinning = false
+    }
+
+    RotationAnimation {
+        target: spinnerTurn
+        from: 0
+        to: 360
+        duration: root.spinnerTurnMs
+        loops: Animation.Infinite
+        running: root.spinning && root.visible
+        paused: running && root.view.paused
+    }
+
+    SequentialAnimation {
+        loops: Animation.Infinite
+        running: root.spinning && root.visible
+        paused: running && root.view.paused
+        NumberAnimation {
+            target: spinner
+            property: "opacity"
+            from: root.spinnerDimOpacity
+            to: 1
+            duration: root.spinnerTurnMs / 2
+            easing.type: Easing.BezierSpline
+            easing.bezierCurve: root.pulseCurve
+        }
+        NumberAnimation {
+            target: spinner
+            property: "opacity"
+            from: 1
+            to: root.spinnerDimOpacity
+            duration: root.spinnerTurnMs / 2
+            easing.type: Easing.BezierSpline
+            easing.bezierCurve: root.pulseCurve
+        }
     }
 
     Shape {
@@ -171,16 +297,94 @@ Rectangle {
         }
     }
 
-    Image {
+    Item {
         id: logo
         anchors.centerIn: parent
         anchors.verticalCenterOffset: -root.rise
         width: root.logoSize
         height: root.logoSize
         visible: root.logoSize > 0
-        opacity: root.logoOpacity
-        source: root.view.logo
-        sourceSize: Qt.size(root.logoSize, root.logoSize)
+        transform: PixelSnap {
+            target: logo
+        }
+
+        BootLogoPart {
+            id: frame
+            part: root.parts.frame
+            parts: root.parts
+            logoSize: logo.width
+            pixelScale: root.pixelScale
+            opacity: 0
+            startScale: root.frameStartScale
+            duration: root.frameMs
+            curve: root.settleCurve
+            fadeDuration: root.frameMs
+            fadeCurve: root.settleCurve
+            paused: root.view.paused
+        }
+
+        Item {
+            id: spinnerFade
+            anchors.fill: parent
+            opacity: 0
+
+            Item {
+                id: spinnerTurn
+                x: root.parts.spinner.x * logo.width
+                y: root.parts.spinner.y * logo.height
+                width: root.parts.spinner.width * logo.width
+                height: root.parts.spinner.height * logo.height
+
+                BootLogoPart {
+                    id: spinner
+                    part: root.parts.spinner
+                    parts: root.parts
+                    logoSize: logo.width
+                    pixelScale: root.pixelScale
+                    origin: Qt.point(spinnerTurn.x, spinnerTurn.y)
+                }
+            }
+        }
+
+        Repeater {
+            id: plates
+            model: root.parts.plates
+            delegate: BootLogoPart {
+                required property var modelData
+                part: modelData
+                parts: root.parts
+                logoSize: logo.width
+                pixelScale: root.pixelScale
+                opacity: 0
+                startShift: -root.plateShiftPart * logo.width
+                delay: modelData.row * root.plateStaggerMs
+                duration: root.plateMs
+                curve: root.settleCurve
+                fadeDuration: root.plateMs * root.partFadePart
+                fadeCurve: root.linearCurve
+                paused: root.view.paused
+            }
+        }
+
+        Repeater {
+            id: boxes
+            model: root.parts.boxes
+            delegate: BootLogoPart {
+                required property var modelData
+                part: modelData
+                parts: root.parts
+                logoSize: logo.width
+                pixelScale: root.pixelScale
+                opacity: 0
+                startScale: 0
+                delay: root.boxesAtMs + (modelData.row + modelData.column) * root.boxStaggerMs
+                duration: root.boxMs
+                curve: root.popCurve
+                fadeDuration: root.boxMs * root.partFadePart
+                fadeCurve: root.linearCurve
+                paused: root.view.paused
+            }
+        }
     }
 
     Text {
@@ -209,7 +413,7 @@ Rectangle {
         anchors.bottomMargin: root.stripRoom + root.statusGap
         height: root.statusLineHeight
         visible: root.statusShown
-        opacity: root.logoOpacity
+        opacity: 0
         text: root.view.hwLine
         textFormat: Text.PlainText
         elide: Text.ElideRight

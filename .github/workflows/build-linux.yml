@@ -27,6 +27,7 @@ jobs:
     steps:
       - name: Install the checkout tools
         run: |
+          dnf -y upgrade
           dnf -y install epel-release dnf-plugins-core
           dnf config-manager --set-enabled crb
           dnf -y install git python3

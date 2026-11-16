@@ -17,6 +17,8 @@ shares the same core, so the core is a family field.
 
 A row states what is true of the board, and what CERF supports on it.
 
+A row field is the last level of data definition.
+
 A set that grows when a board or a SoC arrives is a string id. A closed set
 that a new board never extends is a C++ enum.
 

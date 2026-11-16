@@ -187,7 +187,7 @@ endif()
 
 if(MSVC)
     target_compile_options(cerf-qt PRIVATE /permissive- /utf-8 /MP)
-    target_link_options(cerf-qt PRIVATE /DEBUG
+    target_link_options(cerf-qt PRIVATE /DEBUG /LARGEADDRESSAWARE
                         "/PDBSTRIPPED:$<TARGET_FILE_DIR:cerf-qt>/${cerfqt_frontend_name}.public.pdb"
                         "$<$<CONFIG:Release>:/OPT:REF>" "$<$<CONFIG:Release>:/OPT:ICF>")
     set_source_files_properties(${cerfqt_sources} PROPERTIES COMPILE_OPTIONS "/W4;/WX")

@@ -5,7 +5,7 @@
 #include <string>
 
 inline constexpr char     kWaitForPidArg[]     = "--wait-for-pid=";
-inline constexpr uint32_t kWaitForPidTimeoutMs = 30000;
+inline constexpr uint32_t kWaitForPidTimeoutMs = 5000;
 
 std::string WaitForPidArgument(uint32_t pid);
 bool        ParseWaitForPidArg(const char* arg, std::optional<uint32_t>& pid);

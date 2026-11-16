@@ -481,7 +481,7 @@ python run_claude.py
       <td>TBA</td>
       <td>
         <p><b>⚠️ Important</b><br/>
-          ❗ Upgrade hangs - workaround: you need to wait 30 seconds during upgrade and let CERF kill the old process.</p>
+          ❗ Upgrade hangs - workaround: you need to wait 5 seconds during upgrade and let CERF kill the old process.</p>
         <p><b>📱 Devices</b><br/>
           🆕 HP Jornada 680, HP 620LX support (thx @Gadgetoid/sh3-emu)<br/>
           🆕 NEC Rockhopper: Improved CE.NET OAL support</p>

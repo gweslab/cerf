@@ -35,5 +35,5 @@ Order:
 
 Hint for implementer agent only: Each chunk is wrapped into Skill(verify). Don't jump chunks, get LEGIT everywhere. Solve questions via Skill(verify-options)
 
-Hint for goal agent only: when agent says that the device is implemented - this means so, you mark the goal completed. Don't invent hidden goals.
+Hint for goal agent only: when agent says that the device is implemented - this means so, you mark the goal completed. Don't invent hidden goals and don't demand proofs - the implementer agent has no feature to lie.
 ```

@@ -66,6 +66,10 @@ by its magic bytes and unwraps it. Recognized containers today:
   codename) `.bin` firmware package: a fixed header followed by the bootable OS
   XIP, byte-identical to what an extracted `.nb0` carries. `ArnoldLocateOsXip`
   resolves it.
+- **Siemens FWF** (OMS+ stream, `cerf::fwf_oms::IsOmsStream`) - the Mobile Panels 2nd generation
+  firmware file: an object stream that carries the OS update container. The board programs
+  `/flashboot` of its eMMC image from it, and `BoardBootImage::ReadBootImage` reads the OS image
+  back from there into the flat span (`rom.is_fwf`); a board without that service refuses the file.
 
 CERF unwraps all of these to a **flat XIP span** that the rest of the pipeline
 treats identically.
@@ -89,8 +93,8 @@ treats identically.
 For each declared / auto-detected ROM file:
 
 1. **Read the whole file** into `rom.raw`.
-2. **Detect the container** by leading magic, in order: B000FF → NOSAJ →
-   ARNOLD → else flat NB0. The chosen branch sets `rom.flat` (a span over the
+2. **Detect the container** by leading magic, in order: B000FF → FWF →
+   NOSAJ → ARNOLD → else flat NB0. The chosen branch sets `rom.flat` (a span over the
    bootable XIP) and `rom.flat_base_va` (the VA that file-offset 0 of the flat
    maps to).
 3. **Find the ROMHDR.** Scan the flat for every `ECEC` ROM signature

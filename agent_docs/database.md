@@ -34,6 +34,14 @@ A family and all its known members enter the database in one change. A member
 is known when a source shows that it uses the platform. A family with rows for
 only some of its known members is a defect of the database.
 
+A source puts a model on the platform in two cases. It shows a ROM or an
+upgrade that the vendor ships for the model and for members together, or it
+states that the model is built on a member. A source about one model decides
+only that model and the models built on it. A group that one spec forms, such
+as CPU speed, decides nothing. A part that no source documents never keeps a
+member out, and its row records the parts that are known. A model stays out
+only when a source puts it on another platform.
+
 A field on the family applies to every member. A board sets the field only
 where the board differs, and the value of the board wins. `device_features`
 merge by `feature_id`, `board_config` merges by parameter, and the `notes` of a
@@ -76,6 +84,9 @@ The baseline is the one board of the family that does not have the field.
 
 A `rom_types` or `storage_types` row binds through `board_ids`,
 `board_family_ids`, or both. A row with neither field binds every board.
+
+Settle the member list from platform evidence first, then name the family. An
+argument for a name never decides which models are members.
 
 The name of a family is the name of its platform. Use the public name of the
 vendor for the platform. If no public name exists, use the name that the ROM

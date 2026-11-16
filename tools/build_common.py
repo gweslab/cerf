@@ -41,21 +41,30 @@ class BuildReport:
         self.failed_names.append(name)
 
 
-def _blocking(branch: HostBranch) -> Dict[int, str]:
+def _runs_from_or_unknown(folder: Path, pid: int) -> bool:
+    image = host_processes.executable_path(pid)
+    return image is None or folder.resolve() in Path(image).resolve().parents
+
+
+def _blocking(branch: HostBranch, output: Path) -> Dict[int, str]:
+    frontend = PurePosixPath(branch.frontend)
     if branch.name == WIN32_X86:
-        wanted = {PurePosixPath(branch.frontend).stem.lower()} | {n.lower() for n in WINDOWS_TOOL_BLOCKERS}
+        frontend_name = frontend.stem.lower()
+        tools = {n.lower() for n in WINDOWS_TOOL_BLOCKERS}
     else:
-        wanted = {PurePosixPath(branch.frontend).name.lower()}
+        frontend_name = frontend.name.lower()
+        tools = set()
     me = os.getpid()
     return {pid: name for pid, name in host_processes.list_processes().items()
-            if name.lower() in wanted and pid != me}
+            if pid != me and (name.lower() in tools
+                              or (name.lower() == frontend_name and _runs_from_or_unknown(output, pid)))}
 
 
-def wait_for_blocking_processes(branch: HostBranch, force_kill: bool,
+def wait_for_blocking_processes(branch: HostBranch, output: Path, force_kill: bool,
                                 heartbeat: Callable[[], None]) -> bool:
     deadline = time.monotonic() + WAIT_BUDGET_SECONDS
     while True:
-        procs = _blocking(branch)
+        procs = _blocking(branch, output)
         if not procs:
             return True
         if force_kill:

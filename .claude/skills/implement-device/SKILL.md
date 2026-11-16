@@ -174,10 +174,11 @@ The `yes` authorizes one `/tracking create`. Create an umbrella tracker for the
 bring-up. Put these items in it:
 
 - In `TASK & WHY`: the board, its bundles, and the reason for the bring-up.
-- A standing `VERIFY GATE` line: "A chunk is the code that removes one halt
-  line. Each chunk passes `/verify` before the next chunk starts. Record the
-  verdict in the `/tracking update` of that session, under CODE STATE, verbatim
-  with file:line. Never skip the gate on a JIT, MMU or CPU change."
+- A standing `VERIFY GATE` line: "A chunk is the guest routine at the PC of a
+  halt line, run to its end. Each chunk passes `/verify` before the next chunk
+  starts. Record the verdict in the `/tracking update` of that session, under
+  CODE STATE, verbatim with file:line. Never skip the gate on a JIT, MMU or CPU
+  change."
 - A standing `PROCEDURE` line: "Follow
   `.claude/skills/implement-device/SKILL.md` § The bring-up loop." Copy the
   steps and the chunk rules of the loop under that line.
@@ -196,20 +197,28 @@ CERF halts when the board needs something that CERF does not have. The halt
 line in the log names that thing: a board id, a service, or a physical address
 with a guest PC.
 
-A chunk is the code that removes one halt line.
+A halt line opens a chunk. Its task is the guest routine at the PC of the
+halt, run to its end, together with the routines that it calls. The chunk ends
+when the halt leaves that routine. A halt line with no guest PC, such as a
+board id or a service, opens a chunk for that one item.
 
 1. Run the bundle.
 2. Find the first halt line in the log. Write that line in your reply before
    you edit a file.
-3. Find what the halt line names. For a physical address, find its peripheral
-   block in the memory map of the datasheet.
-4. Research that item only. Read its manual entry and the guest code at the PC
-   of the halt. Save the excerpt that you cite under `references/<soc>/`.
-5. Implement the item fully.
+3. Read the guest routine at the PC of the halt, from its entry to its return.
+   Also read the routines that it calls. List every register and every unit
+   that they read or write. That list is the chunk. For a physical address,
+   find the peripheral block of each register in the memory map of the
+   datasheet.
+4. Research the items of the list only. Read the manual entry of each one and
+   the guest code that touches it. Save the excerpt that you cite under
+   `references/<soc>/`.
+5. Implement every item of the list fully.
 6. Build. Make sure that the build succeeded.
-7. Run the bundle again. Make sure that the halt line changed.
-8. Run `/verify` on the chunk. Correct each `CRITICAL PROBLEM FOUND`. Repeat
-   until the verdict is `LEGIT`.
+7. Run the bundle again. If the new halt line is still inside the routine, the
+   list missed an item. Add the item to the list. Then go to step 4.
+8. When the halt line leaves the routine, run `/verify` on the chunk. Correct
+   each `CRITICAL PROBLEM FOUND`. Repeat until the verdict is `LEGIT`.
 9. Go to step 2 with the new halt line.
 
 Continue until the guest shows its GUI. Then continue until the user can
@@ -217,13 +226,13 @@ operate the device.
 
 Chunk rules:
 
-- Do not create or edit a file that the current halt line does not ask for.
-- Do not research an item that no halt line names.
-- Do not write code for the next halt line before the current chunk is `LEGIT`.
+- Do not create or edit a file that the current chunk does not ask for.
+- Do not research an item that the routine of the current chunk does not touch.
+- Do not write code for the next chunk before the current chunk is `LEGIT`.
   The user wipes a working tree that mixes chunks.
+- If two rules conflict on the current chunk, settle the conflict from the guest
+  and agent_docs in the same turn.
 - Never mix two chunks unless the work requires it.
-- A halt line that changes its text or its address usually ends a chunk. Run
-  `/verify` at that point.
 
 The rule "implement all checklist steps as one body of work" in
 `agent_docs/workflow.md` § Scope Rules does not apply to a bring-up.

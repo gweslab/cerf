@@ -35,16 +35,15 @@ stock driver and the stock behavior, these routes do not apply.
 
 Delete such temporary code when you no longer need it.
 
+If you need to perform a repeating routine for your testing - save the configured save state to prevent
+redoing full device setup.
+
 ## Emulator Features
 
-- If you want to test hibernation, inject touch, inject keyboard presses - you always can create
-  a temporary trace file which does that invasively for you. Delete that file in the same reply
-  that reports what it measured. Write it, build, run, read the log, then remove it before you
-  say what it showed. A report of a measurement is a moment that always arrives. The end of a
-  task is not, and on a hunt across sessions that moment never comes. Do not keep the probe
-  because you need it again. Its text is in the reply that just used it, and to write it again
-  costs a minute. A probe that survives drives the board on every later run, and it reads as a
-  hardware fault.
+- If you want to test hibernation, inject touch or inject keyboard presses, write a trace file
+  under `libCerfCore/src/tracing/<bundle>/`. Gate each invasive action of the file on an
+  environment variable. The file stays on disk with the other trace files of the device. While
+  its variable is absent, it does nothing, so it does not drive the board on later runs.
 - If you want to insert a PC Card, simply temporary modify the code. We usually auto-insert NE2000
   into one slot if guest OS is CE 4+. For CE <= 3, NE2000 interrupts a welcome wizard with a config dialog
   and combine that with not calibrated touch panel.
@@ -56,9 +55,10 @@ Delete such temporary code when you no longer need it.
   run. A welcome page before the calibration screen still needs a tap. On a Guest Additions run above
   the panel size, the flag also writes the panel size into the `cerf-user.json` of the device.
 
-## Env-variable gate for temporary scaffolding
+## Env-variable gate for invasive debugging code
 
-Temp scaffolding reads a host environment variable. It never reads that value from a constant
+Invasive debugging code, in a trace file or in temporary scaffolding, reads a host environment
+variable. It never reads that value from a constant
 in the file. An absent or zero value leaves it inert, so one build serves both the stock run and
 the invasive run. The variable carries a value, not only an on/off flag - a delay, a count, a
 guest address. The variable goes in front of the runner command. A user-facing option is a

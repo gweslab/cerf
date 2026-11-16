@@ -63,7 +63,8 @@ def run(args, branch, lock) -> int:
     def heartbeat():
         cerf_locks.update_stamp(lock)
 
-    if not build_common.wait_for_blocking_processes(branch, args.force_kill, heartbeat):
+    if not build_common.wait_for_blocking_processes(branch, host_branch.output_dir(ROOT, args.config, branch),
+                                                    args.force_kill, heartbeat):
         return 1
     heartbeat()
 

@@ -135,9 +135,11 @@ The user disagrees with the last verdict, and says that the documents already ha
 
 The reason is the text after `void`, verbatim. If that text is empty, the reason is the words with which the user objected to the verdict, verbatim. Do not summarize the reason.
 
-1. Resume the reviewer that returned the verdict. Send this message to its agent ID through `SendMessage`, with nothing added:
+1. Resume the reviewer that returned the verdict. Send this message to its agent ID through `SendMessage`:
 
-   *"The user voids your verdict. The reason of the user, verbatim: "<reason>". Invoke `/session-feedback`. Give your perspective on how agent_docs must change."*
+   *"The user voids your verdict. The reason of the user, verbatim: "<reason>". The facts that make the verdict wrong: <each fact, with its source>. Invoke `/session-feedback`. Give your perspective on how agent_docs must change."*
+
+   The reason of the user can be short. Without the facts, the reviewer cannot see what its verdict missed.
 2. In the same turn, invoke `Skill(session-feedback)` yourself.
 3. Before the reviewer returns, write your own entries to `tmp/verify/<slug>.void.md`, with the slug of the prompt file. The reply of the reviewer then cannot shape your entries.
 4. Do not show your entries to the user yet. End the turn.

@@ -403,11 +403,11 @@ python run_claude.py
       <td rowspan="2" align="center"><b>NEC VR4122</b><br/><sub>MIPS III</sub></td>
       <td rowspan="2"><b>Casio JX670</b></td>
       <td><img src="assets/icons_sources/board.svg" width="16" height="16" title="PDA" alt="PDA"/> <b>Casio Cassiopeia E-700</b> <code>casio_cassiopeia_e700</code></td>
-      <td><img src="assets/icons_sources/stylus.svg" width="32" height="32" title="Touch Panel" alt="Touch Panel"/> <img src="assets/icons_sources/ga_autoresize.svg" width="32" height="32" title="Emulator's Guest Additions" alt="Emulator's Guest Additions"/> <img src="assets/icons_sources/speaker_active.svg" width="32" height="32" title="Built-in/Pluggable Sound" alt="Built-in/Pluggable Sound"/></td>
+      <td><img src="assets/icons_sources/stylus.svg" width="32" height="32" title="Touch Panel" alt="Touch Panel"/> <img src="assets/icons_sources/keyboard.svg" width="32" height="32" title="Keyboard or keypad" alt="Keyboard or keypad"/> <img src="assets/icons_sources/suspend.svg" width="32" height="32" title="CPU Supend/Resume" alt="CPU Supend/Resume"/> <img src="assets/icons_sources/ga_autoresize.svg" width="32" height="32" title="Emulator's Guest Additions" alt="Emulator's Guest Additions"/> <img src="assets/icons_sources/speaker_active.svg" width="32" height="32" title="Built-in/Pluggable Sound" alt="Built-in/Pluggable Sound"/> <img src="assets/icons_sources/microphone.svg" width="32" height="32" title="Built-in/Pluggable Microphone" alt="Built-in/Pluggable Microphone"/></td>
     </tr>
     <tr>
       <td><img src="assets/icons_sources/board.svg" width="16" height="16" title="PDA" alt="PDA"/> <b>Casio Cassiopeia EM-500</b> <code>casio_cassiopeia_em500</code></td>
-      <td><img src="assets/icons_sources/stylus.svg" width="32" height="32" title="Touch Panel" alt="Touch Panel"/> <img src="assets/icons_sources/ga_autoresize.svg" width="32" height="32" title="Emulator's Guest Additions" alt="Emulator's Guest Additions"/> <img src="assets/icons_sources/speaker_active.svg" width="32" height="32" title="Built-in/Pluggable Sound" alt="Built-in/Pluggable Sound"/></td>
+      <td><img src="assets/icons_sources/stylus.svg" width="32" height="32" title="Touch Panel" alt="Touch Panel"/> <img src="assets/icons_sources/keyboard.svg" width="32" height="32" title="Keyboard or keypad" alt="Keyboard or keypad"/> <img src="assets/icons_sources/suspend.svg" width="32" height="32" title="CPU Supend/Resume" alt="CPU Supend/Resume"/> <img src="assets/icons_sources/ga_autoresize.svg" width="32" height="32" title="Emulator's Guest Additions" alt="Emulator's Guest Additions"/> <img src="assets/icons_sources/speaker_active.svg" width="32" height="32" title="Built-in/Pluggable Sound" alt="Built-in/Pluggable Sound"/> <img src="assets/icons_sources/microphone.svg" width="32" height="32" title="Built-in/Pluggable Microphone" alt="Built-in/Pluggable Microphone"/></td>
     </tr>
     <tr>
       <td align="center"><b>NEC VR5500</b><br/><sub>MIPS IV</sub></td>
@@ -449,6 +449,30 @@ python run_claude.py
       <td><img src="assets/icons_sources/stylus.svg" width="32" height="32" title="Touch Panel" alt="Touch Panel"/> <img src="assets/icons_sources/keyboard.svg" width="32" height="32" title="Keyboard or keypad" alt="Keyboard or keypad"/> <img src="assets/icons_sources/suspend.svg" width="32" height="32" title="CPU Supend/Resume" alt="CPU Supend/Resume"/> <img src="assets/icons_sources/ga_autoresize.svg" width="32" height="32" title="Emulator's Guest Additions" alt="Emulator's Guest Additions"/> <img src="assets/icons_sources/speaker_active.svg" width="32" height="32" title="Built-in/Pluggable Sound" alt="Built-in/Pluggable Sound"/> <img src="assets/icons_sources/pcmcia_enabled.svg" width="32" height="32" title="PC Card Socket" alt="PC Card Socket"/> <img src="assets/icons_sources/internet.svg" width="32" height="32" title="Built-in Network Adapter" alt="Built-in Network Adapter"/> <img src="assets/icons_sources/battery.svg" width="32" height="32" title="Battery" alt="Battery"/> <img src="assets/icons_sources/serial_com.svg" width="32" height="32" title="Serial Port" alt="Serial Port"/></td>
     </tr>
     <tr>
+      <td rowspan="2" align="center"><b>Hitachi HD6417096</b><br/><sub>SH-3</sub></td>
+      <td rowspan="2"><b>Casio Cassiopeia A-10</b></td>
+      <td><img src="assets/icons_sources/board.svg" width="16" height="16" title="PDA" alt="PDA"/> <b>Casio Cassiopeia A-11</b> <code>casio_cassiopeia_a11</code></td>
+      <td><img src="assets/icons_sources/stylus.svg" width="32" height="32" title="Touch Panel" alt="Touch Panel"/> <img src="assets/icons_sources/keyboard.svg" width="32" height="32" title="Keyboard or keypad" alt="Keyboard or keypad"/> <img src="assets/icons_sources/suspend.svg" width="32" height="32" title="CPU Supend/Resume" alt="CPU Supend/Resume"/> <img src="assets/icons_sources/ga_autoresize.svg" width="32" height="32" title="Emulator's Guest Additions" alt="Emulator's Guest Additions"/> <img src="assets/icons_sources/speaker_active.svg" width="32" height="32" title="Built-in/Pluggable Sound" alt="Built-in/Pluggable Sound"/> <img src="assets/icons_sources/pcmcia_enabled.svg" width="32" height="32" title="PC Card Socket" alt="PC Card Socket"/> <img src="assets/icons_sources/battery.svg" width="32" height="32" title="Battery" alt="Battery"/> <img src="assets/icons_sources/serial_com.svg" width="32" height="32" title="Serial Port" alt="Serial Port"/></td>
+    </tr>
+    <tr>
+      <td><img src="assets/icons_sources/board.svg" width="16" height="16" title="PDA" alt="PDA"/> <b>Casio Cassiopeia A-51</b> <code>casio_cassiopeia_a51</code></td>
+      <td><img src="assets/icons_sources/stylus.svg" width="32" height="32" title="Touch Panel" alt="Touch Panel"/> <img src="assets/icons_sources/keyboard.svg" width="32" height="32" title="Keyboard or keypad" alt="Keyboard or keypad"/> <img src="assets/icons_sources/suspend.svg" width="32" height="32" title="CPU Supend/Resume" alt="CPU Supend/Resume"/> <img src="assets/icons_sources/ga_autoresize.svg" width="32" height="32" title="Emulator's Guest Additions" alt="Emulator's Guest Additions"/> <img src="assets/icons_sources/speaker_active.svg" width="32" height="32" title="Built-in/Pluggable Sound" alt="Built-in/Pluggable Sound"/> <img src="assets/icons_sources/pcmcia_enabled.svg" width="32" height="32" title="PC Card Socket" alt="PC Card Socket"/> <img src="assets/icons_sources/battery.svg" width="32" height="32" title="Battery" alt="Battery"/> <img src="assets/icons_sources/serial_com.svg" width="32" height="32" title="Serial Port" alt="Serial Port"/></td>
+    </tr>
+    <tr>
+      <td rowspan="3" align="center"><b>Hitachi SH7707</b><br/><sub>SH-3</sub></td>
+      <td rowspan="3"><b>HP 300 series</b></td>
+      <td><img src="assets/icons_sources/board.svg" width="16" height="16" title="PDA" alt="PDA"/> <b>HP 300LX</b> <code>hp_300lx</code></td>
+      <td><img src="assets/icons_sources/stylus.svg" width="32" height="32" title="Touch Panel" alt="Touch Panel"/> <img src="assets/icons_sources/keyboard.svg" width="32" height="32" title="Keyboard or keypad" alt="Keyboard or keypad"/> <img src="assets/icons_sources/suspend.svg" width="32" height="32" title="CPU Supend/Resume" alt="CPU Supend/Resume"/> <img src="assets/icons_sources/ga_autoresize.svg" width="32" height="32" title="Emulator's Guest Additions" alt="Emulator's Guest Additions"/> <img src="assets/icons_sources/speaker_active.svg" width="32" height="32" title="Built-in/Pluggable Sound" alt="Built-in/Pluggable Sound"/> <img src="assets/icons_sources/pcmcia_enabled.svg" width="32" height="32" title="PC Card Socket" alt="PC Card Socket"/> <img src="assets/icons_sources/battery.svg" width="32" height="32" title="Battery" alt="Battery"/> <img src="assets/icons_sources/serial_com.svg" width="32" height="32" title="Serial Port" alt="Serial Port"/></td>
+    </tr>
+    <tr>
+      <td><img src="assets/icons_sources/board.svg" width="16" height="16" title="PDA" alt="PDA"/> <b>HP 320LX</b> <code>hp_320lx</code></td>
+      <td><img src="assets/icons_sources/stylus.svg" width="32" height="32" title="Touch Panel" alt="Touch Panel"/> <img src="assets/icons_sources/keyboard.svg" width="32" height="32" title="Keyboard or keypad" alt="Keyboard or keypad"/> <img src="assets/icons_sources/suspend.svg" width="32" height="32" title="CPU Supend/Resume" alt="CPU Supend/Resume"/> <img src="assets/icons_sources/ga_autoresize.svg" width="32" height="32" title="Emulator's Guest Additions" alt="Emulator's Guest Additions"/> <img src="assets/icons_sources/speaker_active.svg" width="32" height="32" title="Built-in/Pluggable Sound" alt="Built-in/Pluggable Sound"/> <img src="assets/icons_sources/pcmcia_enabled.svg" width="32" height="32" title="PC Card Socket" alt="PC Card Socket"/> <img src="assets/icons_sources/battery.svg" width="32" height="32" title="Battery" alt="Battery"/> <img src="assets/icons_sources/serial_com.svg" width="32" height="32" title="Serial Port" alt="Serial Port"/></td>
+    </tr>
+    <tr>
+      <td><img src="assets/icons_sources/board.svg" width="16" height="16" title="PDA" alt="PDA"/> <b>HP 360LX</b> <code>hp_360lx</code></td>
+      <td><img src="assets/icons_sources/stylus.svg" width="32" height="32" title="Touch Panel" alt="Touch Panel"/> <img src="assets/icons_sources/keyboard.svg" width="32" height="32" title="Keyboard or keypad" alt="Keyboard or keypad"/> <img src="assets/icons_sources/suspend.svg" width="32" height="32" title="CPU Supend/Resume" alt="CPU Supend/Resume"/> <img src="assets/icons_sources/ga_autoresize.svg" width="32" height="32" title="Emulator's Guest Additions" alt="Emulator's Guest Additions"/> <img src="assets/icons_sources/speaker_active.svg" width="32" height="32" title="Built-in/Pluggable Sound" alt="Built-in/Pluggable Sound"/> <img src="assets/icons_sources/pcmcia_enabled.svg" width="32" height="32" title="PC Card Socket" alt="PC Card Socket"/> <img src="assets/icons_sources/battery.svg" width="32" height="32" title="Battery" alt="Battery"/> <img src="assets/icons_sources/serial_com.svg" width="32" height="32" title="Serial Port" alt="Serial Port"/></td>
+    </tr>
+    <tr>
       <td align="center"><b>Hitachi SH7709</b><br/><sub>SH-3</sub></td>
       <td><b>HP 600 series</b></td>
       <td><img src="assets/icons_sources/board.svg" width="16" height="16" title="PDA" alt="PDA"/> <b>HP 620LX</b> <code>hp_620lx</code></td>
@@ -484,15 +508,19 @@ python run_claude.py
           ❗ Upgrade hangs - workaround: you need to wait 5 seconds during upgrade and let CERF kill the old process.</p>
         <p><b>📱 Devices</b><br/>
           🆕 HP Jornada 680, HP 620LX support (thx @Gadgetoid/sh3-emu)<br/>
-          🆕 NEC Rockhopper: Improved CE.NET OAL support</p>
+          🆕 HP 300LX, 320LX, 360LX family support (thx @Gadgetoid/sh3-emu)<br/>
+          🆕 Casio Cassiopeia A11, A51 family support (thx @Gadgetoid/sh3-emu)<br/>
+          🆕 NEC Rockhopper: Improved CE.NET OAL support<br/>
+          ✅ Casio Cassiopeia EM-500 family: Audio playback crash fixes, hardward buttons and HUD</p>
         <p><b>💿 Emulator</b><br/>
           🆕 SH3 guest CPU emulation<br/>
           🆕 RetroArch shaders support (librashader)<br/>
-          🆕 Automatical calibration helper<br/>
+          🆕 Calibration helper - CERF performs calibration automatically<br/>
+          🆕 CERF crashes now save a state - you wont lose data on crash<br/>
           ✅ PS/2 mouse lost double clicks on Android<br/>
           ✅ PS/2 mouse incorrect behaviour fixed<br/>
           ✅ Android&#x27;s HUD is now fully adaptive - saves your screen space<br/>
-          ✅ Emulator is now large address aware, fixes some heavy boards halts on 64-bit systems</p>
+          ✅ Emulator is now large address aware, fixes some heavy boards halts on x64 systems</p>
         <p><b>🗂️ Devices Manager</b><br/>
           🆕 Import, export, clone your devices</p>
         <p><b>✨ Guest Additions</b><br/>

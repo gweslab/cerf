@@ -276,6 +276,11 @@ must ground each of these:
 The grounding reaches you two ways. The prompt declares it above the target.
 The file carries it in any citation it happens to hold. Read both.
 
+**A finding needs a remedy that can be done.** If the only remedy that a finding
+allows is a source that an exhausted search did not find, the finding is wrong.
+The same is true when the only remedy is a halt that ends the boot for good.
+Judge the code against the decompiled guest contract instead.
+
 A permitted source is a decompilation as often as it is a document, and on this
 project it is usually the decompilation. A decompilation grounding names the
 ROM bundle, the module, the function and the address. Verify it the same way
@@ -443,8 +448,8 @@ SUMMARY
 RECOMMENDATIONS
   <Optional. Omit the whole block when you have nothing. See § "Recommendations block".>
 
-NEXT ROUND SPAWN TYPE MUST BE: [resume this agent|spawn new agent]
-  <One of the two, verbatim. See § "Next round spawn type".>
+NEXT ROUND SPAWN TYPE MUST BE: [resume this agent|spawn new agent|spawn new agent; resume this agent if same target continued and has <= 800 lines of round diff]
+  <One of the three, verbatim. See § "Next round spawn type".>
 
 VERDICT: CRITICAL PROBLEM FOUND. [<CATEGORY>]
   -- or --
@@ -457,15 +462,16 @@ One case replaces this whole block and carries no verdict: a cited binary that n
 
 ## Next round spawn type
 
-Every verdict carries one `NEXT ROUND SPAWN TYPE MUST BE:` line, with exactly one of the two values.
+Every verdict carries one `NEXT ROUND SPAWN TYPE MUST BE:` line, with exactly one of the three values.
 
-- **`resume this agent`** - only for light `CRITICAL PROBLEM FOUND` cases. You judge, and the bar is low-risk, mechanical remediation where your context is worth more than fresh eyes. Examples: the verdict is about clearing comments, rewriting docs, rewriting comments. Usually a <=800 lines round diff IS a resume.
-  Example: spawner agent didnt flip an instruction set support flag inside CPU config. It's 4 lines fix, so it's OBVIOUSLY a resume, never respawn.
-- **`spawn new agent`** - everything else. **Every `LEGIT. KEEP GOING.` is also `spawn new agent`**: the target is closed, and the next `/verify` carries a new target that must not be re-reviewed by a session that holds this one.
+- **`resume this agent`** - the default for every `CRITICAL PROBLEM FOUND`. The next round continues this review and reuses the research it already holds.
+  Example: the spawner did not set an instruction set flag in a `cpu_configs` row. The fix is 4 lines, so it is a resume, never a respawn.
+- **`spawn new agent`** - for a `CRITICAL PROBLEM FOUND` whose remedy discards the target: a re-architecture, a revert of the design, or a round diff over 800 lines.
+- **`spawn new agent; resume this agent if same target continued and has <= 800 lines of round diff`** - for every `LEGIT. KEEP GOING.`. The target is closed, and the next `/verify` usually carries a new target. When the same target continues after the `LEGIT` and needs a new review, a round diff of 800 lines or fewer resumes this agent.
+
+Write the spawn line from the remedy alone. Before you write it, state the remedy in one sentence and estimate its diff in lines. The line follows from that estimate and from whether your research carries over. It never follows from the number of failed rounds, the weight of the finding, or a void of your earlier verdict.
 
 The spawner obeys the line. A `resume` means the next round continues this review conversation. A `spawn` means a fresh subagent with no memory of this round.
-
-The spawn type measures the size of the fix. It is not a grade of the finding.
 
 Valid `CRITICAL PROBLEM FOUND` categories. Invent a new all-caps label when nothing below fits:
 

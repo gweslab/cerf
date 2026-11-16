@@ -355,13 +355,16 @@ catch it early, hook `OnPc` at the entry of
 bytes. The **MIPS engine** instead halts the run through its
 `UnimplementedHelper` with the opcode and the PC. As a result, an
 undecodable or unimplemented MIPS opcode surfaces as a `[FATAL]` directly.
-The **SH engine** halts the run when it compiles the block. The halt
-names the opcode and the PC. H'Fxxx on a core without the DSP unit goes
-to the guest handler at VBR + H'100 instead. EXPEVT is H'180, or H'1A0 in
-a delay slot. With SR.BL set, or in the delay slot of RTE, that exception
-halts the run. Either way the instruction bytes at `pc` are not the bytes the
-kernel or driver expects. **Almost always not a JIT bug** - the bytes at
-that PA in DRAM are wrong because something corrupted them.
+When the opcode map of the core assigns no instruction to a code, the
+**SH engine** sends that code to the guest handler at VBR + H'100. EXPEVT
+is H'180, or H'1A0 in a delay slot. With SR.BL set, that exception resets
+only the CPU registers, and the guest boots again from H'A0000000. In the
+delay slot of RTE, the exception halts the run. A defined instruction that the
+engine does not model halts the run when it executes. To fix the halt,
+implement that instruction in the engine. On every engine, an unassigned
+or undecodable code at `pc` has one of two causes. Something corrupted
+the bytes at that PA in DRAM, or the guest jumped to an address that
+holds data. Either cause is almost never a JIT bug.
 
 Investigation:
 
@@ -377,9 +380,11 @@ Investigation:
    `references/extracted-roms/<device>/<rom>/fs/Windows/<name>`) and
    disassemble at the corresponding RVA. The IDA bytes are the
    EXPECTED bytes.
-4. Compare expected bytes vs `insn=0x…` in the crash. If they differ,
+4. Compare the expected bytes with `insn=0x…` in the crash. If they differ,
    something overwrote the module's `.text` after the kernel placed
-   it in DRAM.
+   it in DRAM. If they match and IDA shows data at that address, the
+   guest jumped there. Find that jump from the return address and the
+   caller. Then debug the branch that chose the target.
 5. The most common causes are three. CERF's ROM parser placed wrong
    bytes at that PA (decompression bug, wrong `o32_dataptr`, wrong
    `o32_psize`). The kernel's own loader did the wrong thing with the
@@ -617,9 +622,10 @@ at a given VA, so the match is unambiguous where a name lookup is not.
    trace file. `build.py --mode production` excludes the entire
    `libCerfCore/src/tracing/<bundle>/` subtree from the build.
 
-Git ignores per-device trace files. They are personal debugging
-scaffolding, not committed source, and they stay on your disk across your
-local sessions. Verify your existing hooks before
+Git ignores per-device trace files. They are locally stored debugging
+files, not scaffolding and not committed source. They stay on your disk
+across your local sessions, and no cleanup deletes them. Verify your
+existing hooks before
 you re-derive a path. The bundle CRC32 gates them (silent no-op on any
 other bundle), and production builds exclude them, so they cost nothing
 at runtime.
@@ -702,3 +708,7 @@ List every hit with its address. A claim without that list is a guess.
 Never run IDA from `build/` or `bundled/`. A rebuild wipes `build/`, and
 IDA holds locks there. `bundled/` is CERF's runtime input - an `.i64`
 sidecar inside it pollutes the input tree.
+
+## Crash state debugging
+
+CERF writes a crash save state which may be used for decomposing and live RAM debugging if needed.

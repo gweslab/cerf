@@ -26,8 +26,7 @@ CE version. These pieces are common to all ROMs:
   architecture under `ce_apps/<arch>/`. `GuestAdditionsBinaries::ArchDir`
   (`libCerfCore/src/boot/guest_additions_binaries.{h,cpp}`) selects them from
   `GetCpuArch()` plus the CPU subtype of the ROM. The stub reads the body bytes
-  and **manual-maps the PE itself**: VirtualAlloc + section copy + base reloc +
-  coredll import bind + entry. The verified loader of the kernel therefore never
+  and **manual-maps the PE itself**. The verified loader of the kernel therefore never
   sees the unsigned body. This mechanism loads past WM5 / WM2003SE module
   authentication. It gives each process that loads the module its OWN body
   image (per-process by construction). It also lives in CERF-owned memory that
@@ -41,10 +40,8 @@ Only **the placement of the stub into the ROM** differs by ROM class:
   The section bytes and e32/o32 records of the stub need one host span. The
   injector picks one of two hosts:
   - **Squat, the primary host.** This host is the largest section of the
-    victim inside the ROM image. The injector takes this section when the
-    section holds the whole span, is PA-contiguous over the span, and lies
-    inside one CERF memory region.
-    For an in-place load, the section must also be page-aligned and writable.
+    victim inside the ROM image.
+    For an in-place load, the section must be page-aligned and writable.
     An in-place code section has no MEM_WRITE flag, and the CE6 loader refuses
     such a section when its dataptr is not page-aligned.
     The injector zeroes the span first. The `.bss` of the stub lies past its
@@ -52,9 +49,10 @@ Only **the placement of the stub into the ROM** differs by ROM class:
   - **Band, the fallback.** This host is a CERF-owned PA band in the
     `cerf_virt` window (`libCerfCore/src/boot/cerf_injection_region.{h,cpp}`). Its VA is
     a static-window VA that the OAT of the board leaves unmapped. The MMU of
-    the guest engine maps that VA to the band. Each victim that falls back
-    takes its own span in the band. A board halts when its squat fails and
-    the band has no static-window hole or no room left for the span.
+    the guest engine maps that VA to the band. But MIPS kseg0 and SH P1 map
+    the low 512 MB of physical space with no translation. When the band PA
+    lies there, the band VA is its alias in that window. The engine then maps
+    nothing.
 
   On CE6 and later the stub runs in place from its host, because a kernel-VA
   base makes the loader skip its section copy. On CE5 and earlier the loader
@@ -69,11 +67,9 @@ Only **the placement of the stub into the ROM** differs by ROM class:
   - IMGFS is a flash filesystem (an FTL over the NOR/NAND image), not an XIP
   TOC. There is therefore no slot to overwrite. The injector allocates fresh
   FTL flash pages and writes the logical-sector-map entry of each page, so
-  imgfs.dll adopts it. It writes the `e32_rom` module header and per-section
-  data of the stub into those pages. It then repoints the IMGFS **dirent**
+  imgfs.dll adopts it. It then repoints the IMGFS **dirent**
   module-index / section-index records of the victim at the new pages. CERF
-  injects the SAME stub. Only the placement substrate is the FTL instead of
-  the TOC.
+  injects the SAME stub.
 
 Every path flags the writable sections of the stub SHARED. The stub also keeps
 its per-process state pid-keyed. See § The cross-process writable-state

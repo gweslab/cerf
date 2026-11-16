@@ -29,3 +29,8 @@ Put each core library at the repository root. Put third-party code in
   no SSH key.
 - The project rules apply inside a library as they apply in the rest of this
   repository.
+
+# Forks
+
+If you are working on CERF fork you have a more complex bump path since you want
+your PR's pointers pointed at CERF mainstream commits. See  `.github\CONTRIBUTING.md`

@@ -29,9 +29,10 @@ Order:
 - Implement sound input/output depending if device supports those
 - Implement PC Cards if a device has these slots and ensure they work
 - Ensure PC Cards still work after CPU suspend/soft reset
-- Identical scenario for COM ports - implement and smoke test if a device has COM ports
-- Implement phone line if a device has one (optional - might be too complex, PC Card/COM might replace that)
+- Identical scenario for COM ports - implement and smoke test CERF's COM scenarios if a device has COM ports
+- Implement phone line if a device has one (optional - might be too complex, depending on user ruling, default is stub)
 
+When the implementation is done - that's judged by the implementer agent, not by goal agent. The implementer agent must say "IMPLEMENTATION DONE" verbatim and the goal hook agent must mark goal completed when sees it. The text around are hints for implementer, not for goal hook agent.
 
 Hint for implementer agent only: Each chunk is wrapped into Skill(verify). Don't jump chunks, get LEGIT everywhere. Solve questions via Skill(verify-options)
 

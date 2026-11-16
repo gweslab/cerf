@@ -22,6 +22,7 @@ bool MenuDismissFilter::OnPopup(const QPointF& global) {
 }
 
 bool MenuDismissFilter::SwallowMouse(const QMouseEvent& event) {
+    if (event.type() == QEvent::MouseMove && OnPopup(event.globalPosition())) return true;
     const bool begins =
         event.type() == QEvent::MouseButtonPress || event.type() == QEvent::MouseButtonDblClick;
     if (begins && (armed_ || OnPopup(event.globalPosition()))) {

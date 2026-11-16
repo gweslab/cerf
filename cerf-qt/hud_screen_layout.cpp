@@ -17,11 +17,11 @@ using cerfcore::HudSide;
 constexpr double kFingerDp = 64.0;
 
 struct Slot {
-    HudSide side   = HudSide::kBottom;
-    bool    turned = false;
-    double  along  = 0.0;
-    double  depth  = 0.0;
-    double  gap    = 0.0;
+    HudSide side  = HudSide::kBottom;
+    HudTurn turn  = HudTurn::kNone;
+    double  along = 0.0;
+    double  depth = 0.0;
+    double  gap   = 0.0;
 };
 
 struct Fit {
@@ -51,7 +51,7 @@ bool CanCross(const HudNode& root) {
 Slot NativeSlot(const DbHud& hud, const HudPanel& panel, const DbLcdPanelSize& units) {
     const bool   x_edge = HudAlongX(panel.side);
     const double edge   = x_edge ? units.width : units.height;
-    return {panel.side, false, (x_edge ? panel.width : panel.height) * edge,
+    return {panel.side, HudTurn::kNone, (x_edge ? panel.width : panel.height) * edge,
             (x_edge ? panel.height : panel.width) * edge, hud.gap * edge};
 }
 
@@ -59,9 +59,9 @@ bool IsRocker(const HudNode& node) {
     return node.kind == HudNode::Kind::kDpad && node.dpad.left.empty() && node.dpad.right.empty();
 }
 
-double RockerDepth(const HudNode& root, double along, double depth, double gap) {
-    const HudArrangement at   = HudArrangePanel(root, FrameRect{0.0, 0.0, along, depth}, gap, true);
-    const HudArrangement more = HudArrangePanel(root, FrameRect{0.0, 0.0, along, depth + 1.0}, gap, true);
+double RockerDepth(const HudNode& root, double along, double depth, double gap, HudTurn turn) {
+    const HudArrangement at   = HudArrangePanel(root, FrameRect{0.0, 0.0, along, depth}, gap, turn);
+    const HudArrangement more = HudArrangePanel(root, FrameRect{0.0, 0.0, along, depth + 1.0}, gap, turn);
     double               need = depth;
     for (size_t i = 0; i < at.elements.size(); ++i) {
         const FrameRect& cell = at.elements[i].rect;
@@ -71,10 +71,24 @@ double RockerDepth(const HudNode& root, double along, double depth, double gap) 
     return need;
 }
 
+HudSide CounterClockwiseOf(HudSide side) {
+    switch (side) {
+        case HudSide::kTop:    return HudSide::kLeft;
+        case HudSide::kLeft:   return HudSide::kBottom;
+        case HudSide::kBottom: return HudSide::kRight;
+        default:               return HudSide::kTop;
+    }
+}
+
+HudTurn TurnBetween(HudSide from, HudSide to) {
+    return CounterClockwiseOf(from) == to ? HudTurn::kCounterClockwise : HudTurn::kClockwise;
+}
+
 Slot Crossed(Slot slot, HudSide side, const HudNode& root) {
-    slot.side   = side;
-    slot.turned = !KeyMatrix(root);
-    if (slot.turned && HudAlongX(side)) slot.depth = RockerDepth(root, slot.along, slot.depth, slot.gap);
+    slot.turn = KeyMatrix(root) ? HudTurn::kNone : TurnBetween(slot.side, side);
+    slot.side = side;
+    if (slot.turn != HudTurn::kNone && HudAlongX(side))
+        slot.depth = RockerDepth(root, slot.along, slot.depth, slot.gap, slot.turn);
     return slot;
 }
 
@@ -144,10 +158,11 @@ public:
 
     std::vector<HudPanelPlace> Lay(const std::vector<Slot>& slots, double scale) const {
         const HudInsets     depth = Depths(slots, scale);
+        const bool          moved = primary_ >= 0 && slots[primary_].side != hud_.panels[primary_].side;
         std::vector<size_t> outward;
         for (size_t i = 0; i < slots.size(); ++i)
-            if (static_cast<int>(i) != primary_) outward.push_back(i);
-        if (primary_ >= 0) outward.push_back(static_cast<size_t>(primary_));
+            if (!moved || static_cast<int>(i) != primary_) outward.push_back(i);
+        if (moved) outward.push_back(static_cast<size_t>(primary_));
         HudInsets                  offset;
         std::vector<HudPanelPlace> out(slots.size());
         for (auto it = outward.rbegin(); it != outward.rend(); ++it) {
@@ -167,7 +182,7 @@ public:
                 case HudSide::kRight:  r = {area_w_ - off - d, at, d, along}; break;
             }
             HudAddToSide(offset, slot.side, d);
-            out[*it] = {r, lo, hi, slot.side, slot.turned, slot.gap * scale};
+            out[*it] = {r, lo, hi, slot.side, slot.turn, slot.gap * scale};
         }
         return out;
     }

@@ -746,9 +746,12 @@ the render and input plumbing that connects the host UI to the guest.
   **On Android, the content of a panel decides how it can move.** A panel whose
   content is a column of two or more rows is a key matrix, for example a keyboard or
   a phone keypad. It keeps its layout. It moves to the other axis only when it has at
-  least as many rows as cells in its longest row. Every other panel turns its rows
-  into columns when it moves to the other axis. A panel that turns onto the top or
-  bottom gets deep enough for each rocker to be as tall as it is wide.
+  least as many rows as cells in its longest row.
+
+  Every other panel turns when it moves to the other axis. It takes the quarter turn
+  that carries its old side onto its new side, as a device does when a person turns
+  it. Each key stays upright. A panel that turns onto the top or bottom gets deep
+  enough for each rocker to be as tall as it is wide.
 
   The main panel is the first panel with a full d-pad.
 
@@ -762,8 +765,9 @@ the render and input plumbing that connects the host UI to the guest.
   moves that give the framebuffer the largest fit. Of two sets of moves with an equal
   fit, it keeps the set with fewer moves.
 
-  On each side, the panels stack outward in list order, and the main panel is at the
-  edge of the screen. CERF centers every panel on its side.
+  On each side, the panels stack outward in list order. When CERF moves the main
+  panel to a side, the main panel goes to the edge of the screen. CERF centers
+  every panel on its side.
 
   **On Android, the HUD uses the real size of the guest surface.** A Guest Additions
   resolution changes the space that the framebuffer needs, so the panels follow it.
@@ -893,6 +897,14 @@ the render and input plumbing that connects the host UI to the guest.
   parent menu while its submenu is open. `MenuDismissFilter` swallows a press
   that reaches the emulator window when the press lies inside a visible popup
   window.
+
+  **A move inside an open menu never reaches the emulator window.** Qt passes a
+  move from a submenu to its parent menu. The emulator window can then get a copy
+  of that move with a position in the coordinates of the parent menu. Qt Quick
+  delivers hover at that point. A point in the top rows of a menu falls on the
+  menu bar, and the bar then opens the menu of the item there. The menu bar
+  still follows the pointer, because Qt gives it the moves over the bar
+  directly.
 
   **Qt 6.8.4 reports a press that a menu item accepts as not accepted.** The
   window under the menu then gets the press too. For that reason, the Windows

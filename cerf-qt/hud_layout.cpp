@@ -22,33 +22,37 @@ bool HoldsControl(const HudNode& node) {
     }
 }
 
-void Place(const HudNode& node, FrameRect rect, double gap, bool turned, HudArrangement& out) {
+void Place(const HudNode& node, FrameRect rect, double gap, HudTurn turn, HudArrangement& out) {
     if (node.kind == HudNode::Kind::kButton || node.kind == HudNode::Kind::kDpad ||
         node.kind == HudNode::Kind::kSticker) {
         out.elements.push_back({&node, rect});
         return;
     }
     if (node.kind == HudNode::Kind::kSpace || node.children.empty()) return;
-    const bool row   = (node.kind == HudNode::Kind::kRow) != turned;
-    double     total = 0.0;
+    const bool   is_row  = node.kind == HudNode::Kind::kRow;
+    const bool   row     = is_row != (turn != HudTurn::kNone);
+    const bool   reverse = turn == (is_row ? HudTurn::kCounterClockwise : HudTurn::kClockwise);
+    const size_t count   = node.children.size();
+    const auto   ordered = [&](size_t k) -> const HudNode& { return node.children[reverse ? count - 1 - k : k]; };
+    double       total   = 0.0;
     for (const HudNode& child : node.children) total += child.grow;
     const double pitch = ((row ? rect.w : rect.h) + gap) / total;
     double       at    = row ? rect.x : rect.y;
-    for (size_t i = 0; i < node.children.size(); ++i) {
-        const HudNode& child  = node.children[i];
+    for (size_t k = 0; k < count; ++k) {
+        const HudNode& child  = ordered(k);
         const double   extent = pitch * child.grow - gap;
-        Place(child, row ? FrameRect{at, rect.y, extent, rect.h} : FrameRect{rect.x, at, rect.w, extent}, gap, turned,
+        Place(child, row ? FrameRect{at, rect.y, extent, rect.h} : FrameRect{rect.x, at, rect.w, extent}, gap, turn,
               out);
         at += extent + gap;
-        if (i + 1 == node.children.size() || !HoldsControl(child) || !HoldsControl(node.children[i + 1])) continue;
+        if (k + 1 == count || !HoldsControl(child) || !HoldsControl(ordered(k + 1))) continue;
         const double line = at - gap / 2.0;
         out.separators.push_back(row ? HudSeparator{{line, rect.y}, {line, rect.y + rect.h}}
                                      : HudSeparator{{rect.x, line}, {rect.x + rect.w, line}});
     }
 }
 
-void PlacePanel(const HudNode& root, const FrameRect& rect, double gap, bool turned, HudArrangement& out) {
-    Place(root, FrameRect{rect.x + gap, rect.y + gap, rect.w - 2.0 * gap, rect.h - 2.0 * gap}, gap, turned, out);
+void PlacePanel(const HudNode& root, const FrameRect& rect, double gap, HudTurn turn, HudArrangement& out) {
+    Place(root, FrameRect{rect.x + gap, rect.y + gap, rect.w - 2.0 * gap, rect.h - 2.0 * gap}, gap, turn, out);
 }
 
 }
@@ -100,7 +104,7 @@ HudFrame HudOutside(const DbHud& hud, double fb_w, double fb_h, const cerfcore::
         const double  span   = (x_edge ? fb_w : fb_h) + cross;
         const double  lo     = -(x_edge ? grown.left : grown.top);
         const double  at     = lo + HudAligned(panel.align, span, along);
-        HudPanelPlace place{{}, lo, lo + span, panel.side, false, hud.gap * base};
+        HudPanelPlace place{{}, lo, lo + span, panel.side, HudTurn::kNone, hud.gap * base};
         switch (panel.side) {
             case HudSide::kBottom: place.rect = {at, fb_h + grown.bottom, along, depth}; break;
             case HudSide::kTop:    place.rect = {at, -grown.top - depth, along, depth}; break;
@@ -150,14 +154,14 @@ HudArrangement HudArrange(const HudFrame& frame) {
     HudArrangement out;
     for (size_t i = 0; i < frame.places.size(); ++i) {
         const HudPanelPlace& place = frame.places[i];
-        PlacePanel((*frame.panels)[i].root, place.rect, place.gap, place.turned, out);
+        PlacePanel((*frame.panels)[i].root, place.rect, place.gap, place.turn, out);
     }
     return out;
 }
 
-HudArrangement HudArrangePanel(const HudNode& root, const FrameRect& rect, double gap, bool turned) {
+HudArrangement HudArrangePanel(const HudNode& root, const FrameRect& rect, double gap, HudTurn turn) {
     HudArrangement out;
-    PlacePanel(root, rect, gap, turned, out);
+    PlacePanel(root, rect, gap, turn, out);
     return out;
 }
 

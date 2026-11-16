@@ -23,12 +23,14 @@ struct HudArrangement {
     std::vector<HudSeparator> separators;
 };
 
+enum class HudTurn { kNone, kClockwise, kCounterClockwise };
+
 struct HudPanelPlace {
     FrameRect         rect;
     double            slot_lo = 0.0;
     double            slot_hi = 0.0;
     cerfcore::HudSide side    = cerfcore::HudSide::kBottom;
-    bool              turned  = false;
+    HudTurn           turn    = HudTurn::kNone;
     double            gap     = 0.0;
 };
 
@@ -56,6 +58,6 @@ HudFrame       HudOutside(const cerfcore::DbHud& hud, double fb_w, double fb_h, 
 ContentBox     HudBox(const cerfcore::DbHud& hud, double fb_w, double fb_h);
 void           HudSurfaceFor(const cerfcore::DbHud& hud, double content_w, double content_h, double& fb_w, double& fb_h);
 HudArrangement HudArrange(const HudFrame& frame);
-HudArrangement HudArrangePanel(const cerfcore::HudNode& root, const FrameRect& rect, double gap, bool turned);
+HudArrangement HudArrangePanel(const cerfcore::HudNode& root, const FrameRect& rect, double gap, HudTurn turn);
 
 }

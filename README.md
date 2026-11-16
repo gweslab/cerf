@@ -448,6 +448,18 @@ python run_claude.py
       <td><img src="assets/icons_sources/board.svg" width="16" height="16" title="PDA" alt="PDA"/> <b>Sharp Mobilon HC-4600</b> <code>sharp_mobilon_hc4600</code></td>
       <td><img src="assets/icons_sources/stylus.svg" width="32" height="32" title="Touch Panel" alt="Touch Panel"/> <img src="assets/icons_sources/keyboard.svg" width="32" height="32" title="Keyboard or keypad" alt="Keyboard or keypad"/> <img src="assets/icons_sources/suspend.svg" width="32" height="32" title="CPU Supend/Resume" alt="CPU Supend/Resume"/> <img src="assets/icons_sources/ga_autoresize.svg" width="32" height="32" title="Emulator's Guest Additions" alt="Emulator's Guest Additions"/> <img src="assets/icons_sources/speaker_active.svg" width="32" height="32" title="Built-in/Pluggable Sound" alt="Built-in/Pluggable Sound"/> <img src="assets/icons_sources/pcmcia_enabled.svg" width="32" height="32" title="PC Card Socket" alt="PC Card Socket"/> <img src="assets/icons_sources/internet.svg" width="32" height="32" title="Built-in Network Adapter" alt="Built-in Network Adapter"/> <img src="assets/icons_sources/battery.svg" width="32" height="32" title="Battery" alt="Battery"/> <img src="assets/icons_sources/serial_com.svg" width="32" height="32" title="Serial Port" alt="Serial Port"/></td>
     </tr>
+    <tr>
+      <td align="center"><b>Hitachi SH7709</b><br/><sub>SH-3</sub></td>
+      <td><b>HP 600 series</b></td>
+      <td><img src="assets/icons_sources/board.svg" width="16" height="16" title="PDA" alt="PDA"/> <b>HP 620LX</b> <code>hp_620lx</code></td>
+      <td><img src="assets/icons_sources/stylus.svg" width="32" height="32" title="Touch Panel" alt="Touch Panel"/> <img src="assets/icons_sources/keyboard.svg" width="32" height="32" title="Keyboard or keypad" alt="Keyboard or keypad"/> <img src="assets/icons_sources/suspend.svg" width="32" height="32" title="CPU Supend/Resume" alt="CPU Supend/Resume"/> <img src="assets/icons_sources/ga_autoresize.svg" width="32" height="32" title="Emulator's Guest Additions" alt="Emulator's Guest Additions"/> <img src="assets/icons_sources/speaker_active.svg" width="32" height="32" title="Built-in/Pluggable Sound" alt="Built-in/Pluggable Sound"/> <img src="assets/icons_sources/microphone.svg" width="32" height="32" title="Built-in/Pluggable Microphone" alt="Built-in/Pluggable Microphone"/> <img src="assets/icons_sources/pcmcia_enabled.svg" width="32" height="32" title="PC Card Socket" alt="PC Card Socket"/> <img src="assets/icons_sources/battery.svg" width="32" height="32" title="Battery" alt="Battery"/> <img src="assets/icons_sources/serial_com.svg" width="32" height="32" title="Serial Port" alt="Serial Port"/></td>
+    </tr>
+    <tr>
+      <td align="center"><b>Hitachi SH7729</b><br/><sub>SH3-DSP</sub></td>
+      <td><b>HP 600 series</b></td>
+      <td><img src="assets/icons_sources/board.svg" width="16" height="16" title="PDA" alt="PDA"/> <b>HP Jornada 680</b> <code>jornada_680</code></td>
+      <td><img src="assets/icons_sources/stylus.svg" width="32" height="32" title="Touch Panel" alt="Touch Panel"/> <img src="assets/icons_sources/keyboard.svg" width="32" height="32" title="Keyboard or keypad" alt="Keyboard or keypad"/> <img src="assets/icons_sources/suspend.svg" width="32" height="32" title="CPU Supend/Resume" alt="CPU Supend/Resume"/> <img src="assets/icons_sources/ga_autoresize.svg" width="32" height="32" title="Emulator's Guest Additions" alt="Emulator's Guest Additions"/> <img src="assets/icons_sources/speaker_active.svg" width="32" height="32" title="Built-in/Pluggable Sound" alt="Built-in/Pluggable Sound"/> <img src="assets/icons_sources/microphone.svg" width="32" height="32" title="Built-in/Pluggable Microphone" alt="Built-in/Pluggable Microphone"/> <img src="assets/icons_sources/pcmcia_enabled.svg" width="32" height="32" title="PC Card Socket" alt="PC Card Socket"/> <img src="assets/icons_sources/battery.svg" width="32" height="32" title="Battery" alt="Battery"/> <img src="assets/icons_sources/serial_com.svg" width="32" height="32" title="Serial Port" alt="Serial Port"/></td>
+    </tr>
   </tbody>
 </table>
 
@@ -469,7 +481,7 @@ python run_claude.py
       <td>TBA</td>
       <td>
         <p><b>❗ Important</b><br/>
-          [macOS] We&#x27;ve fixed an upgrade system bug, however: this time you need to wait 30 seconds during upgrade and let CERF kill the old process.</p>
+          [macOS] Upgrade hang workaround: you need to wait 30 seconds during upgrade and let CERF kill the old process.</p>
         <p><b>📱 Devices</b><br/>
           🆕 HP Jornada 680, HP 620LX support (thx @Gadgetoid/sh3-emu)<br/>
           🆕 NEC Rockhopper: Improved CE.NET OAL support</p>
@@ -479,7 +491,8 @@ python run_claude.py
           🆕 Automatical calibration helper<br/>
           ✅ PS/2 mouse lost double clicks on Android<br/>
           ✅ PS/2 mouse incorrect behaviour fixed<br/>
-          ✅ Android&#x27;s HUD is now fully adaptive - saves your screen space</p>
+          ✅ Android&#x27;s HUD is now fully adaptive - saves your screen space<br/>
+          ✅ Emulator is now large address aware, fixes some heavy boards halts on 64-bit systems</p>
         <p><b>🗂️ Devices Manager</b><br/>
           🆕 Import, export, clone your devices</p>
         <p><b>✨ Guest Additions</b><br/>

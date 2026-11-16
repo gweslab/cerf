@@ -28,6 +28,8 @@ Only the author can push to the CERF repositories. To send a change, work in you
 5. Open a pull request in each changed repository.
 6. When the author merges the library pull requests, update your `cerf` pull request to point at the merged library commits.
 
+Don't update changelog or generate READMEs - keep that for maintainers.
+
 ## Low-quality contributions are **forbidden**
 
 A low-quality contribution might be one of these:

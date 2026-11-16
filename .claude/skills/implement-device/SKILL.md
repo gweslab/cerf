@@ -261,4 +261,4 @@ follow them):
 7. **`/verify`**, fix any `CRITICAL PROBLEM FOUND`;
 8. **Repeat** until GUI, then interaction - the user-observable bring-up target.
 
-ONCE HALT HAS CHANGED MESSGAGE/MOVED AGENT DECIDES IF IT'S A CHUNK AND TIME TO SPAWN /verify, IN MOST SCENARIOS IT IS TRUE. Do NOT jump chunks - the working tree will be wiped. Record bring-up loop into tracking document. One chunk at the time. Never mix chunks unless this is required. 
+ONCE HALT HAS CHANGED MESSGAGE/MOVED AGENT DECIDES IF IT'S A CHUNK AND TIME TO SPAWN /verify, IN MOST SCENARIOS IT IS TRUE. Do NOT jump chunks - the working tree will be wiped. Record bring-up loop algorithm into tracking document as the governing order. One chunk at the time. Never mix chunks unless this is required. THAT'S ONE OF THE MOST IMPORTANT RULES. NEVER RACE PAST A CHANGED HALT INTO MORE WORK.

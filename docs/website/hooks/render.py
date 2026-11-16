@@ -60,7 +60,7 @@ def _stats():
         (str(len(platforms)), 'devices'),
         (str(len(boards)), 'board variants'),
         (str(len(socs)),      'SoCs'),
-        (' + '.join(cpus), 'guest CPUs'),
+        (str(len(cpus)), 'CPU archs'),
     ]
     out = ['<div class="cerf-stats">']
     for value, label in cells:

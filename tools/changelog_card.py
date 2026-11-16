@@ -42,7 +42,7 @@ KINDS = {
     "candidate": ("RELEASE CANDIDATE", (187, 128, 9)),
     "unstable": ("UNSTABLE", (196, 90, 30)),
 }
-MARKER_COLORS = {"new": GREEN, "fixed": BLUE, "deleted": RED}
+MARKER_COLORS = {"important": RED, "new": GREEN, "fixed": BLUE, "deleted": RED}
 
 TITLE_SIZE = 34
 SUB_SIZE = 22
@@ -304,6 +304,13 @@ class _Card:
         color = MARKER_COLORS.get(marker)
         if color is None:
             paint.box(cx - 3, cy - 3, cx + 3, cy + 3, MUTED, 3)
+            return
+        if marker == "important":
+            stroke = MARKER * 0.25
+            paint.box(cx - stroke / 2, cy - half, cx + stroke / 2,
+                      cy + half * 0.2, color, stroke / 2)
+            paint.box(cx - stroke / 2, cy + half - stroke, cx + stroke / 2,
+                      cy + half, color, stroke / 2)
             return
         paint.box(cx - half, cy - half, cx + half, cy + half, color, 4)
         arm = MARKER * 0.28

@@ -9,43 +9,30 @@ CHANGELOG_YML = os.path.join(REPO, 'docs', 'changelog.yml')
 
 _BOLD = re.compile(r'\*\*(.+?)\*\*')
 
-PLAIN = 'plain'
-CATEGORIZED = 'categorized'
-
 GROUPS = [
-    ('important',       'Important',       '❗', PLAIN),
-    ('devices',         'Devices',         '📱', CATEGORIZED),
-    ('emulator',        'Emulator',        '💿', CATEGORIZED),
-    ('launcher',        'Launcher',        '🚀', CATEGORIZED),
-    ('cerfman',         'Devices Manager', '🗂️', CATEGORIZED),
-    ('ce_apps',         'CE Apps',         '💾', CATEGORIZED),
-    ('guest_additions', 'Guest Additions', '✨', CATEGORIZED),
-    ('website',         'Website',         '🌐', CATEGORIZED),
-    ('patches',         'Patches',         '🚑', CATEGORIZED),
-    ('changes',         'Changes',         '📝', PLAIN),
+    ('important',       'Important',       '⚠️'),
+    ('devices',         'Devices',         '📱'),
+    ('emulator',        'Emulator',        '💿'),
+    ('launcher',        'Launcher',        '🚀'),
+    ('cerfman',         'Devices Manager', '🗂️'),
+    ('ce_apps',         'CE Apps',         '💾'),
+    ('guest_additions', 'Guest Additions', '✨'),
+    ('website',         'Website',         '🌐'),
+    ('patches',         'Patches',         '🚑')
 ]
 
 SUBCATS = [
-    ('new',     '🆕'),
-    ('fixed',   '✅'),
-    ('deleted', '❌'),
+    ('important', '❗'),
+    ('new',       '🆕'),
+    ('fixed',     '✅'),
+    ('deleted',   '❌'),
 ]
+
+LEGACY = ('changes', 'Changes', '📝')
 
 
 def _lines(block):
     return [line.strip() for line in (block or '').splitlines() if line.strip()]
-
-
-def _subcats(block, kind):
-    if kind == PLAIN:
-        lines = _lines(block)
-        return [{'key': None, 'emoji': None, 'lines': lines}] if lines else []
-    subcats = []
-    for sub_key, sub_emoji in SUBCATS:
-        lines = _lines((block or {}).get(sub_key))
-        if lines:
-            subcats.append({'key': sub_key, 'emoji': sub_emoji, 'lines': lines})
-    return subcats
 
 
 def load():
@@ -54,11 +41,24 @@ def load():
     entries = []
     for item in data:
         groups = []
-        for key, heading, emoji, kind in GROUPS:
-            subcats = _subcats(item.get(key), kind)
+        for key, heading, emoji in GROUPS:
+            sub = item.get(key)
+            if not sub:
+                continue
+            subcats = []
+            for sub_key, sub_emoji in SUBCATS:
+                lines = _lines(sub.get(sub_key))
+                if lines:
+                    subcats.append({'key': sub_key, 'emoji': sub_emoji,
+                                    'lines': lines})
             if subcats:
                 groups.append({'heading': heading, 'emoji': emoji,
                                'subcats': subcats})
+        legacy = _lines(item.get(LEGACY[0]))
+        if legacy:
+            groups.append({'heading': LEGACY[1], 'emoji': LEGACY[2],
+                           'subcats': [{'key': None, 'emoji': None,
+                                        'lines': legacy}]})
         entries.append({'version': str(item['version']),
                         'date': str(item.get('date', '')),
                         'groups': groups})

@@ -5,152 +5,141 @@ description: Start the bring-up of a new board or ROM in CERF.
 
 # Start Board Implementation - new-board bring-up
 
-Obey `CLAUDE.md` and every `agent_docs/` page; this ritual never overrides them.
+`CLAUDE.md` and every `agent_docs/` page override this skill.
 
-Governing principle: **the ROM is the only trusted starting point, and YOU
-establish every fact yourself.** A stated SoC/board is a hint, not a fact -
-confirm board, SoC, CPU, and CERF's existing support from the ROM bytes + the
-internet before writing a line. A bring-up that starts on an unverified
+The ROM is the only trusted starting point. A stated SoC or board is a hint.
+Establish the board, the SoC, the CPU and the existing CERF support yourself,
+from the ROM bytes and the internet. A bring-up that starts from an unverified
 assumption wastes dozens of sessions.
 
----
+Edit no file in the source tree before the first run of the bundle in Phase D.
 
 ## Phase 0 - Welcome
 
-Open with a brief, warm welcome + thank-you BEFORE Gate A1:
+Before Gate A1, write this welcome to the user:
 
 > 🎉 Welcome - and thank you for contributing a new board to CERF! I'll start
 > from your ROM, confirm the board/SoC facts myself, and lay out what the
 > bring-up will take before we commit to it.
 
-A line or two, then straight into the gates. The welcome never delays a gate.
-
----
+Use one or two lines for it. Then start Gate A1 in the same reply.
 
 ## Phase A - Gates
 
-### Gate A1 - Acquire the ROM (fail only if nothing resolves)
+### Gate A1 - Find the ROM
 
-The user does not have to type a path - naming the board ("implement simpad
-sl4") is enough. All regular dev ROMs live under `bundled/devices/`, so that
-listing is your index.
+The user can name the board without a path. The development ROMs are in
+`bundled/devices/`.
 
-1. **Board name given** → `ls bundled/devices/` and **match by FAMILY, not exact
-   string** (do NOT depend on `cerf.json` - optional, usually absent for a
-   user's own ROM). Tolerate variant/generation/letter/separator differences:
-   "simpad cl4", "simpad sl4", "SIMpad SL4" all resolve to the `simpad_sl4_*`
-   bundles. You are identifying the board, not string-equality testing a folder.
-2. **Path inside `bundled/devices/`** → stat it, use it.
-3. **Path outside `bundled/devices/`** → ask whether to copy it into
-   `bundled/devices/` first (where every dev ROM lives); proceed once placed, or
-   if the user says to run it in place.
-4. **One candidate** → record its ROM path, continue.
-5. **Several candidates for the same board** (NORMAL - a board commonly ships
-   multiple ROM generations) → SUCCESS, not a problem. Same board id; name the
-   generations, take the newest (or ask one short "which generation?"), continue.
+1. If the user names a board, run `ls bundled/devices/`. Match the name by
+   family, not by exact string. Accept a different variant, generation, letter
+   or separator. For example, "simpad cl4", "simpad sl4" and "SIMpad SL4" all
+   match the `simpad_sl4_*` bundles. Do not use `cerf.json` for the match.
+2. If the user gives a path inside `bundled/devices/`, make sure that the path
+   exists. Then use it.
+3. If the user gives a path outside `bundled/devices/`, ask whether to copy the
+   ROM into `bundled/devices/` first. Continue after the copy, or when the user
+   tells you to run the ROM in place.
+4. If one bundle matches, record its ROM path.
+5. If several bundles match the same board, they are ROM generations of one
+   board id. Name the generations. Then take the newest one, or ask "which
+   generation?".
 
-**HARD RULE - candidates found ≠ "absent".** If `ls` surfaced any plausible
-bundle for the named family, you have RESOLVED - you may NEVER report "no ROM /
-not found" while holding a list of matching bundles. A variant/letter token
-mismatch against bundles that are clearly the same family is a RESOLVE, never a
-fail. Never assert presence/absence from memory; `ls` in THIS run and read it
-like a human picking the obvious match.
+If `ls` shows a bundle that plausibly belongs to the named family, the ROM is
+found. Do not report "not found" in that case. Do not state from memory that a
+bundle is present or absent.
 
-**Only if `ls` produced ZERO plausible candidates** - STOP and FAIL:
+If `ls` shows no plausible bundle, stop and write:
 
 > ❌ I couldn't find any ROM for "<what the user said>" under `bundled/devices/`.
 > Point me at the ROM path directly, then re-run `/implement-device`.
 
-### Gate A2 - IDA MCP connectivity (warn + ask if absent)
+### Gate A2 - IDA MCP
 
-Reverse engineering confirms every fact below and drives the whole loop.
+The bring-up depends on reverse engineering in IDA.
 
-- **The presence check IS the "list instances" call.** `ToolSearch` query `ida`,
-  find the instance-list tool, load its schema, CALL it. Whether the tool is
-  available to call is the entire test - callable = IDA MCP running; no such tool
-  = not running.
-- **Call succeeds** → ✅ running. **0 open instances is NORMAL** - IDA is usually
-  closed and ROMs unextracted at the start; the *call succeeding* is the proof,
-  not the count. You bring IDA up yourself when a step needs it (Phase B / B1).
-- **No list-instances tool to call at all** → not running. **Do not fail** -
-  warn and ask:
+1. Find the tool that lists the IDA instances: use `ToolSearch` with the query
+   `ida`. Load the schema of the tool and call it.
+2. If the call succeeds, the IDA MCP runs. A result of 0 instances is normal,
+   because you open IDA when a step needs it.
+3. If no such tool exists, the IDA MCP does not run. Do not fail. Write this
+   warning and wait for the answer:
 
-  > ⚠️ No IDA MCP detected. Without reverse engineering I'm badly limited -
-  > bring-up is decompile-driven (cracking the kernel OEMAddressTable for page
-  > tables, decoding which driver touches each register), and going blind tends
-  > to dead-end and burn far more sessions. The MCP server lives in this repo:
-  > `tools/ida_server.py` (load inside IDA) + `tools/claude_ida.py` (the MCP
-  > client); `tools/open_ida.py --wait <pe>` opens a module. Install those and
-  > reconnect for a real shot.
-  >
-  > Continue anyway without RE? `[yes|no]`
+   > ⚠️ No IDA MCP detected. Without reverse engineering I'm badly limited -
+   > bring-up is decompile-driven (cracking the kernel OEMAddressTable for page
+   > tables, decoding which driver touches each register), and going blind tends
+   > to dead-end and burn far more sessions. The MCP server lives in this repo:
+   > `tools/ida_server.py` (load inside IDA) + `tools/claude_ida.py` (the MCP
+   > client); `tools/open_ida.py --wait <pe>` opens a module. Install those and
+   > reconnect for a real shot.
+   >
+   > Continue anyway without RE? `[yes|no]`
 
-  No → stop. Yes → continue, marking the RE-dependent table rows ⚠️.
+If the answer is no, stop. If the answer is yes, continue, and mark with ⚠️
+each table row that depends on reverse engineering.
 
----
+## Phase B - Establish the facts
 
-## Phase B - Establish the facts (you, from the ROM + the internet)
+Phase B and Phase C change no file in the source tree. Do the minimum work
+that fills the table of Phase C. Give a source for each fact.
 
-Minimum traversal to fill the table. You are IDENTIFYING, not implementing. Each
-fact gets a source.
+### B0 - Acceptance pipeline
 
-- **B0 - Which acceptance pipeline?** Before extraction, settle what the file IS
-  (`agent_docs/rom_acceptance.md`): flat XIP, a recognised container (B000FF /
-  NOSAJ / ARNOLD), or a whole-storage dump the guest's own boot path reads. Check
-  the leading magic, the presence of `ECEC` markers (a CE2-era image legitimately
-  has none → `ResolveRomhdrStructural`), and whether the image is a raw bus
-  capture needing normalization (aliasing, wrap, pad). This decides whether B1's
-  extractor can even run.
-- **B1 - Extract & inventory the modules.** The ROM is usually NOT extracted yet -
-  you do it: `tools/extract_bundles.py` produces per-module PEs under
-  `references/extracted-roms/<device>/<rom>/fs/Windows/`. Open a module with
-  `python tools/open_ida.py --wait <pe>` (`--wait` blocks until it's usable;
-  background it if you have parallel research). Note kernel/coredll/gwes/filesys/
-  device/driver module names - driver names are SoC tells (e.g. `*_mx31.dll` →
-  i.MX31).
-- **B2 - Confirm the declared board is the right one.** The declared `board_id`
-  selects the `BoardContext` (`agent_docs/rules.md` § "Per-device facts come from
-  the ROM"); confirm that declaration names the silicon actually in the ROM before
-  writing a `BoardContext` asserting it. `meta.soc_family` and the user's word are
-  hints, never facts. Evidence, in order of weight: the B1 driver/module names (an
-  OEM BSP names its drivers after its own silicon); the register bases the OAL
-  actually addresses; then the OEM's model string if one appears in the blob. A
-  byte match is evidence only once you have shown the bytes are the string and
-  not arbitrary data.
-- **B3 - Board family, and is the board already in CERF?** Establish the family before you
-  write code. Search Linux, NetBSD
-  (`references/netbsd/sys/arch/hpc/hpc/platid_name.c` and the port code),
-  Rockbox, vendor pages, and Wikipedia in every language. Find the devices that
-  the vendor built on this platform: rebadges, regional models, revisions, and
-  panel and size variants. Save each page that you cite under
-  `references/board_families/<vendor>/`. Then read the `board_families` and
-  `boards` tables in `libCerfCore/db.json`, and list `libCerfCore/src/boards/` and
-  `bundled/devices/`. Match the B2 identity to one result: family present, board
-  present, or absent. A new family gets a row. Every known member gets a board
-  row with its `support_level` and its `internal__spec_divergences`. This
-  includes members that nobody dumped.
-- **B4 - SoC / CPU family.** From the identity + driver/OEM names, determine the
-  SoC, its CPU architecture (`CpuArch::kArm` / `CpuArch::kMips` - which JIT engine
-  the board runs), and the specific core with its ISA level (ARM720T, ARM920T,
-  SA-11xx, ARM1136, Cortex-A8; R3000A/R3900/R4100/R5000-class MIPS, …). Confirm
-  via the internet (datasheet / Linux `arch/arm/mach-*` or `arch/mips/`, QEMU,
-  device specs) - not the user's word.
-- **B5 - SoC implemented in CERF? Reusable SoC?** Read the `socs` table in
-  `libCerfCore/db.json`; list
-  `libCerfCore/src/socs/` + `libCerfCore/src/cpu/`. Is this SoC present? Does `cpu_configs` in
-  `libCerfCore/db.json` have a row for it, and is the core's strategy set under
-  `libCerfCore/src/cpu/<core>/` - `ArmCoprocProvider` on ARM; `MipsCp0Model`,
-  `MipsTlbModel` and `MipsExceptionModel` on MIPS? If
-  absent, is there a close relative sharing silicon/core? Reuse is the
-  difference between a short and a long bring-up - name it.
+Decide which pipeline of `agent_docs/rom_acceptance.md` accepts the file. If
+the file is a raw bus capture, normalize it first. The result tells you whether
+the extractor of B1 can read the file.
 
----
+### B1 - Modules
 
-## Phase C - Readiness table (FIXED structure - identical for everyone)
+Extract the ROM with `tools/extract_bundles.py`. Open its modules with
+`tools/open_ida.py --wait`. Record the names of the kernel, the system modules
+and the drivers. A driver name can show the SoC. For example, `*_mx31.dll`
+shows the i.MX31.
 
-Emit exactly this. Same columns/rows/order every run. `Finding` = the fact + its
-source; `Status` = one emoji (✅ present/reusable/good · ⚠️ caution/new
-work/unconfirmed · ❌ missing/blocker).
+### B2 - Board identity
+
+The declared `board_id` selects the `BoardContext`. Make sure that the
+declaration names the silicon that the ROM uses. `meta.soc_family` and the word
+of the user are hints. Use this evidence, the strongest first:
+
+1. The names of the drivers and modules from B1. An OEM names its drivers after
+   its own silicon.
+2. The register bases that the OAL addresses.
+3. The model string of the OEM, if the ROM has one.
+
+A byte match is evidence only after you show that the bytes are a string.
+
+### B3 - Board family
+
+Find the devices that the vendor built on this platform: rebadges, regional
+models, revisions, and panel and size variants. Search Linux, NetBSD
+(`references/netbsd/sys/arch/hpc/hpc/platid_name.c` and the port code),
+Rockbox, vendor pages, and Wikipedia in every language. Save each page that you
+cite under `references/board_families/<vendor>/`.
+
+Then read the `board_families` and `boards` tables in `libCerfCore/db.json`.
+List `libCerfCore/src/boards/` and `bundled/devices/`. Decide one result: the
+family is present, the board is present, or both are absent.
+
+### B4 - SoC and CPU
+
+Find the SoC, its CPU architecture, and the core with its ISA level. Use the
+identity of B2 and the driver names. Make sure that a datasheet, the Linux or
+QEMU source, or a device specification agrees. The word of the user is not such
+a source.
+
+### B5 - SoC support in CERF
+
+Read the `socs` and `cpu_configs` tables in `libCerfCore/db.json`. List
+`libCerfCore/src/socs/` and `libCerfCore/src/cpu/`. Record whether CERF has the
+SoC, a `cpu_configs` row for it, and the strategy set of its core. If CERF
+lacks the SoC, name the closest SoC or core that the bring-up can reuse.
+
+## Phase C - Readiness table
+
+Write exactly this table. Keep the columns, the rows and their order the same
+in every run. `Finding` is the fact and its source. `Status` is one emoji: ✅
+for present or reusable, ⚠️ for new work or an uncertain fact, ❌ for missing.
 
 ```
 ## /implement-device - bring-up readiness
@@ -166,99 +155,75 @@ work/unconfirmed · ❌ missing/blocker).
 | 7 | Reusable / similar SoC or core | <what reuses what | none - from scratch>  | ✅/⚠️  |
 ```
 
-Under the table, the **session estimate** from rows 6-7:
+Under the table, give the session estimate from rows 6 and 7. If CERF supports
+the SoC and its peripherals are reusable, the estimate is about 5-40 sessions.
+For a new CPU or SoC, the estimate is about 40-100 sessions or more.
 
-- **SoC supported + peripherals reusable** → ~**5-40 sessions** (board complexity
-  still swings this widely).
-- **New CPU/SoC from scratch** → ~**40-100+ sessions**, impossible to bound up
-  front.
-
-Then ask on its own line:
+Then ask on a line of its own:
 
 > Start the bring-up? `[yes|no]`
 
-STOP and wait. Do not begin work, do not create any document, until `yes`.
+Stop and wait for the answer. Do not start work and do not create a document
+before `yes`. If user pre-approved you may start. You also may suggest Skill(implement-device-goal) for a good /goal harness text.
 
----
+## Phase D - Start
 
-## Phase D - On `yes`: seed tracking, teach the workflow, start
+### D1 - Create the tracking document
 
-### D1 - `/tracking create` (the `yes` authorizes this one write)
+The `yes` authorizes one `/tracking create`. Create an umbrella tracker for the
+bring-up. Put these items in it:
 
-Invoke the `tracking` skill's CREATE for a new board bring-up doc. It's an
-**umbrella / progress tracker** (many independent peripheral workstreams), so
-keep it a coarse index. Seed it with:
+- In `TASK & WHY`: the board, its bundles, and the reason for the bring-up.
+- A standing `VERIFY GATE` line: "A chunk is the code that removes one halt
+  line. Each chunk passes `/verify` before the next chunk starts. Record the
+  verdict in the `/tracking update` of that session, under CODE STATE, verbatim
+  with file:line. Never skip the gate on a JIT, MMU or CPU change."
+- A standing `PROCEDURE` line: "Follow
+  `.claude/skills/implement-device/SKILL.md` § The bring-up loop." Copy the
+  steps and the chunk rules of the loop under that line.
+- `Session 0`: the readiness table of Phase C, verbatim. The work starts at
+  Session 1.
 
-- `TASK & WHY` - bring up board `<X>`; why it matters; empty FORBIDDEN
-  CONCLUSIONS / BANNED APPROACHES.
-- **A standing `VERIFY GATE` line** (survives compaction): *"Every finished
-  implementation chunk - a peripheral, a `cpu_configs` row/`ArmCoprocProvider`/`MipsCp0Model`,
-  the `PageTableBuilder`, the `BoardContext`, the LCD/INTC/timer/
-  DMA/touch models - is run through `/verify` BEFORE the next chunk, verdict
-  recorded in that session's `/tracking update` (CODE STATE, verbatim with
-  file:line). Never skip the gate on JIT/MMU/CPU changes."*
-- **A `PROCEDURE` line** pointing at the durable method: *"Follow the bring-up
-  loop and ground rules in `.claude/skills/implement-device/SKILL.md`
-  § The bring-up loop."* (Plus the committed reference set: `CLAUDE.md`,
-  `agent_docs/rules.md`, `agent_docs/debugging.md`, `agent_docs/code_style.md`.)
-- **`Session 0`** - paste the Phase C readiness table verbatim (identity +
-  source, SoC/CPU, what CERF has, reuse plan, estimate). The durable
-  baseline a compacted agent resumes from. Real work starts at Session 1.
+### D2 - Make the first run
 
-The `yes` authorizes this single create only - not standing authorization; every
-later write needs its own `/tracking update` from the user.
+Run each bundle of the task on the untouched tree. Do not edit a file before
+this run. The first halt line of this run names chunk 1. Then follow § The
+bring-up loop from step 2.
 
-### D2 - Teach the cross-session workflow (say this to the user)
+## The bring-up loop
 
-> For a productive multi-session bring-up:
-> - End of each session: `/tracking update` (you invoke it).
-> - Then `/compact`.
-> - Then `/tracking restore` next session to reload the world.
->
-> One protecting rule: **never run `/tracking` because I asked you to.** If I
-> propose updating the tracking doc, that's a bailout - only YOU decide when a
-> session ends. I never raise the tracking document myself.
+CERF halts when the board needs something that CERF does not have. The halt
+line in the log names that thing: a board id, a service, or a physical address
+with a guest PC.
 
-### D3 - Run the bring-up loop (the procedure below)
+A chunk is the code that removes one halt line.
 
-Pick the entry point from the table, then run § The bring-up loop:
+1. Run the bundle.
+2. Find the first halt line in the log. Write that line in your reply before
+   you edit a file.
+3. Find what the halt line names. For a physical address, find its peripheral
+   block in the memory map of the datasheet.
+4. Research that item only. Read its manual entry and the guest code at the PC
+   of the halt. Save the excerpt that you cite under `references/<soc>/`.
+5. Implement the item fully.
+6. Build. Make sure that the build succeeded.
+7. Run the bundle again. Make sure that the halt line changed.
+8. Run `/verify` on the chunk. Correct each `CRITICAL PROBLEM FOUND`. Repeat
+   until the verdict is `LEGIT`.
+9. Go to step 2 with the new halt line.
 
-- **New SoC/core (rows 6-7 ❌)** → start at the CPU/JIT strategy set for the
-  board's `CpuArch`: write the `cpu_configs` row of the SoC in
-  `libCerfCore/db.json`, the core clock (`ArmCoreClock` or `MipsCoreClock`), and the
-  `ArmCoprocProvider` or the `MipsCp0Model`, `MipsTlbModel` and
-  `MipsExceptionModel` concretes, from the CPU architecture reference
-  manual + the core TRM (downloaded to `references/<soc>/` first), then the
-  `PageTableBuilder` / memory map, then the peripheral loop.
-- **SoC supported (rows 6-7 ✅)** → start at the `libCerfCore/db.json` rows of the
-  family and the board, and at the `<family_id>_family_id.h` of the family. Then
-  write the `BoardContext` concrete that returns that family id. Set `board.id`
-  and `rom.primary` in the cerf.json of the bundle. Then write the
-  `PageTableBuilder` (crack the OEMAddressTable of the kernel in IDA). Then run
-  the peripheral loop.
+Continue until the guest shows its GUI. Then continue until the user can
+operate the device.
 
----
+Chunk rules:
 
-## The bring-up loop (the engine)
+- Do not create or edit a file that the current halt line does not ask for.
+- Do not research an item that no halt line names.
+- Do not write code for the next halt line before the current chunk is `LEGIT`.
+  The user wipes a working tree that mixes chunks.
+- Never mix two chunks unless the work requires it.
+- A halt line that changes its text or its address usually ends a chunk. Run
+  `/verify` at that point.
 
-The kernel boots, hits an unimplemented register/MMIO address, and
-`HaltUnsupportedAccess` fatals with the PA + guest PC. **One blocker per cycle**,
-each step obeying the rules in `CLAUDE.md` / `agent_docs/` (don't restate them -
-follow them):
-
-1. **Build** (`CLAUDE.md` § Build) - confirm it actually succeeded.
-2. **Run** with a SHORT GNU `timeout` and a per-task `--log-file`
-   (`agent_docs/debugging.md` § Timeout). Never background cerf; never read
-   stdout.
-3. **Read the FIRST** `FATAL|unsupported|unmapped|rejected|Halt` line - that PA +
-   guest PC is the blocker.
-4. **Decode the PA → peripheral block** from the datasheet memory map.
-5. **Research it** the nuclear-bisection way (`agent_docs/debugging.md`): find the
-   register in the SoC manual, decompile the guest PC that touched it for the
-   exact semantics, write the citation excerpt under `references/<soc>/`.
-6. **Implement the blocker fully** - no fake-success stub; the mandatory-real
-   peripherals are never stubbed (`agent_docs/rules.md` § Board Implementation).
-7. **`/verify`**, fix any `CRITICAL PROBLEM FOUND`;
-8. **Repeat** until GUI, then interaction - the user-observable bring-up target.
-
-ONCE HALT HAS CHANGED MESSGAGE/MOVED AGENT DECIDES IF IT'S A CHUNK AND TIME TO SPAWN /verify, IN MOST SCENARIOS IT IS TRUE. Do NOT jump chunks - the working tree will be wiped. Record bring-up loop algorithm into tracking document as the governing order. One chunk at the time. Never mix chunks unless this is required. THAT'S ONE OF THE MOST IMPORTANT RULES. NEVER RACE PAST A CHANGED HALT INTO MORE WORK.
+The rule "implement all checklist steps as one body of work" in
+`agent_docs/workflow.md` § Scope Rules does not apply to a bring-up.

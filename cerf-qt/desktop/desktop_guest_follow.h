@@ -30,6 +30,7 @@ public:
     bool InRequest() const { return requests_ > 0; }
     void Follow() { follow_guest_ = true; }
     void Placed() { placed_ = true; }
+    void Attach();
     void ExpectResize(const QSize& before, const QSize& after);
     void ExpectStates(Qt::WindowStates states);
     bool LiveResizeOn() const;
@@ -48,4 +49,5 @@ private:
     int                           requests_     = 0;
     bool                          follow_guest_ = true;
     bool                          placed_       = false;
+    bool                          attached_     = false;
 };

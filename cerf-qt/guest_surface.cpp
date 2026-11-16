@@ -45,12 +45,22 @@ GuestSurface::GuestSurface(QQuickItem* parent) : FrameViewItem(parent), touch_(T
 
 GuestSurface::~GuestSurface() { Detach(); }
 
-void GuestSurface::Attach(cerfcore::CerfEmulator& emu, uint32_t surf_w, uint32_t surf_h) {
-    gate_.Attach(emu);
+void GuestSurface::Prepare(uint32_t surf_w, uint32_t surf_h) {
     presenter_ = std::make_unique<QtFramePresenter>(std::make_unique<QtEmulatorPresent>(*this), surf_w, surf_h,
                                                     FillColor());
     scroll_.Bind(&presenter_->Layout());
     SyncPlacementSurface();
+    Relayout();
+}
+
+void GuestSurface::ShowContent(cerfcore::CerfEmulator& emu) {
+    overlays_.ShowFonts(emu);
+    Relayout();
+    tab_view_.Refresh(emu, PixelScale());
+}
+
+void GuestSurface::Attach(cerfcore::CerfEmulator& emu) {
+    gate_.Attach(emu);
     Relayout();
     presenter_->StartRepaints(static_cast<int>(emu.Get<cerfcore::RefreshRateService>().FrameIntervalMs()), [this] {
         gate_.Run([this](cerfcore::CerfEmulator& emu) {
@@ -165,6 +175,7 @@ void GuestSurface::Relayout() {
     if (!presenter_) return;
     const ViewArea a = AreaFor(QSizeF(width(), height()), safe_margins_);
     presenter_->SetCanvasSize(a.width, a.height);
+    overlays_.ShowCanvas(presenter_->Layout(), PixelScale());
     LOG(Lcd, "GuestSurface: area %dx%d safe %d,%d,%d,%d hud %d,%d,%d,%d\n", a.width, a.height, a.left, a.top, a.right,
         a.bottom, a.hud_left, a.hud_top, a.hud_right, a.hud_bottom);
     placement_.SetArea(a);
@@ -183,7 +194,7 @@ ViewArea GuestSurface::AreaFor(QSizeF logical, const QMarginsF& safe) const {
         const QSize canvas = DeviceCanvasSize(logical.width(), logical.height(), PixelScale());
         return ViewArea{canvas.width(), canvas.height()};
     }
-    ViewArea a;
+    ViewArea a = SurfaceAreaPlanner::BaseArea(logical, safe, PixelScale());
     gate_.Run([&](cerfcore::CerfEmulator& emu) {
         a = emu.Get<SurfaceAreaPlanner>().AreaFor(logical, safe, PixelScale(), Dpr(), presenter_->Layout());
     });

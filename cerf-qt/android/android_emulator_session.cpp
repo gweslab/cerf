@@ -23,13 +23,9 @@ AndroidEmulatorSession::AndroidEmulatorSession(QString device, const QStringList
 
 void AndroidEmulatorSession::Boot() {
     LOG(Manager, "AndroidEmulatorSession: starting %s\n", qUtf8Printable(device_));
-    run_ = std::make_unique<QtEmulatorRun>(
-        config_, static_cast<int>(arg_storage_.size()), argv_.data(), [this] { Finish(); },
-        [](cerfcore::CerfEmulator& emu) { emu.Get<QtEmulatorWindow>().OnTeardownWedged(); });
-    run_->BootInBackground([this](cerfcore::CerfEmulator& emu) {
-        emu.Get<QtEmulatorWindow>().SetWedgedHandler([this] { Abandon(); });
-        emu.Get<QtEmulatorWindow>().OpenWindow();
-    });
+    run_ = std::make_unique<QtEmulatorRun>(config_, static_cast<int>(arg_storage_.size()), argv_.data(),
+                                           [this] { Finish(); }, [this] { Abandon(); });
+    run_->Boot();
 }
 
 void AndroidEmulatorSession::Raise() {

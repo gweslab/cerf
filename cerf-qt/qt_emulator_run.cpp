@@ -1,6 +1,7 @@
 #include "qt_emulator_run.h"
 
 #include "nested_event_loops.h"
+#include "qt_emulator_window.h"
 #include "qt_ui_thread_calls.h"
 #include "shutdown_teardown.h"
 
@@ -17,7 +18,7 @@
 #include <utility>
 
 QtEmulatorRun::QtEmulatorRun(const cerfcore::CerfConfig& cfg, int argc, char** argv, std::function<void()> on_exit,
-                             std::function<void(cerfcore::CerfEmulator&)> on_wedged)
+                             std::function<void()> on_wedged)
     : args_(argv, argv + argc),
       argv_(PointersTo(args_)),
       emu_(std::make_unique<cerfcore::CerfEmulator>(cfg, argc, argv_.data())),
@@ -33,7 +34,7 @@ std::vector<char*> QtEmulatorRun::PointersTo(std::vector<std::string>& args) {
 
 QtEmulatorRun::~QtEmulatorRun() { Stop(); }
 
-bool QtEmulatorRun::Boot(const std::function<void(cerfcore::CerfEmulator&)>& open_window) {
+void QtEmulatorRun::Boot() {
     const cerfcore::Log::CautionScope outside_instance(nullptr);
     emu_->CreateAllServices();
     cerfcore::Fatal& fatal = emu_->Get<cerfcore::Fatal>();
@@ -42,57 +43,24 @@ bool QtEmulatorRun::Boot(const std::function<void(cerfcore::CerfEmulator&)>& ope
         fatal_ = &fatal;
     }
     WatchStopAfterHalt(fatal);
-    bool booted = false;
-    fatal.Guard([this, &booted, &open_window] {
-        emu_->ResolveAllSlots();
-        emu_->ReadyAllServices();
-        open_window(*emu_);
-        {
-            std::lock_guard<std::mutex> lock(window_mutex_);
-            ui_calls_      = &emu_->Get<QtUiThreadCalls>();
-            window_open_   = true;
-            guest_started_ = true;
-        }
-        emu_->StartGuest();
-        booted = true;
-    });
-    if (booted) StartWaiter();
-    return booted;
-}
-
-void QtEmulatorRun::BootInBackground(std::function<void(cerfcore::CerfEmulator&)> open_window) {
-    const cerfcore::Log::CautionScope outside_instance(nullptr);
-    emu_->CreateAllServices();
-    cerfcore::Fatal& fatal = emu_->Get<cerfcore::Fatal>();
-    WatchStopAfterHalt(fatal);
     const auto booted = std::make_shared<bool>(false);
     boot_             = emu_->Get<cerfcore::InstanceThreads>().Start(
-        [this, &fatal, booted, open_window = std::move(open_window)] {
+        [this, &fatal, booted] {
             {
                 std::lock_guard<std::mutex> lock(window_mutex_);
                 if (stopping_) return;
-                fatal_    = &fatal;
                 ui_calls_ = &emu_->Get<QtUiThreadCalls>();
             }
             emu_->ResolveAllSlots();
-            emu_->ReadyAllServices();
-            QMetaObject::invokeMethod(
-                &context_,
-                [this, open_window, &fatal] {
-                    {
-                        std::lock_guard<std::mutex> lock(window_mutex_);
-                        if (stopping_) return;
-                    }
-                    const bool opened = fatal.Guard([this, &open_window] { open_window(*emu_); });
-                    std::lock_guard<std::mutex> lock(window_mutex_);
-                    window_open_ = opened;
-                    window_changed_.notify_all();
-                },
-                Qt::QueuedConnection);
+            if (!RunWindowStep(fatal, [this] { emu_->Get<QtEmulatorWindow>().ShowWindow(); })) return;
             {
-                std::unique_lock<std::mutex> lock(window_mutex_);
-                window_changed_.wait(lock, [this, &fatal] { return window_open_ || stopping_ || fatal.Halted(); });
-                if (!window_open_) return;
+                std::lock_guard<std::mutex> lock(window_mutex_);
+                window_open_ = true;
+            }
+            emu_->ReadyAllServices();
+            if (!RunWindowStep(fatal, [this] { emu_->Get<QtEmulatorWindow>().AttachWindow(); })) return;
+            {
+                std::lock_guard<std::mutex> lock(window_mutex_);
                 guest_started_ = true;
             }
             emu_->StartGuest();
@@ -105,6 +73,34 @@ void QtEmulatorRun::BootInBackground(std::function<void(cerfcore::CerfEmulator&)
                 PostExit();
             }
         });
+    fatal.Guard([this] {
+        auto& window = emu_->Get<QtEmulatorWindow>();
+        window.SetWedgedHandler(std::move(on_wedged_));
+        window.PrepareWindow();
+    });
+}
+
+bool QtEmulatorRun::RunWindowStep(cerfcore::Fatal& fatal, std::function<void()> step) {
+    {
+        std::lock_guard<std::mutex> lock(window_mutex_);
+        step_done_ = false;
+    }
+    QMetaObject::invokeMethod(
+        &context_,
+        [this, step = std::move(step), &fatal] {
+            {
+                std::lock_guard<std::mutex> lock(window_mutex_);
+                if (stopping_) return;
+            }
+            const bool done = fatal.Guard([&step] { step(); });
+            std::lock_guard<std::mutex> lock(window_mutex_);
+            step_done_ = done;
+            window_changed_.notify_all();
+        },
+        Qt::QueuedConnection);
+    std::unique_lock<std::mutex> lock(window_mutex_);
+    window_changed_.wait(lock, [this, &fatal] { return step_done_ || stopping_ || fatal.Halted(); });
+    return step_done_;
 }
 
 cerfcore::CerfEmulator* QtEmulatorRun::OpenEmulator() {
@@ -149,7 +145,7 @@ void QtEmulatorRun::CheckStoppedAfterHalt() {
     const cerfcore::Log::CautionScope outside_instance(nullptr);
     LOG(Caution, "QtEmulatorRun: the guest did not stop within %ums of the halt\n",
         cerffrontend::ShutdownTeardown::kGraceMs);
-    on_wedged_(*emu_);
+    emu_->Get<QtEmulatorWindow>().OnTeardownWedged();
 }
 
 void QtEmulatorRun::PostExit() {

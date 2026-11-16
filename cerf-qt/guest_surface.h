@@ -56,7 +56,9 @@ public:
     explicit GuestSurface(QQuickItem* parent = nullptr);
     ~GuestSurface() override;
 
-    void Attach(cerfcore::CerfEmulator& emu, uint32_t surf_w, uint32_t surf_h);
+    void Prepare(uint32_t surf_w, uint32_t surf_h);
+    void ShowContent(cerfcore::CerfEmulator& emu);
+    void Attach(cerfcore::CerfEmulator& emu);
     void Detach();
 
     SurfaceOverlays*              Overlays() { return &overlays_; }

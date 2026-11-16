@@ -2,21 +2,16 @@ import QtQuick
 import QtQuick.Layouts
 import CerfStyle
 
-PageWindow {
+FixedWidthWindow {
     id: alert
     property string message
     property string level
     property bool topmost: false
-    readonly property int fixedWidth: 400
     signal finished(var result)
 
     modal: true
     flags: Qt.Dialog | (topmost ? Qt.WindowStaysOnTopHint : 0)
-    width: fixedWidth
-    height: column.implicitHeight
-    minimumWidth: fixedWidth
-    maximumWidth: fixedWidth
-    minimumHeight: column.implicitHeight
+    contentHeight: column.implicitHeight
 
     onClosing: alert.finished(undefined)
 

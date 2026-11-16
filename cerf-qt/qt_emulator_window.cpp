@@ -46,30 +46,38 @@ constexpr uint32_t kScreenshotHintMs = 2000;
 
 QtEmulatorWindow::~QtEmulatorWindow() = default;
 
-void QtEmulatorWindow::OpenWindow() {
+void QtEmulatorWindow::PrepareWindow() { MakeWindow(); }
+
+void QtEmulatorWindow::ShowWindow() {
     const auto live = emu_.Get<cerfcore::DeviceConfig>().Live();
-    MakeWindow();
-    surface_->Attach(emu_, live->board_configurable_screen_width, live->board_configurable_screen_height);
+    surface_->Prepare(live->board_configurable_screen_width, live->board_configurable_screen_height);
+    ApplyPresentation();
+    surface_->ShowContent(emu_);
+    surface_->SetFramebufferActive(CurrentTab() == Tab::Framebuffer);
+    QStringList titles;
+    for (const std::string& title : emu_.Get<EmulatorWindowHost>().MenuTitles()) titles.append(QString::fromStdString(title));
+    controller_->ShowTitles(std::move(titles));
+    surface_w_.store(surface_->GuestSurfaceWidth(), std::memory_order_release);
+    surface_h_.store(surface_->GuestSurfaceHeight(), std::memory_order_release);
+    LOG(Lcd, "QtEmulatorWindow: showing at %ux%u\n", live->board_configurable_screen_width,
+        live->board_configurable_screen_height);
+    ShowHostWindow();
+    native_handle_.store(static_cast<uint64_t>(window_->winId()), std::memory_order_release);
+}
+
+void QtEmulatorWindow::AttachWindow() {
+    surface_->Attach(emu_);
     emu_.Get<cerffrontend::CanvasInput>().Attach(surface_);
     input_attached_ = true;
     controller_->Attach(emu_);
     if (widget_bar_) widget_bar_->Attach(emu_);
     if (status_bar_) status_bar_->Attach(emu_);
     if (overlay_area_) overlay_area_->Attach(emu_);
-    ApplyPresentation();
-    surface_->SetFramebufferActive(CurrentTab() == Tab::Framebuffer);
-    surface_w_.store(surface_->GuestSurfaceWidth(), std::memory_order_release);
-    surface_h_.store(surface_->GuestSurfaceHeight(), std::memory_order_release);
     teardown_timer_ = std::make_unique<QTimer>();
     teardown_timer_->setInterval(static_cast<int>(cerffrontend::ShutdownTeardown::kPollMs));
     teardown_timer_->callOnTimeout(gate_.Bind([this] { PollTeardown(); }));
-    LOG(Lcd, "QtEmulatorWindow: opening at %ux%u\n", live->board_configurable_screen_width,
-        live->board_configurable_screen_height);
-
-    auto& host = emu_.Get<EmulatorWindowHost>();
-    host.ShowWindow();
-    native_handle_.store(static_cast<uint64_t>(window_->winId()), std::memory_order_release);
-    host.PlaceWindow();
+    LOG(Lcd, "QtEmulatorWindow: attached\n");
+    emu_.Get<EmulatorWindowHost>().AttachWindow();
     ReleaseHeldJobs();
 }
 
@@ -82,6 +90,12 @@ void QtEmulatorWindow::MakeWindow() {
     status_bar_   = window_->property("statusBar").value<BarWidgetList*>();
     overlay_area_ = window_->property("overlayArea").value<OverlayTouchArea*>();
     window_->installEventFilter(&menu_dismiss_);
+}
+
+void QtEmulatorWindow::ShowHostWindow() {
+    if (host_shown_) return;
+    host_shown_ = true;
+    emu_.Get<EmulatorWindowHost>().ShowWindow();
 }
 
 void QtEmulatorWindow::MenuClosing() { menu_dismiss_.Arm(); }
@@ -316,10 +330,8 @@ std::vector<cerffrontend::MenuItem> QtEmulatorWindow::GearMenu() {
 }
 
 QObject* QtEmulatorWindow::CreateDialog(const QString& type_name, const QVariantMap& properties) {
-    if (!window_) {
-        MakeWindow();
-        emu_.Get<EmulatorWindowHost>().ShowWindow();
-    }
+    MakeWindow();
+    ShowHostWindow();
     QVariant created;
     QMetaObject::invokeMethod(window_.data(), "createDialog", Q_RETURN_ARG(QVariant, created),
                               Q_ARG(QVariant, type_name), Q_ARG(QVariant, properties));

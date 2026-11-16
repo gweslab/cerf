@@ -2,22 +2,17 @@ import QtQuick
 import QtQuick.Layouts
 import CerfStyle
 
-PageWindow {
+FixedWidthWindow {
     id: host
     required property QtObject model
     property bool finished: false
     readonly property int iconSize: 32
     readonly property int logLines: 12
-    readonly property int fixedWidth: 400
 
     title: model.heading
     modal: false
     visible: true
-    width: fixedWidth
-    height: column.implicitHeight
-    minimumWidth: fixedWidth
-    maximumWidth: fixedWidth
-    minimumHeight: column.implicitHeight
+    contentHeight: column.implicitHeight
 
     onClosing: close => close.accepted = host.finished
 

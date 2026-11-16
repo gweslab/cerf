@@ -46,7 +46,7 @@ protected:
         switch (event->type()) {
             case QEvent::Close:
                 event->ignore();
-                gate_.Run([](cerfcore::CerfEmulator& emu) { emu.Get<QtEmulatorWindow>().CloseRequested(); });
+                gate_.Run([](cerfcore::CerfEmulator& emu) { emu.Get<QtEmulatorWindow>().Controller()->RequestClose(); });
                 return true;
             case QEvent::WindowStateChange: {
                 const auto*            change = static_cast<QWindowStateChangeEvent*>(event);
@@ -78,19 +78,10 @@ public:
 
     void ShowWindow() override {
         QQuickWindow* window = emu_.Get<QtEmulatorWindow>().Window();
-        if (shown_) return;
-        shown_ = true;
         window->setTitle(QString::fromStdString(emu_.Get<cerffrontend::WindowTitle>().Compose()));
         events_ = std::make_unique<DesktopWindowEvents>(emu_);
         window->installEventFilter(events_.get());
-        QObject::connect(window, &QWindow::activeChanged, events_.get(), gate_.Bind([this, window] {
-            if (!window->isActive()) OnDeactivated();
-        }));
-        if (NativeMenuBar::Active()) new GlobalMenuBar(*window, *emu_.Get<QtEmulatorWindow>().Controller());
         emu_.Get<QtFocusPolicy>().Show(*window);
-    }
-
-    void PlaceWindow() override {
         GuestSurface& surface = *emu_.Get<QtEmulatorWindow>().Surface();
         const int     scale   = emu_.Get<cerffrontend::StartupScale>().Factor(
             qRound(cerffrontend::kDefaultDpi * QGuiApplication::primaryScreen()->devicePixelRatio()));
@@ -99,7 +90,17 @@ public:
         FitWindowToSurface(static_cast<uint32_t>(surface.Layout().ContentWidth()),
                            static_cast<uint32_t>(surface.Layout().ContentHeight()));
         emu_.Get<DesktopGuestFollow>().Placed();
-        emu_.Get<QtFocusPolicy>().Focus(surface);
+    }
+
+    void AttachWindow() override {
+        auto&         win    = emu_.Get<QtEmulatorWindow>();
+        QQuickWindow* window = win.Window();
+        QObject::connect(window, &QWindow::activeChanged, events_.get(), gate_.Bind([this, window] {
+            if (!window->isActive()) OnDeactivated();
+        }));
+        if (NativeMenuBar::Active()) new GlobalMenuBar(*window, *win.Controller());
+        emu_.Get<DesktopGuestFollow>().Attach();
+        emu_.Get<QtFocusPolicy>().Focus(*win.Surface());
     }
 
     void Raise() override {
@@ -230,7 +231,6 @@ private:
     const cerfcore::InstanceGate gate_{emu_};
     std::unique_ptr<QObject>     events_;
     ContentWindowState           chrome_;
-    bool                         shown_ = false;
 };
 
 }

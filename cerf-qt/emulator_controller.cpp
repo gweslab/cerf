@@ -95,13 +95,11 @@ void EmulatorController::ToggleHud() {
     gate_.Run([](cerfcore::CerfEmulator& emu) { emu.Get<cerffrontend::HudSelection>().Toggle(); });
 }
 
-QStringList EmulatorController::MenuTitles() const {
-    QStringList titles;
-    gate_.Run([&titles](cerfcore::CerfEmulator& emu) {
-        for (const std::string& title : emu.Get<EmulatorWindowHost>().MenuTitles())
-            titles.append(QString::fromStdString(title));
-    });
-    return titles;
+QStringList EmulatorController::MenuTitles() const { return titles_; }
+
+void EmulatorController::ShowTitles(QStringList titles) {
+    titles_ = std::move(titles);
+    emit menusChanged();
 }
 
 QVariantList EmulatorController::Menu(int index, QObject* menu) {

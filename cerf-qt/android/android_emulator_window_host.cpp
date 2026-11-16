@@ -43,7 +43,7 @@ public:
 
     void ShowWindow() override { emu_.Get<QtEmulatorWindow>().Window()->showFullScreen(); }
 
-    void PlaceWindow() override { AdoptResolutionToScreen(); }
+    void AttachWindow() override { AdoptResolutionToScreen(); }
 
     void Raise() override {
         QQuickWindow* window = emu_.Get<QtEmulatorWindow>().Window();

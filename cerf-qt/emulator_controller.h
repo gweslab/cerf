@@ -26,6 +26,7 @@ public:
     bool        HudShown() const;
     QStringList MenuTitles() const override;
     void        RefreshHud() { emit hudChanged(); }
+    void        ShowTitles(QStringList titles);
 
     void Attach(cerfcore::CerfEmulator& emu) {
         gate_.Attach(emu);
@@ -60,4 +61,5 @@ private:
 
     cerfcore::InstanceGate gate_;
     StripPressDelay        row_press_{*this};
+    QStringList            titles_;
 };

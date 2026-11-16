@@ -25,33 +25,38 @@ void SurfaceOverlays::PlaceCards(const QVariantList& placed) {
     }
 }
 
-void SurfaceOverlays::Refresh(cerfcore::CerfEmulator& emu, const cerffrontend::ViewportLayout& layout, QPointF scale,
-                              CursorPicture cursor) {
-    auto&      tabs        = emu.Get<cerffrontend::CanvasTabs>();
-    const bool framebuffer = tabs.Current() == cerfcore::CanvasTab::Framebuffer;
+void SurfaceOverlays::ShowFonts(cerfcore::CerfEmulator& emu) {
+    const auto& resources = emu.Get<QtPaintResources>();
+    ui_family_            = resources.UiFamily();
+    mono_family_          = resources.MonoFamily();
+    emit fontsChanged();
+}
+
+void SurfaceOverlays::ShowCanvas(const cerffrontend::ViewportLayout& layout, QPointF scale) {
     if (scale != scale_) {
         scale_ = scale;
         emit pixelScaleChanged();
-    }
-    hud_.Update(framebuffer ? emu.Get<cerffrontend::HudNodes>().Build(layout.Compute(), scale) : QList<QVariantMap>());
-    auto& notifications = emu.Get<cerffrontend::NotificationOverlay>();
-    cards_.Update(notifications.Cards());
-    notifications.SetPlaced(placed_, scale);
-    if (ui_family_.isEmpty()) {
-        const auto& resources = emu.Get<QtPaintResources>();
-        ui_family_            = resources.UiFamily();
-        mono_family_          = resources.MonoFamily();
-        emit fontsChanged();
-    }
-    const bool dimmed = tabs.ShouldDesaturate();
-    if (dimmed != dimmed_) {
-        dimmed_ = dimmed;
-        emit dimmedChanged();
     }
     const QRectF canvas(0, 0, layout.CanvasWidth() / scale.x(), layout.CanvasHeight() / scale.y());
     if (canvas != canvas_) {
         canvas_ = canvas;
         emit canvasChanged();
+    }
+}
+
+void SurfaceOverlays::Refresh(cerfcore::CerfEmulator& emu, const cerffrontend::ViewportLayout& layout, QPointF scale,
+                              CursorPicture cursor) {
+    ShowCanvas(layout, scale);
+    auto&      tabs        = emu.Get<cerffrontend::CanvasTabs>();
+    const bool framebuffer = tabs.Current() == cerfcore::CanvasTab::Framebuffer;
+    hud_.Update(framebuffer ? emu.Get<cerffrontend::HudNodes>().Build(layout.Compute(), scale) : QList<QVariantMap>());
+    auto& notifications = emu.Get<cerffrontend::NotificationOverlay>();
+    cards_.Update(notifications.Cards());
+    notifications.SetPlaced(placed_, scale);
+    const bool dimmed = tabs.ShouldDesaturate();
+    if (dimmed != dimmed_) {
+        dimmed_ = dimmed;
+        emit dimmedChanged();
     }
     const QPointF arrow_at = cursor.arrow ? QPointF(cursor.hot.x() / scale.x(), cursor.hot.y() / scale.y()) : QPointF();
     if (cursor.arrow != arrow_shown_ || arrow_at != arrow_at_) {

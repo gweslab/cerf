@@ -62,7 +62,9 @@ public:
     void SetWedgedHandler(std::function<void()> handler) { wedged_handler_ = std::move(handler); }
     void RunWedgedHandler() const { wedged_handler_(); }
 
-    void                                OpenWindow();
+    void                                PrepareWindow();
+    void                                ShowWindow();
+    void                                AttachWindow();
     void                                CloseWindow();
     void                                Raise();
     void                                SetKeyboardGrab(bool on);
@@ -89,6 +91,7 @@ public:
 
 private:
     void     MakeWindow();
+    void     ShowHostWindow();
     QObject* CreateDialog(const QString& type_name, const QVariantMap& properties);
     void     ApplyPresentation();
     void     Post(std::function<void()> job);
@@ -105,6 +108,7 @@ private:
     QPointer<BarWidgetList>      status_bar_;
     QPointer<OverlayTouchArea>   overlay_area_;
     bool                         input_attached_ = false;
+    bool                         host_shown_     = false;
 
     std::mutex                         held_mutex_;
     std::vector<std::function<void()>> held_;

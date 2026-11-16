@@ -63,45 +63,37 @@ state are forbidden.
 
 ### Service locator mechanics
 
-- **Registration is one macro line per `.cpp`.** `REGISTER_SERVICE(Foo)`
-  makes `Foo` resolvable only as `Foo`. `REGISTER_SERVICE_AS(Foo, Base)` makes
-  `Foo` a candidate for the `Base` slot, also resolvable as `Foo` (the strategy
-  pattern). `REGISTER_SERVICE_AS_FALLBACK(Foo, Base)` wins only if
-  `ShouldRegister` returned true for no non-fallback candidate. Boot then
-  constructs every candidate. Boot runs the `ShouldRegister` of each slot to pick the single
-  winner. Boot then calls `EnsureReady` on **every** winner.
+- **`REGISTER_SERVICE_AS_FALLBACK(Foo, Base)` wins only if `ShouldRegister`
+  returned true for no non-fallback candidate.** Boot constructs every
+  candidate, also the candidates that lose their slot.
 - **The `OnReady` of every winning service runs exactly once**, at boot. It
-  runs whether or not anything ever calls `Get<>` for it. `OnReady` is also
-  lazy. A first `Get<Dep>()` from inside your `OnReady` runs `Dep::OnReady`
-  before it returns, so the graph self-orders on demand. Both paths guard
-  with a mutex, so `OnReady` never runs twice. There is no init phase, no
-  declared order, and no pre-warm step.
-- **If no candidate won the slot, `Get<T>()` is fatal.** **`TryGet<T>()`**
-  returns `nullptr` for an optional dependency.
+  runs whether or not anything ever calls `Get<>` for it.
 - **Misuse halts the instance with the types named**: two `ShouldRegister`
   true for one Base, a required slot with no winner, or a
-  `ShouldRegister`↔`Get` cycle. You need no defensive check around `Get<>`.
-- **`ShouldRegister()`** can call `Get<>`/`TryGet<>` through the same lazy
-  path.
+  `ShouldRegister`↔`Get` cycle.
 - **`Get<Foo>()` resolves the `Base` slot first when
   `REGISTER_SERVICE_AS(Foo, Base)` registers `Foo`.**
 - **Any thread can call `Get<>` at any time.** A thread that needs a slot
   while another thread resolves it waits, then gets the winner of that slot.
   Each slot resolves once.
-- **The emulator window opens after the readiness sweep and before the guest
-  starts.** A shown window can paint at once. That paint reads services whose
-  `OnReady` can still be on the stack. A job that a service posts to the window
-  before it opens runs after it opens.
+- **The emulator window shows right after the resolution sweep, and it attaches
+  to the instance after the readiness sweep.** A job that a service posts to the
+  window before it attaches runs after it attaches.
 
   On Android, a start-up alert before a user-error halt opens the window during
-  the sweep. Its items read no services during the sweep. On the desktop, such
-  an alert opens a window of its own and never the emulator window. The alert
+  a sweep. On the desktop, such an alert opens a window of its own and never the
+  emulator window. The alert
   can come while the device configuration loads. The emulator window reads that
   configuration, so it cannot open during the load.
-- **The Android frontend boots the emulator on a boot thread.** Qt binds a
-  `QObject` service to the thread that creates it. As a result, the GUI thread
-  creates the services. A boot thread runs the resolution sweep and the
-  readiness sweep, and starts the guest.
+- **The emulator boots on a boot thread on every host. The GUI thread never runs
+  the resolution sweep or the readiness sweep.** Qt binds a `QObject` to the
+  thread that creates it. As a result, the GUI thread creates the services. An
+  `OnReady` creates a `QObject` that needs an event loop, for example a socket
+  notifier, in a job that it posts to the GUI thread.
+
+  While the boot thread runs, a start-up alert can be the only window of the
+  desktop emulator process. While its instance runs, that process therefore
+  ends when the instance exits, never when its last window closes.
 - **On Android, every device instance shares the GUI thread with the
   manager.** Device code opens a nested event loop only through
   `NestedEventLoops`. `QtEmulatorRun` holds the exit of the instance until every
@@ -114,7 +106,6 @@ state are forbidden.
   then race. Resolve every service that the thread uses before you start it.
   A thread that a `JitRunner` pre-start hook starts runs after the readiness
   sweep, so it finds every service ready.
-- **The locator is the `libservicelocator` submodule.**
 
 - `libCerfCore/include/cerfcore/core/cerf_emulator.h`, `libCerfCore/include/cerfcore/core/service.h`,
   `libservicelocator/include/servicelocator/`
@@ -778,7 +769,7 @@ the render and input plumbing that connects the host UI to the guest.
   resolution changes the space that the framebuffer needs, so the panels follow it.
   When Guest Additions take the resolution from the screen, the surface follows the
   HUD instead. The HUD then takes the bound screen that is closest to the configured
-  screen size, not to the size of the framebuffer. When the window opens, the guest
+  screen size, not to the size of the framebuffer. When the window attaches, the guest
   takes the size of the area in which the view mode shows the guest. As a result, the
   guest shows at 1:1. A later rotation or a later change of the view mode keeps that
   guest size.

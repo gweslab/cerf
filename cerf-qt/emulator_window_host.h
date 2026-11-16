@@ -15,7 +15,7 @@ public:
     using cerfcore::Service::Service;
 
     virtual void ShowWindow()                            = 0;
-    virtual void PlaceWindow()                           = 0;
+    virtual void AttachWindow()                          = 0;
     virtual void Raise()                                 = 0;
     virtual bool IsFullscreen() const                    = 0;
     virtual void ToggleFullscreen()                      = 0;

@@ -30,8 +30,13 @@ bool DesktopGuestFollow::LiveResizeOn() const {
     return policy != nullptr && policy->Enabled();
 }
 
+void DesktopGuestFollow::Attach() {
+    attached_ = true;
+    if (!follow_guest_) ArmLiveResize();
+}
+
 void DesktopGuestFollow::ArmLiveResize() {
-    if (!LiveResizeOn()) return;
+    if (!attached_ || !LiveResizeOn()) return;
     if (emu_.Get<QtEmulatorWindow>().Window()->windowStates().testFlag(Qt::WindowMinimized)) return;
     resize_debounce_.start();
 }

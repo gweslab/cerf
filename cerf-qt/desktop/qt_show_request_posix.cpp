@@ -27,8 +27,10 @@ public:
                 error);
             return;
         }
-        notifier_ = new QSocketNotifier(fd_, QSocketNotifier::Read);
-        QObject::connect(notifier_, &QSocketNotifier::activated, notifier_, gate_.Bind([this] { Drain(); }));
+        emu_.Get<QtEmulatorWindow>().RunOnUiThread([this] {
+            notifier_ = new QSocketNotifier(fd_, QSocketNotifier::Read);
+            QObject::connect(notifier_, &QSocketNotifier::activated, notifier_, gate_.Bind([this] { Drain(); }));
+        });
     }
 
     void OnShutdown() override { Close(); }

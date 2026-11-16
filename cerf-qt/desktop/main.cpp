@@ -8,7 +8,6 @@
 #include "../qt_app_defaults.h"
 #include "../qt_back_gesture.h"
 #include "../qt_emulator_run.h"
-#include "../qt_emulator_window.h"
 #include "../qt_message_log.h"
 #include "host_diagnostics.h"
 #include "host_timer_resolution.h"
@@ -28,14 +27,15 @@ int RunEmulator(int argc, char** argv) {
     HostDiagnostics::LogReport();
     std::optional<int> halt;
     std::string        crash_log_path;
+    QGuiApplication::setQuitOnLastWindowClosed(false);
     {
-        QtEmulatorRun run(cfg, argc, argv, [] { QCoreApplication::exit(0); },
-                          [](cerfcore::CerfEmulator& emu) { emu.Get<QtEmulatorWindow>().OnTeardownWedged(); });
-        if (run.Boot([](cerfcore::CerfEmulator& emu) { emu.Get<QtEmulatorWindow>().OpenWindow(); }))
-            QCoreApplication::exec();
+        QtEmulatorRun run(cfg, argc, argv, [] { QCoreApplication::exit(0); }, {});
+        run.Boot();
+        QCoreApplication::exec();
         halt = run.Halt();
         if (halt) crash_log_path = run.CrashLogPath();
     }
+    QGuiApplication::setQuitOnLastWindowClosed(true);
 #if !CERF_DEV_MODE
     if (halt == cerfcore::CERF_FATAL_RUNTIME_ERROR) {
         return ManagerApp::Run(argc, argv, [&crash_log_path](cerfcore::CerfEmulator& manager) {

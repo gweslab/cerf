@@ -18,15 +18,19 @@ cerffrontend::HudScreenMetrics SurfaceAreaPlanner::HudMetrics(qreal dpr) {
     return {dpr, cerfcore::DbLcdPanelSize{live->board_configurable_screen_width, live->board_configurable_screen_height}};
 }
 
+ViewArea SurfaceAreaPlanner::BaseArea(QSizeF logical, const QMarginsF& safe, QPointF scale) {
+    const QSize canvas = DeviceCanvasSize(logical.width(), logical.height(), scale);
+    return ViewArea{canvas.width(),
+                    canvas.height(),
+                    DeviceExtent(safe.left(), scale.x()),
+                    DeviceExtent(safe.top(), scale.y()),
+                    DeviceExtent(safe.right(), scale.x()),
+                    DeviceExtent(safe.bottom(), scale.y())};
+}
+
 ViewArea SurfaceAreaPlanner::AreaFor(QSizeF logical, const QMarginsF& safe, QPointF scale, qreal dpr,
                                      const cerffrontend::ViewportLayout& layout) {
-    const QSize canvas = DeviceCanvasSize(logical.width(), logical.height(), scale);
-    ViewArea    a{canvas.width(),
-               canvas.height(),
-               DeviceExtent(safe.left(), scale.x()),
-               DeviceExtent(safe.top(), scale.y()),
-               DeviceExtent(safe.right(), scale.x()),
-               DeviceExtent(safe.bottom(), scale.y())};
+    ViewArea                      a   = BaseArea(logical, safe, scale);
     const cerffrontend::HudInsets hud = emu_.Get<cerffrontend::HudSelection>().InsideInsets(
         a.width - a.left - a.right, a.height - a.top - a.bottom, layout.Presentation().quarter, layout.SurfaceWidth(),
         layout.SurfaceHeight(), HudMetrics(dpr));

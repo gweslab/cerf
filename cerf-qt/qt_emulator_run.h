@@ -23,14 +23,13 @@ class QtUiThreadCalls;
 class QtEmulatorRun {
 public:
     QtEmulatorRun(const cerfcore::CerfConfig& cfg, int argc, char** argv, std::function<void()> on_exit,
-                  std::function<void(cerfcore::CerfEmulator&)> on_wedged);
+                  std::function<void()> on_wedged);
     ~QtEmulatorRun();
 
     QtEmulatorRun(const QtEmulatorRun&)            = delete;
     QtEmulatorRun& operator=(const QtEmulatorRun&) = delete;
 
-    bool                    Boot(const std::function<void(cerfcore::CerfEmulator&)>& open_window);
-    void                    BootInBackground(std::function<void(cerfcore::CerfEmulator&)> open_window);
+    void                    Boot();
     cerfcore::CerfEmulator* OpenEmulator();
     std::optional<int>      Halt();
     std::string             CrashLogPath();
@@ -40,6 +39,7 @@ public:
 private:
     static std::vector<char*> PointersTo(std::vector<std::string>& args);
 
+    bool RunWindowStep(cerfcore::Fatal& fatal, std::function<void()> step);
     void StartWaiter();
     void PostExit();
     void WatchStopAfterHalt(cerfcore::Fatal& fatal);
@@ -49,7 +49,7 @@ private:
     std::vector<char*>                           argv_;
     std::unique_ptr<cerfcore::CerfEmulator>      emu_;
     std::function<void()>                        on_exit_;
-    std::function<void(cerfcore::CerfEmulator&)> on_wedged_;
+    std::function<void()>                        on_wedged_;
     QObject                                      context_;
     std::thread                                  boot_;
     std::thread                                  waiter_;
@@ -58,6 +58,7 @@ private:
     cerfcore::Fatal*                             fatal_         = nullptr;
     QtUiThreadCalls*                             ui_calls_      = nullptr;
     bool                                         window_open_   = false;
+    bool                                         step_done_     = false;
     bool                                         guest_started_ = false;
     bool                                         stopping_      = false;
     bool                                         abandoned_     = false;

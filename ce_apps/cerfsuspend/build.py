@@ -12,6 +12,8 @@ VARIANTS = [
     dict(COMMON, arch="arm", obj_dir="obj_arm", wce_version="211", subsystem_version="2.11"),
     dict(COMMON, arch="mips", mips_isa="mips1", obj_dir="obj_mips1", wce_version="100",
          subsystem_version="2.00"),
+    dict(COMMON, arch="sh3", obj_dir="obj_sh3", wce_version="100", subsystem_version="2.00",
+         sources=["main.c", str(HERE.parent / "cerf_guest" / "cerf_rt_sh.cpp")]),
 ]
 
 if __name__ == "__main__":

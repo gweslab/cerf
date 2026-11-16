@@ -4,8 +4,10 @@ typedef void (WINAPI *PFN_OutputDebugStringW)(LPCWSTR);
 typedef void (WINAPI *PFN_PowerOffSystem)(void);
 typedef LPVOID (WINAPI *PFN_VirtualAlloc)(LPVOID, DWORD, DWORD, DWORD);
 typedef BOOL (WINAPI *PFN_VirtualCopy)(LPVOID, LPVOID, DWORD, DWORD);
+typedef BOOL (WINAPI *PFN_KernelIoControl)(DWORD, LPVOID, DWORD, LPVOID, DWORD, LPDWORD);
 
 #define CERF_PAGE_PHYSICAL 0x400u
+#define CERF_IOCTL_HAL_REBOOT 0x0101003Cu
 
 static PFN_OutputDebugStringW s_ods = NULL;
 
@@ -121,6 +123,46 @@ static DWORD ParseNumber(const WCHAR** pp)
     return v;
 }
 
+static int Reboot(HMODULE core, DWORD ms, const WCHAR* marker)
+{
+    PFN_KernelIoControl kic = (PFN_KernelIoControl)GetProcAddressW(core, L"KernelIoControl");
+    DWORD               out = 0;
+    HANDLE              once;
+    if (kic == NULL) {
+        Say(L"no KernelIoControl", 0);
+        return 1;
+    }
+    while (*marker == L' ') ++marker;
+    if (*marker != 0) {
+        once = CreateFileW(marker, GENERIC_WRITE, 0, NULL, CREATE_NEW, FILE_ATTRIBUTE_NORMAL, NULL);
+        if (once == INVALID_HANDLE_VALUE) {
+            Say(L"marker present, no reboot", GetLastError());
+            return 0;
+        }
+        CloseHandle(once);
+    }
+    Say(L"reboot after ms", ms);
+    Sleep(ms);
+    Say(L"IOCTL_HAL_REBOOT at tick", GetTickCount());
+    if (!kic(CERF_IOCTL_HAL_REBOOT, NULL, 0, NULL, 0, &out)) {
+        Say(L"IOCTL_HAL_REBOOT failed", GetLastError());
+        return 1;
+    }
+    Say(L"IOCTL_HAL_REBOOT returned", out);
+    return 1;
+}
+
+static BOOL TakeWord(const WCHAR** pp, const WCHAR* word)
+{
+    const WCHAR* p = *pp;
+    while (*p == L' ') ++p;
+    for (; *word; ++word, ++p)
+        if (*p != *word) return FALSE;
+    if (*p != 0 && *p != L' ') return FALSE;
+    *pp = p;
+    return TRUE;
+}
+
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrev, LPWSTR lpCmdLine, int nShow)
 {
     HMODULE            core  = LoadLibraryW(L"coredll.dll");
@@ -136,6 +178,11 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrev, LPWSTR lpCmdLine, int n
         off   = (PFN_PowerOffSystem)GetProcAddressW(core, L"PowerOffSystem");
     }
     if (p == NULL) p = L"";
+    if (TakeWord(&p, L"reboot")) {
+        if (core == NULL) return 1;
+        ms = ParseNumber(&p);
+        return Reboot(core, ms, p);
+    }
     ms    = ParseNumber(&p);
     alarm = ParseNumber(&p);
     soc   = ParseNumber(&p);

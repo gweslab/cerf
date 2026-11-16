@@ -10,6 +10,32 @@ from ida_mcp_app import mcp
 from ida_mcp_client import get_or_broadcast, ida_get, normalize_ea
 
 
+def _require(value: str, name: str) -> None:
+    if not value:
+        raise ToolError(f"{name} is required")
+
+
+def _require_direction(direction: str) -> None:
+    if direction not in ("down", "up"):
+        raise ToolError("direction must be 'down' or 'up'")
+
+
+def _flag(value: bool) -> str:
+    return "1" if value else "0"
+
+
+def _search_params(max_results: int, start: Optional[str], end: Optional[str],
+                   **fields: str) -> dict[str, str]:
+    if max_results <= 0:
+        raise ToolError("max_results must be positive")
+    params = dict(fields, max_results=str(max_results))
+    if start:
+        params["start"] = normalize_ea(start)
+    if end:
+        params["end"] = normalize_ea(end)
+    return params
+
+
 @mcp.tool()
 def ida_search_bytes(
     target: str,
@@ -26,7 +52,9 @@ def ida_search_bytes(
 
     Args:
         pattern: Hex byte pattern with optional '??' wildcards,
-                 e.g. "48 8B ?? 10" or "E8 ?? ?? ?? FF".
+                 e.g. "48 8B ?? 10" or "E8 ?? ?? ?? FF". A wildcard covers a
+                 whole byte: a half-byte token such as "4?" is refused. To match
+                 part of an instruction word, use ida_search_insn.
         start: Hex address to start searching from. Defaults to min_ea (down) or max_ea (up).
         direction: "down" (forward) or "up" (backward). Default "down".
         max_results: Max matches to return (default 100).
@@ -35,19 +63,9 @@ def ida_search_bytes(
     Returns:
         {"pattern", "count", "results": [{"ea", "name"}, ...]}
     """
-    if not pattern:
-        raise ToolError("pattern is required")
-    if direction not in ("down", "up"):
-        raise ToolError("direction must be 'down' or 'up'")
-    if max_results <= 0:
-        raise ToolError("max_results must be positive")
-    params: dict[str, str] = {
-        "pattern": pattern,
-        "direction": direction,
-        "max_results": str(max_results),
-    }
-    if start:
-        params["start"] = normalize_ea(start)
+    _require(pattern, "pattern")
+    _require_direction(direction)
+    params = _search_params(max_results, start, None, pattern=pattern, direction=direction)
     return get_or_broadcast(target, "/api/search", params)
 
 
@@ -82,22 +100,12 @@ def ida_search_text(
         Matches bytes anywhere, including inside a longer string; to enumerate
         defined string literals use ida_get_strings with content_filter.
     """
-    if not text:
-        raise ToolError("text is required")
+    _require(text, "text")
     if encoding not in ("ascii", "utf16", "both"):
         raise ToolError("encoding must be 'ascii', 'utf16' or 'both'")
-    if direction not in ("down", "up"):
-        raise ToolError("direction must be 'down' or 'up'")
-    if max_results <= 0:
-        raise ToolError("max_results must be positive")
-    params: dict[str, str] = {
-        "text": text,
-        "encoding": encoding,
-        "direction": direction,
-        "max_results": str(max_results),
-    }
-    if start:
-        params["start"] = normalize_ea(start)
+    _require_direction(direction)
+    params = _search_params(max_results, start, None, text=text, encoding=encoding,
+                            direction=direction)
     return get_or_broadcast(target, "/api/search_text", params)
 
 
@@ -138,17 +146,49 @@ def ida_search_immediate(
         matched_as is "immediate" | "address" | "high16" | "low16";
         matches_by_kind gives the signal/noise split before you read results.
     """
-    if not value:
-        raise ToolError("value is required")
-    if max_results <= 0:
-        raise ToolError("max_results must be positive")
-    params: dict[str, str] = {
-        "value": normalize_ea(value),
-        "include_halves": "1" if include_halves else "0",
-        "max_results": str(max_results),
-    }
-    if start:
-        params["start"] = normalize_ea(start)
-    if end:
-        params["end"] = normalize_ea(end)
+    _require(value, "value")
+    params = _search_params(max_results, start, end, value=normalize_ea(value),
+                            include_halves=_flag(include_halves))
     return get_or_broadcast(target, "/api/search_immediate", params)
+
+
+_SEARCH_INSN_DESCRIPTION = (
+    'Find code whose instruction word matches "VALUE/MASK" hex pairs, for example '
+    'patterns="4014/F0FF 8200/FF00". Each word is read in the byte order of the image and '
+    "matches when (word & MASK) == VALUE. word_size is the size of one instruction word in "
+    "bytes: 1, 2 or 4 (SH and Thumb 2, ARM and MIPS 4). The word at the head of each code "
+    "item is tested. include_noncode=true also tests every word of the code segments "
+    "that is not inside a code item, at addresses aligned to word_size: unexplored bytes "
+    'and data items. Such a hit has where "undefined" or "data". It is a literal, a table, '
+    'or code that IDA does not decode, so read it before a claim of "no such instruction". '
+    'target is a port, a path or a unique substring of it; "*" or "all:<pattern>" queries '
+    "every instance. start and end are optional hex bounds. Returns patterns, count, "
+    "total_matches, matches_by_pattern, scanned_instructions, scanned_undefined_words, "
+    "scanned_data_words, truncated and results [{ea, word, pattern, where, func_ea, "
+    "func_name, disasm}]. matches_by_pattern counts a word for each pattern that it "
+    "matches, and pattern names the first of them."
+)
+
+
+@mcp.tool(description=_SEARCH_INSN_DESCRIPTION)
+def ida_search_insn(
+    target: str,
+    patterns: str,
+    word_size: int,
+    include_noncode: bool = False,
+    start: Optional[str] = None,
+    end: Optional[str] = None,
+    max_results: int = 100,
+) -> dict[str, Any]:
+    _require(patterns, "patterns")
+    params = _search_params(max_results, start, end, patterns=patterns,
+                            word_size=str(word_size), include_noncode=_flag(include_noncode))
+
+    def ran_requested_pass(reply: dict[str, Any]) -> None:
+        if reply.get("include_noncode") is not include_noncode:
+            raise ToolError(
+                "The reply of this IDA instance does not state the include_noncode pass "
+                "that the request asked for. Its server text differs from the text of this "
+                "tool. Restart the instance.")
+
+    return get_or_broadcast(target, "/api/search_insn", params, check=ran_requested_pass)

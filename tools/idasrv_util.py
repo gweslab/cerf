@@ -5,6 +5,7 @@ it through run_in_main().
 """
 
 import binascii
+import re
 
 import idaapi
 import idc
@@ -41,12 +42,15 @@ def hex_ea(ea):
     return f"0x{ea:X}"
 
 
+_HEX_RE = re.compile(r'(?:0[xX])?([0-9A-Fa-f]+)')
+
+
 def parse_hex(s):
     """Parse a hex string (with or without 0x prefix) into an int."""
-    s = s.strip()
-    if s.lower().startswith("0x"):
-        s = s[2:]
-    return int(s, 16)
+    parts = _HEX_RE.fullmatch(s.strip())
+    if not parts:
+        raise ValueError(f"Not a hex number: {s!r}")
+    return int(parts.group(1), 16)
 
 
 def run_in_main(fn, mode=ida_kernwin.MFF_READ):

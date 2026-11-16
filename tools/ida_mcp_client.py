@@ -6,10 +6,11 @@ import ctypes
 import glob
 import json
 import os
+import re
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from fnmatch import fnmatch
-from typing import Any
+from typing import Any, Callable
 
 import requests
 from mcp.server.fastmcp.exceptions import ToolError
@@ -184,16 +185,25 @@ def _handle_response(resp: requests.Response, url: str) -> dict[str, Any]:
         raise ToolError(f"Non-JSON response from IDA at {url}") from exc
 
 
-def ida_get(target: str, path: str, params: dict[str, Any] | None = None) -> dict[str, Any]:
+def _get_json(url: str, params: dict[str, Any] | None,
+              check: Callable[[dict[str, Any]], None] | None) -> dict[str, Any]:
+    resp = requests.get(url, params=params or {}, timeout=IDA_TIMEOUT)
+    payload = _handle_response(resp, url)
+    if check is not None:
+        check(payload)
+    return payload
+
+
+def ida_get(target: str, path: str, params: dict[str, Any] | None = None,
+            check: Callable[[dict[str, Any]], None] | None = None) -> dict[str, Any]:
     """GET JSON from a specific IDA HTTP server."""
     url = _url(target, path)
     logger.debug("GET %s %s", url, params)
     try:
-        resp = requests.get(url, params=params or {}, timeout=IDA_TIMEOUT)
+        return _get_json(url, params, check)
     except requests.RequestException as exc:
         logger.error("HTTP error: %s", exc)
         raise ToolError(f"HTTP error talking to IDA at {url}: {exc}") from exc
-    return _handle_response(resp, url)
 
 
 def ida_post(target: str, path: str, body: dict[str, Any]) -> dict[str, Any]:
@@ -272,7 +282,8 @@ def _is_empty_result(payload: Any) -> bool:
 
 
 def broadcast_get(target: str, path: str,
-                  params: dict[str, Any] | None = None) -> dict[str, Any]:
+                  params: dict[str, Any] | None = None,
+                  check: Callable[[dict[str, Any]], None] | None = None) -> dict[str, Any]:
     """Run one GET against every instance the broadcast target selects.
 
     Instances are queried in parallel, so wall-clock stays close to a single
@@ -289,8 +300,7 @@ def broadcast_get(target: str, path: str,
 
     def _one(inst: dict[str, Any]):
         url = f"http://{inst['host']}:{inst['port']}{path}"
-        resp = requests.get(url, params=params or {}, timeout=IDA_TIMEOUT)
-        return _handle_response(resp, url)
+        return _get_json(url, params, check)
 
     with ThreadPoolExecutor(max_workers=min(_BROADCAST_WORKERS, len(instances))) as pool:
         futures = {pool.submit(_one, inst): inst for inst in instances}
@@ -324,15 +334,19 @@ def broadcast_get(target: str, path: str,
 def get_or_broadcast(target: str, path: str,
                      params: dict[str, Any] | None = None,
                      narrowed: bool = True,
-                     narrowing_hint: str = "") -> dict[str, Any]:
+                     narrowing_hint: str = "",
+                     check: Callable[[dict[str, Any]], None] | None = None) -> dict[str, Any]:
     """Dispatch to one instance, or fan out when *target* is a broadcast."""
     if not is_broadcast_target(target):
-        return ida_get(target, path, params)
+        return ida_get(target, path, params, check)
     if not narrowed:
         raise ToolError(
             "Broadcasting this tool across instances without narrowing would "
             "return every entry from every module at once. " + narrowing_hint)
-    return broadcast_get(target, path, params)
+    return broadcast_get(target, path, params, check)
+
+
+_EA_RE = re.compile(r"(?:0x)?([0-9a-f]+)")
 
 
 def normalize_ea(ea: str) -> str:
@@ -341,13 +355,7 @@ def normalize_ea(ea: str) -> str:
     Accepts "0x401000", "401000", "0X401000".
     Returns lowercase hex with 0x prefix.
     """
-    s = ea.strip().lower()
-    if not s:
-        raise ToolError("ea must be a non-empty hex string")
-    if s.startswith("0x"):
-        s = s[2:]
-    try:
-        value = int(s, 16)
-    except ValueError as exc:
-        raise ToolError(f"ea must be a hex address, got {ea!r}") from exc
-    return f"0x{value:x}"
+    parts = _EA_RE.fullmatch(ea.strip().lower())
+    if not parts:
+        raise ToolError(f"ea must be a hex address, got {ea!r}")
+    return f"0x{int(parts.group(1), 16):x}"

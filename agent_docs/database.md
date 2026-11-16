@@ -30,6 +30,10 @@ Examples are the panel, the keypad, a radio, the RAM or flash size, the
 region, and the vendor that sells the board. A hardware revision is a member
 of its own. A panel or size variant is also a member of its own.
 
+A family and all its known members enter the database in one change. A member
+is known when a source shows that it uses the platform. A family with rows for
+only some of its known members is a defect of the database.
+
 A field on the family applies to every member. A board sets the field only
 where the board differs, and the value of the board wins. `device_features`
 merge by `feature_id`, `board_config` merges by parameter, and the `notes` of a

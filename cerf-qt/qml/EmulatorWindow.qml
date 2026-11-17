@@ -339,8 +339,7 @@ ScreenWindow {
     FloatingBar {
         id: floatingBar
         z: 1
-        visible: root.touch
-        enabled: root.touch
+        touch: root.touch
         surface: guestSurface
         emulator: controller
         areaWidth: root.width

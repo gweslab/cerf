@@ -6,6 +6,7 @@ Item {
     id: bar
     required property GuestSurface surface
     required property EmulatorController emulator
+    required property bool touch
     property real areaWidth: 0
     property real areaHeight: 0
     property bool stripShown: false
@@ -55,8 +56,8 @@ Item {
     height: barHeight
     containmentMask: body
     opacity: revealed ? 1 : 0
-    visible: opacity > 0
-    enabled: revealed
+    visible: touch && opacity > 0
+    enabled: touch && revealed
 
     Behavior on opacity {
         NumberAnimation {

@@ -1,6 +1,7 @@
 #include "device_actions.h"
 
 #include "bundle_installer.h"
+#include "byte_size_text.h"
 #include "device_directory.h"
 #include "device_meta.h"
 #include "device_run_state.h"
@@ -14,9 +15,12 @@
 #include <cerfcore/core/cerf_config.h>
 #include <cerfcore/core/cerf_emulator.h>
 #include <cerfcore/core/log.h>
+#include <cerfcore/state/state_image_format.h>
 #include "../main_config.h"
+#include "../saved_state_preview.h"
 
 #include <QDir>
+#include <QFileInfo>
 #include <QStringList>
 
 REGISTER_SERVICE(DeviceActions);
@@ -38,17 +42,34 @@ bool DeviceActions::HasSavedState(const QString& name) const {
     return ReadSavedState(LocalManifestStore::DevicePath(name)).has_value();
 }
 
+QVariantList DeviceActions::SavedStates(const QString& name) const {
+    QVariantList out;
+    for (const SavedStateInfo& state : ReadSavedStates(LocalManifestStore::DevicePath(name))) {
+        out.append(QVariantMap{{QStringLiteral("file"), state.file},
+                               {QStringLiteral("crash"), state.crash},
+                               {QStringLiteral("label"), SavedStateCaption(state)},
+                               {QStringLiteral("when"), SavedStateTime(state)},
+                               {QStringLiteral("size"), FormatSize(state.size)},
+                               {QStringLiteral("details"), SavedStateDetails(state)}});
+    }
+    return out;
+}
+
+QString DeviceActions::ResumeBoot() const { return QString::fromLatin1(cerfcore::kBootResume); }
+
 QString DeviceActions::WarmBoot() const { return QString::fromLatin1(cerfcore::kBootWarm); }
 
 QString DeviceActions::ColdBoot() const { return QString::fromLatin1(cerfcore::kBootCold); }
 
-QVariantMap DeviceActions::Launch(const QString& name, const QString& boot, bool confirmed) {
+QVariantMap DeviceActions::Launch(const QString& name, const QString& boot, const QString& state, bool confirmed) {
     if (emu_.Get<StartingDevices>().Pending(name)) return {};
     QStringList args{QString::fromLatin1(cerffrontend::kArgDevice) + name};
     if (VerboseLogs())
         args.append(QString::fromLatin1(cerffrontend::kArgLog) + QString::fromLatin1(cerfcore::Log::kAllCategories));
-    args.append(QString::fromLatin1(cerfcore::kArgBoot) +
-                (boot.isEmpty() ? QString::fromLatin1(cerfcore::kBootResume) : boot));
+    const bool crash = state == QString::fromLatin1(cerfcore::kCrashStateFile);
+    const char* automatic = crash ? cerfcore::kBootWarm : cerfcore::kBootResume;
+    args.append(QString::fromLatin1(cerfcore::kArgBoot) + (boot.isEmpty() ? QString::fromLatin1(automatic) : boot));
+    if (!state.isEmpty()) args.append(QString::fromLatin1(cerfcore::kArgStatePath) + state);
     return emu_.Get<EmulatorLauncher>().Launch(name, args, confirmed);
 }
 
@@ -58,11 +79,14 @@ QVariantMap DeviceActions::RefuseRunning(const QString& name) const {
                      QStringLiteral("%1 is running. Close it and try again.").arg(DisplayName(name)));
 }
 
-QVariantMap DeviceActions::DiscardSavedState(const QString& name) {
+QVariantMap DeviceActions::DiscardSavedState(const QString& name, const QString& state) {
     if (QVariantMap refusal = RefuseRunning(name); !refusal.isEmpty()) return refusal;
     const QString path = LocalManifestStore::DevicePath(name);
-    if (!ReadSavedState(path)) return {};
-    for (const QString& file : DeviceDirectory::SavedStateNames()) {
+    QStringList   files{state};
+    const QString saved = QString::fromLatin1(cerfcore::kDefaultStateFile);
+    if (state == saved || !QFileInfo(QDir(path).filePath(saved)).isFile())
+        files.append(QString::fromLatin1(cerffrontend::kSavedStatePreviewFile));
+    for (const QString& file : files) {
         QString error;
         if (!RemoveEntry(PathOf(QDir(path).filePath(file)), error))
             return FlowError(QStringLiteral("Delete failed"),

@@ -232,6 +232,29 @@ to a pinned slot has no pinned form. Both are compile faults.
 
 None of these is visible from any single file.
 
+- **A halt inside a block leaves CPU state at the restart point of the
+  halting instruction.** A saved image of it then resumes correctly. These
+  rules make this true:
+  - Every call from a block into host code finds the restart PC in CPU
+    state. Each frontend gives `Builder::SetCallPc` the restart PC of each
+    instruction. The restart PC is the address of the instruction. On SH,
+    an instruction in a delay slot restarts at its branch. On MIPS, it
+    restarts at the slot, because CPU state holds the pending branch.
+  - The builder stores the restart PC once per instruction. For this
+    reason, every builder path that writes a slot reports the write through
+    `NoteSlotWrite`. The builder also counts the PC store of a memory access
+    of the helper model, so that lowering path keeps the store.
+  - A soft-TLB miss runs its helper with the restart PC in the PC slot.
+    When the helper returns, the miss puts the old slot value back, because
+    an ARM block transfer can hold its loaded PC in that slot. An ARM memory
+    slow entry stores `guest_pc` before it translates an address or reaches
+    a peripheral.
+  - Before an instruction commits state, it runs every test that can halt.
+    A part that it commits before a later call must give the same result
+    when the instruction runs again.
+  - The delay slot of SH RTE runs after RTE restored SR, so a halt there
+    has no restart point in the block. `GuestEngine::SettleRestartPoint`
+    puts SR back when the run ends.
 - **A CERF service that resolves an ISA-specific engine service must
   gate `ShouldRegister` on `CpuArch` itself.** On a board of the other
   ISA the engine has no such service, and the lookup halts at boot.

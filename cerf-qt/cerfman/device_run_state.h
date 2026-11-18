@@ -4,6 +4,7 @@
 
 #include <cstdint>
 #include <optional>
+#include <vector>
 
 struct RunningStatus {
     uint32_t pid  = 0;
@@ -11,8 +12,10 @@ struct RunningStatus {
 };
 
 struct SavedStateInfo {
-    qint64 saved_at_msecs = 0;
-    qint64 size           = 0;
+    QString file;
+    bool    crash          = false;
+    qint64  saved_at_msecs = 0;
+    qint64  size           = 0;
 };
 
 enum class RunStateKind { kRunning, kSaved, kOff };
@@ -23,5 +26,9 @@ struct RunState {
 };
 
 std::optional<RunningStatus>  ReadRunningStatus(const QString& device_path);
+std::vector<SavedStateInfo>   ReadSavedStates(const QString& device_path);
 std::optional<SavedStateInfo> ReadSavedState(const QString& device_path);
+QString                       SavedStateTime(const SavedStateInfo& state);
+QString                       SavedStateDetails(const SavedStateInfo& state);
+QString                       SavedStateCaption(const SavedStateInfo& state);
 RunState                      ReadRunState(const QString& device_path);

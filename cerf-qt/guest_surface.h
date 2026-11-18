@@ -60,6 +60,7 @@ public:
     void ShowContent(cerfcore::CerfEmulator& emu);
     void Attach(cerfcore::CerfEmulator& emu);
     void Detach();
+    void ShowCards(cerfcore::CerfEmulator& emu);
 
     SurfaceOverlays*              Overlays() { return &overlays_; }
     CanvasTabView*                TabView() { return &tab_view_; }
@@ -77,7 +78,8 @@ public:
     void                          SetIntegerScale(int factor);
     void                          SetFramebufferActive(bool active) override;
     void                          Repaint() override { update(); }
-    bool CaptureSurface(std::vector<uint32_t>& out, uint32_t& w, uint32_t& h) override;
+    bool CaptureSurface(cerfcore::FrameSource& source, std::vector<uint32_t>& out, uint32_t& w,
+                        uint32_t& h) override;
     void RequestShadedCapture() override;
     qreal                         Dpr() const;
     QSize                         ScreenRegionFor(QSizeF logical, const QMarginsF& safe) const;

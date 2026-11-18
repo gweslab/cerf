@@ -43,8 +43,10 @@ void CliUsage::Print(const char* prog) {
     printf("  --ga-share-folder=PATH   Mount the host directory PATH into the guest at boot\n");
     printf("                           (relative to the install folder; needs --guest-additions)\n");
     printf("  --recovery               Boot the device's recovery ROM (rom.recovery) instead of primary\n");
-    printf("  --boot=resume|cold|warm  Saved-state boot action when state.img exists\n");
+    printf("  --boot=resume|cold|warm  Saved-state boot action when the state image exists\n");
     printf("                           (resume=full restore, warm=RAM+flash only, cold=ignore)\n");
+    printf("  --state-path=PATH        State image that --boot uses (relative to the device folder;\n");
+    printf("                           default: state.img)\n");
     printf("  --tab=boot|hw|fb         Startup tab: boot screen, hardware console, or framebuffer\n");
     printf("                           (default: hw in dev, boot in release)\n");
     printf("  --full-screen            Enter borderless fullscreen (host key + F) once the window is shown\n");

@@ -53,6 +53,7 @@ public:
 
     void ShowFonts(cerfcore::CerfEmulator& emu);
     void ShowCanvas(const cerffrontend::ViewportLayout& layout, QPointF scale);
+    void ShowCards(cerfcore::CerfEmulator& emu, QPointF scale);
     void Refresh(cerfcore::CerfEmulator& emu, const cerffrontend::ViewportLayout& layout, QPointF scale,
                  CursorPicture cursor);
 

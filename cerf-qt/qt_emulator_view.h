@@ -5,6 +5,8 @@
 #include <cstdint>
 #include <vector>
 
+namespace cerfcore { class FrameSource; }
+
 class QtEmulatorView {
 public:
     virtual void     SetPresentation(const cerffrontend::ViewPresentation& presentation) = 0;
@@ -13,7 +15,8 @@ public:
     virtual void     SetGuestSurfaceSize(uint32_t w, uint32_t h)                          = 0;
     virtual uint32_t GuestSurfaceWidth() const                                            = 0;
     virtual uint32_t GuestSurfaceHeight() const                                           = 0;
-    virtual bool     CaptureSurface(std::vector<uint32_t>& out, uint32_t& w, uint32_t& h) = 0;
+    virtual bool     CaptureSurface(cerfcore::FrameSource& source, std::vector<uint32_t>& out, uint32_t& w,
+                                    uint32_t& h)                                         = 0;
     virtual void     RequestShadedCapture()                                               = 0;
 
 protected:

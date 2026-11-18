@@ -25,6 +25,7 @@ public:
     static constexpr char kUpdateChannelKey[]       = "update_channel";
     static constexpr char kDiscordRichPresenceKey[] = "discord_rich_presence";
     static constexpr char kLastSaveStateModeKey[]   = "last_save_state_mode";
+    static constexpr char kSaveStateOnCrashKey[]    = "save_state_on_crash";
     static constexpr char kTutorialFinishedKey[]    = "tutorial_finished";
     static constexpr int    kDynamicScale            = 0;
     static constexpr int    kOriginalScale           = 1;
@@ -51,6 +52,8 @@ public:
 
     bool LastSaveStateMode() const;
     void SaveLastSaveStateMode(bool save_state);
+
+    bool SaveStateOnCrash() const;
 
     bool TutorialFinished() const;
 

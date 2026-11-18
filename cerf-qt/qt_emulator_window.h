@@ -56,6 +56,7 @@ public:
     uint64_t NativeHandle() const override { return native_handle_.load(std::memory_order_acquire); }
 
     void CloseRequested();
+    void ShowCards();
     void BeginShutdownTeardown();
     bool AdoptsHostResolution() const;
     void OnTeardownWedged();

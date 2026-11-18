@@ -6,6 +6,7 @@
   "update_channel": "stable",
   "discord_rich_presence": false,
   "last_save_state_mode": false,
+  "save_state_on_crash": true,
   "tutorial_finished": false,
   "enterprise": {
     "allowed": false,

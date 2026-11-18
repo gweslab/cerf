@@ -75,6 +75,8 @@ void GuestSurface::Attach(cerfcore::CerfEmulator& emu) {
     forceActiveFocus(Qt::OtherFocusReason);
 }
 
+void GuestSurface::ShowCards(cerfcore::CerfEmulator& emu) { overlays_.ShowCards(emu, PixelScale()); }
+
 void GuestSurface::Detach() {
     text_.Drop();
     if (gate_.Attached()) {
@@ -157,13 +159,9 @@ void GuestSurface::RefreshViewport() {
     update();
 }
 
-bool GuestSurface::CaptureSurface(std::vector<uint32_t>& out, uint32_t& w, uint32_t& h) {
-    bool captured = false;
-    if (presenter_)
-        gate_.Run([&](cerfcore::CerfEmulator& emu) {
-            captured = presenter_->Capture(emu.Get<cerfcore::FrameRenderer>(), out, w, h);
-        });
-    return captured;
+bool GuestSurface::CaptureSurface(cerfcore::FrameSource& source, std::vector<uint32_t>& out, uint32_t& w,
+                                  uint32_t& h) {
+    return presenter_ && presenter_->Capture(source, out, w, h);
 }
 
 void GuestSurface::RequestShadedCapture() {

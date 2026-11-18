@@ -102,7 +102,8 @@ QString DeviceDirectory::BaseConfigName() { return QString::fromLatin1(cerfcore:
 QString DeviceDirectory::UserConfigName() { return QString::fromLatin1(cerfcore::kUserConfigFileName); }
 
 QStringList DeviceDirectory::SavedStateNames() {
-    return {QString::fromLatin1(cerfcore::kDefaultStateFile), QString::fromLatin1(cerffrontend::kSavedStatePreviewFile)};
+    return {QString::fromLatin1(cerfcore::kDefaultStateFile), QString::fromLatin1(cerfcore::kCrashStateFile),
+            QString::fromLatin1(cerffrontend::kSavedStatePreviewFile)};
 }
 
 QString DeviceDirectory::StorageDefaultFile(const QString& storage_id) {

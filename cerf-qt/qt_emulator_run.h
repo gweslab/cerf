@@ -44,6 +44,8 @@ private:
     void PostExit();
     void WatchStopAfterHalt(cerfcore::Fatal& fatal);
     void CheckStoppedAfterHalt();
+    void WatchCardsAfterHalt(cerfcore::Fatal& fatal);
+    void ShowCardsAfterHalt();
 
     std::vector<std::string>                     args_;
     std::vector<char*>                           argv_;

@@ -36,6 +36,8 @@ bool SettingsModel::DiscordRichPresence() const {
     return emu_.Get<FrontendConfig>().DiscordRichPresence();
 }
 
+bool SettingsModel::SaveStateOnCrash() const { return emu_.Get<FrontendConfig>().SaveStateOnCrash(); }
+
 SettingsModel::ChannelText SettingsModel::TextOf(const QString& channel) const {
     const std::string value = channel.toStdString();
     if (value == FrontendConfig::kUpdateChannelDisabled) return {"Disable updates", "No update notifications."};
@@ -66,7 +68,7 @@ QString SettingsModel::ScaleLabel(int value) const {
 }
 
 QString SettingsModel::Save(const QVariantList& host_key, const QString& channel, int scale,
-                            bool discord) {
+                            bool discord, bool crash_state) {
     auto& config = emu_.Get<FrontendConfig>();
     const std::string previous_channel = config.UpdateChannel();
 
@@ -76,6 +78,7 @@ QString SettingsModel::Save(const QVariantList& host_key, const QString& channel
     const bool  written = config.Write(
         [&](Json& j) {
             config.Assign(j, FrontendConfig::Key() / FrontendConfig::kDiscordRichPresenceKey, discord);
+            config.Assign(j, FrontendConfig::Key() / FrontendConfig::kSaveStateOnCrashKey, crash_state);
             config.Assign(j, FrontendConfig::Key() / FrontendConfig::kHostKeyKey, vks);
             config.Assign(j, FrontendConfig::Key() / FrontendConfig::kDefaultScaleKey, scale);
             config.Assign(j, FrontendConfig::Key() / FrontendConfig::kUpdateChannelKey, channel.toStdString());

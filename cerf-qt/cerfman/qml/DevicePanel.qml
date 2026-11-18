@@ -78,6 +78,10 @@ Item {
                         Menu {
                             id: bootMenu
                             MenuItem {
+                                text: qsTr("Resume state")
+                                onTriggered: panel.commands.launch(panel.row.name, DeviceActions.resumeBoot)
+                            }
+                            MenuItem {
                                 text: qsTr("Warm boot")
                                 onTriggered: panel.commands.launch(panel.row.name, DeviceActions.warmBoot)
                             }

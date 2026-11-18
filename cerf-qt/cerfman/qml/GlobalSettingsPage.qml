@@ -10,7 +10,7 @@ ScrollPage {
 
     function snapshot() {
         return {"hostKey": JSON.stringify(capture.vks), "channel": channel, "scale": scale,
-                "discord": discord.checked}
+                "discord": discord.checked, "crashState": crashState.checked}
     }
 
     function accept(done) {
@@ -19,7 +19,7 @@ ScrollPage {
             done()
             return
         }
-        const error = SettingsModel.Save(capture.vks, channel, scale, discord.checked)
+        const error = SettingsModel.Save(capture.vks, channel, scale, discord.checked, crashState.checked)
         if (error !== "") {
             Dialogs.inform(page, qsTr("Settings"), qsTr("Could not save:\n%1").arg(error))
             return
@@ -92,6 +92,12 @@ ScrollPage {
                 labelOf: v => SettingsModel.ScaleLabel(v)
                 onPicked: value => page.scale = value
             }
+        }
+        SwitchRow {
+            id: crashState
+            title: qsTr("Save state on crash")
+            description: qsTr("When a device stops on an error, keep its state so that you can boot it again with its memory.")
+            checked: SettingsModel.SaveStateOnCrash()
         }
         SwitchRow {
             id: discord

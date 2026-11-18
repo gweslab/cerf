@@ -88,19 +88,50 @@ ApplicationWindow {
 
     function launch(name, boot) {
         if (TutorialState.finished || DeviceActions.Running(name)) {
-            startDevice(name, boot, false)
+            chooseState(name, boot)
             return
         }
         if (!ManagerOperations.RefuseWhileBusy())
-            openTutorial(() => startDevice(name, boot, false))
+            openTutorial(() => chooseState(name, boot))
     }
 
-    function startDevice(name, boot, confirmed) {
+    function openSavedStates(name, bootable, boot) {
+        const dialog = savedStatesDialog.createObject(host(), {"name": name, "bootable": bootable})
+        dialog.picked.connect(state => startDevice(name, boot, state.file, false))
+        dialog.removeRequested.connect(state => discardState(name, state, () => dialog.reload(), dialog.contentItem))
+        dialog.open()
+    }
+
+    function discardState(name, state, done, host) {
+        managerFlows.ask(qsTr("Delete saved state"),
+                  qsTr("Delete %1 for %2?\nThis cannot be undone.").arg(state.label).arg(DeviceActions.DisplayName(name)),
+                  () => {
+            if (ManagerOperations.RefuseWhileBusy())
+                return
+            managerFlows.failed(DeviceActions.DiscardSavedState(name, state.file), host)
+            refreshAll()
+            done()
+        }, host)
+    }
+
+    function chooseState(name, boot) {
+        if (boot === DeviceActions.coldBoot || DeviceActions.Running(name) || !DeviceActions.HasSavedState(name)) {
+            startDevice(name, boot, "", false)
+            return
+        }
+        const states = Array.from(DeviceActions.SavedStates(name))
+        if (states.length === 1)
+            startDevice(name, boot, states[0].file, false)
+        else
+            openSavedStates(name, true, boot)
+    }
+
+    function startDevice(name, boot, state, confirmed) {
         if (ManagerOperations.RefuseWhileBusy())
             return
-        const reply = DeviceActions.Launch(name, boot, confirmed)
+        const reply = DeviceActions.Launch(name, boot, state, confirmed)
         if (reply.confirm !== undefined) {
-            managerFlows.ask(reply.confirm.title, reply.confirm.message, () => startDevice(name, boot, true))
+            managerFlows.ask(reply.confirm.title, reply.confirm.message, () => startDevice(name, boot, state, true))
             return
         }
         if (managerFlows.failed(reply))
@@ -121,12 +152,11 @@ ApplicationWindow {
     function discard(name) {
         if (ManagerOperations.RefuseWhileBusy())
             return
-        managerFlows.ask(qsTr("Delete saved state"),
-                  qsTr("Delete the saved state for %1?\nThis cannot be undone.").arg(selectedRow.deviceName),
-                  () => {
-            managerFlows.failed(DeviceActions.DiscardSavedState(name))
-            refreshAll()
-        })
+        const states = Array.from(DeviceActions.SavedStates(name))
+        if (states.length === 1)
+            discardState(name, states[0], () => {})
+        else
+            openSavedStates(name, false, "")
     }
 
     function updateDevice(name) {
@@ -384,6 +414,11 @@ ApplicationWindow {
     Component {
         id: tutorialPage
         TutorialView {}
+    }
+
+    Component {
+        id: savedStatesDialog
+        SavedStatesDialog {}
     }
 
     Component {

@@ -405,6 +405,18 @@ span. Some interrupt controllers hold their status clear for the duration of
 reset. Such a controller latches no edge in that span if the reset is of a kind
 that resets it.
 
+**A reset delivery that a halt interrupts stays pending.** A saved image of that
+machine then delivers the same reset again. A new step that consumes a part of the
+request puts it back with an `UnwindRollback`.
+
+The listeners that ran before the halt keep their effects. The second delivery is
+then a second assertion of the reset line during the first. A bootloader stand-in
+reads the RAM that its first run wrote, as the real bootloader does after a second
+reset.
+
+The RAM fill of a warm boot from an image is not part of an image, so no rollback
+puts it back.
+
 - `libCerfCore/include/cerfcore/socs/guest_cpu_reset.h`, `libCerfCore/src/socs/guest_cpu_reset.cpp`
 
 **`GuestColdBoot`** implements hard reset (cold boot). At reset
@@ -649,6 +661,11 @@ the render and input plumbing that connects the host UI to the guest.
 
 - **`NotificationStack`** is the card stack over every canvas tab, and it takes
   only notices that interrupt the user's workflow, never routine events.
+
+  **After a halt, the owner of the instance shows card changes on the window.** The
+  repaint timer of the window reads the cards through an `InstanceGate`, which runs
+  nothing after a halt.
+  - `libCerfCore/include/cerfcore/host/notification_stack.h`, `cerf-qt/qt_emulator_run.cpp`
 
 - **`OverlayInput`** - the one owner of the input for the overlays above the
   guest canvas, for example the notification cards and the HUD. A press goes to

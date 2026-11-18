@@ -13,8 +13,8 @@ constexpr const char* kDeviceConfigOptions[] = {
     cerfcore::kArgBoardId,     cerfcore::kArgRomPrimary,       cerfcore::kArgScreenWidth,
     cerfcore::kArgScreenHeight, cerfcore::kArgScreenDpi,       cerfcore::kArgScreenBpp,
     cerfcore::kArgScreenRefreshRate, cerfcore::kArgGaShareFolder, cerfcore::kArgBoot,
-    cerfcore::kArgTab,         cerfcore::kArgGaColorScheme,    cerfcore::kArgGaFontSize,
-    cerfcore::kArgGaAutorun};
+    cerfcore::kArgStatePath,   cerfcore::kArgTab,              cerfcore::kArgGaColorScheme,
+    cerfcore::kArgGaFontSize,  cerfcore::kArgGaAutorun};
 
 constexpr const char* kDeviceConfigFlags[] = {cerfcore::kArgDisableNetwork, cerfcore::kArgGuestAdditions,
                                               cerfcore::kArgFullScreen, cerfcore::kArgNoFocus,

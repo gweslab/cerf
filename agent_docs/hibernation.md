@@ -35,8 +35,39 @@ effectively a cold boot, and all guest state from since boot is lost. Hibernatio
 preserves the full running machine across an exit.
 
 **Triggers:** the Actions-menu Save/Load state, and a Shutdown dialog on window
-close (save-on-exit). At startup, the `--boot` mode selects what CERF does with a
-default `state.img` in the device directory.
+close (save-on-exit). At startup, the `--boot` mode selects what CERF does with the
+state image in the device directory. `--state-path` names that image, and
+`state.img` is the default.
+
+## Crash state
+
+When a halt stops a running guest, `CrashStateSaver` writes the machine to
+`crash-state.img` in the device directory.
+
+**The save runs on the JIT thread after its loop ends, never at the halt site.**
+The halt site can be any thread, and the guest can still run there. At the end of
+the JIT thread no guest code runs, so the save needs no pause. Every halt after
+the JIT thread starts ends that thread, so every such halt reaches the save. A
+halt during teardown does not reach it.
+
+**CERF writes no crash state when the guest has not run.** The existing image then
+stays. This holds in these cases:
+
+- No guest instruction ran since the instance started. The machine is still the
+  image that it started from, or a cold machine.
+- The reset delivery of a warm boot from an image did not finish. The image holds
+  the RAM that this delivery fills. A crash state at that point replaces the image
+  with RAM that the delivery did not fill.
+
+**The CPU state in the image is a restart point.** A full resume of it runs the
+halting instruction or the halting reset delivery again. A peripheral or a thread
+that changed its state before the halt keeps that change. A halt on another thread
+stops the guest at a block boundary, so the state of the halting part is as the
+halt left it.
+
+**A halt inside a full restore keeps the machine from before the restore.** The
+save waits for a restore on another thread to end, so a halt outside the restore
+keeps the machine that the restore leaves.
 
 ## The `.img` format
 

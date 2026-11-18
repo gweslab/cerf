@@ -202,8 +202,10 @@ void QtEmulatorWindow::RunOnUiThreadAfter(uint32_t delay_ms, std::function<void(
     QTimer::singleShot(static_cast<int>(delay_ms), window_.data(), gate_.Bind([job = std::move(job)] { job(); }));
 }
 
+void QtEmulatorWindow::ShowCards() { surface_->ShowCards(emu_); }
+
 bool QtEmulatorWindow::CaptureGuestSurface(std::vector<uint32_t>& out, uint32_t& w, uint32_t& h) {
-    return surface_->CaptureSurface(out, w, h);
+    return surface_->CaptureSurface(emu_.Get<cerfcore::FrameRenderer>(), out, w, h);
 }
 
 bool QtEmulatorWindow::RequestShadedCapture() {

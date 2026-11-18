@@ -38,7 +38,7 @@ public:
         const std::string name = emu_.Get<cerfcore::DeviceConfig>().device_name;
         if (name.empty()) return;
         window_ = &emu_.Get<FrontendWindow>();
-        worker_.Start(emu_.Get<cerfcore::InstanceThreads>(), cerfcore::GetDeviceDir(name) + kRunningStatusFileName,
+        worker_.Start(emu_.Get<cerfcore::InstanceThreads>(), cerfcore::ResolveDeviceFile(name, kRunningStatusFileName),
                       kHeartbeatInterval, [this] { WriteStatus(); });
     }
 

@@ -12,7 +12,7 @@
 AndroidEmulatorSession::AndroidEmulatorSession(QString device, const QStringList& args, FinishFn on_finished)
     : device_(std::move(device)),
       on_finished_(std::move(on_finished)),
-      crash_log_path_(cerfcore::GetDeviceDir(device_.toStdString()) + cerfcore::kCrashLogFileName) {
+      crash_log_path_(cerfcore::ResolveDeviceFile(device_.toStdString(), cerfcore::kCrashLogFileName)) {
     arg_storage_.emplace_back(CERF_FRONTEND_NAME);
     for (const QString& arg : args) arg_storage_.push_back(arg.toStdString());
     for (std::string& arg : arg_storage_) argv_.push_back(arg.data());

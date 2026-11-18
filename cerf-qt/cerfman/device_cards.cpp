@@ -5,7 +5,6 @@
 #include "board_catalog.h"
 #include "bundle_catalog.h"
 #include "device_inventory.h"
-#include "byte_size_text.h"
 #include "device_run_state.h"
 #include "device_texts.h"
 #include "local_manifest_store.h"
@@ -15,7 +14,6 @@
 
 #include <cerfcore/core/cerf_emulator.h>
 
-#include <QDateTime>
 #include <QDir>
 #include <QFileInfo>
 #include <QSize>
@@ -43,12 +41,7 @@ QString RunStateName(RunStateKind kind) {
 
 QString CardStatus(const RunState& state) {
     if (state.kind == RunStateKind::kRunning) return QStringLiteral("Running");
-    if (state.saved) {
-        const QString when  = QDateTime::fromMSecsSinceEpoch(state.saved->saved_at_msecs).toString(
-            QStringLiteral("dd.MM HH:mm"));
-        const QString size = FormatSize(state.saved->size);
-        return size.isEmpty() ? QStringLiteral("Saved %1").arg(when) : QStringLiteral("Saved %1 · %2").arg(when, size);
-    }
+    if (state.saved) return SavedStateCaption(*state.saved);
     return QStringLiteral("Powered off");
 }
 

@@ -10,6 +10,7 @@
 #include <cerfcore/core/instance_threads.h>
 #include <cerfcore/core/log.h>
 #include <cerfcore/execution/jit_runner.h>
+#include <cerfcore/host/notification_stack.h>
 
 #include <QMetaObject>
 #include <QTimer>
@@ -43,6 +44,7 @@ void QtEmulatorRun::Boot() {
         fatal_ = &fatal;
     }
     WatchStopAfterHalt(fatal);
+    WatchCardsAfterHalt(fatal);
     const auto booted = std::make_shared<bool>(false);
     boot_             = emu_->Get<cerfcore::InstanceThreads>().Start(
         [this, &fatal, booted] {
@@ -134,6 +136,22 @@ void QtEmulatorRun::WatchStopAfterHalt(cerfcore::Fatal& fatal) {
             },
             Qt::QueuedConnection);
     });
+}
+
+void QtEmulatorRun::WatchCardsAfterHalt(cerfcore::Fatal& fatal) {
+    emu_->Get<cerfcore::NotificationStack>().RegisterChangeListener([this, &fatal] {
+        if (!fatal.Halted()) return;
+        QMetaObject::invokeMethod(&context_, [this] { ShowCardsAfterHalt(); }, Qt::QueuedConnection);
+    });
+}
+
+void QtEmulatorRun::ShowCardsAfterHalt() {
+    {
+        std::lock_guard<std::mutex> lock(window_mutex_);
+        if (!guest_started_ || stopping_) return;
+    }
+    const cerfcore::Log::CautionScope outside_instance(nullptr);
+    emu_->Get<QtEmulatorWindow>().ShowCards();
 }
 
 void QtEmulatorRun::CheckStoppedAfterHalt() {

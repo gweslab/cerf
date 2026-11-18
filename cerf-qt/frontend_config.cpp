@@ -74,6 +74,8 @@ std::string FrontendConfig::UpdateChannel() const { return Read().at(kUpdateChan
 
 bool FrontendConfig::LastSaveStateMode() const { return Read().at(kLastSaveStateModeKey).get<bool>(); }
 
+bool FrontendConfig::SaveStateOnCrash() const { return Read().at(kSaveStateOnCrashKey).get<bool>(); }
+
 bool FrontendConfig::TutorialFinished() const { return Read().at(kTutorialFinishedKey) == true; }
 
 bool FrontendConfig::Write(const std::function<void(json&)>& mutate, std::string& error) {

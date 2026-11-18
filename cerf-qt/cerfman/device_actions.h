@@ -6,6 +6,7 @@
 
 #include <QObject>
 #include <QString>
+#include <QVariantList>
 #include <QVariantMap>
 #include <QtQml/qqmlregistration.h>
 
@@ -13,6 +14,7 @@ class DeviceActions : public QObject, public cerfcore::Service {
     Q_OBJECT
     QML_ELEMENT
     QML_SINGLETON
+    Q_PROPERTY(QString resumeBoot READ ResumeBoot CONSTANT)
     Q_PROPERTY(QString warmBoot READ WarmBoot CONSTANT)
     Q_PROPERTY(QString coldBoot READ ColdBoot CONSTANT)
     Q_PROPERTY(bool verboseLogs READ VerboseLogs WRITE SetVerboseLogs NOTIFY verboseLogsChanged)
@@ -23,16 +25,18 @@ public:
         return ManagerQmlEngine::Singleton<DeviceActions>(qml);
     }
 
+    QString ResumeBoot() const;
     QString WarmBoot() const;
     QString ColdBoot() const;
 
     bool VerboseLogs() const;
     void SetVerboseLogs(bool verbose);
 
-    Q_INVOKABLE QVariantMap Launch(const QString& name, const QString& boot, bool confirmed);
-    Q_INVOKABLE bool        Running(const QString& name) const;
-    Q_INVOKABLE bool        HasSavedState(const QString& name) const;
-    Q_INVOKABLE QVariantMap DiscardSavedState(const QString& name);
+    Q_INVOKABLE QVariantMap  Launch(const QString& name, const QString& boot, const QString& state, bool confirmed);
+    Q_INVOKABLE bool         Running(const QString& name) const;
+    Q_INVOKABLE bool         HasSavedState(const QString& name) const;
+    Q_INVOKABLE QVariantList SavedStates(const QString& name) const;
+    Q_INVOKABLE QVariantMap  DiscardSavedState(const QString& name, const QString& state);
     Q_INVOKABLE QVariantMap Remove(const QString& name);
     Q_INVOKABLE QString     Directory(const QString& name) const;
     Q_INVOKABLE QString     DisplayName(const QString& name) const;

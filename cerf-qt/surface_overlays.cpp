@@ -44,15 +44,19 @@ void SurfaceOverlays::ShowCanvas(const cerffrontend::ViewportLayout& layout, QPo
     }
 }
 
+void SurfaceOverlays::ShowCards(cerfcore::CerfEmulator& emu, QPointF scale) {
+    auto& notifications = emu.Get<cerffrontend::NotificationOverlay>();
+    cards_.Update(notifications.Cards());
+    notifications.SetPlaced(placed_, scale);
+}
+
 void SurfaceOverlays::Refresh(cerfcore::CerfEmulator& emu, const cerffrontend::ViewportLayout& layout, QPointF scale,
                               CursorPicture cursor) {
     ShowCanvas(layout, scale);
     auto&      tabs        = emu.Get<cerffrontend::CanvasTabs>();
     const bool framebuffer = tabs.Current() == cerfcore::CanvasTab::Framebuffer;
     hud_.Update(framebuffer ? emu.Get<cerffrontend::HudNodes>().Build(layout.Compute(), scale) : QList<QVariantMap>());
-    auto& notifications = emu.Get<cerffrontend::NotificationOverlay>();
-    cards_.Update(notifications.Cards());
-    notifications.SetPlaced(placed_, scale);
+    ShowCards(emu, scale);
     const bool dimmed = tabs.ShouldDesaturate();
     if (dimmed != dimmed_) {
         dimmed_ = dimmed;

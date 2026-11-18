@@ -33,7 +33,7 @@ public:
         if (name.empty()) return;
         window_   = &emu_.Get<FrontendWindow>();
         exporter_ = &emu_.Get<ImageExporter>();
-        worker_.Start(emu_.Get<cerfcore::InstanceThreads>(), cerfcore::GetDeviceDir(name) + kLiveScreenshotFileName,
+        worker_.Start(emu_.Get<cerfcore::InstanceThreads>(), cerfcore::ResolveDeviceFile(name, kLiveScreenshotFileName),
                       kInterval, [this] { Tick(); });
     }
 

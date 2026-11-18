@@ -138,7 +138,15 @@ These rules apply to each copy:
 - Export does not change the value of a file that it leaves out. Clone points that value at the file of the original device, so the two devices share the file. A value that names no existing file does not change.
 - When the user does not keep the personal configuration, `cerf-user.json` keeps only `meta`, `rom`, `storage` and `board.id`. The `launcher` block stays only when the user keeps the repository link.
 - A clone that keeps the repository link gets a copy of the `devices/manifest.json` record of the original, with no packages in the copy.
-- The saved state is `state.img` and its screenshot. The copy keeps their names.
+- The saved state is `state.img`, `crash-state.img` and their screenshot. The copy keeps their names.
+
+## Saved states
+
+Run boots `state.img` with `--boot=resume` and `crash-state.img` with `--boot=warm`.
+On the same build, a full resume of a crash state usually reaches the same halt again.
+The Resume state entry of the Run menu resumes either image in full.
+
+The saved-state screenshot belongs to `state.img` when that image exists.
 
 ## Running devices
 

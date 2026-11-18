@@ -24,6 +24,7 @@ Later wins. Below is an unfinished description of schema. Some values are absent
 | `device` | string | The device directory to boot when the command line has no `--device=` |
 | `bundle_repositories` | array of `{ url, enabled }` | The [ROM bundle repositories](bundle-repositories.md) |
 | `last_save_state_mode` | boolean | **Save the state** checkmark state in shutdown window |
+| `save_state_on_crash` | boolean | Save `crash-state.img` when emulator crashes |
 | `update_channel` | string | `disabled`, `stable`, or `unstable`. |
 | `discord_rich_presence` | boolean | - |
 | `tutorial_finished` | boolean | - |

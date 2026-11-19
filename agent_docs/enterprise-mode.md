@@ -33,9 +33,6 @@ dialog can resume a guest that sleeps.
 
 ## The shutdown policy
 
-The action that runs with no dialog waits longer after a guest suspend than the dialog
-does. Some guests sleep and wake at once, and the user cannot cancel that action.
-
 A host action that the host does not implement stays in the shutdown policy. It halts
 the instance when it runs.
 

@@ -94,7 +94,7 @@ const char* ShutdownPrompt::SaveLinkText() const {
 }
 
 bool ShutdownPrompt::CountsDown(ShutdownTrigger trigger) const {
-    return trigger == ShutdownTrigger::WindowClose && !emu_.Get<cerfcore::GuestDeepSleep>().Asleep() &&
+    return trigger == ShutdownTrigger::WindowClose && !emu_.Get<cerfcore::GuestDeepSleep>().Suspended() &&
            Actions().front() == ShutdownAction::Exit;
 }
 

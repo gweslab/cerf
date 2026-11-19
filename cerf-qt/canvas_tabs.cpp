@@ -47,7 +47,7 @@ bool CanvasTabs::OnPresentTick(bool content_latched) {
 
 bool CanvasTabs::ShouldDesaturate() {
     return tab_ == Tab::Framebuffer && (emu_.Get<cerfcore::EmulationPause>().IsPaused() ||
-                                        emu_.Get<cerfcore::GuestDeepSleep>().Asleep());
+                                        emu_.Get<cerfcore::GuestDeepSleep>().Suspended());
 }
 
 }

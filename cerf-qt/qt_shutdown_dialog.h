@@ -9,7 +9,6 @@
 #include <QVariant>
 #include <QVariantMap>
 
-#include <cstdint>
 #include <vector>
 
 class QtEmulatorWindow;
@@ -24,7 +23,6 @@ public:
 private:
     void                         StopCountdown();
     void                         FollowSleep();
-    uint32_t                     SleepSettleMs();
     void                         ShowDialog(cerffrontend::ShutdownTrigger trigger);
     QVariantMap                  Texts(cerffrontend::ShutdownTrigger trigger);
     cerffrontend::ShutdownChoice Choice(const QVariant& result);
@@ -38,6 +36,5 @@ private:
     bool                                      open_         = false;
     bool                                      withdrawn_    = false;
     bool                                      saving_       = false;
-    uint32_t                                  sleep_changes_ = 0;
     cerffrontend::ShutdownTrigger             open_trigger_ = cerffrontend::ShutdownTrigger::WindowClose;
 };

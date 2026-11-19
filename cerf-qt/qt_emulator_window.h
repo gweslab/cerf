@@ -50,7 +50,6 @@ public:
     uint32_t GuestSurfaceHeight() const override { return surface_h_.load(std::memory_order_acquire); }
     void     SetGuestSurfaceSize(uint32_t w, uint32_t h) override;
     void     RunOnUiThread(std::function<void()> job) override;
-    void     RunOnUiThreadAfter(uint32_t delay_ms, std::function<void()> job) override;
     bool     CaptureGuestSurface(std::vector<uint32_t>& out, uint32_t& w, uint32_t& h) override;
     bool     RequestShadedCapture() override;
     uint64_t NativeHandle() const override { return native_handle_.load(std::memory_order_acquire); }

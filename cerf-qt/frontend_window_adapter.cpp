@@ -33,10 +33,6 @@ void FrontendWindowAdapter::SetGuestSurfaceSize(uint32_t w, uint32_t h) { Platfo
 
 void FrontendWindowAdapter::RunOnUiThread(std::function<void()> job) { PlatformWindow().RunOnUiThread(std::move(job)); }
 
-void FrontendWindowAdapter::RunOnUiThreadAfter(uint32_t delay_ms, std::function<void()> job) {
-    PlatformWindow().RunOnUiThreadAfter(delay_ms, std::move(job));
-}
-
 bool FrontendWindowAdapter::CaptureGuestSurface(std::vector<uint32_t>& out, uint32_t& w, uint32_t& h) {
     return PlatformWindow().CaptureGuestSurface(out, w, h);
 }

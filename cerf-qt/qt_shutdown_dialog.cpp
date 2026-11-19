@@ -27,31 +27,18 @@ using cerffrontend::ShutdownChoice;
 using cerffrontend::ShutdownPrompt;
 using cerffrontend::ShutdownTrigger;
 
-constexpr uint32_t kSleepGraceMs            = 100;
-constexpr uint32_t kUnattendedSleepSettleMs = 3000;
-constexpr int      kNoAction                = -1;
+constexpr int kNoAction = -1;
 
 }
 
 void QtShutdownDialog::OnReady() {
     window_ = &emu_.Get<QtEmulatorWindow>();
-    emu_.Get<cerfcore::GuestDeepSleep>().RegisterSleepListener([this](bool asleep) {
-        window_->RunOnUiThread([this, asleep] {
-            const uint32_t change = ++sleep_changes_;
-            if (!asleep) {
-                FollowSleep();
-                return;
-            }
-            StopCountdown();
-            window_->RunOnUiThreadAfter(SleepSettleMs(), [this, change] {
-                if (change == sleep_changes_) FollowSleep();
-            });
+    emu_.Get<cerfcore::GuestDeepSleep>().RegisterSuspendListener([this](bool suspended) {
+        window_->RunOnUiThread([this, suspended] {
+            if (suspended) StopCountdown();
+            FollowSleep();
         });
     });
-}
-
-uint32_t QtShutdownDialog::SleepSettleMs() {
-    return emu_.Get<ShutdownPrompt>().Unattended() ? kUnattendedSleepSettleMs : kSleepGraceMs;
 }
 
 void QtShutdownDialog::StopCountdown() {
@@ -60,7 +47,7 @@ void QtShutdownDialog::StopCountdown() {
 }
 
 void QtShutdownDialog::FollowSleep() {
-    if (emu_.Get<cerfcore::GuestDeepSleep>().Asleep()) {
+    if (emu_.Get<cerfcore::GuestDeepSleep>().Suspended()) {
         Show(ShutdownTrigger::GuestSleep);
         return;
     }
@@ -158,7 +145,7 @@ void QtShutdownDialog::Perform(ShutdownTrigger trigger, ShutdownChoice choice) {
     switch (choice) {
         case ShutdownChoice::Cancel:
             if (trigger == ShutdownTrigger::GuestSleep) sleep.Resume();
-            else if (sleep.Asleep()) Show(ShutdownTrigger::GuestSleep);
+            else if (sleep.Suspended()) Show(ShutdownTrigger::GuestSleep);
             return;
         case ShutdownChoice::SoftReset: emu_.Get<cerfcore::GuestCpuReset>().WarmResetFromHost(); return;
         case ShutdownChoice::HardReset: emu_.Get<cerfcore::GuestColdBoot>().RequestHardResetFromHost(); return;
@@ -185,7 +172,7 @@ void QtShutdownDialog::SaveAndExit(bool suspend_host) {
                 return;
             }
             emu_.Get<ShutdownPrompt>().CancelCloseRequest();
-            if (emu_.Get<cerfcore::GuestDeepSleep>().Asleep()) ShowDialog(ShutdownTrigger::GuestSleep);
+            if (emu_.Get<cerfcore::GuestDeepSleep>().Suspended()) ShowDialog(ShutdownTrigger::GuestSleep);
         });
     });
 }

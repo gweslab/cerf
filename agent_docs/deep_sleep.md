@@ -2,7 +2,8 @@
 
 CERF models guest deep sleep / suspend. When the running guest powers down its
 CPU (a SoC power-down register write, or a CPU power-mode instruction), CERF
-halts the virtual CPU and tells the frontend that the guest sleeps. A wake from
+halts the virtual CPU. For every sleep except a boot sleep, CERF also tells the
+frontend that the guest sleeps. A wake from
 `GuestDeepSleep::Resume()` resumes the guest exactly where it slept, with no data
 loss. This is the GUEST's own suspend/resume on faithful virtual hardware. CERF
 only halts the CPU and drives the wake.
@@ -39,6 +40,23 @@ installation set it.
 On a clock-stop board, a reset that ends a sleep powers the system up before the reset
 reaches the CPU. This holds for every source of the reset. A soft reset resets only the
 CPU. The Suspend State leaves the rest of the system powered down.
+
+## The boot sleep
+
+Some boards sleep once while they boot, before the guest OS runs.
+
+**A boot sleep is a sleep that begins before the guest first idles after a reset that is
+not a sleep wake.** Some boards sleep in their boot after a cold boot only. As a result, the
+reset alone does not identify the boot sleep.
+
+A board whose boot sleeps registers a `BootSleep` service. Its `Waker()` names what ends
+that sleep. `ResumeSource::User` means that the board waits for the user. CERF then
+delivers the user wake when the sleep begins. `ResumeSource::Hardware` means that the
+hardware of the board ends it.
+
+**A boot sleep never reaches the frontend.** The sleep listeners still run, because hardware
+models follow every sleep. A frontend shows the sleep of the guest only from
+`RegisterSuspendListener` and `Suspended()`. It shows that sleep with no delay.
 
 ## Wake shapes - read the SoC and the board before picking one
 

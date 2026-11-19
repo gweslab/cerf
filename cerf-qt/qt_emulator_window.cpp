@@ -198,15 +198,11 @@ void QtEmulatorWindow::Post(std::function<void()> job) {
         Qt::QueuedConnection);
 }
 
-void QtEmulatorWindow::RunOnUiThreadAfter(uint32_t delay_ms, std::function<void()> job) {
-    QTimer::singleShot(static_cast<int>(delay_ms), window_.data(), gate_.Bind([job = std::move(job)] { job(); }));
-}
-
-void QtEmulatorWindow::ShowCards() { surface_->ShowCards(emu_); }
-
 bool QtEmulatorWindow::CaptureGuestSurface(std::vector<uint32_t>& out, uint32_t& w, uint32_t& h) {
     return surface_->CaptureSurface(emu_.Get<cerfcore::FrameRenderer>(), out, w, h);
 }
+
+void QtEmulatorWindow::ShowCards() { surface_->ShowCards(emu_); }
 
 bool QtEmulatorWindow::RequestShadedCapture() {
     if (!window_ || !window_->isExposed()) return false;

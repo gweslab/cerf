@@ -66,7 +66,7 @@ Every new code and change in JIT/MMU must be done through this workflow. Every S
 
 Heuristics and similar ambiguous approaches are forbidden in JIT/MMU. They are forbidden at any level where the problem obviously cannot be handled at 100%. JIT/peripherals/whatever - no heuristics anywhere. Consider such a heuristic approach an architecture damage.
 
-**A change that reaches another board family gets a smoke test on every device folder of that family.** A smoke test boots the device and uses the changed feature. A test of some members on their default configuration misses the other members. It also misses the user configurations that drive other boot paths.
+**A run on one more device folder needs a branch that the earlier runs of the change did not reach.** Before the run, name the changed branch that the guest of that folder takes. Make sure that no earlier run of the change took that branch. Examples are another boot path, another user configuration and another caller of the changed code. A folder whose guest takes only branches that an earlier run already took gets no run.
 
 ## Reference Licence Hygiene
 

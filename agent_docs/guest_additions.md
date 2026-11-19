@@ -208,11 +208,11 @@ re-audit that helper for vestigiality. Never assume that it is still required.
 
 ## Display driver + blit pipeline
 
-The universal CERF display driver. `--guest-additions` injects it into the
-guest ROM at load time. The body is the GPE/DDGPE/DDI scaffolding of CERF
-(`ce_apps/cerf_guest/include/cerf_gpe.h`, `include/cerf_ddi.h`) plus the driver
-built on it. It links `coredll` only. A per-version compatibility layer
-reshapes the driver-interface data at the OS boundary. That layer is the
+`cerf_guest` is the universal CERF display driver. Its body is the
+GPE/DDGPE/DDI scaffolding of CERF (`ce_apps/cerf_guest/include/cerf_gpe.h`,
+`include/cerf_ddi.h`) plus the driver built on it. It links `coredll` only. A
+per-version compatibility layer reshapes the driver-interface data at the OS
+boundary. That layer is the
 DDI/DDHAL translation (`cerf_ddi_*.cpp`, `cerf_ddhal*.cpp`) and the
 per-generation ddraw headers
 (`include/ddraw_ce5.h` / `ddraw_ce6.h` / `ddraw_wm.h`). The single CE6-shaped
@@ -223,10 +223,7 @@ shapes.
 It is the guest-side partner of the host `libCerfCore/src/peripherals/cerf_virt/` virtual
 framebuffer and `gpe_cmd` accelerator channel. The driver routes blits over
 that channel, and the host performs them natively (`cerf_ddgpe_blt.cpp`
-`BltPrepare` routing, `main.cpp` channel ABI). It owns the universal display
-path: host-framebuffer rendering, host-accelerated blits, a DirectDraw HAL,
-dynamic resolution, and the cursor / keyboard / shared-storage / task-manager
-transport.
+`BltPrepare` routing, `main.cpp` channel ABI).
 
 **Guest additions replaces the display driver. It does not switch off the
 panel of the board.** The board display controller keeps its full emulation,
@@ -265,12 +262,9 @@ We decrease size only when it's required by a device specifics.
 
 The host owns the default palette. At startup and at every reset that is
 not a resume, the host loads the palette of the depth into the `cerf_virt`
-palette registers. That palette is `guest_additions.indexed_palette` of the
-device configuration, or else the first `ga_palettes` row of `db.json` for the
-depth. The driver creates its default palette from those registers and holds no
-palette table of its own. A palette change of the guest writes the same
-registers, and the host expands index→RGB on scanout. The driver accepts a
-change to every entry.
+palette registers. The driver creates its default palette from those
+registers. A palette change of the guest writes the same registers, and the
+host expands index→RGB on scanout. The driver accepts a change to every entry.
 
 A DirectDraw flip moves the scanout offset of the guest-additions display to
 the target surface. GDI continues to draw into the GDI primary. As a result, a

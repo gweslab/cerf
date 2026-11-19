@@ -126,7 +126,7 @@ that the guest programs stays in code. The CPU clock is one example.
 The order of `cpu_config_params` is the display order. Put a new parameter
 next to the parameters that it relates to.
 
-## Guest-additions palettes
+## Guest-additions palettes - `libCerfCore/palettes.json`
 
 A `ga_palettes` row is one palette of the guest-additions display. `bpp` is the
 indexed depth of the palette. `values` holds `1 << bpp` `[red, green, blue]`

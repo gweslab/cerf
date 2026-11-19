@@ -162,15 +162,17 @@ cerf_read_string_define(cerfqt_frontend_name "${CERF_EXECUTABLE_NAMES_HEADER}" C
 cerf_read_string_define(cerfqt_product_name
                         "${CMAKE_CURRENT_SOURCE_DIR}/../libCerfCore/include/cerfcore/core/product_name_text.h"
                         CERF_PRODUCT_NAME)
-cerf_read_string_define(cerfqt_db_json_name "${CERF_INSTALL_LAYOUT_HEADER}" CERF_DB_JSON_NAME)
-cerf_read_string_define(cerfqt_huds_json_name "${CERF_INSTALL_LAYOUT_HEADER}" CERF_HUDS_JSON_NAME)
+set(cerfqt_core_data_names)
+foreach(cerfqt_core_data_define IN ITEMS CERF_DB_JSON_NAME CERF_HUDS_JSON_NAME CERF_PALETTES_JSON_NAME)
+    cerf_read_string_define(cerfqt_core_data_name "${CERF_INSTALL_LAYOUT_HEADER}" ${cerfqt_core_data_define})
+    list(APPEND cerfqt_core_data_names "${cerfqt_core_data_name}")
+endforeach()
 cerf_read_string_define(cerfqt_ce_apps_name "${CERF_INSTALL_LAYOUT_HEADER}" CERF_CE_APPS_DIR_NAME)
 cerf_read_string_define(cerfqt_global_defaults_name "${CERF_INSTALL_ROOT_HEADER}" CERF_GLOBAL_DEFAULTS_NAME)
 cerf_read_string_define(cerfqt_license_name "${CERF_INSTALL_ROOT_HEADER}" CERF_LICENSE_NAME)
 cerf_read_string_define(cerfqt_notices_name "${CERF_INSTALL_ROOT_HEADER}" CERF_NOTICES_NAME)
 cerf_read_string_define(cerfqt_licenses_dir_name "${CERF_INSTALL_ROOT_HEADER}" CERF_LICENSES_DIR_NAME)
-set(cerfqt_db_json "${CMAKE_CURRENT_SOURCE_DIR}/../libCerfCore/${cerfqt_db_json_name}")
-set(cerfqt_huds_json "${CMAKE_CURRENT_SOURCE_DIR}/../libCerfCore/${cerfqt_huds_json_name}")
+set(cerfqt_core_data_dir "${CMAKE_CURRENT_SOURCE_DIR}/../libCerfCore")
 if(NOT APPLE)
     set_target_properties(cerf-qt PROPERTIES OUTPUT_NAME "${cerfqt_frontend_name}")
 endif()
@@ -256,8 +258,12 @@ if(ANDROID)
             message(FATAL_ERROR "tools/local_config.py --merge failed (${cerfqt_merge_rc})")
         endif()
     endif()
-    configure_file("${cerfqt_db_json}" "${cerfqt_install_dir}/${cerfqt_db_json_name}" COPYONLY)
-    configure_file("${cerfqt_huds_json}" "${cerfqt_install_dir}/${cerfqt_huds_json_name}" COPYONLY)
+    set(cerfqt_core_data_files)
+    foreach(cerfqt_core_data_name IN LISTS cerfqt_core_data_names)
+        configure_file("${cerfqt_core_data_dir}/${cerfqt_core_data_name}"
+                       "${cerfqt_install_dir}/${cerfqt_core_data_name}" COPYONLY)
+        list(APPEND cerfqt_core_data_files "${cerfqt_install_dir}/${cerfqt_core_data_name}")
+    endforeach()
     set(cerfqt_repo_dir "${CMAKE_CURRENT_SOURCE_DIR}/..")
     configure_file("${cerfqt_repo_dir}/${cerfqt_notices_name}" "${cerfqt_install_dir}/${cerfqt_notices_name}" COPYONLY)
     execute_process(COMMAND "${Python3_EXECUTABLE}" "${cerfqt_repo_dir}/tools/third_party_sources.py"
@@ -269,8 +275,7 @@ if(ANDROID)
     qt_add_resources(cerf-qt "cerfqt_install"
         PREFIX "${cerfqt_install_prefix}"
         BASE "${cerfqt_install_dir}"
-        FILES "${cerfqt_global_defaults}" "${cerfqt_install_dir}/${cerfqt_db_json_name}"
-              "${cerfqt_install_dir}/${cerfqt_huds_json_name}" "${cerfqt_install_dir}/${cerfqt_notices_name}")
+        FILES "${cerfqt_global_defaults}" ${cerfqt_core_data_files} "${cerfqt_install_dir}/${cerfqt_notices_name}")
     file(TO_CMAKE_PATH "${CERFQT_ANDROID_CE_APPS_DIR}" cerfqt_ce_apps_dir)
     file(GLOB_RECURSE cerfqt_ce_apps CONFIGURE_DEPENDS "${cerfqt_ce_apps_dir}/*")
     qt_add_resources(cerf-qt "cerfqt_ce_apps"
@@ -313,14 +318,13 @@ if(ANDROID)
     endif()
     qt_add_android_permission(cerf-qt NAME android.permission.RECORD_AUDIO)
 else()
+    string(REPLACE ";" "$<SEMICOLON>" cerfqt_core_data_names_arg "${cerfqt_core_data_names}")
     add_custom_target(cerf-qt-bundled ALL
         COMMAND "${CMAKE_COMMAND}"
                 "-DCERFQT_BUNDLED_DIR=${CMAKE_CURRENT_SOURCE_DIR}/../bundled"
                 "-DCERFQT_LOCAL_CONFIG_NAME=${CERFQT_LOCAL_CONFIG_NAME}"
-                "-DCERFQT_DB_JSON=${cerfqt_db_json}"
-                "-DCERFQT_DB_JSON_NAME=${cerfqt_db_json_name}"
-                "-DCERFQT_HUDS_JSON=${cerfqt_huds_json}"
-                "-DCERFQT_HUDS_JSON_NAME=${cerfqt_huds_json_name}"
+                "-DCERFQT_CORE_DATA_DIR=${cerfqt_core_data_dir}"
+                "-DCERFQT_CORE_DATA_NAMES=${cerfqt_core_data_names_arg}"
                 "-DCERFQT_OUTPUT_DIR=${cerfqt_output_dir}"
                 -P "${CMAKE_CURRENT_SOURCE_DIR}/copy_bundled.cmake"
         VERBATIM)

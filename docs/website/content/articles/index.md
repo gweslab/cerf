@@ -25,5 +25,6 @@
 - [**The configuration files**](cerf-json.md) - the three layers of `cerf.json`, and what each one
   can set.
 - [**Save and restore**](hibernation.md) - how saved state works
+- [**Automation API**](automation.md) - control a running emulator from a Python script
 - [**Windows CE ROM containers**](rom-containers.md) - the ROM file formats, how they differ across
   CE versions, and how to extract them.

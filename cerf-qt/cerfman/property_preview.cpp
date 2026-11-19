@@ -57,8 +57,8 @@ QVariantList PropertyPreview::Blocks(const PropertySheet& sheet) const {
             {QStringLiteral("key"), key},
             {QStringLiteral("title"), page.value(QStringLiteral("title"))},
             {QStringLiteral("rows"), rows},
-            {QStringLiteral("warning"),
-             catalog.SupportWarning(key == QLatin1String(sp::kBoard) ? sheet.BoardId() : QString())}});
+            {QStringLiteral("support"),
+             catalog.SupportClauses(key == QLatin1String(sp::kBoard) ? sheet.BoardId() : QString())}});
     }
     return out;
 }

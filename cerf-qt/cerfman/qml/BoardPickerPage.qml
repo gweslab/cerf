@@ -7,7 +7,6 @@ WizardPage {
     property string current: ""
     property string selected: current
     property var rows: []
-    readonly property int supportWidth: 160
     signal picked(string boardId)
 
     title: qsTr("Pick a board")
@@ -79,12 +78,14 @@ WizardPage {
 
                     Label {
                         Layout.fillWidth: true
+                        Layout.preferredWidth: 0
                         text: slot.modelData.name
                         wrapMode: Text.Wrap
                     }
-                    CaptionLabel {
-                        Layout.preferredWidth: page.supportWidth
-                        text: slot.modelData.support
+                    SupportLevelLabel {
+                        Layout.fillWidth: true
+                        Layout.preferredWidth: 0
+                        clauses: slot.modelData.support
                     }
                 }
             }

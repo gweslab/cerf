@@ -114,9 +114,9 @@ ColumnLayout {
                     text: BoardCatalog.BoardLabel(fields.boardId, qsTr("Pick a board"))
                     onClicked: fields.pickBoard()
                 }
-                SupportWarningLabel {
+                SupportLevelLabel {
                     Layout.fillWidth: true
-                    warning: BoardCatalog.SupportWarning(fields.boardId)
+                    clauses: BoardCatalog.SupportClauses(fields.boardId)
                 }
             }
         }

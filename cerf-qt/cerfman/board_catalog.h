@@ -50,7 +50,7 @@ public:
 
     Q_INVOKABLE QString      DisplayName(const QString& board_id) const;
     Q_INVOKABLE QString      BoardLabel(const QString& board_id, const QString& empty_text) const;
-    Q_INVOKABLE QVariantMap  SupportWarning(const QString& board_id) const;
+    Q_INVOKABLE QVariantList SupportClauses(const QString& board_id) const;
     Q_INVOKABLE QString      FirstRunningBoard() const;
     Q_INVOKABLE QVariantList GroupedBoards(bool show_unsupported, bool show_unknown,
                                            const QString& query) const;

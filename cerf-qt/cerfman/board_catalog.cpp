@@ -22,14 +22,42 @@ std::pair<int, QString> BoardSortKey(const QString& name) {
     return {BoardCatalog::NameTier(name), SortText(name)};
 }
 
-QString LevelLabel(SupportLevel level) {
+constexpr char kToneGood[]    = "good";
+constexpr char kToneCaution[] = "caution";
+constexpr char kToneBad[]     = "bad";
+
+struct SupportClause {
+    QString     text;
+    const char* tone;
+};
+
+SupportClause RomClause(SupportLevel level) {
     switch (level) {
-        case SupportLevel::BootableFull:    return QStringLiteral("Bootable; Full support");
-        case SupportLevel::BootablePartial: return QStringLiteral("Bootable; Partial support");
-        case SupportLevel::UnknownPartial:  return QStringLiteral("Unknown; Partial support");
-        case SupportLevel::NoSupport:       return QStringLiteral("Unbootable; No support");
+        case SupportLevel::BootableFull:
+        case SupportLevel::BootablePartial: return {QStringLiteral("ROM is bootable"), kToneGood};
+        case SupportLevel::UnknownPartial:  return {QStringLiteral("No ROM ever tested"), kToneCaution};
+        case SupportLevel::NoSupport:       return {QStringLiteral("Unbootable"), kToneBad};
     }
-    return QString();
+    return {};
+}
+
+SupportClause HardwareClause(SupportLevel level) {
+    switch (level) {
+        case SupportLevel::BootableFull:    return {QStringLiteral("Full hardware coverage"), kToneGood};
+        case SupportLevel::BootablePartial:
+        case SupportLevel::UnknownPartial:  return {QStringLiteral("Only shared hardware support"), kToneCaution};
+        case SupportLevel::NoSupport:       return {QStringLiteral("No hardware support"), kToneBad};
+    }
+    return {};
+}
+
+QVariantMap ClauseRow(const SupportClause& clause) {
+    return QVariantMap{{QStringLiteral("text"), clause.text},
+                       {QStringLiteral("tone"), QString::fromLatin1(clause.tone)}};
+}
+
+QVariantList LevelClauses(SupportLevel level) {
+    return {ClauseRow(RomClause(level)), ClauseRow(HardwareClause(level))};
 }
 
 }
@@ -115,23 +143,11 @@ QString BoardCatalog::ArchName(const QString& board_id) const {
     return arch ? QString::fromLatin1(cerfcore::CpuArchName(*arch)) : QString();
 }
 
-QVariantMap BoardCatalog::SupportWarning(const QString& board_id) const {
-    const auto warning = [](bool danger, const QString& text) {
-        return QVariantMap{{QStringLiteral("danger"), danger}, {QStringLiteral("text"), text}};
-    };
-    if (board_id.isEmpty()) return warning(false, QString());
+QVariantList BoardCatalog::SupportClauses(const QString& board_id) const {
+    if (board_id.isEmpty()) return {};
     const DbBoard* board = Find(board_id);
-    if (!board) return warning(true, QStringLiteral("CERF does not know this board."));
-    switch (board->support_level) {
-        case SupportLevel::BootableFull:
-            return warning(false, QString());
-        case SupportLevel::NoSupport:
-            return warning(true, LevelLabel(board->support_level));
-        case SupportLevel::BootablePartial:
-        case SupportLevel::UnknownPartial:
-            return warning(false, LevelLabel(board->support_level));
-    }
-    return warning(false, QString());
+    if (!board) return {ClauseRow({QStringLiteral("CERF does not know this board."), kToneBad})};
+    return LevelClauses(board->support_level);
 }
 
 QStringList BoardCatalog::Notes(const QString& board_id) const {
@@ -188,7 +204,7 @@ QVariantList BoardCatalog::GroupedBoards(bool show_unsupported, bool show_unknow
         if (!show_unsupported && board.support_level == SupportLevel::NoSupport) continue;
         const QString id = QString::fromStdString(board.id);
         const QStringList fields{QString::fromStdString(board.name), id, FamilyName(id), SocLabel(id),
-                                 LevelLabel(board.support_level)};
+                                 RomClause(board.support_level).text, HardwareClause(board.support_level).text};
         if (!MatchesQuery(fields, query)) continue;
         members[board.family_id].push_back(&board);
     }
@@ -211,7 +227,7 @@ QVariantList BoardCatalog::GroupedBoards(bool show_unsupported, bool show_unknow
             ids.append(id);
             rows.append(QVariantMap{{QStringLiteral("id"), id},
                                     {QStringLiteral("name"), QString::fromStdString(board->name)},
-                                    {QStringLiteral("support"), LevelLabel(board->support_level)}});
+                                    {QStringLiteral("support"), LevelClauses(board->support_level)}});
         }
         QVariantMap group = GroupHardware(ids);
         group.insert(QStringLiteral("family"), QString::fromStdString(family->name));

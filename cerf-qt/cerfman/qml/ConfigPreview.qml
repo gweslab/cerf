@@ -33,10 +33,10 @@ ColumnLayout {
                 rows: block.modelData.rows
                 stacked: preview.stacked
             }
-            SupportWarningLabel {
+            SupportLevelLabel {
                 Layout.fillWidth: true
                 Layout.topMargin: Theme.spaceS
-                warning: block.modelData.warning
+                clauses: block.modelData.support
             }
         }
     }

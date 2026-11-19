@@ -1,5 +1,3 @@
-/* Entrance animations mirroring yaroslavkibysh.com (src/js/reveal.js).
-   The hidden state comes from cerf.css; this only reveals. */
 (function () {
   var ENTRANCE_MS = 900;
 
@@ -33,7 +31,7 @@
     var stats = document.querySelector('.cerf-stats');
     if (stats) show(stats, 500);
 
-    document.querySelectorAll('.md-typeset h2').forEach(function (el) {
+    document.querySelectorAll('.cerf-hero ~ h2').forEach(function (el) {
       showOnScroll(el, 0);
     });
 

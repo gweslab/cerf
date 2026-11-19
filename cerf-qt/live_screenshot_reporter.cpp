@@ -21,7 +21,11 @@ namespace cerffrontend {
 
 namespace {
 
+#if CERF_DEV_MODE
+constexpr auto kInterval    = std::chrono::seconds(1);
+#else
 constexpr auto kInterval    = std::chrono::seconds(5);
+#endif
 constexpr auto kCaptureWait = std::chrono::seconds(3);
 
 class LiveScreenshotReporter : public cerfcore::Service {

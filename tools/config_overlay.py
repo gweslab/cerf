@@ -7,16 +7,21 @@ from typing import Any, Dict, List, Optional
 
 from json_files import write_json
 
-NAME = "cerf.local.json"
+LOCAL_NAME = "cerf.local.json"
+UNSTABLE_NAME = "cerf.unstable.json"
+NAMES = (LOCAL_NAME, UNSTABLE_NAME)
 
 
-class LocalConfigError(Exception):
+class ConfigOverlayError(Exception):
     pass
 
 
-def overlay_for(root: Path, mode: str) -> Optional[Path]:
-    path = root / "bundled" / NAME
-    return path if mode == "dev" and path.is_file() else None
+def overlay_for(root: Path, mode: str, unstable: bool) -> Optional[Path]:
+    bundled = root / "bundled"
+    if mode == "dev":
+        local = bundled / LOCAL_NAME
+        return local if local.is_file() else None
+    return bundled / UNSTABLE_NAME if unstable else None
 
 
 def merge(cerf_json: Path, overlay: Path) -> None:
@@ -29,9 +34,9 @@ def _object(path: Path) -> Dict[str, Any]:
     try:
         value = json.loads(path.read_text(encoding="utf-8-sig"))
     except ValueError as exc:
-        raise LocalConfigError("{}: {}".format(path, exc))
+        raise ConfigOverlayError("{}: {}".format(path, exc))
     if not isinstance(value, dict):
-        raise LocalConfigError("{} holds no JSON object".format(path))
+        raise ConfigOverlayError("{} holds no JSON object".format(path))
     return value
 
 
@@ -39,11 +44,11 @@ def main(argv: List[str]) -> int:
     if len(argv) == 4 and argv[1] == "--merge":
         try:
             merge(Path(argv[2]), Path(argv[3]))
-        except LocalConfigError as exc:
+        except ConfigOverlayError as exc:
             sys.stderr.write("{}\n".format(exc))
             return 1
         return 0
-    sys.stderr.write("usage: local_config.py --merge <cerf.json> <overlay>\n")
+    sys.stderr.write("usage: config_overlay.py --merge <cerf.json> <overlay>\n")
     return 2
 
 

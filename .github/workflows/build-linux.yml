@@ -15,6 +15,9 @@ on:
       compiler-env:
         type: string
         required: true
+      unstable:
+        type: boolean
+        required: true
 
 jobs:
   build:
@@ -96,7 +99,7 @@ jobs:
         shell: bash
         run: |
           source "${{ inputs.compiler-env }}"
-          python3 build.py --config Release --mode production --ce-apps-from=ci/ce_apps
+          python3 build.py --config Release --mode production ${{ inputs.unstable && '--unstable' || '' }} --ce-apps-from=ci/ce_apps
 
       - uses: ./.github/actions/vcpkg-cache
         with:

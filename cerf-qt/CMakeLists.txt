@@ -251,11 +251,11 @@ if(ANDROID)
         message(FATAL_ERROR "tools/host_branch.py --stamp failed (${cerfqt_stamp_rc})")
     endif()
     if(CERFQT_GLOBAL_CONFIG_OVERLAY)
-        execute_process(COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/../tools/local_config.py"
+        execute_process(COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/../tools/config_overlay.py"
                                 --merge "${cerfqt_global_defaults}" "${CERFQT_GLOBAL_CONFIG_OVERLAY}"
                         RESULT_VARIABLE cerfqt_merge_rc)
         if(NOT cerfqt_merge_rc EQUAL 0)
-            message(FATAL_ERROR "tools/local_config.py --merge failed (${cerfqt_merge_rc})")
+            message(FATAL_ERROR "tools/config_overlay.py --merge failed (${cerfqt_merge_rc})")
         endif()
     endif()
     set(cerfqt_core_data_files)
@@ -319,10 +319,11 @@ if(ANDROID)
     qt_add_android_permission(cerf-qt NAME android.permission.RECORD_AUDIO)
 else()
     string(REPLACE ";" "$<SEMICOLON>" cerfqt_core_data_names_arg "${cerfqt_core_data_names}")
+    string(REPLACE ";" "$<SEMICOLON>" cerfqt_config_overlay_names_arg "${CERFQT_CONFIG_OVERLAY_NAMES}")
     add_custom_target(cerf-qt-bundled ALL
         COMMAND "${CMAKE_COMMAND}"
                 "-DCERFQT_BUNDLED_DIR=${CMAKE_CURRENT_SOURCE_DIR}/../bundled"
-                "-DCERFQT_LOCAL_CONFIG_NAME=${CERFQT_LOCAL_CONFIG_NAME}"
+                "-DCERFQT_CONFIG_OVERLAY_NAMES=${cerfqt_config_overlay_names_arg}"
                 "-DCERFQT_CORE_DATA_DIR=${cerfqt_core_data_dir}"
                 "-DCERFQT_CORE_DATA_NAMES=${cerfqt_core_data_names_arg}"
                 "-DCERFQT_OUTPUT_DIR=${cerfqt_output_dir}"

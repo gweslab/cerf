@@ -6,8 +6,8 @@ from pathlib import Path
 from typing import Callable, Dict, List, Optional
 
 import build_report
+import config_overlay
 import librashader_library
-import local_config
 import resvg_library
 import rust_library_build
 import verified_download
@@ -23,11 +23,12 @@ class BuildAbort(Exception):
 class FrontendBuild:
     device_traces = True
 
-    def __init__(self, root: Path, config: str, mode: str, rebuild: bool,
+    def __init__(self, root: Path, config: str, mode: str, unstable: bool, rebuild: bool,
                  heartbeat: Callable[[], None], branch: HostBranch) -> None:
         self.root = root
         self.config = config
         self.mode = mode
+        self.unstable = unstable
         self.rebuild = rebuild
         self.heartbeat = heartbeat
         self.branch = branch
@@ -39,7 +40,7 @@ class FrontendBuild:
     def cmake_options(self) -> List[str]:
         return ["-DCERF_BUILD_QT=ON", "-DCERFCORE_DEV_MODE=" + self.dev,
                 "-DCERFCORE_DEVICE_TRACES=" + (self.dev if self.device_traces else "OFF"),
-                "-DCERFQT_LOCAL_CONFIG_NAME=" + local_config.NAME,
+                "-DCERFQT_CONFIG_OVERLAY_NAMES=" + ";".join(config_overlay.NAMES),
                 "-DPython3_EXECUTABLE={}".format(sys.executable)]
 
     def compiler_cache(self) -> Optional[str]:

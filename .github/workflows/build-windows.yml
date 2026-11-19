@@ -2,6 +2,10 @@ name: build-windows
 
 on:
   workflow_call:
+    inputs:
+      unstable:
+        type: boolean
+        required: true
 
 jobs:
   build:
@@ -71,7 +75,7 @@ jobs:
 
       - name: Build
         shell: pwsh
-        run: python build.py --config Release --mode production --ce-apps-from=ci/ce_apps
+        run: python build.py --config Release --mode production ${{ inputs.unstable && '--unstable' || '' }} --ce-apps-from=ci/ce_apps
 
       - uses: ./.github/actions/compiler-cache
         if: ${{ !cancelled() }}

@@ -12,9 +12,9 @@ sys.path.insert(0, str(ROOT / "tools"))
 
 import build_common
 import cerf_locks
+import config_overlay
 import frontend_build
 import host_branch
-import local_config
 from host_branch import ANDROID_AMD64, ANDROID_ARM64, WIN32_X86
 from product_facts import GLOBAL_CONFIG_NAME, GLOBAL_DEFAULTS_NAME
 
@@ -25,6 +25,8 @@ def parse_args(argv):
     parser = argparse.ArgumentParser(description="Build CERF for this host.")
     parser.add_argument("--config", "-Config", default="Release")
     parser.add_argument("--mode", "-Mode", choices=("dev", "production"), default="dev")
+    parser.add_argument("--unstable", action="store_true",
+                        help="make an unstable build")
     parser.add_argument("--force-kill", "-ForceKill", action="store_true")
     parser.add_argument("--rebuild", "-Rebuild", action="store_true")
     parser.add_argument("--android", nargs="?", const="arm64", choices=sorted(ANDROID_BRANCHES),
@@ -35,6 +37,8 @@ def parse_args(argv):
     parser.add_argument("--ce-apps-only", action="store_true",
                         help="build only ce_apps, not the frontend")
     args = parser.parse_args(argv)
+    if args.unstable and args.mode != "production":
+        parser.error("--unstable needs --mode production")
     if args.config.lower() in ("d", "debug"):
         args.config = "Debug"
     elif args.config.lower() == "release":
@@ -50,13 +54,12 @@ def build_branch(args):
 
 def host_build(branch, args, heartbeat):
     if branch.name in ANDROID_BRANCHES.values():
-        import build_android
-        return build_android.AndroidBuild(ROOT, args.config, args.mode, args.rebuild, heartbeat, branch)
-    if branch.name == WIN32_X86:
-        import build_windows
-        return build_windows.WindowsBuild(ROOT, args.config, args.mode, args.rebuild, heartbeat, branch)
-    import build_posix
-    return build_posix.PosixBuild(ROOT, args.config, args.mode, args.rebuild, heartbeat, branch)
+        from build_android import AndroidBuild as Build
+    elif branch.name == WIN32_X86:
+        from build_windows import WindowsBuild as Build
+    else:
+        from build_posix import PosixBuild as Build
+    return Build(ROOT, args.config, args.mode, args.unstable, args.rebuild, heartbeat, branch)
 
 
 def run(args, branch, lock) -> int:
@@ -102,14 +105,15 @@ def run(args, branch, lock) -> int:
         if not branch.package_file:
             host_branch.stamp(out / GLOBAL_DEFAULTS_NAME, branch)
             print("[BUILD] {} stamped into {}".format(branch.name, out / GLOBAL_DEFAULTS_NAME), flush=True)
-            overlay = local_config.overlay_for(ROOT, args.mode)
+            overlay = config_overlay.overlay_for(ROOT, args.mode, args.unstable)
             if overlay is not None:
+                target = out / (GLOBAL_CONFIG_NAME if args.mode == "dev" else GLOBAL_DEFAULTS_NAME)
                 try:
-                    local_config.merge(out / GLOBAL_CONFIG_NAME, overlay)
-                except local_config.LocalConfigError as exc:
+                    config_overlay.merge(target, overlay)
+                except config_overlay.ConfigOverlayError as exc:
                     print("[BUILD] FAILED! {}".format(exc), flush=True)
                     return 1
-                print("[BUILD] {} merged into {}".format(overlay, out / GLOBAL_CONFIG_NAME), flush=True)
+                print("[BUILD] {} merged into {}".format(overlay, target), flush=True)
             build_common.ship_notices(ROOT, out)
         report.ok()
     else:

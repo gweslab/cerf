@@ -196,7 +196,7 @@ main() {
     unstable=no
     yes_no 'Install unstable version?' no && unstable=yes
     if [ "$unstable" = yes ]; then
-        printf '%s\n' 'You picked an unstable build to install. This build might break on new updates or clobber your installation directory. If you want to continue receiving unstable channel updates, pick that channel in Settings later.'
+        printf '%s\n' 'You picked an unstable build to install. This build might break on new updates or clobber your installation directory.'
         yes_no 'Would you like to continue?' no || return 0
     fi
 

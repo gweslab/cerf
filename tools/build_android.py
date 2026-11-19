@@ -9,7 +9,7 @@ from typing import Dict, Optional, Tuple
 import android_openssl
 import android_sdk
 import build_report
-import local_config
+import config_overlay
 import qt_android
 import qt_online_repository
 import vcpkg_install
@@ -123,7 +123,7 @@ class AndroidBuild(FrontendBuild):
         build_dir = self.build_dir(self.config)
         self.clear_for_rebuild(build_dir)
         signed = signing_configured()
-        overlay = local_config.overlay_for(self.root, self.mode)
+        overlay = config_overlay.overlay_for(self.root, self.mode, self.unstable)
         self.configure(build_dir, [
             self.cmake, "-S", self.root, "-B", build_dir, "-G", "Ninja",
             "-DCMAKE_MAKE_PROGRAM={}".format(self.ninja),

@@ -67,8 +67,7 @@ function Install-CeRuntimeFoundation {
     $unstable    = Read-YesNo 'Install unstable version?' $false
     if ($unstable) {
         Write-Host ("You picked an unstable build to install. This build might break on new updates or clobber " +
-                    "your installation directory. If you want to continue receiving unstable channel updates, " +
-                    "pick that channel in Settings later.")
+                    "your installation directory.")
         if (-not (Read-YesNo 'Would you like to continue?' $false)) { return }
     }
 

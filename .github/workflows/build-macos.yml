@@ -2,6 +2,10 @@ name: build-macos
 
 on:
   workflow_call:
+    inputs:
+      unstable:
+        type: boolean
+        required: true
 
 jobs:
   build:
@@ -48,7 +52,7 @@ jobs:
           host-branch: ${{ env.HOST_BRANCH }}
 
       - name: Build
-        run: python3 build.py --config Release --mode production --ce-apps-from=ci/ce_apps
+        run: python3 build.py --config Release --mode production ${{ inputs.unstable && '--unstable' || '' }} --ce-apps-from=ci/ce_apps
 
       - uses: ./.github/actions/rust-library-cache
         if: ${{ !cancelled() }}

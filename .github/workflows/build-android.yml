@@ -2,6 +2,10 @@ name: build-android
 
 on:
   workflow_call:
+    inputs:
+      unstable:
+        type: boolean
+        required: true
     outputs:
       signed:
         description: true when the APK is signed and uploaded.
@@ -110,7 +114,7 @@ jobs:
             export QT_ANDROID_KEYSTORE_PATH="$RUNNER_TEMP/cerf-release.jks"
           fi
           python3 tools/build_android.py --signed-output >> "$GITHUB_OUTPUT"
-          python3 build.py --android --config Release --mode production --ce-apps-from=ci/ce_apps
+          python3 build.py --android --config Release --mode production ${{ inputs.unstable && '--unstable' || '' }} --ce-apps-from=ci/ce_apps
 
       - uses: ./.github/actions/vcpkg-cache
         with:

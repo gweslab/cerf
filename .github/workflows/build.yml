@@ -37,6 +37,8 @@ jobs:
       group: ${{ github.workflow }}-${{ github.ref }}-windows
       cancel-in-progress: true
     uses: ./.github/workflows/build-windows.yml
+    with:
+      unstable: ${{ !contains(github.event.head_commit.message, '[release cerf]') }}
     secrets: inherit
 
   build-linux:
@@ -50,6 +52,7 @@ jobs:
       runner: ubuntu-latest
       container: almalinux:9
       compiler-env: /opt/rh/gcc-toolset-15/enable
+      unstable: ${{ !contains(github.event.head_commit.message, '[release cerf]') }}
     secrets: inherit
 
   build-linux-arm64:
@@ -63,6 +66,7 @@ jobs:
       runner: ubuntu-24.04-arm
       container: almalinux:10
       compiler-env: /usr/lib/gcc-toolset/15-env.source
+      unstable: ${{ !contains(github.event.head_commit.message, '[release cerf]') }}
     secrets: inherit
 
   build-macos:
@@ -71,6 +75,8 @@ jobs:
       group: ${{ github.workflow }}-${{ github.ref }}-macos
       cancel-in-progress: true
     uses: ./.github/workflows/build-macos.yml
+    with:
+      unstable: ${{ !contains(github.event.head_commit.message, '[release cerf]') }}
     secrets: inherit
 
   build-android:
@@ -79,6 +85,8 @@ jobs:
       group: ${{ github.workflow }}-${{ github.ref }}-android
       cancel-in-progress: true
     uses: ./.github/workflows/build-android.yml
+    with:
+      unstable: ${{ !contains(github.event.head_commit.message, '[release cerf]') }}
     secrets: inherit
 
   publish:

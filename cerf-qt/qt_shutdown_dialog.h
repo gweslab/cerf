@@ -9,6 +9,7 @@
 #include <QVariant>
 #include <QVariantMap>
 
+#include <optional>
 #include <vector>
 
 class QtEmulatorWindow;
@@ -21,20 +22,20 @@ public:
     void Show(cerffrontend::ShutdownTrigger trigger);
 
 private:
-    void                         StopCountdown();
-    void                         FollowSleep();
-    void                         ShowDialog(cerffrontend::ShutdownTrigger trigger);
-    QVariantMap                  Texts(cerffrontend::ShutdownTrigger trigger);
-    cerffrontend::ShutdownChoice Choice(const QVariant& result);
-    void OfferAc(cerffrontend::ShutdownTrigger trigger, cerffrontend::ShutdownChoice choice);
-    void Perform(cerffrontend::ShutdownTrigger trigger, cerffrontend::ShutdownChoice choice);
-    void SaveAndExit(bool suspend_host);
+    using OptionalAction = std::optional<cerffrontend::ShutdownAction>;
+
+    void           StopCountdown();
+    void           FollowSleep();
+    void           ShowDialog(cerffrontend::ShutdownTrigger trigger);
+    QVariantMap    Texts(cerffrontend::ShutdownTrigger trigger);
+    OptionalAction Choice(const QVariant& result);
+    void           OfferAc(cerffrontend::ShutdownTrigger trigger, OptionalAction action);
+    void           Perform(cerffrontend::ShutdownTrigger trigger, OptionalAction action);
 
     QtEmulatorWindow*                         window_       = nullptr;
     QPointer<QObject>                         dialog_;
     std::vector<cerffrontend::ShutdownAction> shown_actions_;
     bool                                      open_         = false;
     bool                                      withdrawn_    = false;
-    bool                                      saving_       = false;
     cerffrontend::ShutdownTrigger             open_trigger_ = cerffrontend::ShutdownTrigger::WindowClose;
 };

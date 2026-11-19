@@ -21,6 +21,7 @@ hibernation
 deep_sleep
 workflow_examples
 debugging
+automation
 
 In the same folder but optional, loaded on subsystem work, whole work is void if disrespected when needed:
 

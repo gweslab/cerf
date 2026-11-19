@@ -7,12 +7,15 @@
 #include <cerfcore/core/service.h>
 #include <cerfcore/host/machine_requests.h>
 
+#include <QMetaObject>
+#include <QPointer>
 #include <QStringList>
 #include <QUrl>
 #include <QVariantList>
 #include <QVariantMap>
 
 #include <cstdint>
+#include <map>
 #include <string>
 #include <vector>
 
@@ -25,13 +28,19 @@ public:
     using cerfcore::Service::Service;
 
     void OnReady() override {
-        emu_.Get<cerfcore::MachineRequests>().Subscribe([this](const cerfcore::MachineRequest& request) {
+        auto& requests = emu_.Get<cerfcore::MachineRequests>();
+        requests.Subscribe([this](const cerfcore::MachineRequest& request) {
             emu_.Get<FrontendWindow>().RunOnUiThread([this, request] { Answer(request); });
+        });
+        requests.SubscribeSettled([this](uint64_t serial) {
+            emu_.Get<FrontendWindow>().RunOnUiThread([this, serial] { Withdraw(serial); });
         });
     }
 
 private:
     void Answer(const cerfcore::MachineRequest& request) {
+        auto& requests = emu_.Get<cerfcore::MachineRequests>();
+        if (!requests.Pending(request.serial)) return;
         cerfcore::MachineReply reply;
         switch (request.kind) {
             case cerfcore::MachineRequestKind::kPath: {
@@ -48,8 +57,25 @@ private:
                 reply.size      = AskSize(request);
                 reply.cancelled = reply.size == 0;
                 break;
+            case cerfcore::MachineRequestKind::kOutputPath:
+                reply.path      = request.recommended_path;
+                reply.cancelled = false;
+                break;
         }
-        emu_.Get<cerfcore::MachineRequests>().Reply(request.serial, reply);
+        dialogs_.erase(request.serial);
+        if (!requests.Pending(request.serial)) return;
+        requests.Reply(request.serial, reply);
+    }
+
+    void Withdraw(uint64_t serial) {
+        const auto open = dialogs_.find(serial);
+        if (open == dialogs_.end() || !open->second) return;
+        QMetaObject::invokeMethod(open->second.data(), "close");
+    }
+
+    QVariant RunRequestDialog(uint64_t serial, const QString& type_name, const QVariantMap& properties) {
+        return emu_.Get<QtEmulatorWindow>().RunDialog(type_name, properties,
+                                                      [this, serial](QObject* dialog) { dialogs_[serial] = dialog; });
     }
 
     std::vector<std::string> Pick(const cerfcore::MachineRequest& request, bool multiple) {
@@ -66,11 +92,10 @@ private:
             filters << NameFilter(kind, patterns);
         }
         filters << AllFilesNameFilter();
-        const QVariant result = emu_.Get<QtEmulatorWindow>().RunDialog(
-            QStringLiteral("EmulatorFileDialog"),
-            QVariantMap{{QStringLiteral("title"), title},
-                        {QStringLiteral("nameFilters"), filters},
-                        {QStringLiteral("multiple"), multiple}});
+        const QVariant result = RunRequestDialog(request.serial, QStringLiteral("EmulatorFileDialog"),
+                                                 QVariantMap{{QStringLiteral("title"), title},
+                                                             {QStringLiteral("nameFilters"), filters},
+                                                             {QStringLiteral("multiple"), multiple}});
         std::vector<std::string> out;
         const FileAccess&        files = emu_.Get<FileAccess>();
         for (const QVariant& url : result.toList()) {
@@ -87,15 +112,16 @@ private:
                                 {QStringLiteral("value"), static_cast<qulonglong>(request.recommended)},
                                 {QStringLiteral("unit"), QString()}};
         const QVariantList values =
-            emu_.Get<QtEmulatorWindow>()
-                .RunDialog(QStringLiteral("NumberPromptDialog"),
-                           QVariantMap{{QStringLiteral("title"), QStringLiteral("Generate CompactFlash image")},
-                                       {QStringLiteral("minimum"), static_cast<qulonglong>(request.minimum)},
-                                       {QStringLiteral("maximum"), static_cast<qulonglong>(request.maximum)},
-                                       {QStringLiteral("fields"), QVariantList{field}}})
+            RunRequestDialog(request.serial, QStringLiteral("NumberPromptDialog"),
+                             QVariantMap{{QStringLiteral("title"), QStringLiteral("Generate CompactFlash image")},
+                                         {QStringLiteral("minimum"), static_cast<qulonglong>(request.minimum)},
+                                         {QStringLiteral("maximum"), static_cast<qulonglong>(request.maximum)},
+                                         {QStringLiteral("fields"), QVariantList{field}}})
                 .toList();
         return values.isEmpty() ? 0u : values.front().toULongLong();
     }
+
+    std::map<uint64_t, QPointer<QObject>> dialogs_;
 };
 
 }

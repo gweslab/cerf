@@ -54,6 +54,8 @@ void CliUsage::Print(const char* prog) {
     printf("                           open at the bottom of the Z order until you switch to them\n");
     printf("  --auto-calibration       Pass the guest touch calibration screen without asking\n");
     printf("                           (answers every calibration prompt with Yes)\n");
+    printf("  --automation[=NAME]      Open the automation endpoint NAME for scripts\n");
+    printf("                           (default name: cerf-automation-PID)\n");
     printf("  --help                   Show this help\n");
     printf("\n");
     std::string board_ids;

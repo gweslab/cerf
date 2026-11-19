@@ -40,17 +40,12 @@ redoing full device setup.
 
 ## Emulator Features
 
-- If you want to test hibernation, inject touch or inject keyboard presses, write a trace file
-  under `libCerfCore/src/tracing/<bundle>/`. Gate each invasive action of the file on an
-  environment variable. The file stays on disk with the other trace files of the device. While
-  its variable is absent, it does nothing, so it does not drive the board on later runs.
-- If you want to insert a PC Card, simply temporary modify the code. We usually auto-insert NE2000
-  into one slot if guest OS is CE 4+. For CE <= 3, NE2000 interrupts a welcome wizard with a config dialog
-  and combine that with not calibrated touch panel.
+- On CE 3 and older, insert an NE2000 card after the welcome wizard. The card opens a configuration
+  dialog over the wizard.
 - The emulator writes a screenshot of the guest screen to `live_state.png` in the device directory while it
   runs. A graceful shutdown deletes it.
 - If you need own files to be accessible inside guest OS, you can boot GA with `--ga-share-folder=...` (spawned as ``\CERF Storage\*``) or
-  generate FAT16/FAT32 CF PCCard and insert it the same temp scaffolding (usually visible as ``\Storage Card\*``).
+  generate a FAT16/FAT32 CF card through the automation endpoint (usually visible as ``\Storage Card\*``).
 - If a cold boot stops at the touch calibration screen of the guest, add `--auto-calibration` to the
   run. A welcome page before the calibration screen still needs a tap. On a Guest Additions run above
   the panel size, the flag also writes the panel size into the `cerf-user.json` of the device.

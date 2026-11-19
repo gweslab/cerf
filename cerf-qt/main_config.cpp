@@ -1,9 +1,11 @@
 #include "main_config.h"
+#include "automation_option.h"
 #include <cerfcore/core/cli_option.h>
 #include <cerfcore/core/log.h>
 #include <cerfcore/core/run_timeout.h>
 #include <cstdlib>
 #include <cstring>
+#include <string>
 
 namespace cerffrontend {
 
@@ -32,8 +34,10 @@ bool IsDeviceConfigArgument(const char* argument) {
 }
 
 ArgParseResult ParseCerfArgs(int argc, char* argv[], cerfcore::CerfConfig& cfg) {
+    std::string automation_name;
     for (int i = 1; i < argc; i++) {
-        const char* v = nullptr;
+        const char*              v          = nullptr;
+        const AutomationArgument automation = ReadAutomationArgument(argv[i], automation_name);
         if (cerfcore::ReadCliOption(argv[i], kArgLog, v)) {
             cerfcore::Log::SetEnabled(cerfcore::Log::ParseCategories(v));
         } else if (cerfcore::ReadCliOption(argv[i], "--no-log=", v)) {
@@ -58,7 +62,11 @@ ArgParseResult ParseCerfArgs(int argc, char* argv[], cerfcore::CerfConfig& cfg) 
             cerfcore::Log::SetEnabled(cerfcore::Log::MASK_NONE);
         } else if (strcmp(argv[i], "--help") == 0 || strcmp(argv[i], "-h") == 0) {
             return ArgParseResult::HelpShown;
-        } else if (!IsDeviceConfigArgument(argv[i])) {
+        } else if (automation == AutomationArgument::kInvalid) {
+            LOG(Caution, "%s needs a name of 1 to %zu letters, digits, '.', '_' or '-' (got '%s')\n",
+                kArgAutomationName, kMaxAutomationNameLength, argv[i]);
+            return ArgParseResult::BadArgument;
+        } else if (automation == AutomationArgument::kOther && !IsDeviceConfigArgument(argv[i])) {
             LOG(Caution, "Unknown argument: %s (use --help)\n", argv[i]);
             return ArgParseResult::BadArgument;
         }

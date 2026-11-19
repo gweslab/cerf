@@ -1,3 +1,4 @@
+#include "calibration_answers.h"
 #include "frontend_window.h"
 #include "guest_calibration_fallback.h"
 #include "qt_ui_thread_calls.h"
@@ -8,7 +9,11 @@
 #include <cerfcore/host/notification_stack.h>
 #include <cerfcore/host/user_alert.h>
 
+#include <QMetaObject>
+#include <QPointer>
+
 #include <chrono>
+#include <optional>
 #include <string>
 
 namespace cerffrontend {
@@ -27,12 +32,14 @@ public:
         window_   = &emu_.Get<FrontendWindow>();
     }
 
-    bool ApprovesCalibration() override { return AskYes("Calibrate the screen for you?"); }
-
-    bool ApprovesPanelResolution(uint32_t, uint32_t) override {
-        return AskYes("You need a stock resolution to pass the calibration screen. Switch and soft reset now?");
+    cerfcore::CalibrationAnswer ApprovesCalibration() override {
+        return AskYes(CalibrationQuestion::kCalibrate, 0, 0, "Calibrate the screen for you?");
     }
 
+    cerfcore::CalibrationAnswer ApprovesPanelResolution(uint32_t width, uint32_t height) override {
+        return AskYes(CalibrationQuestion::kPanelResolution, width, height,
+                      "You need a stock resolution to pass the calibration screen. Switch and soft reset now?");
+    }
 
     void CalibrationFinished() override {
         emu_.Get<cerfcore::NotificationStack>().Post(cerfcore::NotificationKind::Success,
@@ -55,11 +62,29 @@ public:
     }
 
 private:
-    bool AskYes(const std::string& message) {
-        PromptAnswer answer = PromptAnswer::kClosed;
-        ui_calls_->Run(
-            [&] { answer = emu_.Get<YesNoPrompt>().Ask(kTitle, message, YesNoLevel::kPlain, YesNoEnter::kYes); });
-        return answer == PromptAnswer::kYes;
+    cerfcore::CalibrationAnswer AskYes(CalibrationQuestion question, uint32_t width, uint32_t height,
+                                       const std::string& message) {
+        CalibrationAnswers* answers = emu_.TryGet<CalibrationAnswers>();
+        PromptAnswer        prompt  = PromptAnswer::kClosed;
+        std::optional<bool> remote;
+        ui_calls_->Run([&] {
+            QPointer<QObject> dialog;
+            const auto        close = [&dialog] {
+                if (dialog) QMetaObject::invokeMethod(dialog.data(), "close");
+            };
+            if (answers != nullptr) answers->Opened(question, width, height, [&remote, &close](bool yes) {
+                remote = yes;
+                close();
+            });
+            prompt = emu_.Get<YesNoPrompt>().Ask(kTitle, message, YesNoLevel::kPlain, YesNoEnter::kYes,
+                                                 [&dialog, &remote, &close](QObject* opened) {
+                                                     dialog = opened;
+                                                     if (remote) close();
+                                                 });
+            if (answers != nullptr) answers->Closed();
+        });
+        if (remote) return cerfcore::CalibrationAnswer{.yes = *remote, .host_notices = false};
+        return cerfcore::CalibrationAnswer{.yes = prompt == PromptAnswer::kYes, .host_notices = true};
     }
 
     QtUiThreadCalls* ui_calls_ = nullptr;

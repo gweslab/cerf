@@ -6,22 +6,13 @@
 
 #include <cstdint>
 #include <functional>
+#include <optional>
 #include <string>
 #include <vector>
 
 namespace cerffrontend {
 
 enum class ShutdownTrigger { WindowClose, GuestSleep };
-enum class ShutdownChoice {
-    Cancel,
-    Exit,
-    ExitSave,
-    SoftReset,
-    HardReset,
-    SaveSuspendHost,
-    SavePoweroffHost,
-    SaveRestartHost,
-};
 
 class ShutdownPrompt : public cerfcore::Service {
 public:
@@ -29,7 +20,7 @@ public:
 
     static constexpr uint32_t kCountdownMs = 15000u;
 
-    static bool Exits(ShutdownChoice choice);
+    static bool Exits(std::optional<ShutdownAction> action);
 
     const char* Title() const;
     const char* Heading() const;
@@ -50,13 +41,13 @@ public:
     std::vector<ShutdownAction> Actions() const;
     bool                        Unattended() const;
 
-    ShutdownChoice Commit(ShutdownAction action, bool save, bool remember);
-    ShutdownChoice CommitUnattended();
+    ShutdownAction Commit(ShutdownAction action, bool save, bool remember);
+    ShutdownAction CommitUnattended();
 
-    std::function<void()> AcOffer(ShutdownTrigger trigger, ShutdownChoice choice);
+    std::function<void()> AcOffer(ShutdownTrigger trigger, std::optional<ShutdownAction> action);
 
     bool BeginCloseRequest();
-    void FinishCloseRequest(ShutdownChoice choice);
+    void FinishCloseRequest(std::optional<ShutdownAction> action);
     void CancelCloseRequest();
 
 private:

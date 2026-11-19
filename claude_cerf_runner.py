@@ -12,10 +12,13 @@ from pathlib import Path, PurePosixPath
 from typing import List, Optional
 
 ROOT = Path(__file__).resolve().parent
+sys.dont_write_bytecode = True
 sys.path.insert(0, str(ROOT / "tools"))
+sys.path.insert(0, str(ROOT / "bundled" / "tools"))
 
 import cerf_locks
 import host_branch
+from cerf_automation.transport import endpoint_name
 
 EXIT_USAGE = 2
 EXIT_MISSING = 3
@@ -46,6 +49,13 @@ def usage(slots: int, frontend: str) -> None:
     print("                      msys and mixed-slash paths (/z/tmp/x.log, Z:/tmp/x.log) become "
           "Z:\\tmp\\x.log on Windows.")
     print("  --device=NAME       Forwarded to {}.".format(frontend))
+    print("")
+    print("Automation:")
+    print("  --automation        Opens the automation endpoint, named after the log file. The runner "
+          "prints the name.")
+    print("  --automation=NAME   Opens the automation endpoint NAME.")
+    print("                      Scripts drive the instance with the cerf_automation package in the "
+          "tools folder.")
     print("")
     print("The runner forwards every other argument to {} unchanged, and it adds --no-focus:"
           .format(frontend))
@@ -149,13 +159,17 @@ def main(argv: List[str]) -> int:
     build_lock = cerf_locks.build_lock(ROOT, "RUNNER")
     run_locks = cerf_locks.run_locks(ROOT, "RUNNER")
 
-    timeout_raw = log_raw = device = None
+    timeout_raw = log_raw = device = automation = None
     forward: List[str] = []
     for arg in argv:
         if arg.startswith("--timeout="):
             timeout_raw = arg[len("--timeout="):]
         elif arg.startswith("--log-file="):
             log_raw = arg[len("--log-file="):]
+        elif arg == "--automation":
+            automation = ""
+        elif arg.startswith("--automation="):
+            automation = arg[len("--automation="):]
         else:
             if arg.startswith("--device="):
                 device = arg[len("--device="):]
@@ -187,6 +201,10 @@ def main(argv: List[str]) -> int:
     log_file = native_path(log_raw)
     log_file.parent.mkdir(parents=True, exist_ok=True)
     forward += ["--log-file={}".format(log_file), "--timeout={}".format(timeout), "--no-focus"]
+    if automation == "":
+        automation = endpoint_name(log_file.stem)
+    if automation is not None:
+        forward.append("--automation={}".format(automation))
     emergency = timeout + 10
 
     exe_dir = host_branch.output_dir(ROOT, "Release", branch)
@@ -194,6 +212,10 @@ def main(argv: List[str]) -> int:
     note = " (converted from '{}')".format(log_raw) if str(log_file) != log_raw else ""
     say("{}, timeout {} s, emergency kill {} s, log {}{}".format(device, timeout, emergency,
                                                                 log_file, note))
+    if automation is not None:
+        say("automation endpoint {}, package in {}".format(automation, exe_dir / "tools"))
+        say("  python -m cerf_automation --endpoint {} --wait 60 describe   (run it in that folder)"
+            .format(automation))
 
     while True:
         cerf_locks.wait(build_lock)

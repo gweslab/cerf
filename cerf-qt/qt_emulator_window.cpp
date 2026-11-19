@@ -324,7 +324,7 @@ std::vector<cerffrontend::MenuItem> QtEmulatorWindow::GearMenu() {
                    MenuItem::IconAction("Power off/reset", "power_settings_new", [this] { CloseRequested(); })}));
     if (emu_.Get<cerfcore::AutoCalibration>().CanPress())
         items.push_back(MenuItem::Action("Calibrate screen", [this] {
-            emu_.Get<cerfcore::AutoCalibration>().Request(cerfcore::CalibrationTrigger::kMenu);
+            emu_.Get<cerfcore::AutoCalibration>().Request(cerfcore::CalibrationRequest{});
         }));
     items.push_back(MenuItem{});
     items.push_back(tabs.Item(Tab::Hw));

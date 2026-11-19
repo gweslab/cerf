@@ -8,5 +8,6 @@ inline constexpr char kRunningStatusFileName[]     = "cerf-status.json";
 inline constexpr char kRunningStatusPidKey[]       = "pid";
 inline constexpr char kRunningStatusWindowKey[]    = "hwnd";
 inline constexpr char kRunningStatusHeartbeatKey[] = "heartbeat_unix";
+inline constexpr char kRunningStatusAutomationKey[] = "automation";
 
 }

@@ -3,7 +3,10 @@
 #include <cerfcore/core/service.h>
 
 #include <cstdint>
+#include <functional>
 #include <string>
+
+class QObject;
 
 namespace cerffrontend {
 
@@ -15,7 +18,8 @@ class YesNoPrompt : public cerfcore::Service {
 public:
     using cerfcore::Service::Service;
 
-    PromptAnswer Ask(const std::string& title, const std::string& message, YesNoLevel level, YesNoEnter enter);
+    PromptAnswer Ask(const std::string& title, const std::string& message, YesNoLevel level, YesNoEnter enter,
+                     const std::function<void(QObject*)>& opened = {});
 };
 
 }

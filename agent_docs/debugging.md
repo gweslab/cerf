@@ -282,6 +282,9 @@ not on a generic round number. The rule is:
 A run that ends at 60s when the target fired at t+12 wasted 48s of
 guest time × N runs × however many sessions. Pick small numbers.
 
+An automation session is the one exception. Its timeout covers the whole
+session.
+
 ### Single failure = re-run, not bump
 
 A run that misses its target at the chosen timeout is data, but data of

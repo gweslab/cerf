@@ -104,9 +104,9 @@ bool ShutdownPrompt::Unattended() const {
     return emu_.Get<EnterpriseConfig>().Enabled() && Actions().size() == 1;
 }
 
-bool ShutdownPrompt::Exits(ShutdownChoice choice) {
-    return choice == ShutdownChoice::Exit || choice == ShutdownChoice::ExitSave ||
-           choice == ShutdownChoice::SaveSuspendHost;
+bool ShutdownPrompt::Exits(std::optional<ShutdownAction> action) {
+    return action == ShutdownAction::Exit || action == ShutdownAction::SaveStateExit ||
+           action == ShutdownAction::SaveStateSuspendHost;
 }
 
 bool ShutdownPrompt::SaveByDefault() const {
@@ -119,9 +119,9 @@ const char* ShutdownPrompt::PlugInAcReason() const {
     return "A guest OS might deadlock in sleep if the battery is low.";
 }
 
-std::function<void()> ShutdownPrompt::AcOffer(ShutdownTrigger trigger, ShutdownChoice choice) {
-    const bool resumes = trigger == ShutdownTrigger::GuestSleep && choice == ShutdownChoice::Cancel;
-    const bool resets  = choice == ShutdownChoice::SoftReset || choice == ShutdownChoice::HardReset;
+std::function<void()> ShutdownPrompt::AcOffer(ShutdownTrigger trigger, std::optional<ShutdownAction> action) {
+    const bool resumes = trigger == ShutdownTrigger::GuestSleep && !action;
+    const bool resets  = action == ShutdownAction::SoftReset || action == ShutdownAction::HardReset;
     if (!resumes && !resets) return {};
     for (cerfcore::MachineObject* object : emu_.Get<cerfcore::MachineObjectTree>().Roots()) {
         auto* battery = dynamic_cast<cerfcore::Battery*>(object);
@@ -130,21 +130,13 @@ std::function<void()> ShutdownPrompt::AcOffer(ShutdownTrigger trigger, ShutdownC
     return {};
 }
 
-ShutdownChoice ShutdownPrompt::Commit(ShutdownAction action, bool save, bool remember) {
-    switch (action) {
-        case ShutdownAction::SoftReset:             return ShutdownChoice::SoftReset;
-        case ShutdownAction::HardReset:             return ShutdownChoice::HardReset;
-        case ShutdownAction::SaveStateExit:         return ShutdownChoice::ExitSave;
-        case ShutdownAction::SaveStateSuspendHost:  return ShutdownChoice::SaveSuspendHost;
-        case ShutdownAction::SaveStatePoweroffHost: return ShutdownChoice::SavePoweroffHost;
-        case ShutdownAction::SaveStateRestartHost:  return ShutdownChoice::SaveRestartHost;
-        case ShutdownAction::Exit:                  break;
-    }
+ShutdownAction ShutdownPrompt::Commit(ShutdownAction action, bool save, bool remember) {
+    if (action != ShutdownAction::Exit) return action;
     if (remember) emu_.Get<FrontendConfig>().SaveLastSaveStateMode(save);
-    return save ? ShutdownChoice::ExitSave : ShutdownChoice::Exit;
+    return save ? ShutdownAction::SaveStateExit : ShutdownAction::Exit;
 }
 
-ShutdownChoice ShutdownPrompt::CommitUnattended() { return Commit(Actions().front(), false, false); }
+ShutdownAction ShutdownPrompt::CommitUnattended() { return Commit(Actions().front(), false, false); }
 
 bool ShutdownPrompt::BeginCloseRequest() {
     if (close_pending_ || emu_.Get<ShutdownTeardown>().Active()) return false;
@@ -152,8 +144,8 @@ bool ShutdownPrompt::BeginCloseRequest() {
     return true;
 }
 
-void ShutdownPrompt::FinishCloseRequest(ShutdownChoice choice) {
-    if (!Exits(choice)) close_pending_ = false;
+void ShutdownPrompt::FinishCloseRequest(std::optional<ShutdownAction> action) {
+    if (!Exits(action)) close_pending_ = false;
 }
 
 void ShutdownPrompt::CancelCloseRequest() {

@@ -89,7 +89,7 @@ std::vector<MenuItem> HostMenuModel::Actions() {
                                      [this] { emu_.Get<cerfcore::KeyboardRouter>().SendCtrlAltDel(); }));
     if (emu_.Get<cerfcore::AutoCalibration>().CanPress())
         items.push_back(MenuItem::Action("Calibrate screen", [this] {
-            emu_.Get<cerfcore::AutoCalibration>().Request(cerfcore::CalibrationTrigger::kMenu);
+            emu_.Get<cerfcore::AutoCalibration>().Request(cerfcore::CalibrationRequest{});
         }));
     items.push_back(MenuItem{});
     items.push_back(

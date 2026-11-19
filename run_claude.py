@@ -24,7 +24,7 @@ DOCS = ("CLAUDE.md", "README_SOURCE.md", "agent_docs/workflow.md",
         "agent_docs/workflow_examples.md", "agent_docs/subsystems.md",
          "agent_docs/jit.md",
         "agent_docs/timers_clocks.md", "agent_docs/rules.md", "agent_docs/hibernation.md",
-        "agent_docs/code_style.md", "agent_docs/debugging.md", 
+        "agent_docs/code_style.md", "agent_docs/debugging.md", "agent_docs/automation.md",
         "agent_docs/deep_sleep.md",
          "agent_docs/database.md",
         "agent_docs/submodules.md")

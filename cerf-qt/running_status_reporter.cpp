@@ -1,3 +1,4 @@
+#include "automation_endpoint.h"
 #include "device_status_files.h"
 #include "frontend_window.h"
 #include "periodic_device_file.h"
@@ -37,7 +38,8 @@ public:
     void OnReady() override {
         const std::string name = emu_.Get<cerfcore::DeviceConfig>().device_name;
         if (name.empty()) return;
-        window_ = &emu_.Get<FrontendWindow>();
+        window_   = &emu_.Get<FrontendWindow>();
+        endpoint_ = emu_.TryGet<AutomationEndpoint>();
         worker_.Start(emu_.Get<cerfcore::InstanceThreads>(), cerfcore::ResolveDeviceFile(name, kRunningStatusFileName),
                       kHeartbeatInterval, [this] { WriteStatus(); });
     }
@@ -50,6 +52,10 @@ private:
         j[kRunningStatusPidKey]       = cerfcore::host_platform::CurrentProcessId();
         j[kRunningStatusWindowKey]    = window_->NativeHandle();
         j[kRunningStatusHeartbeatKey] = NowUnix();
+        if (endpoint_ != nullptr) {
+            const std::string address = endpoint_->Address();
+            if (!address.empty()) j[kRunningStatusAutomationKey] = address;
+        }
         uint32_t error = 0;
         if (cerfcore::CfgWriteJsonFile(worker_.Path(), j, error)) {
             write_failed_ = false;
@@ -61,8 +67,9 @@ private:
         write_failed_ = true;
     }
 
-    FrontendWindow*    window_       = nullptr;
-    bool               write_failed_ = false;
+    FrontendWindow*     window_       = nullptr;
+    AutomationEndpoint* endpoint_     = nullptr;
+    bool                write_failed_ = false;
     PeriodicDeviceFile worker_{"RunningStatusReporter"};
 };
 

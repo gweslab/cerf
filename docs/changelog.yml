@@ -7,7 +7,7 @@
     new: |
       HP Jornada 680, HP 620LX support (thx @Gadgetoid/sh3-emu)
       HP 300LX, 320LX, 360LX family support (thx @Gadgetoid/sh3-emu)
-      Casio Cassiopeia A11, A51 family support (thx @Gadgetoid/sh3-emu)
+      Casio Cassiopeia A11, A51; PA-2400U support (thx @Gadgetoid/sh3-emu)
       NEC Rockhopper: Improved CE.NET OAL support
     fixed: |
       Casio Cassiopeia EM-500 family: Audio playback crash fixes, hardward buttons and HUD
@@ -19,7 +19,8 @@
       SH3 guest CPU emulation
       RetroArch shaders support (librashader)
       Calibration helper - CERF performs calibration automatically
-      CERF crashes now save a state - you wont lose data on crash
+      CERF crash now saves a state - you wont lose data on crash
+      Automation API
     fixed: |
       PS/2 mouse lost double clicks on Android
       PS/2 mouse incorrect behaviour fixed

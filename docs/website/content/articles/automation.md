@@ -1,6 +1,6 @@
 # Automation API
 
-Bet you also wanted to automate your Windows CE experience? **That's now possible.** We bundle the Python automation API since CE Runtime Foundation 10.
+Bet you always wanted to automate your Windows CE experience? **That's now possible.** We bundle the Python automation API since CE Runtime Foundation 10.
 
 !!! question "**Desktop** platform is required."
 

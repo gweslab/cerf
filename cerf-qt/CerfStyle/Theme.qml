@@ -108,6 +108,7 @@ QtObject {
 
     readonly property color previewBackdrop: "#1f2329"
     readonly property real previewBlurOpacity: 0.55
+    readonly property real previewStaleSaturation: -0.6
     readonly property color previewScrim: "#cc000000"
     readonly property color previewClear: "#00000000"
     readonly property color noFill: "#00000000"
@@ -173,6 +174,7 @@ QtObject {
     readonly property int radius: 5
     readonly property int previewRadius: 10
     readonly property int previewBlurRadius: 64
+    readonly property int previewStaleBlurRadius: 32
     readonly property int previewDiscSize: 64
     readonly property int previewGlyphSize: 48
     readonly property int deviceCellHeight: 212

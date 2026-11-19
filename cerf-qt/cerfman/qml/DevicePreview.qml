@@ -13,6 +13,7 @@ Item {
     property real textOpacity: height < restHeight ? 0 : 1
     readonly property bool effects: !LegacyWindows.active && GraphicsInfo.api !== GraphicsInfo.Software
     readonly property string source: row !== null ? row.preview : ""
+    readonly property bool stale: row !== null && row.stalePreview
     readonly property var lines: {
         if (row === null)
             return []
@@ -59,13 +60,21 @@ Item {
             blurEnabled: true
             blur: 1.0
             blurMax: Theme.previewBlurRadius
+            saturation: preview.stale ? Theme.previewStaleSaturation : 0
         }
         Image {
             anchors.fill: parent
             source: preview.source
             fillMode: Image.PreserveAspectFit
             asynchronous: true
-            visible: preview.source !== ""
+            visible: preview.source !== "" && (preview.effects || !preview.stale)
+            layer.enabled: preview.effects && preview.stale
+            layer.effect: MultiEffect {
+                blurEnabled: true
+                blur: 1.0
+                blurMax: Theme.previewStaleBlurRadius
+                saturation: Theme.previewStaleSaturation
+            }
         }
         Item {
             anchors.fill: parent

@@ -45,16 +45,28 @@ QString CardStatus(const RunState& state) {
     return QStringLiteral("Powered off");
 }
 
-QString PreviewUrl(const QString& device_path, const RunState& state) {
-    const char* name = state.kind == RunStateKind::kRunning ? cerffrontend::kLiveScreenshotFileName
-                       : state.kind == RunStateKind::kSaved ? cerffrontend::kSavedStatePreviewFile
-                                                            : nullptr;
-    if (name == nullptr) return QString();
+struct CardPreview {
+    QString url;
+    bool    stale = false;
+};
+
+QString FileUrl(const QString& device_path, const char* name) {
     const QFileInfo info(QDir(device_path).filePath(QString::fromLatin1(name)));
     if (!info.isFile()) return QString();
     QUrl url = QUrl::fromLocalFile(info.absoluteFilePath());
     url.setQuery(QString::number(info.lastModified().toMSecsSinceEpoch()));
     return url.toString();
+}
+
+CardPreview PreviewOf(const QString& device_path, const RunState& state) {
+    const char* name = state.kind == RunStateKind::kRunning ? cerffrontend::kLiveScreenshotFileName
+                       : state.kind == RunStateKind::kSaved ? cerffrontend::kSavedStatePreviewFile
+                                                            : nullptr;
+    if (name != nullptr) {
+        QString url = FileUrl(device_path, name);
+        if (!url.isEmpty()) return CardPreview{std::move(url), false};
+    }
+    return CardPreview{FileUrl(device_path, cerffrontend::kPreviewFileName), true};
 }
 
 }
@@ -78,10 +90,11 @@ QVariantMap DeviceCards::Rows(const QString& query) const {
     auto&        boards           = emu_.Get<BoardCatalog>();
     QVariantList out;
     for (const DeviceBundle& device : shown) {
-        const QString  path     = LocalManifestStore::DevicePath(device.name);
-        const RunState state    = ReadRunState(path);
-        const bool     starting = state.kind != RunStateKind::kRunning && starting_devices.Pending(device.name);
-        const bool     running  = starting || state.kind == RunStateKind::kRunning;
+        const QString     path     = LocalManifestStore::DevicePath(device.name);
+        const RunState    state    = ReadRunState(path);
+        const CardPreview preview  = PreviewOf(path, state);
+        const bool        starting = state.kind != RunStateKind::kRunning && starting_devices.Pending(device.name);
+        const bool        running  = starting || state.kind == RunStateKind::kRunning;
         out.append(QVariantMap{
             {QStringLiteral("key"), device.name},
             {QStringLiteral("name"), device.name},
@@ -96,7 +109,8 @@ QVariantMap DeviceCards::Rows(const QString& query) const {
             {QStringLiteral("launchLabel"), running ? QStringLiteral("Show") : QStringLiteral("Run")},
             {QStringLiteral("saved"), !running && state.kind == RunStateKind::kSaved},
             {QStringLiteral("removable"), !running},
-            {QStringLiteral("preview"), PreviewUrl(path, state)},
+            {QStringLiteral("preview"), preview.url},
+            {QStringLiteral("stalePreview"), preview.stale},
             {QStringLiteral("updatable"), device.Updatable()},
         });
     }

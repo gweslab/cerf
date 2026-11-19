@@ -2,6 +2,8 @@
 #include "frontend_window.h"
 #include "image_exporter.h"
 #include "periodic_device_file.h"
+#include "qt_ui_thread_calls.h"
+#include "screenshots.h"
 
 #include <cerfcore/core/cerf_emulator.h>
 #include <cerfcore/core/cerf_paths.h>
@@ -9,7 +11,10 @@
 #include <cerfcore/core/instance_threads.h>
 #include <cerfcore/core/run_timeout.h>
 #include <cerfcore/core/service.h>
+#include <cerfcore/execution/jit_runner.h>
+#include <cerfcore/host/host_input_activity.h>
 
+#include <atomic>
 #include <chrono>
 #include <condition_variable>
 #include <cstdint>
@@ -35,8 +40,12 @@ public:
     void OnReady() override {
         const std::string name = emu_.Get<cerfcore::DeviceConfig>().device_name;
         if (name.empty()) return;
-        window_   = &emu_.Get<FrontendWindow>();
-        exporter_ = &emu_.Get<ImageExporter>();
+        window_       = &emu_.Get<FrontendWindow>();
+        exporter_     = &emu_.Get<ImageExporter>();
+        preview_path_ = cerfcore::ResolveDeviceFile(name, kPreviewFileName);
+        emu_.Get<cerfcore::HostInputActivity>().RegisterListener(
+            [this] { input_seen_.store(true, std::memory_order_release); });
+        emu_.Get<cerfcore::JitRunner>().RegisterRunEndListener([this] { WritePendingPreview(); });
         worker_.Start(emu_.Get<cerfcore::InstanceThreads>(), cerfcore::ResolveDeviceFile(name, kLiveScreenshotFileName),
                       kInterval, [this] { Tick(); });
     }
@@ -54,6 +63,22 @@ private:
     }
 
     void Tick() {
+        const bool           input = input_seen_.exchange(false, std::memory_order_acq_rel);
+        std::vector<uint8_t> png;
+        if (!CapturePng(png)) {
+            if (input) input_seen_.store(true, std::memory_order_release);
+            return;
+        }
+        exporter_->WriteEncodedPng(png, worker_.Path());
+        if (input) exporter_->WriteEncodedPng(png, preview_path_);
+    }
+
+    void WritePendingPreview() {
+        if (!input_seen_.exchange(false, std::memory_order_acq_rel)) return;
+        emu_.Get<QtUiThreadCalls>().Run([this] { emu_.Get<Screenshots>().SaveGuestSurfaceTo(preview_path_); });
+    }
+
+    bool CapturePng(std::vector<uint8_t>& png) {
         uint64_t serial = 0;
         {
             std::lock_guard<std::mutex> lock(capture_mutex_);
@@ -76,16 +101,18 @@ private:
         std::unique_lock<std::mutex> lock(capture_mutex_);
         const bool done = capture_cv_.wait_for(lock, kCaptureWait,
                                                [&] { return capture_done_ == serial || worker_.Stopping(); });
-        if (!done || worker_.Stopping() || !captured_) return;
+        if (!done || worker_.Stopping() || !captured_) return false;
         const std::vector<uint32_t> pixels = std::move(pixels_);
         const uint32_t              w      = w_;
         const uint32_t              h      = h_;
         lock.unlock();
-        exporter_->WritePng(pixels, w, h, worker_.Path());
+        return exporter_->EncodePng(pixels, w, h, png);
     }
 
     FrontendWindow*         window_   = nullptr;
     ImageExporter*          exporter_ = nullptr;
+    std::string             preview_path_;
+    std::atomic<bool>       input_seen_{false};
     std::mutex              capture_mutex_;
     std::condition_variable capture_cv_;
     uint64_t                capture_serial_ = 0;

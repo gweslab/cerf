@@ -18,14 +18,15 @@
     new: |
       SH3 guest CPU emulation
       RetroArch shaders support (librashader)
-      Calibration helper - CERF performs calibration automatically
-      CERF crash now saves a state - you wont lose data on crash
-      Automation API
+      Calibration helper - emulator performs calibration automatically
+      Emulator crash now saves a state - you wont lose data on crash
+      Automate your emulator with Python - https://cerf.cx/articles/automation
     fixed: |
       PS/2 mouse lost double clicks on Android
       PS/2 mouse incorrect behaviour fixed
       Android's HUD is now fully adaptive - saves your screen space
       Emulator is now large address aware, fixes some heavy boards halts on x64 systems
+      Some global emulator parameters were overwritten each update
   guest_additions:
     fixed: |
       Various crash fixes

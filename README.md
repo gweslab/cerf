@@ -519,13 +519,14 @@ python run_claude.py
         <p><b>💿 Emulator</b><br/>
           🆕 SH3 guest CPU emulation<br/>
           🆕 RetroArch shaders support (librashader)<br/>
-          🆕 Calibration helper - CERF performs calibration automatically<br/>
-          🆕 CERF crash now saves a state - you wont lose data on crash<br/>
-          🆕 Automation API<br/>
+          🆕 Calibration helper - emulator performs calibration automatically<br/>
+          🆕 Emulator crash now saves a state - you wont lose data on crash<br/>
+          🆕 Automate your emulator with Python - https://cerf.cx/articles/automation<br/>
           ✅ PS/2 mouse lost double clicks on Android<br/>
           ✅ PS/2 mouse incorrect behaviour fixed<br/>
           ✅ Android&#x27;s HUD is now fully adaptive - saves your screen space<br/>
-          ✅ Emulator is now large address aware, fixes some heavy boards halts on x64 systems</p>
+          ✅ Emulator is now large address aware, fixes some heavy boards halts on x64 systems<br/>
+          ✅ Some global emulator parameters were overwritten each update</p>
         <p><b>🗂️ Devices Manager</b><br/>
           🆕 Import, export, clone your devices</p>
         <p><b>✨ Guest Additions</b><br/>

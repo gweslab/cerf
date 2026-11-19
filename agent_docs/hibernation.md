@@ -125,7 +125,8 @@ other section by its frame. It finds a section by its id, in any order. Every
 later build must keep this part of the format. It is the magic, the frame and
 tag encoding, the header fields, the ids of the Ram and Flash sections, and
 every field in them. A change there refuses every image that users already
-saved.
+saved with a released build. A board that no released build supports has no
+such images.
 
 **The warm boot reports a warm reset, never a power-on reset.** A guest treats
 a power-on reset as a loss of RAM, and some guests clear RAM before the kernel

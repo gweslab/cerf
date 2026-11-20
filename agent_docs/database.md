@@ -169,7 +169,19 @@ A `rocker` is a device rocker or dial: `up`, `down` and an optional `center` pre
 with no left and right. It is one cell, so it keeps up above down when Android turns
 its column into a row. A device control that is not a d-pad is never a `dpad`.
 
-A preset holds the layout that the device has.
+A preset holds the layout of the device, never its geometry. It keeps the keys of the
+device, their rows and their order. Every control is a full key that a finger can press,
+and no cell is smaller than one unit. No control has an unusual position unless the user
+asks for it. The arrow keys always line up as a group.
+
+A preset starts from the original layout and changes it where the change makes the HUD
+easier to use. It moves further from the hardware only when the user asks. A photo of the
+device shows which keys exist and where they sit in the layout. The photo never sets the
+size or the position of a cell.
+
+A device control that sits elsewhere on the case, for example the power button, is a
+full key of the preset. Its position on the case sets neither its place nor its size on
+the HUD.
 
 Panels on one side stack outward in list order.
 

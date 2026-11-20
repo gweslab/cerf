@@ -97,7 +97,7 @@ Identical conception as above but for writable persistant user storage.
 | `automatic_calibration` | boolean | `false` turns off the search for the touch calibration screen. Absent: on. |
 | `throttle_multiplier` | number | - |
 | `cpu_rate_multiplier` | number | - |
-| `hud` | string | `none`, or a HUD id from `huds.json`. Absent: the HUD of the board. |
+| `hud` | string | `none`, or a HUD id. Absent: the HUD of the board. |
 | `shaders.presets` | array of `{ path, enabled }` | - |
 | `shaders.parameters` | object of numbers | - |
 | `shaders.screenshots` | boolean | Save and copy screenshots with the shaders. Absent: `true`. |

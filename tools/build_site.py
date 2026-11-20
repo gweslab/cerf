@@ -60,7 +60,7 @@ def main():
                '--livereload',
                '-f', config,
                '-w', SITE,
-               '-w', os.path.join(ROOT, 'libCerfCore', 'db.json'),
+               '-w', os.path.join(ROOT, 'libCerfCore', 'db'),
                '-w', os.path.join(ROOT, 'docs', 'changelog.yml'),
                '-w', os.path.join(ROOT, 'cerf-qt', 'play_store_links_text.h')]
         if args.port is not None:

@@ -30,7 +30,4 @@ foreach(cerfqt_file IN LISTS cerfqt_bundled)
                               GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE)
     endif()
 endforeach()
-foreach(cerfqt_core_data_name IN LISTS CERFQT_CORE_DATA_NAMES)
-    file(COPY_FILE "${CERFQT_CORE_DATA_DIR}/${cerfqt_core_data_name}" "${CERFQT_OUTPUT_DIR}/${cerfqt_core_data_name}"
-         ONLY_IF_DIFFERENT)
-endforeach()
+file(COPY_FILE "${CERFQT_DB_JSON}" "${CERFQT_OUTPUT_DIR}/${CERFQT_DB_JSON_NAME}" ONLY_IF_DIFFERENT)

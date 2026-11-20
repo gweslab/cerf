@@ -29,7 +29,9 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Fetch libCerfCore
-        run: git submodule update --init --depth 1 libCerfCore
+        run: |
+          git submodule update --init --depth 1 libCerfCore
+          git -C libCerfCore submodule update --init --depth 1 sad
 
       - uses: actions/setup-python@v5
         with:

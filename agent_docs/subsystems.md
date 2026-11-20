@@ -155,7 +155,8 @@ is identical across every board on that core. Its concretes live under
 family gates leaves every other family on that SoC with no winner.
 
 The static facts of a core are data, not a strategy. ID register values and
-instruction-set capabilities live in the `cpu_configs` rows of `db.json`.
+instruction-set capabilities live in the `cpu_configs` rows of the board database,
+`libCerfCore/db/cpu_configs/`.
 
 ### `libCerfCore/src/boards/<family>/` - one board family
 
@@ -722,7 +723,7 @@ the render and input plumbing that connects the host UI to the guest.
   - `cerf-qt/button_row.h`
 
 - **The HUD** - the device buttons and d-pads that the frontend draws around the
-  framebuffer. `libCerfCore/huds.json` holds the presets.
+  framebuffer. `libCerfCore/db/huds/` holds the presets.
 
   **A HUD press is a press on the stock keyboard of the board.**
   `KeyboardRouter::OnStockKey` sends it to the stock keyboard, also while the

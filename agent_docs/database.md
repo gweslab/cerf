@@ -1,9 +1,30 @@
-# The board database - `libCerfCore/db.json`
+# The board database - `libCerfCore/db/`
 
-`db.json` holds the board and SoC facts that CERF components share.
+The board database holds the board and SoC facts that CERF components share.
 
-The file ships inside the CERF installation. It belongs to that CERF
-version. A user never edits it.
+The build compiles the database into one `db.json`. That file ships inside the
+CERF installation. It belongs to that CERF version. A user never edits it.
+
+## Files
+
+The database is a tree of directories and small JSON files. The SAD compiler in
+`libCerfCore/sad/` compiles it, and `libCerfCore/sad/README.md` describes the
+format. Every consumer reads the compiled database, never the files of the tree.
+
+Each table is a directory. Each row is a file named after its `id`, and the
+compiler writes that name into the row. A row with `device_specs` is a directory
+with the same name. Its `index.json` holds the fields of the row, and its
+`device_specs/` directory holds one file for each item. The `rom_types` and
+`storage_types` tables repeat an `id` on purpose, so their files have free names
+and each row keeps its own `id`.
+
+The database guarantees no row order. A reader that takes the first row of a set
+gets the row that `$index` puts first:
+
+- `$index` in each generic part sets the display order of the parts.
+- The default palette of each depth has `$index`, so it comes first for its depth.
+- The generic `primary` ROM type has `$index`, so the primary ROM comes first among
+  the file types of a board.
 
 ## What belongs in it
 
@@ -98,8 +119,7 @@ name and an icon. Several parts can share one icon. A part never groups
 different kinds of hardware: Wi-Fi, cellular and IrDA are three parts with one
 icon. A consumer finds a part by its id, never by a displayed name.
 
-The order of `device_generic_parts` is the display order. Parts that share an
-icon sit next to each other.
+In the display order, parts that share an icon sit next to each other.
 
 The `device_specs` of a family or a board is a list of spec items. A spec item
 is one part of the device. It has:
@@ -120,6 +140,7 @@ for example two displays.
 The first display item with a size gives the panel size of the board. CERF
 opens the emulator window at that size, and guest additions take it as their
 default. A later display item can carry its size, and no component reads it.
+When a row holds more than one display item, `$index` puts the panel item first.
 
 **A family holds only the items that every member has, unchanged.** When one
 member differs in a part, the family stops holding that part, and each member
@@ -181,8 +202,6 @@ default to its real part. A default outside the `values` list marks that part
 of the member as not supported. cerfman shows "Not supported" next to Auto,
 and the website marks the part with the unsupported badge.
 
-The order of `board_config_params` is the display order.
-
 ## CPU configurations
 
 A `cpu_configs` row with a `soc_id` is the CPU of that SoC. A row without a
@@ -196,20 +215,18 @@ every parameter of its architecture.
 Only a fact that the silicon fixes goes into `cpu_configs`. A rate or a state
 that the guest programs stays in code. The CPU clock is one example.
 
-The order of `cpu_config_params` is the display order. Put a new parameter
-next to the parameters that it relates to.
+## Guest-additions palettes - `guest_additions/palettes/`
 
-## Guest-additions palettes - `libCerfCore/palettes.json`
-
-A `ga_palettes` row is one palette of the guest-additions display. `bpp` is the
+A palette row is one palette of the guest-additions display. `bpp` is the
 indexed depth of the palette. `values` holds `1 << bpp` `[red, green, blue]`
-colors. The first row for a depth is the default of that depth. A device
+colors. The first palette for a depth is the default of that depth. A device
 configuration stores a chosen palette as its colors, never as its `id`. The
 manager names such a palette by its colors.
 
-## HUD presets - `libCerfCore/huds.json`
+## HUD presets - `huds/`
 
-`huds.json` holds the on-screen HUDs of the frontend.
+`huds/devices/` holds the on-screen HUDs of the frontend. `huds/elements/` holds
+the named elements that the HUDs share.
 
 A HUD binds through `board_ids`, `board_family_ids`, or both. A HUD that names
 the board wins over a HUD that names its family.

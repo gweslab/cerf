@@ -117,7 +117,7 @@ models, revisions, and panel and size variants. Search Linux, NetBSD
 Rockbox, vendor pages, and Wikipedia in every language. Save each page that you
 cite under `references/board_families/<vendor>/`.
 
-Then read the `board_families` and `boards` tables in `libCerfCore/db.json`.
+Then read the `board_families` and `boards` directories of `libCerfCore/db/`.
 List `libCerfCore/src/boards/` and `bundled/devices/`. Decide one result: the
 family is present, the board is present, or both are absent.
 
@@ -130,7 +130,7 @@ a source.
 
 ### B5 - SoC support in CERF
 
-Read the `socs` and `cpu_configs` tables in `libCerfCore/db.json`. List
+Read the `socs` and `cpu_configs` directories of `libCerfCore/db/`. List
 `libCerfCore/src/socs/` and `libCerfCore/src/cpu/`. Record whether CERF has the
 SoC, a `cpu_configs` row for it, and the strategy set of its core. If CERF
 lacks the SoC, name the closest SoC or core that the bring-up can reuse.
@@ -149,7 +149,7 @@ for present or reusable, ⚠️ for new work or an uncertain fact, ❌ for missi
 | 1 | ROM acquired                   | <bundle / path>                           | ✅/❌  |
 | 2 | IDA MCP connectivity           | <running, N instances | not running>      | ✅/⚠️  |
 | 3 | Board identity                 | <declared board.id> confirmed by <tells>  | ✅/⚠️  |
-| 4 | Board already in CERF          | <db.json row exists | absent>             | ✅/❌  |
+| 4 | Board already in CERF          | <board row exists | absent>               | ✅/❌  |
 | 5 | SoC / CPU family               | <SoC>, <core>, <CpuArch + isa level>      | ✅/⚠️  |
 | 6 | SoC implemented in CERF        | <libCerfCore/src/socs/<x> present | absent>           | ✅/❌  |
 | 7 | Reusable / similar SoC or core | <what reuses what | none - from scratch>  | ✅/⚠️  |

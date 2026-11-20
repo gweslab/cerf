@@ -19,7 +19,9 @@ jobs:
           submodules: false
 
       - name: Fetch core libraries
-        run: git submodule update --init libservicelocator libCerfEngine libCerfCore
+        run: |
+          git submodule update --init libservicelocator libCerfEngine libCerfCore
+          git -C libCerfCore submodule update --init sad
 
       - name: Add MSBuild to PATH
         uses: microsoft/setup-msbuild@v2

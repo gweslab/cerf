@@ -41,7 +41,9 @@ jobs:
       - name: Fetch core libraries
         run: |
           git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          git config --global --add safe.directory "$GITHUB_WORKSPACE/libCerfCore"
           git submodule update --init libservicelocator libCerfEngine libCerfCore
+          git -C libCerfCore submodule update --init sad
 
       - name: Install the Android SDK packages
         run: |

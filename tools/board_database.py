@@ -1,14 +1,17 @@
 from __future__ import annotations
 
-import json
 import os
+import sys
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
 from header_defines import str_define
 
 _ROOT = Path(os.path.abspath(__file__)).parent.parent
-DB_PATH = _ROOT / "libCerfCore" / "db.json"
+DB_ROOT = _ROOT / "libCerfCore" / "db"
+sys.path.insert(0, str(_ROOT / "libCerfCore" / "sad"))
+
+from sad import SadError, compile_tree
 _SUPPORT_LEVEL_TEXT = _ROOT / "libCerfCore" / "include" / "cerfcore" / "core" / "support_level_text.h"
 _BOARD_ORDER_TEXT = _ROOT / "cerf-qt" / "cerfman" / "board_order_text.h"
 
@@ -22,12 +25,9 @@ class BoardDatabaseError(RuntimeError):
 
 def _load() -> dict:
     try:
-        obj = json.loads(DB_PATH.read_text(encoding="utf-8-sig"))
-    except (OSError, ValueError) as exc:
-        raise BoardDatabaseError("{} is unreadable: {}".format(DB_PATH, exc))
-    if not isinstance(obj, dict):
-        raise BoardDatabaseError("{} must hold a JSON object at the top level".format(DB_PATH))
-    return obj
+        return compile_tree(DB_ROOT, "json")
+    except (OSError, SadError) as exc:
+        raise BoardDatabaseError("{} does not compile: {}".format(DB_ROOT, exc))
 
 
 def _rows(table: str) -> List[dict]:

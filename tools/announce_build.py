@@ -14,6 +14,7 @@ from ci_release import (Artifact, CiError, load_credentials, post_discord,
 
 QA_CHANNEL_ID = "1537263681228771349"
 QA_ROLE_ID = "1537262210118852708"
+DOWNLOAD_URL = "https://cerf.cx/download/#unstable-builds"
 
 
 def message(builds: List[Tuple[HostBranch, Artifact]], release_candidate: bool,
@@ -24,10 +25,8 @@ def message(builds: List[Tuple[HostBranch, Artifact]], release_candidate: bool,
     headline = f"{title} [{kind}] available"
     if ping_role:
         headline += f" <@&{ping_role}>"
-    downloads = " · ".join(f"[{branch.label}]({build.download_url})"
-                           for branch, build in builds)
     return (f"{headline}\n"
-            f"Download: {downloads} · "
+            f"[Download]({DOWNLOAD_URL}) · "
             f"[CI build]({run.run_url}) · "
             f"[`{run.sha[:7]}`]({run.commit_url})\n\n"
             "Receive this build in your local installation:\n"

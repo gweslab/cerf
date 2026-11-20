@@ -70,6 +70,8 @@ A change to a core library gets a commit in that library and a commit in each re
 
 To move a pointer, check out the new commit inside the folder of the library. Then stage that folder. Do not write a pointer into the index with `git update-index`. This also applies when the library folder is a plain clone without a submodule entry. With that command, the folder stays at the old commit. `git status` then lists the folder as changed. A commit that stages the folder puts the pointer back to the old commit.
 
+**A library has more than one checkout in this tree, and each checkout follows the pointer of the repository that holds it.** `libCerfEngine` sits at the root and inside `libCerfCore`. `libservicelocator` sits at the root, inside `libCerfEngine`, and inside `libCerfCore/libCerfEngine`. When your commit moves a pointer, check out the same commit in every other folder whose repository records that pointer. A folder left at the old commit shows as changed in the repository that holds it. A later commit there that stages the folder records the old commit again. Before you finish, run `git status` in the root and in each of these repositories. None of them lists a library folder that you moved.
+
 Push a library before the repository that holds its pointer. Push the root last. Before you push a repository, make sure that the remote of each library holds the commit that the pointer names. A pointer to a commit that is only local breaks every CI checkout.
 
 The check covers every commit that the push sends, not only the last one. A library commit can be amended or rebased after a pointer to it was committed. A pointer in those commits can then name a commit that the library branch no longer holds. If it does, rewrite that commit locally with the correct pointer before you push. After the push, the same fix needs a force push.
@@ -99,6 +101,6 @@ If your reading of the request is incorrect, the user sees that line and stops y
 
 ## Hard stops
 
-- **Never run git unless the user asked.** `/commit` is that ask. It covers this one commit, the library commits of the same change, and the commits that record their pointers. Do not `git push`, which needs separate approval.
+- **Never run git unless the user asked.** `/commit` is that ask. It covers this one commit, the library commits of the same change, the commits that record their pointers, and the checkouts that move every other copy of a library to the pointer that holds it. Do not `git push`, which needs separate approval.
 - **Never force past `.gitignore`** with `git add -f`. The ignore is a STOP signal.
 - **Stage only what this session changed.** Other agents and the user work in this tree at the same time, so `git status` often lists edits that are not yours. If you did not make a change, leave it unstaged and say it is there.

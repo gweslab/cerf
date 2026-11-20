@@ -14,6 +14,7 @@
       Casio Cassiopeia EM-500 family: Audio playback crash fixes, hardward buttons and HUD
       Sharp HC family: COM port issues fixed
       [Breaking] Symbol Mk500 family: NOR storage now handled properly. If you want to boot your saved device open Board Settings and set the old flash image into the new field
+      Nino 300 family: Fixed touch lag/timing
   cerfman:
     new: |
       Import, export, clone your devices

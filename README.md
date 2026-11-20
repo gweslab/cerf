@@ -196,7 +196,8 @@ python run_claude.py
           🆕 NEC Rockhopper: Improved CE.NET OAL support<br/>
           ✅ Casio Cassiopeia EM-500 family: Audio playback crash fixes, hardward buttons and HUD<br/>
           ✅ Sharp HC family: COM port issues fixed<br/>
-          ✅ [Breaking] Symbol Mk500 family: NOR storage now handled properly. If you want to boot your saved device open Board Settings and set the old flash image into the new field</p>
+          ✅ [Breaking] Symbol Mk500 family: NOR storage now handled properly. If you want to boot your saved device open Board Settings and set the old flash image into the new field<br/>
+          ✅ Nino 300 family: Fixed touch lag/timing</p>
         <p><b>💿 Emulator</b><br/>
           🆕 SH3 guest CPU emulation<br/>
           🆕 RetroArch shaders support (librashader)<br/>

@@ -1,174 +1,195 @@
-# ROM Acceptance - what CERF eats and how
+# ROM acceptance: what CERF boots from
 
-CERF runs the original device's software unchanged. The CE binaries - kernel,
-OAL, drivers, userspace - are the ROM's own guest code (see `agent_docs/rules.md`
-§ WinCE Accuracy). This page is about the layer below that: what *file* CERF
-accepts as "the ROM", and how it turns that file into a guest that runs.
+CERF has two boot paths. Decide which one a device takes before you write any code
+for it. A wrong choice is not a detail that a later fix repairs. It puts machine
+state into a read-only input, and every service that trusts that input breaks.
 
-The rule that governs: **CERF accepts the original OEM firmware package / dump as
-shipped, and extracts or serves the bootable image from it.** It does NOT accept
-- and must never be made to require - a pre-extracted, repackaged, or otherwise
-modified image produced by an external tool. If a device's bootable image lives
-inside an OEM container or a whole-flash dump, CERF parses that container /
-serves that flash. It does not ask the user (or a build step, or a remote
-manifest) to give it a stripped payload. A device that only boots from a
-hand-extracted XIP is a CERF gap to close, not the intended shape.
+## The decision
 
-**A raw hardware *capture* is normalized to the flat container before bundling.**
-The "no external pre-extraction" rule above concerns a *recognized container or
-filesystem CERF parses itself* (B000FF / NOSAJ / ARNOLD / IMGFS / a whole-flash
-FS). It does not extend to raw memory-bus capture artifacts. A dump read from the
-bus carries properties of *how it was read* rather than of the ROM. These
-properties are chip-select **aliasing / mirroring** (a small flash repeated
-across a larger decode window - for example an 8 MB part that appears twice
-across a 16 MB window), **floating / undriven-bus** regions, **blank / erased
-pad** (`0x00` / `0xFF`), and **address wrap** (the image straddles the physical
-device, so it is contiguous only modulo the device size). These are not ROM.
-`RomParserService` consumes the flat container only. De-aliasing, de-wrapping,
-and pad-trimming are capture normalization performed before bundling, not parser
-behavior.
+Ask one question: can the guest write the storage that holds its own OS image?
 
-The ROM is the **flat ROMHDR/TOC container** (`physfirst..physlast`). The test for
-a raw capture is whether it holds that container fully and intact. If it does,
-normalization yields the bundled artifact: a contiguous `physfirst..physlast`
-image with file-0 == physfirst (a flat NB0, Axis 1 below) - the flat span
-`RomParserService` reads. The pre-extraction that the rule above forbids is a
-distinct case: there the bootable image sits inside a container / filesystem CERF
-must crack, and a pre-cracked payload is supplied instead. A capture that does
-not hold the full container - truncated at the wrap, missing modules - is
-incomplete and is re-dumped, not patched.
+The guest writes it when one of these is true:
 
-This sits next to two related pages. `agent_docs/boot_loaders.md` covers whether
-CERF skips, models, or fully emulates the OEM bootloader. The Guest-Additions
-injection mechanism (`agent_docs/guest_additions.md`) recomposes a ROM by the
-same ROMIMAGE rules CERF parses it with.
+- The bootloader can reflash the OS.
+- The OS flash driver writes the region that holds the OS image. Examples are an
+  IMGFS, a registry hive, a flash file store and a recovery partition.
+- An update or recovery mode of the device rewrites the image.
 
-## Two independent acceptance axes
+| Answer | Path |
+|---|---|
+| No. The image is a fixed ROM, or it comes as a read-only container. | Path 1: the shortcut |
+| Yes. The device boots from storage that the guest writes. | Path 2: whole storage is the primary boot device |
 
-CERF classifies every supported device on two axes. They are orthogonal - a
-device picks one value on each.
+Almost every old device (about 98%) takes path 1. The rest take path 2, and for
+those devices path 1 is wrong, however well it seems to boot.
 
-### Axis 1 - original container vs raw payload
+## Path 1: the shortcut (`RomParserService`)
 
-The OEM ships the bootable image inside a container with a header, sometimes a
-signature catalog, sometimes multiple partitions. CERF recognizes the container
-by its magic bytes and unwraps it. Recognized containers today:
+CERF reads a generic Windows CE ROM container, places the XIP regions in memory and
+starts the kernel directly. It skips the OEM bootloader.
 
-- **flat NB0 / raw XIP** - no container. The file *is* the XIP. The common case.
-- **B000FF** (`kB000FFSignature`, `"B000FF\n"`) - a sectioned image: a list of
-  `(base, size, checksum) + data` sections, terminated by a `base==0` section
-  whose `size` field carries the kernel entry VA. `AssembleB000FFFlat` assembles
-  it into a flat span. Pocket PC / multi-XIP NB0 dumps.
-- **NOSAJ** (`kNosajSignature`, `"NOSAJ\0"`) - the SmartBook G138 `.fim`
-  package: inline partition descriptors + a byte-reversed `"DiAlOgUe"` launch
-  block that frames the OS XIP. `NosajLocateOsXip` resolves it.
-- **ARNOLDBOOTBLOCK** (`kArnoldSignature`) - the Siemens SIMpad (`"Arnold"`
-  codename) `.bin` firmware package: a fixed header followed by the bootable OS
-  XIP, byte-identical to what an extracted `.nb0` carries. `ArnoldLocateOsXip`
-  resolves it.
+Path 1 works because of the design of Windows CE. Windows CE lets a ROM container
+go anywhere and boot in any way (*Inside Windows CE*). The bootloader only
+orchestrates the boot. It does not have to exist or act. The simplest boot that
+Microsoft gives is to place the image in RAM and start the kernel. Path 1 is that
+boot.
 
-CERF unwraps all of these to a **flat XIP span** that the rest of the pipeline
-treats identically.
+`RomParserService` is the input of the instance. These rules hold for it:
 
-### Axis 2 - flat XIP vs whole storage
+- It reads. It never writes.
+- Its result is fixed for the life of the instance. Every service can cache what
+  it derives from that result, and none of them subscribes to a change.
+- It never reports machine state. Bytes that the guest writes are machine state.
+- It never parses again at reset to follow a guest update. A device whose guest
+  installs another OS image takes path 2.
 
-- **Flat XIP** - the bootable image is one contiguous XIP (kernel + ROM
-  modules + ROM files), small enough to place in DRAM and execute.
-  `RomParserService` (`libCerfCore/src/boot/rom_parser_service.cpp`) handles it. The vast
-  majority of boards.
-- **Whole storage** - the dump is an entire flash / NAND / disk (often multiple
-  GB). The bootable image is a region *inside* it that the device's own boot
-  path locates and copies to DRAM. CERF maps the dump on demand and serves it
-  through the emulated storage controller. The guest reads it the way real
-  hardware does. Ford SYNC 2 (`.sec` → `SecFlash` → i.MX51 NFC) is the current
-  example.
+### The input of path 1
 
-## The flat-XIP pipeline (`RomParserService`)
+CERF accepts the original OEM firmware package or dump as shipped. CERF extracts
+the bootable image itself. It never requires a pre-extracted, repackaged or
+modified image from an external tool. A device that boots only from a
+hand-extracted XIP is a CERF gap to close.
 
-`RomParserService::ParseOne` (`libCerfCore/src/boot/rom_parser_service.cpp`) is the funnel.
-For each declared / auto-detected ROM file:
+A new container format only locates the XIP span and its base VA, from the bytes
+of the container. The shared path finds the ROMHDR and parses the TOC.
 
-1. **Read the whole file** into `rom.raw`.
-2. **Detect the container** by leading magic, in order: B000FF → NOSAJ →
-   ARNOLD → else flat NB0. The chosen branch sets `rom.flat` (a span over the
-   bootable XIP) and `rom.flat_base_va` (the VA that file-offset 0 of the flat
-   maps to).
-3. **Find the ROMHDR.** Scan the flat for every `ECEC` ROM signature
-   (`FindAllEcec`, `0x43454345` at XIP+0x40, with the pTOC kernel-VA at
-   +0x44). `ResolveRomhdrAtEcec` resolves each marker
-   to a ROMHDR. A CE2-era image with no ECEC record uses
-   `ResolveRomhdrStructural` instead, which scans for a self-consistent ROMHDR
-   validated against an `nk.exe` module name.
-4. **Parse the TOC** (`ParseModulesAndFiles`): `nummods` TOCentry records +
-   `numfiles` FILESentry records. It resolves names via `load_offset`.
-5. **IMGFS** (WM6+ only): `FindImgfsBase` locates the IMGFS superblock. The
-   walker (`ce_imgfs_walker`) enumerates flash-filesystem modules. CERF skips
-   this step for container formats that are pure XIP (NOSAJ, ARNOLD) and for
-   B000FF.
+### A raw capture of a ROM chip
 
-The outputs that every downstream consumer relies on are `rom.flat`,
-`rom.flat_base_va`, `rom.entry_va`, and `rom.xips[*].toc`. A new container format
-only has to populate `rom.flat` / `rom.flat_base_va` correctly. Steps 3-5 are
-shared.
+A dump read from the memory bus carries artifacts of how it was read:
 
-### Adding a container format
+- Aliasing or mirroring: a small chip repeats across a larger decode window. For
+  example, an 8 MB part appears twice across 16 MB.
+- Floating or undriven bus regions.
+- Blank or erased pad (`0x00` / `0xFF`) at the ends.
+- Address wrap: the image runs past the end of the chip, so it is contiguous only
+  modulo the chip size.
 
-Mirror the existing ones - they share a shape:
+These artifacts are not ROM. Normalization before bundling removes them. It drops
+a mirror copy, rotates a wrapped dump so the image is contiguous, and trims erased
+pad at the ends. Normalization never cuts ROM content. A bootloader, a boot
+monitor, an updater or a gap inside the chip is ROM content, and it stays.
 
-- A signature constant + a `*LocateOsXip` resolver in
-  `libCerfCore/src/boot/rom_image_parse.{h,cpp}` that returns the XIP's `data_off`,
-  `flat_size`, and `base_va`. When the container does not store the base VA, the
-  resolver recovers it: it verifies the candidate ROMHDR against the container's
-  own invariants (NOSAJ verifies `physlast - physfirst == span`, ARNOLD verifies
-  `physfirst == candidate base`). This is ROM-content verification, the same kind
-  the ECEC resolver already does - not a JIT/MMU heuristic.
-- A detection branch + an `is_<format>` flag in `ParseOne` / `ParsedRom` that
-  sets `rom.flat` and `rom.flat_base_va`, then lets the shared ECEC/ROMHDR/TOC
-  path run.
+Normalization is not parser behavior. `RomParserService` reads the normalized
+file. A capture that does not hold the whole ROMHDR / TOC container is incomplete.
+Dump it again. Do not patch it.
 
-Everything that locates the XIP, the base, or the entry must come from the ROM's
-own bytes - never `cerf.json`, `meta`, a whole-image CRC, or runtime RAM
-heuristics (`agent_docs/rules.md` § "Per-device facts come from the ROM").
+## Path 2: whole storage is the primary boot device
 
-## The whole-storage pipeline (`SecFlash` + storage controller)
+CERF models the storage hardware of the device over a persistent, writable image
+file. The hardware is a NAND chip and its controller, an eMMC, or a flash chip on
+the memory bus. The image is machine state. What the guest writes stays written,
+across resets and across runs. The storage image is the input of the device, and
+`RomParserService` does not own it.
 
-For multi-GB dumps CERF does not extract the bootable image to a flat span - the
-guest's own storage stack reads it. Ford SYNC 2:
+Path 2 takes one of two forms.
 
-- **`SecFlash`** (`libCerfCore/src/boot/sec_flash.{h,cpp}`) owns the `.sec` NAND image as a
-  `MappedFile` (CERF never maps the ~2 GiB file whole) and a parsed
-  `SecContainer` (`libCerfCore/src/boot/sec_container.{h,cpp}`) that de-chunks the package
-  (chunked payload + PKCS#7 catalog, `SecHeader` magic `0x400D400D`). It
-  registers only when the device dir holds a `.sec`. Consumers `TryGet` and
-  tolerate absence.
-- **The i.MX51 NAND path** consumes it. `imx51_nand_bootloader_boot.cpp` models
-  the NAND boot ROM (reads a flash header from `SecFlash`, copies the bootable
-  image to DRAM). `imx51_nfc.cpp` (the NAND Flash Controller) serves NAND pages
-  from `SecFlash` on demand, so the guest's flash filesystem reads them like real
-  silicon.
+### Form A: the device boots from storage through its own boot path
 
-`RomParserService` is not involved - `.sec` is not in its file-extension list,
-and Sync 2 boots entirely through emulated NAND. This is the same family as the
-Zune approach in `agent_docs/boot_loaders.md`. There CERF synthesizes a blank
-disk with the expected partition, and the OS boots from it. The bootable image
-reaches DRAM through emulated storage + the device's own boot path, not through a
-host-side XIP extractor.
+Reset enters the boot ROM or the bootloader of the device. That code reads the
+storage, as on the hardware.
 
-The choice of this pipeline is a property of the dump, not a convenience. A
-whole-NAND container that wraps a flash filesystem (BINFS / IMGFS over an FTL)
-has no single flat XIP to extract. Therefore CERF must emulate the controller
-faithfully and let the guest read its own storage.
+- Ford SYNC 2: NAND is always the primary boot device, and a bootloader boots from
+  it.
+- A device with NOR flash on the memory bus, for example the HP iPAQ hx4700: the
+  flash is mapped at the reset address. The bootloader and the kernel region run
+  in place from it. The OS flash driver writes the IMGFS and the file store in
+  the same flash. The flash chip model is the controller here: its command set
+  programs and erases the storage image. This is the SYNC 2 form.
 
-## Where the file comes from
+### Form B: CERF provides the whole storage and jumps into the container on it
 
-`RomParserService::OnReady` resolves the file set from `DeviceConfig`:
-`rom_primary` (+ `rom_extensions`, or `rom_recovery` under `--recovery`). The
-`rom` block of `cerf.json` or the `--rom-primary` flag names them - the
-configuration declares the bootable file, and CERF does not search for it. The
-configuration declares the board the same way (`cerf.json board.id` /
-`--board-id`), which selects the `BoardContext`. SoC, OS version, memory map, and
-the XIP / base / entry resolution above all still come from the ROM's own bytes.
-They never come from `cerf.json` or `meta` (`agent_docs/rules.md` § "Per-device
-facts come from the ROM"). The bundled device tree (`bundled/devices/<name>/`)
-holds the original OEM file - the package or dump as shipped, not a derived
-artifact.
+The device has no bootloader that CERF runs. CERF still models the whole storage.
+At boot, CERF finds the generic Windows CE container on the storage and starts its
+kernel directly.
+
+- CERF reads the container from the storage at each boot. The container is never
+  a separate input.
+- The guest can rewrite its own container. The next boot then starts what the
+  storage holds at that time.
+
+Nokia Lumia 800 takes this form. The primary boot device is the eMMC. It is work in
+progress: CERF seeds the eMMC, and the direct boot from it is not wired yet.
+
+### Seeding the storage on the first boot
+
+If the storage image does not exist, CERF can seed it from an OEM container.
+After that, the storage image is the only input, and the container is no longer
+necessary to boot.
+
+- SYNC 2 seeds the factory boot region of the NAND from the `.sec` update
+  container. The bootloader then enters factory recovery mode and reads the `.sec`
+  over the emulated USB. It formats the NAND and flashes it fully.
+- Lumia 800 seeds the whole eMMC.
+
+A dump of the whole storage of a device can also be the seed. It is the storage as
+read, not a ROM container, so path 1 normalization does not apply to it. It can
+hold the data of its owner.
+
+This is obviously optional, not everything is possible to seed, and some devices
+might want to have only one boot source.
+
+## A device that boots both ways
+
+A complex device keeps its bootloader in writable storage. The bootloader reads
+that storage first. The Windows CE image is in the same storage. The OS does not
+have to access that storage, because Windows CE does not require it. The more
+complex a device is, the more often its user mode writes the storage.
+
+Take a device whose writable NOR flash holds its bootloader and its OS image, as
+in form A. Its OS never writes the flash. CERF can boot it in two ways. Path 1
+boots from `rom.primary`, a generic container such as an upgrade package. Path 2
+boots from a storage image of the flash, through the bootloader.
+
+Both boots are correct together while the guest OS does not write the storage.
+Path 1 never runs the bootloader, so a bootloader that can reflash the OS does
+not make path 1 wrong here.
+
+The path that CERF implements first depends on what is available. CERF often
+relies on upgrade packages, because those are the images that people can get
+online. A dump of the storage can come later.
+
+### Storage that the OS writes, with no dump
+
+A write into the storage has its own correctness bar. Take a device whose OS
+keeps user data in a partition of its writable storage. No dump of that storage
+exists. CERF then models the storage as a regular writable storage type of the
+device. A boot does not require it. CERF can synthesize it as a blank device. The
+storage does not have to be bootable.
+
+This is close to the Lumia 800, where CERF seeds the whole eMMC with the OS. Here
+CERF does not know what the storage holds. It cannot place anything on it,
+because no bootloader is available to read it.
+
+### The target and the result
+
+The target is the most correct shape of the device. What CERF builds is flexible,
+and the correct set of boots differs by device. Some devices have one correct
+boot: the bootloader from storage. Other devices have a boot from `rom.primary`,
+a boot from storage, and a blank storage that CERF synthesizes at boot. The guest
+OS keeps user data in that storage. Its content is unknown.
+
+## Live tech debts
+
+Those were done wrong. Lack the proper writable storage config, proper save, or save it
+into save state. 
+
+- SiemensSimaticTp177b4 SpansionS29Gl256
+- SMDK2410 NOR flash (really bad case and nobody wants to clean this mess)
+- Whatever OMAP 35xx is doing 
+- Zune 30 is a surprise example. A bootloader spins HDD and loads NK.BIN from there.
+  Then guest OS writes and reads that HDD for music and user data but never for NK.BIN itself.
+  We own no bootloader. We provide HDD for OS as proper writable storage but we also hold NK.BIN
+  separately as a regular `rom.primary` boot. Is that correct? Reading what this page says is
+  actually yes, it's one of non-realistic but flexible ways. What's the most corrrect approach?
+  Obtaining a bootloader is rather impossible I believe. The more correct approach might be CERF
+  reading NK.BIN from HDD directly and booting. This way ordinary HDD dumps will boot
+  their own OS. They dont do now so that's a real gap. 
+- Basically every flash/storage CERF models that doesn't go into `storage` and is not configurable 
+  in Board Settings is wrong.
+
+The emulator somehow works in this state so we just don't touch those tech debts because it works. Any new code must be done properly.
+That's a harsh reality of foundation done incorrectly so now everything rests on really bad architecture. 
+For example at the very beginning of the project we incorrectly imagined that what you need is 
+a WinCE container itself with the rest of flash thrown away. The book and practice confirms it's a working path.
+Then the practice also confirm that throwing everything away is wrong because you force people into manual parse the upgrade packages.
+Then the practice demolishes it by making guest OS heavy coupled with a bootloader and a proprietary NAND layout.

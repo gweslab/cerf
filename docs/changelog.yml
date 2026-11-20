@@ -2,7 +2,7 @@
   date: TBA
   important:
     important: |
-      Upgrade hangs - workaround: you need to wait 5 seconds during upgrade and let CERF kill the old process.
+      Upgrade hangs - workaround: you need to wait 5 seconds during upgrade and let CERF kill the old process
   devices:
     new: |
       HP Jornada 680, HP 620LX support (thx @Gadgetoid/sh3-emu)
@@ -12,6 +12,8 @@
       NEC Rockhopper: Improved CE.NET OAL support
     fixed: |
       Casio Cassiopeia EM-500 family: Audio playback crash fixes, hardward buttons and HUD
+      Sharp HC family: COM port issues fixed
+      [Breaking] Symbol Mk500 family: NOR storage now handled properly. If you want to boot your saved device open Board Settings and set the old flash image into the new field
   cerfman:
     new: |
       Import, export, clone your devices

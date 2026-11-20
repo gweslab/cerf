@@ -187,14 +187,16 @@ python run_claude.py
       <td>TBA</td>
       <td>
         <p><b>⚠️ Important</b><br/>
-          ❗ Upgrade hangs - workaround: you need to wait 5 seconds during upgrade and let CERF kill the old process.</p>
+          ❗ Upgrade hangs - workaround: you need to wait 5 seconds during upgrade and let CERF kill the old process</p>
         <p><b>📱 Devices</b><br/>
           🆕 HP Jornada 680, HP 620LX support (thx @Gadgetoid/sh3-emu)<br/>
           🆕 HP 300LX, 320LX, 360LX family support (thx @Gadgetoid/sh3-emu)<br/>
           🆕 Casio Cassiopeia A11, A51; PA-2400U support (thx @Gadgetoid/sh3-emu)<br/>
           🆕 NEC MobilePro 450 support<br/>
           🆕 NEC Rockhopper: Improved CE.NET OAL support<br/>
-          ✅ Casio Cassiopeia EM-500 family: Audio playback crash fixes, hardward buttons and HUD</p>
+          ✅ Casio Cassiopeia EM-500 family: Audio playback crash fixes, hardward buttons and HUD<br/>
+          ✅ Sharp HC family: COM port issues fixed<br/>
+          ✅ [Breaking] Symbol Mk500 family: NOR storage now handled properly. If you want to boot your saved device open Board Settings and set the old flash image into the new field</p>
         <p><b>💿 Emulator</b><br/>
           🆕 SH3 guest CPU emulation<br/>
           🆕 RetroArch shaders support (librashader)<br/>

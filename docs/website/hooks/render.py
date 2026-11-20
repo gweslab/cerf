@@ -24,7 +24,7 @@ FUNDING_LINKS = [
 
 SITE_LINKS = [
     # ('GitHub',  ':fontawesome-brands-github:',  'https://github.com/gweslab/cerf'),
-    ('Discord', ':fontawesome-brands-discord:', 'https://discord.gg/QREE9Y2v2d'),
+    ('Discord', ':fontawesome-brands-discord:', 'https://cerf.cx/discord'),
 ]
 
 sys.path.insert(0, ROOT)

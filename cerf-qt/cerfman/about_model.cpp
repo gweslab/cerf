@@ -34,7 +34,7 @@ QString AboutModel::LinksHtml() const {
     QStringList links;
     const std::pair<const char*, const char*> entries[] = {
         {"Website", cerffrontend::kWebsiteUrl},
-        {"Discord", cerffrontend::kDiscordUrl},
+        {"Discord", cerffrontend::kDiscordUrl.text},
         {"Patreon", cerffrontend::kPatreonUrl},
         {"License", cerffrontend::kLicenseUrl.text},
         {"Privacy policy", cerffrontend::kPrivacyUrl.text},

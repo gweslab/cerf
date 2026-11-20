@@ -12,7 +12,7 @@ QString ProductLinksModel::GuestAdditionsUrl() const {
 
 QString ProductLinksModel::WebsiteUrl() const { return QString::fromUtf8(cerffrontend::kWebsiteUrl); }
 
-QString ProductLinksModel::DiscordUrl() const { return QString::fromUtf8(cerffrontend::kDiscordUrl); }
+QString ProductLinksModel::DiscordUrl() const { return QString::fromUtf8(cerffrontend::kDiscordUrl.text); }
 
 QString ProductLinksModel::DonateUrl() const { return QString::fromUtf8(cerffrontend::kDonateUrl.text); }
 

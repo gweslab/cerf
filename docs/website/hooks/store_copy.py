@@ -215,8 +215,12 @@ def configure(config):
     config.edit_uri = None
     config.mdx_configs.setdefault('pymdownx.snippets', {})['base_path'] = [STORE_SNIPPETS, SNIPPETS]
     links = StoreLinks()
-    config.extra['social'] = [entry for entry in config.extra.get('social', [])
-                              if links.target(entry['link']) is not None]
+    social = []
+    for entry in config.extra.get('social', []):
+        link = links.target(entry['link'])
+        if link is not None:
+            social.append(dict(entry, link=link))
+    config.extra['social'] = social
     config.nav = _nav(config.nav, links)
 
 

@@ -11,7 +11,7 @@
 </div><br/>
 
 <div align="center">
-  <a href="https://discord.gg/QREE9Y2v2d"><img src="https://img.shields.io/badge/Discord-join%20the%20server-5865F2?logo=discord&amp;logoColor=white" alt="Discord"/></a> {support_badges}
+  <a href="https://cerf.cx/discord"><img src="https://img.shields.io/badge/Discord-join%20the%20server-5865F2?logo=discord&amp;logoColor=white" alt="Discord"/></a> {support_badges}
 </div>
 
 <br/>

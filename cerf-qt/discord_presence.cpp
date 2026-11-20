@@ -76,7 +76,7 @@ private:
         a["assets"]["large_image"] = kLargeImage;
         a["assets"]["large_text"]  = kProductName;
         a["buttons"]               = json::array();
-        a["buttons"].push_back({ {"label", "Join Discord"}, {"url", kDiscordUrl} });
+        a["buttons"].push_back({ {"label", "Join Discord"}, {"url", kDiscordUrl.text} });
 
         json frame;
         frame["cmd"]              = "SET_ACTIVITY";

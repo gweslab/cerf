@@ -29,7 +29,6 @@ inline constexpr char kProductAuthorUrl[] = CERF_PRODUCT_AUTHOR_URL;
 inline constexpr int  kProductFirstYear   = 2019;
 inline constexpr char kWebsiteUrl[]       = CERF_WEBSITE_URL;
 inline constexpr char kStoreWebsiteUrl[]  = CERF_PLAY_STORE_WEBSITE_URL;
-inline constexpr char kDiscordUrl[]       = "https://discord.gg/QREE9Y2v2d";
 inline constexpr char kPatreonUrl[]       = CERF_PATREON_URL;
 
 inline constexpr auto kDownloadUrl           = JoinLink(kWebsiteUrl, "/download/");
@@ -37,6 +36,7 @@ inline constexpr auto kAndroidDownloadUrl    = JoinLink(kWebsiteUrl, "/download?
 inline constexpr auto kPlayStoreUrl =
     JoinLink("https://play.google.com/store/apps/details?id=", CERF_ANDROID_PACKAGE_NAME);
 inline constexpr auto kDonateUrl             = JoinLink(kWebsiteUrl, "/donate");
+inline constexpr auto kDiscordUrl            = JoinLink(kWebsiteUrl, "/discord");
 inline constexpr auto kArticlesUrl           = JoinLink(kWebsiteUrl, "/articles/");
 inline constexpr auto kGuestAdditionsUrl     = JoinLink(kArticlesUrl.text, "guest-additions/");
 inline constexpr auto kBundleRepositoriesUrl = JoinLink(kArticlesUrl.text, "bundle-repositories/");

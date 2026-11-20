@@ -108,6 +108,12 @@ compatible panel that the ROM does not drive. A RAM size belongs in the list
 when the board can take it. A size that the vendor never fitted also belongs in
 the list when the guest supports it.
 
+A part belongs to the whole family or to a subset of its members. When every
+member has the slot or the pads for the part, the family row holds the
+parameter. Otherwise the row of each member with the slot or the pads holds it.
+A `values` list with only `none` never states that a member lacks the slot or
+the pads.
+
 The order of `board_config_params` is the display order.
 
 ## CPU configurations

@@ -160,6 +160,12 @@ ColumnLayout {
                 id: configRow
                 required property var modelData
                 title: modelData.name
+                detail: WarningLabel {
+                    visible: !configRow.modelData.defaultSupported
+                             && fields.configValues[configRow.modelData.id] === null
+                    danger: true
+                    text: qsTr("Not supported")
+                }
                 ChoiceBox {
                     enabled: fields.editable
                     values: configRow.modelData.values

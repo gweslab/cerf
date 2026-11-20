@@ -20,12 +20,6 @@ Item {
     readonly property real cy: Math.floor(height / unit / 2) * unit
     readonly property int outline: 1
     readonly property int resourceInset: 4
-    readonly property int bodyHalfWidth: 8
-    readonly property int bodyHalfHeight: 6
-    readonly property int diskCorner: 3
-    readonly property int hubSize: 5
-    readonly property int pinPitch: 5
-    readonly property int pinLength: 2
     readonly property int gridCell: 4
     readonly property int gridGap: 1
     readonly property int gridColumns: 4
@@ -112,8 +106,6 @@ Item {
         sourceComponent: {
             switch (root.kind) {
             case "resource": return resource
-            case "chip": return chip
-            case "disk": return disk
             case "led": return led
             case "grid": return grid
             case "power": return power
@@ -134,68 +126,6 @@ Item {
                 height: side
                 source: root.source
                 sourceSize: Qt.size(side, side)
-            }
-        }
-    }
-
-    Component {
-        id: chip
-        Item {
-            Rectangle {
-                x: root.cx - root.u(root.bodyHalfWidth)
-                y: root.cy - root.u(root.bodyHalfHeight)
-                width: root.u(2 * root.bodyHalfWidth)
-                height: root.u(2 * root.bodyHalfHeight)
-                color: Theme.barChipFill
-                border.color: Theme.barOutline
-                border.width: root.u(root.outline)
-            }
-            Repeater {
-                model: 3
-                delegate: Item {
-                    required property int index
-                    readonly property real pinX: root.cx + root.u((index - 1) * root.pinPitch)
-                    Rectangle {
-                        x: parent.pinX
-                        y: root.cy - root.u(root.bodyHalfHeight + root.pinLength)
-                        width: root.u(root.outline)
-                        height: root.u(root.pinLength)
-                        color: Theme.barOutline
-                    }
-                    Rectangle {
-                        x: parent.pinX
-                        y: root.cy + root.u(root.bodyHalfHeight - root.outline)
-                        width: root.u(root.outline)
-                        height: root.u(root.pinLength)
-                        color: Theme.barOutline
-                    }
-                }
-            }
-        }
-    }
-
-    Component {
-        id: disk
-        Item {
-            Rectangle {
-                x: root.cx - root.u(root.bodyHalfWidth)
-                y: root.cy - root.u(root.bodyHalfHeight)
-                width: root.u(2 * root.bodyHalfWidth)
-                height: root.u(2 * root.bodyHalfHeight)
-                radius: root.u(root.diskCorner)
-                color: Theme.barDiskFill
-                border.color: Theme.barOutline
-                border.width: root.u(root.outline)
-            }
-            Rectangle {
-                x: root.cx - root.u(Math.floor(root.hubSize / 2))
-                y: root.cy - root.u(Math.floor(root.hubSize / 2))
-                width: root.u(root.hubSize)
-                height: width
-                radius: width / 2
-                color: Theme.barDiskHub
-                border.color: Theme.barOutline
-                border.width: root.u(root.outline)
             }
         }
     }

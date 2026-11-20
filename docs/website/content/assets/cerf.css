@@ -29,9 +29,16 @@
   --cerf-scene-opacity: 0.42;
   --cerf-hero-shadow: 0 2px 24px rgba(255, 255, 255, 0.75);
   --cerf-media-bg: rgba(27, 25, 34, 0.06);
+  --cerf-tone-good: #3fb950;
+  --cerf-tone-caution: #8a5a00;
+  --cerf-tone-bad: #c42b1c;
+  --cerf-on-color: #ffffff;
+  --cerf-on-color-muted: rgba(255, 255, 255, 0.75);
 }
 
 [data-md-color-scheme="slate"] {
+  --cerf-tone-caution: #ffb900;
+  --cerf-tone-bad: #f48771;
   --cerf-bg: #19171c;
   --cerf-text: #e1e0ff;
   --cerf-text-muted: rgba(225, 224, 255, 0.65);
@@ -295,13 +302,210 @@ body[data-md-color-scheme="default"] .md-nav__source {
   background: var(--cerf-glass-bg);
 }
 
-.md-typeset .cerf-boards img {
-  vertical-align: middle;
+.md-typeset .cerf-db-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 1rem;
+  margin-bottom: 0.8rem;
 }
 
-.md-typeset .cerf-boards td,
-.md-typeset .cerf-boards th {
-  white-space: nowrap;
+.md-typeset .cerf-db-filters[hidden],
+.md-typeset .cerf-db-card[hidden] {
+  display: none;
+}
+
+.md-typeset .cerf-db-search {
+  flex: 1 1 14rem;
+  max-width: 24rem;
+  padding: 0.35rem 0.6rem;
+  border: 1px solid var(--cerf-glass-border-strong);
+  border-radius: 0.4rem;
+  background: var(--cerf-glass-bg);
+  color: var(--cerf-text);
+  font: inherit;
+  font-size: 0.75rem;
+}
+
+.md-typeset .cerf-db-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.75rem;
+  color: var(--cerf-text-soft);
+  cursor: pointer;
+}
+
+.md-typeset .cerf-db-toggle input {
+  appearance: none;
+  display: inline-grid;
+  place-content: center;
+  width: 0.85rem;
+  height: 0.85rem;
+  margin: 0;
+  border: 1px solid var(--cerf-glass-border-strong);
+  border-radius: 0.2rem;
+  background: var(--cerf-glass-bg);
+  cursor: pointer;
+}
+
+.md-typeset .cerf-db-toggle input::after {
+  content: "";
+  width: 0.22rem;
+  height: 0.42rem;
+  border: solid var(--cerf-on-color);
+  border-width: 0 2px 2px 0;
+  transform: translateY(-0.05rem) rotate(45deg);
+  visibility: hidden;
+}
+
+.md-typeset .cerf-db-toggle input:checked {
+  background: var(--cerf-primary);
+  border-color: var(--cerf-primary);
+}
+
+.md-typeset .cerf-db-toggle input:checked::after {
+  visibility: visible;
+}
+
+.md-typeset .cerf-db-toggle input:focus-visible,
+.md-typeset .cerf-db-search:focus-visible {
+  outline: 2px solid var(--cerf-primary);
+  outline-offset: 1px;
+}
+
+.md-typeset .cerf-db-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr));
+  gap: 0.8rem;
+}
+
+.md-typeset .cerf-db-card {
+  border: 1px solid var(--cerf-glass-border);
+  background: var(--cerf-glass-bg);
+  border-radius: 0.4rem;
+  padding: 0.7rem 0.8rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  overflow: hidden;
+}
+
+.md-typeset .cerf-db-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 0.5rem;
+  margin: -0.7rem -0.8rem 0;
+  padding: 0.5rem 0.8rem;
+  background: var(--cerf-db-tint);
+  color: var(--cerf-on-color);
+}
+
+.md-typeset .cerf-db-title {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.md-typeset .cerf-db-name {
+  font-weight: 700;
+}
+
+.md-typeset .cerf-db-family {
+  font-size: 0.7rem;
+  color: var(--cerf-on-color-muted);
+}
+
+.md-typeset .cerf-db-arch {
+  display: inline-block;
+  border-radius: 999px;
+  padding: 0 0.35rem;
+  margin-left: 0.3rem;
+  font-size: 0.8em;
+  line-height: 1.3;
+  vertical-align: middle;
+  color: var(--cerf-on-color);
+}
+
+.md-typeset .cerf-db-year {
+  color: var(--cerf-on-color-muted);
+  font-size: 0.85em;
+  flex: none;
+}
+
+.md-typeset .cerf-db-support {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.2rem 0.8rem;
+  font-size: 0.75rem;
+  color: var(--cerf-text-muted);
+}
+
+.md-typeset .cerf-db-clause {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.md-typeset .cerf-db-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex: none;
+}
+
+.md-typeset .cerf-db-good {
+  background: var(--cerf-tone-good);
+}
+
+.md-typeset .cerf-db-caution {
+  background: var(--cerf-tone-caution);
+}
+
+.md-typeset .cerf-db-bad {
+  background: var(--cerf-tone-bad);
+}
+
+.md-typeset ul.cerf-db-rows {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  font-size: 0.75rem;
+}
+
+.md-typeset ul.cerf-db-rows > li {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0;
+}
+
+.md-typeset .cerf-db-icon {
+  position: relative;
+  display: inline-block;
+  width: 20px;
+  height: 20px;
+  flex: none;
+}
+
+.md-typeset .cerf-db-icon img {
+  width: 20px;
+  height: 20px;
+  vertical-align: top;
+}
+
+.md-typeset .cerf-db-off img {
+  opacity: 0.73;
+}
+
+.md-typeset .cerf-db-icon img.cerf-db-badge {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: 42%;
+  height: 42%;
+  opacity: 1;
 }
 
 .md-button.cerf-hidden {

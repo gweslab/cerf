@@ -12,7 +12,6 @@ DB_PATH = _ROOT / "libCerfCore" / "db.json"
 _SUPPORT_LEVEL_TEXT = _ROOT / "libCerfCore" / "include" / "cerfcore" / "core" / "support_level_text.h"
 _BOARD_ORDER_TEXT = _ROOT / "cerf-qt" / "cerfman" / "board_order_text.h"
 
-SUPPORT_BOOTABLE_PARTIAL = str_define(_SUPPORT_LEVEL_TEXT, "CERF_SUPPORT_BOOTABLE_PARTIAL")
 RUNNING_LEVELS = tuple(str_define(_SUPPORT_LEVEL_TEXT, "CERF_RUNNING_SUPPORT_LEVELS").split())
 _LAST_TIER_PREFIX = str_define(_BOARD_ORDER_TEXT, "CERF_LAST_BOARD_TIER_PREFIX")
 
@@ -52,12 +51,8 @@ def _effective_board(board_row: dict) -> dict:
     out = {k: v for k, v in family.items() if k not in ("id", "name")}
     out.update(board_row)
     out["notes"] = _list(family, "notes") + _list(board_row, "notes")
-    merged: Dict[str, dict] = {}
-    for row in (family, board_row):
-        for feature in _list(row, "device_features"):
-            if isinstance(feature, dict) and isinstance(feature.get("feature_id"), str):
-                merged[feature["feature_id"]] = feature
-    out["device_features"] = list(merged.values())
+    out["device_specs"] = [s for row in (family, board_row) for s in _list(row, "device_specs")
+                           if isinstance(s, dict) and isinstance(s.get("generic_part_id"), str)]
     config: Dict[str, dict] = {}
     for row in (family, board_row):
         if isinstance(row.get("board_config"), dict):
@@ -75,8 +70,8 @@ SOCS = _by_id("socs")
 BOARD_FAMILIES_BY_ID = _by_id("board_families")
 BOARDS = [_effective_board(b) for b in _rows("boards")]
 BOARDS_BY_ID = {b["id"]: b for b in BOARDS}
-FEATURE_SPECS: List[Tuple[str, str, str]] = [
-    (f["id"], f.get("icon", f["id"]), f.get("name", f["id"])) for f in _rows("device_features")]
+GENERIC_PARTS: List[dict] = _rows("device_generic_parts")
+BOARD_CONFIG_PARAMS = _by_id("board_config_params")
 
 
 def sort_text(value: object) -> str:
@@ -94,11 +89,6 @@ def board_sort_key(board_name: object) -> Tuple[int, str]:
     else:
         tier = 1
     return (tier, name)
-
-
-def family_of(board_id: str) -> Optional[dict]:
-    entry = BOARDS_BY_ID.get(board_id)
-    return BOARD_FAMILIES_BY_ID.get(entry.get("board_family_id", "")) if entry else None
 
 
 def soc_of(board_id: str) -> Optional[dict]:

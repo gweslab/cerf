@@ -43,9 +43,9 @@ member out, and its row records the parts that are known. A model stays out
 only when a source puts it on another platform.
 
 A field on the family applies to every member. A board sets the field only
-where the board differs, and the value of the board wins. `device_features`
-merge by `feature_id`, `board_config` merges by parameter, and the `notes` of a
-board add to the notes of the family.
+where the board differs, and the value of the board wins. The `device_specs`
+of a board add to the specs of the family (see § Device specs), `board_config`
+merges by parameter, and the `notes` of a board add to the notes of the family.
 
 The code of a family serves every member. It reads a fact that differs
 between members, for example the SoC or the RAM size, from the row of the
@@ -57,9 +57,10 @@ runs the family code for that part, and its support level records the
 difference.
 
 For example, a regional member has another keyboard layout. Its keys sit on
-the same matrix pins as the keys of the baseline, so the family keyboard works
-on it. Only some key labels or host key bindings are wrong for that member.
-Another member has a part that the baseline lacks, such as a built-in modem.
+the same matrix pins as the keys of the other members, so the family keyboard
+works on it. Only some key labels or host key bindings are wrong for that
+member. Another member has a part that the other members lack, such as a
+built-in modem.
 The family code runs on that member, and the member has no modem in CERF.
 
 Running the family code on such a member is not a guessed implementation.
@@ -78,10 +79,6 @@ The board sets `support_level`. The values are:
 - `no_support` - the board is broken in CERF, or a known difference breaks the
   guest.
 
-`internal__spec_divergences` records why a board is its own entry. It holds
-spec facts only. Each fact compares the board with the baseline of the family.
-The baseline is the one board of the family that does not have the field.
-
 A `rom_types` or `storage_types` row binds through `board_ids`,
 `board_family_ids`, or both. A row with neither field binds every board.
 
@@ -92,6 +89,63 @@ The name of a family is the name of its platform. Use the public name of the
 vendor for the platform. If no public name exists, use the name that the ROM
 gives its platform. If the ROM gives no name, use the name of the design that
 the other members came from.
+
+## Device specs
+
+`device_generic_parts` is the table of generic parts. A generic part is one
+kind of hardware, for example a display, a NAND chip or a Wi-Fi radio. It has a
+name and an icon. Several parts can share one icon. A part never groups
+different kinds of hardware: Wi-Fi, cellular and IrDA are three parts with one
+icon. A consumer finds a part by its id, never by a displayed name.
+
+The order of `device_generic_parts` is the display order. Parts that share an
+icon sit next to each other.
+
+The `device_specs` of a family or a board is a list of spec items. A spec item
+is one part of the device. It has:
+
+- `generic_part_id` - the generic part. The part is the type of the item.
+- `supported` - `true` when CERF models the part, `false` when the device has
+  the part and CERF does not model it. A device that does not have a part has
+  no item for it.
+- `displayed_name` - optional. The name of a stock part that the user cannot
+  change, for example a panel model or a keyboard layout.
+- the optional fields of its part. Only the display part has fields today:
+  `display_width` and `display_height`, the panel size in pixels. An item never
+  carries a field that its part does not have.
+
+A device can have more than one item of one part. Each item is one component,
+for example two displays.
+
+The first display item with a size gives the panel size of the board. CERF
+opens the emulator window at that size, and guest additions take it as their
+default. A later display item can carry its size, and no component reads it.
+
+**A family holds only the items that every member has, unchanged.** When one
+member differs in a part, the family stops holding that part, and each member
+that has the part holds its own item. A board item never replaces a family
+item. The items of a board add to the items of its family.
+
+Members can differ in a part that has no public name, for example the same
+speaker on other pins. Their items then take a letter as their displayed name:
+Speakers A, Speakers B. The letters state that the parts differ, and they do
+not state which part CERF supports.
+
+### Clear facts and open facts
+
+A hardware fact is clear when a generic part, a field of that part, or a
+board configuration parameter can state it. A clear fact goes into
+`device_specs` or `board_config`, never into text.
+
+A hardware fact is open when no generic part and no field can state it yet,
+for example a CompactFlash slot, a phone connector, the size of a NOR flash or
+the color of a backlight. An open fact stays as text in
+`internal__spec_divergences` of the member that differs. When CERF gets a part
+or a field for it, the fact moves out of that text.
+
+`internal__spec_divergences` holds hardware facts only. The content, the size
+and the language of a ROM, a market, a brand, the bundled software and the CPU
+clock never go into it.
 
 ## Board configuration
 
@@ -113,6 +167,19 @@ member has the slot or the pads for the part, the family row holds the
 parameter. Otherwise the row of each member with the slot or the pads holds it.
 A `values` list with only `none` never states that a member lacks the slot or
 the pads.
+
+A `board_config_params` row with a `generic_part_id` links the parameter to
+that part. The value of the parameter then describes the first item of that
+part, after its displayed name: `Display B - Monochrome STN (240x320)`. A
+parameter with no generic part does not show as a part, for example the
+MIPS16EN pin.
+
+A part that a user can change and that CERF does not model yet still gets its
+parameter. Its `values` list holds the values that CERF supports, for example
+the one RAM size that the code maps. A member whose real part differs sets its
+default to its real part. A default outside the `values` list marks that part
+of the member as not supported. cerfman shows "Not supported" next to Auto,
+and the website marks the part with the unsupported badge.
 
 The order of `board_config_params` is the display order.
 
@@ -190,8 +257,8 @@ between those units. Cells at the same unit position in two rows or columns with
 same total `grow` line up.
 
 The width and the height of a panel are fractions of the length of the screen
-edge that the panel sits on. The screen of a HUD is the `lcd_panel_size` of one
-of its bound boards. That board has the panel size that is the closest to the size
+edge that the panel sits on. The screen of a HUD is the panel size of one of its
+bound boards (see § Device specs). That board has the panel size that is the closest to the size
 of the framebuffer.
 
 ## Where an id constant lives

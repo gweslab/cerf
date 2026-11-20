@@ -38,7 +38,8 @@ QVariantList BoardConfigCatalog::Params(const QString& board_id) const {
         out.append(QVariantMap{{QStringLiteral("board"), board_id},
                                {QStringLiteral("id"), QString::fromStdString(s.param_id)},
                                {QStringLiteral("name"), QString::fromStdString(db.FindBoardConfigParam(s.param_id)->name)},
-                               {QStringLiteral("values"), values}});
+                               {QStringLiteral("values"), values},
+                               {QStringLiteral("defaultSupported"), s.Accepts(s.default_value)}});
     }
     return out;
 }

@@ -232,7 +232,7 @@ QString PropertySheet::SoftReset() const { return QString::fromLatin1(cerffronte
 
 bool PropertySheet::GuestAdditionsAvailable(const QString& board_id) const {
     if (subject_.forbid_guest_additions || subject_.os_ver_major == 1) return false;
-    return emu_.Get<BoardCatalog>().FeatureAllowed(board_id, "guest_additions");
+    return emu_.Get<BoardCatalog>().PartAllowed(board_id, "guest_additions");
 }
 
 QVariantList PropertySheet::Pages() const {

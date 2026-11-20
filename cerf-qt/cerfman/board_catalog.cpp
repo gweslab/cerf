@@ -90,22 +90,23 @@ bool BoardCatalog::Runs(const QString& board_id) const {
     return board && board->runs;
 }
 
-std::optional<bool> BoardCatalog::FeatureSupport(const QString& board_id, std::string_view feature_id) const {
+std::optional<bool> BoardCatalog::PartSupport(const QString& board_id, std::string_view part_id) const {
     const DbBoard* board = Find(board_id);
     if (!board) return std::nullopt;
-    for (const auto& f : board->features)
-        if (f.feature_id == feature_id) return f.supported;
-    return std::nullopt;
+    std::optional<bool> supported;
+    for (const auto& s : board->specs)
+        if (s.generic_part_id == part_id) supported = supported.value_or(true) && s.supported;
+    return supported;
 }
 
-bool BoardCatalog::FeatureAllowed(const QString& board_id, std::string_view feature_id) const {
-    return FeatureSupport(board_id, feature_id).value_or(true);
+bool BoardCatalog::PartAllowed(const QString& board_id, std::string_view part_id) const {
+    return PartSupport(board_id, part_id).value_or(true);
 }
 
-std::vector<const cerfcore::DbDeviceFeature*> BoardCatalog::UnsupportedFeatures(const QString& board_id) const {
-    std::vector<const cerfcore::DbDeviceFeature*> out;
-    for (const auto& feature : emu_.Get<BoardDatabase>().DeviceFeatures())
-        if (FeatureSupport(board_id, feature.id) == false) out.push_back(&feature);
+std::vector<const cerfcore::DbGenericPart*> BoardCatalog::UnsupportedParts(const QString& board_id) const {
+    std::vector<const cerfcore::DbGenericPart*> out;
+    for (const auto& part : emu_.Get<BoardDatabase>().GenericParts())
+        if (PartSupport(board_id, part.id) == false) out.push_back(&part);
     return out;
 }
 

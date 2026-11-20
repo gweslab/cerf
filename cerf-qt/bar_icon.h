@@ -15,10 +15,6 @@ struct ResourceIcon {
     std::string name;
 };
 
-struct ChipIcon {};
-
-struct HardDiskIcon {};
-
 struct LampLook {
     bool               lit      = false;
     Rgb                color;
@@ -58,7 +54,6 @@ struct FolderIcon {
     bool enabled = false;
 };
 
-using BarIcon = std::variant<ResourceIcon, ChipIcon, HardDiskIcon, LedIcon, LedGridIcon, PowerInputIcon,
-                             BatteryIcon, FolderIcon>;
+using BarIcon = std::variant<ResourceIcon, LedIcon, LedGridIcon, PowerInputIcon, BatteryIcon, FolderIcon>;
 
 }

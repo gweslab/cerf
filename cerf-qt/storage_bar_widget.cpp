@@ -17,10 +17,7 @@ public:
     std::string Name() const override { return storage_.ObjectName(); }
     BarGroup    Group() const override { return BarGroup::Storage; }
 
-    BarIcon Icon() const override {
-        if (storage_.Medium() == cerfcore::StorageMedium::kHardDisk) return HardDiskIcon{};
-        return ChipIcon{};
-    }
+    BarIcon Icon() const override { return ResourceIcon{"storage"}; }
 
     std::string Tooltip() const override {
         switch (storage_.Medium()) {

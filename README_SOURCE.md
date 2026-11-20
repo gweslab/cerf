@@ -169,9 +169,7 @@ Run the environment:
 python run_claude.py
 ```
 
-## Supported Devices
-
-{supported_devices}
+## [Supported Devices](https://cerf.cx/devices)
 
 ## Changelog
 

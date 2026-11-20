@@ -46,8 +46,6 @@ struct IconRow {
         row[QStringLiteral("kind")]   = QStringLiteral("resource");
         row[QStringLiteral("source")] = AssetImageUrl(QString::fromStdString(icon.name));
     }
-    void operator()(const cerffrontend::ChipIcon&) const { row[QStringLiteral("kind")] = QStringLiteral("chip"); }
-    void operator()(const cerffrontend::HardDiskIcon&) const { row[QStringLiteral("kind")] = QStringLiteral("disk"); }
     void operator()(const cerffrontend::LedIcon& icon) const {
         QVariantList lamps;
         for (const cerffrontend::LampLook& lamp : icon.lamps) lamps.append(LampRow(lamp));

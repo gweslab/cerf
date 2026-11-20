@@ -35,7 +35,7 @@ public:
     std::optional<cerfcore::CpuArch> Arch(const QString& board_id) const;
     QString                          ArchName(const QString& board_id) const;
     bool                             Runs(const QString& board_id) const;
-    bool                             FeatureAllowed(const QString& board_id, std::string_view feature_id) const;
+    bool                             PartAllowed(const QString& board_id, std::string_view part_id) const;
     QString                          MountPointDefault() const;
     QString                          FamilyName(const QString& board_id) const;
     QString                          SocLabel(const QString& board_id) const;
@@ -46,7 +46,7 @@ public:
     uint32_t                         GaWindowSize(const QString& board_id) const;
     int                              DeviceYear(const QString& board_id) const;
 
-    std::vector<const cerfcore::DbDeviceFeature*> UnsupportedFeatures(const QString& board_id) const;
+    std::vector<const cerfcore::DbGenericPart*> UnsupportedParts(const QString& board_id) const;
 
     Q_INVOKABLE QString      DisplayName(const QString& board_id) const;
     Q_INVOKABLE QString      BoardLabel(const QString& board_id, const QString& empty_text) const;
@@ -56,5 +56,5 @@ public:
                                            const QString& query) const;
 
 private:
-    std::optional<bool> FeatureSupport(const QString& board_id, std::string_view feature_id) const;
+    std::optional<bool> PartSupport(const QString& board_id, std::string_view part_id) const;
 };

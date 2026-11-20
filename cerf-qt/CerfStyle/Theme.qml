@@ -68,10 +68,6 @@ QtObject {
     readonly property color consoleError: dark ? "#ff6e6e" : "#c42b1c"
     readonly property color consoleWarning: dark ? "#ebd25a" : "#8a5a00"
 
-    readonly property color barChipFill: "#282c34"
-    readonly property color barOutline: "#9696a0"
-    readonly property color barDiskFill: "#30343c"
-    readonly property color barDiskHub: "#aaafb9"
     readonly property color barVibrate: "#c8a050"
     readonly property color barLedDark: "#222c24"
     readonly property color barLedRim: "#96a096"

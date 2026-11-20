@@ -158,12 +158,12 @@ QVariantMap DeviceCards::Details(const QString& name) const {
                            src.name, !src.website.isEmpty() ? src.website : src.origin);
     }
 
-    QVariantList unsupported_features;
-    for (const cerfcore::DbDeviceFeature* feature : boards.UnsupportedFeatures(device.meta.board_id))
-        unsupported_features.append(QVariantMap{
-            {QStringLiteral("icon"), QString::fromStdString(feature->icon)},
+    QVariantList unsupported_parts;
+    for (const cerfcore::DbGenericPart* part : boards.UnsupportedParts(device.meta.board_id))
+        unsupported_parts.append(QVariantMap{
+            {QStringLiteral("icon"), QString::fromStdString(part->icon)},
             {QStringLiteral("tip"), QStringLiteral("The emulator might produce no effect or crash if you access %1")
-                                        .arg(QString::fromStdString(feature->name))}});
+                                        .arg(QString::fromStdString(part->name))}});
 
     const QStringList note_lines = device.meta.notes + boards.Notes(device.meta.board_id);
     const QString     notes =
@@ -182,5 +182,5 @@ QVariantMap DeviceCards::Details(const QString& name) const {
                                                                 : QStringLiteral("Get")}});
     }
 
-    return details(device.name, device.meta.description.trimmed(), source, unsupported_features, notes, packages);
+    return details(device.name, device.meta.description.trimmed(), source, unsupported_parts, notes, packages);
 }

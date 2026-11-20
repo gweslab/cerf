@@ -101,7 +101,14 @@ The board sets `support_level`. The values are:
   guest.
 
 A `rom_types` or `storage_types` row binds through `board_ids`,
-`board_family_ids`, or both. A row with neither field binds every board.
+`board_family_ids`, or both. A `storage_types` row with neither field binds every
+board. A `rom_types` row with neither field binds every board whose
+`rom_placing_mode` is `flat_container`. That row describes an input of
+`RomParserService`, and a board on another boot path never reads one.
+
+A storage file is optional by default, because CERF can create or seed it. A
+`storage_types` row with `"required": true` names a storage that CERF cannot
+create, for example a flash that holds the bootloader of the board.
 
 Settle the member list from platform evidence first, then name the family. An
 argument for a name never decides which models are members.

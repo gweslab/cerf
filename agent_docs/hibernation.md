@@ -195,7 +195,10 @@ A frame with no owner in this build refuses the image.
 - **Ram** - the volatile memory regions.
 - **Flash** - the read-only memory regions. Flash writes since boot are machine
   state. A warm boot from an image of the same ROM applies this section too,
-  because flash keeps its contents across every reset on real hardware.
+  because flash keeps its contents across every reset on real hardware. A
+  region of the `kStorage` kind is not in the image. Its storage file holds its
+  content, as a disk image holds the content of a disk. The peripheral of such a
+  region writes each change to that file, and it saves only its own registers.
 - **Periph** - every registered peripheral.
 - **Presentation** - the guest-surface dimensions, so a custom resolution
   restores its window size.

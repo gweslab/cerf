@@ -35,8 +35,8 @@ CE version. These pieces are common to all ROMs:
 Only **the placement of the stub into the ROM** differs by ROM class:
 
 - **XIP / MultiXIP** (`libCerfCore/src/boot/guest_additions_injector.cpp`) - the ROM
-  carries a TOC of XIP modules. The injector therefore overwrites the TOC entry
-  of the victim module (its e32/o32/load offsets) to repoint it at the stub.
+  carries a TOC of XIP modules. As a result, the injector overwrites the TOC
+  entry of the victim module (its e32/o32/load offsets) to repoint it at the stub.
   The section bytes and e32/o32 records of the stub need one host span. The
   injector picks one of two hosts:
   - **Squat, the primary host.** This host is the largest section of the
@@ -44,7 +44,7 @@ Only **the placement of the stub into the ROM** differs by ROM class:
     For an in-place load, the section must be page-aligned and writable.
     An in-place code section has no MEM_WRITE flag, and the CE6 loader refuses
     such a section when its dataptr is not page-aligned.
-    The injector zeroes the span first. The `.bss` of the stub lies past its
+    The injector zeroes the span, because the `.bss` of the stub lies past its
     raw bytes, and an in-place load does not clear that `.bss`.
   - **Band, the fallback.** This host is a CERF-owned PA band in the
     `cerf_virt` window (`libCerfCore/src/boot/cerf_injection_region.{h,cpp}`). Its VA is
@@ -63,6 +63,13 @@ Only **the placement of the stub into the ROM** differs by ROM class:
 
   A hard reset replays the whole host span. CERF also restores an in-place host
   on every reset, because the writable data of the stub lives in it.
+
+  **An injection into a storage image never writes that image.** Some ROMs run
+  in place from storage that the guest writes, for example NOR flash. The
+  injection then writes a read overlay of the storage array. Before a program
+  or erase command of the guest changes an overlaid byte, CERF removes the
+  overlay of that byte. The guest then changes the bytes that the file holds.
+  The overlay stays across resets, because the array keeps its contents.
 - **IMGFS** (WM6+, `libCerfCore/src/boot/imgfs_injector.cpp` + `ce_imgfs_patcher.{h,cpp}`)
   - IMGFS is a flash filesystem (an FTL over the NOR/NAND image), not an XIP
   TOC. There is therefore no slot to overwrite. The injector allocates fresh

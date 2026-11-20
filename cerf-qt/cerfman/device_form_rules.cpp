@@ -126,7 +126,8 @@ QVariantMap DeviceFormRules::WithDefaults(const QString& board_id, const QVarian
 
 bool DeviceFormRules::IsRequired(const DeviceFileType& type, const QVariantMap& files,
                                  const QString& base_dir) const {
-    if (IsStorage(type) || type.optional) return false;
+    if (IsStorage(type)) return type.required;
+    if (type.optional) return false;
     for (const std::string& storage_id : type.optional_for_storage_ids) {
         const QString id    = QString::fromStdString(storage_id);
         const QString value = DeviceDirectory::StorageFile(
@@ -139,12 +140,13 @@ bool DeviceFormRules::IsRequired(const DeviceFileType& type, const QVariantMap& 
 
 QString DeviceFormRules::FileProblem(const DeviceFileType& type, const QVariantMap& files,
                                      const QString& base_dir) const {
-    const QString value = Value(files, BlockOf(type), QString::fromStdString(type.id));
+    const QString given = Value(files, BlockOf(type), QString::fromStdString(type.id));
+    const QString value = type.required ? EffectiveValue(type, given) : given;
     const QString name  = QString::fromStdString(type.name);
     if (value.isEmpty())
         return IsRequired(type, files, base_dir) ? QStringLiteral("Pick the %1.").arg(name) : QString();
     const QString path = ResolveDeviceFileValue(value, base_dir);
-    if (!IsStorage(type) || IsDocumentFileValue(path)) return MissingFileProblem(name, path);
+    if (!IsStorage(type) || type.required || IsDocumentFileValue(path)) return MissingFileProblem(name, path);
     const QFileInfo info(path);
     if (!IsAbsolute(path)) {
         const QString folder = QFileInfo(value).path();

@@ -8,6 +8,7 @@
       HP Jornada 680, HP 620LX support (thx @Gadgetoid/sh3-emu)
       HP 300LX, 320LX, 360LX family support (thx @Gadgetoid/sh3-emu)
       Casio Cassiopeia A11, A51; PA-2400U support (thx @Gadgetoid/sh3-emu)
+      NEC MobilePro 450 support
       NEC Rockhopper: Improved CE.NET OAL support
     fixed: |
       Casio Cassiopeia EM-500 family: Audio playback crash fixes, hardward buttons and HUD
@@ -30,6 +31,9 @@
   guest_additions:
     fixed: |
       Various crash fixes
+  website:
+    new: |
+      Live device database - https://cerf.cx/devices
 
 - version: v8.1
   date: 10 Nov 2026
@@ -446,13 +450,9 @@
 - version: v1.0
   date: Vaporware
   changes: |
-    Rewrite of WCECL from scratch (Feb 2026) with an ARM emulator backend; ran Solitaire like the original x86 WCECL.
-    User-space CE emulator built on mocking COREDLL.DLL. Ran several CE shells (CE 5 best), plus a heuristically reconstructed Windows Mobile 5 shell.
-    Scope collapsed: CE COM is a user-space driver, kernel API traps differ per CE version, forcing per-version strategies until it had quietly become a sloppy kernel + MMU rewrite of every CE version.
-    Died on Win32 per-process object limits and leaking APIs. Replaced by v2 - a real silicon emulator.
+    Rewrite of WCECL from scratch (Feb 2026) with an ARM emulator backend
 
 - version: WCECL
   date: Vaporware
   changes: |
     Windows CE Compatibility Layer (https://github.com/dz333n/wcecl), 2019 - a shim DLL repointing COREDLL.DLL APIs to desktop Win32 to run x86-built CE apps.
-    Ran Solitaire and cmd.exe (contributions from @veselcraft and @TheNNX), but only a few x86 apps - never real MIPS or ARM binaries.

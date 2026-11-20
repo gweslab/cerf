@@ -192,6 +192,7 @@ python run_claude.py
           🆕 HP Jornada 680, HP 620LX support (thx @Gadgetoid/sh3-emu)<br/>
           🆕 HP 300LX, 320LX, 360LX family support (thx @Gadgetoid/sh3-emu)<br/>
           🆕 Casio Cassiopeia A11, A51; PA-2400U support (thx @Gadgetoid/sh3-emu)<br/>
+          🆕 NEC MobilePro 450 support<br/>
           🆕 NEC Rockhopper: Improved CE.NET OAL support<br/>
           ✅ Casio Cassiopeia EM-500 family: Audio playback crash fixes, hardward buttons and HUD</p>
         <p><b>💿 Emulator</b><br/>
@@ -209,6 +210,8 @@ python run_claude.py
           🆕 Import, export, clone your devices</p>
         <p><b>✨ Guest Additions</b><br/>
           ✅ Various crash fixes</p>
+        <p><b>🌐 Website</b><br/>
+          🆕 Live device database - https://cerf.cx/devices</p>
       </td>
     </tr>
     <tr>

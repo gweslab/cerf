@@ -1,0 +1,36 @@
+<svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+<line x1="3.5" y1="9" x2="3.5" y2="13" stroke="#FFFB7B"/>
+<line x1="2.5" y1="9" x2="2.5" y2="13" stroke="#8A861A"/>
+<line x1="7.5" y1="9" x2="7.5" y2="13" stroke="#FFFB7B"/>
+<line x1="11.5" y1="9" x2="11.5" y2="13" stroke="#FFFB7B"/>
+<line x1="5.5" y1="9" x2="5.5" y2="13" stroke="#FFFB7B"/>
+<line x1="9.5" y1="9" x2="9.5" y2="13" stroke="#FFFB7B"/>
+<line x1="13.5" y1="9" x2="13.5" y2="13" stroke="#FFFB7B"/>
+<line x1="4.5" y1="9" x2="4.5" y2="13" stroke="#89861A"/>
+<line x1="8.5" y1="9" x2="8.5" y2="13" stroke="#89861A"/>
+<line x1="12.5" y1="9" x2="12.5" y2="13" stroke="#89861A"/>
+<line x1="6.5" y1="9" x2="6.5" y2="13" stroke="#89861A"/>
+<line x1="10.5" y1="9" x2="10.5" y2="13" stroke="#89861A"/>
+<g clip-path="url(#clip0_595_2786)">
+<rect y="2" width="16" height="9" fill="url(#paint0_linear_595_2786)"/>
+<line x1="14" y1="5.5" x2="11" y2="5.5" stroke="#232323"/>
+<line x1="14" y1="6.5" x2="11" y2="6.5" stroke="#232323"/>
+<line x1="14" y1="7.5" x2="11" y2="7.5" stroke="#232323"/>
+<line x1="4" y1="5.5" x2="2" y2="5.5" stroke="#232323"/>
+<line x1="8.5" y1="7" x2="8.5" y2="5" stroke="#232323"/>
+<line x1="4" y1="7.5" x2="2" y2="7.5" stroke="#232323"/>
+<line x1="10.5" y1="5" x2="10.5" y2="8" stroke="#232323"/>
+<line x1="6.5" y1="5" x2="6.5" y2="8" stroke="#232323"/>
+<line x1="5.5" y1="5" x2="5.5" y2="8" stroke="#232323"/>
+</g>
+<rect x="0.5" y="2.5" width="15" height="8" stroke="black" stroke-opacity="0.43"/>
+<defs>
+<linearGradient id="paint0_linear_595_2786" x1="0.999999" y1="2.64286" x2="10.3227" y2="15.2112" gradientUnits="userSpaceOnUse">
+<stop stop-color="#6EFF42"/>
+<stop offset="1" stop-color="#1F8400"/>
+</linearGradient>
+<clipPath id="clip0_595_2786">
+<rect y="2" width="16" height="9" fill="white"/>
+</clipPath>
+</defs>
+</svg>

@@ -26,7 +26,7 @@ void CanvasTabs::OnReady() {
 bool CanvasTabs::Set(Tab tab, bool user_initiated) {
     if (user_initiated) user_picked_view_ = true;
     if (tab_ == tab) return false;
-    if (tab_ == Tab::Framebuffer) emu_.Get<CanvasInput>().ReleasePenIfDown();
+    if (tab_ == Tab::Framebuffer && user_initiated) emu_.Get<CanvasInput>().ReleasePenIfDown();
     tab_ = tab;
     return true;
 }

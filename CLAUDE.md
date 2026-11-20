@@ -46,6 +46,10 @@ python claude_cerf_runner.py --timeout=20 --log-file=/z/tmp/my_run.log --device=
 
 The runner is the queue. It waits for `.build_lock` and it holds one `.cerf_lock.N`. No builds durin these, etc. It's important to respect parallel runs.
 
+Start the runner in the foreground or as a background task of the session, so that the session tracks the run. Never detach it with a shell `&`, a subshell or `nohup`.
+
+Close each CERF instance as soon as you no longer need it. Other people and your build can then use its run slot. This applies to a run with automation and to a run with a timeout.
+
 Example args are required.
 --timeout exits for 124.
 

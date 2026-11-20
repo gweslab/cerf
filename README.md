@@ -343,6 +343,12 @@ python run_claude.py
       <td><img src="assets/icons_sources/stylus.svg" width="32" height="32" title="Touch Panel" alt="Touch Panel"/> <img src="assets/icons_sources/ga_autoresize.svg" width="32" height="32" title="Emulator's Guest Additions" alt="Emulator's Guest Additions"/> <img src="assets/icons_sources/speaker_active.svg" width="32" height="32" title="Built-in/Pluggable Sound" alt="Built-in/Pluggable Sound"/></td>
     </tr>
     <tr>
+      <td align="center"><b>NEC VR4101</b><br/><sub>MIPS III</sub></td>
+      <td><b>NEC MobilePro 200</b></td>
+      <td><img src="assets/icons_sources/board.svg" width="16" height="16" title="PDA" alt="PDA"/> <b>NEC MobilePro 450</b> <code>nec_mobilepro_450</code></td>
+      <td><img src="assets/icons_sources/stylus.svg" width="32" height="32" title="Touch Panel" alt="Touch Panel"/> <img src="assets/icons_sources/keyboard.svg" width="32" height="32" title="Keyboard or keypad" alt="Keyboard or keypad"/> <img src="assets/icons_sources/suspend.svg" width="32" height="32" title="CPU Supend/Resume" alt="CPU Supend/Resume"/> <img src="assets/icons_sources/speaker_active.svg" width="32" height="32" title="Built-in/Pluggable Sound" alt="Built-in/Pluggable Sound"/> <img src="assets/icons_sources/pcmcia_enabled.svg" width="32" height="32" title="PC Card Socket" alt="PC Card Socket"/> <img src="assets/icons_sources/battery.svg" width="32" height="32" title="Battery" alt="Battery"/> <img src="assets/icons_sources/serial_com.svg" width="32" height="32" title="Serial Port" alt="Serial Port"/></td>
+    </tr>
+    <tr>
       <td align="center"><b>NEC VR4102</b><br/><sub>MIPS III</sub></td>
       <td><b>NEC MobilePro 700</b></td>
       <td><img src="assets/icons_sources/board.svg" width="16" height="16" title="PDA" alt="PDA"/> <b>NEC MobilePro 700</b> <code>nec_mobilepro_700</code></td>

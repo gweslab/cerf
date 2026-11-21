@@ -1,6 +1,6 @@
 ---
 name: leak
-description: Skill to remove AI slop prose.
+description: Skill to remove AI slop prose. Agent must invoke after writing any text chunks (documents, `--help`, skills, hook texts, message box texts, website text)
 ---
 
 # Leak - Enumerate the narration leaks. Delete them.

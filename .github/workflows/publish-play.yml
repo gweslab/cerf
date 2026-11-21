@@ -1,0 +1,55 @@
+name: publish-play
+
+on:
+  workflow_call:
+    inputs:
+      track:
+        type: string
+        required: true
+      attempts:
+        type: number
+        default: 1
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Fetch libCerfCore
+        run: git submodule update --init libCerfCore
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install the publish dependencies
+        run: python -m pip install --quiet --disable-pip-version-check google-auth pyyaml requests
+
+      - name: Stamp version.h with CI build info
+        id: version
+        run: python tools/stamp_version.py --run=${{ github.run_number }} --sha=${{ github.sha }}
+
+      - name: Fetch the Android app bundle
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ steps.version.outputs.bundle-artifact-android-arm64 }}
+          path: ci/android-bundle
+
+      - name: Publish the app bundle on Google Play
+        env:
+          PLAY_SERVICE_ACCOUNT_JSON: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+        run: >-
+          python tools/publish_play.py
+          --bundle=ci/android-bundle/${{ steps.version.outputs.bundle-android-arm64 }}
+          --track=${{ inputs.track }}
+          --attempts=${{ inputs.attempts }}
+
+      - name: Delete the app bundle artifact
+        uses: ./.github/actions/delete-run-artifact
+        with:
+          name: ${{ steps.version.outputs.bundle-artifact-android-arm64 }}

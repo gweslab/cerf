@@ -11,6 +11,7 @@ from changelog_card import artifact_card
 from host_branch import HostBranch
 from ci_release import (Artifact, CiError, load_credentials, post_discord,
                         run_artifact)
+from tool_cli import option, run_main
 
 QA_CHANNEL_ID = "1537263681228771349"
 QA_ROLE_ID = "1537262210118852708"
@@ -34,8 +35,7 @@ def message(builds: List[Tuple[HostBranch, Artifact]], release_candidate: bool,
 
 
 def main(argv: List[str]) -> int:
-    run_id = next((a.partition("=")[2] for a in argv
-                   if a.startswith("--run-id=")), "")
+    run_id = option(argv, "--run-id") or ""
     if not run_id.isdigit():
         raise CiError("--run-id=<id> is required")
     release_candidate = "--rc" in argv
@@ -64,8 +64,4 @@ def main(argv: List[str]) -> int:
 
 
 if __name__ == "__main__":
-    try:
-        raise SystemExit(main(sys.argv[1:]))
-    except CiError as exc:
-        print(f"ERROR: {exc}", file=sys.stderr)
-        raise SystemExit(1)
+    run_main(main, (CiError,))

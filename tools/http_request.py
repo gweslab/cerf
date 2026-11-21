@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import http.client
 import urllib.error
 import urllib.request
 from typing import Optional, Type
@@ -14,6 +15,14 @@ class AuthStrippingRedirect(urllib.request.HTTPRedirectHandler):
         return new
 
 
+def _failure(error: Type[Exception], text: str, status: Optional[int] = None,
+             body: str = "") -> Exception:
+    failure = error(text)
+    failure.status = status
+    failure.body = body
+    return failure
+
+
 def request(url: str, headers: dict, error: Type[Exception], user_agent: str, method: str = "GET",
             body: Optional[bytes] = None, content_type: Optional[str] = None) -> bytes:
     headers = dict(headers)
@@ -26,7 +35,10 @@ def request(url: str, headers: dict, error: Type[Exception], user_agent: str, me
         with opener.open(req, timeout=120) as response:
             return response.read()
     except urllib.error.HTTPError as exc:
-        detail = exc.read().decode("utf-8", "replace")[:400]
-        raise error(f"{method} {url} -> HTTP {exc.code}: {detail}") from exc
+        body = exc.read().decode("utf-8", "replace")
+        raise _failure(error, f"{method} {url} -> HTTP {exc.code}: {body[:400]}",
+                       exc.code, body) from exc
     except urllib.error.URLError as exc:
-        raise error(f"{method} {url} unreachable: {exc}") from exc
+        raise _failure(error, f"{method} {url} unreachable: {exc}") from exc
+    except (OSError, http.client.HTTPException) as exc:
+        raise _failure(error, f"{method} {url} failed: {exc!r}") from exc

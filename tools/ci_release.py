@@ -68,6 +68,13 @@ class Artifact:
         return f"{host_branch.CI_BASE_URL}/{self.name}.zip"
 
 
+def env(name: str) -> str:
+    value = os.environ.get(name, "").strip()
+    if not value:
+        raise CiError(f"{name} is unset or empty")
+    return value
+
+
 def load_env() -> dict:
     values = {}
     if ENV_PATH.is_file():

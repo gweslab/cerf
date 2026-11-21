@@ -1,0 +1,20 @@
+name: Delete a run artifact
+description: Delete an artifact of the current workflow run by its name.
+
+inputs:
+  name:
+    description: The name of the artifact.
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Delete the artifact
+      shell: bash
+      env:
+        GH_TOKEN: ${{ github.token }}
+        ARTIFACT: ${{ inputs.name }}
+      run: |
+        runs="repos/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+        id=$(gh api "$runs/artifacts?name=$ARTIFACT" --jq '.artifacts[0].id')
+        gh api --method DELETE "repos/${{ github.repository }}/actions/artifacts/$id"

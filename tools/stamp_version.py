@@ -17,6 +17,10 @@ def artifact_name(version: str, sha: str, branch: host_branch.HostBranch) -> str
     return "CERF-{}-{}-{}".format(version, sha, host_branch.release_marker(branch))
 
 
+def bundle_artifact_name(version: str, sha: str, branch: host_branch.HostBranch) -> str:
+    return artifact_name(version, sha, branch) + "-bundle"
+
+
 def main(argv) -> int:
     parser = argparse.ArgumentParser(description="Stamp version.h with CI build info.")
     parser.add_argument("--run", type=int, required=True)
@@ -41,12 +45,17 @@ def main(argv) -> int:
     for branch in host_branch.ci_branches():
         lines.append("artifact-{}={}".format(branch.name, artifact_name(version, sha, branch)))
         lines.append("frontend-{}={}".format(branch.name, branch.frontend))
+        if branch.store_bundle:
+            lines.append("bundle-{}={}".format(branch.name, branch.store_bundle))
+            lines.append("bundle-artifact-{}={}".format(
+                branch.name, bundle_artifact_name(version, sha, branch)))
     if job_branch is not None:
         lines.append("artifact=" + artifact_name(version, sha, job_branch))
         lines.append("out=" + host_branch.output_dir(Path("."), "Release", job_branch).as_posix())
         lines.append("frontend=" + job_branch.frontend)
         if job_branch.store_bundle:
             lines.append("bundle=" + job_branch.store_bundle)
+            lines.append("bundle-artifact=" + bundle_artifact_name(version, sha, job_branch))
     write_github_output(lines)
     print("Stamped: {} build {} (word {}), {}, {}".format(version, args.run, word, stamp, sha))
     return 0

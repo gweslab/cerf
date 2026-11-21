@@ -87,6 +87,9 @@ jobs:
     uses: ./.github/workflows/build-android.yml
     with:
       unstable: ${{ !contains(github.event.head_commit.message, '[release cerf]') }}
+      store-bundle: >-
+        ${{ github.event_name == 'push' &&
+            (github.ref == 'refs/heads/main' || contains(github.event.head_commit.message, '[release cerf]')) }}
     secrets: inherit
 
   publish:
@@ -225,6 +228,11 @@ jobs:
       group: ${{ github.workflow }}-${{ github.ref }}-release
       cancel-in-progress: true
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: write
+    outputs:
+      latest: ${{ steps.deploy.outputs.latest }}
 
     steps:
       - name: Refuse a release without a signed Android build
@@ -243,11 +251,7 @@ jobs:
           python-version: "3.12"
 
       - name: Install the release dependencies
-        run: python -m pip install --quiet --disable-pip-version-check boto3 pillow pyyaml
-
-      - name: Stamp version.h with CI build info
-        id: version
-        run: python tools/stamp_version.py --run=${{ github.run_number }} --sha=${{ github.sha }}
+        run: python -m pip install --quiet --disable-pip-version-check pillow pyyaml
 
       - name: Settle the artifact API
         run: sleep 60
@@ -261,23 +265,41 @@ jobs:
           python tools/deploy.py --yes --sha=${{ github.sha }}
           ${{ contains(github.event.head_commit.message, '[no ping]') && '--no-ping' || '' }}
 
-      - name: Fetch the Android build
-        id: android
-        if: ${{ !cancelled() && steps.deploy.outputs.latest == 'true' }}
-        uses: actions/download-artifact@v4
+      - name: Delete the app bundle that no Play job publishes
+        if: >-
+          ${{ !cancelled() && steps.deploy.outputs.latest == 'false' &&
+              needs.build-android.outputs.bundle-artifact != '' }}
+        uses: ./.github/actions/delete-run-artifact
         with:
-          name: ${{ steps.version.outputs.artifact-android-arm64 }}
-          path: ci/android
+          name: ${{ needs.build-android.outputs.bundle-artifact }}
 
-      - name: Publish the Android release APK to R2
-        if: ${{ !cancelled() && steps.android.outcome == 'success' }}
-        env:
-          R2_ACCOUNT_ID:        ${{ secrets.R2_ACCOUNT_ID }}
-          R2_BUCKET:            cerf
-          R2_ACCESS_KEY_ID:     ${{ secrets.R2_ACCESS_KEY_ID }}
-          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
-          R2_PREFIX:            cerf_android
-        run: |
-          mkdir -p ci/dist
-          cp "ci/android/${{ steps.version.outputs.frontend-android-arm64 }}" ci/dist/cerf_latest.apk
-          python tools/publish_r2_object.py --file=ci/dist/cerf_latest.apk --content-type=application/vnd.android.package-archive
+  play-beta:
+    needs: [build-android, publish]
+    if: >-
+      ${{ needs.build-android.outputs.signed == 'true' &&
+          !contains(github.event.head_commit.message, '[release cerf]') }}
+    concurrency:
+      group: ${{ github.workflow }}-play-beta
+      cancel-in-progress: true
+    permissions:
+      contents: read
+      actions: write
+    uses: ./.github/workflows/publish-play.yml
+    with:
+      track: beta
+    secrets: inherit
+
+  play-production:
+    needs: release
+    if: ${{ !cancelled() && needs.release.outputs.latest == 'true' }}
+    concurrency:
+      group: ${{ github.workflow }}-play-production
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      actions: write
+    uses: ./.github/workflows/publish-play.yml
+    with:
+      track: production
+      attempts: 3
+    secrets: inherit

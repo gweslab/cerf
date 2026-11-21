@@ -18,6 +18,7 @@ import librashader_library
 import qt_online_repository
 import vcpkg_install
 from product_facts import NOTICES_NAME
+from tool_cli import run_main
 
 QT_VERSION = qt_online_repository.QT_VERSION
 QT_SOURCE_URL = "https://download.qt.io/official_releases/qt/{0}/{1}/submodules/{2}-everywhere-src-{1}.tar.xz"
@@ -281,8 +282,4 @@ def main(argv: List[str]) -> int:
 
 
 if __name__ == "__main__":
-    try:
-        raise SystemExit(main(sys.argv[1:]))
-    except (SourceError, host_branch.UnsupportedHost, OSError) as exc:
-        print("ERROR: {}".format(exc), file=sys.stderr)
-        raise SystemExit(1)
+    run_main(main, (SourceError, host_branch.UnsupportedHost, OSError))

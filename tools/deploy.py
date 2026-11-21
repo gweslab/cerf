@@ -26,6 +26,7 @@ from ci_release import (GITHUB_API, GITHUB_UPLOADS, REPO, Artifact, CiError,
                         release_order, request, run_artifact)
 from github_output import write_github_output
 from host_branch import HostBranch
+from tool_cli import option, run_main
 
 DISCORD_CHANNEL_ID = "1517249750796206191"
 RELEASE_WATCHERS_ROLE_ID = "1553511779789971606"
@@ -45,7 +46,7 @@ def existing_release(token: str, tag: str) -> Optional[dict]:
     try:
         return github(token, f"/repos/{REPO}/releases/tags/{tag}")
     except CiError as exc:
-        if "HTTP 404" in str(exc):
+        if exc.status == 404:
             return None
         raise
 
@@ -117,7 +118,7 @@ def release_message(artifact: Artifact, ping_role: Optional[str]) -> str:
 def main(argv: List[str]) -> int:
     assume_yes = "--yes" in argv
     ping_role = None if "--no-ping" in argv else RELEASE_WATCHERS_ROLE_ID
-    sha = next((a.partition("=")[2] for a in argv if a.startswith("--sha=")), None)
+    sha = option(argv, "--sha")
     token, secret = load_credentials()
 
     artifact = latest_artifact(token, sha)
@@ -168,8 +169,4 @@ def main(argv: List[str]) -> int:
 
 
 if __name__ == "__main__":
-    try:
-        raise SystemExit(main(sys.argv[1:]))
-    except CiError as exc:
-        print(f"ERROR: {exc}", file=sys.stderr)
-        raise SystemExit(1)
+    run_main(main, (CiError,))

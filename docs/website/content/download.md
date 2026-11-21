@@ -47,9 +47,7 @@ hide:
 === ":fontawesome-brands-android: Android"
     !!! question "**Android 10 (ARM64) and newer** is required."
 
-    1. [:fontawesome-solid-download: Download APK](/cerf_latest_arm64.apk){ .md-button .md-button--primary }
-    2. Open it on your phone
-    3. Follow on-screen instructions
+    [:fontawesome-brands-google-play: Google Play](https://play.google.com/store/apps/details?id=cx.cerf){ .md-button .md-button--primary }
 
 </div>
 
@@ -68,15 +66,18 @@ You might need to read the source of your platform's installer if it needs addit
 
 You can obtain an unstable build in a few ways:
 
-=== "Deskop Installer"
+=== "Android"
+    Join open testing and install the emulator from Play Store
+
+    [:fontawesome-brands-google-play: Google Play open testing](https://play.google.com/apps/testing/cx.cerf)
+
+=== "Deskop / Installer"
     The installers above work for unstable builds too. Just pick the one. It's the recommended path for desktops for a clean unstable build installation.
 
-=== "Over the air"
+=== "Desktop / Over the air"
     If you have CE Runtime Foundation installed you can update over the air - switch to unstable builds at:
 
     **Emulator Settings** → **Update Channel** → **Unstable Releases**
 
-=== "Manual download and Android"
-    Play Store: Join our [Discord](/discord) to find information how to opt-in for the closed testing. We'll soon replace it with open testing.
-
-    Find raw archives at [:fontawesome-solid-list: GitHub Artifacts](https://github.com/gweslab/cerf/actions/workflows/build.yml?query=branch%3Amain+is%3Asuccess). Andoird APK lives there too. Registration is required.
+=== "Manual download"
+    Find raw archives at [:fontawesome-solid-list: GitHub Artifacts](https://github.com/gweslab/cerf/actions/workflows/build.yml?query=branch%3Amain+is%3Asuccess). Registration is required.

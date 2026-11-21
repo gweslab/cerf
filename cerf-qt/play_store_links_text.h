@@ -10,7 +10,7 @@
 #define CERF_PATREON_URL                     "https://www.patreon.com/dz3n"
 #define CERF_PRODUCT_AUTHOR_URL              "https://yaroslavkibysh.com"
 #define CERF_PLAY_STORE_REMOVED_URLS         CERF_GITHUB_OWNER_URL " " CERF_GITHUB_RAW_OWNER_URL " " CERF_GITHUB_AUTHOR_URL " " CERF_PATREON_URL " " CERF_PRODUCT_AUTHOR_URL
-#define CERF_PLAY_STORE_REMOVED_PATHS        "/download /feedback /donate /license /win_installer.ps1 /unix_installer.sh /cerf_latest_arm64.apk"
+#define CERF_PLAY_STORE_REMOVED_PATHS        "/download /feedback /donate /license /win_installer.ps1 /unix_installer.sh"
 #define CERF_PLAY_STORE_SITE_REMOVED_DOMAINS "github.com githubusercontent.com patreon.com"
 
 #endif

@@ -8,11 +8,13 @@ _ROOT = Path(__file__).resolve().parent.parent
 _EXECUTABLE_NAMES = _ROOT / "cerf-qt" / "executable_names_text.h"
 _INSTALL_ROOT = _ROOT / "cerf-qt" / "install_root_files_text.h"
 _RESOURCE_PATHS = _ROOT / "cerf-qt" / "resource_paths_text.h"
+_ANDROID_PACKAGE = _ROOT / "cerf-qt" / "android_package_text.h"
 _CORE_TEXT = _ROOT / "libCerfCore" / "include" / "cerfcore" / "core"
 
 QML_SOURCE_DIR = Path("cerf-qt") / "cerfman" / "qml"
 FRONTEND_NAME = str_define(_EXECUTABLE_NAMES, "CERF_FRONTEND_NAME")
 PRODUCT_NAME = str_define(_CORE_TEXT / "product_name_text.h", "CERF_PRODUCT_NAME")
+ANDROID_PACKAGE_NAME = str_define(_ANDROID_PACKAGE, "CERF_ANDROID_PACKAGE_NAME")
 DB_JSON_NAME = str_define(_CORE_TEXT / "install_layout_text.h", "CERF_DB_JSON_NAME")
 CE_APPS_DIR_NAME = str_define(_CORE_TEXT / "install_layout_text.h", "CERF_CE_APPS_DIR_NAME")
 GLOBAL_CONFIG_NAME = str_define(_INSTALL_ROOT, "CERF_GLOBAL_CONFIG_NAME")

@@ -6,10 +6,16 @@ on:
       unstable:
         type: boolean
         required: true
+      store-bundle:
+        type: boolean
+        required: true
     outputs:
       signed:
         description: true when the APK is signed and uploaded.
         value: ${{ jobs.build.outputs.signed }}
+      bundle-artifact:
+        description: name of the uploaded app bundle artifact, empty when none was uploaded.
+        value: ${{ jobs.build.outputs.bundle-artifact }}
 
 jobs:
   build:
@@ -17,6 +23,7 @@ jobs:
     container: ubuntu:26.04
     outputs:
       signed: ${{ steps.build.outputs.signed }}
+      bundle-artifact: ${{ steps.bundle.outputs.artifact-id && steps.version.outputs.bundle-artifact || '' }}
     env:
       HOST_BRANCH: android-arm64
       ANDROID_SDK_ROOT: /opt/android-sdk
@@ -160,8 +167,10 @@ jobs:
           path: ${{ steps.version.outputs.out }}/${{ steps.version.outputs.frontend }}
 
       - name: Upload the app bundle
-        if: ${{ steps.build.outputs.signed == 'true' }}
+        id: bundle
+        if: ${{ steps.build.outputs.signed == 'true' && inputs.store-bundle }}
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ steps.version.outputs.artifact }}-bundle
+          name: ${{ steps.version.outputs.bundle-artifact }}
           path: ${{ steps.version.outputs.out }}/${{ steps.version.outputs.bundle }}
+          retention-days: 1

@@ -11,7 +11,8 @@ from typing import List, Set
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import host_branch
 import version_header
-from ci_release import CiError, changelog_markdown
+from ci_release import CiError, changelog_markdown, env
+from tool_cli import option, run_main
 
 LATEST_SCHEMA = 1
 BRANCHES_KEY = host_branch.BRANCHES_KEY
@@ -26,13 +27,6 @@ def version_fields() -> dict:
     fields["commit_hash"] = version_header.read_str("sha")
     fields["build_date"] = version_header.read_str("date")
     return fields
-
-
-def env(name: str) -> str:
-    value = os.environ.get(name, "").strip()
-    if not value:
-        raise CiError(f"{name} is unset or empty")
-    return value
 
 
 def make_client():
@@ -103,7 +97,7 @@ def referenced_objects(latest: dict, prefix: str) -> Set[str]:
 
 
 def argument(argv: List[str], name: str) -> str:
-    value = next((a.partition("=")[2] for a in argv if a.startswith(name + "=")), None)
+    value = option(argv, name)
     if not value:
         raise CiError("usage: publish_r2_build.py --zip=<path> --host-branch=<name>")
     return value
@@ -161,8 +155,4 @@ def main(argv: List[str]) -> int:
 
 
 if __name__ == "__main__":
-    try:
-        raise SystemExit(main(sys.argv[1:]))
-    except CiError as exc:
-        print(f"ERROR: {exc}", file=sys.stderr)
-        raise SystemExit(1)
+    run_main(main, (CiError,))

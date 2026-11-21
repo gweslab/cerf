@@ -2,6 +2,26 @@
 
 {% block extrahead %}
   <script>document.documentElement.classList.add('cerf-anim');</script>
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="{{ config.site_name }}">
+  {% if page.meta and page.meta.title %}
+    <meta property="og:title" content="{{ page.meta.title }}">
+  {% elif page.title and not page.is_homepage %}
+    <meta property="og:title" content="{{ page.title | striptags }}">
+  {% else %}
+    <meta property="og:title" content="{{ config.site_name }}">
+  {% endif %}
+  {% if page.meta and page.meta.description %}
+    <meta property="og:description" content="{{ page.meta.description }}">
+  {% elif config.site_description %}
+    <meta property="og:description" content="{{ config.site_description }}">
+  {% endif %}
+  {% if page.canonical_url %}
+    <meta property="og:url" content="{{ page.canonical_url }}">
+  {% endif %}
+  <meta property="og:image" content="{{ config.site_url ~ config.extra.preview_image }}">
+  <meta property="og:image:alt" content="{{ config.site_name }}">
+  <meta name="twitter:card" content="summary_large_image">
   {% if config.extra.play_store_copy %}
     <meta name="robots" content="noindex, nofollow">
   {% endif %}
@@ -10,8 +30,8 @@
 {% block hero %}
   {% if page.is_homepage %}
     <div class="cerf-scene" aria-hidden="true">
-      <img class="cerf-scene-light" src="{{ 'assets/img/cerf-light.svg' | url }}" alt="" />
-      <img class="cerf-scene-dark" src="{{ 'assets/img/cerf.svg' | url }}" alt="" />
+      <img class="cerf-scene-light" src="{{ config.extra.scene_light | url }}" alt="" />
+      <img class="cerf-scene-dark" src="{{ config.extra.scene_dark | url }}" alt="" />
     </div>
     <div class="cerf-scene-overlay" aria-hidden="true"></div>
   {% endif %}

@@ -6,9 +6,23 @@ on:
     paths:
       - "docs/website/**"
       - "docs/changelog.yml"
+      - "docs/github_band.svg"
       - "libCerfCore"
+      - "assets/cerf.ico"
+      - "assets/icons_sources/**"
+      - "tools/board_database.py"
       - "tools/build_site.py"
+      - "tools/changelog.py"
+      - "tools/header_defines.py"
+      - "tools/product_facts.py"
+      - "tools/svg_raster.py"
+      - "cerf-qt/android_package_text.h"
+      - "cerf-qt/cerfman/board_order_text.h"
+      - "cerf-qt/executable_names_text.h"
+      - "cerf-qt/install_root_files_text.h"
       - "cerf-qt/play_store_links_text.h"
+      - "cerf-qt/resource_paths_text.h"
+      - ".github/FUNDING.yml"
       - ".github/workflows/site.yml"
   workflow_dispatch:
 

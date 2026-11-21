@@ -16,8 +16,6 @@ theme:
   name: material
   custom_dir: overrides
   language: en
-  logo: assets/img/cerf.svg
-  favicon: assets/img/cerf.ico
   icon:
     repo: fontawesome/brands/github
   font:

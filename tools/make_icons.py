@@ -7,6 +7,7 @@ from pathlib import Path
 from ico_format import (WIN16_PALETTE, build_ico, dib_frame,
                         dib_frame_indexed)
 from product_facts import ASSET_ICONS_DIR, ERROR_ASSET, LOGO_ASSET, LOGO_PNG, LOGO_PX
+from svg_raster import render_svg
 
 DEFAULT_SIZES = [16, 20, 24, 32, 48, 64, 256]
 
@@ -31,30 +32,18 @@ ANDROID_ICON_DENSITIES = (("mdpi", 48), ("hdpi", 72), ("xhdpi", 96), ("xxhdpi", 
 TARGETS = ("ico", "ce_ico", "ce2_ico", "logo", "android")
 
 
-def render_image(svg_path, size):
-    """resvg-render svg_path at size*size, return a clean RGBA PIL Image."""
-    import resvg_py
-    from PIL import Image
-    raw = resvg_py.svg_to_bytes(svg_path=str(svg_path), width=size, height=size)
-    im = Image.open(BytesIO(bytes(raw))).convert("RGBA")
-    if im.size != (size, size):
-        im = im.resize((size, size), Image.LANCZOS)
-    return im
-
-
 def render_png(svg_path, size):
-    """resvg-render svg_path at size*size, return a clean RGBA PNG blob."""
     buf = BytesIO()
-    render_image(svg_path, size).save(buf, format="PNG")
+    render_svg(svg_path, size, size, "RGBA").save(buf, format="PNG")
     return buf.getvalue()
 
 
 def render_dib(svg_path, size, ce_mask=False):
-    return dib_frame(render_image(svg_path, size), ce_mask=ce_mask)
+    return dib_frame(render_svg(svg_path, size, size, "RGBA"), ce_mask=ce_mask)
 
 
 def render_dib_indexed(svg_path, size, bpp=4, dither=False, palette=None):
-    return dib_frame_indexed(render_image(svg_path, size), bpp=bpp,
+    return dib_frame_indexed(render_svg(svg_path, size, size, "RGBA"), bpp=bpp,
                              dither=dither, palette=palette)
 
 

@@ -3,8 +3,9 @@ import json
 
 from board_database import (BOARD_CONFIG_PARAMS, BOARD_FAMILIES_BY_ID, BOARDS, GENERIC_PARTS, board_sort_key,
                             soc_family_of, soc_of, sort_text)
+from build_site import ICONS_DIR
 
-ICONS_URL = '/assets/icons'
+ICONS_URL = '/' + ICONS_DIR
 UNSUPPORTED_BADGE = 'unsupported_badge'
 CPU_ICON = 'board'
 

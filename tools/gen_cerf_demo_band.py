@@ -9,41 +9,21 @@ Rendered at the SVG's intrinsic width/height (the demo StretchBlts it to the
 dialog width, so only the band's own aspect ratio matters).
 """
 
-import re
 import sys
-from io import BytesIO
 from pathlib import Path
 
-import resvg_py
-from PIL import Image
-
 from product_facts import ABOUT_BAND_ASSET, ASSET_ICONS_DIR
+from svg_raster import intrinsic_size, render_svg
 
 REPO = Path(__file__).resolve().parent.parent
 DEFAULT_SVG = REPO / "assets" / ASSET_ICONS_DIR / (ABOUT_BAND_ASSET + ".svg")
 OUT = REPO / "ce_apps" / "cerf_demo" / "band_data.h"
 
 
-def intrinsic_size(svg_text):
-    w = re.search(r'<svg[^>]*\bwidth="(\d+)"', svg_text)
-    h = re.search(r'<svg[^>]*\bheight="(\d+)"', svg_text)
-    if not (w and h):
-        vb = re.search(r'viewBox="[\d.]+ [\d.]+ ([\d.]+) ([\d.]+)"', svg_text)
-        if not vb:
-            sys.exit("cannot determine SVG intrinsic size")
-        return round(float(vb.group(1))), round(float(vb.group(2)))
-    return int(w.group(1)), int(h.group(1))
-
-
 def main() -> int:
     svg = Path(sys.argv[1]) if len(sys.argv) > 1 else DEFAULT_SVG
     w, h = intrinsic_size(svg.read_text(encoding="utf-8"))
-
-    raw = resvg_py.svg_to_bytes(svg_path=str(svg), width=w, height=h)
-    img = Image.open(BytesIO(bytes(raw))).convert("RGB")
-    if img.size != (w, h):
-        img = img.resize((w, h), Image.LANCZOS)
-    data = img.tobytes()
+    data = render_svg(svg, w, h, "RGB").tobytes()
 
     lines = [
         "/* Auto-generated asset. Do not hand-edit. */",

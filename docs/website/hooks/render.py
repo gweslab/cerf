@@ -10,11 +10,11 @@ HERE      = os.path.dirname(os.path.abspath(__file__))
 SITE      = os.path.dirname(HERE)
 ROOT      = os.path.dirname(os.path.dirname(SITE))
 DEV_YML   = os.path.join(SITE, 'devices.yml')
-DEV_DIR   = os.path.join(SITE, 'content', 'assets', 'devices')
+DEV_DIR   = 'assets/devices'
 FEAT_YML  = os.path.join(SITE, 'features.yml')
-FEAT_DIR  = os.path.join(SITE, 'content', 'assets', 'features')
+FEAT_DIR  = 'assets/features'
 ART_YML   = os.path.join(SITE, 'articles.yml')
-ART_DIR   = os.path.join(SITE, 'content', 'assets', 'articles')
+ART_DIR   = 'assets/articles'
 FUNDING   = os.path.join(ROOT, '.github', 'FUNDING.yml')
 
 FUNDING_LINKS = [
@@ -32,6 +32,7 @@ sys.path.insert(0, HERE)
 import store_copy
 import changelog
 import device_database
+from build_site import BAND_PNG, CONTENT, LIGHT_SVG, LOGO_ICO, LOGO_SVG, served_path
 from board_database import running_boards, soc_family_of
 
 
@@ -66,7 +67,8 @@ def _stats():
     return '\n'.join(out)
 
 
-def _slides(entry, assets_dir, assets_url, single_key):
+def _slides(entry, assets, single_key):
+    assets_dir = os.path.join(CONTENT, assets)
     folder = entry.get('dir')
     if folder:
         path = os.path.join(assets_dir, folder)
@@ -74,12 +76,12 @@ def _slides(entry, assets_dir, assets_url, single_key):
             return []
         names = sorted(n for n in os.listdir(path)
                        if n.lower().endswith(('.png', '.jpg', '.jpeg', '.gif', '.webp')))
-        return [f'{assets_url}/{folder}/{n}' for n in names]
+        return [f'/{assets}/{folder}/{n}' for n in names]
 
     names = entry.get(single_key)
     if isinstance(names, str):
         names = [names]
-    return [f'{assets_url}/{n}' for n in names or []
+    return [f'/{assets}/{n}' for n in names or []
             if os.path.isfile(os.path.join(assets_dir, n))]
 
 
@@ -97,7 +99,7 @@ def _devices():
     out = ['<div class="cerf-rail">',
            '<div class="cerf-rail-track" tabindex="0" role="region" aria-label="Devices">']
     for index, device in enumerate(devices):
-        slides = _slides(device, DEV_DIR, '/assets/devices', 'file')
+        slides = _slides(device, DEV_DIR, 'file')
         if not slides:
             continue
 
@@ -144,13 +146,13 @@ def _card_url(link):
     return url + '#' + anchor if anchor else url
 
 
-def _cards(manifest, key, assets_dir, assets_url):
+def _cards(manifest, key, assets):
     with open(manifest, 'r', encoding='utf-8') as f:
         cards = yaml.safe_load(f).get(key) or []
 
     out = ['<div class="cerf-wall" markdown>\n']
     for index, card in enumerate(cards):
-        slides = _slides(card, assets_dir, assets_url, 'image')
+        slides = _slides(card, assets, 'image')
 
         out.append(f'<a class="cerf-card" href="{_card_url(card.get("link", ""))}">')
         if slides:
@@ -189,6 +191,11 @@ def on_config(config):
     if config.copyright and '{cur_year}' in config.copyright:
         config.copyright = config.copyright.replace(
             '{cur_year}', str(datetime.date.today().year))
+    config.theme['logo'] = served_path(LOGO_SVG)
+    config.theme['favicon'] = served_path(LOGO_ICO)
+    config.extra['scene_light'] = served_path(LIGHT_SVG)
+    config.extra['scene_dark'] = served_path(LOGO_SVG)
+    config.extra['preview_image'] = BAND_PNG
     if store_copy.active(config):
         store_copy.configure(config)
     return config
@@ -218,10 +225,10 @@ def on_page_markdown(markdown, page, config, files):
         markdown = markdown.replace('{devices}', _devices())
     if '{features}' in markdown:
         markdown = markdown.replace(
-            '{features}', _cards(FEAT_YML, 'features', FEAT_DIR, '/assets/features'))
+            '{features}', _cards(FEAT_YML, 'features', FEAT_DIR))
     if '{articles}' in markdown:
         markdown = markdown.replace(
-            '{articles}', _cards(ART_YML, 'articles', ART_DIR, '/assets/articles'))
+            '{articles}', _cards(ART_YML, 'articles', ART_DIR))
     if '{links}' in markdown:
         markdown = markdown.replace('{links}', _links())
     return markdown

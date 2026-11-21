@@ -1,6 +1,6 @@
---8<-- "ai-summary.md"
-
 # Running your own ROM
+
+--8<-- "ai-summary.md"
 
 CERF emulates a *whole device* - the SoC, the board, the memory map and every peripheral the ROM's
 drivers touch. A ROM boots when **that board is implemented in CERF**. The same chip on another

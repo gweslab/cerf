@@ -64,7 +64,8 @@ USER_AGENT = "CERF third-party sources"
 HOMEBREW_ENV = {"HOMEBREW_DEVELOPER": "1", "HOMEBREW_NO_AUTO_UPDATE": "1"}
 HOMEBREW_RECIPE = (
     'require "json"\n'
-    "f = Formulary.factory(Pathname(ARGV.fetch(0)))\n"
+    "path = Pathname(ARGV.fetch(0))\n"
+    'f = Formulary.from_contents(path.basename(".rb").to_s, path, path.read)\n'
     'puts JSON.generate({"stable" => [f.stable.url, f.stable.checksum&.hexdigest],\n'
     '  "patches" => f.patchlist.select(&:external?).map { |p| [p.url, p.resource.checksum&.hexdigest] },\n'
     '  "files" => f.patchlist.grep(LocalPatch).map { |p| p.file.to_s }})\n')
@@ -87,8 +88,11 @@ class Component:
 
 
 def _output(argv: List[str], env: Optional[Dict[str, str]] = None) -> str:
-    return subprocess.run(argv, check=True, capture_output=True, text=True,
-                          env=dict(os.environ, **(env or {}))).stdout.strip()
+    done = subprocess.run(argv, capture_output=True, text=True, env=dict(os.environ, **(env or {})))
+    if done.returncode != 0:
+        raise SourceError("{} exited with {}:\n{}".format(" ".join(argv[:2]), done.returncode,
+                                                         (done.stderr + done.stdout).strip()))
+    return done.stdout.strip()
 
 
 def _get(url: str, headers: Optional[Dict[str, str]] = None) -> bytes:
@@ -279,6 +283,6 @@ def main(argv: List[str]) -> int:
 if __name__ == "__main__":
     try:
         raise SystemExit(main(sys.argv[1:]))
-    except (SourceError, host_branch.UnsupportedHost, subprocess.CalledProcessError, OSError) as exc:
+    except (SourceError, host_branch.UnsupportedHost, OSError) as exc:
         print("ERROR: {}".format(exc), file=sys.stderr)
         raise SystemExit(1)

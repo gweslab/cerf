@@ -21,7 +21,7 @@ When the user asks to bump the CERF version, follow § Bump mode instead.
    - version: v8.0
      date: TBA
      changes: |
-       -
+       No user affecting changes yet
    ```
 
 4. **Run `python compile_readme.py`** (from repo root). Confirm it prints `README.md compiled (vX.Y)`.
@@ -54,7 +54,7 @@ Subcategories:
 `docs/changelog.yml` is the source; the README table and the website changelog page are generated from it.
 
 1. **Open `docs/changelog.yml`.** The **latest version is the topmost list entry** (currently `TBA` at the top).
-2. **Pick the group + subcategory** from the legend above. If that `group:` / `subcat:` key already exists in the top entry, append your line to its `|` block; otherwise add the key (a `|` literal block) in any order. If the top entry still has the `changes: |` / `-` placeholder from § Bump mode, delete it. Do not create a new version entry. Do not touch older entries.
+2. **Pick the group + subcategory** from the legend above. If that `group:` / `subcat:` key already exists in the top entry, append your line to its `|` block; otherwise add the key (a `|` literal block) in any order. If the top entry still has the placeholder from § Bump mode, delete it. Do not create a new version entry. Do not touch older entries.
 3. **Write one raw line.** Plain string - no escaping; colons and `<`, `&`, quotes are fine. `**text**` renders bold. Strip a prefix that just repeats the group (`Guest Additions:`, `Launcher:`), but keep a board name that says which device (`NEC MP700:`, `Zune 30:`).
 4. **Run `python compile_readme.py`** (from repo root). Confirm it prints `README.md compiled (vX.Y)`.
 

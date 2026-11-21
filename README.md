@@ -183,8 +183,16 @@ python run_claude.py
   </thead>
   <tbody>
     <tr>
-      <td>v10.0</td>
+      <td>v10.1</td>
       <td>TBA</td>
+      <td>
+        <p><b>📝 Changes</b><br/>
+          No user affecting changes yet</p>
+      </td>
+    </tr>
+    <tr>
+      <td>v10.0</td>
+      <td>21 Nov 2026</td>
       <td>
         <p><b>⚠️ Important</b><br/>
           ❗ Upgrade hangs - workaround: you need to wait 5 seconds during upgrade and let CERF kill the old process</p>
@@ -215,29 +223,6 @@ python run_claude.py
           ✅ Various crash fixes</p>
         <p><b>🌐 Website</b><br/>
           🆕 Live device database - https://cerf.cx/devices</p>
-      </td>
-    </tr>
-    <tr>
-      <td>v8.1</td>
-      <td>10 Nov 2026</td>
-      <td>
-        <p><b>📱 Devices</b><br/>
-          🆕 NEC MobilePro 790 support<br/>
-          🆕 IBM WorkPad z50 support<br/>
-          🆕 Compaq Aero 1500 family support<br/>
-          🆕 Sharp Mobilon HC4xxx: HC4500/HC4600 support; suspend support</p>
-        <p><b>💿 Emulator</b><br/>
-          🆕 Save states improved: Emulator attempts to restore RAM with user objects instead of giving up<br/>
-          🆕 Low battery deadlock helper for a shutdown dialog<br/>
-          ✅ Various styling/usability fixes on all platforms</p>
-        <p><b>🗂️ Devices Manager</b><br/>
-          🆕 Board parts editor in Board Settings dialog</p>
-        <p><b>✨ Guest Additions</b><br/>
-          🆕 Indexed palettes rework and configuration</p>
-        <p><b>🚑 Patches</b><br/>
-          ✅ Patch 1: Compaq Aero - fixed in-guest reset crash; Philips Velo 1 - proper Windows CE 2.0 ROM support (thx @Gadgetoid); Added NE2000 3.3V PC Card<br/>
-          ✅ Patch 2: Guest Additions are working again on Mobilon family<br/>
-          ✅ Patch 3: Fixed broken glow effects (especially on Android)</p>
       </td>
     </tr>
     <tr>

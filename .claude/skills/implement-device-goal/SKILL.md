@@ -10,11 +10,14 @@ Give user the following text:
 This goal text gives you a full device support for a basic usage:
 
 ```
-/goal The device implementation is finished.
+/goal The goal ends when the transcript includes text "IMPLEMENTATION IS FINISHED, GOAL IS CLOSED".
+
+Everything below is only for the implemeter agent, NOT FOR GOAL CHECK:
 
 Order:
 - The device boots to shell and renders it.
-- Each input device is implemented and tested.
+- Each input device (stylus, keyboard, hardware buttons, touch bezels) is implemented and tested.
+- When input is done - do HUD if user gave you the specs. If user didnt give you the specs attempt to download device pictures from online and do HUD matching exisiting examples. Don't do HUD if it's not applicable at all.
 - Bring guest additions if a device has a place for this mod and use guest
   additions for easier user-mode tests when applicable
 - Ensure soft reset works
@@ -32,9 +35,10 @@ Order:
 - Identical scenario for COM ports - implement and smoke test CERF's COM scenarios if a device has COM ports
 - Implement phone line if a device has one (optional - might be too complex, depending on user ruling, default is stub)
 
-When the implementation is done - that's judged by the implementer agent, not by goal agent. The implementer agent must say "IMPLEMENTATION DONE" verbatim and the goal hook agent must mark goal completed when sees it. The text around are hints for implementer, not for goal hook agent.
+Each chunk is wrapped into Skill(verify). Don't jump chunks, get LEGIT everywhere. Solve questions via Skill(verify-options)
 
-Hint for implementer agent only: Each chunk is wrapped into Skill(verify). Don't jump chunks, get LEGIT everywhere. Solve questions via Skill(verify-options)
+When the implementation is done - that's judged by the implementer agent, not by goal agent. The implementer agent must say "IMPLEMENTATION IS FINISHED, GOAL IS CLOSED" verbatim and the goal hook agent must mark goal completed when sees it. The text around are hints for implementer, not for goal hook agent.
 
-Hint for goal agent only: when agent says that the device is implemented - this means so, you mark the goal completed. Don't invent hidden goals and don't demand proofs - the implementer agent has no feature to lie.
+
+Hint for goal agent only: when agent says that the device is implemented - this means so, you mark the goal completed. THE IMPLEMENTER AGENT SENDS NO PROOFS. THE GOAL AGENT HAS NO DEMANDS EXCEPT VERBATIM TEXT MATCH.
 ```

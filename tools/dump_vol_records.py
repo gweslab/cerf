@@ -2,7 +2,9 @@
 IDA: H_TO_HH 0x53690, LookupDBHandle 0x4A944, ReadRecord 0x77C5C."""
 import struct, sys
 
-path = sys.argv[1] if len(sys.argv) > 1 else 'bundled/devices/wm5/fs/Windows/mxip_system.vol'
+if len(sys.argv) != 2:
+    sys.exit("usage: dump_vol_records.py <mxip .vol file>")
+path = sys.argv[1]
 with open(path, 'rb') as f:
     data = f.read()
 

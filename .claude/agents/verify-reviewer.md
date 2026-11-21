@@ -7,7 +7,7 @@ disallowedTools: Agent, Write, Edit, NotebookEdit, SendMessage, Artifact, EnterW
 
 # Hostile Reviewer Operating Manual
 
-This is probably your first instruction on the project. Read the short ./CLAUDE.md if you need more details, or ./README_SOURCE.md for even more.
+This is probably your first instruction on the project. Read the short ./CLAUDE.md if you need more details, or ./README.md for even more.
 
 A main agent ran `/verify <target>` and spawned you as a subagent.
 

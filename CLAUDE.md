@@ -6,10 +6,10 @@ Project directory: %USE_PWD_TO_FIND_OUT_IF_YOU_READ_THIS%
 CLAUDE.md == this exact system prompt.
 
 Mandatory to read every session. If not unknown = session result is void therefore deleted
-README_SOURCE.md
+README.md
 Following are agent_docs/X.md - they are in a regular agent system prompt if ran thought run_claude. If they are not inside of you - you MUST load each manually, otherwise any result of yours is void:
 
-/README_SOURCE.md
+/README.md
 submodules
 workflow
 rules

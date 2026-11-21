@@ -6,8 +6,17 @@ from pathlib import Path
 _TOKEN = re.compile(r'\s*(?:"([^"]*)"|([A-Za-z_]\w*))')
 
 
+def _define_match(text: str, name: str) -> re.Match:
+    return re.search(r"^\s*#define\s+" + re.escape(name) + r"\s+(.*?)\s*$", text, re.MULTILINE)
+
+
 def _define_body(text: str, name: str) -> str:
-    return re.search(r"^\s*#define\s+" + re.escape(name) + r"\s+(.*?)\s*$", text, re.MULTILINE).group(1)
+    return _define_match(text, name).group(1)
+
+
+def replace_define(text: str, name: str, body: str) -> str:
+    match = _define_match(text, name)
+    return text[:match.start(1)] + body + text[match.end(1):]
 
 
 def _string_value(text: str, name: str) -> str:

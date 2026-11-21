@@ -26,9 +26,9 @@ def assert_in_extracted_roms(p):
             f"\nERROR: refusing to open {resolved} in IDA.\n"
             f"Per CLAUDE.md, IDA only opens PEs under\n"
             f"  {EXTRACTED_ROMS}\n"
-            f"That tree is produced by tools/extract_bundles.py from\n"
-            f"each bundle's .nb0 / .bin; matching PDBs land next to\n"
-            f"the modules automatically.\n"
+            f"Extract the ROM into that tree with\n"
+            f"  python references/extract-wince-rom/extract_wince_rom.py <rom path> "
+            f"-o references/extracted-roms/<device>/<rom>/\n"
             f"Never run IDA from build/ or bundled/.\n\n"
         )
         sys.exit(2)
@@ -149,7 +149,7 @@ def main():
             time.sleep(args.stagger)
 
     if args.wait:
-        print(f"\nWaiting for IDA analysis and server registration...")
+        print("\nWaiting for IDA analysis and server registration...")
         for f in files:
             port = wait_for_registration(f)
             if port:

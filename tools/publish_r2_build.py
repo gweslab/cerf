@@ -10,25 +10,21 @@ from typing import List, Set
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import host_branch
+import version_header
 from ci_release import CiError, changelog_markdown
-from header_defines import int_define, str_define
 
-VERSION_PATH = Path("cerf-qt/version.h")
 LATEST_SCHEMA = 1
 BRANCHES_KEY = host_branch.BRANCHES_KEY
 
 
 def version_fields() -> dict:
-    if not VERSION_PATH.is_file():
-        raise CiError(f"{VERSION_PATH} not found - run from the repo root")
-    build = int_define(VERSION_PATH, "CERF_VERSION_BUILD")
+    build = version_header.read_int("build")
     if build == 0:
         raise CiError("CERF_VERSION_BUILD is 0 - version.h was never stamped")
-    numbers = [int_define(VERSION_PATH, name)
-               for name in ("CERF_VERSION_MAJOR", "CERF_VERSION_MINOR", "CERF_VERSION_PATCH")] + [build]
+    numbers = version_header.release_numbers() + [build]
     fields = dict(zip(host_branch.ENTRY_VERSION_KEYS, numbers))
-    fields["commit_hash"] = str_define(VERSION_PATH, "CERF_VERSION_SHA")
-    fields["build_date"] = str_define(VERSION_PATH, "CERF_VERSION_DATE")
+    fields["commit_hash"] = version_header.read_str("sha")
+    fields["build_date"] = version_header.read_str("date")
     return fields
 
 

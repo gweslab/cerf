@@ -27,12 +27,10 @@ SITE_LINKS = [
     ('Discord', ':fontawesome-brands-discord:', 'https://cerf.cx/discord'),
 ]
 
-sys.path.insert(0, ROOT)
 sys.path.insert(0, os.path.join(ROOT, 'tools'))
 sys.path.insert(0, HERE)
 import store_copy
 import changelog
-import compile_readme
 import device_database
 from board_database import running_boards, soc_family_of
 
@@ -210,8 +208,6 @@ def on_page_content(content, page, config, files):
 
 
 def on_page_markdown(markdown, page, config, files):
-    if '{version}' in markdown:
-        markdown = markdown.replace('{version}', compile_readme.parse_version())
     if '{boards_table}' in markdown:
         markdown = markdown.replace('{boards_table}', device_database.build_device_database())
     if '{changelog_table}' in markdown:

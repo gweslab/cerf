@@ -5,6 +5,7 @@ import shutil
 import subprocess
 import sys
 
+from changelog import CHANGELOG_YML
 from product_facts import ASSET_ICONS_DIR, LOGO_ASSET
 
 ROOT      = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -61,7 +62,7 @@ def main():
                '-f', config,
                '-w', SITE,
                '-w', os.path.join(ROOT, 'libCerfCore', 'db'),
-               '-w', os.path.join(ROOT, 'docs', 'changelog.yml'),
+               '-w', CHANGELOG_YML,
                '-w', os.path.join(ROOT, 'cerf-qt', 'play_store_links_text.h')]
         if args.port is not None:
             cmd += ['-a', f'127.0.0.1:{args.port}']

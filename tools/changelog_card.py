@@ -12,7 +12,7 @@ from PIL import Image, ImageDraw, ImageFont
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import changelog
-from ci_release import Artifact, latest_release
+from ci_release import Artifact, previous_release
 from product_facts import FONT_SANS, FONT_SANS_BOLD, FONTS_DIR, LOGO_PNG, PRODUCT_NAME
 from source_diffstat import diffstat
 
@@ -330,7 +330,7 @@ def render_card(groups: List[dict], info: CardInfo) -> bytes:
 
 
 def artifact_card(token: str, artifact: Artifact, kind: str) -> bytes:
-    since, base = latest_release(token)
+    since, base = previous_release(token, artifact.tag)
     added, deleted = diffstat(base, artifact.sha)
     entry = changelog.entry_for(artifact.series)
     groups = entry["groups"] if entry else []

@@ -664,21 +664,21 @@ function at the crashing PC. Read the actual bytes, not the bytes you
 assume.
 
 Per-module PEs live under
-`references/extracted-roms/<device>/<rom>/fs/Windows/<name>`.
-`tools/extract_bundles.py` produces them, and it runs
-`references/extract-wince-rom` against each `.nb0` / `.bin` in
-`bundled/devices/<device>/`. The tool copies matching PDBs from
-`bundled/devices/<device>/pdbs/` next to the modules
-automatically, so IDA finds symbols without any extra step.
+`references/extracted-roms/<device>/<rom>/fs/Windows/<name>`. `<device>`
+is the name of the device directory, and `<rom>` is the file name of the
+ROM. Run the extractor on the ROM directly, and always write its output
+into that tree:
+
+```
+python references/extract-wince-rom/extract_wince_rom.py <rom path> -o references/extracted-roms/<device>/<rom>/
+```
+
 `references/extracted-roms/` is gitignored and persistent across
-rebuilds - point IDA at it directly:
+rebuilds. Point IDA at it directly:
 
 ```
 python tools/open_ida.py --wait references/extracted-roms/<device>/<rom>/fs/Windows/<name>
 ```
-
-The `--wait` flag blocks until IDA finishes analysis and registers the
-MCP server.
 
 **The extracted PEs are reconstructions, not runtime captures.**
 `extract-wince-rom` rebuilds each module: it places the module bytes at
@@ -709,8 +709,8 @@ only the kernel. Search every address form that the guest can use:
 List every hit with its address. A claim without that list is a guess.
 
 Never run IDA from `build/` or `bundled/`. A rebuild wipes `build/`, and
-IDA holds locks there. `bundled/` is CERF's runtime input - an `.i64`
-sidecar inside it pollutes the input tree.
+IDA holds locks there. Each build copies `bundled/` into the build
+output, so an `.i64` sidecar inside it lands there too.
 
 ## Crash state debugging
 

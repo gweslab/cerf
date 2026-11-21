@@ -8,7 +8,7 @@ import time
 import uuid
 from dataclasses import dataclass, replace
 from pathlib import Path
-from typing import Optional, Tuple
+from typing import List, Optional, Tuple
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import changelog
@@ -25,7 +25,6 @@ DISCORD_SUPPRESS_EMBEDS = 1 << 2
 ARTIFACT_NAME = re.compile(r"^CERF-(\d+)\.(\d+)\.(\d+)-([0-9a-f]+)-" + re.escape(host_branch.RELEASE_PREFIX)
                            + r"([A-Za-z0-9-]+)$")
 WIN32_PLATFORM = host_branch.by_name(host_branch.WIN32_X86).platform_dir
-CHANGELOG_PATH = Path("docs/changelog.yml")
 ENV_PATH = Path(".env")
 USER_AGENT = "CERF deploy"
 
@@ -169,25 +168,47 @@ def run_artifact(token: str, run_id: int, platform: str = WIN32_PLATFORM,
 
 
 def changelog_markdown(tag: str, fallback: Optional[str] = None) -> str:
-    if not CHANGELOG_PATH.is_file():
-        raise CiError(f"{CHANGELOG_PATH} not found; run from the repo root")
     entry = changelog.entry_for(tag)
     if entry is None or not entry["groups"]:
         if fallback is not None:
             return fallback
-        raise CiError(f"{CHANGELOG_PATH} has no entries for v{tag}")
+        raise CiError(f"{changelog.CHANGELOG_YML} has no entries for v{tag}")
     return changelog.render_markdown(entry["groups"])
 
 
-def latest_release(token: str) -> Tuple[str, str]:
-    release = github(token, f"/repos/{REPO}/releases/latest")
-    tag = release.get("tag_name")
+def release_order(tag: str) -> Tuple[int, ...]:
+    return tuple(int(part) for part in tag.split("."))
+
+
+def latest_release_tag(token: str) -> str:
+    tag = github(token, f"/repos/{REPO}/releases/latest").get("tag_name")
     if not tag:
         raise CiError("the latest release reports no tag")
-    sha = github(token, f"/repos/{REPO}/commits/{tag}").get("sha")
+    return tag
+
+
+def _published_releases(token: str) -> List[dict]:
+    releases = []
+    page = 1
+    while True:
+        batch = github(token, f"/repos/{REPO}/releases?per_page=100&page={page}")
+        if not batch:
+            return releases
+        releases += [r for r in batch if not r.get("draft") and not r.get("prerelease")]
+        page += 1
+
+
+def previous_release(token: str, tag: str) -> Tuple[str, str]:
+    order = release_order(tag)
+    earlier = [r for r in _published_releases(token) if release_order(r["tag_name"]) < order]
+    if not earlier:
+        raise CiError(f"no published release comes before {tag}")
+    release = max(earlier, key=lambda r: release_order(r["tag_name"]))
+    previous = release["tag_name"]
+    sha = github(token, f"/repos/{REPO}/commits/{previous}").get("sha")
     if not sha:
-        raise CiError(f"release tag {tag} resolves to no commit")
-    return release.get("name") or tag, sha
+        raise CiError(f"release tag {previous} resolves to no commit")
+    return release.get("name") or previous, sha
 
 
 def _multipart(payload: dict, image: bytes, filename: str) -> Tuple[bytes, str]:

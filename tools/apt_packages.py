@@ -14,9 +14,5 @@ ANDROID_BUILD_PACKAGES = COMPILE_TOOLS + HOST_QT_TOOL_LIBRARIES + (
 PACKAGE_SETS = {"linux": BUILD_PACKAGES, "ce-apps": CE_APPS_PACKAGES, "android": ANDROID_BUILD_PACKAGES}
 
 
-def install_command():
-    return "sudo apt install " + " ".join(BUILD_PACKAGES)
-
-
 if __name__ == "__main__":
     sys.exit(exit_code(["apt-get", "install", "-y", "--no-install-recommends", *PACKAGE_SETS[sys.argv[1]]]))

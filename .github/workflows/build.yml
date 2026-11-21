@@ -2,7 +2,7 @@ name: build
 
 on:
   push:
-    branches: ["main"]
+    branches: ["main", "release-*"]
   pull_request:
     branches: ["main"]
 
@@ -92,7 +92,7 @@ jobs:
   publish:
     name: publish beta binaries
     needs: [build-windows, build-linux, build-linux-arm64, build-macos, build-android]
-    if: ${{ github.event_name == 'push' }}
+    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
     concurrency:
       group: ${{ github.workflow }}-${{ github.ref }}-publish
       cancel-in-progress: true
@@ -180,21 +180,10 @@ jobs:
           python tools/pack_release.py "ci/dist/$name.zip" ci/android
           python tools/publish_r2_build.py --zip="ci/dist/$name.zip" --host-branch=android-arm64
 
-      - name: Publish the Android release APK to R2
-        if: >-
-          ${{ needs.build-android.outputs.signed == 'true' &&
-              contains(github.event.head_commit.message, '[release cerf]') }}
-        env:
-          R2_PREFIX: cerf_android
-        run: |
-          mkdir -p ci/dist
-          cp "ci/android/${{ steps.version.outputs.frontend-android-arm64 }}" ci/dist/cerf_latest.apk
-          python tools/publish_r2_object.py --file=ci/dist/cerf_latest.apk --content-type=application/vnd.android.package-archive
-
   announce:
     needs: [build-windows, build-linux, build-linux-arm64, build-macos, build-android, publish]
     if: >-
-      ${{ github.event_name == 'push' &&
+      ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' &&
           !contains(github.event.head_commit.message, '[release cerf]') }}
     concurrency:
       group: ${{ github.workflow }}-${{ github.ref }}-announce
@@ -254,15 +243,41 @@ jobs:
           python-version: "3.12"
 
       - name: Install the release dependencies
-        run: python -m pip install --quiet --disable-pip-version-check pillow pyyaml
+        run: python -m pip install --quiet --disable-pip-version-check boto3 pillow pyyaml
+
+      - name: Stamp version.h with CI build info
+        id: version
+        run: python tools/stamp_version.py --run=${{ github.run_number }} --sha=${{ github.sha }}
 
       - name: Settle the artifact API
         run: sleep 60
 
       - name: Publish the release
+        id: deploy
         env:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
           DISCORD_SECRET: ${{ secrets.DISCORD_SECRET }}
         run: >-
           python tools/deploy.py --yes --sha=${{ github.sha }}
           ${{ contains(github.event.head_commit.message, '[no ping]') && '--no-ping' || '' }}
+
+      - name: Fetch the Android build
+        id: android
+        if: ${{ !cancelled() && steps.deploy.outputs.latest == 'true' }}
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ steps.version.outputs.artifact-android-arm64 }}
+          path: ci/android
+
+      - name: Publish the Android release APK to R2
+        if: ${{ !cancelled() && steps.android.outcome == 'success' }}
+        env:
+          R2_ACCOUNT_ID:        ${{ secrets.R2_ACCOUNT_ID }}
+          R2_BUCKET:            cerf
+          R2_ACCESS_KEY_ID:     ${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          R2_PREFIX:            cerf_android
+        run: |
+          mkdir -p ci/dist
+          cp "ci/android/${{ steps.version.outputs.frontend-android-arm64 }}" ci/dist/cerf_latest.apk
+          python tools/publish_r2_object.py --file=ci/dist/cerf_latest.apk --content-type=application/vnd.android.package-archive

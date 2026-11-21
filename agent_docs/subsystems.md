@@ -1133,37 +1133,31 @@ callback. libCerfCore code includes it as `cerfcore/core/callback_list.h`. A uni
 that calls a list of callbacks only in this way keeps the list in a
 `CallbackList`.
 
-## Bundled device tree
+## Device directories
 
-`bundled/devices/<name>/` is the input that CERF reads at boot:
+The `devices/` folder next to `cerf.exe` holds one directory for each device.
+The user installs a device there, and `cerf.exe` and the Devices Manager find it
+there. In a dev build, the folder is `build/Release/<platform>/devices/`. A
+device directory holds:
 
 - A Windows CE ROM image, `*.nb0` or `*.bin`. CERF takes whichever file
   is present. The filename does not matter.
 - `cerf.json` - the optional per-device configuration. Every field is optional,
   and `cerf.exe` runs without the file. The file is required in one case only:
-  a multi-partition / multi-file bundle, for example a ROM plus a separate
-  EEPROM image present together. The `rom` block then names which file boots
-  and which file is data, so CERF does not guess. Everything else in the file
-  is a user convenience. The `meta` block is manager-only metadata (display
-  name, board, SoC, OS, year). The `board` / `network` / `rom` overrides let a
-  user pre-bake options that the manager or the CLI otherwise passes each
-  time (a custom screen resolution on boards that support one or for a
-  guest-additions boot, a force-flipped flag). When the file is absent, CERF
-  uses `DeviceConfig` defaults plus CLI overrides.
+  a device directory with more than one image, for example a ROM plus a
+  separate EEPROM image. The `rom` block then names which file boots and which
+  file is data, so CERF does not guess. Everything else in the file is a user
+  convenience. The `meta` block is manager-only metadata. The `board`,
+  `network` and `rom` overrides store options that the manager or the CLI
+  otherwise passes at each start.
 
-Git ignores the bundle directories and the local `manifest.json` in
-`bundled/devices/`.
-
-For IDA debugging, `tools/extract_bundles.py` decomposes the same `.nb0` /
-`.bin` offline into `references/extracted-roms/<dev>/<rom>/`. The script runs
-`references/extract-wince-rom` against each ROM and copies in any matching
-PDBs. That tree is gitignored. CERF does not consume it at runtime. It serves
-IDA / static analysis only - see `agent_docs/debugging.md` § IDA discipline.
-
-The `cerf-qt-bundled` CMake target mirrors `bundled/**/*` into the folder that
-holds the frontend at build time. The copy is
-incremental and never deletes destination files that are absent from the
-source set.
+`bundled/devices/` is an optional, gitignored store for development. It is not
+the place where device ROMs live, and a release build does not include it. At
+each build, the `cerf-qt-bundled` CMake target mirrors `bundled/**/*` into the
+folder that holds the frontend. A developer keeps a device directory in
+`bundled/devices/` when each build must reset that device in `devices/` of the
+build. The copy is incremental and never deletes destination files that are
+absent from the source set.
 
 ## CE Apps - CERF-built CE binaries
 

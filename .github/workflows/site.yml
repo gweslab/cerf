@@ -7,9 +7,7 @@ on:
       - "docs/website/**"
       - "docs/changelog.yml"
       - "libCerfCore"
-      - "compile_readme.py"
       - "tools/build_site.py"
-      - "cerf-qt/version.h"
       - "cerf-qt/play_store_links_text.h"
       - ".github/workflows/site.yml"
   workflow_dispatch:

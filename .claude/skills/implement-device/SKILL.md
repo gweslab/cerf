@@ -28,30 +28,31 @@ Use one or two lines for it. Then start Gate A1 in the same reply.
 
 ### Gate A1 - Find the ROM
 
-The user can name the board without a path. The development ROMs are in
-`bundled/devices/`.
+The user can name the board without a path. In a dev build, the devices are in
+`build/Release/<platform>/devices/`.
 
-1. If the user names a board, run `ls bundled/devices/`. Match the name by
-   family, not by exact string. Accept a different variant, generation, letter
-   or separator. For example, "simpad cl4", "simpad sl4" and "SIMpad SL4" all
-   match the `simpad_sl4_*` bundles. Do not use `cerf.json` for the match.
-2. If the user gives a path inside `bundled/devices/`, make sure that the path
-   exists. Then use it.
-3. If the user gives a path outside `bundled/devices/`, ask whether to copy the
-   ROM into `bundled/devices/` first. Continue after the copy, or when the user
-   tells you to run the ROM in place.
-4. If one bundle matches, record its ROM path.
-5. If several bundles match the same board, they are ROM generations of one
+1. If the user names a board, run `ls build/Release/<platform>/devices/`. Match
+   the name by family, not by exact string. Accept a different variant,
+   generation, letter or separator. For example, "simpad cl4", "simpad sl4" and
+   "SIMpad SL4" all match the `simpad_sl4_*` devices. Do not use `cerf.json` for
+   the match.
+2. If the user gives a path inside that folder, make sure that the path exists.
+   Then use it.
+3. If the user gives a path outside that folder, ask whether to copy the ROM
+   into a new device directory there first. Continue after the copy, or when the
+   user tells you to run the ROM in place.
+4. If one device matches, record its ROM path.
+5. If several devices match the same board, they are ROM generations of one
    board id. Name the generations. Then take the newest one, or ask "which
    generation?".
 
-If `ls` shows a bundle that plausibly belongs to the named family, the ROM is
+If `ls` shows a device that plausibly belongs to the named family, the ROM is
 found. Do not report "not found" in that case. Do not state from memory that a
-bundle is present or absent.
+device is present or absent.
 
-If `ls` shows no plausible bundle, stop and write:
+If `ls` shows no plausible device, stop and write:
 
-> ❌ I couldn't find any ROM for "<what the user said>" under `bundled/devices/`.
+> ❌ I could not find any ROM for "<what the user said>" under `build/Release/<platform>/devices/`.
 > Point me at the ROM path directly, then re-run `/implement-device`.
 
 ### Gate A2 - IDA MCP
@@ -91,8 +92,8 @@ the extractor of B1 can read the file.
 
 ### B1 - Modules
 
-Extract the ROM with `tools/extract_bundles.py`. Open its modules with
-`tools/open_ida.py --wait`. Record the names of the kernel, the system modules
+Extract the ROM into `references/extracted-roms/` with the extractor. Open its
+modules with `tools/open_ida.py --wait`. Record the names of the kernel, the system modules
 and the drivers. A driver name can show the SoC. For example, `*_mx31.dll`
 shows the i.MX31.
 
@@ -118,8 +119,8 @@ Rockbox, vendor pages, and Wikipedia in every language. Save each page that you
 cite under `references/board_families/<vendor>/`.
 
 Then read the `board_families` and `boards` directories of `libCerfCore/db/`.
-List `libCerfCore/src/boards/` and `bundled/devices/`. Decide one result: the
-family is present, the board is present, or both are absent.
+List `libCerfCore/src/boards/` and `build/Release/<platform>/devices/`. Decide
+one result: the family is present, the board is present, or both are absent.
 
 ### B4 - SoC and CPU
 

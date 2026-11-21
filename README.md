@@ -28,7 +28,7 @@
 
 Visit [the website](https://cerf.cx/download) to learn how to download a stable or an unstable build.
 
-10.0 [![build](https://github.com/gweslab/cerf/actions/workflows/build.yml/badge.svg)](https://github.com/gweslab/cerf/actions/workflows/build.yml)
+[![build](https://github.com/gweslab/cerf/actions/workflows/build.yml/badge.svg)](https://github.com/gweslab/cerf/actions/workflows/build.yml)
 
 ## [Contribution Guidelines](.github/CONTRIBUTING.md)
 
@@ -47,10 +47,10 @@ Install modern Visual Studio with the C++ desktop development workload.
 
 ### Linux
 
-Install the build packages. These are the Ubuntu 26.04 names:
+Install the build packages. The script installs them with apt, under their Ubuntu 26.04 names:
 
 ```
-sudo apt install git cmake ninja-build g++ pkg-config ccache wine clang patchelf curl zip unzip tar make perl bison flex libgl-dev libasound2-dev libxcb1-dev libxcb-randr0-dev libwayland-dev
+sudo python3 tools/apt_packages.py linux
 ```
 
 Clone vcpkg and run `bootstrap-vcpkg.sh` in the clone. Set `VCPKG_ROOT` to the clone. The build downloads Qt into `third_party/qt/` and ships it with CERF.
@@ -60,7 +60,7 @@ Clone vcpkg and run `bootstrap-vcpkg.sh` in the clone. Set `VCPKG_ROOT` to the c
 Install the Xcode Command Line Tools (`xcode-select --install`) and [Homebrew](https://brew.sh). Then install the build packages:
 
 ```
-brew install cmake ninja pkgconf ccache qtbase qtsvg qtdeclarative libslirp libzip nlohmann-json
+python3 tools/homebrew_packages.py
 ```
 
 ### All hosts
@@ -100,7 +100,7 @@ The build script will:
 
 `python build.py --android=amd64` builds `build/<Config>/android-amd64/cerf.apk` for an x86_64 Android emulator. Install these first:
 
-- the Android SDK with `platforms;android-36`, `build-tools;36.0.0` and `ndk;29.0.14206865`, and set `ANDROID_SDK_ROOT` to it
+- the Android SDK with the packages that `python tools/android_sdk.py --packages` prints, and set `ANDROID_SDK_ROOT` to it
 - a JDK 17 or newer, and set `JAVA_HOME` to it
 - on Linux, a vcpkg checkout with `bootstrap-vcpkg.sh` run in it, and set `VCPKG_ROOT` to it
 
@@ -171,65 +171,7 @@ python run_claude.py
 
 ## [Supported Devices](https://cerf.cx/devices)
 
-## Changelog
-
-<table>
-  <thead>
-    <tr>
-      <th>Version</th>
-      <th>Release Date</th>
-      <th>Changes</th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr>
-      <td>v10.1</td>
-      <td>TBA</td>
-      <td>
-        <p><b>📝 Changes</b><br/>
-          No user affecting changes yet</p>
-      </td>
-    </tr>
-    <tr>
-      <td>v10.0</td>
-      <td>21 Nov 2026</td>
-      <td>
-        <p><b>⚠️ Important</b><br/>
-          ❗ Upgrade hangs - workaround: you need to wait 5 seconds during upgrade and let CERF kill the old process</p>
-        <p><b>📱 Devices</b><br/>
-          🆕 HP Jornada 680, HP 620LX support (thx @Gadgetoid/sh3-emu)<br/>
-          🆕 HP 300LX, 320LX, 360LX family support (thx @Gadgetoid/sh3-emu)<br/>
-          🆕 Casio Cassiopeia A11, A51; PA-2400U support (thx @Gadgetoid/sh3-emu)<br/>
-          🆕 NEC MobilePro 450 support<br/>
-          🆕 NEC Rockhopper: Improved CE.NET OAL support<br/>
-          ✅ Casio Cassiopeia EM-500 family: Audio playback crash fixes, hardward buttons and HUD<br/>
-          ✅ Sharp HC family: COM port issues fixed<br/>
-          ✅ [Breaking] Symbol Mk500 family: NOR storage now handled properly. If you want to boot your saved device open Board Settings and set the old flash image into the new field<br/>
-          ✅ Nino 300 family: Fixed touch lag/timing</p>
-        <p><b>💿 Emulator</b><br/>
-          🆕 SH3 guest CPU emulation<br/>
-          🆕 RetroArch shaders support (librashader)<br/>
-          🆕 Calibration helper - emulator performs calibration automatically<br/>
-          🆕 Emulator crash now saves a state - you wont lose data on crash<br/>
-          🆕 Automate your emulator with Python - https://cerf.cx/articles/automation<br/>
-          ✅ PS/2 mouse lost double clicks on Android<br/>
-          ✅ PS/2 mouse incorrect behaviour fixed<br/>
-          ✅ Android&#x27;s HUD is now fully adaptive - saves your screen space<br/>
-          ✅ Emulator is now large address aware, fixes some heavy boards halts on x64 systems<br/>
-          ✅ Some global emulator parameters were overwritten each update</p>
-        <p><b>🗂️ Devices Manager</b><br/>
-          🆕 Import, export, clone your devices</p>
-        <p><b>✨ Guest Additions</b><br/>
-          ✅ Various crash fixes</p>
-        <p><b>🌐 Website</b><br/>
-          🆕 Live device database - https://cerf.cx/devices</p>
-      </td>
-    </tr>
-    <tr>
-      <td colspan="3"><b>Previous versions</b> - see the <a href="https://cerf.cx/changelog/">full changelog</a>.</td>
-    </tr>
-  </tbody>
-</table>
+## [Changelog](https://cerf.cx/changelog)
 
 ---
 

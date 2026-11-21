@@ -20,7 +20,7 @@ import host_processes
 
 GB = 1 << 30
 ROOT_TAG = "%USE_PWD_TO_FIND_OUT_IF_YOU_READ_THIS%"
-DOCS = ("CLAUDE.md", "README_SOURCE.md", "agent_docs/workflow.md",
+DOCS = ("CLAUDE.md", "README.md", "agent_docs/workflow.md",
         "agent_docs/workflow_examples.md", "agent_docs/subsystems.md",
          "agent_docs/jit.md",
         "agent_docs/timers_clocks.md", "agent_docs/rules.md", "agent_docs/hibernation.md",

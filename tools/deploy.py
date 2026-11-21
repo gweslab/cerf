@@ -22,7 +22,9 @@ import host_branch
 from changelog_card import artifact_card
 from ci_release import (GITHUB_API, GITHUB_UPLOADS, REPO, Artifact, CiError,
                         changelog_markdown, github, latest_artifact,
-                        load_credentials, post_discord, request, run_artifact)
+                        latest_release_tag, load_credentials, post_discord,
+                        release_order, request, run_artifact)
+from github_output import write_github_output
 from host_branch import HostBranch
 
 DISCORD_CHANNEL_ID = "1517249750796206191"
@@ -80,7 +82,7 @@ def release_asset(token: str, branch: HostBranch, artifact: Artifact) -> Path:
     return archive
 
 
-def create_release(token: str, artifact: Artifact, body: str) -> dict:
+def create_release(token: str, artifact: Artifact, body: str, newest: bool) -> dict:
     return github(token, f"/repos/{REPO}/releases", "POST", {
         "tag_name": artifact.tag,
         "target_commitish": artifact.sha,
@@ -88,6 +90,7 @@ def create_release(token: str, artifact: Artifact, body: str) -> dict:
         "body": body,
         "draft": False,
         "prerelease": False,
+        "make_latest": "true" if newest else "false",
     })
 
 
@@ -128,6 +131,9 @@ def main(argv: List[str]) -> int:
 
     if existing_release(token, artifact.tag) is not None:
         raise CiError(f"release {artifact.tag} already exists")
+    current = latest_release_tag(token)
+    newest = release_order(artifact.tag) > release_order(current)
+    print(f"  latest release: {current} -> {artifact.tag if newest else current}")
 
     body = changelog_markdown(artifact.series)
     print(f"\nChangelog for v{artifact.series}:\n{body}\n")
@@ -146,8 +152,9 @@ def main(argv: List[str]) -> int:
     confirm(f"Publish tag {artifact.tag} at {artifact.sha[:7]} with these assets?",
             assume_yes)
 
-    release = create_release(token, artifact, body)
+    release = create_release(token, artifact, body, newest)
     print(f"  release created: {release['html_url']}")
+    write_github_output([f"latest={'true' if newest else 'false'}"])
     for path in archives:
         print(f"  uploading {path.name} ...")
         print(f"  asset: {upload_asset(token, release['id'], path)}")

@@ -1,5 +1,5 @@
 - version: v10.0
-  date: 20 Nov 2026
+  date: 21 Nov 2026
   important:
     important: |
       Upgrade hangs - workaround: you need to wait 5 seconds during upgrade and let CERF kill the old process

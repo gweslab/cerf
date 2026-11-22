@@ -15,7 +15,9 @@ public:
 
     class Request {
     public:
-        explicit Request(DesktopGuestFollow& follow) : follow_(follow) { ++follow_.requests_; }
+        explicit Request(DesktopGuestFollow& follow) : follow_(follow) {
+            if (follow_.requests_++ == 0) follow_.delivered_in_request_ = QSize();
+        }
         ~Request() { --follow_.requests_; }
         Request(const Request&)            = delete;
         Request& operator=(const Request&) = delete;
@@ -32,6 +34,7 @@ public:
     void Placed() { placed_ = true; }
     void Attach();
     void ExpectResize(const QSize& before, const QSize& after);
+    void SettleResize(const QSize& before, const QSize& requested, const QSize& applied);
     void ExpectStates(Qt::WindowStates states);
     bool LiveResizeOn() const;
     void ArmLiveResize();
@@ -46,6 +49,7 @@ private:
     QTimer                        resize_debounce_;
     std::vector<QSize>            pending_;
     std::vector<Qt::WindowStates> pending_states_;
+    QSize                         delivered_in_request_;
     int                           requests_     = 0;
     bool                          follow_guest_ = true;
     bool                          placed_       = false;

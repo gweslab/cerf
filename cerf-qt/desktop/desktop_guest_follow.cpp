@@ -65,9 +65,17 @@ void DesktopGuestFollow::ExpectResize(const QSize& before, const QSize& after) {
     if (after != before) pending_.push_back(after);
 }
 
+void DesktopGuestFollow::SettleResize(const QSize& before, const QSize& requested, const QSize& applied) {
+    if (applied == requested) return;
+    const auto unanswered = std::find(pending_.begin(), pending_.end(), requested);
+    if (unanswered != pending_.end()) pending_.erase(unanswered);
+    if (applied != before && applied != delivered_in_request_) pending_.push_back(applied);
+}
+
 void DesktopGuestFollow::ExpectStates(Qt::WindowStates states) { pending_states_.push_back(states); }
 
 void DesktopGuestFollow::OnResized(const QSize& size) {
+    if (requests_ > 0) delivered_in_request_ = size;
     const auto requested = std::find(pending_.begin(), pending_.end(), size);
     if (requested != pending_.end()) {
         pending_.erase(pending_.begin(), requested + 1);

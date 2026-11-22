@@ -206,9 +206,11 @@ private:
         if (!fit) return true;
         auto& follow = emu_.Get<DesktopGuestFollow>();
         if (window.windowStates().testFlag(Qt::WindowMaximized)) follow.ExpectStates(Qt::WindowNoState);
-        follow.ExpectResize(window.geometry().size(), fit->client);
+        const QSize before = window.geometry().size();
+        follow.ExpectResize(before, fit->client);
         const DesktopGuestFollow::Request request(follow);
         chrome_.ApplyFit(window, *fit);
+        follow.SettleResize(before, fit->client, window.geometry().size());
         return fit->whole;
     }
 

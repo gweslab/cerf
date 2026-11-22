@@ -150,27 +150,29 @@ is one part of the device. It has:
   no item for it.
 - `displayed_name` - optional. The name of a stock part that the user cannot
   change, for example a panel model or a keyboard layout.
-- the optional fields of its part. Only the display part has fields today:
-  `display_width` and `display_height`, the panel size in pixels. An item never
+- the optional fields of its part, for example `display_width` and
+  `display_height` of the display part, the panel size in pixels. An item never
   carries a field that its part does not have.
 
 A device can have more than one item of one part. Each item is one component,
 for example two displays.
 
-The first display item with a size gives the panel size of the board. CERF
-opens the emulator window at that size, and guest additions take it as their
-default. A later display item can carry its size, and no component reads it.
-When a row holds more than one display item, `$index` puts the panel item first.
+The first display item with a size gives the panel size of the board. The size
+is a hardware fact of the panel. CERF opens the emulator window at that size,
+and guest additions take it as their default. A later display item can carry
+its size, and no component reads it. When a row holds more than one display
+item, `$index` puts the panel item first.
 
 **A family holds only the items that every member has, unchanged.** When one
 member differs in a part, the family stops holding that part, and each member
 that has the part holds its own item. A board item never replaces a family
 item. The items of a board add to the items of its family.
 
-Members can differ in a part that has no public name, for example the same
-speaker on other pins. Their items then take a letter as their displayed name:
-Speakers A, Speakers B. The letters state that the parts differ, and they do
-not state which part CERF supports.
+When members differ in a part, the displayed name of each item states the known
+difference, for example 256 colors and 4096 colors. Only parts that differ in a
+way that no source names take a letter, for example the same speaker on other
+pins: Speakers A, Speakers B. The letters state that the parts differ, and they
+do not state which part CERF supports.
 
 ### Clear facts and open facts
 
@@ -178,11 +180,19 @@ A hardware fact is clear when a generic part, a field of that part, or a
 board configuration parameter can state it. A clear fact goes into
 `device_specs` or `board_config`, never into text.
 
-A hardware fact is open when no generic part and no field can state it yet,
-for example a CompactFlash slot, a phone connector, the size of a NOR flash or
-the color of a backlight. An open fact stays as text in
-`internal__spec_divergences` of the member that differs. When CERF gets a part
-or a field for it, the fact moves out of that text.
+A fact about a component that CERF models is always clear. When a change
+records such a component and no generic part describes it, the change adds the
+part: a new `device_generic_parts` row with its own id and name and the icon of
+its nearest part. A missing part is never a reason to leave the component out,
+or to put it into the displayed name of another part. For example, a graphics
+controller beside the display gets a part of its own.
+
+A hardware fact is open when CERF does not model its component and no part
+describes that component. A fact is also open when no field of its part can
+state it. Examples are a CompactFlash slot, a phone connector, the size of a NOR
+flash and the color of a backlight. An open fact stays as text in
+`internal__spec_divergences` of the member that differs. When a part or a field
+for it exists, the fact moves out of that text.
 
 `internal__spec_divergences` holds hardware facts only. The content, the size
 and the language of a ROM, a market, a brand, the bundled software and the CPU
@@ -202,6 +212,11 @@ part that a user can fit to the board. A value can break the guest, for example 
 compatible panel that the ROM does not drive. A RAM size belongs in the list
 when the board can take it. A size that the vendor never fitted also belongs in
 the list when the guest supports it.
+
+The values of one parameter can depend on another part of the board, for example
+the panels that a graphics controller can drive. Such a dependency needs a
+mechanism of its own in the database. The first board that needs it gets that
+mechanism, never a flat `values` list or an exception for one board.
 
 A part belongs to the whole family or to a subset of its members. When every
 member has the slot or the pads for the part, the family row holds the

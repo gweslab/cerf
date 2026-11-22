@@ -503,6 +503,11 @@ the render and input plumbing that connects the host UI to the guest.
   window at that size. When the guest signals the same size, the user sees
   no window resize. A panel that reports a different size wins.
 
+  The declared panel size is a hardware fact. A stock guest driver can program a
+  larger frame than the panel has, for example one more pixel line. The fix for
+  such a driver trims the frame to the declared size. It never clamps the size in
+  the display code of one board.
+
   When the user sets no guest-additions resolution override, guest additions
   take that same board fact. The manager resolves that order too.
 

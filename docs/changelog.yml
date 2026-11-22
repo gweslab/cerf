@@ -1,7 +1,11 @@
 - version: v10.1
   date: TBA
-  changes: |
-    No user affecting changes yet
+  devices:
+    new: |
+      Jornada 540 family support [WIP]
+  emulator:
+    new: |
+      Moved LEDs into HUDs; Added button face effects
 
 - version: v10.0
   date: 21 Nov 2026

@@ -3,9 +3,11 @@
   devices:
     new: |
       Jornada 540 family support [WIP]
+      ODO family: added HUD
   emulator:
     new: |
-      Moved LEDs into HUDs; Added button face effects
+      Moved LEDs into HUDs
+      Added HUD button face effects
 
 - version: v10.0
   date: 21 Nov 2026

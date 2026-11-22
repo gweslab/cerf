@@ -37,7 +37,7 @@ const QList<QByteArray> kRoles = {"kind",    "boxLeft", "boxTop", "boxWidth", "b
                                   "center",  "lamps",   "lampShape", "mono",     "keyUnit"};
 
 constexpr std::pair<cerfcore::HudLampShape, const char*> kLampShapeNames[] = {
-    {cerfcore::HudLampShape::kCircle, "circle"}};
+    {cerfcore::HudLampShape::kCircle, "circle"}, {cerfcore::HudLampShape::kDisc, "disc"}};
 
 QString LampShapeName(cerfcore::HudLampShape shape) {
     for (const auto& [value, name] : kLampShapeNames)
@@ -107,11 +107,13 @@ QList<QVariantMap> HudNodes::Build(const ViewportLayout::Layout& frame, QPointF 
     const FrameRect               image = frame.Rect();
     if (std::any_of(bands.begin(), bands.end(), [&image](const FrameRect& band) { return band.Overlaps(image); }))
         for (const FrameRect& band : bands) out.append(Row("band", band, scale));
-    const cerfcore::KeyboardMap* map   = emu_.TryGet<cerfcore::KeyboardMap>();
-    const uint8_t                layer = map == nullptr ? 0 : HeldLayer(*map);
-    const double                 unit  = HudSmallestControl(controls.Shown(), [scale](const HudShown& shown) {
+    const cerfcore::KeyboardMap* map    = emu_.TryGet<cerfcore::KeyboardMap>();
+    const uint8_t                layer  = map == nullptr ? 0 : HeldLayer(*map);
+    const auto                   side   = [scale](const HudShown& shown) {
         return std::min(shown.canvas.w / scale.x(), shown.canvas.h / scale.y());
-    });
+    };
+    const double                 keycap = HudSmallest(controls.Shown(), HudIsKeycap, side);
+    const double                 unit   = keycap > 0.0 ? keycap : HudSmallest(controls.Shown(), HudIsControl, side);
     for (const HudShown& shown : controls.Shown()) {
         if (shown.node->kind == HudNode::Kind::kButton)
             out.append(Button(shown, Face(shown.node->button, map, layer), Renamed(shown.node->button.keys, map),

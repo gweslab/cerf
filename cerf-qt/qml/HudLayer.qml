@@ -87,6 +87,8 @@ Item {
                         id: key
                         anchors.fill: parent
                         unit: cell.keyUnit
+                        lamps: cell.lamps
+                        lampShape: cell.lampShape
                         sunk: cell.down || cell.latched
                     }
                     HoverHandler {
@@ -105,12 +107,9 @@ Item {
                             anchors.fill: parent
                             symbol: cell.symbol
                             label: cell.label
-                            lamps: cell.lamps
-                            lampShape: cell.lampShape
                             family: cell.mono ? root.monoFamily : root.uiFamily
                             ink: Theme.hudInk
                             iconSize: Math.max(1, Math.round(cell.side * root.iconPart))
-                            lampSize: Math.max(1, Math.round(cell.side * root.lampPart))
                             labelSize: Math.max(1, Math.round(cell.side * root.labelPart))
                             labelRoom: Math.max(1, Math.round(cell.width * root.labelRoomPart))
                         }
@@ -235,7 +234,10 @@ Item {
         id: cap
         property bool sunk: false
         property bool round: false
+        property var lamps: []
+        property string lampShape
         required property real unit
+        readonly property bool led: lampShape !== ""
         readonly property real seam: root.devicePixels(root.seamPixels)
         readonly property real travel: root.devicePixels(unit * root.travelPart)
         readonly property real faceWidth: width - seam
@@ -243,60 +245,81 @@ Item {
         readonly property real faceTop: sunk ? travel : 0
         readonly property real corner: round ? Math.min(faceWidth, faceHeight) / 2
                                              : Math.max(1, Math.round(unit * root.radiusPart))
+        readonly property bool circleLed: led && lampShape === "circle"
+        readonly property real bodyWidth: circleLed ? Math.min(faceWidth, faceHeight) : faceWidth
+        readonly property real bodyHeight: circleLed ? Math.min(faceWidth, faceHeight) : faceHeight
+        readonly property real bodyX: (faceWidth - bodyWidth) / 2
+        readonly property real bodyY: (faceHeight - bodyHeight) / 2
+        readonly property real cornerX: led ? bodyWidth / 2 : corner
+        readonly property real cornerY: led ? bodyHeight / 2 : corner
 
         Shape {
             visible: !cap.sunk
+            x: cap.bodyX
+            y: cap.bodyY
             preferredRendererType: Shape.CurveRenderer
             ShapePath {
                 strokeColor: Theme.noFill
                 fillColor: Theme.hudKeyShadow
                 startX: 0
-                startY: cap.faceHeight - cap.corner
+                startY: cap.bodyHeight - cap.cornerY
                 PathArc {
-                    x: cap.corner
-                    y: cap.faceHeight
-                    radiusX: cap.corner
-                    radiusY: cap.corner
+                    x: cap.cornerX
+                    y: cap.bodyHeight
+                    radiusX: cap.cornerX
+                    radiusY: cap.cornerY
                     direction: PathArc.Counterclockwise
                 }
                 PathLine {
-                    x: cap.faceWidth - cap.corner
-                    y: cap.faceHeight
+                    x: cap.bodyWidth - cap.cornerX
+                    y: cap.bodyHeight
                 }
                 PathArc {
-                    x: cap.faceWidth
-                    y: cap.faceHeight - cap.corner
-                    radiusX: cap.corner
-                    radiusY: cap.corner
+                    x: cap.bodyWidth
+                    y: cap.bodyHeight - cap.cornerY
+                    radiusX: cap.cornerX
+                    radiusY: cap.cornerY
                     direction: PathArc.Counterclockwise
                 }
                 PathLine {
-                    x: cap.faceWidth
-                    y: cap.faceHeight - cap.corner + cap.travel
+                    x: cap.bodyWidth
+                    y: cap.bodyHeight - cap.cornerY + cap.travel
                 }
                 PathArc {
-                    x: cap.faceWidth - cap.corner
-                    y: cap.faceHeight + cap.travel
-                    radiusX: cap.corner
-                    radiusY: cap.corner
+                    x: cap.bodyWidth - cap.cornerX
+                    y: cap.bodyHeight + cap.travel
+                    radiusX: cap.cornerX
+                    radiusY: cap.cornerY
                 }
                 PathLine {
-                    x: cap.corner
-                    y: cap.faceHeight + cap.travel
+                    x: cap.cornerX
+                    y: cap.bodyHeight + cap.travel
                 }
                 PathArc {
                     x: 0
-                    y: cap.faceHeight - cap.corner + cap.travel
-                    radiusX: cap.corner
-                    radiusY: cap.corner
+                    y: cap.bodyHeight - cap.cornerY + cap.travel
+                    radiusX: cap.cornerX
+                    radiusY: cap.cornerY
                 }
                 PathLine {
                     x: 0
-                    y: cap.faceHeight - cap.corner
+                    y: cap.bodyHeight - cap.cornerY
                 }
             }
         }
+        Loader {
+            active: cap.led
+            x: cap.bodyX
+            y: cap.faceTop + cap.bodyY
+            width: cap.bodyWidth
+            height: cap.bodyHeight
+            sourceComponent: HudLamp {
+                lamps: cap.lamps
+                shape: cap.lampShape
+            }
+        }
         Rectangle {
+            visible: !cap.led
             y: cap.faceTop
             width: cap.faceWidth
             height: cap.faceHeight
@@ -329,12 +352,14 @@ Item {
         property real lampSize
         property int labelSize
         property real labelRoom
+        readonly property bool disc: lampShape === "disc"
+        readonly property real lampScale: lampSize / Math.max(1, Math.min(width, height))
 
         HudLamp {
             visible: parent.lampShape !== ""
             anchors.centerIn: parent
-            width: parent.lampSize
-            height: parent.lampSize
+            width: parent.disc ? parent.width * parent.lampScale : parent.lampSize
+            height: parent.disc ? parent.height * parent.lampScale : parent.lampSize
             lamps: parent.lamps
             shape: parent.lampShape
         }

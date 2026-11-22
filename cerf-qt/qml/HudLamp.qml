@@ -6,7 +6,6 @@ Item {
     id: root
     property var lamps: []
     property string shape
-    property double now: 0
 
     readonly property real glowPart: 1.9
     readonly property real floorPart: 0.84
@@ -26,84 +25,21 @@ Item {
     readonly property real darkHighlight: 0.3
     readonly property real glowAlpha: 0.5
 
-    function shownColor(lamp, t) {
-        if (!lamp.lit)
-            return null
-        const cycle = lamp.onMs + lamp.offMs
-        if (!lamp.blinking || cycle === 0 || t % cycle < lamp.onMs)
-            return lamp.color
-        return lamp.between !== undefined ? lamp.between : null
-    }
-
-    function lit(t) {
-        return lamps.some(lamp => shownColor(lamp, t) !== null)
-    }
-
-    function fill(t) {
-        const main = lamps.length > 0 ? shownColor(lamps[0], t) : null
-        let mixed = main !== null ? main : Theme.lampDark
-        for (let i = 1; i < lamps.length; ++i) {
-            const other = shownColor(lamps[i], t)
-            if (other === null)
-                continue
-            mixed = main !== null ? Qt.rgba(Math.min(1, mixed.r + other.r), Math.min(1, mixed.g + other.g),
-                                            Math.min(1, mixed.b + other.b), 1) : other
-        }
-        return mixed
-    }
-
-    function untilEdge(t) {
-        let wait = 0
-        for (const lamp of lamps) {
-            const cycle = lamp.onMs + lamp.offMs
-            if (!lamp.lit || !lamp.blinking || cycle === 0)
-                continue
-            const phase = t % cycle
-            const left = phase < lamp.onMs ? lamp.onMs - phase : cycle - phase
-            wait = wait === 0 ? left : Math.min(wait, left)
-        }
-        return wait
-    }
-
-    function followBlink() {
-        now = Date.now()
-        const wait = untilEdge(now)
-        if (wait > 0) {
-            blink.interval = wait
-            blink.restart()
-        } else {
-            blink.stop()
-        }
-    }
-
-    onLampsChanged: followBlink()
-    Component.onCompleted: followBlink()
-
-    Timer {
-        id: blink
-        onTriggered: root.followBlink()
+    LampLight {
+        id: light
+        lamps: root.lamps
     }
 
     Loader {
         anchors.fill: parent
-        sourceComponent: root.shape === "circle" ? circle : null
+        sourceComponent: root.shape === "circle" ? circle : root.shape === "disc" ? disc : null
     }
 
-    component Disc: Shape {
+    Component {
         id: disc
-        property alias gradient: path.fillGradient
-        preferredRendererType: Shape.CurveRenderer
-        ShapePath {
-            id: path
-            strokeColor: Theme.noFill
-            PathAngleArc {
-                centerX: disc.width / 2
-                centerY: disc.height / 2
-                radiusX: disc.width / 2
-                radiusY: disc.height / 2
-                startAngle: 0
-                sweepAngle: 360
-            }
+        HudLedFace {
+            base: light.color
+            lit: light.lit
         }
     }
 
@@ -112,10 +48,10 @@ Item {
         Item {
             id: led
             readonly property real side: Math.min(width, height)
-            readonly property color dome: root.fill(root.now)
-            readonly property bool glowing: root.lit(root.now)
+            readonly property color dome: light.color
+            readonly property bool glowing: light.lit
 
-            Disc {
+            HudDisc {
                 visible: led.glowing
                 anchors.centerIn: parent
                 width: led.side * root.glowPart
@@ -159,7 +95,7 @@ Item {
                 radius: width / 2
                 color: Theme.lampFloor
             }
-            Disc {
+            HudDisc {
                 id: domeDisc
                 anchors.centerIn: parent
                 width: led.side * root.domePart

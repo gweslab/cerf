@@ -245,15 +245,17 @@ button has `keys` or an `action`. An action is the object path of a
 cell, and it takes no press. An example is the icon that the device prints above a
 key.
 
-A `lamp` cell shows the lamp at its `object` path. A button with a `lamp` shows
-that lamp as its face, for a button that sits in an LED. A `display` cell shows the
-characters of the character display at its `object` path. Lamp and display cells take
-no press.
+A `lamp` cell shows the lamp at its `object` path. The `shape` of a lamp is `circle`, a
+round LED, or `disc`, a widened oval LED whose whole face lights. A lamp with no
+`shape` is a `circle`. A button with a `lamp` is an LED button, and that lamp is its
+whole face. A `display` cell shows the characters of the character display at its
+`object` path. Lamp and display cells take no press.
 
 An indicator is a lamp that lies over its panel and takes no cell, so it moves no key.
 `x` and `y` place its center as fractions of the panel as the preset draws it. `size`
-is its diameter as a fraction of the shorter side of the panel. On Android, the
-indicator moves and turns with its panel.
+is its height as a fraction of the shorter side of the panel. `aspect` is its width
+divided by its height, 1 when absent. On Android, the indicator moves and turns with
+its panel.
 
 An LED-only HUD carries its indicator on an empty panel. It needs no layout of the device.
 

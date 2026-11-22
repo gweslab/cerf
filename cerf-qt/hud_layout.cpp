@@ -48,16 +48,23 @@ void PlaceIndicators(const HudPanel& panel, const HudPanelPlace& place, HudArran
     const FrameRect& r    = place.rect;
     const double     side = std::min(r.w, r.h);
     for (const cerfcore::HudIndicator& indicator : panel.indicators) {
-        const FramePoint at   = Turned(indicator.x, indicator.y, place.turn);
-        const double     size = indicator.size * side;
-        out.elements.push_back(
-            {&indicator.node, FrameRect{r.x + at.x * r.w - size / 2.0, r.y + at.y * r.h - size / 2.0, size, size}});
+        const FramePoint at     = Turned(indicator.x, indicator.y, place.turn);
+        const double     tall   = indicator.size * side;
+        const double     wide   = tall * indicator.aspect;
+        const bool       turned = place.turn != HudTurn::kNone;
+        const double     w      = turned ? tall : wide;
+        const double     h      = turned ? wide : tall;
+        out.elements.push_back({&indicator.node, FrameRect{r.x + at.x * r.w - w / 2.0, r.y + at.y * r.h - h / 2.0, w, h}});
     }
 }
 
 }
 
 bool HudAlongX(HudSide side) { return side == HudSide::kTop || side == HudSide::kBottom; }
+
+bool HudIsControl(const HudNode& node) { return node.kind == HudNode::Kind::kButton || node.kind == HudNode::Kind::kDpad; }
+
+bool HudIsKeycap(const HudNode& node) { return HudIsControl(node) && node.button.face.lamp.object.empty(); }
 
 double HudAligned(HudAlign align, double span, double extent) {
     switch (align) {

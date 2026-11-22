@@ -53,12 +53,14 @@ void           HudSurfaceFor(const cerfcore::DbHud& hud, double content_w, doubl
 HudArrangement HudArrange(const HudFrame& frame);
 HudArrangement HudArrangePanel(const cerfcore::HudNode& root, const FrameRect& rect, HudTurn turn);
 
-template <typename Placed, typename Side>
-double HudSmallestControl(const std::vector<Placed>& placed, Side side) {
+bool HudIsControl(const cerfcore::HudNode& node);
+bool HudIsKeycap(const cerfcore::HudNode& node);
+
+template <typename Placed, typename Counts, typename Side>
+double HudSmallest(const std::vector<Placed>& placed, Counts counts, Side side) {
     double smallest = 0.0;
     for (const Placed& p : placed) {
-        if (p.node->kind != cerfcore::HudNode::Kind::kButton && p.node->kind != cerfcore::HudNode::Kind::kDpad)
-            continue;
+        if (!counts(*p.node)) continue;
         const double s = side(p);
         if (smallest == 0.0 || s < smallest) smallest = s;
     }

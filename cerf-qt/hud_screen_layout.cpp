@@ -196,8 +196,8 @@ private:
 
     double SmallestControl(const std::vector<Slot>& slots) const {
         const HudFrame unit{area_w_, area_h_, true, &hud_.panels, Lay(slots, 1.0)};
-        return HudSmallestControl(HudArrange(unit).elements,
-                                  [](const HudPlaced& placed) { return std::min(placed.rect.w, placed.rect.h); });
+        return HudSmallest(HudArrange(unit).elements, HudIsControl,
+                           [](const HudPlaced& placed) { return std::min(placed.rect.w, placed.rect.h); });
     }
 
     const DbHud& hud_;

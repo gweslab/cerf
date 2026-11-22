@@ -85,10 +85,23 @@ built-in modem.
 The family code runs on that member, and the member has no modem in CERF.
 
 Running the family code on such a member is not a guessed implementation.
-Code never takes a family service away from a member. A board id check in
-`ShouldRegister` that skips the member, or a halt on that member, is such a
-removal. A member is `bootable_full` only when CERF models every difference
-of that member.
+Code never takes a family service away from a member. These are all removals:
+
+- A board id check in `ShouldRegister` that skips the member
+- A halt on that member
+- A per-member answer that turns off one feature of the service
+
+A member lacks a part only when a source names the absence. Without such a
+source, the member has the part, because its family siblings and the
+platforms that its family came from have it. An input path that nobody has
+found yet is an open investigation, never an absence. A member is
+`bootable_full` only when CERF models every difference of that member.
+
+Family code finds a control that the members share by what the control is,
+for example the LED button. A virtual key or a pin of one member does not
+find the control on a member whose wiring differs. The control then
+disappears on that member with no error. Find the wiring of each member in its own ROM.
+Start from the routine that a sibling member uses for that control.
 
 The board sets `support_level`. The values are:
 

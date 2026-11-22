@@ -1,11 +1,13 @@
 #include "hud_controls.h"
 
 #include "button_row.h"
+#include "host_holds_release.h"
 
 #include <cerfcore/core/cerf_emulator.h>
 #include <cerfcore/core/hud_database.h>
-#include <cerfcore/host/device_buttons.h>
 #include <cerfcore/host/keyboard_router.h>
+#include <cerfcore/host/machine_indicators.h>
+#include <cerfcore/host/machine_object_tree.h>
 
 #include <algorithm>
 #include <cmath>
@@ -97,6 +99,8 @@ double FarDistance(const FrameRect& from, const FrameRect& to) {
 
 }
 
+void HudControls::OnReady() { emu_.Get<HostHoldsRelease>().Add([this] { CancelAll(); }); }
+
 void HudControls::Place(const cerfcore::DbHud& hud, const ViewportLayout::Layout& frame) {
     if (&hud == hud_ && SameFrame(frame, frame_) && canvas_area_ == placed_area_) return;
     hud_         = &hud;
@@ -104,7 +108,6 @@ void HudControls::Place(const cerfcore::DbHud& hud, const ViewportLayout::Layout
     placed_area_ = canvas_area_;
     shown_.clear();
     bands_.clear();
-    separators_.clear();
     const HudFit fit = FitFor(hud, frame);
     placement_       = fit.placement;
     Publish(fit.frame, fit.sx, fit.sy);
@@ -134,14 +137,10 @@ HudControls::HudFit HudControls::FitFor(const cerfcore::DbHud& hud, const Viewpo
 
 void HudControls::Publish(const HudFrame& frame, double sx, double sy) {
     const auto scaled = [sx, sy](const FrameRect& r) { return FrameRect{r.x * sx, r.y * sy, r.w * sx, r.h * sy}; };
-    const auto turned = [this, sx, sy](FramePoint p) { return placement_.ToCanvas(FramePoint{p.x * sx, p.y * sy}); };
-    const HudArrangement arrangement = HudArrange(frame);
-    for (const HudPlaced& e : arrangement.elements) {
+    for (const HudPlaced& e : HudArrange(frame).elements) {
         const FrameRect device = scaled(e.rect);
         shown_.push_back({e.node, device, placement_.ToCanvas(device)});
     }
-    for (const HudSeparator& s : arrangement.separators) separators_.push_back({turned(s.from), turned(s.to)});
-
     bands_ = BandRects(frame, placement_, sx, sy);
 }
 
@@ -149,7 +148,6 @@ void HudControls::Clear() {
     hud_ = nullptr;
     shown_.clear();
     bands_.clear();
-    separators_.clear();
 }
 
 bool HudControls::InBand(int x, int y) const {
@@ -163,7 +161,9 @@ const HudShown* HudControls::At(int x, int y) const {
     const double px = x + 0.5;
     const double py = y + 0.5;
     for (const HudShown& s : shown_) {
-        if (s.node->kind == HudNode::Kind::kSticker || !Contains(s.canvas, px, py)) continue;
+        if (s.node->kind == HudNode::Kind::kSticker || s.node->kind == HudNode::Kind::kIndicator ||
+            !Contains(s.canvas, px, py))
+            continue;
         if (s.node->kind == HudNode::Kind::kDpad && s.node->dpad.shape == HudDpadShape::kCircle) {
             const double r  = std::min(s.canvas.w, s.canvas.h) / 2.0;
             const double dx = px - (s.canvas.x + s.canvas.w / 2.0);
@@ -208,13 +208,12 @@ bool HudControls::Press(HudPointer pointer, int x, int y) {
     press.node  = s->node;
     press.since = std::chrono::steady_clock::now();
     if (s->node->kind == HudNode::Kind::kButton) {
-        if (Latched(s->node))                    press.unlatch = true;
-        else if (!s->node->button.action.empty()) RunAction(s->node->button.action);
-        else                                      press.keys = s->node->button.keys;
+        if (Latched(s->node)) press.unlatch = true;
+        else                  press.held = TargetOf(s->node->button);
     } else {
-        press.keys = DpadKeys(*s, placement_.ToDevice(FramePoint{x + 0.5, y + 0.5}));
+        press.held.keys = DpadKeys(*s, placement_.ToDevice(FramePoint{x + 0.5, y + 0.5}));
     }
-    PressKeys(press.keys);
+    Engage(press.held);
     pointers_[pointer] = std::move(press);
     return true;
 }
@@ -225,10 +224,10 @@ void HudControls::Move(HudPointer pointer, int x, int y) {
     const HudShown* s = Of(it->second.node);
     if (s == nullptr) return;
     std::vector<uint8_t> keys = DpadKeys(*s, placement_.ToDevice(FramePoint{x + 0.5, y + 0.5}));
-    if (keys == it->second.keys) return;
+    if (keys == it->second.held.keys) return;
     PressKeys(keys);
-    ReleaseKeys(it->second.keys);
-    it->second.keys = std::move(keys);
+    ReleaseKeys(it->second.held.keys);
+    it->second.held.keys = std::move(keys);
 }
 
 void HudControls::Release(HudPointer pointer, bool hold_latches) {
@@ -239,43 +238,41 @@ void HudControls::Release(HudPointer pointer, bool hold_latches) {
     if (press.unlatch) {
         const auto latched = latched_.find(press.node);
         if (latched == latched_.end()) return;
-        ReleaseKeys(latched->second);
+        Disengage(latched->second);
         latched_.erase(latched);
         return;
     }
     const auto held_ms =
         std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - press.since).count();
-    if (hold_latches && !press.keys.empty() && press.node->kind == HudNode::Kind::kButton &&
+    if (hold_latches && press.held.Holds() && press.node->kind == HudNode::Kind::kButton &&
         held_ms >= ButtonRow::kHoldMs) {
-        latched_[press.node] = press.keys;
+        latched_[press.node] = press.held;
         return;
     }
-    ReleaseKeys(press.keys);
+    Disengage(press.held);
 }
 
 bool HudControls::ToggleLatch(int x, int y) {
     const HudShown* s = At(x, y);
     if (s == nullptr) return false;
     if (s->node->kind != HudNode::Kind::kButton) return true;
-    if (!s->node->button.action.empty()) {
-        RunAction(s->node->button.action);
-        return true;
-    }
     const auto latched = latched_.find(s->node);
     if (latched != latched_.end()) {
-        ReleaseKeys(latched->second);
+        Disengage(latched->second);
         latched_.erase(latched);
         return true;
     }
-    PressKeys(s->node->button.keys);
-    latched_[s->node] = s->node->button.keys;
+    const HudHeld held = TargetOf(s->node->button);
+    Engage(held);
+    if (held.Holds()) latched_[s->node] = held;
+    else              Disengage(held);
     return true;
 }
 
 void HudControls::CancelAll() {
-    for (auto& [pointer, press] : pointers_) ReleaseKeys(press.keys);
+    for (auto& [pointer, press] : pointers_) Disengage(press.held);
     pointers_.clear();
-    for (auto& [node, keys] : latched_) ReleaseKeys(keys);
+    for (auto& [node, held] : latched_) Disengage(held);
     latched_.clear();
 }
 
@@ -287,9 +284,24 @@ bool HudControls::Pressed(const HudNode* node) const {
     return std::any_of(pointers_.begin(), pointers_.end(), [node](const auto& p) { return p.second.node == node; });
 }
 
-void HudControls::RunAction(const std::string& id) {
-    for (cerfcore::MachineButton* button : emu_.Get<cerfcore::DeviceButtons>().Buttons())
-        if (button->ObjectId() == id) button->Press();
+bool HudControls::HudHeld::Holds() const { return !keys.empty() || (button != nullptr && !button->Momentary()); }
+
+HudControls::HudHeld HudControls::TargetOf(const cerfcore::HudButton& button) const {
+    HudHeld held;
+    held.keys = button.keys;
+    if (!button.action.empty())
+        held.button = dynamic_cast<cerfcore::MachineButton*>(emu_.Get<cerfcore::MachineObjectTree>().Find(button.action));
+    return held;
+}
+
+void HudControls::Engage(const HudHeld& held) {
+    PressKeys(held.keys);
+    if (held.button != nullptr) held.button->Down();
+}
+
+void HudControls::Disengage(const HudHeld& held) {
+    if (held.button != nullptr) held.button->Up();
+    ReleaseKeys(held.keys);
 }
 
 bool HudControls::KeysDown(const std::vector<uint8_t>& keys) const {

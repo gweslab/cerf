@@ -56,6 +56,7 @@ public:
 
     void CloseRequested();
     void ShowCards();
+    void OnRowKeysChanged();
     void BeginShutdownTeardown();
     bool AdoptsHostResolution() const;
     void OnTeardownWedged();

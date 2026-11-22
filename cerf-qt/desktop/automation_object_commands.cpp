@@ -4,6 +4,7 @@
 #include "automation_server.h"
 
 #include "../automation_option.h"
+#include "../host_holds_release.h"
 
 #include <cerfcore/core/cerf_emulator.h>
 #include <cerfcore/core/service.h>
@@ -23,8 +24,11 @@
 
 #include <cstdint>
 #include <limits>
+#include <map>
 #include <optional>
+#include <set>
 #include <string>
+#include <utility>
 #include <vector>
 
 namespace cerffrontend {
@@ -107,11 +111,14 @@ private:
     }
 
     void RegisterLevers(AutomationServer& server) {
-        server.AddMethod("button.press", "Presses a device button.", {PathParam()}, "empty object",
-                         [this](const AutomationCall& call) {
-                             As<cerfcore::MachineButton>(call, "button").Press();
-                             call.Reply(AutomationJson::object());
-                         });
+        server.AddMethod("button.press", "Presses a device button and holds it until button.release.", {PathParam()},
+                         "empty object", [this](const AutomationCall& call) { HoldButton(call, true); });
+        server.AddMethod("button.release", "Releases a device button that this connection pressed.", {PathParam()},
+                         "empty object", [this](const AutomationCall& call) { HoldButton(call, false); });
+        server.AddDisconnectListener([this](uint64_t connection) { ReleaseButtons(connection); });
+        emu_.Get<HostHoldsRelease>().Add([this] {
+            while (!held_buttons_.empty()) ReleaseButtons(held_buttons_.begin()->first);
+        });
         server.AddMethod("feature.set", "Turns a pointer feature on or off.",
                          {PathParam(), {"enabled", "bool", true, "the new state"}}, "empty object",
                          [this](const AutomationCall& call) {
@@ -167,6 +174,29 @@ private:
         if (object == nullptr)
             throw AutomationError(AutomationServer::kInvalidParams, std::string("the object is not a ") + kind);
         return *object;
+    }
+
+    void HoldButton(const AutomationCall& call, bool down) {
+        auto& button = As<cerfcore::MachineButton>(call, "button");
+        auto& held   = held_buttons_[call.Connection()];
+        if (down) {
+            if (!held.insert(&button).second)
+                throw AutomationError(AutomationServer::kRefused, "this connection already holds that button");
+            button.Down();
+        } else {
+            if (held.erase(&button) == 0)
+                throw AutomationError(AutomationServer::kRefused, "this connection does not hold that button");
+            button.Up();
+        }
+        call.Reply(AutomationJson::object());
+    }
+
+    void ReleaseButtons(uint64_t connection) {
+        const auto it = held_buttons_.find(connection);
+        if (it == held_buttons_.end()) return;
+        const std::set<cerfcore::MachineButton*> buttons = std::move(it->second);
+        held_buttons_.erase(it);
+        for (cerfcore::MachineButton* button : buttons) button->Up();
     }
 
     void Append(cerfcore::MachineObject* parent, AutomationJson& out) {
@@ -248,7 +278,8 @@ private:
         throw AutomationError(AutomationServer::kInvalidParams, "the object has no source with that id");
     }
 
-    size_t object_topic_ = 0;
+    size_t                                                  object_topic_ = 0;
+    std::map<uint64_t, std::set<cerfcore::MachineButton*>> held_buttons_;
 };
 
 }

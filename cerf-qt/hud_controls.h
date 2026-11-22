@@ -15,6 +15,10 @@
 #include <string>
 #include <vector>
 
+namespace cerfcore {
+class MachineButton;
+}
+
 namespace cerffrontend {
 
 struct HudShown {
@@ -34,6 +38,8 @@ class HudControls : public cerfcore::Service {
 public:
     using cerfcore::Service::Service;
 
+    void OnReady() override;
+
     void SetCanvasArea(const FrameRect& area, const HudScreenMetrics& metrics) {
         canvas_area_ = CanvasArea{area, metrics};
     }
@@ -43,7 +49,6 @@ public:
 
     const std::vector<HudShown>&     Shown() const { return shown_; }
     const std::vector<FrameRect>&    Bands() const { return bands_; }
-    const std::vector<HudSeparator>& Separators() const { return separators_; }
     const FramePlacement&            Placement() const { return placement_; }
     bool                             InsideCanvas() const { return placed_area_.has_value(); }
 
@@ -64,9 +69,16 @@ public:
     std::vector<uint8_t> DpadKeys(const HudShown& shown, FramePoint device) const;
 
 private:
+    struct HudHeld {
+        std::vector<uint8_t>     keys;
+        cerfcore::MachineButton* button = nullptr;
+
+        bool Holds() const;
+    };
+
     struct PointerPress {
         const cerfcore::HudNode*              node = nullptr;
-        std::vector<uint8_t>                  keys;
+        HudHeld                               held;
         std::chrono::steady_clock::time_point since;
         bool                                  unlatch = false;
     };
@@ -91,7 +103,9 @@ private:
     const HudShown* Of(const cerfcore::HudNode* node) const;
     void            PressKeys(const std::vector<uint8_t>& keys);
     void            ReleaseKeys(const std::vector<uint8_t>& keys);
-    void            RunAction(const std::string& id);
+    HudHeld         TargetOf(const cerfcore::HudButton& button) const;
+    void            Engage(const HudHeld& held);
+    void            Disengage(const HudHeld& held);
 
     const cerfcore::DbHud*                         hud_ = nullptr;
     ViewportLayout::Layout                         frame_;
@@ -100,9 +114,8 @@ private:
     FramePlacement                                 placement_{FrameRect{}, 0};
     std::vector<HudShown>                          shown_;
     std::vector<FrameRect>                         bands_;
-    std::vector<HudSeparator>                      separators_;
     std::map<HudPointer, PointerPress>             pointers_;
-    std::map<const cerfcore::HudNode*, std::vector<uint8_t>> latched_;
+    std::map<const cerfcore::HudNode*, HudHeld>    latched_;
     std::array<uint8_t, 256>                       count_{};
 };
 

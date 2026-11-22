@@ -13,14 +13,8 @@ struct HudPlaced {
     FrameRect                rect;
 };
 
-struct HudSeparator {
-    FramePoint from;
-    FramePoint to;
-};
-
 struct HudArrangement {
-    std::vector<HudPlaced>    elements;
-    std::vector<HudSeparator> separators;
+    std::vector<HudPlaced> elements;
 };
 
 enum class HudTurn { kNone, kClockwise, kCounterClockwise };
@@ -31,7 +25,6 @@ struct HudPanelPlace {
     double            slot_hi = 0.0;
     cerfcore::HudSide side    = cerfcore::HudSide::kBottom;
     HudTurn           turn    = HudTurn::kNone;
-    double            gap     = 0.0;
 };
 
 struct HudFrame {
@@ -58,6 +51,18 @@ HudFrame       HudOutside(const cerfcore::DbHud& hud, double fb_w, double fb_h, 
 ContentBox     HudBox(const cerfcore::DbHud& hud, double fb_w, double fb_h);
 void           HudSurfaceFor(const cerfcore::DbHud& hud, double content_w, double content_h, double& fb_w, double& fb_h);
 HudArrangement HudArrange(const HudFrame& frame);
-HudArrangement HudArrangePanel(const cerfcore::HudNode& root, const FrameRect& rect, double gap, HudTurn turn);
+HudArrangement HudArrangePanel(const cerfcore::HudNode& root, const FrameRect& rect, HudTurn turn);
+
+template <typename Placed, typename Side>
+double HudSmallestControl(const std::vector<Placed>& placed, Side side) {
+    double smallest = 0.0;
+    for (const Placed& p : placed) {
+        if (p.node->kind != cerfcore::HudNode::Kind::kButton && p.node->kind != cerfcore::HudNode::Kind::kDpad)
+            continue;
+        const double s = side(p);
+        if (smallest == 0.0 || s < smallest) smallest = s;
+    }
+    return smallest;
+}
 
 }

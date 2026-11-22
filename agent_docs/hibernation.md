@@ -236,7 +236,8 @@ guest-visible state, and a pause of one does not pause the other:
    - **Lock-order invariant (a violation deadlocks):** take the freeze lock
      before any peripheral mutex. A worker never holds `WorkerSection` across a
      condition-variable wait, a sleep or a thread join. Acquire it, do the state
-     touch, release it, then wait.
+     touch, release it, then wait. A save or a restore never takes a lock that a
+     host thread can hold while that thread waits for `WorkerSection`.
 
 A peripheral whose state advances only on the JIT thread has no worker and needs
 no `WorkerSection`. Every timer on the guest cycle clock is such a peripheral.

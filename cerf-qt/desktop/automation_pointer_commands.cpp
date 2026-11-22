@@ -3,6 +3,7 @@
 
 #include "../automation_option.h"
 #include "../frontend_window.h"
+#include "../host_holds_release.h"
 
 #include <cerfcore/core/cerf_emulator.h>
 #include <cerfcore/core/service.h>
@@ -60,6 +61,7 @@ public:
         server.AddDisconnectListener([this](uint64_t connection) { Release(connection); });
         emu_.Get<cerfcore::HostPointerInputLock>().RegisterAcquireListener(
             [this] { emu_.Get<FrontendWindow>().RunOnUiThread([this] { held_.clear(); }); });
+        emu_.Get<HostHoldsRelease>().Add([this] { held_.clear(); });
     }
 
 private:

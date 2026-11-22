@@ -239,10 +239,23 @@ A HUD binds through `board_ids`, `board_family_ids`, or both. A HUD that names
 the board wins over a HUD that names its family.
 
 A key is the name of a Windows virtual-key code, for example `VK_RETURN`. A
-button has `keys` or an `action`. An action is the id of a `DeviceButtons`
-action of the board. A `sticker` is an `icon` or a short `label` in its own
+button has `keys` or an `action`. An action is the object path of a
+`MachineButton`, a list of object ids from the root, for example
+`["notification_led", "button"]`. A `sticker` is an `icon` or a short `label` in its own
 cell, and it takes no press. An example is the icon that the device prints above a
 key.
+
+A `lamp` cell shows the lamp at its `object` path. A button with a `lamp` shows
+that lamp as its face, for a button that sits in an LED. A `display` cell shows the
+characters of the character display at its `object` path. Lamp and display cells take
+no press.
+
+An indicator is a lamp that lies over its panel and takes no cell, so it moves no key.
+`x` and `y` place its center as fractions of the panel as the preset draws it. `size`
+is its diameter as a fraction of the shorter side of the panel. On Android, the
+indicator moves and turns with its panel.
+
+An LED-only HUD carries its indicator on an empty panel. It needs no layout of the device.
 
 A face is an icon or a label, never both. A control takes the Material Symbols icon of
 its meaning wherever one exists. The face is the same on every device, whatever its
@@ -276,9 +289,8 @@ the HUD.
 
 Panels on one side stack outward in list order.
 
-A cell with a `grow` of n takes n units of its row or column, together with the gaps
-between those units. Cells at the same unit position in two rows or columns with the
-same total `grow` line up.
+A cell with a `grow` of n takes n units of its row or column. Cells at the same unit
+position in two rows or columns with the same total `grow` line up.
 
 The width and the height of a panel are fractions of the length of the screen
 edge that the panel sits on. The screen of a HUD is the panel size of one of its

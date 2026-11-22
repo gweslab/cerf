@@ -19,7 +19,6 @@ struct RowButton {
     uint8_t     vk    = 0;
     std::string label;
     bool        named = false;
-    bool        held  = false;
 };
 
 class ButtonRow : public cerfcore::Service {
@@ -28,8 +27,10 @@ public:
 
     static constexpr int kHoldMs = 1000;
 
+    void                   OnReady() override;
     void                   SetKeysShown(bool shown);
     std::vector<RowButton> Buttons();
+    std::vector<uint8_t>   HeldKeys() const;
     void                   PressAt(size_t index);
     void                   ReleaseAt(size_t index);
     bool                   HoldAt(size_t index);
@@ -40,6 +41,7 @@ private:
     std::string Label(const cerfcore::SpecialKey& key) const;
     void        SendKey(uint8_t vk, bool key_up);
     void        ReleaseHeld();
+    void        HeldChanged();
 
     cerfcore::KeyboardInput* source_        = nullptr;
     std::bitset<256>         held_;

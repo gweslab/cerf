@@ -33,7 +33,7 @@ To run one method from the shell, run `python -m cerf_automation --endpoint <nam
 - Never connect by device. Never connect to an instance that `running` lists. Other sessions run the same devices at the same time, so such a connection can reach the instance of another session.
 - Decide from the screen or from an event rather than from a fixed sleep.
 - Subscribe before the action whose event you wait for. An event that fires before the subscription is lost.
-- A press or a key ends when its connection closes.
+- A press or a key ends when its connection closes, and when a state load restores the machine.
 - The `save_state_*` actions write the default state image of the device. That image can belong to the user. For a test save, use `state.save` with a path of its own.
 - Do not run `save_state_suspend_host`, `save_state_poweroff_host` or `save_state_restart_host`. They act on the host computer.
 

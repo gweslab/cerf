@@ -368,6 +368,19 @@ calls `Open` on the guest CPU thread, so `Open` can block.
   `cerf-qt/desktop/host_audio_outputs_*`, `host_audio_inputs_*`,
   `cerf-qt/android/android_audio_outputs.cpp`, `android_audio_inputs.cpp`
 
+## Vibration
+
+A `MachineVibrator` gives each change of its state to the `VibrationOutputs`
+service of the frontend. The call comes on the thread that changed the state,
+often the guest CPU thread, so it must not block.
+
+A frontend decides how the person feels or sees the vibration. A guest often
+pulses the vibrator. A frontend that shows a vibration must keep it shown for some
+time after the last pulse, or it flickers with each pulse.
+
+- `libCerfCore/include/cerfcore/host/vibration_outputs.h`, `machine_indicators.h`,
+  `cerf-qt/vibration_notice.cpp`
+
 ## CPU reset & cold boot
 
 **`GuestCpuReset`** is the funnel for every CERF-initiated CPU reset
@@ -736,11 +749,21 @@ the render and input plumbing that connects the host UI to the guest.
   binds it on that layer.** While a key that holds a layer is down, such a HUD key
   shows the face that the HUD preset gives it for that layer. Without that face, it
   shows the label of the binding. A HUD key with no label or icon of its own shows the label of its
-  binding on the base layer. On the desktop, a HUD key that the map renames shows the name
-  of its host key in small text in a corner.
+  binding on the base layer. On the desktop, a HUD key that the map renames names its host
+  key in a tooltip.
 
-  **A HUD action button runs one action of the `DeviceButtons` service of the
-  board.** The whole action runs on one press.
+  **A HUD action button holds its `MachineButton` down for as long as the HUD holds
+  the press.** A latch holds it like a key. A `DeviceButtons` action is momentary:
+  the whole action runs on the press, its release has no effect, and the HUD never
+  latches it.
+
+  **A full restore ends every hold of the host.** The restore releases every input
+  of the machine, so a hold that stays on the host side no longer matches the
+  guest. Frontend code that keeps a guest input down on its own, as a latch or for
+  a script, must register its release with `HostHoldsRelease`.
+
+  **A user can select the HUD of another board.** A cell whose object the machine
+  does not have therefore shows a dark lamp, and its button presses nothing.
 
   **On the desktop, the fit modes fit the framebuffer and its HUD as one box.**
   Every host-to-guest point maps through that fit. The HUD keeps the size of its
@@ -802,11 +825,14 @@ the render and input plumbing that connects the host UI to the guest.
   framebuffer together fit the safe zone. As a result, a small key panel beside a
   large screen grows into the space that the framebuffer cannot use. On a large
   screen, the HUD stays at the size of a fingertip, and the framebuffer gets the rest.
+  A HUD with no control, for example a HUD of indicators alone, keeps the scale of the
+  framebuffer.
 
   The framebuffer fits, pans and zooms in the rest of the canvas. A touch inside the
   HUD band never reaches the guest.
   - `cerf-qt/hud_selection.h`, `cerf-qt/hud_controls.h`, `cerf-qt/hud_nodes.h`, `cerf-qt/qml/HudLayer.qml`,
-    `cerf-qt/view_presentation.h`, `libCerfCore/include/cerfcore/host/device_buttons.h`
+    `cerf-qt/qml/HudLamp.qml`, `cerf-qt/view_presentation.h`, `libCerfCore/include/cerfcore/host/device_buttons.h`,
+    `libCerfCore/include/cerfcore/host/machine_indicators.h`
 
 - **`ViewRotation`** - the quarter turns of the user, on top of the angle of the
   frame. The host-to-guest point map and the relative mouse deltas turn with the

@@ -204,6 +204,8 @@ bool QtEmulatorWindow::CaptureGuestSurface(std::vector<uint32_t>& out, uint32_t&
 
 void QtEmulatorWindow::ShowCards() { surface_->ShowCards(emu_); }
 
+void QtEmulatorWindow::OnRowKeysChanged() { controller_->RefreshRowKeys(); }
+
 bool QtEmulatorWindow::RequestShadedCapture() {
     if (!window_ || !window_->isExposed()) return false;
     surface_->RequestShadedCapture();

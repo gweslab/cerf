@@ -263,6 +263,11 @@ class Cerf:
         time.sleep(hold)
         self.call("keyboard.release", key=key)
 
+    def press_button(self, path: List[str], hold: float = 0.1) -> None:
+        self.call("button.press", path=path)
+        time.sleep(hold)
+        self.call("button.release", path=path)
+
     def type_text(self, text: str, hold: float = 0.1, gap: float = 0.1) -> None:
         for key in self.call("keyboard.keys_for_text", text=text):
             if key["shift"]:

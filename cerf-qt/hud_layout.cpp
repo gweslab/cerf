@@ -12,17 +12,7 @@ using cerfcore::HudNode;
 using cerfcore::HudPanel;
 using cerfcore::HudSide;
 
-bool HoldsControl(const HudNode& node) {
-    switch (node.kind) {
-        case HudNode::Kind::kButton:
-        case HudNode::Kind::kDpad:   return true;
-        case HudNode::Kind::kRow:
-        case HudNode::Kind::kColumn: return std::any_of(node.children.begin(), node.children.end(), HoldsControl);
-        default:                     return false;
-    }
-}
-
-void Place(const HudNode& node, FrameRect rect, double gap, HudTurn turn, HudArrangement& out) {
+void Place(const HudNode& node, FrameRect rect, HudTurn turn, HudArrangement& out) {
     if (node.kind == HudNode::Kind::kButton || node.kind == HudNode::Kind::kDpad ||
         node.kind == HudNode::Kind::kSticker) {
         out.elements.push_back({&node, rect});
@@ -36,23 +26,33 @@ void Place(const HudNode& node, FrameRect rect, double gap, HudTurn turn, HudArr
     const auto   ordered = [&](size_t k) -> const HudNode& { return node.children[reverse ? count - 1 - k : k]; };
     double       total   = 0.0;
     for (const HudNode& child : node.children) total += child.grow;
-    const double pitch = ((row ? rect.w : rect.h) + gap) / total;
+    const double pitch = (row ? rect.w : rect.h) / total;
     double       at    = row ? rect.x : rect.y;
     for (size_t k = 0; k < count; ++k) {
         const HudNode& child  = ordered(k);
-        const double   extent = pitch * child.grow - gap;
-        Place(child, row ? FrameRect{at, rect.y, extent, rect.h} : FrameRect{rect.x, at, rect.w, extent}, gap, turn,
-              out);
-        at += extent + gap;
-        if (k + 1 == count || !HoldsControl(child) || !HoldsControl(ordered(k + 1))) continue;
-        const double line = at - gap / 2.0;
-        out.separators.push_back(row ? HudSeparator{{line, rect.y}, {line, rect.y + rect.h}}
-                                     : HudSeparator{{rect.x, line}, {rect.x + rect.w, line}});
+        const double   extent = pitch * child.grow;
+        Place(child, row ? FrameRect{at, rect.y, extent, rect.h} : FrameRect{rect.x, at, rect.w, extent}, turn, out);
+        at += extent;
     }
 }
 
-void PlacePanel(const HudNode& root, const FrameRect& rect, double gap, HudTurn turn, HudArrangement& out) {
-    Place(root, FrameRect{rect.x + gap, rect.y + gap, rect.w - 2.0 * gap, rect.h - 2.0 * gap}, gap, turn, out);
+FramePoint Turned(double u, double v, HudTurn turn) {
+    switch (turn) {
+        case HudTurn::kClockwise:        return {1.0 - v, u};
+        case HudTurn::kCounterClockwise: return {v, 1.0 - u};
+        default:                         return {u, v};
+    }
+}
+
+void PlaceIndicators(const HudPanel& panel, const HudPanelPlace& place, HudArrangement& out) {
+    const FrameRect& r    = place.rect;
+    const double     side = std::min(r.w, r.h);
+    for (const cerfcore::HudIndicator& indicator : panel.indicators) {
+        const FramePoint at   = Turned(indicator.x, indicator.y, place.turn);
+        const double     size = indicator.size * side;
+        out.elements.push_back(
+            {&indicator.node, FrameRect{r.x + at.x * r.w - size / 2.0, r.y + at.y * r.h - size / 2.0, size, size}});
+    }
 }
 
 }
@@ -104,7 +104,7 @@ HudFrame HudOutside(const DbHud& hud, double fb_w, double fb_h, const cerfcore::
         const double  span   = (x_edge ? fb_w : fb_h) + cross;
         const double  lo     = -(x_edge ? grown.left : grown.top);
         const double  at     = lo + HudAligned(panel.align, span, along);
-        HudPanelPlace place{{}, lo, lo + span, panel.side, HudTurn::kNone, hud.gap * base};
+        HudPanelPlace place{{}, lo, lo + span, panel.side, HudTurn::kNone};
         switch (panel.side) {
             case HudSide::kBottom: place.rect = {at, fb_h + grown.bottom, along, depth}; break;
             case HudSide::kTop:    place.rect = {at, -grown.top - depth, along, depth}; break;
@@ -154,14 +154,16 @@ HudArrangement HudArrange(const HudFrame& frame) {
     HudArrangement out;
     for (size_t i = 0; i < frame.places.size(); ++i) {
         const HudPanelPlace& place = frame.places[i];
-        PlacePanel((*frame.panels)[i].root, place.rect, place.gap, place.turn, out);
+        const HudPanel&      panel = (*frame.panels)[i];
+        Place(panel.root, place.rect, place.turn, out);
+        PlaceIndicators(panel, place, out);
     }
     return out;
 }
 
-HudArrangement HudArrangePanel(const HudNode& root, const FrameRect& rect, double gap, HudTurn turn) {
+HudArrangement HudArrangePanel(const HudNode& root, const FrameRect& rect, HudTurn turn) {
     HudArrangement out;
-    PlacePanel(root, rect, gap, turn, out);
+    Place(root, rect, turn, out);
     return out;
 }
 

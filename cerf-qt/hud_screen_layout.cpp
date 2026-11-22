@@ -21,7 +21,6 @@ struct Slot {
     HudTurn turn  = HudTurn::kNone;
     double  along = 0.0;
     double  depth = 0.0;
-    double  gap   = 0.0;
 };
 
 struct Fit {
@@ -48,20 +47,20 @@ bool CanCross(const HudNode& root) {
     return root.children.size() >= longest;
 }
 
-Slot NativeSlot(const DbHud& hud, const HudPanel& panel, const DbLcdPanelSize& units) {
+Slot NativeSlot(const HudPanel& panel, const DbLcdPanelSize& units) {
     const bool   x_edge = HudAlongX(panel.side);
     const double edge   = x_edge ? units.width : units.height;
     return {panel.side, HudTurn::kNone, (x_edge ? panel.width : panel.height) * edge,
-            (x_edge ? panel.height : panel.width) * edge, hud.gap * edge};
+            (x_edge ? panel.height : panel.width) * edge};
 }
 
 bool IsRocker(const HudNode& node) {
     return node.kind == HudNode::Kind::kDpad && node.dpad.left.empty() && node.dpad.right.empty();
 }
 
-double RockerDepth(const HudNode& root, double along, double depth, double gap, HudTurn turn) {
-    const HudArrangement at   = HudArrangePanel(root, FrameRect{0.0, 0.0, along, depth}, gap, turn);
-    const HudArrangement more = HudArrangePanel(root, FrameRect{0.0, 0.0, along, depth + 1.0}, gap, turn);
+double RockerDepth(const HudNode& root, double along, double depth, HudTurn turn) {
+    const HudArrangement at   = HudArrangePanel(root, FrameRect{0.0, 0.0, along, depth}, turn);
+    const HudArrangement more = HudArrangePanel(root, FrameRect{0.0, 0.0, along, depth + 1.0}, turn);
     double               need = depth;
     for (size_t i = 0; i < at.elements.size(); ++i) {
         const FrameRect& cell = at.elements[i].rect;
@@ -88,7 +87,7 @@ Slot Crossed(Slot slot, HudSide side, const HudNode& root) {
     slot.turn = KeyMatrix(root) ? HudTurn::kNone : TurnBetween(slot.side, side);
     slot.side = side;
     if (slot.turn != HudTurn::kNone && HudAlongX(side))
-        slot.depth = RockerDepth(root, slot.along, slot.depth, slot.gap, slot.turn);
+        slot.depth = RockerDepth(root, slot.along, slot.depth, slot.turn);
     return slot;
 }
 
@@ -148,7 +147,8 @@ public:
         const double    across_x = depth.left + depth.right;
         const double    across_y = depth.top + depth.bottom;
         const double    shared   = std::min(area_w_ / (fb_w_ + across_x), area_h_ / (fb_h_ + across_y));
-        double       scale    = finger_px_ / SmallestControl(slots);
+        const double    smallest = SmallestControl(slots);
+        double          scale    = smallest > 0.0 ? finger_px_ / smallest : shared;
         if (across_x > 0.0) scale = std::min(scale, (area_w_ - shared * fb_w_) / across_x);
         if (across_y > 0.0) scale = std::min(scale, (area_h_ - shared * fb_h_) / across_y);
         for (const Slot& slot : slots)
@@ -182,7 +182,7 @@ public:
                 case HudSide::kRight:  r = {area_w_ - off - d, at, d, along}; break;
             }
             HudAddToSide(offset, slot.side, d);
-            out[*it] = {r, lo, hi, slot.side, slot.turn, slot.gap * scale};
+            out[*it] = {r, lo, hi, slot.side, slot.turn};
         }
         return out;
     }
@@ -196,13 +196,8 @@ private:
 
     double SmallestControl(const std::vector<Slot>& slots) const {
         const HudFrame unit{area_w_, area_h_, true, &hud_.panels, Lay(slots, 1.0)};
-        double         smallest = 0.0;
-        for (const HudPlaced& placed : HudArrange(unit).elements) {
-            if (placed.node->kind == HudNode::Kind::kSticker) continue;
-            const double side = std::min(placed.rect.w, placed.rect.h);
-            if (smallest == 0.0 || side < smallest) smallest = side;
-        }
-        return smallest;
+        return HudSmallestControl(HudArrange(unit).elements,
+                                  [](const HudPlaced& placed) { return std::min(placed.rect.w, placed.rect.h); });
     }
 
     const DbHud& hud_;
@@ -226,7 +221,7 @@ HudFrame HudInside(const DbHud& hud, double area_w, double area_h, int quarter, 
     const ScreenPlanner   planner(hud, area_w, area_h, turned ? tall : wide, turned ? wide : tall,
                                   kFingerDp * metrics.px_per_dp);
     std::vector<Slot>   slots;
-    for (const HudPanel& panel : hud.panels) slots.push_back(NativeSlot(hud, panel, units));
+    for (const HudPanel& panel : hud.panels) slots.push_back(NativeSlot(panel, units));
     const std::vector<Slot> chosen = area_h > area_w ? planner.Portrait(slots) : planner.Landscape(slots);
     return {area_w, area_h, true, &hud.panels, planner.Lay(chosen, planner.Measure(chosen).scale)};
 }

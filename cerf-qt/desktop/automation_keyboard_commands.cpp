@@ -2,6 +2,7 @@
 #include "automation_server.h"
 
 #include "../automation_option.h"
+#include "../host_holds_release.h"
 
 #include <cerfcore/core/cerf_emulator.h>
 #include <cerfcore/core/service.h>
@@ -49,6 +50,9 @@ public:
                              call.Reply(AutomationJson::object());
                          });
         server.AddDisconnectListener([this](uint64_t connection) { ReleaseAll(connection); });
+        emu_.Get<HostHoldsRelease>().Add([this] {
+            while (!held_.empty()) ReleaseAll(held_.begin()->first);
+        });
     }
 
 private:

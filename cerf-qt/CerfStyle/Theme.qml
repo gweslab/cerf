@@ -38,14 +38,21 @@ QtObject {
     readonly property color tapBubbleRing: "#ffffff"
 
     readonly property color hudBackdrop: "#80000000"
-    readonly property color hudVeil: "#1cffffff"
-    readonly property color hudVeilCenter: "#28ffffff"
-    readonly property color hudVeilDown: "#50ffffff"
+    readonly property color hudKeyEdge: "#40ffffff"
+    readonly property color hudKeyTop: "#26ffffff"
+    readonly property color hudKeyBottom: "#14ffffff"
+    readonly property color hudKeySunkEdge: "#70000000"
+    readonly property color hudKeySunkTop: "#40000000"
+    readonly property color hudKeySunkBottom: "#28000000"
+    readonly property color hudKeyShadow: "#b0000000"
     readonly property color hudInk: "#ececec"
     readonly property color hudArrow: "#a0a0a0"
     readonly property color hudHint: "#969696"
-    readonly property color hudLatchRim: "#5aa0ff"
-    readonly property color hudSeparator: "#404040"
+    readonly property color lampDark: "#2a342c"
+    readonly property color lampCutoutShade: "#e0000000"
+    readonly property color lampCutoutLight: "#50ffffff"
+    readonly property color lampFloor: "#0a0c0a"
+    readonly property color lampHighlight: "#ffffff"
 
     readonly property color cardWarning: "#f2c94c"
     readonly property color cardWarningRim: "#bf951e"
@@ -68,12 +75,6 @@ QtObject {
     readonly property color consoleError: dark ? "#ff6e6e" : "#c42b1c"
     readonly property color consoleWarning: dark ? "#ebd25a" : "#8a5a00"
 
-    readonly property color barVibrate: "#c8a050"
-    readonly property color barLedDark: "#222c24"
-    readonly property color barLedRim: "#96a096"
-    readonly property color barLedRimBlink: "#78e682"
-    readonly property color barGridDark: "#3c321e"
-    readonly property color barGridOutline: "#5a4b28"
     readonly property color barPowerOk: "#9ba5af"
     readonly property color barPowerOkFill: "#26303a"
     readonly property color barPowerFail: "#f56969"
@@ -141,7 +142,6 @@ QtObject {
     }
 
     readonly property int fitMinimumPixelSize: 1
-    readonly property int hudHintMinimumSize: 8
     readonly property int cardFontSize: 13
     readonly property int cardCompactFontSize: 11
     readonly property int consoleFontSize: 11

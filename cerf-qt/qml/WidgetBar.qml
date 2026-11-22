@@ -92,9 +92,6 @@ Item {
             required property real rxCount
             required property real txCount
             required property url source
-            required property var lamps
-            required property bool vibrate
-            required property var cells
             required property int percent
             required property bool unplugged
             required property string level
@@ -140,9 +137,6 @@ Item {
                 unit: root.unit
                 kind: box.kind
                 source: box.source
-                lamps: box.lamps
-                vibrate: box.vibrate
-                cells: box.cells
                 percent: box.percent
                 unplugged: box.unplugged
                 level: box.level

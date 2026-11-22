@@ -1,9 +1,11 @@
 #include "button_row.h"
 
 #include "canvas_input.h"
+#include "host_holds_release.h"
 #include "host_key_name.h"
 #include <cerfcore/host/virtual_keys.h>
 #include "pc_key_legend.h"
+#include "qt_emulator_window.h"
 
 #include <cerfcore/core/cerf_emulator.h>
 #include <cerfcore/host/keyboard_input.h>
@@ -17,6 +19,13 @@ namespace {
 
 bool IsArrow(uint8_t vk) { return vk == cerfcore::kVkLeft || vk == cerfcore::kVkUp || vk == cerfcore::kVkRight || vk == cerfcore::kVkDown; }
 
+}
+
+void ButtonRow::OnReady() {
+    emu_.Get<HostHoldsRelease>().Add([this] {
+        CancelPress();
+        ReleaseHeld();
+    });
 }
 
 bool ButtonRow::Shown(const cerfcore::SpecialKey& key) const {
@@ -36,10 +45,21 @@ void ButtonRow::SetKeysShown(bool shown) {
 }
 
 void ButtonRow::ReleaseHeld() {
+    if (held_.none()) return;
     for (size_t vk = 0; vk < held_.size(); ++vk)
         if (held_.test(vk)) SendKey(static_cast<uint8_t>(vk), true);
     held_.reset();
+    HeldChanged();
 }
+
+std::vector<uint8_t> ButtonRow::HeldKeys() const {
+    std::vector<uint8_t> out;
+    for (size_t vk = 0; vk < held_.size(); ++vk)
+        if (held_.test(vk)) out.push_back(static_cast<uint8_t>(vk));
+    return out;
+}
+
+void ButtonRow::HeldChanged() { emu_.Get<QtEmulatorWindow>().OnRowKeysChanged(); }
 
 std::string ButtonRow::Label(const cerfcore::SpecialKey& key) const {
     if (key.guest_label != nullptr) return key.guest_label;
@@ -63,7 +83,6 @@ std::vector<RowButton> ButtonRow::Buttons() {
         b.vk    = key.vk;
         b.label = Label(key);
         b.named = key.guest_label != nullptr;
-        b.held  = held_.test(key.vk);
         out.push_back(std::move(b));
     }
     return out;
@@ -94,6 +113,7 @@ void ButtonRow::ReleaseAt(size_t index) {
     if (held_.test(b.vk)) {
         held_.reset(b.vk);
         SendKey(b.vk, true);
+        HeldChanged();
     }
 }
 
@@ -105,6 +125,7 @@ bool ButtonRow::HoldAt(size_t index) {
     if (pressing_ && pressed_vk_ == b.vk) {
         pressing_ = false;
         held_.set(b.vk);
+        HeldChanged();
     }
     return held_.test(b.vk);
 }

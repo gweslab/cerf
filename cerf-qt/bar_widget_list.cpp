@@ -4,7 +4,6 @@
 #include "qt_emulator_window.h"
 #include "qt_menu_presenter.h"
 #include "qt_resource_paths.h"
-#include "qt_rgb_color.h"
 
 #include <cerfcore/core/cerf_emulator.h>
 #include <cerfcore/host/pointer_router.h>
@@ -18,17 +17,7 @@ constexpr uint32_t kHintHoldMs = 3000;
 constexpr int      kHintGap    = 96;
 
 const QList<QByteArray> kRoles = {"kind",    "name",      "tooltip", "usable", "rxCount", "txCount", "source",
-                                  "lamps",   "vibrate",   "cells",   "percent", "unplugged", "level", "failed",
-                                  "folderOn"};
-
-QVariantMap LampRow(const cerffrontend::LampLook& lamp) {
-    return {{QStringLiteral("lit"), lamp.lit},
-            {QStringLiteral("color"), ToQColor(lamp.color)},
-            {QStringLiteral("blinking"), lamp.blinking},
-            {QStringLiteral("onMs"), static_cast<int>(lamp.on_ms)},
-            {QStringLiteral("offMs"), static_cast<int>(lamp.off_ms)},
-            {QStringLiteral("between"), lamp.between ? QVariant(ToQColor(*lamp.between)) : QVariant()}};
-}
+                                  "percent", "unplugged", "level",   "failed", "folderOn"};
 
 QString Level(cerffrontend::BatteryLevel level) {
     switch (level) {
@@ -45,20 +34,6 @@ struct IconRow {
     void operator()(const cerffrontend::ResourceIcon& icon) const {
         row[QStringLiteral("kind")]   = QStringLiteral("resource");
         row[QStringLiteral("source")] = AssetImageUrl(QString::fromStdString(icon.name));
-    }
-    void operator()(const cerffrontend::LedIcon& icon) const {
-        QVariantList lamps;
-        for (const cerffrontend::LampLook& lamp : icon.lamps) lamps.append(LampRow(lamp));
-        row[QStringLiteral("kind")]    = QStringLiteral("led");
-        row[QStringLiteral("lamps")]   = lamps;
-        row[QStringLiteral("vibrate")] = icon.vibrate;
-    }
-    void operator()(const cerffrontend::LedGridIcon& icon) const {
-        QVariantList cells;
-        for (const cerffrontend::LedGridCell& cell : icon.cells)
-            cells.append(QVariantMap{{QStringLiteral("lit"), cell.lit}, {QStringLiteral("color"), ToQColor(cell.color)}});
-        row[QStringLiteral("kind")]  = QStringLiteral("grid");
-        row[QStringLiteral("cells")] = cells;
     }
     void operator()(const cerffrontend::PowerInputIcon& icon) const {
         row[QStringLiteral("kind")]   = QStringLiteral("power");
@@ -105,8 +80,6 @@ bool BarWidgetList::Shown(cerfcore::CerfEmulator& emu, const cerffrontend::BarWi
 QVariantMap BarWidgetList::Row(const cerffrontend::BarWidget* widget) const {
     QVariantMap row;
     for (const QByteArray& role : kRoles) row.insert(QString::fromLatin1(role), QVariant());
-    row[QStringLiteral("lamps")]   = QVariantList();
-    row[QStringLiteral("cells")]   = QVariantList();
     row[QStringLiteral("name")]    = QString::fromStdString(widget->Name());
     row[QStringLiteral("tooltip")] = QString::fromStdString(widget->Tooltip());
     row[QStringLiteral("usable")]  = widget->IsEnabled();

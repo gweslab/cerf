@@ -68,7 +68,7 @@ QVariantList EmulatorController::RowButtons(bool keyboard_open) {
             entry["index"]      = static_cast<int>(i);
             entry["label"]      = QString::fromStdString(b.label);
             entry["symbol"]     = ArrowSymbol(b);
-            entry["held"]       = b.held;
+            entry["vk"]         = static_cast<int>(b.vk);
             out.append(entry);
         }
     });
@@ -76,6 +76,14 @@ QVariantList EmulatorController::RowButtons(bool keyboard_open) {
 }
 
 int EmulatorController::RowHoldMs() const { return cerffrontend::ButtonRow::kHoldMs; }
+
+QVariantList EmulatorController::HeldRowKeys() const {
+    QVariantList out;
+    gate_.Run([&out](cerfcore::CerfEmulator& emu) {
+        for (uint8_t vk : emu.Get<cerffrontend::ButtonRow>().HeldKeys()) out.append(static_cast<int>(vk));
+    });
+    return out;
+}
 
 bool EmulatorController::HudAvailable() const {
     bool available = false;
@@ -120,15 +128,13 @@ void EmulatorController::ReleaseRowButton(int index) { row_press_.End(index); }
 
 void EmulatorController::CancelRowButton(int index) { row_press_.Cancel(index); }
 
-bool EmulatorController::HoldRowButton(int index) {
-    if (!gate_.Attached()) return false;
+void EmulatorController::HoldRowButton(int index) {
+    if (!gate_.Attached()) return;
     row_press_.HandOver(index);
-    bool held = false;
-    gate_.Run([index, &held](cerfcore::CerfEmulator& emu) {
-        held = emu.Get<cerffrontend::ButtonRow>().HoldAt(static_cast<size_t>(index));
-        if (held) PerformLongPressHaptic(*emu.Get<QtEmulatorWindow>().Window());
+    gate_.Run([index](cerfcore::CerfEmulator& emu) {
+        if (emu.Get<cerffrontend::ButtonRow>().HoldAt(static_cast<size_t>(index)))
+            PerformLongPressHaptic(*emu.Get<QtEmulatorWindow>().Window());
     });
-    return held;
 }
 
 void EmulatorController::OnStripStep(StripPressDelay::Step step, int index) {

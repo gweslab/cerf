@@ -133,6 +133,7 @@ ScreenWindow {
             anchors.fill: parent
             model: guestSurface.overlays.hud
             uiFamily: guestSurface.overlays.uiFamily
+            monoFamily: guestSurface.overlays.monoFamily
             pixelScale: guestSurface.overlays.pixelScale.y
         }
 
@@ -267,16 +268,13 @@ ScreenWindow {
                         leadingInset: index === 0 ? guestSurface.safeMargins.left : 0
                         label: modelData.label
                         symbol: modelData.symbol
-                        held: modelData.held
+                        held: controller.heldRowKeys.includes(modelData.vk)
                         holdMs: controller.rowHoldMs
                         Accessible.name: modelData.label
                         onKeyDown: controller.PressRowButton(modelData.index)
-                        onKeyUp: {
-                            controller.ReleaseRowButton(modelData.index)
-                            held = false
-                        }
+                        onKeyUp: controller.ReleaseRowButton(modelData.index)
                         onKeyCanceled: controller.CancelRowButton(modelData.index)
-                        onHeldLong: held = controller.HoldRowButton(modelData.index)
+                        onHeldLong: controller.HoldRowButton(modelData.index)
                     }
                 }
                 Item {

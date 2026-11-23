@@ -2,7 +2,7 @@
   date: TBA
   devices:
     new: |
-      Jornada 540 family support [WIP]
+      Jornada 540 family support
       ODO family: added HUD
   emulator:
     new: |

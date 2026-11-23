@@ -35,11 +35,12 @@ QVariantList BoardConfigCatalog::Params(const QString& board_id) const {
     for (const cerfcore::DbBoardConfigSetting& s : SettingsFor(board_id)) {
         QVariantList values{NullVariant()};
         for (const std::string& v : s.values) values.append(QString::fromStdString(v));
+        const cerfcore::DbPart* picked = db.FindPart(s.default_value);
         out.append(QVariantMap{{QStringLiteral("board"), board_id},
                                {QStringLiteral("id"), QString::fromStdString(s.param_id)},
                                {QStringLiteral("name"), QString::fromStdString(db.FindBoardConfigParam(s.param_id)->name)},
                                {QStringLiteral("values"), values},
-                               {QStringLiteral("defaultSupported"), s.Accepts(s.default_value)}});
+                               {QStringLiteral("defaultSupported"), picked ? picked->supported : s.Accepts(s.default_value)}});
     }
     return out;
 }
@@ -69,9 +70,10 @@ Json BoardConfigCatalog::Diff(const QString& board_id, const QVariantMap& set, c
 }
 
 QString BoardConfigCatalog::ValueLabel(const QString& board_id, const QString& param_id, const QVariant& value) const {
-    const cerfcore::DbBoardConfigParam* param =
-        emu_.Get<cerfcore::BoardDatabase>().FindBoardConfigParam(param_id.toStdString());
-    const auto name = [param](const std::string& id) {
+    const auto&                         db    = emu_.Get<cerfcore::BoardDatabase>();
+    const cerfcore::DbBoardConfigParam* param = db.FindBoardConfigParam(param_id.toStdString());
+    const auto name = [this, &db, param](const std::string& id) {
+        if (const cerfcore::DbPart* part = db.FindPart(id)) return emu_.Get<BoardCatalog>().PartLabel(*part);
         return QString::fromStdString(cerfcore::FindConfigEnumValue(param->enum_values, id)->name);
     };
     if (value.isNull()) return QStringLiteral("Auto (%1)").arg(name(Setting(board_id, param_id)->default_value));

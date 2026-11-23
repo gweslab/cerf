@@ -16,7 +16,8 @@ compiler writes that name into the row. A row with `device_specs` is a directory
 with the same name. Its `index.json` holds the fields of the row, and its
 `device_specs/` directory holds one file for each item. The `rom_types` and
 `storage_types` tables repeat an `id` on purpose, so their files have free names
-and each row keeps its own `id`.
+and each row keeps its own `id`. `parts/` holds one directory for each generic
+part.
 
 The database guarantees no row order. A reader that takes the first row of a set
 gets the row that `$index` puts first:
@@ -65,8 +66,9 @@ only when a source puts it on another platform.
 
 A field on the family applies to every member. A board sets the field only
 where the board differs, and the value of the board wins. The `device_specs`
-of a board add to the specs of the family (see § Device specs), `board_config`
-merges by parameter, and the `notes` of a board add to the notes of the family.
+of a board add to the items of the family, `board_config` merges by parameter,
+and the `notes` of a board add to the notes of the family. A part names its
+boards and families itself.
 
 The code of a family serves every member. It reads a fact that differs
 between members, for example the SoC or the RAM size, from the row of the
@@ -131,68 +133,104 @@ vendor for the platform. If no public name exists, use the name that the ROM
 gives its platform. If the ROM gives no name, use the name of the design that
 the other members came from.
 
-## Device specs
+## Generic parts
 
 `device_generic_parts` is the table of generic parts. A generic part is one
-kind of hardware, for example a display, a NAND chip or a Wi-Fi radio. It has a
-name and an icon. Several parts can share one icon. A part never groups
-different kinds of hardware: Wi-Fi, cellular and IrDA are three parts with one
-icon. A consumer finds a part by its id, never by a displayed name.
+kind of hardware, for example an LCD panel, an LCD controller, a GPU, a NAND
+chip or a Wi-Fi radio. In the display order, generic parts that share an icon
+sit next to each other.
 
-In the display order, parts that share an icon sit next to each other.
+The split follows real hardware, and it is as specific as the hardware is. The
+test is the question of a user: "Is my part X a Y?" An LCD panel, an OLED panel
+and an LCD controller are three generic parts. Wi-Fi, cellular and IrDA are
+three generic parts with one icon. A PC Card socket and a CompactFlash slot are
+two generic parts, also when CERF models both with the same socket code.
 
-The `device_specs` of a family or a board is a list of spec items. A spec item
-is one part of the device. It has:
+CPU suspend and guest additions are features of the emulator, not hardware.
+The `device_specs` of a family or a board hold them.
 
-- `generic_part_id` - the generic part. The part is the type of the item.
-- `supported` - `true` when CERF models the part, `false` when the device has
-  the part and CERF does not model it. A device that does not have a part has
-  no item for it.
-- `displayed_name` - optional. The name of a stock part that the user cannot
-  change, for example a panel model or a keyboard layout.
-- the optional fields of its part, for example `display_width` and
-  `display_height` of the display part, the panel size in pixels. An item never
-  carries a field that its part does not have.
+## Parts
 
-A device can have more than one item of one part. Each item is one component,
-for example two displays.
+`parts/` is the table of parts. A part is one identity: one chip, one panel,
+one keyboard. A part with `"supported": false` is on the real board, and CERF
+does not support it.
 
-The first display item with a size gives the panel size of the board. The size
-is a hardware fact of the panel. CERF opens the emulator window at that size,
-and guest additions take it as their default. A later display item can carry
-its size, and no component reads it. When a row holds more than one display
-item, `$index` puts the panel item first.
+**Identity decides what a part is, never the code.** Two chips from two vendors
+are two parts, also when they behave the same and CERF runs the same code for
+both. That code exists once. Each part carries the parameters that the code
+reads, for example the row, column and bank bits of a RAM chip.
 
-**A family holds only the items that every member has, unchanged.** When one
-member differs in a part, the family stops holding that part, and each member
-that has the part holds its own item. A board item never replaces a family
-item. The items of a board add to the items of its family.
+The model of a chip registers when the board has that part. Code that serves
+several parts reads their parameters, never their ids.
 
-When members differ in a part, the displayed name of each item states the known
-difference, for example 256 colors and 4096 colors. Only parts that differ in a
-way that no source names take a letter, for example the same speaker on other
-pins: Speakers A, Speakers B. The letters state that the parts differ, and they
-do not state which part CERF supports.
+### Names
+
+A part with a known name has that name, for example `Epson S1D13505`. Its id
+names the vendor and the model: `epson_s1d13505`. A difference that a person
+can describe is a known name too, for example `French keyboard` or
+`Monochrome STN`.
+
+A part that nobody can describe has `"unknown_name": true`:
+
+- When it is the only such part of its generic part in a family, it has no
+  name. Its id is `<family>_<generic part>`. It shows as the name of its generic
+  part.
+- When a family has several such parts of one generic part, and no parameter
+  that shows tells them apart, they take the names `A`, `B`, `C`. The id ends in
+  the letter: `hp_600_lcd_panel_a`. They show as the generic part name and the
+  letter: `LCD panel A`.
+- When such a part is in several families, its id names the vendor, for example
+  `hp_lcd_controller_1`.
+
+### Parameters
+
+A parameter is a fact of the part. Each generic part has its own parameters,
+and a part never carries a parameter that its generic part does not have:
+
+- `lcd_panel`, `oled_panel` - `width` and `height`, the panel size in pixels.
+  `technology` - `monochrome_stn`, `color_dstn` or `color_tft`.
+  `clamp_viewport` is true when the renderer of the panel cuts the guest frame
+  to `width` and `height`.
+- `ram` - `size_mb` is the size of all chips of the part together. A part has
+  `chip_count`, the number of chips, only when a source gives the number. A part
+  on the SA-1110 also has `row_bits`, `column_bits` and `bank_bits`.
+- `dram_card` - `size_mb`.
+- `battery` - `chemistry`.
+
+The first part of a board with a width and a height gives the panel size of the
+board. The size records the real panel, and CERF uses it as a hint.
+
+### Connections
+
+Each connection names `board_ids`, `board_family_ids`, or both. A board has the
+part when a connection names its id or the id of its family.
+
+**A part connects to the family only when every member has it, unchanged.**
+Otherwise it connects to the boards that have it. A part that a board
+configuration parameter offers has no connections: the parameter puts it on the
+board.
+
+When members differ in a part, each variant is a part of its own.
 
 ### Clear facts and open facts
 
-A hardware fact is clear when a generic part, a field of that part, or a
-board configuration parameter can state it. A clear fact goes into
-`device_specs` or `board_config`, never into text.
+A hardware fact is clear when a generic part, a parameter or a board
+configuration parameter can state it. A clear fact goes into `parts/` or
+`board_config`, never into text.
 
 A fact about a component that CERF models is always clear. When a change
 records such a component and no generic part describes it, the change adds the
-part: a new `device_generic_parts` row with its own id and name and the icon of
-its nearest part. A missing part is never a reason to leave the component out,
-or to put it into the displayed name of another part. For example, a graphics
-controller beside the display gets a part of its own.
+generic part. That is a new `device_generic_parts` row with its own id, its own
+name and the icon of its nearest generic part. A missing generic part is never a reason to
+leave the component out, or to put it into the name of another part. For
+example, a graphics controller beside the panel gets a part of its own.
 
-A hardware fact is open when CERF does not model its component and no part
-describes that component. A fact is also open when no field of its part can
-state it. Examples are a CompactFlash slot, a phone connector, the size of a NOR
-flash and the color of a backlight. An open fact stays as text in
-`internal__spec_divergences` of the member that differs. When a part or a field
-for it exists, the fact moves out of that text.
+A hardware fact is open when CERF does not model its component and no generic
+part describes that component. A fact is also open when no parameter of its
+part can state it. Examples are a phone connector, the size of a NOR flash and
+the color of a backlight. An open fact stays as text in
+`internal__spec_divergences` of the member that differs. When a generic part or
+a parameter for it exists, the fact moves out of that text.
 
 `internal__spec_divergences` holds hardware facts only. The content, the size
 and the language of a ROM, a market, a brand, the bundled software and the CPU
@@ -201,17 +239,37 @@ clock never go into it.
 ## Board configuration
 
 A board configuration parameter lets the user of one device change a fact of
-its board, for example the RAM size or a memory card. Its default choice is
-Auto. Auto takes the value that the family or board row gives. A real model
-stays a member of its own. Its row sets the Auto value for that model. A part
-that the user plugs in is never a member of its own.
+its board, for example the RAM or a memory card. Its default choice is Auto.
+Auto takes the value that the family or board row gives. A real model stays a
+member of its own. Its row sets the Auto value for that model. A part that the
+user plugs in is never a member of its own.
 
-A parameter is a part that a user can change on the real device. The user
-solders it, plugs it in or connects it. The `values` list of the row holds every
-part that a user can fit to the board. A value can break the guest, for example a
-compatible panel that the ROM does not drive. A RAM size belongs in the list
+A parameter is one of two kinds:
+
+- A part picker has `"part_picker": true` and one `generic_part_id`. The user
+  picks a part, for example the RAM or the LCD panel. The name of the parameter
+  is the name of its generic part. Each entry of `enum_values` is a part,
+  `{ "part_id": "..." }`, or a choice with no part, such as
+  `{ "id": "none", "name": "None" }`. The picked part is a part of the board, and
+  its `supported` says whether CERF supports it.
+- A configuration sets something on the board that is not a part, for
+  example the MIPS16EN pin. It never shows as a part.
+
+A part picker offers a part that a user can change on the real device while it is
+off. The user solders it, plugs it in or connects it. The `values` list of the row
+holds every part that a user can fit to the board. A value can break the guest, for example a
+compatible panel that the ROM does not drive. A RAM part belongs in the list
 when the board can take it. A size that the vendor never fitted also belongs in
 the list when the guest supports it.
+
+Hardware that a person plugs in while the device runs is never a part and never a
+part picker. Examples are a PC card and an expansion pack. A machine socket takes it
+at runtime. The socket is a part of the board, also when it sits on an accessory
+that CERF keeps attached.
+
+A change to the meaning or to the values of a parameter gives it a new id with
+`_v2`, for example `ram_v2`. The old key in a user file then names no parameter.
+CERF ignores it.
 
 The values of one parameter can depend on another part of the board, for example
 the panels that a graphics controller can drive. Such a dependency needs a
@@ -224,18 +282,10 @@ parameter. Otherwise the row of each member with the slot or the pads holds it.
 A `values` list with only `none` never states that a member lacks the slot or
 the pads.
 
-A `board_config_params` row with a `generic_part_id` links the parameter to
-that part. The value of the parameter then describes the first item of that
-part, after its displayed name: `Display B - Monochrome STN (240x320)`. A
-parameter with no generic part does not show as a part, for example the
-MIPS16EN pin.
-
 A part that a user can change and that CERF does not model yet still gets its
-parameter. Its `values` list holds the values that CERF supports, for example
-the one RAM size that the code maps. A member whose real part differs sets its
-default to its real part. A default outside the `values` list marks that part
-of the member as not supported. cerfman shows "Not supported" next to Auto,
-and the website marks the part with the unsupported badge.
+part picker. Its `values` list holds the parts that CERF supports, for example
+the one RAM part that the code maps. A member whose real part differs sets its
+default to its real part, and that part has `"supported": false`.
 
 ## CPU configurations
 
@@ -324,7 +374,7 @@ position in two rows or columns with the same total `grow` line up.
 
 The width and the height of a panel are fractions of the length of the screen
 edge that the panel sits on. The screen of a HUD is the panel size of one of its
-bound boards (see § Device specs). That board has the panel size that is the closest to the size
+bound boards (see § Parameters). That board has the panel size that is the closest to the size
 of the framebuffer.
 
 ## Where an id constant lives

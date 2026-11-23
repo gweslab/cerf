@@ -180,7 +180,13 @@ The `ShouldRegister` of a concrete returns
 
 Each off-chip IC family has one directory.
 
-The `ShouldRegister` of a concrete compares against a family list:
+When the board database records the IC as a part, the `ShouldRegister` of a
+concrete asks whether the board has that part:
+
+    return emu_.Get<BoardParts>().Has(PartId::X);
+
+A new board that has the IC connects to the part in the database. Otherwise
+the `ShouldRegister` compares against a family list:
 
     auto f = emu_.Get<BoardContext>().GetBoardFamilyId();
     return f == BoardFamilyId::X || f == BoardFamilyId::Y;
@@ -499,14 +505,16 @@ the render and input plumbing that connects the host UI to the guest.
   a size. Guest additions replace the display driver, so they need a size of
   their own.
 
-  A board declares its panel size in the board database, and CERF opens the
-  window at that size. When the guest signals the same size, the user sees
-  no window resize. A panel that reports a different size wins.
+  A board declares its panel size in the board database, on its panel part, and
+  CERF opens the window at that size. When the guest signals the same size, the
+  user sees no window resize. A panel that reports a different size wins.
 
-  The declared panel size is a hardware fact. A stock guest driver can program a
-  larger frame than the panel has, for example one more pixel line. The fix for
-  such a driver trims the frame to the declared size. It never clamps the size in
-  the display code of one board.
+  The declared panel size records the real panel, and CERF uses it as a hint. A
+  stock guest driver can program a larger frame than the panel has, for example
+  one more pixel line. The fix for such a driver is the `clamp_viewport`
+  parameter of the panel part. The renderer of the panel reads it from
+  `BoardParts` and cuts the frame to the panel size. A board never clamps the
+  size with a constant in its display code.
 
   When the user sets no guest-additions resolution override, guest additions
   take that same board fact. The manager resolves that order too.

@@ -94,9 +94,23 @@ std::optional<bool> BoardCatalog::PartSupport(const QString& board_id, std::stri
     const DbBoard* board = Find(board_id);
     if (!board) return std::nullopt;
     std::optional<bool> supported;
-    for (const auto& s : board->specs)
-        if (s.generic_part_id == part_id) supported = supported.value_or(true) && s.supported;
+    for (const cerfcore::DbPart* p : board->parts)
+        if (p->generic_part_id == part_id) supported = supported.value_or(true) && p->supported;
+    for (const cerfcore::DbFeature& f : board->features)
+        if (f.generic_part_id == part_id) supported = supported.value_or(true) && f.supported;
     return supported;
+}
+
+QString BoardCatalog::PartLabel(const cerfcore::DbPart& part) const {
+    const QString generic = QString::fromStdString(emu_.Get<BoardDatabase>().GenericPart(part.generic_part_id).name);
+    const QString name    = QString::fromStdString(part.name);
+    const QString single  = !part.unknown_name ? name
+                            : name.isEmpty()   ? generic
+                                               : QStringLiteral("%1 %2").arg(generic, name);
+    const QString label   = part.chip_count ? QStringLiteral("%1x %2").arg(*part.chip_count).arg(single) : single;
+    if (part.width && part.height) return QStringLiteral("%1 (%2x%3)").arg(label).arg(*part.width).arg(*part.height);
+    if (part.size_mb) return QStringLiteral("%1 (%2 MB)").arg(label).arg(*part.size_mb);
+    return label;
 }
 
 bool BoardCatalog::PartAllowed(const QString& board_id, std::string_view part_id) const {

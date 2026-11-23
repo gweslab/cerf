@@ -13,12 +13,10 @@ Only the user triggers this skill by typing `/supported-devices`. An agent never
 
 1. Read `agent_docs/database.md` § Files. Then read a nearby row in `libCerfCore/db/board_families/` and a nearby row in `libCerfCore/db/boards/`. Those rows are the schema.
 2. For a whole-board bring-up: if the family has no row, add one to `board_families/`. If the board has no row, add one to `boards/`. Copy the shape of nearby rows, not a field list from memory. The name of the row is the `id` of the board, exactly the value that `cerf.json board.id` names. Set the `support_level` of the board from what runs now. If the SoC is new, also add its rows to `socs/` and `soc_families/`.
-3. For part work, and for a bring-up in step 2: make `device_specs` agree with what runs. Read `agent_docs/database.md` § Device specs first. Each part has one of three states:
-   - `{ "generic_part_id": "x", "supported": true }` - the hardware is present and works in CERF
-   - `{ "generic_part_id": "x", "supported": false }` - the hardware is present on the real board, and CERF does not support it
-   - item absent - the board has no such hardware (never write `false` for hardware that does not exist)
-
-   A `generic_part_id` is valid only when `device_generic_parts/` declares it.
+3. For part work, and for a bring-up in step 2: make the parts of the board agree with what runs. Read `agent_docs/database.md` § Parts and § Board configuration first. Each part has one of three states for a board:
+   - connected, `"supported": true` - the hardware is present and works in CERF
+   - connected, `"supported": false` - the hardware is present on the real board, and CERF does not support it
+   - not connected - the board has no such hardware (never connect a `false` part for hardware that does not exist)
 
 ## What to change
 

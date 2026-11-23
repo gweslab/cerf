@@ -46,6 +46,12 @@ def _list(row: dict, key: str) -> list:
     return value if isinstance(value, list) else []
 
 
+def _connects(part: dict, board_row: dict) -> bool:
+    family_id = board_row.get("board_family_id")
+    return any(board_row["id"] in _list(c, "board_ids") or family_id in _list(c, "board_family_ids")
+               for c in _list(part, "connections") if isinstance(c, dict))
+
+
 def _effective_board(board_row: dict) -> dict:
     family = BOARD_FAMILIES_BY_ID.get(board_row.get("board_family_id", ""), {})
     out = {k: v for k, v in family.items() if k not in ("id", "name")}
@@ -60,6 +66,11 @@ def _effective_board(board_row: dict) -> dict:
                 config[param] = {**config.get(param, {}), **setting}
     if config:
         out["board_config"] = config
+    parts = [p for p in PARTS if _connects(p, board_row)]
+    parts += [PARTS_BY_ID[s["default"]] for param, s in config.items()
+              if BOARD_CONFIG_PARAMS[param].get("part_picker") and s.get("default") in PARTS_BY_ID]
+    order = {g["id"]: i for i, g in enumerate(GENERIC_PARTS)}
+    out["parts"] = sorted(parts, key=lambda p: (order[p["generic_part_id"]], PARTS.index(p)))
     return out
 
 
@@ -68,10 +79,29 @@ _DB = _load()
 SOC_FAMILIES = _by_id("soc_families")
 SOCS = _by_id("socs")
 BOARD_FAMILIES_BY_ID = _by_id("board_families")
+GENERIC_PARTS: List[dict] = _rows("device_generic_parts")
+GENERIC_PARTS_BY_ID = {g["id"]: g for g in GENERIC_PARTS}
+PARTS: List[dict] = _rows("parts")
+PARTS_BY_ID = {p["id"]: p for p in PARTS}
+BOARD_CONFIG_PARAMS = _by_id("board_config_params")
 BOARDS = [_effective_board(b) for b in _rows("boards")]
 BOARDS_BY_ID = {b["id"]: b for b in BOARDS}
-GENERIC_PARTS: List[dict] = _rows("device_generic_parts")
-BOARD_CONFIG_PARAMS = _by_id("board_config_params")
+
+
+def part_label(part: dict) -> str:
+    generic = GENERIC_PARTS_BY_ID[part["generic_part_id"]]["name"]
+    name = part.get("name", "")
+    if not part.get("unknown_name"):
+        label = name
+    else:
+        label = f"{generic} {name}" if name else generic
+    if "chip_count" in part:
+        label = f"{part['chip_count']}x {label}"
+    if "width" in part and "height" in part:
+        return f"{label} ({part['width']}x{part['height']})"
+    if "size_mb" in part:
+        return f"{label} ({part['size_mb']} MB)"
+    return label
 
 
 def sort_text(value: object) -> str:

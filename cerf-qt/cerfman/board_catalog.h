@@ -47,6 +47,7 @@ public:
     int                              DeviceYear(const QString& board_id) const;
 
     std::vector<const cerfcore::DbGenericPart*> UnsupportedParts(const QString& board_id) const;
+    QString                                     PartLabel(const cerfcore::DbPart& part) const;
 
     Q_INVOKABLE QString      DisplayName(const QString& board_id) const;
     Q_INVOKABLE QString      BoardLabel(const QString& board_id, const QString& empty_text) const;

@@ -1,8 +1,8 @@
 import html
 import json
 
-from board_database import (BOARD_CONFIG_PARAMS, BOARD_FAMILIES_BY_ID, BOARDS, GENERIC_PARTS, board_sort_key,
-                            soc_family_of, soc_of, sort_text)
+from board_database import (BOARD_FAMILIES_BY_ID, BOARDS, GENERIC_PARTS, board_sort_key, part_label, soc_family_of,
+                            soc_of, sort_text)
 from build_site import ICONS_DIR
 
 ICONS_URL = '/' + ICONS_DIR
@@ -47,50 +47,10 @@ def _row(icon, supported, title, content):
     return f'<li>{_icon(icon, supported, title)}<span class="cerf-db-row-text">{content}</span></li>'
 
 
-def _value_name(param_id, value_id):
-    return next(v['name'] for v in BOARD_CONFIG_PARAMS[param_id]['enum_values'] if v['id'] == value_id)
-
-
-def _linked_settings(board, part_id):
-    return [(param_id, setting) for param_id, setting in board.get('board_config', {}).items()
-            if BOARD_CONFIG_PARAMS[param_id].get('generic_part_id') == part_id]
-
-
-def _setting_text(param_id, setting):
-    return _value_name(param_id, setting['default'])
-
-
-def _setting_supported(setting):
-    return setting['default'] in setting.get('values', [])
-
-
-def _size_text(spec):
-    if 'display_width' not in spec:
-        return ''
-    return f'{spec["display_width"]}x{spec["display_height"]}'
-
-
-def _entry(segments, size, supported):
-    text = ' - '.join(s for s in segments if s)
-    if size:
-        text = f'{text} ({size})' if text else size
-    return supported, text
-
-
-def _part_entries(board, part_id):
-    specs = [s for s in board['device_specs'] if s['generic_part_id'] == part_id]
-    settings = _linked_settings(board, part_id)
-    if not specs:
-        if not settings:
-            return []
-        return [_entry([_setting_text(p, s) for p, s in settings], '',
-                       all(_setting_supported(s) for _p, s in settings))]
-    entries = []
-    for index, spec in enumerate(specs):
-        attached = settings if index == 0 else []
-        segments = [spec.get('displayed_name', '')] + [_setting_text(p, s) for p, s in attached]
-        supported = spec['supported'] and all(_setting_supported(s) for _p, s in attached)
-        entries.append(_entry(segments, _size_text(spec), supported))
+def _part_entries(board, generic):
+    entries = [(p['supported'], part_label(p)) for p in board['parts'] if p['generic_part_id'] == generic['id']]
+    entries += [(f['supported'], generic['name']) for f in board['device_specs']
+                if f['generic_part_id'] == generic['id']]
     return entries
 
 
@@ -103,8 +63,8 @@ def _cpu_row(board):
 def _part_rows(board):
     working, missing = [], []
     for part in GENERIC_PARTS:
-        for supported, text in _part_entries(board, part['id']):
-            row = _row(part['icon'], supported, part['name'], html.escape(text or part['name']))
+        for supported, text in _part_entries(board, part):
+            row = _row(part['icon'], supported, part['name'], html.escape(text))
             (working if supported else missing).append(row)
     return working + missing
 

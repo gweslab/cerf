@@ -107,8 +107,7 @@ kernel directly.
 - The guest can rewrite its own container. The next boot then starts what the
   storage holds at that time.
 
-Nokia Lumia 800 takes this form. The primary boot device is the eMMC. It is work in
-progress: CERF seeds the eMMC, and the direct boot from it is not wired yet.
+Nokia Lumia 800 takes this form. The primary boot device is the eMMC.
 
 ### Seeding the storage on the first boot
 

@@ -18,13 +18,9 @@ public:
 
     bool ShouldRegister() override { return emu_.Get<cerfcore::DeviceConfig>().guest_additions; }
 
-    void OnReady() override {
-        if (!Available()) enabled_.store(false, std::memory_order_release);
-    }
-
     bool Available() const override { return emu_.Get<cerfcore::GuestLiveResize>().Supported(); }
 
-    bool Enabled() const override { return enabled_.load(std::memory_order_acquire); }
+    bool Enabled() const override { return enabled_.load(std::memory_order_acquire) && Available(); }
 
     void SetEnabled(bool on) override {
         if (!Available()) return;

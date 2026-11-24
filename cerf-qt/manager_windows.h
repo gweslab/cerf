@@ -4,7 +4,6 @@
 #include <cerfcore/state/guest_reset.h>
 
 #include <functional>
-#include <optional>
 
 namespace cerffrontend {
 
@@ -16,7 +15,7 @@ class ManagerWindows : public cerfcore::Service {
 public:
     using cerfcore::Service::Service;
 
-    virtual void EditLiveProperties(const char* page, bool force_reboot, std::optional<int> ce_major,
+    virtual void EditLiveProperties(const char* page, bool force_reboot, bool live_resize,
                                     LiveSheetFinished finished) = 0;
 };
 

@@ -15,7 +15,7 @@ public:
 
     void OpenSettings(const char* page, const std::string& device_line);
     void OpenTutorial();
-    void EditLiveProperties(const char* page, bool force_reboot, std::optional<int> ce_major,
+    void EditLiveProperties(const char* page, bool force_reboot, bool live_resize,
                             cerffrontend::LiveSheetFinished finished);
 
 private:

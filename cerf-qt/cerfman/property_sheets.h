@@ -10,8 +10,6 @@
 #include <QVariantMap>
 #include <QtQml/qqmlregistration.h>
 
-#include <optional>
-
 class PropertySheets : public QObject, public cerfcore::Service {
     Q_OBJECT
     QML_ELEMENT
@@ -26,6 +24,6 @@ public:
     Q_INVOKABLE QObject* CreateForDevice(const QString& name, bool running, const QString& initial_page);
 
     void EditLive(const QVariantMap& window, const QString& initial_page, bool force_reboot,
-                  std::optional<int> ce_major, cerffrontend::LiveSheetFinished finished);
+                  bool live_resize, cerffrontend::LiveSheetFinished finished);
     bool ShowLive(const QString& page, bool force_reboot);
 };

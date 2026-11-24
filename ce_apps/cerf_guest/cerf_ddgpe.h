@@ -99,6 +99,8 @@ public:
     void SurfaceLayout(void* lcl, GPESurf* s, CerfPrimaryLayout* out);
     void* FbLockBase(GPESurf* s, ULONG pa);
     SCODE AllocBackBuffer(GPESurf** ppSurf);
+    SCODE AllocVideoBlock(GPESurf** ppSurf, int width, int height, int stride, ULONG bytes,
+                          EGPEFormat format);
     void  ReleaseScanout(GPESurf* s);
     CerfAliasKind BltAliasKind(GPEBltParms* p);
     BOOL  SnapshotSource(GPEBltParms* p, GPESurf** ppTemp);

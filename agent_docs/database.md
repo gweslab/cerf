@@ -300,6 +300,13 @@ every parameter of its architecture.
 Only a fact that the silicon fixes goes into `cpu_configs`. A rate or a state
 that the guest programs stays in code. The CPU clock is one example.
 
+**A CPU parameter states what the core is, never what CERF does.** A value
+that records what CERF models, supports, stubs or halts on is not a CPU
+parameter. It goes in the engine or core code, next to the path that it
+guards. Each value of a parameter comes from a manual page of that core. A
+parameter takes the name of its register or field in that manual, for example
+"SCTLR read-only bits".
+
 ## Guest-additions palettes - `guest_additions/palettes/`
 
 A palette row is one palette of the guest-additions display. `bpp` is the

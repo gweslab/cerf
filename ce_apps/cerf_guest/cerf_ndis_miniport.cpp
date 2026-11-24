@@ -3,6 +3,7 @@
 #include "cerf_ndis_packet_rx.h"
 #include "cerf_ndis_slot.h"
 #include "cerf_debug_log.h"
+#include "cerf_os_version.h"
 #include "cerf_regs_map.h"
 
 #include "cerfcore/peripherals/cerf_virt/cerf_virt_addr_map.h"
@@ -79,19 +80,11 @@ extern "C" ULONG CerfMpEthDbOff(void) { return CerfMpSelf()->ethdb_off; }
 extern "C" ULONG CerfMpOsMajor(void)  { return CerfMpSelf()->os_major; }
 
 static void CerfMpResolveLayout(CerfMpSlot* mp) {
-    OSVERSIONINFOW ovi;
-
     if (mp->layout_resolved) return;
     mp->layout_resolved = 1;
 
-    memset(&ovi, 0, sizeof(ovi));
-    ovi.dwOSVersionInfoSize = sizeof(ovi);
-    if (!GetVersionExW(&ovi)) {
-        CERF_LOG_X("ndis: GetVersionExW failed gle", GetLastError());
-        return;
-    }
-    mp->os_major = ovi.dwMajorVersion;
-    mp->os_minor = ovi.dwMinorVersion;
+    mp->os_major = CerfOsMajor();
+    mp->os_minor = CerfOsMinor();
 
     if (mp->os_major == 2 && mp->os_minor < 11) {
         mp->ethdb_off = CERF_NDIS_MINIPORT_ETHDB_ALT;

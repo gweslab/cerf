@@ -16,13 +16,17 @@
 #include "cerf_dma_arena.h"
 #include "cerf_ddgpe.h"
 #include "cerf_ddgpe_primary_layout.h"
+#include "cerf_display_mode.h"
 #include "cerf_driver_in_driver.h"
+#include "cerf_os_version.h"
 #include "cerf_eng_callbacks.h"
 #include "cerf_gradient.h"
 #include "cerf_input_pump.h"
 #include "cerf_power.h"
 #include "cerf_registry_customizations.h"
 #include "cerf_service_pump.h"
+#include "cerf_wp7_flip.h"
+#include "cerf_wp7_gpu_budget.h"
 #include "main.h"
 
 #define CERF_GPE_DESC_VA          0x000u
@@ -61,7 +65,6 @@ ULONG g_FbPrimaryReserve = 0;
 
 void* g_FbMemVa   = NULL;
 ULONG g_EngineVersion = 0;
-ULONG g_OsMajor = 0;
 
 extern "C" const wchar_t* CerfInjectedModuleName(void) { return Mn()->module_name; }
 
@@ -73,6 +76,13 @@ extern "C" void CerfSetCarrierName(const wchar_t* name) {
     mn->module_name[i] = 0;
 }
 
+void CerfReloadFbGeometry(void) {
+    CerfMainState* mn = Mn();
+    g_FbWidth  = mn->fb_regs[0];
+    g_FbHeight = mn->fb_regs[1];
+    g_FbStride = mn->fb_regs[3];
+}
+
 void CerfReadFbRegs(void) {
     CerfMainState* mn = Mn();
     if (mn->fb_regs) return;
@@ -80,10 +90,8 @@ void CerfReadFbRegs(void) {
         g_CerfVirtBase + cerfcore::CerfVirt::kFramebufferRegsOffset,
         cerfcore::CerfVirt::kFramebufferRegsSize);
     if (!mn->fb_regs) return;
-    g_FbWidth  = mn->fb_regs[0];
-    g_FbHeight = mn->fb_regs[1];
+    CerfReloadFbGeometry();
     g_FbBpp    = mn->fb_regs[2];
-    g_FbStride = mn->fb_regs[3];
     g_FbMemPa   = mn->fb_regs[5];
     g_FbMemTotal = mn->fb_regs[7];
     g_FbPrimaryReserve = mn->fb_regs[8];
@@ -93,14 +101,37 @@ void CerfReadFbRegs(void) {
     g_FbSystemFontPresent = mn->fb_regs[12];
 }
 
-extern "C" void CerfSetScanoutOffset(ULONG offset) {
+extern "C" void CerfWriteFbReg(ULONG offset, ULONG value) {
     CerfMainState* mn = Mn();
     CerfReadFbRegs();
     if (!mn->fb_regs) {
         CERF_FATAL("cerf_guest: FB register map FAILED");
         return;
     }
-    mn->fb_regs[cerfcore::CerfVirt::kFbRegScanoutOffset / 4] = offset;
+    mn->fb_regs[offset / 4] = value;
+}
+
+extern "C" ULONG CerfReadFbReg(ULONG offset) {
+    CerfMainState* mn = Mn();
+    CerfReadFbRegs();
+    if (!mn->fb_regs) {
+        CERF_FATAL("cerf_guest: FB register map FAILED");
+        return 0;
+    }
+    return mn->fb_regs[offset / 4];
+}
+
+extern "C" void CerfSetScanoutOffset(ULONG offset) {
+    CerfWriteFbReg(cerfcore::CerfVirt::kFbRegScanoutOffset, offset);
+}
+
+extern "C" void CerfSetScanoutLayer(ULONG pa, ULONG width, ULONG height, ULONG stride,
+                                    ULONG bpp) {
+    CerfWriteFbReg(cerfcore::CerfVirt::kFbRegLayerWidth, width);
+    CerfWriteFbReg(cerfcore::CerfVirt::kFbRegLayerHeight, height);
+    CerfWriteFbReg(cerfcore::CerfVirt::kFbRegLayerStride, stride);
+    CerfWriteFbReg(cerfcore::CerfVirt::kFbRegLayerBpp, bpp);
+    CerfWriteFbReg(cerfcore::CerfVirt::kFbRegLayerPa, pa);
 }
 
 static BOOL CerfMapGpeCmd(CerfMainState* mn) {
@@ -246,6 +277,22 @@ static DHPDEV APIENTRY CerfEnablePDEVWrap(
     return result;
 }
 
+typedef char Wp7DrvTailFollowsHead[
+    (offsetof(DRVENABLEDATA, DrvContrastControl) == WP7_DRVENABLEDATA_HEAD_SLOTS * sizeof(void*)) ? 1 : -1];
+typedef char Wp7DrvTailFillsTable[
+    (sizeof(WP7DRVENABLETAIL) ==
+     (WP7_DRVENABLEDATA_SLOTS - WP7_DRVENABLEDATA_HEAD_SLOTS) * sizeof(void*)) ? 1 : -1];
+
+static void CerfFillWp7DrvTail(DRVENABLEDATA* pded) {
+    WP7DRVENABLETAIL* tail = (WP7DRVENABLETAIL*)&pded->DrvContrastControl;
+    tail->DrvPowerHandler      = DrvPowerHandler;
+    tail->DrvEscape            = DrvEscape;
+    tail->DrvGradientFill      = CerfDrvGradientFill;
+    tail->DrvAlphaBlend        = CerfDrvAlphaBlendWp7;
+    tail->DrvFullScreenSurface = CerfWp7FullScreenSurface;
+    tail->DrvDisableDriver     = DrvDisableDriver;
+}
+
 extern "C" BOOL APIENTRY DrvEnableDriver(ULONG iEngineVersion,
                                           ULONG cj,
                                           DRVENABLEDATA* pded,
@@ -259,6 +306,10 @@ extern "C" BOOL APIENTRY DrvEnableDriver(ULONG iEngineVersion,
     CerfApplyRegistryCustomizations();
 
     if (pded == NULL || pCallbacks == NULL || cj < 26 * sizeof(void*)) return FALSE;
+    if (CerfIsWp7()) {
+        CerfWp7FitGpuBudget();
+        CerfDisplayModeReportFixedSize();
+    }
 
     if (!mn->module_name[0]) {
         wchar_t full[MAX_PATH];
@@ -272,12 +323,7 @@ extern "C" BOOL APIENTRY DrvEnableDriver(ULONG iEngineVersion,
             mn->module_name[i] = L'\0';
         }
     }
-    {
-        OSVERSIONINFOW ovi;
-        ovi.dwOSVersionInfoSize = sizeof(ovi);
-        g_OsMajor = GetVersionExW(&ovi) ? ovi.dwMajorVersion : 5u;
-        CerfSetVidBackingByOsMajor(g_OsMajor);
-    }
+    CerfSetVidBackingByOsMajor(CerfOsMajor());
 
     g_EngineVersion = iEngineVersion;
 
@@ -328,6 +374,7 @@ extern "C" BOOL APIENTRY DrvEnableDriver(ULONG iEngineVersion,
     if (cj >= 29 * sizeof(void*)) pded->DrvAlphaBlend    = CerfDrvAlphaBlend;
     if (cj >= 30 * sizeof(void*)) pded->DrvExclusiveMode = DrvExclusiveMode;
     if (cj >= 31 * sizeof(void*)) pded->DrvDisableDriver = DrvDisableDriver;
+    if (CerfIsWp7() && cj == WP7_DRVENABLEDATA_SLOTS * sizeof(void*)) CerfFillWp7DrvTail(pded);
     return TRUE;
 }
 

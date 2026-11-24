@@ -44,6 +44,11 @@ Material Symbols - https://github.com/google/material-design-icons
     Copyright: (c) Google LLC
     Text:      licenses/Apache-2.0.txt
 
+Microsoft C++ Standard Library (std::lerp) - https://github.com/microsoft/STL
+    License:   Apache-2.0 WITH LLVM-exception
+    Copyright: (c) Microsoft Corporation
+    Text:      licenses/Apache-2.0.txt
+
 alsa-lib 1.2.15.3 - https://www.alsa-project.org/
     License:   LGPL-2.1-or-later, used under LGPL-3.0
     Copyright: (c) 1998 Jaroslav Kysela; (c) 2000 Abramo Bagnara
@@ -1026,6 +1031,7 @@ Ganbold Tsagaankhuu's FreeBSD Qualcomm port - https://github.com/tsgan/qualcomm
 Little Kernel - https://android.googlesource.com/kernel/lk
 NetBSD - https://www.netbsd.org/
 Dolphin - https://dolphin-emu.org/
+mGBA - https://mgba.io/
 MAME - https://www.mamedev.org/
 OpenOCD - https://openocd.org/
 dosfstools - https://github.com/dosfstools/dosfstools
@@ -1035,6 +1041,8 @@ Polynomial Interpolators for High-Quality Resampling of Oversampled Audio - Olli
     http://yehar.com/blog/wp-content/uploads/2009/08/deip.pdf
 qemu-neo1973 - Openmoko - https://github.com/jvesely/qemu-neo1973
 libqmi - https://gitlab.freedesktop.org/mobile-broadband/libqmi
+Gobi 3000 SDK - Code Aurora Forum - https://chromium.googlesource.com/chromiumos/third_party/gobi3k-sdk
+oFono - https://git.kernel.org/pub/scm/network/ofono/ofono.git
 ModemManager libqcdm - https://gitlab.freedesktop.org/mobile-broadband/ModemManager
 Rockbox - https://www.rockbox.org/
 Das U-Boot - https://github.com/u-boot/u-boot
@@ -1043,7 +1051,11 @@ pySerial - https://github.com/pyserial/pyserial
 Wine - https://www.winehq.org/
 XNU - https://github.com/apple-oss-distributions/xnu
 Android Open Source Project - https://source.android.com/
+HD2 Leo GPS library - The XDAndroid Project - https://github.com/tytung/android_hardware_leo_libgps
 X.Org Trident driver - https://gitlab.freedesktop.org/xorg/driver/xf86-video-trident
+Mesa freedreno - https://gitlab.freedesktop.org/mesa/mesa
+Xenia - https://github.com/xenia-project/xenia
+ImageMagick - https://imagemagick.org/
 sh3-emu - Phil Howard - https://github.com/Gadgetoid/sh3-emu
 coreboot - https://www.coreboot.org/
 GNU Binutils - https://www.gnu.org/software/binutils/

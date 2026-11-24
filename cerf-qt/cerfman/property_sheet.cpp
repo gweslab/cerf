@@ -38,7 +38,6 @@ namespace sp = sheet_page;
 constexpr std::array<const char*, 5> kRebootKeys = {pf::kBpp, pf::kPalette, pf::kDpi, pf::kFontSize,
                                                     pf::kColorScheme};
 constexpr std::array<const char*, 2> kLiveResizeKeys  = {pf::kWidth, pf::kHeight};
-constexpr int                        kLiveResizeMinCe = 4;
 
 Json FilesToJson(const FileValues& files) {
     Json out = Json::object();
@@ -71,14 +70,14 @@ PropertySubject PropertySubject::OfDirectory(const QString& path) {
 }
 
 PropertySheet::PropertySheet(cerfcore::CerfEmulator& emu, PropertySubject subject, QString mode,
-                             QString initial_page, std::optional<int> ce_major, bool force_reboot,
+                             QString initial_page, bool live_resize, bool force_reboot,
                              QObject* parent)
     : QObject(parent),
       emu_(emu),
       subject_(std::move(subject)),
       mode_(std::move(mode)),
       initial_page_(std::move(initial_page)),
-      ce_major_(ce_major),
+      live_resize_(live_resize),
       force_reboot_(force_reboot) {
     const PersistedValues persisted = ReadPersistedValues(subject_.device, MountPointDefault());
     baseline_               = persisted.baseline;
@@ -297,7 +296,7 @@ bool PropertySheet::RebootRequired() const {
     if (!Live()) return false;
     for (const char* key : kRebootKeys)
         if (ValueChanged(initial_, values_, key)) return true;
-    if (ce_major_ && *ce_major_ >= kLiveResizeMinCe) return false;
+    if (live_resize_) return false;
     for (const char* key : kLiveResizeKeys)
         if (ValueChanged(initial_, values_, key)) return true;
     return false;

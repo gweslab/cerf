@@ -1,7 +1,9 @@
 #include "cerf_ddgpe.h"
 #include "cerf_cursor.h"
 #include "cerf_display_mode.h"
+#include "cerf_os_version.h"
 #include "cerf_power.h"
+#include "cerf_wp7_escape.h"
 #include "main.h"
 
 #ifndef QUERYESCSUPPORT
@@ -130,6 +132,8 @@ ULONG CerfDDGPE::DrvEscape(SURFOBJ* pso, ULONG iEsc, ULONG cjIn, PVOID pvIn,
                            ULONG cjOut, PVOID pvOut) {
     ULONG pwrRet;
     if (CerfPowerEscape(iEsc, cjOut, pvOut, &pwrRet)) return pwrRet;
+    ULONG wp7Ret;
+    if (CerfIsWp7() && CerfWp7Escape(pso, iEsc, cjIn, pvIn, cjOut, pvOut, &wp7Ret)) return wp7Ret;
     if (iEsc == QUERYESCSUPPORT) {
         DWORD code = (pvIn && cjIn >= sizeof(DWORD)) ? *(DWORD*)pvIn : 0;
         if (code == DRVESC_GETSCREENROTATION || code == DRVESC_SETSCREENROTATION) {

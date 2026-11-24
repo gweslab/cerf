@@ -276,6 +276,14 @@ write falls due. Such a peripheral does those writes in a
 `Hibernation::RegisterPreSaveListener` callback. Hibernation runs that callback
 before it writes the image.
 
+**A setting that the user changes while the machine is saved reaches the guest at
+the next reset that is not a sleep resume.** A restore loads the value that the
+image holds, and the guest keeps that value until it boots again. A part that
+reads such a value only in `OnReady` keeps the copy of the image through every
+later reset. A record of what the guest applied keeps the values that the guest
+read, never a copy of the configuration taken later. A flag that only says
+"applied" misses a change.
+
 ### 2. `PostRestore()`
 
 It runs in a **second pass, after the `RestoreState` of every peripheral is

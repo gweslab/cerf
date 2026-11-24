@@ -77,6 +77,12 @@ Only **the placement of the stub into the ROM** differs by ROM class:
   imgfs.dll adopts it. It then repoints the IMGFS **dirent**
   module-index / section-index records of the victim at the new pages. CERF
   injects the SAME stub.
+- **Direct-addressed IMGFS** (`libCerfCore/src/boot/imgfs_stub_injector.cpp`) - a
+  volume with no FTL, where a volume offset is a storage offset. Its directory
+  blocks lie across the whole volume. The walk follows their chain, as
+  `imgfs.dll` does, and does not scan a part of the volume. The stub goes only
+  into chunks (the allocation units of the volume) that the victim owns alone,
+  because one sector or page can hold the chunks of several files.
 
 Every path flags the writable sections of the stub SHARED. The stub also keeps
 its per-process state pid-keyed. See § The cross-process writable-state
@@ -202,16 +208,14 @@ kernel-loaded module becomes vestigial once manual-map delivers the body.
 After any change to how the inputs of a load-bearing helper are produced,
 re-audit that helper for vestigiality. Never assume that it is still required.
 
-## The version / ROM-class axis
+## The version axis
 
-- **FCSE (CE ≤ 5)** - one shared page table. The cp13 FCSE PID relocates low
-  VAs per process. The shared-writable-statics hazard of the previous section
-  is an FCSE property.
-- **ASID (CE6/7)** - per-process page tables. The writable data of the same
-  injected module is per-process by construction.
-- **ROM classes** - XIP single, MultiXIP, and IMGFS (WM6+). XIP / MultiXIP go
-  through `guest_additions_injector.cpp`. IMGFS goes through
-  `imgfs_injector.cpp`.
+On CE 5 and older, all processes use one shared page table, and the cp13 FCSE
+PID relocates the low VAs of each process. The hazard of shared writable
+statics in the previous section exists only on these FCSE kernels.
+
+On CE 6 and CE 7, each process has its own page tables and an ASID. Each
+process therefore has its own copy of the writable data of an injected module.
 
 ## Display driver + blit pipeline
 
@@ -241,6 +245,39 @@ before the guest-additions driver starts.
 The region of the guest-additions framebuffer also holds the offscreen surfaces.
 A write to an offscreen surface is not a write to the displayed frame. Without
 this rule, a first offscreen paint ends the splash early.
+
+**Windows Phone 7 has its own DirectDraw HAL structures.** It reports OS
+version 7.10, which no Windows CE release reports. GWES keeps the `HALInit`
+block on its stack. A driver that fills a CE6-sized block there overwrites the
+stack cookie of GWES (the value that the compiler checks for a stack overrun).
+
+**Windows Phone 7 presents through the flip exports of the display driver.**
+`amdgslldd.dll` loads `ddi.dll` and calls `ScreenUpdateByFlipEx`,
+`ClaimFreeBuffer` and the other flip functions by name. The stub must export
+them as well. The compositor renders with the GPU into memory that it supplies
+(`DDSD_LPSURFACE`). GWES also marks such a surface `DDSCAPS_VIDEOMEMORY`, and
+the driver still wraps the client memory. The display shows such a surface as a
+layer, a scanout source outside the framebuffer region. A copy of each frame
+through the staging arena (the shared buffer that carries pixels to the host)
+runs on the guest CPU and slows the whole boot.
+
+**The video plane of Windows Phone 7 shows under the layer of the compositor.**
+A mixer stage is one step in the blend order of the display hardware. The stock
+driver puts the video on the higher stage and weights it by the inverse of the
+alpha of the compositor layer. The stage order alone therefore gives the wrong
+visual order.
+
+`ClaimFreeBuffer` returns at the first refresh boundary after the shown frame.
+The stock flipper releases a buffer only at vsync (the start of each display
+refresh). Without that limit, the
+compositor renders as many frames as the host can run.
+
+**The graphics memory of Windows Phone 7 limits the screen size.** The compositor
+reserves its slabs (large fixed blocks for its window buffers) from the GPU pool
+of the guest. The size of a slab grows with the screen size, and the pool has a
+fixed size. The driver therefore keeps the slab demand at or below the demand at
+the panel size of the board. Other GPU allocations then keep the share of the
+pool that they have on the device.
 
 **HW means HW.** The `cerf_guest` accelerator must handle every blit class
 (copy, fill, format-convert, palette, masked text, transparency, ROP, …)
@@ -402,9 +439,13 @@ an event. The shell replacement thread is one-shot.
 Host keystrokes reach the guest through the same mechanism as the mouse-pointer
 pump, with `keybd_event` in place of `mouse_event`. Both are coredll exports
 that trap into the same GWES API set (API-set 81). Both are present unchanged
-on every CE version (CE 2.11 → CE 7). One guest binary therefore drives
+on every CE version from CE 2.11 to CE 7. One guest binary therefore drives
 keyboard input on every guest OS, with no per-version code and no
 guest-installed driver.
+
+Windows Phone 7 exports no `mouse_event`. A guest that lacks one of the two
+exports reports that to the host at pump start. The host then keeps that input
+on the stock source of the board, for example the touch panel.
 
 - Host channel: `libCerfCore/src/peripherals/cerf_virt/cerf_virt_keyboard.{h,cpp}` +
   `libCerfCore/include/cerfcore/peripherals/cerf_virt/cerf_virt_keyboard_regs.h`.

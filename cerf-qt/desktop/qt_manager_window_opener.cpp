@@ -29,9 +29,9 @@ void QtManagerWindowOpener::OpenTutorial() {
         [this] { QMetaObject::invokeMethod(emu_.Get<QtEmulatorWindow>().Window(), "openTutorial"); });
 }
 
-void QtManagerWindowOpener::EditLiveProperties(const char* page, bool force_reboot, std::optional<int> ce_major,
+void QtManagerWindowOpener::EditLiveProperties(const char* page, bool force_reboot, bool live_resize,
                                                cerffrontend::LiveSheetFinished finished) {
-    emu_.Get<PropertySheets>().EditLive(Placement(), QString::fromLatin1(page), force_reboot, ce_major,
+    emu_.Get<PropertySheets>().EditLive(Placement(), QString::fromLatin1(page), force_reboot, live_resize,
                                         std::move(finished));
 }
 

@@ -12,9 +12,9 @@ class DesktopLiveCustomizations final : public cerffrontend::ManagerWindows {
 public:
     using cerffrontend::ManagerWindows::ManagerWindows;
 
-    void EditLiveProperties(const char* page, bool force_reboot, std::optional<int> ce_major,
+    void EditLiveProperties(const char* page, bool force_reboot, bool live_resize,
                             cerffrontend::LiveSheetFinished finished) override {
-        emu_.Get<QtManagerWindowOpener>().EditLiveProperties(page, force_reboot, ce_major, std::move(finished));
+        emu_.Get<QtManagerWindowOpener>().EditLiveProperties(page, force_reboot, live_resize, std::move(finished));
     }
 };
 

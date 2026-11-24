@@ -82,8 +82,10 @@ extern "C" HLOCAL RemoteLocalFree(HLOCAL hMem);
 DDGPESurf::DDGPESurf(int width, int height, EGPEFormat format)
     : GPESurf(width, height, NULL, CerfEGPEFormatStride(width, format), format),
       m_pixelFormat(CerfFormatToDDGPE(format)),
-      m_colorKeyLow(0), m_colorKeyHigh(0), m_ownsRemote(0) {
-    const DWORD bytes = (DWORD)CerfEGPEFormatStride(width, format) * (DWORD)height;
+      m_colorKeyLow(0), m_colorKeyHigh(0), m_ownsRemote(0), m_physicalAddress(0),
+      m_surfaceBytes((ULONG)CerfEGPEFormatStride(width, format) * (ULONG)height),
+      m_modified(FALSE), m_yuvCode(0), m_cbOffset(0), m_crOffset(0), m_chromaStride(0) {
+    const DWORD bytes = m_surfaceBytes;
     if (bytes) {
         m_pVirtAddr  = (ADDRESS)RemoteLocalAlloc(LMEM_FIXED, bytes);
         m_ownsRemote = 1;

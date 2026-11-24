@@ -12,3 +12,8 @@ EXPORTS
     CDD_Write
     CDD_Seek
     CDD_IOControl
+    InitializeFlipping
+    TerminateFlipping
+    ScreenUpdateByFlipEx
+    ClaimFreeBuffer
+    SetSurfaceModified

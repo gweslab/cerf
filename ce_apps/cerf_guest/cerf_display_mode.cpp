@@ -48,6 +48,15 @@ static void CerfDmPublish(ULONG quarter) {
         regs[cerfcore::CerfVirt::kRszAppliedGen / 4] + 1u;
 }
 
+void CerfDisplayModeReportFixedSize(void) {
+    volatile ULONG* regs = CerfDisplayModeChannel();
+    if (!regs) {
+        CERF_FATAL("cerf_guest: display mode channel map FAILED");
+        return;
+    }
+    regs[cerfcore::CerfVirt::kRszFixedSize / 4] = 1u;
+}
+
 ULONG CerfDisplayModeRotationCaps(void) {
     return ((ULONG)CERF_DMDO_TURNS << 8) | Dm()->angle;
 }

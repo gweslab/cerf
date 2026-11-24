@@ -13,7 +13,6 @@ extern ULONG g_FbSystemFontPresent;
 extern ULONG g_FbMemTotal;
 extern ULONG g_FbPrimaryReserve;
 extern ULONG g_EngineVersion;
-extern ULONG g_OsMajor;
 
 void  CerfReadFbRegs(void);
 void* CerfMapFbMemory(void);
@@ -28,4 +27,8 @@ extern "C" BOOL  CerfReadPalette(ULONG* rgb, unsigned count);
 extern "C" void* CerfMapFbGlobal(void);
 extern "C" void* CerfMapFbWindow(ULONG fb_pa, ULONG bytes);
 extern "C" void  CerfUnmapFbWindow(void* va);
+extern "C" void  CerfWriteFbReg(ULONG offset, ULONG value);
+extern "C" ULONG CerfReadFbReg(ULONG offset);
+void             CerfReloadFbGeometry(void);
 extern "C" void  CerfSetScanoutOffset(ULONG offset);
+extern "C" void  CerfSetScanoutLayer(ULONG pa, ULONG width, ULONG height, ULONG stride, ULONG bpp);

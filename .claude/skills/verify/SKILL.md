@@ -137,7 +137,7 @@ The reason is the text after `void`, verbatim. If that text is empty, the reason
 
 1. Resume the reviewer that returned the verdict. Send this message to its agent ID through `SendMessage`:
 
-   *"The user voids your verdict. The reason of the user, verbatim: "<reason>". The facts that make the verdict wrong: <each fact, with its source>. Invoke `/session-feedback`. Give your perspective on how agent_docs must change."*
+   *"The user voids your verdict. The reason of the user, verbatim: "<reason>". The facts that make the verdict wrong: <each fact, with its source>. Invoke `/session-feedback`. Give your perspective on how agent_docs must change. Propose only rules that bind every agent, because agent_docs bind every agent. A rule for reviewers alone does not enter agent_docs."*
 
    The reason of the user can be short. Without the facts, the reviewer cannot see what its verdict missed.
 2. In the same turn, invoke `Skill(session-feedback)` yourself.

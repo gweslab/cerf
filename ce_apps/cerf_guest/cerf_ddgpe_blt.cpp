@@ -1,6 +1,8 @@
 #include "cerf_ddgpe.h"
 #include "cerf_display_orientation.h"
 #include "cerf_dma_arena.h"
+#include "cerf_os_version.h"
+#include "cerf_wp7_escape.h"
 #include "main.h"
 
 #include "cerfcore/peripherals/cerf_virt/cerf_virt_addr_map.h"
@@ -251,9 +253,13 @@ void CerfDDGPE::EmitBltBand(const CerfBltBand& b, GPEBltParms* p, int r0, int r1
         RectToDesc(&d.mask_rect, p->prclMask);
         FillSurface(&d.mask, p->pMask, b.ml + c0, b.mt + rr0, b.ml + c1, b.mt + rr1, false);
         if (b.mask_bits == 8)
-            d.cleartype_indices = (g_OsMajor >= 4u)
+            d.cleartype_indices = (CerfOsMajor() >= 4u)
                 ? cerfcore::CerfVirt::kCerfClearTypeLevelIndices
                 : cerfcore::CerfVirt::kCerfClearTypeSampleCountIndices;
+        if (CerfIsWp7()) {
+            d.text_gamma_aa        = CerfWp7TextGammaAa();
+            d.text_gamma_cleartype = CerfWp7TextGammaClearType();
+        }
     }
     if (b.has_brush) {
         d.has_brush    = 1u;

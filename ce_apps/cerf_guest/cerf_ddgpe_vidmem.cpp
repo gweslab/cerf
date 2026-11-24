@@ -116,6 +116,25 @@ SCODE CerfDDGPE::AllocSurface(GPESurf** ppSurf, int width, int height,
     return S_OK;
 }
 
+SCODE CerfDDGPE::AllocVideoBlock(GPESurf** ppSurf, int width, int height, int stride, ULONG bytes,
+                                 EGPEFormat format) {
+    SurfaceHeap* node;
+    CerfVidSurf* s;
+    *ppSurf = NULL;
+    if (!EnsureVideoHeap()) return E_OUTOFMEMORY;
+    node = m_pVidHeap->Alloc(bytes);
+    if (!node) return E_OUTOFMEMORY;
+    s = new CerfVidSurf(width, height, m_vidBaseVa + node->Address(), stride, format,
+                        CerfFormatToDDGPE(format), node->Address(), node);
+    if (!s) {
+        node->Free();
+        return E_OUTOFMEMORY;
+    }
+    s->SetPhysicalMemory(0, bytes);
+    *ppSurf = s;
+    return S_OK;
+}
+
 SCODE CerfDDGPE::AllocBackBuffer(GPESurf** ppSurf) {
     GPESurf*     p = m_pPrimarySurface;
     SurfaceHeap* node;

@@ -2,6 +2,7 @@
   date: TBA
   devices:
     new: |
+      [WIP] Nokia Lumia 800 family support
       Jornada 540 family support
       ODO family: added HUD
   emulator:

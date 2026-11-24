@@ -7,3 +7,5 @@ extern "C" BOOL APIENTRY CerfDrvGradientFill(SURFOBJ*, CLIPOBJ*, XLATEOBJ*, TRIV
                                              PVOID, ULONG, RECTL*, POINTL*, ULONG);
 extern "C" BOOL APIENTRY CerfDrvAlphaBlend(SURFOBJ*, SURFOBJ*, CLIPOBJ*, XLATEOBJ*, RECTL*,
                                            RECTL*, BLENDOBJ*);
+extern "C" BOOL APIENTRY CerfDrvAlphaBlendWp7(SURFOBJ*, SURFOBJ*, CLIPOBJ*, XLATEOBJ*, RECTL*,
+                                              RECTL*, BLENDOBJ*, ULONG);

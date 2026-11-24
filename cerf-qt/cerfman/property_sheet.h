@@ -79,7 +79,7 @@ public:
     static constexpr char kModeLive[]   = "live";
 
     PropertySheet(cerfcore::CerfEmulator& emu, PropertySubject subject, QString mode,
-                  QString initial_page, std::optional<int> ce_major, bool force_reboot,
+                  QString initial_page, bool live_resize, bool force_reboot,
                   QObject* parent = nullptr);
 
     QString      Title() const;
@@ -169,7 +169,7 @@ private:
     PropertySubject         subject_;
     QString                 mode_;
     QString                 initial_page_;
-    std::optional<int>      ce_major_;
+    bool                    live_resize_;
     bool                    force_reboot_;
     bool                    shader_preview_ = false;
     Json                    baseline_;

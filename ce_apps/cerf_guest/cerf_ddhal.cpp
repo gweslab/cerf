@@ -3,6 +3,8 @@
 #include "cerf_ddgpe.h"
 #include "cerf_ddgpe_ddhal.h"
 #include "cerf_ddhal_ce5.h"
+#include "cerf_ddhal_wp7.h"
+#include "cerf_os_version.h"
 #include "main.h"
 #include "include/ddraw_ce6.h"
 #include "include/ddraw_wm.h"
@@ -185,17 +187,21 @@ extern "C" BOOL WmHALInit(void* lpddhi) {
 }
 
 EXTERN_C BOOL WINAPI HALInit(void* lpddhi, BOOL unused1, DWORD modeidx) {
-    OSVERSIONINFOW ovi;
-    ovi.dwOSVersionInfoSize = sizeof(ovi);
-    GetVersionExW(&ovi);
+    const ULONG os_major = CerfOsMajor();
+    const ULONG os_minor = CerfOsMinor();
 
-    if (ovi.dwMajorVersion >= 6) {
+    if (CerfIsWp7()) {
+        BOOL ok = Wp7HALInit(lpddhi);
+        CERF_LOG_X("cerf_guest: HALInit WP7 path ok", ok);
+        return ok;
+    }
+    if (os_major >= 6) {
         buildDDHALInfo((Ce6_DDHALINFO*)lpddhi, modeidx);
         CerfFillHelCaps(&((Ce6_DDHALINFO*)lpddhi)->ddHelCaps);
         CERF_LOG("cerf_guest: HALInit CE6/CE7 path done");
         return TRUE;
     }
-    if (ovi.dwMajorVersion == 5 && ovi.dwMinorVersion >= 1) {
+    if (os_major == 5 && os_minor >= 1) {
         BOOL ok = WmHALInit(lpddhi);
         CERF_LOG_X("cerf_guest: HALInit WM path ok", ok);
         return ok;

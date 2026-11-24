@@ -350,6 +350,21 @@ typedef struct tagDrvEnableData {
     PFN_DrvDisableDriver      DrvDisableDriver;
 } DRVENABLEDATA, *PDRVENABLEDATA;
 
+typedef BOOL (*PFN_Wp7DrvAlphaBlend)(SURFOBJ*, SURFOBJ*, CLIPOBJ*, XLATEOBJ*, RECTL*, RECTL*, BLENDOBJ*, ULONG);
+typedef VOID (*PFN_Wp7DrvFullScreenSurface)(SURFOBJ*);
+
+typedef struct tagWp7DrvEnableTail {
+    PFN_DrvPowerHandler         DrvPowerHandler;
+    PFN_DrvEscape               DrvEscape;
+    PFN_DrvGradientFill         DrvGradientFill;
+    PFN_Wp7DrvAlphaBlend        DrvAlphaBlend;
+    PFN_Wp7DrvFullScreenSurface DrvFullScreenSurface;
+    PFN_DrvDisableDriver        DrvDisableDriver;
+} WP7DRVENABLETAIL;
+
+#define WP7_DRVENABLEDATA_HEAD_SLOTS 21
+#define WP7_DRVENABLEDATA_SLOTS      27
+
 typedef PVOID    (*PFN_BRUSHOBJ_pvAllocRbrush)(BRUSHOBJ*, ULONG);
 typedef PVOID    (*PFN_BRUSHOBJ_pvGetRbrush)(BRUSHOBJ*);
 typedef ULONG    (*PFN_CLIPOBJ_cEnumStart)(CLIPOBJ*, BOOL, ULONG, ULONG, ULONG);

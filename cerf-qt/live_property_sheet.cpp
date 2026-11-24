@@ -4,15 +4,14 @@
 #include "frontend_window.h"
 #include "password_gated_actions.h"
 
-#include <cerfcore/boot/rom_parser_queries.h>
 #include <cerfcore/core/cerf_emulator.h>
 #include <cerfcore/core/device_config.h>
 #include <cerfcore/core/device_config_refresh.h>
+#include <cerfcore/host/guest_live_resize.h>
 #include <cerfcore/peripherals/cerf_virt/cerf_virt_config_apply.h>
 
 #include <QString>
 
-#include <optional>
 #include <string>
 #include <utility>
 
@@ -33,15 +32,13 @@ void LivePropertySheet::Show(const char* page, bool force_reboot, Done done) {
         if (done) waiters_->push_back(std::move(done));
         return;
     }
-    std::optional<int> ce_major;
-    uint16_t           major = 0, minor = 0;
-    auto*              rom   = emu_.TryGet<cerfcore::RomParserQueries>();
-    if (rom && rom->KernelSubsystemVersion(major, minor)) ce_major = major;
+    auto*      resize      = emu_.TryGet<cerfcore::GuestLiveResize>();
+    const bool live_resize = resize && resize->Supported();
 
     waiters_ = std::make_shared<Waiters>();
     if (done) waiters_->push_back(std::move(done));
     emu_.Get<ManagerWindows>().EditLiveProperties(
-        page, force_reboot, ce_major, gate_.Bind([this, waiters = waiters_](bool accepted, GuestReset reset) {
+        page, force_reboot, live_resize, gate_.Bind([this, waiters = waiters_](bool accepted, GuestReset reset) {
             emu_.Get<FrontendWindow>().RunOnUiThread(
                 [this, waiters, accepted, reset] { Finish(accepted, reset, *waiters); });
         }));

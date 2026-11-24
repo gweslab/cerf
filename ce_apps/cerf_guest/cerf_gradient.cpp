@@ -226,12 +226,24 @@ extern "C" BOOL APIENTRY CerfDrvGradientFill(SURFOBJ* pso, CLIPOBJ* pco,
     return ok;
 }
 
+static BOOL CerfAlphaBlend(SURFOBJ* psoDest, SURFOBJ* psoSrc, CLIPOBJ* pco, XLATEOBJ* pxlo,
+                           RECTL* prclDest, RECTL* prclSrc, BLENDOBJ* pBlendObj, ULONG flags) {
+    if (!psoDest || !psoSrc || !prclDest || !prclSrc || !pBlendObj) return FALSE;
+    return AnyBlt(psoDest, psoSrc, NULL, pco, pxlo, prclDest, prclSrc,
+                  NULL, NULL, NULL, 0xCCCC, flags | BLT_ALPHABLEND, BLACKONWHITE,
+                  pBlendObj->BlendFunction);
+}
+
 extern "C" BOOL APIENTRY CerfDrvAlphaBlend(SURFOBJ* psoDest, SURFOBJ* psoSrc,
                                             CLIPOBJ* pco, XLATEOBJ* pxlo,
                                             RECTL* prclDest, RECTL* prclSrc,
                                             BLENDOBJ* pBlendObj) {
-    if (!psoDest || !psoSrc || !prclDest || !prclSrc || !pBlendObj) return FALSE;
-    return AnyBlt(psoDest, psoSrc, NULL, pco, pxlo, prclDest, prclSrc,
-                  NULL, NULL, NULL, 0xCCCC, BLT_ALPHABLEND, BLACKONWHITE,
-                  pBlendObj->BlendFunction);
+    return CerfAlphaBlend(psoDest, psoSrc, pco, pxlo, prclDest, prclSrc, pBlendObj, 0);
+}
+
+extern "C" BOOL APIENTRY CerfDrvAlphaBlendWp7(SURFOBJ* psoDest, SURFOBJ* psoSrc,
+                                               CLIPOBJ* pco, XLATEOBJ* pxlo,
+                                               RECTL* prclDest, RECTL* prclSrc,
+                                               BLENDOBJ* pBlendObj, ULONG flags) {
+    return CerfAlphaBlend(psoDest, psoSrc, pco, pxlo, prclDest, prclSrc, pBlendObj, flags);
 }

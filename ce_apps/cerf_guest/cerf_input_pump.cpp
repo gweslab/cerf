@@ -46,14 +46,12 @@ static DWORD WINAPI CerfInputPumpThread(LPVOID) {
     CERF_LOG_X("cerf_guest: inputpump mouse_event", (DWORD)me);
     CERF_LOG_X("cerf_guest: inputpump keybd_event", (DWORD)ke);
 
-    if (me) {
-        ptr = (volatile ULONG*)CerfMapRegsPage(g_CerfVirtBase + kPointerOffset, kPointerSize);
-        if (!ptr) me = NULL;
-    }
-    if (ke) {
-        kb = (volatile ULONG*)CerfMapRegsPage(g_CerfVirtBase + kKeyboardOffset, kKeyboardSize);
-        if (!kb) ke = NULL;
-    }
+    ptr = (volatile ULONG*)CerfMapRegsPage(g_CerfVirtBase + kPointerOffset, kPointerSize);
+    if (ptr && !me) ptr[kPtrNoInjector / 4] = 1u;
+    if (!ptr) me = NULL;
+    kb = (volatile ULONG*)CerfMapRegsPage(g_CerfVirtBase + kKeyboardOffset, kKeyboardSize);
+    if (kb && !ke) kb[kKbNoInjector / 4] = 1u;
+    if (!kb) ke = NULL;
     if (!me && !ke) {
         CERF_LOG("cerf_guest: inputpump init FAILED");
         return 0;

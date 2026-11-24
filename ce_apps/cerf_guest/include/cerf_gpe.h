@@ -276,10 +276,36 @@ public:
     DDGPESurf(int width, int height, void* pBits, int stride, EGPEFormat format,
               EDDGPEPixelFormat pf)
         : GPESurf(width, height, pBits, stride, format), m_pixelFormat(pf),
-          m_colorKeyLow(0), m_colorKeyHigh(0), m_ownsRemote(0) {}
+          m_colorKeyLow(0), m_colorKeyHigh(0), m_ownsRemote(0), m_physicalAddress(0),
+          m_surfaceBytes((ULONG)(stride < 0 ? -stride : stride) * (ULONG)height),
+          m_modified(FALSE), m_yuvCode(0), m_cbOffset(0), m_crOffset(0), m_chromaStride(0) {}
     virtual ~DDGPESurf();
 
     EDDGPEPixelFormat PixelFormat() const { return m_pixelFormat; }
+
+    ULONG PhysicalAddress() const { return m_physicalAddress; }
+    ULONG SurfaceBytes() const    { return m_surfaceBytes; }
+    void  SetPhysicalMemory(ULONG physical_address, ULONG bytes) {
+        m_physicalAddress = physical_address;
+        m_surfaceBytes    = bytes;
+    }
+
+    ULONG YuvCode() const      { return m_yuvCode; }
+    ULONG CbOffset() const     { return m_cbOffset; }
+    ULONG CrOffset() const     { return m_crOffset; }
+    ULONG ChromaStride() const { return m_chromaStride; }
+    void  SetYuvPlanes(ULONG code, ULONG cb_offset, ULONG cr_offset, ULONG chroma_stride) {
+        m_yuvCode      = code;
+        m_cbOffset     = cb_offset;
+        m_crOffset     = cr_offset;
+        m_chromaStride = chroma_stride;
+    }
+    void MarkModified() { m_modified = TRUE; }
+    BOOL TakeModified() {
+        const BOOL modified = m_modified;
+        m_modified = FALSE;
+        return modified;
+    }
 
     ULONG ColorKeyLow()  const { return m_colorKeyLow; }
     ULONG ColorKeyHigh() const { return m_colorKeyHigh; }
@@ -296,6 +322,13 @@ protected:
     ULONG             m_colorKeyLow;
     ULONG             m_colorKeyHigh;
     int               m_ownsRemote;
+    ULONG             m_physicalAddress;
+    ULONG             m_surfaceBytes;
+    BOOL              m_modified;
+    ULONG             m_yuvCode;
+    ULONG             m_cbOffset;
+    ULONG             m_crOffset;
+    ULONG             m_chromaStride;
 };
 
 class DDGPE : public GPE {

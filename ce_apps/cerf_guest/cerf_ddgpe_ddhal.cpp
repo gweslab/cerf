@@ -66,13 +66,13 @@ extern "C" DWORD WINAPI DDGPECreateSurface(Ce6_DDHAL_CREATESURFACEDATA* pd) {
             const bool display_memory = bPrimaryChain || (dwCaps & CE6_DDSCAPS_VIDEOMEMORY) != 0u;
             if (bPrimaryChain) {
                 sc = gpe->AllocBackBuffer(&s);
-            } else if (dwCaps & CE6_DDSCAPS_VIDEOMEMORY) {
-                sc = gpe->AllocSurface(&s, aw, ah, fmt, GPE_REQUIRE_VIDEO_MEMORY);
             } else if (dwFlags & CE6_DDSD_LPSURFACE) {
                 int stride = desc->lPitch ? (int)desc->lPitch
                                           : CerfEGPEFormatStride(aw, fmt);
                 s = new DDGPESurf(aw, ah, desc->lpSurface, stride, fmt, pf);
                 if (!s || !s->Buffer()) { if (s) delete s; s = NULL; sc = E_OUTOFMEMORY; }
+            } else if (dwCaps & CE6_DDSCAPS_VIDEOMEMORY) {
+                sc = gpe->AllocSurface(&s, aw, ah, fmt, GPE_REQUIRE_VIDEO_MEMORY);
             } else if (dwCaps & CE6_DDSCAPS_SYSTEMMEMORY) {
                 sc = gpe->AllocSurface(&s, aw, ah, fmt, 0);
             } else {

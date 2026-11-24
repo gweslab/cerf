@@ -30,16 +30,16 @@ QObject* PropertySheets::CreateForDevice(const QString& name, bool running, cons
                                     QString::fromLatin1(running ? PropertySheet::kModeLocked
                                                                 : PropertySheet::kModeEdit),
                                     initial_page.isEmpty() ? QString::fromLatin1(sheet_page::kBoard) : initial_page,
-                                    std::nullopt, false);
+                                    false, false);
     QQmlEngine::setObjectOwnership(sheet, QQmlEngine::JavaScriptOwnership);
     return sheet;
 }
 
 void PropertySheets::EditLive(const QVariantMap& window, const QString& initial_page, bool force_reboot,
-                              std::optional<int> ce_major, cerffrontend::LiveSheetFinished finished) {
+                              bool live_resize, cerffrontend::LiveSheetFinished finished) {
     const QString device = QString::fromStdString(emu_.Get<cerfcore::DeviceConfig>().device_name);
     auto*         sheet  = new PropertySheet(emu_, PropertySubject::OfDirectory(LocalManifestStore::DevicePath(device)),
-                                             QString::fromLatin1(PropertySheet::kModeLive), initial_page, ce_major,
+                                             QString::fromLatin1(PropertySheet::kModeLive), initial_page, live_resize,
                                              force_reboot);
     QQmlEngine::setObjectOwnership(sheet, QQmlEngine::CppOwnership);
     QObject::connect(sheet, &PropertySheet::finished, sheet,

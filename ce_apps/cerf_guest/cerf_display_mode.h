@@ -3,6 +3,7 @@
 #include <windows.h>
 
 volatile ULONG* CerfDisplayModeChannel(void);
+void            CerfDisplayModeReportFixedSize(void);
 ULONG           CerfDisplayModeRotationCaps(void);
 ULONG           CerfDisplayModeAngle(void);
 LONG            CerfDisplayModeRotate(ULONG dmdo);

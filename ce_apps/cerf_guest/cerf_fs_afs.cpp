@@ -1,5 +1,6 @@
 #include "cerf_coredll_proc.h"
 #include "cerf_fs_driver.h"
+#include "cerf_os_version.h"
 #include "cerf_regs_map.h"
 
 #include <windows.h>
@@ -14,15 +15,24 @@
 #define HT_AFSVOLUME   16
 #define OID_FIRST_AFS  0
 
-#undef SetHandleOwner
 extern "C" {
-BOOL SetHandleOwner(HANDLE h, HANDLE hProc);
 int  RegisterAFSName(LPCWSTR pName);
 BOOL DeregisterAFS(int index);
 BOOL DeregisterAFSName(int index);
 }
 
 typedef BOOL (*PFN_RegisterAFS)(int, HANDLE, DWORD, DWORD, DWORD);
+typedef BOOL (*PFN_SetHandleOwner)(HANDLE, HANDLE);
+
+static PFN_SetHandleOwner CerfSetHandleOwner(void) {
+    static BOOL               resolved = FALSE;
+    static PFN_SetHandleOwner proc     = NULL;
+    if (!resolved) {
+        proc     = (PFN_SetHandleOwner)CerfCoredllProc(L"SetHandleOwner");
+        resolved = TRUE;
+    }
+    return proc;
+}
 
 static BOOL CerfRegisterAFS(int iAFS, HANDLE hApi, DWORD ctx) {
     PFN_RegisterAFS ex;
@@ -234,7 +244,7 @@ typedef BOOL   (*PFN_RegisterDirectMethods)(HANDLE, const PFNVOID*);
 
 static BOOL CerfCreateApiSets(void) {
     CerfAfsState* af = Afs();
-    OSVERSIONINFO ovi;
+    const ULONG os_major = CerfOsMajor();
     BOOL wide;
     BOOL ffcn;
     PFN_CreateAPISet pCreateAPISet = (PFN_CreateAPISet)CerfCoredllProc(L"CreateAPISet");
@@ -243,9 +253,7 @@ static BOOL CerfCreateApiSets(void) {
         return FALSE;
     }
 
-    ovi.dwOSVersionInfoSize = sizeof(ovi);
-    GetVersionEx(&ovi);
-    wide = (ovi.dwMajorVersion >= 6);
+    wide = (os_major >= 6);
 
     /* smartbook_g138_ce4_2 coredll.dll 0x3F7C460 AFS_FindFirstChangeNotificationW:
        traps AFS method 17 (0xF0010044), the highest AFS stub in that coredll. */
@@ -277,7 +285,7 @@ static BOOL CerfCreateApiSets(void) {
     CERF_LOG_X("cerf_guest: RegisterAPISet HT_FIND ok",
                RegisterAPISet(af->hFindApi, HT_FIND | REGISTER_APISET_TYPE));
 
-    if (ovi.dwMajorVersion >= 6) {
+    if (os_major >= 6) {
         PFN_RegisterDirectMethods pRDM =
             (PFN_RegisterDirectMethods)CerfCoredllProc(L"RegisterDirectMethods");
         if (pRDM) {
@@ -294,8 +302,9 @@ HANDLE CerfFsMakeHandle(HANDLE apiSet, void* ctx, HANDLE hProc) {
     HANDLE h = CreateAPIHandle(apiSet, ctx);
     if (!h) return INVALID_HANDLE_VALUE;
     if (hProc == NULL) {
+        PFN_SetHandleOwner set_owner = CerfSetHandleOwner();
         hProc = GetCurrentProcess();
-        if (hProc) SetHandleOwner(h, hProc);
+        if (hProc && set_owner) set_owner(h, hProc);
     }
     return h;
 }

@@ -2,6 +2,7 @@
 
 #include "cerf_coredll_proc.h"
 #include "cerf_gwes_ready.h"
+#include "cerf_os_version.h"
 #include "main.h"
 
 /* Windows CE 2.0 Toolkit SDK kfuncs.h:22 - SH_WMGR 17 */
@@ -20,7 +21,7 @@ static PFN_IsAPIReady CerfIsApiReadyProc(void) {
 }
 
 extern "C" DWORD CerfShWmgrApiSet(void) {
-    return (g_OsMajor >= 6u) ? CERF_SH_WMGR_CE6 : CERF_SH_WMGR_CE5;
+    return (CerfOsMajor() >= 6u) ? CERF_SH_WMGR_CE6 : CERF_SH_WMGR_CE5;
 }
 
 extern "C" BOOL CerfIsApiReadyAvailable(void) {

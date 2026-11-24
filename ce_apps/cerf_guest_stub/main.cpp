@@ -20,6 +20,10 @@ typedef DWORD (*PFN_CddWrite)(DWORD, LPCVOID, DWORD);
 typedef int   (*PFN_DriverEntry)(void*, void*);
 typedef DWORD (*PFN_CddSeek)(DWORD, LONG, WORD);
 typedef BOOL  (*PFN_CddIOControl)(DWORD, DWORD, PBYTE, DWORD, PBYTE, DWORD, PDWORD);
+typedef int   (*PFN_FlipDisplay)(DWORD);
+typedef int   (*PFN_ScreenUpdate)(DWORD, const DWORD*);
+typedef DWORD (*PFN_ClaimFreeBuffer)(DWORD);
+typedef int   (*PFN_SetSurfaceModified)(void*);
 
 #define CERF_STUB_MAX_PROC 8
 
@@ -65,6 +69,11 @@ typedef struct {
     PFN_CddWrite        cdd_write;
     PFN_CddSeek         cdd_seek;
     PFN_CddIOControl    cdd_ioctl;
+    PFN_FlipDisplay        init_flipping;
+    PFN_FlipDisplay        term_flipping;
+    PFN_ScreenUpdate       screen_update;
+    PFN_ClaimFreeBuffer    claim_free_buffer;
+    PFN_SetSurfaceModified set_surface_modified;
 } CerfStubSlot;
 static CerfStubSlot s_slot[CERF_STUB_MAX_PROC];
 static LONG         s_slot_next = 0;
@@ -301,6 +310,13 @@ static BOOL CerfEnsureBody(void) {
     slot->cdd_write     = (PFN_CddWrite)    CerfFindExport((const UCHAR*)base, "CDD_Write");
     slot->cdd_seek      = (PFN_CddSeek)     CerfFindExport((const UCHAR*)base, "CDD_Seek");
     slot->cdd_ioctl     = (PFN_CddIOControl)CerfFindExport((const UCHAR*)base, "CDD_IOControl");
+    slot->init_flipping = (PFN_FlipDisplay)CerfFindExport((const UCHAR*)base, "InitializeFlipping");
+    slot->term_flipping = (PFN_FlipDisplay)CerfFindExport((const UCHAR*)base, "TerminateFlipping");
+    slot->screen_update = (PFN_ScreenUpdate)CerfFindExport((const UCHAR*)base, "ScreenUpdateByFlipEx");
+    slot->claim_free_buffer =
+        (PFN_ClaimFreeBuffer)CerfFindExport((const UCHAR*)base, "ClaimFreeBuffer");
+    slot->set_surface_modified =
+        (PFN_SetSurfaceModified)CerfFindExport((const UCHAR*)base, "SetSurfaceModified");
 
     set_name = (PFN_SetCarrierName)CerfFindExport((const UCHAR*)base, "CerfSetCarrierName");
     if (set_name) {
@@ -319,59 +335,74 @@ static BOOL CerfEnsureBody(void) {
     return TRUE;
 }
 
+static CerfStubSlot* CerfStubLoadedBody(void) {
+    if (!CerfEnsureBody()) CERF_FATAL("stub: body is not mapped in this process - halting");
+    return CerfStubCurSlot();
+}
+
 extern "C" BOOL APIENTRY DrvEnableDriver(ULONG iEngineVersion, ULONG cj,
                                           void* pded, void* pCallbacks) {
-    CerfStubSlot* cs;
     CERF_LOG_INIT(CERF_LOG_CH_STUB);
     CERF_LOG_X("stub: DrvEnableDriver iEngineVersion", iEngineVersion);
-    if (!CerfEnsureBody() || !(cs = CerfStubCurSlot()) || !cs->drv) {
+    if (!CerfEnsureBody()) {
         CERF_LOG("stub: body bring-up FAILED - display unavailable");
         return FALSE;
     }
-    return cs->drv(iEngineVersion, cj, pded, pCallbacks);
+    return CerfStubCurSlot()->drv(iEngineVersion, cj, pded, pCallbacks);
 }
 
 /* GetProcAddress resolves against the stub, not the manual-mapped body, so a
    by-name entry point unmirrored here returns NULL and the body's is unreachable
    (as DrvEnableDriver already is). HALInit = the DirectDraw HAL entry. */
 extern "C" BOOL APIENTRY HALInit(void* lpddhi, BOOL bUnused, DWORD modeidx) {
-    CerfStubSlot* cs;
     CERF_LOG_INIT(CERF_LOG_CH_STUB);
     CERF_LOG("stub: HALInit");
-    if (!CerfEnsureBody() || !(cs = CerfStubCurSlot()) || !cs->halinit) {
+    if (!CerfEnsureBody()) {
         CERF_LOG("stub: HALInit body unavailable - DirectDraw HAL FALSE");
         return FALSE;
     }
-    return cs->halinit(lpddhi, bUnused, modeidx);
+    return CerfStubCurSlot()->halinit(lpddhi, bUnused, modeidx);
 }
 
 extern "C" int DriverEntry(void* driver_object, void* registry_path) {
-    CerfStubSlot* cs;
     CERF_LOG_INIT(CERF_LOG_CH_STUB);
     CERF_LOG("stub: DriverEntry (NDIS miniport)");
-    if (!CerfEnsureBody() || !(cs = CerfStubCurSlot()) || !cs->driver_entry)
-        return (int)0xC0000001;
-    return cs->driver_entry(driver_object, registry_path);
+    if (!CerfEnsureBody()) return (int)0xC0000001;
+    return CerfStubCurSlot()->driver_entry(driver_object, registry_path);
 }
 
 extern "C" DWORD CDD_Init(DWORD dwContext) {
-    CerfStubSlot* cs;
     CERF_LOG_INIT(CERF_LOG_CH_STUB);
     CERF_LOG("stub: CDD_Init (device.exe carrier)");
-    if (!CerfEnsureBody() || !(cs = CerfStubCurSlot()) || !cs->cdd_init) return 0;
-    return cs->cdd_init(dwContext);
+    if (!CerfEnsureBody()) return 0;
+    return CerfStubCurSlot()->cdd_init(dwContext);
 }
-extern "C" BOOL  CDD_Deinit(DWORD d)               { CerfStubSlot* cs; return (CerfEnsureBody() && (cs = CerfStubCurSlot()) && cs->cdd_deinit) ? cs->cdd_deinit(d) : FALSE; }
-extern "C" DWORD CDD_Open(DWORD d, DWORD a, DWORD s){ CerfStubSlot* cs; return (CerfEnsureBody() && (cs = CerfStubCurSlot()) && cs->cdd_open) ? cs->cdd_open(d, a, s) : 0; }
-extern "C" BOOL  CDD_Close(DWORD h)                { CerfStubSlot* cs; return (CerfEnsureBody() && (cs = CerfStubCurSlot()) && cs->cdd_close) ? cs->cdd_close(h) : FALSE; }
-extern "C" DWORD CDD_Read(DWORD h, LPVOID b, DWORD n)  { CerfStubSlot* cs; return (CerfEnsureBody() && (cs = CerfStubCurSlot()) && cs->cdd_read) ? cs->cdd_read(h, b, n) : 0; }
-extern "C" DWORD CDD_Write(DWORD h, LPCVOID b, DWORD n){ CerfStubSlot* cs; return (CerfEnsureBody() && (cs = CerfStubCurSlot()) && cs->cdd_write) ? cs->cdd_write(h, b, n) : 0; }
-extern "C" DWORD CDD_Seek(DWORD h, LONG a, WORD t) { CerfStubSlot* cs; return (CerfEnsureBody() && (cs = CerfStubCurSlot()) && cs->cdd_seek) ? cs->cdd_seek(h, a, t) : (DWORD)-1; }
+extern "C" BOOL  CDD_Deinit(DWORD d)                   { return CerfStubLoadedBody()->cdd_deinit(d); }
+extern "C" DWORD CDD_Open(DWORD d, DWORD a, DWORD s)   { return CerfStubLoadedBody()->cdd_open(d, a, s); }
+extern "C" BOOL  CDD_Close(DWORD h)                    { return CerfStubLoadedBody()->cdd_close(h); }
+extern "C" DWORD CDD_Read(DWORD h, LPVOID b, DWORD n)  { return CerfStubLoadedBody()->cdd_read(h, b, n); }
+extern "C" DWORD CDD_Write(DWORD h, LPCVOID b, DWORD n){ return CerfStubLoadedBody()->cdd_write(h, b, n); }
+extern "C" DWORD CDD_Seek(DWORD h, LONG a, WORD t)     { return CerfStubLoadedBody()->cdd_seek(h, a, t); }
 extern "C" BOOL  CDD_IOControl(DWORD h, DWORD code, PBYTE pi, DWORD il,
                                PBYTE po, DWORD ol, PDWORD pa) {
-    CerfStubSlot* cs;
-    return (CerfEnsureBody() && (cs = CerfStubCurSlot()) && cs->cdd_ioctl) ? cs->cdd_ioctl(h, code, pi, il, po, ol, pa) : FALSE;
+    return CerfStubLoadedBody()->cdd_ioctl(h, code, pi, il, po, ol, pa);
 }
+extern "C" int InitializeFlipping(DWORD display) {
+    return CerfStubLoadedBody()->init_flipping(display);
+}
+extern "C" int TerminateFlipping(DWORD display) {
+    return CerfStubLoadedBody()->term_flipping(display);
+}
+extern "C" int ScreenUpdateByFlipEx(DWORD display, const DWORD* record) {
+    return CerfStubLoadedBody()->screen_update(display, record);
+}
+extern "C" DWORD ClaimFreeBuffer(DWORD display) {
+    return CerfStubLoadedBody()->claim_free_buffer(display);
+}
+extern "C" int SetSurfaceModified(void* surface) {
+    return CerfStubLoadedBody()->set_surface_modified(surface);
+}
+
 extern "C" BOOL APIENTRY DllEntryPoint(HANDLE hInst, DWORD reason, LPVOID reserved) {
     (void)reserved;
     if (reason == DLL_PROCESS_ATTACH) CerfStubSetInst((HMODULE)hInst);

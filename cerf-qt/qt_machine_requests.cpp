@@ -106,14 +106,18 @@ private:
     }
 
     uint64_t AskSize(const cerfcore::MachineRequest& request) {
+        const bool    tcp_port = request.id == "serial_tcp_port";
         const QString caption =
-            QStringLiteral("Card data size in MiB (minimum %1):").arg(static_cast<qulonglong>(request.minimum));
+            tcp_port ? QStringLiteral("Listen for a client on TCP port:")
+                     : QStringLiteral("Card data size in MiB (minimum %1):").arg(static_cast<qulonglong>(request.minimum));
+        const QString title =
+            tcp_port ? QStringLiteral("TCP Serial Port") : QStringLiteral("Generate CompactFlash image");
         const QVariantMap field{{QStringLiteral("label"), caption},
                                 {QStringLiteral("value"), static_cast<qulonglong>(request.recommended)},
                                 {QStringLiteral("unit"), QString()}};
         const QVariantList values =
             RunRequestDialog(request.serial, QStringLiteral("NumberPromptDialog"),
-                             QVariantMap{{QStringLiteral("title"), QStringLiteral("Generate CompactFlash image")},
+                             QVariantMap{{QStringLiteral("title"), title},
                                          {QStringLiteral("minimum"), static_cast<qulonglong>(request.minimum)},
                                          {QStringLiteral("maximum"), static_cast<qulonglong>(request.maximum)},
                                          {QStringLiteral("fields"), QVariantList{field}}})

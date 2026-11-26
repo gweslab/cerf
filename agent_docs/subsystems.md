@@ -325,6 +325,18 @@ on-SoC UART and a serial PC card. The stack splits into line and personality:
   changes guest state only inside `EmulationFreeze::WorkerSection`.
 - **`SerialEndpointPort`** (`libCerfCore/src/peripherals/serial/serial_endpoint_port.{h,cpp}`) -
   the one owner of the endpoint side of a serial line.
+- **`HostTcpSerial`** (`host_tcp_serial.{h,cpp}`) - the endpoint that
+  carries the raw byte stream of the line over TCP, for desktop sync tools
+  such as ClassicSync. It accepts one client at a time. It drives CTS, DSR
+  and DCD high while a client is connected. It reads the socket only while
+  `RxEmpty()` is true, and the RX drain callback wakes it early, so TCP flow
+  control holds the client back and the guest RX buffer does not overrun.
+  `SerialTcpCommands` asks for the port through a `kSize` `MachineRequest`
+  with the id `serial_tcp_port`, for both the cradle and the serial PC card.
+  `SerialTcpStartup` gives the `--serial-tcp=[SOCKET:][ADDRESS:]PORT` binding
+  to the cradle with that id, which plugs it at start and in the state restore
+  at boot. `HostIoEndpoint` holds what `HostSerialForward` and `HostTcpSerial`
+  share.
 - `libCerfCore/src/peripherals/serial_pccard/` holds ONLY the PC-card consumer. The
   framework named here is board-neutral and lives in
   `libCerfCore/src/peripherals/serial/`.

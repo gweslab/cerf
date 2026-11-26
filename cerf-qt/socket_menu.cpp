@@ -20,12 +20,14 @@ constexpr char kGettingOnlineUrl[] = "https://cerf.cx/getting-online";
 
 bool IsForward(const std::string& type_id) { return type_id == "serial_fwd" || type_id == "forward"; }
 bool IsModem(const std::string& type_id) { return type_id == "serial" || type_id == "modem"; }
+bool IsTcp(const std::string& type_id) { return type_id == "serial_tcp" || type_id == "tcp"; }
 
 }
 
 std::string SocketMenu::CommandLabel(const cerfcore::MachineSocket& socket, const cerfcore::InsertCommand& command,
                                      const cerfcore::InsertArgument* argument) const {
     if (command.id == "insert") return argument ? argument->name : "Insert";
+    if (command.id == "listen") return "Listen on TCP port...";
     if (command.id == "insert_bundled") {
         if (socket.ObjectKind() == cerfcore::MachineObjectKind::kMediaSocket) return argument->name;
         return "Insert - " + argument->name;
@@ -137,8 +139,10 @@ std::string SocketMenu::Detail(const cerfcore::InsertedItem& item) const {
                       net->mac[2], net->mac[3], net->mac[4], net->mac[5]);
         return text;
     }
-    if (const auto* serial = std::get_if<cerfcore::SerialLinkFacts>(&item.facts))
+    if (const auto* serial = std::get_if<cerfcore::SerialLinkFacts>(&item.facts)) {
+        if (IsTcp(item.type_id)) return item.name + " - listening on " + serial->host_port;
         return item.name + " -> host " + serial->host_port;
+    }
     return item.name;
 }
 

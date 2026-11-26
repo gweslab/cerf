@@ -36,6 +36,22 @@ private:
 
     void Alert(const cerfcore::MachineEvent& event) {
         auto& alert = emu_.Get<cerfcore::UserAlert>();
+        if (event.reason == "tcp_listen_failed") {
+            alert.Post(cerfcore::AlertLevel::kWarning, "TCP serial port - " CERF_PRODUCT_NAME,
+                       "The TCP serial port could not listen on " + event.subject + " (error " +
+                           std::to_string(event.code) +
+                           ").\n\nThe port has been ejected. Check that no other application uses that TCP port, "
+                           "then insert it again with another port.",
+                       [] {});
+            return;
+        }
+        if (event.reason == "tcp_failed") {
+            alert.Post(cerfcore::AlertLevel::kWarning, "TCP serial port - " CERF_PRODUCT_NAME,
+                       "The TCP serial port on " + event.subject + " stopped working (error " +
+                           std::to_string(event.code) + ").\n\nThe port has been ejected. Insert it again.",
+                       [] {});
+            return;
+        }
         if (SerialReason(event.reason)) {
             alert.Post(cerfcore::AlertLevel::kWarning, "Serial port forwarder - " CERF_PRODUCT_NAME,
                        "The serial port forwarder lost host " + event.subject + ".\n\n" + SerialDetail(event) +

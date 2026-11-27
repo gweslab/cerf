@@ -39,7 +39,9 @@ shares the same core, so the core is a family field.
 
 A row states what is true of the board, and what CERF supports on it.
 
-A row field is the last level of data definition.
+A row field is the last level of data definition. A change adds a field to a
+table only when no existing field, part, part parameter or board configuration
+parameter can state the fact.
 
 A set that grows when a board or a SoC arrives is a string id. A closed set
 that a new board never extends is a C++ enum.
@@ -71,9 +73,11 @@ and the `notes` of a board add to the notes of the family. A part names its
 boards and families itself.
 
 The code of a family serves every member. It reads a fact that differs
-between members, for example the SoC or the RAM size, from the row of the
-member. A member with no ROM image is still a member, so the code never limits
-itself to the members that have a ROM image.
+between members, for example the SoC or the RAM size. The fact comes from a
+field that the table already has, from a part, or from a board configuration
+parameter. The row of the member sets the Auto value of that parameter. A
+member with no ROM image is still a member, so the code never limits itself to
+the members that have a ROM image.
 
 A member can differ in a part that CERF does not model yet. The member then
 runs the family code for that part, and its support level records the
@@ -253,7 +257,9 @@ A parameter is one of two kinds:
   `{ "id": "none", "name": "None" }`. The picked part is a part of the board, and
   its `supported` says whether CERF supports it.
 - A configuration sets something on the board that is not a part, for
-  example the MIPS16EN pin. It never shows as a part.
+  example the MIPS16EN pin. It never shows as a part. A configuration also
+  carries a level that the board wires, for example a strap or a hardware
+  revision.
 
 A part picker offers a part that a user can change on the real device while it is
 off. The user solders it, plugs it in or connects it. The `values` list of the row

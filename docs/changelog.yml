@@ -1,4 +1,9 @@
 - version: v10.1
+  date: TBA
+  changes: |
+    No user affecting changes yet
+
+- version: v10.1
   date: 27 Nov 2026
   devices:
     new: |

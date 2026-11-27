@@ -1,5 +1,5 @@
 - version: v10.1
-  date: TBA
+  date: 27 Nov 2026
   devices:
     new: |
       Nokia Lumia 800 family bare-bones (bootable to shell, nothing else yet) support

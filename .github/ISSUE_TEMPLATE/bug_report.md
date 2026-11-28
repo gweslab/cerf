@@ -10,7 +10,7 @@ type: Bug
 
 ### **Describe the bug**
 
-Thank for reporting a bug. Please, fill all the information on this ticket matching the example patterns. Replace this text with concise bug description. Don't touch the sample text (or just remove it) if the section doesn't matter in your opinion. Start with the ticket title - keep it concise and distinct. Write a device name in it if its applicable to a specific device.
+Thank for reporting a bug. Please, fill all the information on this ticket matching the example patterns. Replace this text with concise bug description if a title doesn't work alone. Don't touch the sample text (or just remove it) if the section doesn't matter in your opinion. Start with the ticket title - keep it concise and distinct. Write a device name in it if its applicable to a specific device.
 
 ### Complete this section if its applicable to a device or remove this section
 - ROM obtained from known public reposiry?
